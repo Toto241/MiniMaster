@@ -21,25 +21,31 @@ class PairingViewModel(
     private val _showInvalidCodeError = MutableLiveData<Boolean>() // For missing/invalid expiresAt
     val showInvalidCodeError: LiveData<Boolean> = _showInvalidCodeError
 
+    private val _showChildIdSaveError = MutableLiveData<Boolean>() // For errors during childId saving
+    val showChildIdSaveError: LiveData<Boolean> = _showChildIdSaveError
+
     // Simulate a successful pairing event
     fun onPairingSuccess(childId: String, pairingCode: String) { // Added pairingCode parameter
         viewModelScope.launch {
+            _showChildIdSaveError.value = false // Reset error state
             try {
                 // Save childId locally
                 childIdRepository.saveChildId(childId)
 
                 // After successfully saving childId, delete the pairing code from Firestore
-                firestore.collection("pairingCodes").document(pairingCode).delete().await()
-                Log.d("PairingViewModel", "Pairing code $pairingCode deleted successfully.")
+                try {
+                    firestore.collection("pairingCodes").document(pairingCode).delete().await()
+                    Log.d("PairingViewModel", "Pairing code $pairingCode deleted successfully.")
+                } catch (e: Exception) {
+                    // Log error if deleting pairing code fails, but pairing is still "successful" locally
+                    Log.e("PairingViewModel", "Error deleting pairing code $pairingCode: ${e.message}", e)
+                    // Optionally, set a specific LiveData for this kind of error if UI needs to react
+                }
 
             } catch (e: Exception) {
                 // Log error if saving childId fails
-                Log.e("PairingViewModel", "Error saving childId or deleting pairing code $pairingCode: ${e.message}", e)
-                // If deleting the pairing code fails, we log the error.
-                // The pairing is still considered successful at this point because childId was saved.
-                // We can also check specifically for firestore.collection...delete() failure if needed
-                // by separating the try-catch blocks or checking the exception type.
-                // For now, any exception in the block will be caught here.
+                Log.e("PairingViewModel", "Error saving childId: ${e.message}", e)
+                _showChildIdSaveError.value = true // Set error state for UI
             }
         }
     }
@@ -48,6 +54,7 @@ class PairingViewModel(
         viewModelScope.launch {
             _showExpiredCodeError.value = false // Reset error states
             _showInvalidCodeError.value = false // Reset error states
+            _showChildIdSaveError.value = false // Reset error states
             try {
                 val documentSnapshot = firestore.collection("pairingCodes").document(code).get().await()
                 if (documentSnapshot.exists()) {

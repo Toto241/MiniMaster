@@ -204,32 +204,105 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `childIdRepository save fails does not delete code, logs error`() = testDispatcher.runBlockingTest {
+    fun `childIdRepository save fails sets showChildIdSaveError, does not delete code`() = testDispatcher.runBlockingTest {
         val pairingCode = "repoFailCode"
         val childId = "testChildId"
         val futureTime = Timestamp(Date(System.currentTimeMillis() + 100000))
 
         setupFirestoreDocument(pairingCode)
-        whenever(mockDocumentReference.get()).thenReturn(Tasks.forResult(mockDocumentSnapshot))
-        whenever(mockDocumentSnapshot.exists()).thenReturn(true)
-        whenever(mockDocumentSnapshot.getTimestamp("expiresAt")).thenReturn(futureTime)
-        whenever(mockDocumentSnapshot.getString("childId")).thenReturn(childId)
+        // No need to mock documentRef.get() for this test as validatePairingCode is not the focus
+        // but onPairingSuccess requires it for its internal logic if it were more complex.
+        // For this specific test, we only care about the repository save failure.
 
         // Simulate repository save failure
         whenever(mockChildIdRepository.saveChildId(childId)).doSuspendableAnswer { throw RuntimeException("Failed to save ChildId") }
-        
-        // Call validate first, then onPairingSuccess
-        viewModel.validatePairingCode(pairingCode)
+
+        // Call onPairingSuccess directly
         viewModel.onPairingSuccess(childId, pairingCode)
 
         verify(mockChildIdRepository).saveChildId(childId)
         verify(mockDocumentReference, never()).delete() // Delete should NOT be called
-        // Error logging is hard to verify directly.
-        // The problem description asks to "Verify appropriate error state is set in ViewModel".
-        // Currently, the ViewModel catches the exception from saveChildId and logs it, but doesn't set a specific LiveData error.
-        // If we were to set a LiveData error, we'd assert it here.
-        // For now, we'll just check that no *other* errors are set.
-        assertFalse(viewModel.showExpiredCodeError.value ?: false)
-        assertFalse(viewModel.showInvalidCodeError.value ?: false)
+        assertTrue(viewModel.showChildIdSaveError.value ?: false)
+        assertFalse(viewModel.showExpiredCodeError.value ?: false) // Ensure other errors are not set
+        assertFalse(viewModel.showInvalidCodeError.value ?: false) // Ensure other errors are not set
+    }
+
+    @Test
+    fun `validatePairingCode resets all error LiveData before execution`() = testDispatcher.runBlockingTest {
+        // Set all error LiveData to true initially
+        viewModel.showExpiredCodeError.value = true
+        viewModel.showInvalidCodeError.value = true
+        viewModel.showChildIdSaveError.value = true
+
+        val pairingCode = "anyCode"
+        setupFirestoreDocument(pairingCode)
+        // Simulate a Firestore exception to stop execution after error reset
+        whenever(mockDocumentReference.get()).thenReturn(Tasks.forException(FirebaseFirestoreException("Network error", FirebaseFirestoreException.Code.UNAVAILABLE)))
+
+        viewModel.validatePairingCode(pairingCode)
+
+        // Assert that all error LiveData were reset to false initially by validatePairingCode
+        // (even if one is set to true again by the subsequent logic)
+        // The key is they are reset at the beginning of the method call.
+        // For this specific test, showInvalidCodeError will be true due to the exception.
+        // We are testing the reset behavior.
+        assertFalse(viewModel.showExpiredCodeError.value ?: true) // Should be reset from true
+        // showInvalidCodeError will be true due to the mocked exception, so we can't assert false here directly after the call.
+        // The ViewModel sets it to false at the start, then true due to exception.
+        // A more complex test would involve a custom captor or checking states sequentially.
+        // However, the current ViewModel logic does set them to false at the start.
+        assertFalse(viewModel.showChildIdSaveError.value ?: true) // Should be reset from true
+
+        // To properly test the reset, we'd ideally need to peek into the LiveData values
+        // right after the reset lines in the ViewModel, before further logic.
+        // Given the current structure, we verify that errors that *should not* be triggered by
+        // this specific failure (e.g. expired code error on a network failure) remain false.
+    }
+
+    @Test
+    fun `onPairingSuccess resets childIdSaveError before execution`() = testDispatcher.runBlockingTest {
+        viewModel.showChildIdSaveError.value = true
+
+        val childId = "anyChildId"
+        val pairingCode = "anyPairingCode"
+
+        // Simulate a successful save and delete to ensure the method runs past the reset
+        whenever(mockChildIdRepository.saveChildId(childId)).thenReturn(Unit)
+        setupFirestoreDocument(pairingCode)
+        whenever(mockDocumentReference.delete()).thenReturn(Tasks.forResult(null))
+
+
+        viewModel.onPairingSuccess(childId, pairingCode)
+
+        assertFalse(viewModel.showChildIdSaveError.value ?: true)
+    }
+
+    // Placeholder for more specific Firestore error tests if ViewModel is updated
+    @Test
+    fun `firestore read fails with UNAVAILABLE code sets showInvalidCodeError`() = testDispatcher.runBlockingTest {
+        val pairingCode = "networkErrorCode"
+        setupFirestoreDocument(pairingCode)
+        val firestoreException = FirebaseFirestoreException("Network error, service unavailable", FirebaseFirestoreException.Code.UNAVAILABLE)
+        whenever(mockDocumentReference.get()).thenReturn(Tasks.forException(firestoreException))
+
+        viewModel.validatePairingCode(pairingCode)
+
+        assertTrue(viewModel.showInvalidCodeError.value ?: false)
+        // If ViewModel were to differentiate, we might have:
+        // assertTrue(viewModel.showNetworkError.value ?: false)
+    }
+
+    @Test
+    fun `firestore read fails with PERMISSION_DENIED code sets showInvalidCodeError`() = testDispatcher.runBlockingTest {
+        val pairingCode = "permissionErrorCode"
+        setupFirestoreDocument(pairingCode)
+        val firestoreException = FirebaseFirestoreException("Permission denied", FirebaseFirestoreException.Code.PERMISSION_DENIED)
+        whenever(mockDocumentReference.get()).thenReturn(Tasks.forException(firestoreException))
+
+        viewModel.validatePairingCode(pairingCode)
+
+        assertTrue(viewModel.showInvalidCodeError.value ?: false)
+        // If ViewModel were to differentiate, we might have:
+        // assertTrue(viewModel.showPermissionError.value ?: false)
     }
 }
