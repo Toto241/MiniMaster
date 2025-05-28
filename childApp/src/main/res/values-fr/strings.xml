@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">App Enfant</string>
+    <string name="lock_screen_message">L\'application est verrouillée. ID enfant : %1$s</string>
+    <string name="pairing_screen_title">Écran de couplage</string>
+    <string name="pairing_code_input_label">Entrez le code de couplage</string>
+    <string name="pairing_button_text">Coupler l\'appareil</string>
+    <string name="error_code_expired">Le code de couplage a expiré.</string>
+    <string name="error_invalid_code">Code de couplage invalide.</string>
+</resources>

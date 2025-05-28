@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">儿童应用</string>
+    <string name="lock_screen_message">应用程序已锁定。孩子ID：%1$s</string>
+    <string name="pairing_screen_title">配对屏幕</string>
+    <string name="pairing_code_input_label">输入配对码</string>
+    <string name="pairing_button_text">配对设备</string>
+    <string name="error_code_expired">配对码已过期。</string>
+    <string name="error_invalid_code">无效的配对码。</string>
+</resources>
