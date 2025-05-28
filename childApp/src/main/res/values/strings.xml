@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Child App</string>
+    <string name="lock_screen_message">App is locked. Child ID: %1$s</string>
+    <string name="pairing_screen_title">Pairing Screen</string>
+    <string name="pairing_code_input_label">Enter Pairing Code</string>
+    <string name="pairing_button_text">Pair Device</string>
+    <string name="error_code_expired">Pairing code has expired.</string>
+    <string name="error_invalid_code">Invalid pairing code.</string>
+</resources>
