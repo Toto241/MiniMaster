@@ -24,9 +24,13 @@ class PairingViewModel(
     private val _showChildIdSaveError = MutableLiveData<Boolean>() // For errors during childId saving
     val showChildIdSaveError: LiveData<Boolean> = _showChildIdSaveError
 
+    private val _isLoading = MutableLiveData<Boolean>(false) // Initialize with false
+    val isLoading: LiveData<Boolean> = _isLoading
+
     // Simulate a successful pairing event
     fun onPairingSuccess(childId: String, pairingCode: String) { // Added pairingCode parameter
         viewModelScope.launch {
+            _isLoading.value = true // Start loading for saving and deleting
             _showChildIdSaveError.value = false // Reset error state
             try {
                 // Save childId locally
@@ -40,18 +44,22 @@ class PairingViewModel(
                     // Log error if deleting pairing code fails, but pairing is still "successful" locally
                     Log.e("PairingViewModel", "Error deleting pairing code $pairingCode: ${e.message}", e)
                     // Optionally, set a specific LiveData for this kind of error if UI needs to react
+                    // No user-facing error here as childId saving was successful.
                 }
 
             } catch (e: Exception) {
                 // Log error if saving childId fails
                 Log.e("PairingViewModel", "Error saving childId: ${e.message}", e)
                 _showChildIdSaveError.value = true // Set error state for UI
+            } finally {
+                _isLoading.value = false // Stop loading
             }
         }
     }
 
     fun validatePairingCode(code: String) {
         viewModelScope.launch {
+            _isLoading.value = true // Start loading
             _showExpiredCodeError.value = false // Reset error states
             _showInvalidCodeError.value = false // Reset error states
             _showChildIdSaveError.value = false // Reset error states
@@ -59,14 +67,17 @@ class PairingViewModel(
                 val documentSnapshot = firestore.collection("pairingCodes").document(code).get().await()
                 if (documentSnapshot.exists()) {
                     val expiresAt = documentSnapshot.getTimestamp("expiresAt")
-                    if (expiresAt != null) {
+                    val childId = documentSnapshot.getString("childId") // Get childId from document
+
+                    if (expiresAt != null && childId != null) {
                         if (Timestamp.now().seconds > expiresAt.seconds) {
                             _showExpiredCodeError.value = true
                         } else {
-                            // Code is valid and not expired, proceed with pairing flow (not shown here)
+                            // Code is valid and not expired, proceed with pairing by calling onPairingSuccess
+                            onPairingSuccess(childId, code) // Pass childId and code
                         }
                     } else {
-                        // expiresAt field is missing or not a Timestamp
+                        // expiresAt field is missing, not a Timestamp, or childId is missing
                         _showInvalidCodeError.value = true
                     }
                 } else {
@@ -75,7 +86,14 @@ class PairingViewModel(
                 }
             } catch (e: Exception) {
                 // Handle other exceptions, e.g., network issues
+                Log.e("PairingViewModel", "Error validating pairing code: ${e.message}", e)
                 _showInvalidCodeError.value = true
+            } finally {
+                // isLoading is handled by onPairingSuccess if validation is successful,
+                // or here if validation fails directly.
+                if (_showExpiredCodeError.value == true || _showInvalidCodeError.value == true) {
+                    _isLoading.value = false // Stop loading if validation failed directly
+                }
             }
         }
     }
