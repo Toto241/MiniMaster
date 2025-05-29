@@ -1,0 +1,37 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Regeln für die pairingCodes Collection
+    // Ziel: Jeglichen direkten Client-Zugriff (Lesen und Schreiben) unterbinden.
+    // Cloud Functions, die das Admin SDK verwenden, umgehen diese Regeln und haben weiterhin Zugriff.
+    match /pairingCodes/{codeId} {
+      // Kein Client darf Dokumente lesen (get, list).
+      allow get: if false;
+      allow list: if false;
+
+      // Kein Client darf Dokumente schreiben (create, update, delete).
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Beispiel für Regeln anderer Collections (falls vorhanden und benötigt):
+    // Diese sollten an die spezifischen Anforderungen der jeweiligen Collection angepasst werden.
+    // Wenn keine anderen Regeln explizit definiert sind, gilt standardmäßig "allow read, write: if false;".
+
+    // match /users/{userId} {
+    //   // Beispiel: Benutzer können ihr eigenes Dokument lesen und schreiben.
+    //   allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+    //   allow create: if request.auth != null; // Jeder authentifizierte Benutzer kann ein Benutzerdokument erstellen (ggf. einschränken).
+    // }
+
+    // match /someOtherPublicCollection/{docId} {
+    //   // Beispiel: Öffentlich lesbar, aber nur von authentifizierten Benutzern beschreibbar.
+    //   allow get: if true;
+    //   allow list: if true; // Vorsicht bei großen Collections
+    //   allow write: if request.auth != null;
+    // }
+  }
+}
