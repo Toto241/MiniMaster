@@ -6,4 +6,5 @@
     <string name="pairing_button_text">Gerät koppeln</string>
     <string name="error_code_expired">Kopplungscode ist abgelaufen.</string>
     <string name="error_invalid_code">Ungültiger Kopplungscode.</string>
+    <string name="error_saving_child_id">Fehler beim Speichern der Geräte-ID.</string>
 </resources>

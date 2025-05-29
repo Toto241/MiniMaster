@@ -6,4 +6,5 @@
     <string name="pairing_button_text">Pair Device</string>
     <string name="error_code_expired">Pairing code has expired.</string>
     <string name="error_invalid_code">Invalid pairing code.</string>
+    <string name="error_saving_child_id">Error saving device ID.</string>
 </resources>

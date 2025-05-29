@@ -6,4 +6,5 @@
     <string name="pairing_button_text">配对设备</string>
     <string name="error_code_expired">配对码已过期。</string>
     <string name="error_invalid_code">无效的配对码。</string>
+    <string name="error_saving_child_id">保存设备ID时出错。</string>
 </resources>
