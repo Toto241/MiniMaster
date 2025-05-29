@@ -13,13 +13,16 @@ import android.util.Log // Import Log
 // Remove com.google.firebase.Timestamp and com.google.firebase.firestore.FirebaseFirestore if no longer needed
 // import com.google.firebase.Timestamp // No longer needed for direct Firestore date comparison
 // import com.google.firebase.firestore.FirebaseFirestore // No longer needed for direct Firestore access
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class PairingViewModel(
-    private val childIdRepository: ChildIdRepository
-    // private val firestore: FirebaseFirestore // Firestore direct access removed
+@HiltViewModel
+class PairingViewModel @Inject constructor(
+    private val childIdRepository: ChildIdRepository,
+    private val functions: FirebaseFunctions // Injected by Hilt
 ) : ViewModel() {
 
-    private val functions = Firebase.functions("europe-west1") // Or your specific region
+    // private val functions = Firebase.functions("europe-west1") // This line is removed, functions is now injected
 
     private val _showExpiredCodeError = MutableLiveData<Boolean>()
     val showExpiredCodeError: LiveData<Boolean> = _showExpiredCodeError
