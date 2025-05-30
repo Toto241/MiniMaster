@@ -4,8 +4,12 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.lifecycle.viewmodel.compose.viewModel // Import for viewModel()
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dagger.hilt.android.testing.BindValue
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -14,21 +18,36 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import java.util.Locale
 
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class PairingScreenUITest {
 
-    @get:Rule
+    @get:Rule(order = 0)
+    var hiltRule = HiltAndroidRule(this)
+
+    @get:Rule(order = 1)
     val composeTestRule = createComposeRule()
 
     private lateinit var context: Context
-    private lateinit var fakeViewModel: FakePairingViewModel
+
+    // Bind the FakePairingViewModel to be used by Hilt instead of the real one.
+    // Ensure FakePairingViewModel extends PairingViewModel.
+    @BindValue @JvmField
+    val fakeViewModel: PairingViewModel = FakePairingViewModel()
+    // We cast to FakePairingViewModel when we need to call its specific methods for test setup.
+    private val testSpecificViewModel: FakePairingViewModel
+        get() = fakeViewModel as FakePairingViewModel
+
 
     @Before
     fun setUp() {
+        hiltRule.inject()
         context = ApplicationProvider.getApplicationContext()
-        // Initialize with default English for most tests
         setLocale(Locale.ENGLISH)
-        fakeViewModel = FakePairingViewModel()
+        // fakeViewModel is already initialized by Hilt via @BindValue
+        // We need to clear its state before each test if it's not reset by Hilt.
+        testSpecificViewModel.clearAllErrors()
+        testSpecificViewModel._isLoadingLiveData.postValue(false)
     }
 
     private fun setLocale(locale: Locale) {
@@ -46,7 +65,8 @@ class PairingScreenUITest {
     @Test
     fun pairingScreenElementsAreDisplayed() {
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            // PairingScreen will use the Hilt-injected ViewModel (which is our fakeViewModel)
+            PairingScreen()
         }
 
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_screen_title)).assertIsDisplayed()
@@ -57,39 +77,38 @@ class PairingScreenUITest {
     @Test
     fun textInputInCodeFieldWorks() {
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         val testInput = "123456"
-        // Use the label to find the OutlinedTextField, then its text input child
+        // Use the label to find the OutlinedTextField
         composeTestRule.onNodeWithLabel(context.getString(R.string.pairing_code_input_label)).performTextInput(testInput)
-        composeTestRule.onNodeWithText(testInput).assertIsDisplayed() // Checks if the input text is now part of the composable tree
+        composeTestRule.onNodeWithText(testInput).assertIsDisplayed()
     }
 
     @Test
     fun pairingButtonDisabledWhenLoading() {
-        fakeViewModel._isLoadingLiveData.postValue(true)
+        testSpecificViewModel._isLoadingLiveData.postValue(true)
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_button_text)).assertIsNotEnabled()
-        composeTestRule.onNode(hasProgressBarRangeInfo()).assertIsDisplayed() // Checks for CircularProgressIndicator
+        composeTestRule.onNode(hasProgressBarRangeInfo()).assertIsDisplayed()
     }
 
     @Test
     fun pairingButtonDisabledWhenCodeIsEmpty() {
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
-        // Ensure code is empty by checking the text field's content (optional, default is empty)
         composeTestRule.onNodeWithLabel(context.getString(R.string.pairing_code_input_label)).assertTextEquals("")
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_button_text)).assertIsNotEnabled()
     }
 
     @Test
     fun pairingButtonEnabledWhenCodeIsNotEmptyAndNotLoading() {
-        fakeViewModel._isLoadingLiveData.postValue(false)
+        testSpecificViewModel._isLoadingLiveData.postValue(false)
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         composeTestRule.onNodeWithLabel(context.getString(R.string.pairing_code_input_label)).performTextInput("123")
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_button_text)).assertIsEnabled()
@@ -97,38 +116,38 @@ class PairingScreenUITest {
 
     @Test
     fun displayErrorCodeExpired() {
-        fakeViewModel._showExpiredCodeErrorLiveData.postValue(true)
+        testSpecificViewModel._showExpiredCodeErrorLiveData.postValue(true)
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         composeTestRule.onNodeWithText(context.getString(R.string.error_code_expired)).assertIsDisplayed()
     }
 
     @Test
     fun displayErrorInvalidCode() {
-        fakeViewModel._showInvalidCodeErrorLiveData.postValue(true)
+        testSpecificViewModel._showInvalidCodeErrorLiveData.postValue(true)
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         composeTestRule.onNodeWithText(context.getString(R.string.error_invalid_code)).assertIsDisplayed()
     }
 
     @Test
     fun displayErrorSavingChildId() {
-        fakeViewModel._showChildIdSaveErrorLiveData.postValue(true)
+        testSpecificViewModel._showChildIdSaveErrorLiveData.postValue(true)
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         composeTestRule.onNodeWithText(context.getString(R.string.error_saving_child_id)).assertIsDisplayed()
     }
 
     @Test
     fun errorMessageNotShownWhenNoError() {
-        fakeViewModel.clearAllErrors() // Ensure all errors are false
-        fakeViewModel._isLoadingLiveData.postValue(false)
+        testSpecificViewModel.clearAllErrors() // Ensure all errors are false
+        testSpecificViewModel._isLoadingLiveData.postValue(false)
 
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen()
         }
         composeTestRule.onNodeWithText(context.getString(R.string.error_code_expired)).assertDoesNotExist()
         composeTestRule.onNodeWithText(context.getString(R.string.error_invalid_code)).assertDoesNotExist()
@@ -137,38 +156,41 @@ class PairingScreenUITest {
 
     @Test
     fun clickingPairButtonCallsViewModel() {
-        val mockViewModel: PairingViewModel = mock() // Use a real Mockito mock here
+        // For this test, we want to verify the interaction with the Hilt-injected fakeViewModel
+        // The @BindValue fakeViewModel is already in place.
         val testCode = "TESTCODE"
-
         composeTestRule.setContent {
-            PairingScreen(viewModel = mockViewModel)
+            PairingScreen() // Uses the Hilt-injected fakeViewModel
         }
 
         composeTestRule.onNodeWithLabel(context.getString(R.string.pairing_code_input_label)).performTextInput(testCode)
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_button_text)).performClick()
 
-        verify(mockViewModel).validatePairingCode(testCode)
+        // Verify that the validatePairingCode method on our Hilt-injected fakeViewModel was called
+        assert(testSpecificViewModel.validatePairingCodeCalledWith == testCode)
     }
 
     @Test
     fun pairingScreenDisplaysCorrectLanguageGerman() {
-        setLocale(Locale.GERMAN) // Change to German
-        // Re-initialize fakeViewModel to ensure it's created after locale change if it matters for any internal logic (it doesn't here)
-        // fakeViewModel = FakePairingViewModel() // Not strictly needed here as FakeVM doesn't use context for strings
+        setLocale(Locale.GERMAN)
+        // fakeViewModel is already injected by Hilt.
+        // We need to ensure its state is clean if previous tests modified it,
+        // or re-initialize it if necessary (though Hilt handles its lifecycle here).
+        // For this test, we might want to reset any error states on fakeViewModel if they persist.
+        testSpecificViewModel.clearAllErrors()
+        testSpecificViewModel._isLoadingLiveData.postValue(false)
+
 
         composeTestRule.setContent {
-            PairingScreen(viewModel = fakeViewModel)
+            PairingScreen() // Uses Hilt-injected fakeViewModel
         }
 
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_screen_title)).assertIsDisplayed()
-        // For OutlinedTextField, the label is a child Composable. We find the OutlinedTextField node first.
-        // A more robust way would be to use a testTag on the OutlinedTextField itself.
-        // However, searching by label text directly on a node that *is* the label also works.
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_code_input_label)).assertIsDisplayed()
         composeTestRule.onNodeWithText(context.getString(R.string.pairing_button_text)).assertIsDisplayed()
 
         // Test an error message for German
-        fakeViewModel._showInvalidCodeErrorLiveData.postValue(true)
+        testSpecificViewModel._showInvalidCodeErrorLiveData.postValue(true)
         composeTestRule.onNodeWithText(context.getString(R.string.error_invalid_code)).assertIsDisplayed()
     }
 }
