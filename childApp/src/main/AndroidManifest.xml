@@ -3,6 +3,7 @@
     package="com.google.pairing.child">
 
     <application
+        android:name="com.google.pairing.PairingApplication" 
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -12,7 +13,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
+            android:label="@string/app_name" 
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"> {/* Ensure a base theme is set */}
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
