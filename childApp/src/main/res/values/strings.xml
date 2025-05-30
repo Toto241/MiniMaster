@@ -1,10 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Child App</string>
-    <string name="lock_screen_message">App is locked. Child ID: %1$s</string>
+    <!-- The official name of the application, displayed in the app launcher and system settings. -->
+    <string name="app_name">Mini-Master Child App</string>
+
+    <!-- Title text displayed at the top of the pairing screen. -->
     <string name="pairing_screen_title">Pairing Screen</string>
+
+    <!-- Label for the text input field where the user enters the pairing code received from the parent app. -->
     <string name="pairing_code_input_label">Enter Pairing Code</string>
+
+    <!-- Text for the button that the user clicks to initiate the pairing process after entering the code. -->
     <string name="pairing_button_text">Pair Device</string>
+
+    <!-- Message displayed on the lock screen. The %1$s placeholder will be replaced by the unique Child ID. -->
+    <!-- Example: "App is locked. Child ID: child12345" -->
+    <string name="lock_screen_message">App is locked. Child ID: %1$s</string>
+
+    <!-- Error message displayed when the entered pairing code has passed its expiration time. -->
     <string name="error_code_expired">Pairing code has expired.</string>
+
+    <!-- Error message displayed when the entered pairing code is not found, syntactically incorrect, or otherwise invalid. -->
     <string name="error_invalid_code">Invalid pairing code.</string>
+
+    <!-- Error message displayed if saving the device/child ID to local storage fails after successful pairing. -->
     <string name="error_saving_child_id">Error saving device ID.</string>
 </resources>
