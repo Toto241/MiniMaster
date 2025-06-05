@@ -57,7 +57,7 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
 
     functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
     return { pairingCode: pairingCode };
-  } catch (error), {
+  } catch (error) {
     functions.logger.error("Error creating pairing code:", error);
     throw new functions.https.HttpsError(
       "internal",
