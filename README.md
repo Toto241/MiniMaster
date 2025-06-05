@@ -26,3 +26,5 @@ Client access to the `pairingCodes` collection is denied by default. Only the Cl
 
 ## Building
 Open the `childApp` module with Android Studio. When a Gradle wrapper is available, tests can be run with `./gradlew test` and `./gradlew connectedAndroidTest`.
+
+For the Cloud Functions, first install dependencies via `npm install` and check the TypeScript code with `npx tsc index.ts --noEmit`.
