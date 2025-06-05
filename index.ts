@@ -30,7 +30,7 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
   //   );
   // }
 
-  const childId = data.childId;
+  const childId = (data as any).childId;
   if (!childId || typeof childId !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -72,7 +72,7 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
  * and deletes the pairing code.
  */
 export const validatePairingCode = functions.https.onCall(async (data, context) => {
-  const pairingCode = data.pairingCode;
+  const pairingCode = (data as any).pairingCode;
 
   if (!pairingCode || typeof pairingCode !== "string") {
     throw new functions.https.HttpsError(
