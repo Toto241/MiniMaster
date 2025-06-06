@@ -1,0 +1,11 @@
+# Ignore Node dependencies and build output
+node_modules/
+lib/
+
+# Ignore Android build directories
+**/build/
+.gradle/
+
+# IntelliJ/Android Studio project files
+.idea/
+
