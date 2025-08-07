@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { v4 as uuidv4 } from "uuid";
 
 // Initialize Firebase Admin SDK
 // Ensure this is done only once, typically at the top level of your index.ts
@@ -38,33 +39,49 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
     );
   }
 
-  // Code-Generierung (6-stellige Zahl als String)
-  const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const pairingCodesRef = db.collection("pairingCodes");
+  const maxAttempts = 10; // Verhindert eine Endlosschleife
 
-  // Ablaufdatum (24 Stunden in der Zukunft)
-  const now = admin.firestore.Timestamp.now();
-  const expiresAtSeconds = now.seconds + 24 * 60 * 60; // 24 hours in seconds
-  const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Code-Generierung (6-stellige Zahl als String)
+    const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
 
-  try {
-    // Speichern in Firestore
-    const pairingCodeRef = db.collection("pairingCodes").doc(pairingCode);
-    await pairingCodeRef.set({
-      childId: childId,
-      createdAt: now, // Optional: Store creation time for auditing or other purposes
-      expiresAt: expiresAt,
-    });
+    try {
+      const doc = await pairingCodeDocRef.get();
+      if (!doc.exists) {
+        // Code ist einzigartig, wir können ihn verwenden
+        const now = admin.firestore.Timestamp.now();
+        const expiresAtSeconds = now.seconds + 24 * 60 * 60; // 24 Stunden
+        const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
 
-    functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
-    return { pairingCode: pairingCode };
-  } catch (error) {
-    functions.logger.error("Error creating pairing code:", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      "An unexpected error occurred while creating the pairing code.",
-      error
-    );
+        await pairingCodeDocRef.set({
+          childId: childId,
+          createdAt: now,
+          expiresAt: expiresAt,
+        });
+
+        functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
+        return { pairingCode: pairingCode };
+      }
+      // Wenn das Dokument existiert, wird die Schleife fortgesetzt und ein neuer Code versucht
+      functions.logger.warn(`Collision detected for pairing code ${pairingCode}. Retrying...`);
+    } catch (error) {
+      functions.logger.error("Error during pairing code creation attempt:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while creating the pairing code.",
+        error
+      );
+    }
   }
+
+  // Wenn nach maxAttempts immer noch kein einzigartiger Code gefunden wurde
+  functions.logger.error(`Could not create a unique pairing code after ${maxAttempts} attempts.`);
+  throw new functions.https.HttpsError(
+    "resource-exhausted",
+    "Could not generate a unique pairing code. Please try again later."
+  );
 });
 
 /**
@@ -182,3 +199,56 @@ export const validatePairingCode = functions.https.onCall(async (data, context) 
 //   // e.g., by looking up user roles or child-parent relationships in another collection
 //   return true; // Placeholder
 // }
+
+/**
+ * Registers a new master device based on its IMEI.
+ * Creates a permanent profile for the master device with a secret key.
+ */
+export const registerMasterDevice = functions.https.onCall(async (data, context) => {
+  const imei = data.imei;
+  if (!imei || typeof imei !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "The function must be called with a valid 'imei' string."
+    );
+  }
+
+  const masterDeviceRef = db.collection("masters").doc(imei);
+
+  try {
+    const doc = await masterDeviceRef.get();
+    if (doc.exists) {
+      // This device is already registered.
+      // For security, we could return the existing key or an error.
+      // Returning an error is safer to prevent probing.
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "This device has already been registered."
+      );
+    }
+
+    // Device is not registered, create a new profile.
+    const secretKey = uuidv4();
+    const now = admin.firestore.Timestamp.now();
+
+    await masterDeviceRef.set({
+      imei: imei,
+      secretKey: secretKey,
+      createdAt: now,
+    });
+
+    functions.logger.info(`Master device registered with IMEI: ${imei}`);
+    return { secretKey: secretKey };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error; // Re-throw HttpsError to be sent to client
+    }
+    functions.logger.error("Error registering master device:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while registering the device.",
+      error
+    );
+  }
+});
