@@ -3,7 +3,7 @@ import * as sinon from "sinon";
 import { expect } from "chai";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import * as fft from "firebase-functions-test";
+import fft from "firebase-functions-test";
 
 // Initialize firebase-functions-test
 const testEnv = fft();
