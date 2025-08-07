@@ -2,22 +2,19 @@ package com.google.pairing
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 
 @Composable
 fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
     val pairingState by viewModel.pairingState.collectAsState()
     val childImei by viewModel.childImeiForDebug.collectAsState()
+    var pairingCode by remember { mutableStateOf("") }
     var showDebugInfo by remember { mutableStateOf(false) }
 
     Column(
@@ -32,6 +29,27 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
             style = MaterialTheme.typography.h5,
             modifier = Modifier.padding(bottom = 24.dp)
         )
+
+        OutlinedTextField(
+            value = pairingCode,
+            onValueChange = { pairingCode = it },
+            label = { Text(stringResource(R.string.pairing_code_input_label)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            singleLine = true
+        )
+
+        Button(
+            onClick = {
+                val imei = childImei ?: ""
+                viewModel.validateToken(pairingCode, imei)
+            },
+            enabled = pairingCode.isNotBlank() && pairingState !is PairingState.Loading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.pairing_button_text))
+        }
 
         // Main status view
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
