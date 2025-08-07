@@ -308,3 +308,70 @@ export const generatePairingLink = functions.https.onCall(async (data, context) 
 //   // e.g., by looking up user roles or child-parent relationships in another collection
 //   return true; // Placeholder
 // }
+
+/**
+ * Validates a single-use pairing token, and if valid, creates a
+ * permanent child device profile linked to the master device.
+ */
+export const validatePairingToken = functions.https.onCall(async (data, context) => {
+  const { pairingToken, childImei } = data;
+
+  if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Request must include a valid 'pairingToken' and 'childImei'."
+    );
+  }
+
+  const tokenRef = db.collection("pairingTokens").doc(pairingToken);
+
+  try {
+    const tokenDoc = await tokenRef.get();
+
+    if (!tokenDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Pairing token is invalid.");
+    }
+
+    const tokenData = tokenDoc.data();
+    if (!tokenData) {
+      // Should not happen, but for safety
+      await tokenRef.delete();
+      throw new functions.https.HttpsError("internal", "Pairing token data is missing.");
+    }
+
+    // Check for expiration
+    const expiresAt = tokenData.expiresAt as admin.firestore.Timestamp;
+    const now = admin.firestore.Timestamp.now();
+    if (now.seconds > expiresAt.seconds) {
+      await tokenRef.delete();
+      throw new functions.https.HttpsError("deadline-exceeded", "Pairing token has expired.");
+    }
+
+    // Token is valid. Create the child device profile.
+    const childDeviceRef = db.collection("children").doc(childImei);
+    await childDeviceRef.set({
+      childImei: childImei,
+      masterImei: tokenData.masterImei,
+      pairedAt: now,
+    });
+
+    // Delete the used token to prevent reuse.
+    await tokenRef.delete();
+
+    functions.logger.info(`Child device ${childImei} successfully paired with master ${tokenData.masterImei}.`);
+
+    // Return the masterImei as the child's new ID for consistency with the old flow.
+    return { childId: tokenData.masterImei };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error; // Re-throw HttpsError to be sent to client
+    }
+    functions.logger.error("Error validating pairing token:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while validating the pairing token.",
+      error
+    );
+  }
+});

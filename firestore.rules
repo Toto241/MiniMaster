@@ -30,6 +30,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Regeln für die children Collection
+    // Speichert die Profile der gekoppelten Kindergeräte.
+    match /children/{childId} {
+      allow read, write: if false;
+    }
+
     // Beispiel für Regeln anderer Collections (falls vorhanden und benötigt):
     // Diese sollten an die spezifischen Anforderungen der jeweiligen Collection angepasst werden.
     // Wenn keine anderen Regeln explizit definiert sind, gilt standardmäßig "allow read, write: if false;".
