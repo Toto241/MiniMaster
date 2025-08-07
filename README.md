@@ -161,3 +161,12 @@ Speichert die permanente Verbindung zwischen einem Kind- und einem Elterngerät.
   ```
 
 - **Sicherheitsregeln:** Der direkte Client-Zugriff auf **alle** diese Collections ist vollständig gesperrt.
+---
+
+## Debug-Schnittstelle
+
+Um die Entwicklung und Fehlersuche zu erleichtern, verfügen beide Apps über eine einfache Debug-Ansicht am unteren Bildschirmrand.
+
+- **Zugriff:** Die Ansicht kann über einen "Show/Hide Debug Info"-Button ein- und ausgeblendet werden.
+- **`masterApp`:** Zeigt die abgerufene IMEI des Elterngeräts, den erhaltenen `secretKey` und den Status der Kopplungs-Token-Erstellung an.
+- **`childApp`:** Zeigt die abgerufene IMEI des Kindergeräts und den aktuellen Status des Kopplungsprozesses an.

@@ -42,8 +42,9 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val registrationState by viewModel.registrationState.collectAsState()
     val linkState by viewModel.linkGenerationState.collectAsState()
+    val debugState by viewModel.debugState.collectAsState()
     var permissionStatus by remember { mutableStateOf("App needs permission to read device state.") }
-
+    var showDebugInfo by remember { mutableStateOf(false) }
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -77,7 +78,6 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            // Display content based on the registration state
             when (val state = registrationState) {
                 is RegistrationState.Idle -> {
                     Text(
@@ -120,7 +120,32 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                     )
                 }
             }
+
+            // Spacer and Debug section at the bottom
+            Spacer(modifier = Modifier.weight(1f))
+            Button(onClick = { showDebugInfo = !showDebugInfo }) {
+                Text(if (showDebugInfo) "Hide Debug Info" else "Show Debug Info")
+            }
+            if (showDebugInfo) {
+                DebugInfoView(debugState = debugState, linkState = linkState)
+            }
         }
+    }
+}
+
+@Composable
+fun DebugInfoView(debugState: DebugState, linkState: LinkGenerationState) {
+    Column(modifier = Modifier.padding(top = 16.dp)) {
+        Text("---- DEBUG INFO ----", style = MaterialTheme.typography.caption)
+        Text("IMEI: ${debugState.imei ?: "Not set"}", style = MaterialTheme.typography.caption)
+        Text("Secret Key: ${debugState.secretKey ?: "Not set"}", style = MaterialTheme.typography.caption)
+        val linkStatus = when(linkState) {
+            is LinkGenerationState.Idle -> "Idle"
+            is LinkGenerationState.Loading -> "Loading..."
+            is LinkGenerationState.Success -> "Success: ${linkState.pairingToken}"
+            is LinkGenerationState.Error -> "Error: ${linkState.message}"
+        }
+        Text("Link Status: $linkStatus", style = MaterialTheme.typography.caption)
     }
 }
 
