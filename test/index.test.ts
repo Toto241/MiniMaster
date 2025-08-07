@@ -108,6 +108,80 @@ describe("Cloud Functions", () => {
     });
   });
 
+  describe("validatePairingToken", () => {
+    let collectionStub: sinon.SinonStub;
+    let docStub: sinon.SinonStub;
+    let getStub: sinon.SinonStub;
+    let setStub: sinon.SinonStub;
+    let deleteStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      setStub = sinon.stub().resolves();
+      getStub = sinon.stub();
+      deleteStub = sinon.stub().resolves();
+      docStub = sinon.stub().returns({
+        get: getStub,
+        set: setStub,
+        delete: deleteStub,
+      });
+      collectionStub = sinon.stub(db, "collection");
+      collectionStub.withArgs("pairingTokens").returns({ doc: docStub } as any);
+      collectionStub.withArgs("children").returns({ doc: docStub } as any);
+    });
+
+    afterEach(() => {
+      collectionStub.restore();
+    });
+
+    it("should validate a token and create a child profile", async () => {
+      const future = new Date();
+      future.setMinutes(future.getMinutes() + 1);
+      const expiresAt = admin.firestore.Timestamp.fromDate(future);
+      getStub.resolves({
+        exists: true,
+        data: () => ({ masterImei: "parent-imei-123", expiresAt }),
+      });
+
+      const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
+      const result = await wrapped({ pairingToken: "valid-token", childImei: "child-imei-456" });
+
+      expect(result).to.deep.equal({ childId: "parent-imei-123" });
+      expect(collectionStub.calledWith("children")).to.be.true;
+      expect(setStub.calledOnce).to.be.true;
+      expect(deleteStub.calledOnce).to.be.true; // Token should be deleted
+    });
+
+    it("should throw 'not-found' for an invalid token", async () => {
+      getStub.resolves({ exists: false });
+      const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
+      try {
+        await wrapped({ pairingToken: "invalid-token", childImei: "child-imei" });
+        expect.fail("Function should have thrown");
+      } catch(e: any) {
+        expect(e.code).to.equal("not-found");
+      }
+    });
+
+    it("should throw 'deadline-exceeded' for an expired token", async () => {
+      const past = new Date();
+      past.setMinutes(past.getMinutes() - 1);
+      const expiresAt = admin.firestore.Timestamp.fromDate(past);
+      getStub.resolves({
+        exists: true,
+        data: () => ({ masterImei: "parent-imei-123", expiresAt }),
+      });
+
+      const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
+      try {
+        await wrapped({ pairingToken: "expired-token", childImei: "child-imei" });
+        expect.fail("Function should have thrown");
+      } catch(e: any) {
+        expect(e.code).to.equal("deadline-exceeded");
+        expect(deleteStub.calledOnce).to.be.true; // Expired token should be deleted
+      }
+    });
+  });
+
   describe("generatePairingLink", () => {
     let collectionStub: sinon.SinonStub;
     let docStub: sinon.SinonStub;
