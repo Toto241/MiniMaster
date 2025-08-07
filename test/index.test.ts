@@ -186,7 +186,6 @@ describe("Cloud Functions", () => {
         }
     });
   });
-
   describe("registerMasterDevice", () => {
     let collectionStub: sinon.SinonStub;
     let docStub: sinon.SinonStub;

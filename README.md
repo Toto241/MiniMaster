@@ -111,7 +111,6 @@ Die Kopplungscodes werden in der `pairingCodes`-Collection gespeichert. Jedes Do
   }
   ```
 - **Sicherheitsregeln:** Der direkte Zugriff auf diese Collection durch die Client-App wird durch `firestore.rules` vollständig blockiert. Nur die Cloud Functions haben über das Admin SDK die Berechtigung, Dokumente zu lesen und zu schreiben.
-
 ### `masters` Collection
 
 Diese Collection speichert die permanenten Profile für jedes registrierte Elterngerät (Master).
@@ -125,3 +124,4 @@ Diese Collection speichert die permanenten Profile für jedes registrierte Elter
   }
   ```
 - **Sicherheitsregeln:** Genau wie bei den `pairingCodes` ist der direkte Client-Zugriff auf diese Collection vollständig gesperrt.
+
