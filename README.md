@@ -75,6 +75,18 @@ Nachdem der Gradle Wrapper generiert wurde, können Sie die Tests über die Komm
     ./gradlew connectedAndroidTest
     ```
 
+### 3. Android App (masterApp)
+
+Die `masterApp` ist die neue, in Entwicklung befindliche Anwendung für das Elterngerät. Ihr erster Zweck ist es, eine eindeutige Geräte-ID (IMEI) zu erfassen, die als Basis für den neuen Kopplungsmechanismus dienen wird.
+
+**Setup und Bauen:**
+Das Projekt ist nun als Multi-Modul-Projekt konfiguriert.
+1.  **Projekt in Android Studio öffnen:** Öffnen Sie das **Stammverzeichnis** des Repositories in Android Studio. Das IDE sollte beide Module (`childApp` and `masterApp`) erkennen.
+2.  **App bauen:** Sie können die `masterApp` als Ziel in der Build-Konfiguration auswählen und sie auf einem Emulator/Gerät ausführen.
+
+**Wichtiger Hinweis zur IMEI:**
+Das Auslesen der IMEI erfordert die `READ_PHONE_STATE`-Berechtigung. Auf Android-Versionen 10 (API 29) und höher ist der Zugriff auf die IMEI für normale Apps stark eingeschränkt und wird in der Regel eine `SecurityException` auslösen oder `null` zurückgeben. Die App versucht, dies zu handhaben und eine entsprechende Meldung anzuzeigen. Für eine produktive Anwendung müsste ein alternativer, datenschutzfreundlicherer Mechanismus zur eindeutigen Geräteidentifikation in Betracht gezogen werden (z.B. `ANDROID_ID` oder eine bei der Installation generierte UUID).
+
 ---
 
 ## Funktionsweise des Kopplungsprozesses
