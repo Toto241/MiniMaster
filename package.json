@@ -4,7 +4,8 @@
   "description": "This repository contains the experimental implementation of the child application of the **Mini‑Master** project and accompanying Firebase Cloud Functions.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "./node_modules/.bin/tsc",
+    "test": "npm run build && mocha lib/test"
   },
   "keywords": [],
   "author": "",
@@ -15,5 +16,15 @@
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^6.3.2",
     "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@types/chai": "^5.2.2",
+    "@types/mocha": "^10.0.10",
+    "@types/sinon": "^17.0.4",
+    "chai": "^5.2.1",
+    "firebase-functions-test": "^3.4.1",
+    "mocha": "^11.7.1",
+    "sinon": "^21.0.0",
+    "ts-node": "^10.9.2"
   }
 }
