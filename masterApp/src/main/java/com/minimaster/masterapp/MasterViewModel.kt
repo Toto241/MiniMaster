@@ -55,8 +55,10 @@ class MasterViewModel @Inject constructor(
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
                 val key = (result.data as? Map<String, Any>)?.get("secretKey") as? String
                 if (key != null) {
+
                     // Update debug state with credentials
                     _debugState.value = DebugState(imei = imei, secretKey = key)
+
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
                      _registrationState.value = RegistrationState.Error("Backend returned no secret key.")

@@ -28,12 +28,13 @@ class PairingViewModel @Inject constructor(
 
     private val _pairingState = MutableStateFlow<PairingState>(PairingState.Idle)
     val pairingState: StateFlow<PairingState> = _pairingState.asStateFlow()
-
+    
     private val _childImeiForDebug = MutableStateFlow<String?>(null)
     val childImeiForDebug: StateFlow<String?> = _childImeiForDebug.asStateFlow()
 
     fun validateToken(token: String, childImei: String) {
         _childImeiForDebug.value = childImei // Store for debug view
+
         viewModelScope.launch {
             _pairingState.value = PairingState.Loading
 

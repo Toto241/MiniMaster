@@ -45,7 +45,6 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
     val debugState by viewModel.debugState.collectAsState()
     var permissionStatus by remember { mutableStateOf("App needs permission to read device state.") }
     var showDebugInfo by remember { mutableStateOf(false) }
-
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -79,7 +78,6 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            // Main content based on the registration state
             when (val state = registrationState) {
                 is RegistrationState.Idle -> {
                     Text(
