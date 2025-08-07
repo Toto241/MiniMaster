@@ -33,14 +33,12 @@ class MainActivity : ComponentActivity() {
     ) { isGranted: Boolean ->
         if (isGranted) {
             // Permission is granted. Now we can proceed with the pairing token validation.
-            val token = intent.data?.lastPathSegment
-            val imei = getImei(this)
-            if (token != null && imei != null) {
-                viewModel.validateToken(token, imei)
-            }
+            // It's safer to re-handle the intent here to ensure we have the token.
+            handleIntent(intent)
         } else {
             // Handle the case where the user denies the permission.
-            // For now, the PairingScreen will just show an error.
+            // The ViewModel doesn't have an explicit state for this, but the UI will remain idle.
+
             Log.w("MainActivity", "READ_PHONE_STATE permission denied by user.")
         }
     }
@@ -104,15 +102,24 @@ class MainActivity : ComponentActivity() {
         }
         return try {
             val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
                 telephonyManager.imei
             } else {
                 @Suppress("DEPRECATION")
                 telephonyManager.deviceId
             }
+            if (imei == null) {
+                Log.w("MainActivity", "IMEI is null, even with permission.")
+            }
+            imei
         } catch (e: SecurityException) {
             Log.e("MainActivity", "Failed to get IMEI due to SecurityException.", e)
             null
+        } catch (e: Exception) {
+            Log.e("MainActivity", "An unexpected error occurred while getting IMEI.", e)
+            null
+
         }
     }
 }

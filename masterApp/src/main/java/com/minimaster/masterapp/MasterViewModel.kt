@@ -26,19 +26,24 @@ sealed class LinkGenerationState {
     data class Error(val message: String) : LinkGenerationState()
 }
 
+data class DebugState(
+    val imei: String? = null,
+    val secretKey: String? = null
+)
+
 @HiltViewModel
 class MasterViewModel @Inject constructor(
     private val functions: FirebaseFunctions
 ) : ViewModel() {
-
-    private var imei: String? = null
-    private var secretKey: String? = null
 
     private val _registrationState = MutableStateFlow<RegistrationState>(RegistrationState.Idle)
     val registrationState: StateFlow<RegistrationState> = _registrationState.asStateFlow()
 
     private val _linkGenerationState = MutableStateFlow<LinkGenerationState>(LinkGenerationState.Idle)
     val linkGenerationState: StateFlow<LinkGenerationState> = _linkGenerationState.asStateFlow()
+
+    private val _debugState = MutableStateFlow(DebugState())
+    val debugState: StateFlow<DebugState> = _debugState.asStateFlow()
 
     fun registerDevice(imei: String) {
         viewModelScope.launch {
@@ -50,9 +55,10 @@ class MasterViewModel @Inject constructor(
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
                 val key = (result.data as? Map<String, Any>)?.get("secretKey") as? String
                 if (key != null) {
-                    // Store credentials for later use
-                    this@MasterViewModel.imei = imei
-                    this@MasterViewModel.secretKey = key
+
+                    // Update debug state with credentials
+                    _debugState.value = DebugState(imei = imei, secretKey = key)
+
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
                      _registrationState.value = RegistrationState.Error("Backend returned no secret key.")
@@ -69,8 +75,10 @@ class MasterViewModel @Inject constructor(
     }
 
     fun generateLink() {
-        val currentImei = imei
-        val currentSecret = secretKey
+        val currentState = debugState.value
+        val currentImei = currentState.imei
+        val currentSecret = currentState.secretKey
+
         if (currentImei == null || currentSecret == null) {
             _linkGenerationState.value = LinkGenerationState.Error("Device not registered yet.")
             return
