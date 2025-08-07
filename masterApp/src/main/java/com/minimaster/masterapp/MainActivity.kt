@@ -41,15 +41,16 @@ class MainActivity : ComponentActivity() {
 fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val registrationState by viewModel.registrationState.collectAsState()
+    val linkState by viewModel.linkGenerationState.collectAsState()
     var permissionStatus by remember { mutableStateOf("App needs permission to read device state.") }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            permissionStatus = "Permission granted. Ready to register."
             val imei = getImei(context)
             if (imei != null) {
+                permissionStatus = "Permission granted. Ready to register."
                 viewModel.registerDevice(imei)
             } else {
                 permissionStatus = "Permission granted, but failed to retrieve IMEI."
@@ -86,18 +87,11 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
                     Button(onClick = {
-                        when (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE)) {
-                            PackageManager.PERMISSION_GRANTED -> {
-                                val imei = getImei(context)
-                                if (imei != null) {
-                                    viewModel.registerDevice(imei)
-                                } else {
-                                    permissionStatus = "Permission granted, but failed to retrieve IMEI."
-                                }
-                            }
-                            else -> {
-                                requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
-                            }
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                            val imei = getImei(context)
+                            if (imei != null) viewModel.registerDevice(imei) else permissionStatus = "Failed to retrieve IMEI."
+                        } else {
+                            requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
                         }
                     }) {
                         Text("Register This Device")
@@ -105,17 +99,17 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                 }
                 is RegistrationState.Loading -> {
                     CircularProgressIndicator()
-                    Text(
-                        text = "Registering device...",
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
+                    Text(text = "Registering device...", modifier = Modifier.padding(top = 16.dp))
                 }
                 is RegistrationState.Success -> {
                     Text(
-                        text = state.secretKey,
+                        text = state.successMessage,
                         style = MaterialTheme.typography.body1,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LinkGenerationSection(linkState = linkState, onGenerateClick = { viewModel.generateLink() })
                 }
                 is RegistrationState.Error -> {
                     Text(
@@ -124,6 +118,49 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                         style = MaterialTheme.typography.body1,
                         textAlign = TextAlign.Center
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LinkGenerationSection(linkState: LinkGenerationState, onGenerateClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        when (linkState) {
+            is LinkGenerationState.Idle -> {
+                Button(onClick = onGenerateClick) {
+                    Text("Generate Pairing Link")
+                }
+            }
+            is LinkGenerationState.Loading -> {
+                CircularProgressIndicator()
+                Text(text = "Generating link...", modifier = Modifier.padding(top = 16.dp))
+            }
+            is LinkGenerationState.Success -> {
+                Text(
+                    text = "Link generated successfully!",
+                    style = MaterialTheme.typography.h6
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = linkState.pairingToken,
+                    style = MaterialTheme.typography.body2
+                )
+            }
+            is LinkGenerationState.Error -> {
+                Text(
+                    text = linkState.message,
+                    color = MaterialTheme.colors.error,
+                    style = MaterialTheme.typography.body1,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = onGenerateClick) {
+                    Text("Retry Link Generation")
                 }
             }
         }
