@@ -17,6 +17,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Regeln für die masters Collection
+    // Diese Collection speichert die Profile der Elterngeräte.
+    // Zugriff sollte ebenfalls nur serverseitig erfolgen.
+    match /masters/{masterId} {
+      allow read, write: if false;
+    }
+
     // Beispiel für Regeln anderer Collections (falls vorhanden und benötigt):
     // Diese sollten an die spezifischen Anforderungen der jeweiligen Collection angepasst werden.
     // Wenn keine anderen Regeln explizit definiert sind, gilt standardmäßig "allow read, write: if false;".

@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { v4 as uuidv4 } from "uuid";
 
 // Initialize Firebase Admin SDK
 // Ensure this is done only once, typically at the top level of your index.ts
@@ -198,3 +199,56 @@ export const validatePairingCode = functions.https.onCall(async (data, context) 
 //   // e.g., by looking up user roles or child-parent relationships in another collection
 //   return true; // Placeholder
 // }
+
+/**
+ * Registers a new master device based on its IMEI.
+ * Creates a permanent profile for the master device with a secret key.
+ */
+export const registerMasterDevice = functions.https.onCall(async (data, context) => {
+  const imei = data.imei;
+  if (!imei || typeof imei !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "The function must be called with a valid 'imei' string."
+    );
+  }
+
+  const masterDeviceRef = db.collection("masters").doc(imei);
+
+  try {
+    const doc = await masterDeviceRef.get();
+    if (doc.exists) {
+      // This device is already registered.
+      // For security, we could return the existing key or an error.
+      // Returning an error is safer to prevent probing.
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "This device has already been registered."
+      );
+    }
+
+    // Device is not registered, create a new profile.
+    const secretKey = uuidv4();
+    const now = admin.firestore.Timestamp.now();
+
+    await masterDeviceRef.set({
+      imei: imei,
+      secretKey: secretKey,
+      createdAt: now,
+    });
+
+    functions.logger.info(`Master device registered with IMEI: ${imei}`);
+    return { secretKey: secretKey };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error; // Re-throw HttpsError to be sent to client
+    }
+    functions.logger.error("Error registering master device:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while registering the device.",
+      error
+    );
+  }
+});

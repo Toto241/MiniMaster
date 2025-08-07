@@ -8,7 +8,7 @@ Die Android-App ermöglicht es, ein Kindergerät über einen 6-stelligen Code mi
 
 - **Kopplungs-Flow**: Ein `PairingScreen` sammelt den Code, der von der Cloud Function `validatePairingCode` überprüft wird. Bei Erfolg wird die `childId` lokal gespeichert und die App navigiert zum `LockScreen`.
 - **Lokaler Speicher**: `ChildIdRepository` verwendet Jetpack DataStore, um die `childId` persistent zu speichern. Ein globaler `ChildIdProvider` stellt die ID als reaktiven `StateFlow` für die gesamte App bereit.
-- **Backend-Integration**: Cloud Functions in `index.ts` implementieren die Logik zur Erstellung (`createPairingCode`) und Validierung (`validatePairingCode`) von Kopplungscodes unter Verwendung von Firestore.
+- **Backend-Integration**: Cloud Functions in `index.ts` implementieren die Backend-Logik. Dies umfasst die alte Kopplungsmethode (`createPairingCode`, `validatePairingCode`) sowie die neue Funktion `registerMasterDevice` zur Erstellung eines permanenten, sicheren Profils für ein Elterngerät.
 - **Dependency Injection**: Die App nutzt Hilt für Dependency Injection.
 - **Internationalisierung (i18n)**: Alle Texte sind in Englisch, Deutsch, Französisch und vereinfachtem Chinesisch vorhanden.
 - **Testing**: Das Projekt umfasst Unit-Tests für die Backend-Logik, sowie Unit-, Integrations- und UI-Tests für die Android-App.
@@ -81,8 +81,9 @@ Die `masterApp` ist die neue, in Entwicklung befindliche Anwendung für das Elte
 
 **Setup und Bauen:**
 Das Projekt ist nun als Multi-Modul-Projekt konfiguriert.
-1.  **Projekt in Android Studio öffnen:** Öffnen Sie das **Stammverzeichnis** des Repositories in Android Studio. Das IDE sollte beide Module (`childApp` and `masterApp`) erkennen.
-2.  **App bauen:** Sie können die `masterApp` als Ziel in der Build-Konfiguration auswählen und sie auf einem Emulator/Gerät ausführen.
+1.  **Firebase-Konfiguration hinzufügen:** Um die App mit Ihrem Firebase-Projekt zu verbinden, müssen Sie die Konfigurationsdatei `google-services.json` von Ihrem Firebase-Projekt herunterladen und in das `masterApp/`-Verzeichnis kopieren. **Dieser Schritt ist für die Kommunikation mit dem Backend zwingend erforderlich.**
+2.  **Projekt in Android Studio öffnen:** Öffnen Sie das **Stammverzeichnis** des Repositories in Android Studio. Das IDE sollte beide Module (`childApp` and `masterApp`) erkennen.
+3.  **App bauen:** Sie können die `masterApp` als Ziel in der Build-Konfiguration auswählen und sie auf einem Emulator/Gerät ausführen.
 
 **Wichtiger Hinweis zur IMEI:**
 Das Auslesen der IMEI erfordert die `READ_PHONE_STATE`-Berechtigung. Auf Android-Versionen 10 (API 29) und höher ist der Zugriff auf die IMEI für normale Apps stark eingeschränkt und wird in der Regel eine `SecurityException` auslösen oder `null` zurückgeben. Die App versucht, dies zu handhaben und eine entsprechende Meldung anzuzeigen. Für eine produktive Anwendung müsste ein alternativer, datenschutzfreundlicherer Mechanismus zur eindeutigen Geräteidentifikation in Betracht gezogen werden (z.B. `ANDROID_ID` oder eine bei der Installation generierte UUID).
@@ -111,3 +112,17 @@ Die Kopplungscodes werden in der `pairingCodes`-Collection gespeichert. Jedes Do
   }
   ```
 - **Sicherheitsregeln:** Der direkte Zugriff auf diese Collection durch die Client-App wird durch `firestore.rules` vollständig blockiert. Nur die Cloud Functions haben über das Admin SDK die Berechtigung, Dokumente zu lesen und zu schreiben.
+
+### `masters` Collection
+
+Diese Collection speichert die permanenten Profile für jedes registrierte Elterngerät (Master).
+
+- **Struktur eines Dokuments (`/masters/{imei}`):**
+  ```json
+  {
+    "imei": "string",
+    "secretKey": "string (UUID)",
+    "createdAt": "Timestamp"
+  }
+  ```
+- **Sicherheitsregeln:** Genau wie bei den `pairingCodes` ist der direkte Client-Zugriff auf diese Collection vollständig gesperrt.

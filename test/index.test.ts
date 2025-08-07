@@ -186,4 +186,66 @@ describe("Cloud Functions", () => {
         }
     });
   });
+
+  describe("registerMasterDevice", () => {
+    let collectionStub: sinon.SinonStub;
+    let docStub: sinon.SinonStub;
+    let getStub: sinon.SinonStub;
+    let setStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      setStub = sinon.stub().resolves();
+      getStub = sinon.stub();
+      docStub = sinon.stub().returns({
+        get: getStub,
+        set: setStub,
+      });
+      collectionStub = sinon.stub(db, "collection").returns({
+        doc: docStub,
+      } as any);
+    });
+
+    afterEach(() => {
+      collectionStub.restore();
+    });
+
+    it("should register a new device and return a secret key", async () => {
+      getStub.resolves({ exists: false });
+      const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
+      const result = await wrapped({ imei: "new-device-imei" });
+
+      expect(result).to.have.property("secretKey");
+      expect(result.secretKey).to.be.a("string");
+      expect(collectionStub.calledWith("masters")).to.be.true;
+      expect(docStub.calledWith("new-device-imei")).to.be.true;
+      expect(setStub.calledOnce).to.be.true;
+      const setData = setStub.firstCall.args[0];
+      expect(setData).to.have.property("imei", "new-device-imei");
+      expect(setData).to.have.property("secretKey");
+    });
+
+    it("should throw 'already-exists' if the device is already registered", async () => {
+      getStub.resolves({ exists: true });
+      const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
+
+      try {
+        await wrapped({ imei: "existing-device-imei" });
+        expect.fail("Function should have thrown");
+      } catch (error: any) {
+        expect(error.code).to.equal("already-exists");
+        expect(setStub.called).to.be.false;
+      }
+    });
+
+    it("should throw 'invalid-argument' if imei is missing", async () => {
+      const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
+      try {
+        await wrapped({});
+        expect.fail("Function should have thrown");
+      } catch (error: any) {
+        expect(error.code).to.equal("invalid-argument");
+        expect(error.message).to.contain("imei");
+      }
+    });
+  });
 });
