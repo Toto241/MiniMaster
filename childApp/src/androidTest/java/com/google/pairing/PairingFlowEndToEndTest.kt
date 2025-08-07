@@ -150,4 +150,35 @@ class PairingFlowEndToEndTest {
         // Ensure childIdFlow is still null (no navigation should have been triggered by it)
         assert(childIdFlow.value == null)
     }
+
+    @Test
+    fun testExpiredCode_showsErrorAndStaysOnPairingScreen() {
+        // 1. Ensure we start on PairingScreen
+        composeTestRule.onNodeWithText(context.getString(R.string.pairing_screen_title)).assertIsDisplayed()
+
+        // 2. UI Interactions on PairingScreen
+        // Enter the magic expired code
+        composeTestRule.onNodeWithLabel(context.getString(R.string.pairing_code_input_label))
+            .performTextInput(FakePairingViewModel.MAGIC_TEST_CODE_EXPIRED)
+
+        // Click the pair button
+        composeTestRule.onNodeWithText(context.getString(R.string.pairing_button_text))
+            .performClick()
+
+        // 3. Assertions
+        // Verify that validatePairingCode on the fake VM was called with the expired code
+        assert(testSpecificViewModel.validatePairingCodeCalledWith == FakePairingViewModel.MAGIC_TEST_CODE_EXPIRED)
+
+        // Wait for UI to update
+        composeTestRule.waitForIdle()
+
+        // Check if the error message for expired code is displayed
+        composeTestRule.onNodeWithText(context.getString(R.string.error_code_expired)).assertIsDisplayed()
+
+        // Check if still on PairingScreen
+        composeTestRule.onNodeWithText(context.getString(R.string.pairing_screen_title)).assertIsDisplayed()
+
+        // Ensure no attempt was made to save a childId
+        coVerify(exactly = 0) { mockChildIdRepository.saveChildId(any()) }
+    }
 }
