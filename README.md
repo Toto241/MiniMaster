@@ -161,7 +161,6 @@ Speichert die permanente Verbindung zwischen einem Kind- und einem Elterngerät.
   ```
 
 - **Sicherheitsregeln:** Der direkte Client-Zugriff auf **alle** diese Collections ist vollständig gesperrt.
-
 ---
 
 ## Debug-Schnittstelle

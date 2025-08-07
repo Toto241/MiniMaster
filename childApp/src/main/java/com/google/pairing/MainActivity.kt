@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
         } else {
             // Handle the case where the user denies the permission.
             // The ViewModel doesn't have an explicit state for this, but the UI will remain idle.
+
             Log.w("MainActivity", "READ_PHONE_STATE permission denied by user.")
         }
     }
@@ -102,6 +103,7 @@ class MainActivity : ComponentActivity() {
         return try {
             val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
             val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
                 telephonyManager.imei
             } else {
                 @Suppress("DEPRECATION")
@@ -117,6 +119,7 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Log.e("MainActivity", "An unexpected error occurred while getting IMEI.", e)
             null
+
         }
     }
 }
