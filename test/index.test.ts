@@ -108,6 +108,86 @@ describe("Cloud Functions", () => {
     });
   });
 
+  describe("generatePairingLink", () => {
+    let collectionStub: sinon.SinonStub;
+    let docStub: sinon.SinonStub;
+    let getStub: sinon.SinonStub;
+    let setStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      setStub = sinon.stub().resolves();
+      getStub = sinon.stub();
+      docStub = sinon.stub().returns({
+        get: getStub,
+        set: setStub,
+      });
+      // Point the stub to the correct collections based on the call
+      collectionStub = sinon.stub(db, "collection");
+      collectionStub.withArgs("masters").returns({ doc: docStub } as any);
+      collectionStub.withArgs("pairingTokens").returns({ doc: docStub } as any);
+    });
+
+    afterEach(() => {
+      collectionStub.restore();
+    });
+
+    it("should generate a token for an authenticated user", async () => {
+      // Mock the master device document
+      getStub.resolves({
+        exists: true,
+        data: () => ({ secretKey: "correct-secret-key" }),
+      });
+
+      const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+      const result = await wrapped({ imei: "auth-imei", secretKey: "correct-secret-key" });
+
+      expect(result).to.have.property("pairingToken");
+      expect(result.pairingToken).to.be.a("string");
+      expect(collectionStub.calledWith("masters")).to.be.true;
+      expect(collectionStub.calledWith("pairingTokens")).to.be.true;
+      expect(setStub.calledOnce).to.be.true;
+      const tokenData = setStub.firstCall.args[0];
+      expect(tokenData).to.have.property("masterImei", "auth-imei");
+    });
+
+    it("should throw 'unauthenticated' for a wrong secret key", async () => {
+      getStub.resolves({
+        exists: true,
+        data: () => ({ secretKey: "correct-secret-key" }),
+      });
+
+      const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+      try {
+        await wrapped({ imei: "auth-imei", secretKey: "wrong-secret-key" });
+        expect.fail("Function should have thrown");
+      } catch (error: any) {
+        expect(error.code).to.equal("unauthenticated");
+      }
+    });
+
+    it("should throw 'unauthenticated' for a non-existent device", async () => {
+      getStub.resolves({ exists: false });
+
+      const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+      try {
+        await wrapped({ imei: "non-existent-imei", secretKey: "any-key" });
+        expect.fail("Function should have thrown");
+      } catch (error: any) {
+        expect(error.code).to.equal("unauthenticated");
+      }
+    });
+
+    it("should throw 'invalid-argument' if imei or secretKey is missing", async () => {
+      const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+      try {
+        await wrapped({ imei: "some-imei" }); // Missing secretKey
+        expect.fail("Function should have thrown");
+      } catch (error: any) {
+        expect(error.code).to.equal("invalid-argument");
+      }
+    });
+  });
+
   describe("validatePairingCode", () => {
     let collectionStub: sinon.SinonStub;
     let docStub: sinon.SinonStub;
