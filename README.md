@@ -6,9 +6,10 @@ Dieses Repository enthält die experimentelle Implementierung der Kind-Anwendung
 
 Die Android-App ermöglicht es, ein Kindergerät über einen 6-stelligen Code mit einem Elterngerät (nicht Teil dieses Repos) zu koppeln. Nach erfolgreicher Kopplung zeigt das Kindergerät einen Sperrbildschirm mit seiner zugewiesenen ID an.
 
-- **Kopplungs-Flow**: Ein `PairingScreen` sammelt den Code, der von der Cloud Function `validatePairingCode` überprüft wird. Bei Erfolg wird die `childId` lokal gespeichert und die App navigiert zum `LockScreen`.
-- **Lokaler Speicher**: `ChildIdRepository` verwendet Jetpack DataStore, um die `childId` persistent zu speichern. Ein globaler `ChildIdProvider` stellt die ID als reaktiven `StateFlow` für die gesamte App bereit.
-- **Backend-Integration**: Cloud Functions in `index.ts` implementieren die Backend-Logik. Dies umfasst die alte Kopplungsmethode (`createPairingCode`, `validatePairingCode`) sowie die neuen Funktionen für die IMEI-basierte Kopplung: `registerMasterDevice` (erstellt ein permanentes Profil für ein Elterngerät) und `generatePairingLink` (erstellt einen einmalig verwendbaren Kopplungs-Token).
+- **Geräte-Registrierung (Eltern-App)**: Die `masterApp` kann sich über ihre IMEI beim Backend registrieren, um eine permanente Identität mit einem `secretKey` zu erstellen.
+- **Link-basierter Kopplungs-Flow**: Die `masterApp` kann einen einmalig gültigen Kopplungs-Token anfordern. Die `childApp` wird über einen Deep Link (`minimaster://pair/{token}`) geöffnet, um den Kopplungsprozess zu starten, der das Kind-Gerät mit dem Eltern-Gerät verknüpft.
+- **Lokaler Speicher**: Die `childApp` speichert die ID des gekoppelten Elterngeräts persistent mit Jetpack DataStore.
+- **Backend-Integration**: Cloud Functions in `index.ts` implementieren die gesamte Logik für die Geräteregistrierung (`registerMasterDevice`), Token-Erstellung (`generatePairingLink`) und Token-Validierung (`validatePairingToken`).
 - **Dependency Injection**: Die App nutzt Hilt für Dependency Injection.
 - **Internationalisierung (i18n)**: Alle Texte sind in Englisch, Deutsch, Französisch und vereinfachtem Chinesisch vorhanden.
 - **Testing**: Das Projekt umfasst Unit-Tests für die Backend-Logik, sowie Unit-, Integrations- und UI-Tests für die Android-App.
@@ -90,34 +91,45 @@ Das Auslesen der IMEI erfordert die `READ_PHONE_STATE`-Berechtigung. Auf Android
 
 ---
 
-## Funktionsweise des Kopplungsprozesses
+## Funktionsweise des neuen Kopplungsprozesses
 
-1.  **Code-Erstellung (Eltern-Seite):** Ein externes System (z.B. eine Eltern-App) ruft die `createPairingCode`-Cloud-Function mit einer `childId` auf. Die Funktion generiert einen einzigartigen, 6-stelligen Code, speichert ihn mit einem Ablaufdatum (24 Stunden) in Firestore und gibt den Code zurück.
-2.  **Code-Eingabe (Kind-Seite):** Das Kind (oder der Elternteil) gibt diesen 6-stelligen Code in der `childApp` ein.
-3.  **Code-Validierung (Kind-Seite):** Die App ruft die `validatePairingCode`-Cloud-Function auf.
-4.  **Ergebnis:**
-    *   **Erfolg:** Wenn der Code gültig und nicht abgelaufen ist, gibt die Funktion die `childId` zurück. Der Code wird aus Firestore gelöscht, um eine Wiederverwendung zu verhindern. Die `childApp` speichert die `childId` lokal und zeigt den `LockScreen` an.
-    *   **Fehlschlag:** Bei einem ungültigen, abgelaufenen oder bereits verwendeten Code gibt die Funktion einen entsprechenden Fehler zurück, den die App dem Benutzer anzeigt.
+Der neue Prozess ist IMEI- und Link-basiert und ersetzt den alten 6-stelligen Code vollständig.
+
+1.  **Registrierung des Elterngeräts (`masterApp`):**
+    *   Der Nutzer startet die `masterApp`.
+    *   Die App fordert die Berechtigung `READ_PHONE_STATE` an.
+    *   Nach Erteilung der Berechtigung liest die App die IMEI des Geräts aus und ruft die Cloud Function `registerMasterDevice` auf.
+    *   Das Backend erstellt ein permanentes Profil für die IMEI in der `masters`-Collection und generiert einen `secretKey`, der an die App zurückgegeben wird.
+
+2.  **Erstellung des Kopplungs-Links (`masterApp`):**
+    *   Nach erfolgreicher Registrierung kann der Nutzer in der `masterApp` einen Kopplungs-Link anfordern.
+    *   Die App ruft die `generatePairingLink`-Function auf und authentifiziert sich mit ihrer IMEI und dem `secretKey`.
+    *   Das Backend generiert einen einmalig verwendbaren, kurzlebigen (5 Minuten) `pairingToken` und speichert ihn in der `pairingTokens`-Collection.
+    *   Die `masterApp` erhält den Token und zeigt ihn an (in einer echten App würde hier ein klickbarer Link erstellt).
+
+3.  **Kopplung des Kindergeräts (`childApp`):**
+    *   Der `pairingToken` wird an das Kindergerät übermittelt (z.B. per Messenger).
+    *   Auf dem Kindergerät wird ein Link der Form `minimaster://pair/{token}` geöffnet.
+    *   Die `childApp` startet durch diesen Deep Link. Sie extrahiert den `token` aus der URL.
+    *   Die `childApp` fordert ebenfalls die `READ_PHONE_STATE`-Berechtigung an, um ihre eigene IMEI zu lesen.
+    *   Sie ruft die `validatePairingToken`-Function mit dem `token` und ihrer `childImei` auf.
+
+4.  **Validierung im Backend:**
+    *   Das Backend überprüft, ob der `pairingToken` gültig und nicht abgelaufen ist.
+    *   Wenn ja, wird eine permanente Verbindung zwischen Eltern und Kind in der neuen `children`-Collection erstellt.
+    *   Der `pairingToken` wird gelöscht, um eine Wiederverwendung zu verhindern.
+    *   Das Backend gibt die `masterImei` als Bestätigung an die `childApp` zurück.
+
+5.  **Abschluss in der `childApp`:**
+    *   Die `childApp` speichert die erhaltene `masterImei` als ihre neue `childId` und zeigt den `LockScreen` an. Die Kopplung ist abgeschlossen.
 
 ## Firestore Datenstruktur
 
-Die Kopplungscodes werden in der `pairingCodes`-Collection gespeichert. Jedes Dokument hat den 6-stelligen Code als ID.
-
-- **Struktur eines Dokuments (`/pairingCodes/{code}`):**
-  ```json
-  {
-    "childId": "string",
-    "createdAt": "Timestamp",
-    "expiresAt": "Timestamp"
-  }
-  ```
-- **Sicherheitsregeln:** Der direkte Zugriff auf diese Collection durch die Client-App wird durch `firestore.rules` vollständig blockiert. Nur die Cloud Functions haben über das Admin SDK die Berechtigung, Dokumente zu lesen und zu schreiben.
+Die Datenstruktur wurde überarbeitet, um den neuen Kopplungs-Flow zu unterstützen. Die alte `pairingCodes`-Collection wird nicht mehr verwendet.
 
 ### `masters` Collection
-
-Diese Collection speichert die permanenten Profile für jedes registrierte Elterngerät (Master).
-
-- **Struktur eines Dokuments (`/masters/{imei}`):**
+Speichert die permanenten Profile für jedes registrierte Elterngerät.
+- **Struktur (`/masters/{imei}`):**
   ```json
   {
     "imei": "string",
@@ -125,13 +137,10 @@ Diese Collection speichert die permanenten Profile für jedes registrierte Elter
     "createdAt": "Timestamp"
   }
   ```
-- **Sicherheitsregeln:** Genau wie bei den `pairingCodes` ist der direkte Client-Zugriff auf diese Collection vollständig gesperrt.
 
 ### `pairingTokens` Collection
-
-Diese Collection speichert die einmalig verwendbaren Tokens, die von der `masterApp` generiert werden, um eine `childApp` zu koppeln.
-
-- **Struktur eines Dokuments (`/pairingTokens/{token}`):**
+Speichert die einmalig verwendbaren, kurzlebigen Tokens für den Kopplungsprozess.
+- **Struktur (`/pairingTokens/{token}`):**
   ```json
   {
     "masterImei": "string",
@@ -139,4 +148,16 @@ Diese Collection speichert die einmalig verwendbaren Tokens, die von der `master
     "expiresAt": "Timestamp"
   }
   ```
-- **Sicherheitsregeln:** Der direkte Client-Zugriff auf diese Collection ist vollständig gesperrt.
+
+### `children` Collection
+Speichert die permanente Verbindung zwischen einem Kind- und einem Elterngerät.
+- **Struktur (`/children/{childImei}`):**
+  ```json
+  {
+    "childImei": "string",
+    "masterImei": "string",
+    "pairedAt": "Timestamp"
+  }
+  ```
+
+- **Sicherheitsregeln:** Der direkte Client-Zugriff auf **alle** diese Collections ist vollständig gesperrt.
