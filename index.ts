@@ -13,25 +13,30 @@ const db = admin.firestore();
 /**
  * Creates a new pairing code for a given childId.
  */
-export const createPairingCode = functions.https.onCall(async (data, context) => {
-  // Optional: Authentifizierung prüfen
-  // if (!context.auth) {
-  //   throw new functions.https.HttpsError(
-  //     "unauthenticated",
-  //     "The function must be called while authenticated."
-  //   );
-  // }
-  // Optional: Berechtigungsprüfung für die childId
-  // const userId = context.auth.uid;
-  // const canCreateForChild = await checkUserPermissionForChild(userId, data.childId);
-  // if (!canCreateForChild) {
-  //   throw new functions.https.HttpsError(
-  //     "permission-denied",
-  //     "You do not have permission to create a pairing code for this child."
-  //   );
-  // }
+export const createPairingCode = functions.https.onCall(
+  async (data: any, context: any) => {
+  // Authenticate request
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
 
-  const childId = (data as any).childId;
+  // Authorize user for the provided childId
+  const userId = context.auth.uid;
+  const requestedChildId = (data as any).childId;
+  const canCreateForChild = await checkUserPermissionForChild(
+    userId,
+    requestedChildId
+  );
+  if (!canCreateForChild) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "You do not have permission to create a pairing code for this child."
+    );
+  }
+  const childId = requestedChildId;
   if (!childId || typeof childId !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -82,13 +87,15 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
     "resource-exhausted",
     "Could not generate a unique pairing code. Please try again later."
   );
-});
+  }
+);
 
 /**
  * Validates a given pairingCode, and if valid, returns the associated childId
  * and deletes the pairing code.
  */
-export const validatePairingCode = functions.https.onCall(async (data, context) => {
+export const validatePairingCode = functions.https.onCall(
+  async (data: any, context: any) => {
   const pairingCode = (data as any).pairingCode;
 
   if (!pairingCode || typeof pairingCode !== "string") {
@@ -184,14 +191,16 @@ export const validatePairingCode = functions.https.onCall(async (data, context) 
       error // Include original error for server-side logging if needed
     );
   }
-});
+  }
+);
 
 /**
  * Registers a new master device based on its IMEI.
  * Creates a permanent profile for the master device with a secret key.
  */
-export const registerMasterDevice = functions.https.onCall(async (data, context) => {
-  const imei = data.imei;
+export const registerMasterDevice = functions.https.onCall(
+  async (data: any, context: any) => {
+  const imei = (data as any).imei;
   if (!imei || typeof imei !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -237,13 +246,15 @@ export const registerMasterDevice = functions.https.onCall(async (data, context)
       error
     );
   }
-});
+  }
+);
 
 /**
  * Generates a single-use pairing token for an authenticated master device.
  */
-export const generatePairingLink = functions.https.onCall(async (data, context) => {
-  const { imei, secretKey } = data;
+export const generatePairingLink = functions.https.onCall(
+  async (data: any, context: any) => {
+  const { imei, secretKey } = data as any;
 
   if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
     throw new functions.https.HttpsError(
@@ -292,7 +303,8 @@ export const generatePairingLink = functions.https.onCall(async (data, context) 
       error
     );
   }
-});
+  }
+);
 
 
 // Beispiel Firestore-Struktur für `pairingCodes/{generatedCode}`:
@@ -302,19 +314,41 @@ export const generatePairingLink = functions.https.onCall(async (data, context) 
 //   "expiresAt": "Timestamp(seconds=..., nanoseconds=...)"
 // }
 
-// Helper function for permission check (example, not implemented)
-// async function checkUserPermissionForChild(userId: string, childId: string): Promise<boolean> {
-//   // Implement logic to check if userId is authorized for childId
-//   // e.g., by looking up user roles or child-parent relationships in another collection
-//   return true; // Placeholder
-// }
+// Helper function to check if a user is allowed to create a pairing code for a
+// given child. This sample implementation assumes a Firestore structure where
+// each user has a subcollection `children` containing the child IDs they are
+// permitted to manage.
+async function checkUserPermissionForChild(
+  userId: string,
+  childId: string
+): Promise<boolean> {
+  try {
+    const permissionDoc = await db
+      .collection("users")
+      .doc(userId)
+      .collection("children")
+      .doc(childId)
+      .get();
+    return permissionDoc.exists;
+  } catch (error) {
+    functions.logger.error(
+      "Error checking permissions for user",
+      userId,
+      "and child",
+      childId,
+      error
+    );
+    return false;
+  }
+}
 
 /**
  * Validates a single-use pairing token, and if valid, creates a
  * permanent child device profile linked to the master device.
  */
-export const validatePairingToken = functions.https.onCall(async (data, context) => {
-  const { pairingToken, childImei } = data;
+export const validatePairingToken = functions.https.onCall(
+  async (data: any, context: any) => {
+  const { pairingToken, childImei } = data as any;
 
   if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
     throw new functions.https.HttpsError(
@@ -374,4 +408,5 @@ export const validatePairingToken = functions.https.onCall(async (data, context)
       error
     );
   }
-});
+  }
+);
