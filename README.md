@@ -8,7 +8,7 @@ Die Android-App ermöglicht es, ein Kindergerät über einen 6-stelligen Code mi
 
 - **Kopplungs-Flow**: Ein `PairingScreen` sammelt den Code, der von der Cloud Function `validatePairingCode` überprüft wird. Bei Erfolg wird die `childId` lokal gespeichert und die App navigiert zum `LockScreen`.
 - **Lokaler Speicher**: `ChildIdRepository` verwendet Jetpack DataStore, um die `childId` persistent zu speichern. Ein globaler `ChildIdProvider` stellt die ID als reaktiven `StateFlow` für die gesamte App bereit.
-- **Backend-Integration**: Cloud Functions in `index.ts` implementieren die Backend-Logik. Dies umfasst die alte Kopplungsmethode (`createPairingCode`, `validatePairingCode`) sowie die neue Funktion `registerMasterDevice` zur Erstellung eines permanenten, sicheren Profils für ein Elterngerät.
+- **Backend-Integration**: Cloud Functions in `index.ts` implementieren die Backend-Logik. Dies umfasst die alte Kopplungsmethode (`createPairingCode`, `validatePairingCode`) sowie die neuen Funktionen für die IMEI-basierte Kopplung: `registerMasterDevice` (erstellt ein permanentes Profil für ein Elterngerät) und `generatePairingLink` (erstellt einen einmalig verwendbaren Kopplungs-Token).
 - **Dependency Injection**: Die App nutzt Hilt für Dependency Injection.
 - **Internationalisierung (i18n)**: Alle Texte sind in Englisch, Deutsch, Französisch und vereinfachtem Chinesisch vorhanden.
 - **Testing**: Das Projekt umfasst Unit-Tests für die Backend-Logik, sowie Unit-, Integrations- und UI-Tests für die Android-App.
@@ -77,7 +77,7 @@ Nachdem der Gradle Wrapper generiert wurde, können Sie die Tests über die Komm
 
 ### 3. Android App (masterApp)
 
-Die `masterApp` ist die neue, in Entwicklung befindliche Anwendung für das Elterngerät. Ihr erster Zweck ist es, eine eindeutige Geräte-ID (IMEI) zu erfassen, die als Basis für den neuen Kopplungsmechanismus dienen wird.
+Die `masterApp` ist die neue, in Entwicklung befindliche Anwendung für das Elterngerät. Sie kann das Gerät beim Backend registrieren (basierend auf der IMEI) und anschließend einmalig verwendbare Kopplungs-Token für die `childApp` generieren.
 
 **Setup und Bauen:**
 Das Projekt ist nun als Multi-Modul-Projekt konfiguriert.
@@ -126,3 +126,17 @@ Diese Collection speichert die permanenten Profile für jedes registrierte Elter
   }
   ```
 - **Sicherheitsregeln:** Genau wie bei den `pairingCodes` ist der direkte Client-Zugriff auf diese Collection vollständig gesperrt.
+
+### `pairingTokens` Collection
+
+Diese Collection speichert die einmalig verwendbaren Tokens, die von der `masterApp` generiert werden, um eine `childApp` zu koppeln.
+
+- **Struktur eines Dokuments (`/pairingTokens/{token}`):**
+  ```json
+  {
+    "masterImei": "string",
+    "createdAt": "Timestamp",
+    "expiresAt": "Timestamp"
+  }
+  ```
+- **Sicherheitsregeln:** Der direkte Client-Zugriff auf diese Collection ist vollständig gesperrt.
