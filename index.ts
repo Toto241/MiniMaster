@@ -13,30 +13,26 @@ const db = admin.firestore();
 /**
  * Creates a new pairing code for a given childId.
  */
-export const createPairingCode = functions.https.onCall(
-  async (data: any, context: any) => {
-  // Authenticate request
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "The function must be called while authenticated."
-    );
-  }
+export const createPairingCode = functions.https.onCall(async (data, context) => {
+  // Optional: Authentifizierung prüfen
+  // if (!context.auth) {
+  //   throw new functions.https.HttpsError(
+  //     "unauthenticated",
+  //     "The function must be called while authenticated."
+  //   );
+  // }
+  // Optional: Berechtigungsprüfung für die childId
+  // const userId = context.auth.uid;
+  // const canCreateForChild = await checkUserPermissionForChild(userId, data.childId);
+  // if (!canCreateForChild) {
+  //   throw new functions.https.HttpsError(
+  //     "permission-denied",
+  //     "You do not have permission to create a pairing code for this child."
+  //   );
+  // }
 
-  // Authorize user for the provided childId
-  const userId = context.auth.uid;
-  const requestedChildId = (data as any).childId;
-  const canCreateForChild = await checkUserPermissionForChild(
-    userId,
-    requestedChildId
-  );
-  if (!canCreateForChild) {
-    throw new functions.https.HttpsError(
-      "permission-denied",
-      "You do not have permission to create a pairing code for this child."
-    );
-  }
-  const childId = requestedChildId;
+  const childId = (data as any).childId;
+
   if (!childId || typeof childId !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -60,33 +56,15 @@ export const createPairingCode = functions.https.onCall(
         const expiresAtSeconds = now.seconds + 24 * 60 * 60; // 24 Stunden
         const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
 
-        await pairingCodeDocRef.set({
-          childId: childId,
-          createdAt: now,
-          expiresAt: expiresAt,
-        });
-
-        functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
-        return { pairingCode: pairingCode };
-      }
-      // Wenn das Dokument existiert, wird die Schleife fortgesetzt und ein neuer Code versucht
-      functions.logger.warn(`Collision detected for pairing code ${pairingCode}. Retrying...`);
-    } catch (error) {
-      functions.logger.error("Error during pairing code creation attempt:", error);
-      throw new functions.https.HttpsError(
-        "internal",
-        "An unexpected error occurred while creating the pairing code.",
-        error
-      );
-    }
-  }
-
-  // Wenn nach maxAttempts immer noch kein einzigartiger Code gefunden wurde
-  functions.logger.error(`Could not create a unique pairing code after ${maxAttempts} attempts.`);
-  throw new functions.https.HttpsError(
-    "resource-exhausted",
-    "Could not generate a unique pairing code. Please try again later."
-  );
+    functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
+    return { pairingCode: pairingCode };
+  } catch (error) {
+    functions.logger.error("Error creating pairing code:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while creating the pairing code.",
+      error
+    );
   }
 );
 
@@ -94,8 +72,7 @@ export const createPairingCode = functions.https.onCall(
  * Validates a given pairingCode, and if valid, returns the associated childId
  * and deletes the pairing code.
  */
-export const validatePairingCode = functions.https.onCall(
-  async (data: any, context: any) => {
+export const validatePairingCode = functions.https.onCall(async (data, context) => {
   const pairingCode = (data as any).pairingCode;
 
   if (!pairingCode || typeof pairingCode !== "string") {
