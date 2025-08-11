@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { v4 as uuidv4 } from "uuid";
 
 // Initialize Firebase Admin SDK
 // Ensure this is done only once, typically at the top level of your index.ts
@@ -31,6 +32,7 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
   // }
 
   const childId = (data as any).childId;
+
   if (!childId || typeof childId !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -38,22 +40,21 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
     );
   }
 
-  // Code-Generierung (6-stellige Zahl als String)
-  const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const pairingCodesRef = db.collection("pairingCodes");
+  const maxAttempts = 10; // Verhindert eine Endlosschleife
 
-  // Ablaufdatum (24 Stunden in der Zukunft)
-  const now = admin.firestore.Timestamp.now();
-  const expiresAtSeconds = now.seconds + 24 * 60 * 60; // 24 hours in seconds
-  const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Code-Generierung (6-stellige Zahl als String)
+    const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
 
-  try {
-    // Speichern in Firestore
-    const pairingCodeRef = db.collection("pairingCodes").doc(pairingCode);
-    await pairingCodeRef.set({
-      childId: childId,
-      createdAt: now, // Optional: Store creation time for auditing or other purposes
-      expiresAt: expiresAt,
-    });
+    try {
+      const doc = await pairingCodeDocRef.get();
+      if (!doc.exists) {
+        // Code ist einzigartig, wir können ihn verwenden
+        const now = admin.firestore.Timestamp.now();
+        const expiresAtSeconds = now.seconds + 24 * 60 * 60; // 24 Stunden
+        const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
 
     functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
     return { pairingCode: pairingCode };
@@ -65,7 +66,7 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
       error
     );
   }
-});
+);
 
 /**
  * Validates a given pairingCode, and if valid, returns the associated childId
@@ -167,7 +168,121 @@ export const validatePairingCode = functions.https.onCall(async (data, context) 
       error // Include original error for server-side logging if needed
     );
   }
-});
+  }
+);
+
+/**
+ * Registers a new master device based on its IMEI.
+ * Creates a permanent profile for the master device with a secret key.
+ */
+export const registerMasterDevice = functions.https.onCall(
+  async (data: any, context: any) => {
+  const imei = (data as any).imei;
+  if (!imei || typeof imei !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "The function must be called with a valid 'imei' string."
+    );
+  }
+
+  const masterDeviceRef = db.collection("masters").doc(imei);
+
+  try {
+    const doc = await masterDeviceRef.get();
+    if (doc.exists) {
+      // This device is already registered.
+      // For security, we could return the existing key or an error.
+      // Returning an error is safer to prevent probing.
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "This device has already been registered."
+      );
+    }
+
+    // Device is not registered, create a new profile.
+    const secretKey = uuidv4();
+    const now = admin.firestore.Timestamp.now();
+
+    await masterDeviceRef.set({
+      imei: imei,
+      secretKey: secretKey,
+      createdAt: now,
+    });
+
+    functions.logger.info(`Master device registered with IMEI: ${imei}`);
+    return { secretKey: secretKey };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error; // Re-throw HttpsError to be sent to client
+    }
+    functions.logger.error("Error registering master device:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while registering the device.",
+      error
+    );
+  }
+  }
+);
+
+/**
+ * Generates a single-use pairing token for an authenticated master device.
+ */
+export const generatePairingLink = functions.https.onCall(
+  async (data: any, context: any) => {
+  const { imei, secretKey } = data as any;
+
+  if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Request must include a valid 'imei' and 'secretKey'."
+    );
+  }
+
+  const masterDeviceRef = db.collection("masters").doc(imei);
+
+  try {
+    const doc = await masterDeviceRef.get();
+    if (!doc.exists || doc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Invalid IMEI or secret key."
+      );
+    }
+
+    // Device is authenticated, create a new single-use token.
+    const pairingToken = uuidv4();
+    const now = admin.firestore.Timestamp.now();
+    const expiresAtSeconds = now.seconds + 5 * 60; // Token expires in 5 minutes
+    const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
+
+    const tokenRef = db.collection("pairingTokens").doc(pairingToken);
+    await tokenRef.set({
+      masterImei: imei,
+      createdAt: now,
+      expiresAt: expiresAt,
+    });
+
+    functions.logger.info(`Pairing token created for master IMEI: ${imei}`);
+    // In a real app, we would return a full URL, e.g., using Firebase Dynamic Links.
+    // For now, returning the token itself is sufficient for the next step.
+    return { pairingToken: pairingToken };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error; // Re-throw HttpsError to be sent to client
+    }
+    functions.logger.error("Error generating pairing link:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while generating the pairing link.",
+      error
+    );
+  }
+  }
+);
+
 
 // Beispiel Firestore-Struktur für `pairingCodes/{generatedCode}`:
 // {
@@ -176,9 +291,99 @@ export const validatePairingCode = functions.https.onCall(async (data, context) 
 //   "expiresAt": "Timestamp(seconds=..., nanoseconds=...)"
 // }
 
-// Helper function for permission check (example, not implemented)
-// async function checkUserPermissionForChild(userId: string, childId: string): Promise<boolean> {
-//   // Implement logic to check if userId is authorized for childId
-//   // e.g., by looking up user roles or child-parent relationships in another collection
-//   return true; // Placeholder
-// }
+// Helper function to check if a user is allowed to create a pairing code for a
+// given child. This sample implementation assumes a Firestore structure where
+// each user has a subcollection `children` containing the child IDs they are
+// permitted to manage.
+async function checkUserPermissionForChild(
+  userId: string,
+  childId: string
+): Promise<boolean> {
+  try {
+    const permissionDoc = await db
+      .collection("users")
+      .doc(userId)
+      .collection("children")
+      .doc(childId)
+      .get();
+    return permissionDoc.exists;
+  } catch (error) {
+    functions.logger.error(
+      "Error checking permissions for user",
+      userId,
+      "and child",
+      childId,
+      error
+    );
+    return false;
+  }
+}
+
+/**
+ * Validates a single-use pairing token, and if valid, creates a
+ * permanent child device profile linked to the master device.
+ */
+export const validatePairingToken = functions.https.onCall(
+  async (data: any, context: any) => {
+  const { pairingToken, childImei } = data as any;
+
+  if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Request must include a valid 'pairingToken' and 'childImei'."
+    );
+  }
+
+  const tokenRef = db.collection("pairingTokens").doc(pairingToken);
+
+  try {
+    const tokenDoc = await tokenRef.get();
+
+    if (!tokenDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Pairing token is invalid.");
+    }
+
+    const tokenData = tokenDoc.data();
+    if (!tokenData) {
+      // Should not happen, but for safety
+      await tokenRef.delete();
+      throw new functions.https.HttpsError("internal", "Pairing token data is missing.");
+    }
+
+    // Check for expiration
+    const expiresAt = tokenData.expiresAt as admin.firestore.Timestamp;
+    const now = admin.firestore.Timestamp.now();
+    if (now.seconds > expiresAt.seconds) {
+      await tokenRef.delete();
+      throw new functions.https.HttpsError("deadline-exceeded", "Pairing token has expired.");
+    }
+
+    // Token is valid. Create the child device profile.
+    const childDeviceRef = db.collection("children").doc(childImei);
+    await childDeviceRef.set({
+      childImei: childImei,
+      masterImei: tokenData.masterImei,
+      pairedAt: now,
+    });
+
+    // Delete the used token to prevent reuse.
+    await tokenRef.delete();
+
+    functions.logger.info(`Child device ${childImei} successfully paired with master ${tokenData.masterImei}.`);
+
+    // Return the masterImei as the child's new ID for consistency with the old flow.
+    return { childId: tokenData.masterImei };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error; // Re-throw HttpsError to be sent to client
+    }
+    functions.logger.error("Error validating pairing token:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while validating the pairing token.",
+      error
+    );
+  }
+  }
+);
