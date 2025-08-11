@@ -145,7 +145,7 @@ fun DebugInfoView(debugState: DebugState, linkState: LinkGenerationState) {
             is LinkGenerationState.Success -> "Success: ${linkState.pairingToken}"
             is LinkGenerationState.Error -> "Error: ${linkState.message}"
         }
-        Text("Link Status: $linkStatus", style = MaterialTheme.typography.caption)
+        Text("Link Status: $linkStatus", style = MaterialTheme.typography.caption, modifier = Modifier.testTag("debug_link_status"))
     }
 }
 
