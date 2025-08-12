@@ -32,8 +32,21 @@ service cloud.firestore {
 
     // Regeln für die children Collection
     // Speichert die Profile der gekoppelten Kindergeräte.
+    // Nur der Server (Cloud Functions) darf schreiben, aber wir fügen Validierung hinzu.
     match /children/{childId} {
+      // Clients können nicht direkt lesen oder schreiben.
       allow read, write: if false;
+
+      // Diese Regel gilt nicht für das Admin SDK, aber sie ist eine gute Praxis,
+      // um die Datenstruktur zu dokumentieren und für zukünftige, detailliertere Regeln vorzubereiten.
+      // Zukünftige Regel könnte sein: `allow update: if isOwner(childId) && validateData(request.resource.data);`
+      function validateChildData(data) {
+        return data.isLocked is bool &&
+               data.appBlacklist is list &&
+               data.usageRules is map &&
+               (data.lastSeen is timestamp || data.lastSeen == null) &&
+               (data.fcmToken is string || data.fcmToken == null);
+      }
     }
 
     // Beispiel für Regeln anderer Collections (falls vorhanden und benötigt):
