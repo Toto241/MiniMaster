@@ -14,7 +14,9 @@
 
     <!-- Message displayed on the lock screen. The %1$s placeholder will be replaced by the unique Child ID. -->
     <!-- Example: "App is locked. Child ID: child12345" -->
+    <string name="lock_screen_title">Device Locked</string>
     <string name="lock_screen_message">App is locked. Child ID: %1$s</string>
+    <string name="view_tasks_button">View Tasks</string>
 
     <!-- Error message displayed when the entered pairing code has passed its expiration time. -->
     <string name="error_code_expired">Pairing code has expired.</string>
