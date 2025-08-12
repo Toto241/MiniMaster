@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">Kinder-App</string>
+    <string name="lock_screen_title">Gerät gesperrt</string>
     <string name="lock_screen_message">App ist gesperrt. Kind-ID: %1$s</string>
+    <string name="view_tasks_button">Aufgaben anzeigen</string>
     <string name="pairing_screen_title">Kopplungsbildschirm</string>
     <string name="pairing_code_input_label">Kopplungscode eingeben</string>
     <string name="pairing_button_text">Gerät koppeln</string>
