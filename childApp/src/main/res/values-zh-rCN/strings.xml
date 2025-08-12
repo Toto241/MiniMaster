@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">儿童应用</string>
+    <string name="lock_screen_title">设备已锁定</string>
     <string name="lock_screen_message">应用程序已锁定。孩子ID：%1$s</string>
+    <string name="view_tasks_button">查看任务</string>
     <string name="pairing_screen_title">配对屏幕</string>
     <string name="pairing_code_input_label">输入配对码</string>
     <string name="pairing_button_text">配对设备</string>
