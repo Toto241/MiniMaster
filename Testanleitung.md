@@ -92,13 +92,48 @@ Diese Tests überprüfen den gesamten Kopplungs-Flow aus Benutzersicht.
 
 ---
 
-**Testfall M-06: Internationalisierung (i18n)**
+## 3. Manuelle Tests für Kernfunktionen
+
+Nachdem die Geräte erfolgreich gekoppelt wurden, können die folgenden Kernfunktionen getestet werden.
+
+**Testfall F-01: Gerät sperren und entsperren**
+
+1.  Starten Sie die `masterApp` auf Gerät A. Nach der Registrierung sollte das Dashboard mit dem gekoppelten Kindergerät (Gerät B) erscheinen.
+2.  Auf dem Dashboard sehen Sie neben der ID des Kindes einen Schalter für "Locked". Betätigen Sie diesen Schalter.
+3.  **Erwartetes Ergebnis:** In der `masterApp` wird der Status des Schalters aktualisiert. Auf der `childApp` (Gerät B) sollte fast in Echtzeit der Sperrbildschirm erscheinen oder, falls bereits gesperrt, eine sichtbare Änderung stattfinden (dies hängt von der finalen UI-Implementierung ab). Das Entsperren funktioniert auf die gleiche Weise.
+
+**Testfall F-02: Aufgabe für ein Kind erstellen**
+
+1.  Klicken Sie in der `masterApp` auf dem Dashboard beim gewünschten Kind auf **"Create Task"**.
+2.  Sie werden zum "Create Task"-Bildschirm weitergeleitet.
+3.  Geben Sie eine Aufgabenbeschreibung (z.B. "Zimmer aufräumen") und eine Deadline (als Unix-Timestamp, z.B. `1735689600000` für 1. Jan 2025) ein.
+4.  Klicken Sie auf **"Create Task"**.
+5.  **Erwartetes Ergebnis:** Sie werden zum Dashboard zurückgeleitet. In der `childApp` (Gerät B) sollte nach dem Navigieren zum Aufgabenbildschirm die neue Aufgabe in der Liste erscheinen.
+
+**Testfall F-03: Aufgabe als Kind erledigen (mit Fotonachweis)**
+
+1.  Starten Sie die `childApp` auf Gerät B und navigieren Sie zum Aufgabenbildschirm.
+2.  Suchen Sie eine offene Aufgabe und klicken Sie auf **"Complete"**.
+3.  **Erwartetes Ergebnis:** Die Kamera-App des Geräts öffnet sich.
+4.  Machen Sie ein Foto als Nachweis und bestätigen Sie es.
+5.  **Erwartetes Ergebnis:** Sie kehren zur App zurück. Der Status der Aufgabe ändert sich zu "Pending Approval". Im Hintergrund wird das Foto in Firebase Storage hochgeladen und die Aufgabe im Backend aktualisiert.
+
+**Testfall F-04: Aufgabe als Elternteil genehmigen**
+
+1.  Führen Sie Testfall F-03 erfolgreich aus.
+2.  Klicken Sie in der `masterApp` auf dem Dashboard auf **"Review Tasks"**.
+3.  **Erwartetes Ergebnis:** Sie sehen eine Liste der Aufgaben, die auf Genehmigung warten.
+4.  Klicken Sie auf eine Aufgabe. Das von Kind B hochgeladene Foto wird angezeigt.
+5.  Klicken Sie auf **"Approve Task"**.
+6.  **Erwartetes Ergebnis:** Die Aufgabe verschwindet aus der Review-Liste. In der `childApp` wird der Status der Aufgabe als "Approved" angezeigt.
+
+**Testfall F-05: Internationalisierung (i18n)**
 
 1.  Ändern Sie die Gerätesprache auf Gerät A und B (z.B. auf Deutsch, Französisch oder Chinesisch).
 2.  Führen Sie die Apps aus.
 3.  **Erwartetes Ergebnis:** Alle Texte in der Benutzeroberfläche (Titel, Buttons, Fehlermeldungen) werden in der eingestellten Sprache korrekt angezeigt. Bei einer nicht unterstützten Sprache fallen die Texte auf Englisch zurück.
 
-## 3. Automatisierte Tests
+## 4. Automatisierte Tests
 
 Das Projekt enthält bereits eine Reihe von automatisierten Tests und kann um einen End-to-End-Test erweitert werden.
 
@@ -109,6 +144,9 @@ Diese Tests validieren die Logik der Cloud Functions (in `index.ts`) isoliert.
 
 ### 3.2. Android Unit-Tests
 Diese Tests laufen schnell auf der lokalen JVM und prüfen einzelne Komponenten wie ViewModels oder Repositories, ohne dass ein Emulator benötigt wird.
+
+*Hinweis: Die folgenden Befehle setzen voraus, dass ein Gradle Wrapper (`gradlew`) im Projekt vorhanden ist. Da dieser aktuell fehlt, können die Tests nicht direkt über die Kommandozeile ausgeführt werden. Sie können jedoch innerhalb von Android Studio für die jeweiligen Module (`childApp`, `masterApp`) gestartet werden.*
+
 *   **Befehl (Child-App):** `./gradlew :childApp:test`
 *   **Befehl (Master-App):** `./gradlew :masterApp:test`
 
