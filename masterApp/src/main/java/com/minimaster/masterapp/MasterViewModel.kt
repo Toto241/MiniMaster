@@ -33,7 +33,8 @@ data class DebugState(
 
 @HiltViewModel
 class MasterViewModel @Inject constructor(
-    private val functions: FirebaseFunctions
+    private val functions: FirebaseFunctions,
+    private val credentialsRepository: MasterCredentialsRepository
 ) : ViewModel() {
 
     private val _registrationState = MutableStateFlow<RegistrationState>(RegistrationState.Idle)
@@ -45,20 +46,30 @@ class MasterViewModel @Inject constructor(
     private val _debugState = MutableStateFlow(DebugState())
     val debugState: StateFlow<DebugState> = _debugState.asStateFlow()
 
+    init {
+        checkRegistrationStatus()
+    }
+
+    private fun checkRegistrationStatus() {
+        viewModelScope.launch {
+            credentialsRepository.getCredentials.collect { (imei, secret) ->
+                if (!imei.isNullOrEmpty() && !secret.isNullOrEmpty()) {
+                    _registrationState.value = RegistrationState.Success("Device already registered.")
+                }
+            }
+        }
+    }
+
     fun registerDevice(imei: String) {
         viewModelScope.launch {
             _registrationState.value = RegistrationState.Loading
-
             val data = hashMapOf("imei" to imei)
-
             try {
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
                 val key = (result.data as? Map<String, Any>)?.get("secretKey") as? String
                 if (key != null) {
-
-                    // Update debug state with credentials
-                    _debugState.value = DebugState(imei = imei, secretKey = key)
-
+                    // Save credentials to repository
+                    credentialsRepository.saveCredentials(imei, key)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
                      _registrationState.value = RegistrationState.Error("Backend returned no secret key.")
