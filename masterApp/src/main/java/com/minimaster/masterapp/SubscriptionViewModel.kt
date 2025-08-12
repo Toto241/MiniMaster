@@ -17,7 +17,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SubscriptionViewModel @Inject constructor(
     private val billingClientWrapper: BillingClientWrapper,
-    private val functions: FirebaseFunctions
+    private val functions: FirebaseFunctions,
+    private val credentialsRepository: MasterCredentialsRepository
 ) : ViewModel() {
 
     val productDetails: StateFlow<List<ProductDetails>> = billingClientWrapper.productDetails
@@ -28,9 +29,6 @@ class SubscriptionViewModel @Inject constructor(
     )
 
     private val TAG = "SubscriptionViewModel"
-    // TODO: Replace with actual master device credentials from secure storage
-    private val masterImei = "master-device-imei-placeholder"
-    private val secretKey = "master-device-secret-placeholder"
 
     init {
         billingClientWrapper.startConnection()
@@ -42,9 +40,15 @@ class SubscriptionViewModel @Inject constructor(
 
     fun verifyPurchase(purchase: com.android.billingclient.api.Purchase) {
         viewModelScope.launch {
+            val (imei, secret) = credentialsRepository.getCredentials.first()
+            if (imei == null || secret == null) {
+                Log.e(TAG, "Cannot verify purchase, master credentials not found.")
+                return@launch
+            }
+
             val data = hashMapOf(
-                "masterImei" to masterImei,
-                "secretKey" to secretKey,
+                "masterImei" to imei,
+                "secretKey" to secret,
                 "purchaseToken" to purchase.purchaseToken,
                 "sku" to purchase.products.firstOrNull()
             )
