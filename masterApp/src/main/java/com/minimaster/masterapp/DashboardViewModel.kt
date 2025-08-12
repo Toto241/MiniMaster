@@ -29,7 +29,8 @@ data class ReviewableTask(
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val functions: FirebaseFunctions
+    private val functions: FirebaseFunctions,
+    private val credentialsRepository: MasterCredentialsRepository
 ) : ViewModel() {
 
     private val _children = MutableStateFlow<List<ChildDevice>>(emptyList())
@@ -39,80 +40,78 @@ class DashboardViewModel @Inject constructor(
     val reviewableTasks: StateFlow<List<ReviewableTask>> = _reviewableTasks.asStateFlow()
 
     private val TAG = "DashboardViewModel"
-    // TODO: Replace with actual master device credentials from secure storage
-    private val masterImei = "master-device-imei-placeholder"
-    private val secretKey = "master-device-secret-placeholder"
 
     init {
-        loadChildren()
-        loadTasksForReview()
-    }
-
-    private fun loadTasksForReview() {
         viewModelScope.launch {
-            firestore.collectionGroup("tasks")
-                .whereEqualTo("status", "pending_approval")
-                .addSnapshotListener { snapshots, e ->
-                    if (e != null) {
-                        Log.w(TAG, "Listen for reviewable tasks failed.", e)
-                        return@addSnapshotListener
-                    }
-
-                    val tasks = snapshots?.mapNotNull { doc ->
-                        // We need to verify this task belongs to a child of the current master
-                        val childId = doc.reference.parent.parent?.id ?: return@mapNotNull null
-                        ReviewableTask(
-                            taskId = doc.id,
-                            childId = childId,
-                            description = doc.getString("description") ?: "",
-                            photoUrl = doc.getString("photoUrl") ?: ""
-                        )
-                    } ?: emptyList()
-
-                    // This is a simplified filter. A real app might need to cross-reference
-                    // with the children list to ensure the task belongs to this master.
-                    _reviewableTasks.value = tasks
+            credentialsRepository.getCredentials.collect { (imei, _) ->
+                if (imei != null) {
+                    loadChildren(imei)
+                    loadTasksForReview(imei)
                 }
+            }
         }
     }
 
-    private fun loadChildren() {
-        viewModelScope.launch {
-            firestore.collection("children")
-                .whereEqualTo("masterImei", masterImei)
-                .addSnapshotListener { snapshots, e ->
-                    if (e != null) {
-                        Log.w(TAG, "Listen failed.", e)
-                        return@addSnapshotListener
-                    }
-
-                    val childrenList = snapshots?.map { doc ->
-                        ChildDevice(
-                            id = doc.id,
-                            isLocked = doc.getBoolean("isLocked") ?: false,
-                            lastSeen = doc.getTimestamp("lastSeen")?.seconds
-                        )
-                    } ?: emptyList()
-
-                    _children.value = childrenList
-                    Log.d(TAG, "Child devices loaded: ${childrenList.size}")
+    private fun loadTasksForReview(masterImei: String) {
+        firestore.collectionGroup("tasks")
+            .whereEqualTo("status", "pending_approval")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) {
+                    Log.w(TAG, "Listen for reviewable tasks failed.", e)
+                    return@addSnapshotListener
                 }
-        }
+
+                val tasks = snapshots?.mapNotNull { doc ->
+                    val childId = doc.reference.parent.parent?.id ?: return@mapNotNull null
+                    ReviewableTask(
+                        taskId = doc.id,
+                        childId = childId,
+                        description = doc.getString("description") ?: "",
+                        photoUrl = doc.getString("photoUrl") ?: ""
+                    )
+                } ?: emptyList()
+
+                // In a real app, we would cross-reference with a list of this master's children
+                // For now, we assume all pending tasks are for this master.
+                _reviewableTasks.value = tasks
+            }
+    }
+
+    private fun loadChildren(masterImei: String) {
+        firestore.collection("children")
+            .whereEqualTo("masterImei", masterImei)
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e)
+                    return@addSnapshotListener
+                }
+
+                val childrenList = snapshots?.map { doc ->
+                    ChildDevice(
+                        id = doc.id,
+                        isLocked = doc.getBoolean("isLocked") ?: false,
+                        lastSeen = doc.getTimestamp("lastSeen")?.seconds
+                    )
+                } ?: emptyList()
+
+                _children.value = childrenList
+                Log.d(TAG, "Child devices loaded: ${childrenList.size}")
+            }
     }
 
     fun setDeviceLocked(childImei: String, isLocked: Boolean) {
         viewModelScope.launch {
+            val (imei, secret) = credentialsRepository.getCredentials.first()
+            if (imei == null || secret == null) return@launch
+
             val data = hashMapOf(
-                "masterImei" to masterImei,
-                "secretKey" to secretKey,
+                "masterImei" to imei,
+                "secretKey" to secret,
                 "childImei" to childImei,
                 "isLocked" to isLocked
             )
             try {
-                functions
-                    .getHttpsCallable("setDeviceLocked")
-                    .call(data)
-                    .await()
+                functions.getHttpsCallable("setDeviceLocked").call(data).await()
                 Log.d(TAG, "setDeviceLocked called successfully for $childImei")
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling setDeviceLocked", e)
@@ -122,21 +121,21 @@ class DashboardViewModel @Inject constructor(
 
     fun createTask(childImei: String, description: String, deadline: Long) {
         viewModelScope.launch {
+            val (imei, secret) = credentialsRepository.getCredentials.first()
+            if (imei == null || secret == null) return@launch
+
             val deadlineISO = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
                 .format(java.util.Date(deadline))
 
             val data = hashMapOf(
-                "masterImei" to masterImei,
-                "secretKey" to secretKey,
+                "masterImei" to imei,
+                "secretKey" to secret,
                 "childImei" to childImei,
                 "description" to description,
                 "deadlineISO" to deadlineISO
             )
             try {
-                functions
-                    .getHttpsCallable("createTask")
-                    .call(data)
-                    .await()
+                functions.getHttpsCallable("createTask").call(data).await()
                 Log.d(TAG, "createTask called successfully for $childImei")
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling createTask", e)
@@ -146,17 +145,17 @@ class DashboardViewModel @Inject constructor(
 
     fun approveTask(childImei: String, taskId: String) {
         viewModelScope.launch {
+            val (imei, secret) = credentialsRepository.getCredentials.first()
+            if (imei == null || secret == null) return@launch
+
             val data = hashMapOf(
-                "masterImei" to masterImei,
-                "secretKey" to secretKey,
+                "masterImei" to imei,
+                "secretKey" to secret,
                 "childImei" to childImei,
                 "taskId" to taskId
             )
             try {
-                functions
-                    .getHttpsCallable("approveTask")
-                    .call(data)
-                    .await()
+                functions.getHttpsCallable("approveTask").call(data).await()
                 Log.d(TAG, "approveTask called successfully for task $taskId")
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling approveTask", e)

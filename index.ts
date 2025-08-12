@@ -715,9 +715,15 @@ export const verifyPurchase = functions.https.onCall(
       throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
     }
 
-    // TODO: Implement actual verification with Google Play Developer API
-    // This requires setting up OAuth2 credentials and calling the API.
-    // For this example, we will assume the purchase is valid and grant entitlement.
+    // TODO: IMPLEMENTATION REQUIRED FOR PRODUCTION
+    // The following is a placeholder. For a real application, you must verify the
+    // purchaseToken with the Google Play Developer API to prevent fraud.
+    // 1. Set up OAuth 2.0 credentials in your Google Cloud project.
+    // 2. Use a library like 'googleapis' to make an authenticated request.
+    // 3. Call the `purchases.subscriptions.get` endpoint.
+    //    See: https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions/get
+    // 4. Check the `purchaseState` and other fields from the API response.
+    // For this example, we will assume the purchase is always valid.
     const isPurchaseValid = true;
 
     if (isPurchaseValid) {
