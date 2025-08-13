@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.TimeZone
 import javax.inject.Inject
 
 data class ChildDevice(
@@ -124,8 +125,9 @@ class DashboardViewModel @Inject constructor(
             val (imei, secret) = credentialsRepository.getCredentials.first()
             if (imei == null || secret == null) return@launch
 
-            val deadlineISO = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
-                .format(java.util.Date(deadline))
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+            sdf.timeZone = TimeZone.getTimeZone("UTC")
+            val deadlineISO = sdf.format(java.util.Date(deadline))
 
             val data = hashMapOf(
                 "masterImei" to imei,
