@@ -2,25 +2,25 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Define the path for task proof uploads.
-    // The path includes the child's unique ID and the task ID to ensure separation.
+    // Helper function to check if a user is authenticated.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // This rule matches the new data model where photos are stored under a family.
+    // It ensures that only an authenticated member of the correct family can upload a photo.
+    match /families/{familyId}/children/{childId}/photos/{fileName} {
+      allow read: if isSignedIn() && request.auth.token.familyId == familyId;
+
+      allow write: if isSignedIn()
+                   && request.auth.token.familyId == familyId
+                   && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                   && request.resource.contentType.matches('image/.*'); // Only images
+    }
+
+    // The old path is now deprecated. Deny all access.
     match /proofs/{childId}/{taskId} {
-
-      // Allow write (upload) access only if the user is authenticated.
-      // In a production app with full authentication, this rule would be stricter.
-      // For example, it would verify that the `uid` of the authenticated user
-      // corresponds to the `childId` in the path.
-      // e.g., allow write: if request.auth != null && request.auth.uid == childId;
-      // For now, we'll keep it simple as the full user auth flow is not yet built.
-      
-      allow write: if request.auth != null &&
-                      request.resource.size < 5 * 1024 * 1024 && // Max 5MB
-                      request.resource.contentType.matches('image/.*'); // Only images
-
-      // Allow read access for authenticated users.
-      // This allows the parent app (once authenticated) to download and view the proof.
-      // A stricter rule would check if the requester is the authorized parent for the childId.
-      allow read: if request.auth != null;
+        allow read, write: if false;
     }
   }
 }
