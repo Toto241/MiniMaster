@@ -8,6 +8,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: npm ci || npm i
+      - run: npm run lint
       - run: npm test --silent || true
   android:
     runs-on: ubuntu-latest
@@ -17,5 +18,7 @@ jobs:
         run: chmod +x ./gradlew || true
       - name: Run unit tests
         run: ./gradlew test || true
+      - name: Check Kotlin code style
+        run: ./gradlew ktlintCheck || true
       - name: Build debug
         run: ./gradlew assembleDebug || true
