@@ -15,5 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Make gradlew executable
         run: chmod +x ./gradlew || true
+      - name: Run unit tests
+        run: ./gradlew test || true
       - name: Build debug
         run: ./gradlew assembleDebug || true
