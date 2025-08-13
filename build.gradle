@@ -15,3 +15,28 @@ buildscript {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+allprojects {
+    configurations.all {
+        resolutionStrategy {
+            // Force specific versions of transitive dependencies to mitigate CVEs
+            // Ref: Technical Audit Report, Table 4.1
+
+            // CVE-2021-44228 ("Log4Shell")
+            force 'org.apache.logging.log4j:log4j-api:2.17.1'
+            force 'org.apache.logging.log4j:log4j-core:2.17.1'
+
+            // CVE-2022-42003
+            force 'com.fasterxml.jackson.core:jackson-databind:2.13.4.2'
+
+            // CVE-2022-42889 ("Text4Shell")
+            force 'org.apache.commons:commons-text:1.10.0'
+
+            // CVE-2022-31197
+            force 'org.postgresql:postgresql:42.3.6'
+
+            // CVE-2023-20863 (Unlikely in Android, but forced for safety)
+            force 'org.springframework:spring-core:5.3.25' // A common transitive dep from spring-boot
+        }
+    }
+}
