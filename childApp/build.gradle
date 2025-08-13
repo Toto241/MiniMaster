@@ -8,10 +8,10 @@ plugins {
 
 android {
     compileSdkVersion 33
-    namespace "de.example.minimaster.child" // Added namespace
+    namespace "com.google.pairing.child" // Added namespace
 
     defaultConfig {
-        applicationId "de.example.minimaster.child"
+        applicationId "com.google.pairing.child"
         minSdkVersion 21
         targetSdkVersion 33
         versionCode 1
