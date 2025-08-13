@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check if a user is authenticated.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // This rule matches the new data model where photos are stored under a family.
+    // It ensures that only an authenticated member of the correct family can upload a photo.
+    match /families/{familyId}/children/{childId}/photos/{fileName} {
+      allow read: if isSignedIn() && request.auth.token.familyId == familyId;
+
+      allow write: if isSignedIn()
+                   && request.auth.token.familyId == familyId
+                   && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                   && request.resource.contentType.matches('image/.*'); // Only images
+    }
+
+    // The old path is now deprecated. Deny all access.
+    match /proofs/{childId}/{taskId} {
+        allow read, write: if false;
+    }
+  }
+}

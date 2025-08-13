@@ -1,6 +1,9 @@
 import * as functions from "firebase-functions";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { getMessaging } from "firebase-admin/messaging";
 import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
+import { google } from "googleapis";
 
 // Initialize Firebase Admin SDK
 // Ensure this is done only once, typically at the top level of your index.ts
@@ -51,22 +54,37 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
     try {
       const doc = await pairingCodeDocRef.get();
       if (!doc.exists) {
-        // Code ist einzigartig, wir können ihn verwenden
+        // Code ist einzigartig, wir können ihn verwenden.
         const now = admin.firestore.Timestamp.now();
         const expiresAtSeconds = now.seconds + 24 * 60 * 60; // 24 Stunden
         const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
 
-    functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
-    return { pairingCode: pairingCode };
-  } catch (error) {
-    functions.logger.error("Error creating pairing code:", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      "An unexpected error occurred while creating the pairing code.",
-      error
-    );
-  }
-);
+        await pairingCodeDocRef.set({
+          childId: childId,
+          createdAt: now,
+          expiresAt: expiresAt,
+        });
+
+        functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
+        return { pairingCode: pairingCode };
+      }
+      // Wenn der Code existiert, macht die Schleife weiter.
+    } catch (error) {
+      functions.logger.error("Error checking for pairing code uniqueness:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while creating the pairing code.",
+        error
+      );
+    }
+  } // Ende der for-Schleife
+
+  // Wird nur erreicht, wenn nach `maxAttempts` kein Code gefunden wurde.
+  throw new functions.https.HttpsError(
+    "resource-exhausted",
+    "Could not create a unique pairing code. Please try again later."
+  );
+});
 
 /**
  * Validates a given pairingCode, and if valid, returns the associated childId
@@ -282,6 +300,498 @@ export const generatePairingLink = functions.https.onCall(
   }
   }
 );
+
+/**
+ * Sets the lock state for a specific child device.
+ * Requires authentication from the master device.
+ */
+export const setDeviceLocked = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey, childImei, isLocked } = data as any;
+
+    if (
+      !masterImei || typeof masterImei !== "string" ||
+      !secretKey || typeof secretKey !== "string" ||
+      !childImei || typeof childImei !== "string" ||
+      typeof isLocked !== "boolean"
+    ) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include valid 'masterImei', 'secretKey', 'childImei', and 'isLocked' boolean."
+      );
+    }
+
+    // Authenticate master device
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Invalid master IMEI or secret key."
+      );
+    }
+
+    // Authorize action for the child device
+    const childDeviceRef = db.collection("children").doc(childImei);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "This master device is not authorized to control the specified child device."
+      );
+    }
+
+    // Perform the update
+    try {
+      await childDeviceRef.update({
+        isLocked: isLocked,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      functions.logger.info(`Lock state for child ${childImei} set to ${isLocked} by master ${masterImei}.`);
+      return { success: true, isLocked: isLocked };
+
+    } catch (error) {
+      functions.logger.error(`Failed to set lock state for child ${childImei}:`, error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while updating the device lock state.",
+        error
+      );
+    }
+  }
+);
+
+/**
+ * Updates the app blacklist for a specific child device.
+ */
+export const updateAppBlacklist = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey, childImei, appBlacklist } = data as any;
+
+    if (
+      !masterImei || typeof masterImei !== "string" ||
+      !secretKey || typeof secretKey !== "string" ||
+      !childImei || typeof childImei !== "string" ||
+      !Array.isArray(appBlacklist)
+    ) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include valid 'masterImei', 'secretKey', 'childImei', and 'appBlacklist' array."
+      );
+    }
+
+    // Authentication and Authorization
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
+    }
+
+    const childDeviceRef = db.collection("children").doc(childImei);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+      throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
+    }
+
+    try {
+      await childDeviceRef.update({
+        appBlacklist: appBlacklist,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      functions.logger.info(`App blacklist for child ${childImei} updated by master ${masterImei}.`);
+      return { success: true };
+    } catch (error) {
+      functions.logger.error(`Failed to update blacklist for child ${childImei}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to update app blacklist.", error);
+    }
+  }
+);
+
+/**
+ * Sets usage rules for a specific child device.
+ */
+export const setUsageRules = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey, childImei, usageRules } = data as any;
+    // Basic validation, a real implementation would have deeper rule validation
+    if (
+      !masterImei || typeof masterImei !== "string" ||
+      !secretKey || typeof secretKey !== "string" ||
+      !childImei || typeof childImei !== "string" ||
+      typeof usageRules !== 'object' || usageRules === null
+    ) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include valid 'masterImei', 'secretKey', 'childImei', and 'usageRules' object."
+      );
+    }
+
+    // Authentication and Authorization
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
+    }
+
+    const childDeviceRef = db.collection("children").doc(childImei);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+      throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
+    }
+
+    try {
+      await childDeviceRef.update({
+        usageRules: usageRules,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      functions.logger.info(`Usage rules for child ${childImei} updated by master ${masterImei}.`);
+      return { success: true };
+    } catch (error) {
+      functions.logger.error(`Failed to set usage rules for child ${childImei}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
+    }
+  }
+);
+
+/**
+ * Records a heartbeat from a child device to indicate it's online.
+ */
+export const recordHeartbeat = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { childImei } = data as any;
+
+    if (!childImei || typeof childImei !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'childImei'."
+      );
+    }
+
+    const childDeviceRef = db.collection("children").doc(childImei);
+
+    try {
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "The specified child device does not exist."
+        );
+      }
+
+      await childDeviceRef.update({
+        lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { success: true };
+
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      functions.logger.error(`Failed to record heartbeat for child ${childImei}:`, error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while recording heartbeat.",
+        error
+      );
+    }
+  }
+);
+
+/**
+ * Registers or updates the FCM token for a child device, allowing it to receive push messages.
+ */
+export const registerFcmToken = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { childImei, token } = data as any;
+
+    if (!childImei || typeof childImei !== "string" || !token || typeof token !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'childImei' and 'token'."
+      );
+    }
+
+    const childDeviceRef = db.collection("children").doc(childImei);
+
+    try {
+      // We update instead of set to avoid overwriting the whole document.
+      // This will create the document if it doesn't exist, but our flow ensures it does.
+      // For safety, we can check for existence first.
+      const doc = await childDeviceRef.get();
+      if (!doc.exists) {
+          throw new functions.https.HttpsError("not-found", "Child device not found.");
+      }
+
+      await childDeviceRef.update({ fcmToken: token });
+      functions.logger.info(`FCM token for child ${childImei} has been registered.`);
+      return { success: true };
+
+    } catch (error) {
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        functions.logger.error(`Failed to register FCM token for child ${childImei}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to register FCM token.", error);
+    }
+  }
+);
+
+/**
+ * Firestore trigger (v2) that sends an FCM message to a child device when its data changes.
+ * This enables real-time updates on the child device.
+ */
+export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", async (event) => {
+    const childId = event.params.childId;
+    const newData = event.data?.after.data();
+    const oldData = event.data?.before.data();
+
+    // Exit if data is missing
+    if (!newData || !oldData) {
+      functions.logger.log(`Data missing for child ${childId} update, skipping.`);
+      return;
+    }
+
+    const fcmToken = newData.fcmToken;
+
+    // Exit if there's no token
+    if (!fcmToken) {
+      functions.logger.log(`Child ${childId} has no FCM token. No message sent.`);
+      return;
+    }
+
+    // Compare fields to decide if a notification is needed.
+    const lockChanged = newData.isLocked !== oldData.isLocked;
+    const blacklistChanged = JSON.stringify(newData.appBlacklist) !== JSON.stringify(oldData.appBlacklist);
+    const rulesChanged = JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules);
+
+    if (lockChanged || blacklistChanged || rulesChanged) {
+        functions.logger.info(`Detected change for child ${childId}. Preparing to send FCM message.`);
+        const payload = {
+            data: {
+                command: 'SYNC_RULES',
+                // We send a generic command; the client should fetch the latest rules.
+                // This is more robust than sending partial data in the payload.
+                lastUpdated: String(new Date().getTime()),
+            },
+        };
+
+        try {
+            const message = {
+                data: payload.data,
+                token: fcmToken,
+            };
+            await getMessaging().send(message);
+            functions.logger.info(`Successfully sent SYNC_RULES command to child ${childId}.`);
+        } catch (error) {
+            functions.logger.error(`Failed to send FCM message to child ${childId}:`, error);
+            // Optional: Clean up invalid tokens if they are permanently invalid
+            // const messagingError = error as any;
+            // if (messagingError.code === 'messaging/registration-token-not-registered') {
+            //   await event.data?.after.ref.update({ fcmToken: null });
+            // }
+        }
+    }
+  });
+
+/**
+ * Creates a new task for a child device. Called by the master device.
+ */
+export const createTask = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey, childImei, description, deadlineISO } = data as any;
+
+    if (!masterImei || !secretKey || !childImei || !description || !deadlineISO) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    // Authenticate master device
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    }
+
+    // Authorize for child
+    const childDeviceRef = db.collection("children").doc(childImei);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+    }
+
+    const taskRef = childDeviceRef.collection("tasks").doc();
+    await taskRef.set({
+      description: description,
+      deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
+      status: "pending", // "pending", "pending_approval", "approved"
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info(`Task ${taskRef.id} created for child ${childImei}`);
+    return { success: true, taskId: taskRef.id };
+  }
+);
+
+/**
+ * Marks a task as complete from the child's side, attaching a photo proof URL.
+ */
+export const completeTask = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { childImei, taskId, photoUrl } = data as any;
+
+    if (!childImei || !taskId || !photoUrl) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const taskRef = db.collection("children").doc(childImei).collection("tasks").doc(taskId);
+
+    // Basic validation: Check if task and child exist
+    const taskDoc = await taskRef.get();
+    if (!taskDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
+    }
+
+    await taskRef.update({
+      status: "pending_approval",
+      photoUrl: photoUrl,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info(`Task ${taskId} marked as complete by child ${childImei}`);
+    return { success: true };
+  }
+);
+
+/**
+ * Approves a completed task. Called by the master device.
+ */
+export const approveTask = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey, childImei, taskId } = data as any;
+
+    if (!masterImei || !secretKey || !childImei || !taskId) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    // Authenticate master device
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    }
+
+    // Authorize for child
+    const childDeviceRef = db.collection("children").doc(childImei);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+    }
+
+    const taskRef = childDeviceRef.collection("tasks").doc(taskId);
+    await taskRef.update({ status: "approved" });
+
+    functions.logger.info(`Task ${taskId} approved for child ${childImei}`);
+    return { success: true };
+  }
+);
+
+/**
+ * Verifies a purchase with Google Play and grants entitlement.
+ * In a real app, this function would be much more complex, involving secure
+ * communication with the Google Play Developer API using OAuth.
+ */
+export const verifyPurchase = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey, purchaseToken, sku } = data as any;
+
+    if (!masterImei || !secretKey || !purchaseToken || !sku) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    // Authenticate master device
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    }
+
+    // TODO: IMPLEMENTATION REQUIRED FOR PRODUCTION
+    // The following is a placeholder. For a real application, you must verify the
+    // purchaseToken with the Google Play Developer API to prevent fraud.
+    // 1. Set up OAuth 2.0 credentials in your Google Cloud project.
+    // 2. Use a library like 'googleapis' to make an authenticated request.
+    // 3. Call the `purchases.subscriptions.get` endpoint.
+    //    See: https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions/get
+    // 4. Check the `purchaseState` and other fields from the API response.
+    // For this example, we will assume the purchase is always valid.
+    const isPurchaseValid = await verifyPlaySubscription(
+        "com.minimaster.masterapp", // This should match your app's package name
+        sku,
+        purchaseToken
+    ).catch((e) => {
+        functions.logger.error("Error verifying Google Play purchase:", e);
+        return false;
+    });
+
+    if (isPurchaseValid) {
+      const now = admin.firestore.Timestamp.now();
+      const subscriptionType = sku; // e.g., "monthly_subscription" or "yearly_subscription"
+      // In a real app, calculate expiry based on SKU
+      const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 30 * 24 * 60 * 60 * 1000);
+
+      await masterDeviceRef.update({
+        subscription: {
+          status: "active",
+          type: subscriptionType,
+          startedAt: now,
+          expiresAt: expiresAt,
+        },
+      });
+      functions.logger.info(`Subscription ${sku} activated for master ${masterImei}.`);
+      return { success: true, subscriptionStatus: "active" };
+    } else {
+      functions.logger.warn(`Invalid purchase token received for master ${masterImei}.`);
+      throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
+    }
+  }
+);
+
+/**
+ * Gets the current subscription status for the master device.
+ */
+export const getSubscriptionStatus = functions.https.onCall(
+  async (data: any, context: any) => {
+    const { masterImei, secretKey } = data as any;
+    if (!masterImei || !secretKey) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const masterDeviceRef = db.collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    }
+
+    const subscription = masterDoc.data()?.subscription || { status: "none" };
+    return { subscriptionStatus: subscription };
+  }
+);
+
+async function verifyPlaySubscription(packageName: string, productId: string, purchaseToken: string) {
+  const auth = new google.auth.GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+  const client = await auth.getClient();
+  const androidpublisher = google.androidpublisher({ version: "v3", auth: client });
+  const res = await androidpublisher.purchases.subscriptions.get({
+    packageName, subscriptionId: productId, token: purchaseToken,
+  });
+  const body = res.data;
+  // A simple check for a valid, active subscription.
+  // Adapt this logic based on your specific needs (e.g., checking autoRenewing).
+  return body && (body as any).purchaseState === 0 && (body as any).expiryTimeMillis > Date.now();
+}
 
 
 // Beispiel Firestore-Struktur für `pairingCodes/{generatedCode}`:

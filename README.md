@@ -1,32 +1,86 @@
-# MiniMaster
+# Mini-Master: Parental Control Application Suite
 
-This repository contains the experimental implementation of the child application of the **Mini‑Master** project and accompanying Firebase Cloud Functions.
+Mini-Master is a comprehensive parental control solution built for Android. It consists of two main applications: a `masterApp` for parents and a `childApp` for children, orchestrated by a Firebase backend.
 
-## Overview
-The Android app allows a child device to pair with a parent device using a short code. After a successful pairing the child device shows a lock screen with its assigned child ID.
+This system allows parents to define usage rules, set tasks with photo-proof requirements, and remotely lock a child's device in real-time.
+
+For details on the project's structure, security policies, and contribution guidelines, please see:
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**
+- **[SECURITY.md](SECURITY.md)**
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**
 
 ## Features
-- **Pairing Flow** – `PairingScreen` collects a code which is validated by the Cloud Function `validatePairingCode`. On success the child ID is stored locally and the app navigates to the `LockScreen`.
-- **Local Storage** – `ChildIdRepository` uses DataStore to persist the ID. A global `ChildIdProvider` exposes it as a `StateFlow`.
-- **Backend Integration** – Cloud Functions in `index.ts` implement `createPairingCode` and `validatePairingCode` using Firestore.
-- **Dependency Injection** – The app is built with Hilt. ViewModels and repositories are provided through Hilt modules.
-- **Internationalisation** – All strings exist in English, German, French and Simplified Chinese.
-- **Testing** – Unit tests and instrumented Compose tests cover the pairing flow. Manual scenarios are listed in `UX_TEST_SCENARIOS.md`. Automated coverage is summarised in `AUTOMATED_UX_TESTS_SUMMARY.md`.
-- **Translation QA** – `TRANSLATION_QA_CHECKLIST.md` helps reviewing new translations.
 
-## Technology Stack
-- Kotlin, Jetpack Compose and AndroidX
-- Firebase Functions and Firestore
-- Hilt for dependency injection
-- DataStore for local persistence
-- JUnit and AndroidX test libraries
+- **Parent & Child Apps:** A dedicated app for the parent to set rules and an app for the child to enforce them.
+- **Real-Time Locking:** Parents can instantly lock or unlock a child's device.
+- **Task Management:** Create tasks with deadlines, review photo proofs, and approve completion.
+- **Secure Backend:** Logic is handled by secure Cloud Functions with hardened security rules.
+- **Real-Time Sync:** FCM instantly pushes rule changes and commands to the child device.
+- **Subscription Model:** Managed by Google Play Billing and verified by the backend.
+- **Internationalization:** Supports English, German, French, and Chinese.
 
-## Firestore Security
-Client access to the `pairingCodes` collection is denied by default. Only the Cloud Functions operating with the Admin SDK may create or delete codes. See `firestore.rules` for details.
+---
 
-## Building
-Open the `childApp` module with Android Studio. When a Gradle wrapper is available, tests can be run with `./gradlew test` and `./gradlew connectedAndroidTest`.
+## Project Setup
 
-For the Cloud Functions, first install dependencies via `npm install`.
-Then run `npx tsc --noEmit` to type-check all function code using the `tsconfig.json` settings.
-To emit JavaScript for deployment, simply invoke `npx tsc`.
+Follow these steps to get the project running locally for development.
+
+### 1. Prerequisites
+- **Node.js:** v20 or higher.
+- **Firebase Account:** A Firebase project is required.
+- **Firebase CLI:** `npm install -g firebase-tools`
+- **Android Studio:** For running the Android apps.
+- **Gradle:** A local installation of Gradle is needed to generate the wrapper.
+
+### 2. Backend Installation & Setup
+
+1.  **Install Dependencies:** From the project root, run:
+    ```bash
+    npm install
+    ```
+2.  **Firebase Project:**
+    - Log into the Firebase CLI: `firebase login`
+    - Associate the project: `firebase use --add` and select your project.
+3.  **Deploy Backend:**
+    Deploy the Functions and security rules to your project:
+    ```bash
+    firebase deploy
+    ```
+
+### 3. Android Apps Installation & Setup
+
+1.  **Generate Gradle Wrapper (Required First Time):**
+    The Gradle wrapper is necessary for reproducible builds. Run this command from the project root:
+    ```bash
+    gradle wrapper --gradle-version 8.7 --distribution-type all
+    ```
+2.  **Add Firebase Configuration:**
+    - From your Firebase project console, download the `google-services.json` file.
+    - Place a copy of this file in **both** the `masterApp/` and `childApp/` directories. This step is mandatory for the apps to connect to your Firebase backend.
+3.  **Build & Run:**
+    - Open the entire project root directory in Android Studio.
+    - Let Android Studio sync the project.
+    - Select the desired app (`masterApp` or `childApp`) from the build configuration dropdown and run it on an emulator or a physical device.
+
+---
+
+## Testing
+
+### Backend Unit Tests
+The backend functions have a comprehensive unit test suite. To run them:
+```bash
+# From the project root
+npm test
+```
+
+### Manual App Testing
+A detailed manual test plan is available in **[Testanleitung.md](Testanleitung.md)**. It covers all end-to-end user flows.
+
+### CI/CD
+A basic Continuous Integration workflow is defined in `.github/workflows/ci.yml`. It runs tests for the backend and attempts to build the Android apps on every push and pull request.
+
+---
+
+## License
+
+This project is currently unlicensed. Please see the **[LICENSE](LICENSE)** file and add an appropriate open-source license before using this code in a production environment.
