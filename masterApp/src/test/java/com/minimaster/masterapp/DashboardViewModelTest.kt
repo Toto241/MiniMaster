@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runBlockingTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,7 +56,7 @@ class DashboardViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         whenever(credentialsRepository.getCredentials).thenReturn(flowOf("test_imei" to "test_secret"))
-        whenever(functions.getHttpsCallable(any())).thenReturn(callableReference)
+        whenever(functions.getHttpsCallable("createTask")).thenReturn(callableReference)
         whenever(callableReference.call(any<HashMap<String, Any>>())).thenReturn(task)
         viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
     }
@@ -82,10 +83,11 @@ class DashboardViewModelTest {
 
         val expectedDeadlineISO = "2023-01-01T00:00:00Z"
         val capturedData = dataCaptor.value
-        assert(capturedData["childImei"] == childImei)
-        assert(capturedData["description"] == description)
-        assert(capturedData["deadlineISO"] == expectedDeadlineISO)
-        assert(capturedData["masterImei"] == "test_imei")
-        assert(capturedData["secretKey"] == "test_secret")
+        assertEquals(childImei, capturedData["childImei"])
+        assertEquals(description, capturedData["description"])
+        assertEquals(expectedDeadlineISO, capturedData["deadlineISO"])
+        assertEquals("test_imei", capturedData["masterImei"])
+        assertEquals("test_secret", capturedData["secretKey"])
+
     }
 }
