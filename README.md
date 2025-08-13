@@ -65,7 +65,6 @@ Follow these steps to get the project running locally for development.
 ---
 
 ## Testing
-
 ### Backend Unit Tests
 The backend functions have a comprehensive unit test suite. To run them:
 ```bash
@@ -78,8 +77,6 @@ A detailed manual test plan is available in **[Testanleitung.md](Testanleitung.m
 
 ### CI/CD
 A basic Continuous Integration workflow is defined in `.github/workflows/ci.yml`. It runs tests for the backend and attempts to build the Android apps on every push and pull request.
-
----
 
 ## License
 
