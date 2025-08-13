@@ -62,6 +62,16 @@ Follow these steps to get the project running locally for development.
     - Let Android Studio sync the project.
     - Select the desired app (`masterApp` or `childApp`) from the build configuration dropdown and run it on an emulator or a physical device.
 
+4.  **Command-Line Builds:**
+    To build the debug APKs from the command line, use the following commands from the project root:
+    ```bash
+    # Build the childApp
+    ./gradlew :childApp:assembleDebug
+
+    # Build the masterApp
+    ./gradlew :masterApp:assembleDebug
+    ```
+
 ---
 
 ## Testing
