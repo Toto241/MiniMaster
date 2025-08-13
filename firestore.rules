@@ -3,54 +3,54 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regeln für die pairingCodes Collection
-    // Ziel: Jeglichen direkten Client-Zugriff (Lesen und Schreiben) unterbinden.
-    // Cloud Functions, die das Admin SDK verwenden, umgehen diese Regeln und haben weiterhin Zugriff.
-    match /pairingCodes/{codeId} {
-      // Kein Client darf Dokumente lesen (get, list).
-      allow get: if false;
-      allow list: if false;
+    // Helper function to check if a user is authenticated.
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-      // Kein Client darf Dokumente schreiben (create, update, delete).
-      allow create: if false;
-      allow update: if false;
+    // Helper function to check if the user belongs to a specific family.
+    // This assumes the familyId is passed as a custom claim in the auth token.
+    function isFamilyMember(familyId) {
+      return isSignedIn() && request.auth.token.familyId == familyId;
+    }
+
+    // Rules for families collection.
+    // Only authenticated users can create a family.
+    // Only members of that family can read or update it.
+    match /families/{familyId} {
+      allow read, update: if isFamilyMember(familyId);
+      allow create: if isSignedIn();
+    }
+
+    // Rules for the children collection, nested under families.
+    match /families/{familyId}/children/{childId} {
+      // Only family members can access child data.
+      allow read, update: if isFamilyMember(familyId);
+    }
+
+    // Rules for tasks, nested under a specific child.
+    match /families/{familyId}/children/{childId}/tasks/{taskId} {
+      allow read: if isFamilyMember(familyId);
+
+      // Only family members can create or update tasks.
+      // We also validate the data being written to ensure integrity.
+      allow create, update: if isFamilyMember(familyId)
+        && request.resource.data.keys().hasOnly(['description', 'status', 'photoUrl', 'createdAt', 'updatedAt', 'deadline', 'completedAt'])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() < 200
+        && request.resource.data.status is string
+        && (request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
+        && request.resource.data.deadline is timestamp;
+
+      // Nobody can delete tasks directly. This should be handled by a Cloud Function if needed.
       allow delete: if false;
     }
 
-    // Regeln für die masters Collection
-    // Diese Collection speichert die Profile der Elterngeräte.
-    // Zugriff sollte ebenfalls nur serverseitig erfolgen.
-    match /masters/{masterId} {
-      allow read, write: if false;
-    }
-
-    // Regeln für die pairingTokens Collection
-    // Speichert einmalig verwendbare Tokens für den Kopplungsprozess per Link.
-    match /pairingTokens/{tokenId} {
-      allow read, write: if false;
-    }
-
-    // Regeln für die children Collection
-    // Speichert die Profile der gekoppelten Kindergeräte.
-    match /children/{childId} {
-      allow read, write: if false;
-    }
-
-    // Beispiel für Regeln anderer Collections (falls vorhanden und benötigt):
-    // Diese sollten an die spezifischen Anforderungen der jeweiligen Collection angepasst werden.
-    // Wenn keine anderen Regeln explizit definiert sind, gilt standardmäßig "allow read, write: if false;".
-
-    // match /users/{userId} {
-    //   // Beispiel: Benutzer können ihr eigenes Dokument lesen und schreiben.
-    //   allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-    //   allow create: if request.auth != null; // Jeder authentifizierte Benutzer kann ein Benutzerdokument erstellen (ggf. einschränken).
-    // }
-
-    // match /someOtherPublicCollection/{docId} {
-    //   // Beispiel: Öffentlich lesbar, aber nur von authentifizierten Benutzern beschreibbar.
-    //   allow get: if true;
-    //   allow list: if true; // Vorsicht bei großen Collections
-    //   allow write: if request.auth != null;
-    // }
+    // The old collections are now deprecated in favor of the nested structure.
+    // Deny all access to them.
+    match /masters/{masterId} { allow read, write: if false; }
+    match /children/{childId} { allow read, write: if false; }
+    match /pairingCodes/{codeId} { allow read, write: if false; }
+    match /pairingTokens/{tokenId} { allow read, write: if false; }
   }
 }

@@ -25,6 +25,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -32,19 +35,67 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MasterAppScreen()
+            MasterAppNavigation()
         }
     }
 }
 
 @Composable
-fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
+fun MasterAppNavigation(viewModel: MasterViewModel = hiltViewModel()) {
+    val navController = rememberNavController()
+    val registrationState by viewModel.registrationState.collectAsState()
+
+    // Decide the start destination based on the registration state.
+    // This is a simplified approach. A more robust solution might use a dedicated "splash" screen
+    // or check a local flag before deciding the route.
+    val startDestination = when (registrationState) {
+        is RegistrationState.Success -> "dashboard"
+        else -> "registration"
+    }
+
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("registration") {
+            RegistrationScreen(
+                viewModel = viewModel,
+                onRegistrationSuccess = { navController.navigate("dashboard") { popUpTo("registration") { inclusive = true } } }
+            )
+        }
+        composable("dashboard") {
+            DashboardScreen(
+                onNavigateToCreateTask = { childId ->
+                    navController.navigate("createTask/$childId")
+                },
+                onNavigateToReview = { navController.navigate("taskReview") },
+                onNavigateToSubscription = { navController.navigate("subscription") }
+            )
+        }
+        composable("subscription") {
+            SubscriptionScreen()
+        }
+        composable("taskReview") {
+            TaskReviewScreen(onBack = { navController.popBackStack() })
+        }
+        composable("createTask/{childId}") { backStackEntry ->
+            val childId = backStackEntry.arguments?.getString("childId") ?: ""
+            CreateTaskScreen(
+                onTaskCreate = { description, deadline ->
+                    // Get the ViewModel instance scoped to the NavHost
+                    val dashboardViewModel: DashboardViewModel = hiltViewModel(navController.getBackStackEntry("dashboard"))
+                    dashboardViewModel.createTask(childId, description, deadline)
+                    navController.popBackStack()
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+    }
+}
+
+@Composable
+fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> Unit) {
     val context = LocalContext.current
     val registrationState by viewModel.registrationState.collectAsState()
-    val linkState by viewModel.linkGenerationState.collectAsState()
-    val debugState by viewModel.debugState.collectAsState()
     var permissionStatus by remember { mutableStateOf("App needs permission to read device state.") }
-    var showDebugInfo by remember { mutableStateOf(false) }
+
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -61,31 +112,31 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colors.background
-    ) {
+    // Effect to navigate when registration succeeds
+    LaunchedEffect(registrationState) {
+        if (registrationState is RegistrationState.Success) {
+            onRegistrationSuccess()
+        }
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Text("Parent Device Setup", style = MaterialTheme.typography.h4, modifier = Modifier.padding(bottom = 16.dp))
             Text(
-                text = "Master App",
-                style = MaterialTheme.typography.h4,
+                "First, we need to register this device as the primary parent controller. This requires permission to read a unique device ID.",
+                style = MaterialTheme.typography.body1,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
             when (val state = registrationState) {
-                is RegistrationState.Idle -> {
-                    Text(
-                        text = permissionStatus,
-                        style = MaterialTheme.typography.body1,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                is RegistrationState.Idle, is RegistrationState.Error -> {
+                    val message = if (state is RegistrationState.Error) state.message else permissionStatus
+                    Text(text = message, style = MaterialTheme.typography.body2, textAlign = TextAlign.Center, modifier = Modifier.padding(bottom = 24.dp))
                     Button(onClick = {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
                             val imei = getImei(context)
@@ -102,32 +153,8 @@ fun MasterAppScreen(viewModel: MasterViewModel = hiltViewModel()) {
                     Text(text = "Registering device...", modifier = Modifier.padding(top = 16.dp))
                 }
                 is RegistrationState.Success -> {
-                    Text(
-                        text = state.successMessage,
-                        style = MaterialTheme.typography.body1,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    LinkGenerationSection(linkState = linkState, onGenerateClick = { viewModel.generateLink() })
+                    // Handled by LaunchedEffect
                 }
-                is RegistrationState.Error -> {
-                    Text(
-                        text = state.message,
-                        color = MaterialTheme.colors.error,
-                        style = MaterialTheme.typography.body1,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            // Spacer and Debug section at the bottom
-            Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = { showDebugInfo = !showDebugInfo }) {
-                Text(if (showDebugInfo) "Hide Debug Info" else "Show Debug Info")
-            }
-            if (showDebugInfo) {
-                DebugInfoView(debugState = debugState, linkState = linkState)
             }
         }
     }

@@ -14,9 +14,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.Composable
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.core.content.FileProvider
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import java.io.File
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,7 +32,23 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var childIdProvider: ChildIdProvider
+    @Inject
+    lateinit var onboardingRepository: OnboardingRepository
     private val viewModel: PairingViewModel by viewModels()
+    private val tasksViewModel: TasksViewModel by viewModels()
+
+    private var photoUri: Uri? = null
+    private var completingTaskId: String? = null
+
+    private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            photoUri?.let { uri ->
+                completingTaskId?.let { taskId ->
+                    tasksViewModel.completeTaskWithPhoto(taskId, uri)
+                }
+            }
+        }
+    }
 
     // Launcher for the READ_PHONE_STATE permission request
     private val requestPermissionLauncher = registerForActivityResult(
@@ -47,20 +70,67 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         lifecycleScope.launch {
-            childIdProvider.childIdFlow.collect { childId ->
+            childIdProvider.childIdFlow.combine(onboardingRepository.onboardingCompleteFlow) { childId, onboardingComplete ->
+                childId to onboardingComplete
+            }.collect { (childId, onboardingComplete) ->
                 setContent {
-                    if (!childId.isNullOrEmpty()) {
-                        LockScreen(childId = childId)
-                    } else {
-                        // Pass the ViewModel explicitly to the PairingScreen
-                        PairingScreen(viewModel = viewModel)
-                    }
+                    AppNavigation(childId, onboardingComplete)
                 }
             }
         }
 
         // Handle the deep link intent when the activity is created
+    }
+
+    @Composable
+    fun AppNavigation(childId: String?, onboardingComplete: Boolean) {
+        val navController = rememberNavController()
+        val startDestination = when {
+            childId.isNullOrEmpty() -> "pairing"
+            !onboardingComplete -> "permission"
+            else -> "lock"
+        }
+
+        NavHost(navController = navController, startDestination = startDestination) {
+            composable("pairing") {
+                PairingScreen(viewModel = viewModel)
+            }
+            composable("permission") {
+                PermissionScreen(onPermissionGranted = {
+                    lifecycleScope.launch {
+                        onboardingRepository.setOnboardingComplete()
+                        // Navigate to lock screen after setting flag
+                        navController.navigate("lock") {
+                            popUpTo("permission") { inclusive = true }
+                        }
+                    }
+                })
+            }
+            composable("lock") {
+                LockScreen(
+                    childId = childId ?: "Error: ID is null",
+                    onNavigateToTasks = { navController.navigate("tasks") }
+                )
+            }
+            composable("tasks") {
+                TasksScreen(
+                    viewModel = tasksViewModel,
+                    onCompleteTaskClick = { taskId ->
+                        val (uri, file) = createTempImageFile()
+                        photoUri = uri
+                        completingTaskId = taskId
+                        takePictureLauncher.launch(uri)
+                    }
+                )
+            }
+        }
         handleIntent(intent)
+    }
+
+    private fun createTempImageFile(): Pair<Uri, File> {
+        val file = File.createTempFile("proof_", ".jpg", cacheDir)
+        val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", file)
+        return uri to file
     }
 
     override fun onNewIntent(intent: Intent) {
