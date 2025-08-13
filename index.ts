@@ -725,6 +725,7 @@ export const verifyPurchase = functions.https.onCall(
     //    See: https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions/get
     // 4. Check the `purchaseState` and other fields from the API response.
     // For this example, we will assume the purchase is always valid.
+
     const isPurchaseValid = await verifyPlaySubscription(
         "com.minimaster.masterapp", // This should match your app's package name
         sku,
@@ -792,7 +793,6 @@ async function verifyPlaySubscription(packageName: string, productId: string, pu
   // Adapt this logic based on your specific needs (e.g., checking autoRenewing).
   return body && (body as any).purchaseState === 0 && (body as any).expiryTimeMillis > Date.now();
 }
-
 
 // Beispiel Firestore-Struktur für `pairingCodes/{generatedCode}`:
 // {

@@ -2,7 +2,6 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
     // Helper function to check if a user is authenticated.
     function isSignedIn() {
       return request.auth != null;

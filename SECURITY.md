@@ -40,6 +40,5 @@ A basic threat model should be maintained here.
 ## Vulnerability Reporting
 
 Please report any security vulnerabilities to `security@example.com`. We will acknowledge receipt within 48 hours.
-
 ---
 *This is a foundational security document. It should be regularly reviewed and updated as the application evolves.*
