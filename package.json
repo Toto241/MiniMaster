@@ -4,6 +4,7 @@
   "description": "This repository contains the experimental implementation of the child application of the **Mini‑Master** project and accompanying Firebase Cloud Functions.",
   "main": "index.js",
   "scripts": {
+    "lint": "eslint . --ext .js,.ts",
     "test": "mocha --require ts-node/register test/**/*.test.ts"
   },
   "keywords": [],
@@ -21,6 +22,9 @@
     "@types/chai": "^5.2.2",
     "@types/mocha": "^10.0.10",
     "@types/sinon": "^17.0.4",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
     "chai": "^5.2.1",
     "firebase-functions-test": "^3.4.1",
     "mocha": "^11.7.1",
