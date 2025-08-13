@@ -88,5 +88,6 @@ class DashboardViewModelTest {
         assertEquals(expectedDeadlineISO, capturedData["deadlineISO"])
         assertEquals("test_imei", capturedData["masterImei"])
         assertEquals("test_secret", capturedData["secretKey"])
+
     }
 }
