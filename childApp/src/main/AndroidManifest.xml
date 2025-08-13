@@ -13,12 +13,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar"> {/* Ensure a base theme is set */}
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"> <!-- Ensure a base theme is set -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name" 
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"> {/* Ensure a base theme is set */}
+            android:label="@string/app_name"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"> <!-- Ensure a base theme is set -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
