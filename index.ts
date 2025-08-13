@@ -3,6 +3,7 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
+import { google } from "googleapis";
 
 // Initialize Firebase Admin SDK
 // Ensure this is done only once, typically at the top level of your index.ts
@@ -724,7 +725,15 @@ export const verifyPurchase = functions.https.onCall(
     //    See: https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions/get
     // 4. Check the `purchaseState` and other fields from the API response.
     // For this example, we will assume the purchase is always valid.
-    const isPurchaseValid = true;
+
+    const isPurchaseValid = await verifyPlaySubscription(
+        "com.minimaster.masterapp", // This should match your app's package name
+        sku,
+        purchaseToken
+    ).catch((e) => {
+        functions.logger.error("Error verifying Google Play purchase:", e);
+        return false;
+    });
 
     if (isPurchaseValid) {
       const now = admin.firestore.Timestamp.now();
@@ -770,6 +779,20 @@ export const getSubscriptionStatus = functions.https.onCall(
   }
 );
 
+async function verifyPlaySubscription(packageName: string, productId: string, purchaseToken: string) {
+  const auth = new google.auth.GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+  const client = await auth.getClient();
+  const androidpublisher = google.androidpublisher({ version: "v3", auth: client });
+  const res = await androidpublisher.purchases.subscriptions.get({
+    packageName, subscriptionId: productId, token: purchaseToken,
+  });
+  const body = res.data;
+  // A simple check for a valid, active subscription.
+  // Adapt this logic based on your specific needs (e.g., checking autoRenewing).
+  return body && (body as any).purchaseState === 0 && (body as any).expiryTimeMillis > Date.now();
+}
 
 // Beispiel Firestore-Struktur für `pairingCodes/{generatedCode}`:
 // {
