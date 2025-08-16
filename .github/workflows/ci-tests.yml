@@ -1,0 +1,41 @@
+name: CI Tests
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # Dev-Deps auf jeden Fall installieren
+      - name: Ensure dev install (not production)
+        run: |
+          echo "NODE_ENV will be ignored by npm ci"
+          npm config set include=dev
+          npm config delete production || true
+          npm config delete omit || true
+
+      - name: Clean
+        run: |
+          rm -rf node_modules
+          # Entscheide dich für NPM: Yarn-Lock ggf. entfernen, um Konflikte zu vermeiden
+          test -f yarn.lock && rm yarn.lock || true
+
+      - name: Install
+        run: npm ci
+
+      - name: Show resolved keys
+        run: |
+          node -p "require.resolve('jest')"
+          node -p "require.resolve('ts-jest')"
+
+      - name: Test
+        run: npm test
