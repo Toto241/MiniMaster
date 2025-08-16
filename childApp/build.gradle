@@ -4,6 +4,7 @@ plugins {
     id 'kotlin-kapt' // Kotlin Annotation Processing
     id 'com.google.dagger.hilt.android'
     id 'com.google.gms.google-services'
+    id "org.jlleitschuh.gradle.ktlint"
 }
 
 android {
@@ -32,6 +33,12 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
+    }
+    buildFeatures {
+        compose true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion "1.4.6" // Updated for Kotlin 1.8.20 and Compose 1.5.x compatibility
     }
 }
 
@@ -77,14 +84,4 @@ dependencies {
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:1.5.4" // Compose Testing
     debugImplementation "androidx.compose.ui:ui-test-manifest:1.5.4" // Compose Testing
     androidTestImplementation "org.mockito:mockito-android:5.3.1" // Mockito for Android tests
-}
-
-android {
-    buildFeatures {
-        compose true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion "1.4.6" // Updated for Kotlin 1.8.20 and Compose 1.5.x compatibility
-    }
-    // Ensure namespace is defined in the android block if not already. It's in the original.
 }
