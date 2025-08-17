@@ -8,3 +8,6 @@ lib/
 
 # IntelliJ/Android Studio project files
 .idea/
+
+# Credentials and configuration files
+google-services.json
