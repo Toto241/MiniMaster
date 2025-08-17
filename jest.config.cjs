@@ -4,6 +4,7 @@ module.exports = {
   testEnvironment: "node",
   roots: ["<rootDir>/test"],
   setupFiles: ["<rootDir>/test/setup-env.ts"],
+  testMatch: ["<rootDir>/test/**/*.test.ts"],
   moduleFileExtensions: ["ts", "js", "json"],
   transform: { "^.+\\.tsx?$": ["ts-jest", { tsconfig: "tsconfig.json" }] },
   testTimeout: 10000
