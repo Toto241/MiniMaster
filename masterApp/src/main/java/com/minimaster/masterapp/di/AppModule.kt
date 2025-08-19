@@ -1,6 +1,5 @@
 package com.minimaster.masterapp.di
 
-import com.google.firebase.functions.FirebaseFunctions
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory

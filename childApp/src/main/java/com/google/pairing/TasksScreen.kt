@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import java.util.Locale
 
 @Composable
 fun TasksScreen(
@@ -63,7 +64,7 @@ fun TaskItem(task: Task, onCompleteClick: () -> Unit) {
                 Text(text = task.description, style = MaterialTheme.typography.body1)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Status: ${task.status.replace('_', ' ').capitalize()}",
+                    text = "Status: ${task.status.replace('_', ' ').replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}",
                     style = MaterialTheme.typography.caption,
                     color = when (task.status) {
                         "pending" -> Color.Red
