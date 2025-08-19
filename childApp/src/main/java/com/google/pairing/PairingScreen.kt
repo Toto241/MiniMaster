@@ -5,6 +5,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,7 +37,8 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
             label = { Text(stringResource(R.string.pairing_code_input_label)) },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 16.dp)
+                .testTag("PairingCodeTextField"), // Add test tag for UI tests
             singleLine = true
         )
 
@@ -46,7 +48,9 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
                 viewModel.validateToken(pairingCode, imei)
             },
             enabled = pairingCode.isNotBlank() && pairingState !is PairingState.Loading,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("PairingButton") // Add test tag for UI tests
         ) {
             Text(stringResource(R.string.pairing_button_text))
         }
