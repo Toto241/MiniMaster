@@ -9,7 +9,7 @@ import { db } from "./firebase";
 /**
  * Creates a new pairing code for a given childId.
  */
-export const createPairingCode = functions.https.onCall(async (data, context) => {
+export const createPairingCode = functions.https.onCall(async (data, _context) => {
   const childId = (data as any).childId;
 
   if (!childId || typeof childId !== "string") {
@@ -62,7 +62,7 @@ export const createPairingCode = functions.https.onCall(async (data, context) =>
  * Validates a given pairingCode, and if valid, returns the associated childId
  * and deletes the pairing code.
  */
-export const validatePairingCode = functions.https.onCall(async (data, context) => {
+export const validatePairingCode = functions.https.onCall(async (data, _context) => {
   const pairingCode = (data as any).pairingCode;
 
   if (!pairingCode || typeof pairingCode !== "string") {
@@ -154,7 +154,7 @@ export const validatePairingCode = functions.https.onCall(async (data, context) 
  * Registers a new master device based on its IMEI.
  */
 export const registerMasterDevice = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
   const imei = (data as any).imei;
   if (!imei || typeof imei !== "string") {
     throw new functions.https.HttpsError(
@@ -204,7 +204,7 @@ export const registerMasterDevice = functions.https.onCall(
  * Generates a single-use pairing token for an authenticated master device.
  */
 export const generatePairingLink = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
   const { imei, secretKey } = data as any;
 
   if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
@@ -258,7 +258,7 @@ export const generatePairingLink = functions.https.onCall(
  * Sets the lock state for a specific child device.
  */
 export const setDeviceLocked = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey, childImei, isLocked } = data as any;
 
     if (
@@ -315,7 +315,7 @@ export const setDeviceLocked = functions.https.onCall(
  * Updates the app blacklist for a specific child device.
  */
 export const updateAppBlacklist = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey, childImei, appBlacklist } = data as any;
 
     if (
@@ -360,7 +360,7 @@ export const updateAppBlacklist = functions.https.onCall(
  * Sets usage rules for a specific child device.
  */
 export const setUsageRules = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey, childImei, usageRules } = data as any;
     if (
       !masterImei || typeof masterImei !== "string" ||
@@ -404,7 +404,7 @@ export const setUsageRules = functions.https.onCall(
  * Records a heartbeat from a child device to indicate it's online.
  */
 export const recordHeartbeat = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { childImei } = data as any;
 
     if (!childImei || typeof childImei !== "string") {
@@ -449,7 +449,7 @@ export const recordHeartbeat = functions.https.onCall(
  * Registers or updates the FCM token for a child device, allowing it to receive push messages.
  */
 export const registerFcmToken = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { childImei, token } = data as any;
 
     if (!childImei || typeof childImei !== "string" || !token || typeof token !== "string") {
@@ -531,7 +531,7 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
  * Creates a new task for a child device. Called by the master device.
  */
 export const createTask = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey, childImei, description, deadlineISO } = data as any;
 
     if (!masterImei || !secretKey || !childImei || !description || !deadlineISO) {
@@ -567,7 +567,7 @@ export const createTask = functions.https.onCall(
  * Marks a task as complete from the child's side, attaching a photo proof URL.
  */
 export const completeTask = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { childImei, taskId, photoUrl } = data as any;
 
     if (!childImei || !taskId || !photoUrl) {
@@ -596,7 +596,7 @@ export const completeTask = functions.https.onCall(
  * Approves a completed task. Called by the master device.
  */
 export const approveTask = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey, childImei, taskId } = data as any;
 
     if (!masterImei || !secretKey || !childImei || !taskId) {
@@ -627,7 +627,7 @@ export const approveTask = functions.https.onCall(
  * Verifies a purchase with Google Play and grants entitlement.
  */
 export const verifyPurchase = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey, purchaseToken, sku } = data as any;
 
     if (!masterImei || !secretKey || !purchaseToken || !sku) {
@@ -675,7 +675,7 @@ export const verifyPurchase = functions.https.onCall(
  * Gets the current subscription status for the master device.
  */
 export const getSubscriptionStatus = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
     const { masterImei, secretKey } = data as any;
     if (!masterImei || !secretKey) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -709,7 +709,7 @@ async function verifyPlaySubscription(packageName: string, productId: string, pu
  * permanent child device profile linked to the master device.
  */
 export const validatePairingToken = functions.https.onCall(
-  async (data: any, context: any) => {
+  async (data: any, _context: any) => {
   const { pairingToken, childImei } = data as any;
 
   if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
@@ -768,30 +768,4 @@ export const validatePairingToken = functions.https.onCall(
   }
 );
 
-// Helper function to check if a user is allowed to create a pairing code for a
-// given child. This sample implementation assumes a Firestore structure where
-// each user has a subcollection `children` containing the child IDs they are
-// permitted to manage.
-async function checkUserPermissionForChild(
-  userId: string,
-  childId: string
-): Promise<boolean> {
-  try {
-    const permissionDoc = await db()
-      .collection("users")
-      .doc(userId)
-      .collection("children")
-      .doc(childId)
-      .get();
-    return permissionDoc.exists;
-  } catch (error) {
-    functions.logger.error(
-      "Error checking permissions for user",
-      userId,
-      "and child",
-      childId,
-      error
-    );
-    return false;
-  }
-}
+

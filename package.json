@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint . --ext .js,.ts",
-    "test": "jest --config jest.config.cjs"
+    "test": "node --max-old-space-size=4096 node_modules/.bin/jest --config jest.config.cjs"
   },
   "keywords": [],
   "author": "",

@@ -53,6 +53,9 @@ class MasterViewModel @Inject constructor(
     private fun checkRegistrationStatus() {
         viewModelScope.launch {
             credentialsRepository.getCredentials.collect { (imei, secret) ->
+                // Update debug state with current credentials
+                _debugState.value = DebugState(imei = imei, secretKey = secret)
+                
                 if (!imei.isNullOrEmpty() && !secret.isNullOrEmpty()) {
                     _registrationState.value = RegistrationState.Success("Device already registered.")
                 }
@@ -70,6 +73,8 @@ class MasterViewModel @Inject constructor(
                 if (key != null) {
                     // Save credentials to repository
                     credentialsRepository.saveCredentials(imei, key)
+                    // Update debug state immediately for UI consistency
+                    _debugState.value = DebugState(imei = imei, secretKey = key)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
                      _registrationState.value = RegistrationState.Error("Backend returned no secret key.")
