@@ -7,6 +7,10 @@ const config = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: { '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
   testTimeout: 10000,
+  // Optimize memory usage
+  maxWorkers: 1,
+  logHeapUsage: true,
+  detectOpenHandles: true
 };
 
 module.exports = config;
