@@ -6,12 +6,8 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.TestCoroutineDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runBlockingTest
-import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -26,7 +22,6 @@ import org.mockito.kotlin.firstValue
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
-@ExperimentalCoroutinesApi
 @RunWith(MockitoJUnitRunner::class)
 class DashboardViewModelTest {
 
@@ -48,27 +43,18 @@ class DashboardViewModelTest {
     @Captor
     private lateinit var dataCaptor: ArgumentCaptor<HashMap<String, Any>>
 
-    private val testDispatcher = TestCoroutineDispatcher()
-
     private lateinit var viewModel: DashboardViewModel
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(testDispatcher)
         whenever(credentialsRepository.getCredentials).thenReturn(flowOf("test_imei" to "test_secret"))
         whenever(functions.getHttpsCallable("createTask")).thenReturn(callableReference)
         whenever(callableReference.call(any<HashMap<String, Any>>())).thenReturn(task)
         viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
     }
 
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
-        testDispatcher.cleanupTestCoroutines()
-    }
-
     @Test
-    fun `createTask formats date correctly and calls firebase function`() = testDispatcher.runBlockingTest {
+    fun `createTask formats date correctly and calls firebase function`() = runTest {
         // Given
         val childImei = "child_imei_123"
         val description = "Test task"
@@ -88,5 +74,18 @@ class DashboardViewModelTest {
         assertEquals(expectedDeadlineISO, capturedData["deadlineISO"])
         assertEquals("test_imei", capturedData["masterImei"])
         assertEquals("test_secret", capturedData["secretKey"])
+    }
+
+    @Test
+    fun `createTask posts error message on failure`() = runTest {
+        // Given
+        val errorMessage = "Test exception"
+        whenever(callableReference.call(any<HashMap<String, Any>>())).thenThrow(RuntimeException(errorMessage))
+
+        // When
+        viewModel.createTask("child_imei_123", "Test task", 1672531200000L)
+
+        // Then
+        assertEquals("Failed to create task. Please try again.", viewModel.error.value)
     }
 }
