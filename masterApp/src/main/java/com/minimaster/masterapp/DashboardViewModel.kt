@@ -40,7 +40,14 @@ class DashboardViewModel @Inject constructor(
     private val _reviewableTasks = MutableStateFlow<List<ReviewableTask>>(emptyList())
     val reviewableTasks: StateFlow<List<ReviewableTask>> = _reviewableTasks.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     private val TAG = "DashboardViewModel"
+
+    fun errorShown() {
+        _error.value = null
+    }
 
     init {
         viewModelScope.launch {
@@ -55,6 +62,7 @@ class DashboardViewModel @Inject constructor(
 
     private fun loadTasksForReview(masterImei: String) {
         firestore.collectionGroup("tasks")
+            .whereEqualTo("masterImei", masterImei)
             .whereEqualTo("status", "pending_approval")
             .addSnapshotListener { snapshots, e ->
                 if (e != null) {
@@ -72,8 +80,6 @@ class DashboardViewModel @Inject constructor(
                     )
                 } ?: emptyList()
 
-                // In a real app, we would cross-reference with a list of this master's children
-                // For now, we assume all pending tasks are for this master.
                 _reviewableTasks.value = tasks
             }
     }
@@ -116,6 +122,7 @@ class DashboardViewModel @Inject constructor(
                 Log.d(TAG, "setDeviceLocked called successfully for $childImei")
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling setDeviceLocked", e)
+                _error.value = "Failed to update lock state. Please try again."
             }
         }
     }
@@ -141,6 +148,7 @@ class DashboardViewModel @Inject constructor(
                 Log.d(TAG, "createTask called successfully for $childImei")
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling createTask", e)
+                _error.value = "Failed to create task. Please try again."
             }
         }
     }
@@ -161,6 +169,7 @@ class DashboardViewModel @Inject constructor(
                 Log.d(TAG, "approveTask called successfully for task $taskId")
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling approveTask", e)
+                _error.value = "Failed to approve task. Please try again."
             }
         }
     }

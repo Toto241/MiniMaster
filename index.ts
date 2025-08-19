@@ -556,6 +556,7 @@ export const createTask = functions.https.onCall(
       deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      masterImei: masterImei, // Denormalize for easier querying
     });
 
     functions.logger.info(`Task ${taskRef.id} created for child ${childImei}`);
