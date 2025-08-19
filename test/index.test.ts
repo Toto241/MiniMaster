@@ -3,22 +3,36 @@ import * as admin from "firebase-admin";
 import { db as getDbInstance } from "../firebase";
 
 // Mock the entire firebase-admin module
-jest.mock("firebase-admin", () => ({
-  ...jest.requireActual("firebase-admin"), // Import and retain default exports
-  firestore: () => ({
+jest.mock("firebase-admin", () => {
+  const firestoreNamespace = () => ({
     collection: jest.fn(),
-    Timestamp: {
-      now: jest.fn(() => ({
-        seconds: Math.floor(Date.now() / 1000),
-        nanoseconds: 0,
-      })),
-      fromDate: jest.fn((date: Date) => ({
-        seconds: Math.floor(date.getTime() / 1000),
-        nanoseconds: 0,
-      })),
-    },
-  }),
-}));
+  });
+
+  const Timestamp = jest.fn((seconds, nanoseconds) => ({
+    seconds,
+    nanoseconds,
+  })) as any;
+  Timestamp.now = jest.fn(() => ({
+    seconds: Math.floor(Date.now() / 1000),
+    nanoseconds: 0,
+  }));
+  Timestamp.fromDate = jest.fn((date: Date) => ({
+    seconds: Math.floor(date.getTime() / 1000),
+    nanoseconds: 0,
+  }));
+
+  firestoreNamespace.Timestamp = Timestamp;
+
+  firestoreNamespace.FieldValue = {
+    serverTimestamp: jest.fn(),
+  };
+
+  return {
+    ...jest.requireActual("firebase-admin"),
+    initializeApp: jest.fn(),
+    firestore: firestoreNamespace,
+  };
+});
 
 const testEnv = fft();
 
