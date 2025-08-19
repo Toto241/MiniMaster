@@ -10,10 +10,12 @@ jest.mock("firebase-admin", () => ({
     Timestamp: {
       now: jest.fn(() => ({
         seconds: Math.floor(Date.now() / 1000),
+        nanoseconds: 0,
       })),
-      fromDate: (date: Date) => ({
+      fromDate: jest.fn((date: Date) => ({
         seconds: Math.floor(date.getTime() / 1000),
-      }),
+        nanoseconds: 0,
+      })),
     },
   }),
 }));
@@ -140,7 +142,7 @@ describe("Cloud Functions", () => {
     it("should throw 'not-found' for an invalid token", async () => {
       getStub.mockResolvedValue({ exists: false });
       const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
-      await expect(wrapped({ pairingToken: "invalid-token", childImei: "child-imei" })).rejects.toThrow(/Invalid pairing token/);
+      await expect(wrapped({ pairingToken: "invalid-token", childImei: "child-imei" })).rejects.toThrow(/Pairing token is invalid/); // Updated to match exact error message
     });
 
     it("should throw 'deadline-exceeded' for an expired token", async () => {

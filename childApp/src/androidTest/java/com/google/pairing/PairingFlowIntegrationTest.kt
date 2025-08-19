@@ -95,7 +95,14 @@ class PairingFlowIntegrationTest {
         // and then check if LockScreen appears.
         // This bypasses the actual UI interaction for pairing itself.
         runBlocking {
-            ChildIdRepository(context).saveChildId(childIdToSave)
+            // Get the DataStore instance from the DI container
+            val childIdRepository = (composeTestRule.activity as MainActivity).let { activity ->
+                // Since we can't easily access the injected repository from tests,
+                // we'll use the AppModule approach directly
+                val dataStore = com.google.pairing.di.AppModule.provideDataStore(context)
+                ChildIdRepository(dataStore)
+            }
+            childIdRepository.saveChildId(childIdToSave)
         }
         // Relaunch activity to pick up the change from DataStore
         composeTestRule.activityRule.scenario.relaunch()
