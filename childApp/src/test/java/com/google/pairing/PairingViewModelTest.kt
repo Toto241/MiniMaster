@@ -4,6 +4,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,8 +32,7 @@ class PairingViewModelTest {
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
 
-    private val testDispatcher = TestCoroutineDispatcher()
-    private val testScope = TestCoroutineScope(testDispatcher)
+    private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var viewModel: PairingViewModel
     // Mocks for Firebase Functions
@@ -41,8 +41,6 @@ class PairingViewModelTest {
     // HttpsCallableResult is final, so it can be mocked but not with 'mock()' if it causes issues.
     // It's often easier to create a real map for its 'data' property.
     // @Mock private lateinit var mockResult: HttpsCallableResult // Alternative: mock()
-
-    private lateinit var viewModel: PairingViewModel
     private lateinit var mockChildIdRepository: ChildIdRepository
 
     @Before
@@ -75,7 +73,6 @@ class PairingViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        testDispatcher.cleanupTestCoroutines() // Changed from testScope.cleanupTestCoroutines() for clarity
     }
 
     // Helper to mock a successful function call
@@ -101,7 +98,7 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `validatePairingCode success saves childId and no error`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode success saves childId and no error`() = runTest {
         val pairingCode = "validCode"
         val expectedChildId = "testChildId123"
         mockFunctionCallSuccess(expectedChildId)
@@ -118,7 +115,7 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `validatePairingCode expired code error`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode expired code error`() = runTest {
         val pairingCode = "expiredCode"
         mockFunctionCallFailure(FirebaseFunctionsException.Code.DEADLINE_EXCEEDED)
 
@@ -131,7 +128,7 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `validatePairingCode not found error`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode not found error`() = runTest {
         val pairingCode = "notFoundCode"
         mockFunctionCallFailure(FirebaseFunctionsException.Code.NOT_FOUND)
 
@@ -144,7 +141,7 @@ class PairingViewModelTest {
     }
     
     @Test
-    fun `validatePairingCode internal function error`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode internal function error`() = runTest {
         val pairingCode = "internalErrorCode"
         mockFunctionCallFailure(FirebaseFunctionsException.Code.INTERNAL)
 
@@ -157,7 +154,7 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `validatePairingCode generic call exception`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode generic call exception`() = runTest {
         val pairingCode = "genericExceptionCode"
         mockFunctionCallFailure(RuntimeException("Network failed"))
 
@@ -170,7 +167,7 @@ class PairingViewModelTest {
     }
     
     @Test
-    fun `validatePairingCode success but saveChildId fails`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode success but saveChildId fails`() = runTest {
         val pairingCode = "validCodeSaveFail"
         val expectedChildId = "testChildIdSaveFail"
         mockFunctionCallSuccess(expectedChildId)
@@ -186,7 +183,7 @@ class PairingViewModelTest {
 
 
     @Test
-    fun `validatePairingCode resets error LiveData before execution`() = testDispatcher.runBlockingTest {
+    fun `validatePairingCode resets error LiveData before execution`() = runTest {
         // Set error LiveData to true initially
         viewModel.showExpiredCodeError.value = true
         viewModel.showInvalidCodeError.value = true
