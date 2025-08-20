@@ -1,6 +1,5 @@
 package com.google.pairing
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -11,27 +10,27 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.test.TestCoroutineDispatcher
-import kotlinx.coroutines.test.TestCoroutineScope
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runBlockingTest
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.junit.Assert.assertEquals
-import kotlinx.coroutines.flow.first
+import java.io.IOException
 
 @ExperimentalCoroutinesApi
 class ChildIdRepositoryTest {
 
-    private val testDispatcher = TestCoroutineDispatcher()
-    private val testScope = TestCoroutineScope(testDispatcher)
-
+    private val testDispatcher = StandardTestDispatcher()
     private lateinit var mockDataStore: DataStore<Preferences>
 
     // Define the same key used in the repository
@@ -43,28 +42,13 @@ class ChildIdRepositoryTest {
         mockDataStore = mock()
     }
 
-        repository = ChildIdRepository(mockContext) // This will use the real extension if not careful
-                                                    // We rely on mocking `edit` and `data` on `mockDataStore`
-                                                    // and assume `mockContext.dataStore` would return it.
-                                                    // This part is conceptually tricky without DI.
-                                                    // Let's assume `repository.dataStore` (if it were a public property)
-                                                    // is our `mockDataStore`.
-                                                    // The tests below will mock `mockDataStore.edit` and `mockDataStore.data`.
-    }
-
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        testDispatcher.cleanupTestCoroutines()
-        testScope.cleanupTestCoroutines()
     }
 
-    // Remove the unused helper method and unused variables
-    // private fun linkMockDataStoreToRepo() - no longer needed with DI approach
-
-
     @Test
-    fun `saveChildId successfully edits preferences`() = testDispatcher.runBlockingTest {
+    fun `saveChildId successfully edits preferences`() = runTest {
         val childId = "testId"
         val mockPreferences: Preferences = mock()
         val mockMutablePreferences: Preferences.MutablePreferences = mock()
@@ -73,7 +57,7 @@ class ChildIdRepositoryTest {
         whenever(mockDataStore.edit(any())).doAnswer { invocation ->
             val editor = invocation.getArgument<suspend (Preferences.MutablePreferences) -> Unit>(0)
             // Execute the lambda to test the logic
-            testScope.launch { editor(mockMutablePreferences) }
+            editor(mockMutablePreferences)
             flowOf(mockPreferences) // Return the updated preferences
         }
 
@@ -92,7 +76,7 @@ class ChildIdRepositoryTest {
 
 
     @Test
-    fun `getChildId successfully retrieves id`() = testDispatcher.runBlockingTest {
+    fun `getChildId successfully retrieves id`() = runTest {
         val testId = "retrieveTestId"
         val mockPreferences: Preferences = mock()
         
@@ -110,41 +94,32 @@ class ChildIdRepositoryTest {
         assertEquals(testId, result)
         verify(mockDataStore).data
     }
-        val childId = "testId"
-        val mockPreferences: Preferences = mock {
-            on { get(childIdKey) } doAnswer { childId }
-        }
-        whenever(mockDataStore.data).thenReturn(flowOf(mockPreferences))
-
-        val retrievedId = repository.getChildId().first()
-        assertEquals(childId, retrievedId)
-    }
 
     @Test
-    fun `getChildId with empty datastore returns null`() = testDispatcher.runBlockingTest {
-        linkMockDataStoreToRepo()
+    fun `getChildId with empty datastore returns null`() = runTest {
         whenever(mockDataStore.data).thenReturn(flowOf(emptyPreferences()))
 
-        val retrievedId = repository.getChildId().first()
+        val repoUnderTest = ChildIdRepository(mockDataStore)
+        val retrievedId = repoUnderTest.getChildId().first()
         assertNull(retrievedId)
     }
 
     @Test(expected = IOException::class)
-    fun `saveChildId propagates IOException from datastore edit`() = testDispatcher.runBlockingTest {
-        linkMockDataStoreToRepo()
+    fun `saveChildId propagates IOException from datastore edit`() = runTest {
         val childId = "testId"
         whenever(mockDataStore.edit(any())).thenReturn(flow { throw IOException("Disk error") })
 
-        repository.saveChildId(childId) // This should throw IOException
+        val repoUnderTest = ChildIdRepository(mockDataStore)
+        repoUnderTest.saveChildId(childId) // This should throw IOException
     }
 
     @Test
-    fun `getChildId propagates IOException from datastore data flow`() = testDispatcher.runBlockingTest {
-        linkMockDataStoreToRepo()
+    fun `getChildId propagates IOException from datastore data flow`() = runTest {
         whenever(mockDataStore.data).thenReturn(flow { throw IOException("Disk error") })
 
+        val repoUnderTest = ChildIdRepository(mockDataStore)
         try {
-            repository.getChildId().first() // Collect the flow to trigger the exception
+            repoUnderTest.getChildId().first() // Collect the flow to trigger the exception
             assertTrue("Exception was not thrown", false) // Should not reach here
         } catch (e: IOException) {
             assertEquals("Disk error", e.message)
