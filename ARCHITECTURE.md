@@ -1,5 +1,7 @@
 # Architecture Document
 
+> **Note:** This document is a work in progress. It is missing a formal C4 context diagram and detailed sequence diagrams for key user flows.
+
 This document outlines the high-level architecture of the Mini-Master application suite.
 
 ## 1. High-Level Diagram (C4 - Context)
@@ -24,7 +26,7 @@ A context diagram should be placed here, showing the main components and their i
 - **Key Components:**
   - `RuleSyncService`: Listens for FCM messages to trigger real-time rule updates.
   - `HeartbeatWorker`: Periodically sends status updates to the backend.
-  - `Accessibility Service` (to be implemented): Required for app blocking and usage monitoring.
+  - `Accessibility Service` (**Not Implemented**): This is a critical, missing component. It is required for core parental control features like monitoring the foreground app, blocking apps based on rules, and tracking usage time. The current codebase only contains a permission screen to prompt the user to enable the service, but the service itself does not exist.
 
 ### 2.3. Firebase Backend
 - **Cloud Functions (TypeScript):** The core business logic. All client interactions are mediated through these functions. Key functions include `registerMasterDevice`, `setDeviceLocked`, `createTask`, `approveTask`, `verifyPurchase`.

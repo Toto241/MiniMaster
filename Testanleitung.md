@@ -20,15 +20,14 @@ Das Backend verwaltet die Geräteregistrierung und den Kopplungsprozess.
 
 ### 1.2. Android Apps (`masterApp` & `childApp`)
 
-1.  **Firebase-Konfiguration (nur `masterApp`):**
+1.  **Firebase-Konfiguration:**
     *   Laden Sie die Konfigurationsdatei `google-services.json` von Ihrem Firebase-Projekt herunter.
-    *   Kopieren Sie diese Datei in das `masterApp/`-Verzeichnis. **Dieser Schritt ist für die Kommunikation mit dem Backend zwingend erforderlich.**
+    *   Kopieren Sie diese Datei sowohl in das `masterApp/`- als auch in das `childApp/`-Verzeichnis. **Dieser Schritt ist für die Kommunikation mit dem Backend zwingend erforderlich.**
 
-2.  **Gradle Wrapper generieren:**
-    Der Gradle Wrapper stellt sicher, dass für das Projekt eine einheitliche Gradle-Version verwendet wird. Führen Sie die folgenden Befehle vom Stammverzeichnis des Projekts aus:
+2.  **Gradle Wrapper generieren (falls nicht vorhanden):**
+    Der Gradle Wrapper stellt sicher, dass für das Projekt eine einheitliche Gradle-Version verwendet wird. Falls die `gradlew`-Datei im Stammverzeichnis fehlt, führen Sie diesen Befehl aus:
     ```bash
-    (cd masterApp && gradle wrapper)
-    (cd childApp && gradle wrapper)
+    gradle wrapper --gradle-version 8.5 --distribution-type all
     ```
     *Hinweis: Dies erfordert, dass `gradle` auf Ihrem System installiert ist.*
 
@@ -145,7 +144,7 @@ Diese Tests validieren die Logik der Cloud Functions (in `index.ts`) isoliert.
 ### 3.2. Android Unit-Tests
 Diese Tests laufen schnell auf der lokalen JVM und prüfen einzelne Komponenten wie ViewModels oder Repositories, ohne dass ein Emulator benötigt wird.
 
-*Hinweis: Die folgenden Befehle setzen voraus, dass ein Gradle Wrapper (`gradlew`) im Projekt vorhanden ist. Da dieser aktuell fehlt, können die Tests nicht direkt über die Kommandozeile ausgeführt werden. Sie können jedoch innerhalb von Android Studio für die jeweiligen Module (`childApp`, `masterApp`) gestartet werden.*
+*Hinweis: Die folgenden Befehle können über die Kommandozeile ausgeführt werden, sofern eine funktionierende Android SDK-Umgebung konfiguriert ist. Alternativ können sie direkt innerhalb von Android Studio für die jeweiligen Module (`childApp`, `masterApp`) gestartet werden.*
 
 *   **Befehl (Child-App):** `./gradlew :childApp:test`
 *   **Befehl (Master-App):** `./gradlew :masterApp:test`

@@ -19,7 +19,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 
 ## Code Style
 
-- **Kotlin:** Follow the official [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html). We use `ktlint` to enforce this (configuration to be added).
+- **Kotlin:** Follow the official [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html). We use `ktlint` to enforce this. The configuration is managed through the `ktlint-gradle` plugin in `build.gradle` and the `.editorconfig` file at the root of the project.
 - **TypeScript:** Follow standard TypeScript best practices. We use ESLint and Prettier (configuration included in `package.json`).
 
 ## Documentation Requirements
