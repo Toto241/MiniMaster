@@ -27,7 +27,7 @@ Das Backend verwaltet die Geräteregistrierung und den Kopplungsprozess.
 2.  **Gradle Wrapper generieren (falls nicht vorhanden):**
     Der Gradle Wrapper stellt sicher, dass für das Projekt eine einheitliche Gradle-Version verwendet wird. Falls die `gradlew`-Datei im Stammverzeichnis fehlt, führen Sie diesen Befehl aus:
     ```bash
-    gradle wrapper --gradle-version 8.7 --distribution-type all
+    gradle wrapper --gradle-version 8.5 --distribution-type all
     ```
     *Hinweis: Dies erfordert, dass `gradle` auf Ihrem System installiert ist.*
 
