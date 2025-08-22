@@ -1,5 +1,7 @@
 # Security Policy
 
+> **Note:** This document provides a foundational security overview. The threat model is a basic draft and should be actively maintained and expanded as the application evolves.
+
 This document outlines the security policies and considerations for the Mini-Master project.
 
 ## Threat Model (STRIDE)
