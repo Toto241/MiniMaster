@@ -17,7 +17,14 @@ For details on the project's structure, security policies, and contribution guid
 - **Secure Backend:** Logic is handled by secure Cloud Functions with hardened security rules.
 - **Real-Time Sync:** FCM instantly pushes rule changes and commands to the child device.
 - **Subscription Model:** Managed by Google Play Billing and verified by the backend.
-- **Internationalization:** Supports English, German, French, and Chinese.
+- **Internationalization:** The `childApp` supports English, German, French, and Chinese. The `masterApp` is currently English-only.
+
+## Current Status & Known Issues
+
+> **Warning:** This project is a proof-of-concept and is missing critical functionality required for a production-ready parental control application.
+
+- **Missing Core `childApp` Functionality:** The `childApp` **does not** currently implement an `Accessibility Service`. This service is essential for monitoring app usage and blocking applications, which are core features of a parental control app. The existing code includes a screen to *request* these permissions, but the service itself is not built.
+- **Incomplete Android Build Environment:** The execution environment is currently missing the Android SDK, which prevents building and testing the Android applications from the command line.
 
 ---
 
