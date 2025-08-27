@@ -95,6 +95,8 @@ A detailed manual test plan is available in **[Testanleitung.md](Testanleitung.m
 ### CI/CD
 A basic Continuous Integration workflow is defined in `.github/workflows/ci.yml`. It runs tests for the backend and attempts to build the Android apps on every push and pull request.
 
+**Note:** In restricted network environments where `dl.google.com` is blocked, Android CI tests are automatically skipped with clear warnings. See **[ANDROID_CI_NETWORK_LIMITATION.md](ANDROID_CI_NETWORK_LIMITATION.md)** for details and alternative validation approaches.
+
 ## License
 
 This project is currently unlicensed. Please see the **[LICENSE](LICENSE)** file and add an appropriate open-source license before using this code in a production environment.
