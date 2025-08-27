@@ -1,5 +1,8 @@
 # Android CI Tests - Network Limitation Documentation
 
+## Zusammenfassung (Deutsch)
+Die Android CI-Tests schlagen in Netzwerk-eingeschränkten Umgebungen fehl, da der Zugriff auf `dl.google.com` (Googles Android Maven Repository) blockiert ist. Die CI-Pipeline wurde so modifiziert, dass sie diese Einschränkung intelligent erkennt und die Android-Tests überspringt, während die Backend-Tests weiterhin erfolgreich ausgeführt werden.
+
 ## Issue
 The Android CI tests fail in restricted network environments due to blocked access to `dl.google.com` (Google's Android Maven repository).
 
