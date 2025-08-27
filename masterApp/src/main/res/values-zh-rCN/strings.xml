@@ -1,0 +1,58 @@
+<resources>
+    <!-- App name for the master (parent) application -->
+    <string name="app_name">MiniMaster（家长）</string>
+    
+    <!-- Main UI strings -->
+    <string name="parent_device_setup">家长设备设置</string>
+    <string name="setup_description">首先，我们需要将此设备注册为主要家长控制器。这需要读取唯一设备ID的权限。</string>
+    <string name="register_device">注册此设备</string>
+    <string name="registering_device">正在注册设备...</string>
+    
+    <!-- Dashboard strings -->
+    <string name="paired_devices">已配对设备</string>
+    <string name="child_id_label">孩子ID：%1$s</string>
+    <string name="device_locked">已锁定</string>
+    <string name="device_online">在线</string>
+    <string name="device_offline">离线</string>
+    <string name="create_task">创建任务</string>
+    <string name="review_tasks">审查任务</string>
+    <string name="go_premium">升级高级版</string>
+    
+    <!-- Pairing and link generation -->
+    <string name="generate_pairing_link">生成配对链接</string>
+    <string name="generating_link">正在生成链接...</string>
+    <string name="retry_link_generation">重试生成链接</string>
+    <string name="link_generated_success">链接生成成功！</string>
+    <string name="link_status">链接状态：%1$s</string>
+    
+    <!-- Task creation -->
+    <string name="create_new_task">创建新任务</string>
+    <string name="task_description">任务描述</string>
+    <string name="deadline_unix">截止日期（Unix时间戳）</string>
+    <string name="cancel">取消</string>
+    
+    <!-- Task review -->
+    <string name="review_completed_tasks">审查已完成的任务</string>
+    <string name="no_tasks_to_review">没有要审查的任务。</string>
+    <string name="child_label">孩子：%1$s</string>
+    <string name="approve_task">批准任务</string>
+    <string name="back_to_dashboard">返回控制面板</string>
+    
+    <!-- Subscription -->
+    <string name="get_premium">获取高级版</string>
+    <string name="loading_subscription">正在加载订阅选项...</string>
+    <string name="subscribe_for_price">以%1$s订阅</string>
+    
+    <!-- Error messages -->
+    <string name="failed_update_lock_state">无法更新锁定状态。请重试。</string>
+    <string name="failed_create_task">无法创建任务。请重试。</string>
+    <string name="failed_approve_task">无法批准任务。请重试。</string>
+    <string name="unknown_error">发生了未知错误。</string>
+    <string name="error_format">错误（%1$s）：%2$s</string>
+    
+    <!-- Debug info -->
+    <string name="debug_info">---- 调试信息 ----</string>
+    <string name="debug_imei">IMEI：%1$s</string>
+    <string name="debug_secret_key">密钥：%1$s</string>
+    <string name="debug_not_set">未设置</string>
+</resources>

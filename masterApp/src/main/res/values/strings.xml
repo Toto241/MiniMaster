@@ -1,3 +1,58 @@
 <resources>
+    <!-- App name for the master (parent) application -->
     <string name="app_name">MiniMaster (Master)</string>
+    
+    <!-- Main UI strings -->
+    <string name="parent_device_setup">Parent Device Setup</string>
+    <string name="setup_description">First, we need to register this device as the primary parent controller. This requires permission to read a unique device ID.</string>
+    <string name="register_device">Register This Device</string>
+    <string name="registering_device">Registering device...</string>
+    
+    <!-- Dashboard strings -->
+    <string name="paired_devices">Paired Devices</string>
+    <string name="child_id_label">Child ID: %1$s</string>
+    <string name="device_locked">Locked</string>
+    <string name="device_online">Online</string>
+    <string name="device_offline">Offline</string>
+    <string name="create_task">Create Task</string>
+    <string name="review_tasks">Review Tasks</string>
+    <string name="go_premium">Go Premium</string>
+    
+    <!-- Pairing and link generation -->
+    <string name="generate_pairing_link">Generate Pairing Link</string>
+    <string name="generating_link">Generating link...</string>
+    <string name="retry_link_generation">Retry Link Generation</string>
+    <string name="link_generated_success">Link generated successfully!</string>
+    <string name="link_status">Link Status: %1$s</string>
+    
+    <!-- Task creation -->
+    <string name="create_new_task">Create New Task</string>
+    <string name="task_description">Task Description</string>
+    <string name="deadline_unix">Deadline (Unix Timestamp)</string>
+    <string name="cancel">Cancel</string>
+    
+    <!-- Task review -->
+    <string name="review_completed_tasks">Review Completed Tasks</string>
+    <string name="no_tasks_to_review">No tasks to review.</string>
+    <string name="child_label">Child: %1$s</string>
+    <string name="approve_task">Approve Task</string>
+    <string name="back_to_dashboard">Back to Dashboard</string>
+    
+    <!-- Subscription -->
+    <string name="get_premium">Get Premium</string>
+    <string name="loading_subscription">Loading subscription options...</string>
+    <string name="subscribe_for_price">Subscribe for %1$s</string>
+    
+    <!-- Error messages -->
+    <string name="failed_update_lock_state">Failed to update lock state. Please try again.</string>
+    <string name="failed_create_task">Failed to create task. Please try again.</string>
+    <string name="failed_approve_task">Failed to approve task. Please try again.</string>
+    <string name="unknown_error">An unknown error occurred.</string>
+    <string name="error_format">Error (%1$s): %2$s</string>
+    
+    <!-- Debug info -->
+    <string name="debug_info">---- DEBUG INFO ----</string>
+    <string name="debug_imei">IMEI: %1$s</string>
+    <string name="debug_secret_key">Secret Key: %1$s</string>
+    <string name="debug_not_set">Not set</string>
 </resources>
