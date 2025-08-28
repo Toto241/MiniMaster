@@ -5,6 +5,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -19,7 +20,7 @@ fun CreateTaskScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Create New Task") })
+            TopAppBar(title = { Text(stringResource(R.string.create_new_task)) })
         }
     ) { padding ->
         Column(
@@ -33,14 +34,14 @@ fun CreateTaskScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Task Description") },
+                label = { Text(stringResource(R.string.task_description)) },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = deadline,
                 onValueChange = { deadline = it },
-                label = { Text("Deadline (Unix Timestamp)") },
+                label = { Text(stringResource(R.string.deadline_unix)) },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(32.dp))
@@ -53,11 +54,11 @@ fun CreateTaskScreen(
                 },
                 enabled = description.isNotBlank() && deadline.toLongOrNull() != null
             ) {
-                Text("Create Task")
+                Text(stringResource(R.string.create_task))
             }
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onBack) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     }

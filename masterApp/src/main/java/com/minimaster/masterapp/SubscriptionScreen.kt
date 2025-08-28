@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -33,7 +34,7 @@ fun SubscriptionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Get Premium") })
+            TopAppBar(title = { Text(stringResource(R.string.get_premium)) })
         }
     ) { padding ->
         Column(
@@ -43,7 +44,7 @@ fun SubscriptionScreen(
                 .padding(16.dp)
         ) {
             if (productDetails.isEmpty()) {
-                Text("Loading subscription options...")
+                Text(stringResource(R.string.loading_subscription))
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(productDetails) { product ->
@@ -74,7 +75,7 @@ fun ProductItem(
             // This assumes a monthly/yearly subscription with one pricing phase.
             val price = product.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
             Button(onClick = onSubscribeClick) {
-                Text("Subscribe for $price")
+                Text(stringResource(R.string.subscribe_for_price, price ?: ""))
             }
         }
     }

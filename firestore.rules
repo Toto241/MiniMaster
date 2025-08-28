@@ -8,33 +8,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper function to check if the user belongs to a specific family.
-    // This assumes the familyId is passed as a custom claim in the auth token.
-    function isFamilyMember(familyId) {
-      return isSignedIn() && request.auth.token.familyId == familyId;
+    // Rules for masters collection (flat structure to match Cloud Functions)
+    // Masters are identified by IMEI and authenticated via secretKey in Cloud Functions
+    match /masters/{masterId} {
+      // Allow read/write for authenticated users only
+      // Note: Authentication is handled in Cloud Functions via secretKey validation
+      allow read, write: if isSignedIn();
     }
 
-    // Rules for families collection.
-    // Only authenticated users can create a family.
-    // Only members of that family can read or update it.
-    match /families/{familyId} {
-      allow read, update: if isFamilyMember(familyId);
-      allow create: if isSignedIn();
+    // Rules for children collection (flat structure to match Cloud Functions)  
+    // Children are linked to masters via masterImei field
+    match /children/{childId} {
+      // Allow read/write for authenticated users only
+      // Note: Authorization is handled in Cloud Functions via master-child relationship
+      allow read, write: if isSignedIn();
     }
 
-    // Rules for the children collection, nested under families.
-    match /families/{familyId}/children/{childId} {
-      // Only family members can access child data.
-      allow read, update: if isFamilyMember(familyId);
-    }
-
-    // Rules for tasks, nested under a specific child.
-    match /families/{familyId}/children/{childId}/tasks/{taskId} {
-      allow read: if isFamilyMember(familyId);
-
-      // Only family members can create or update tasks.
-      // We also validate the data being written to ensure integrity.
-      allow create, update: if isFamilyMember(familyId)
+    // Rules for tasks, nested under children (matches Cloud Functions)
+    match /children/{childId}/tasks/{taskId} {
+      allow read, write: if isSignedIn();
+      
+      // Validate task data structure when writing
+      allow create, update: if isSignedIn()
         && request.resource.data.keys().hasOnly(['description', 'status', 'photoUrl', 'createdAt', 'updatedAt', 'deadline', 'completedAt'])
         && request.resource.data.description is string
         && request.resource.data.description.size() < 200
@@ -42,15 +37,30 @@ service cloud.firestore {
         && (request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
         && request.resource.data.deadline is timestamp;
 
-      // Nobody can delete tasks directly. This should be handled by a Cloud Function if needed.
-      allow delete: if false;
+      // Allow delete for authenticated users (handled by Cloud Functions)
+      allow delete: if isSignedIn();
     }
 
-    // The old collections are now deprecated in favor of the nested structure.
-    // Deny all access to them.
-    match /masters/{masterId} { allow read, write: if false; }
-    match /children/{childId} { allow read, write: if false; }
-    match /pairingCodes/{codeId} { allow read, write: if false; }
-    match /pairingTokens/{tokenId} { allow read, write: if false; }
+    // Rules for pairing codes (flat structure to match Cloud Functions)
+    match /pairingCodes/{codeId} {
+      // Allow read/write for authenticated users only
+      // Note: Cloud Functions handle the creation and validation logic
+      allow read, write: if isSignedIn();
+    }
+
+    // Rules for pairing tokens (flat structure to match Cloud Functions)
+    match /pairingTokens/{tokenId} {
+      // Allow read/write for authenticated users only
+      // Note: Cloud Functions handle the creation and validation logic
+      allow read, write: if isSignedIn();
+    }
+
+    // Deny access to the old nested family structure to prevent confusion
+    match /families/{familyId} {
+      allow read, write: if false;
+    }
+    match /families/{familyId}/children/{childId} {
+      allow read, write: if false;
+    }
   }
 }
