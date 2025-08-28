@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -23,7 +24,7 @@ fun TaskReviewScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Review Completed Tasks") })
+            TopAppBar(title = { Text(stringResource(R.string.review_completed_tasks)) })
         }
     ) { padding ->
         Column(
@@ -33,7 +34,7 @@ fun TaskReviewScreen(
                 .padding(16.dp)
         ) {
             if (tasksToReview.isEmpty()) {
-                Text("No tasks to review.", style = MaterialTheme.typography.h6)
+                Text(stringResource(R.string.no_tasks_to_review), style = MaterialTheme.typography.h6)
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     items(tasksToReview) { task ->
@@ -48,7 +49,7 @@ fun TaskReviewScreen(
             }
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text("Back to Dashboard")
+                Text(stringResource(R.string.back_to_dashboard))
             }
         }
     }
@@ -61,7 +62,7 @@ fun TaskReviewItem(
 ) {
     Card(elevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Child: ${task.childId}", style = MaterialTheme.typography.caption)
+            Text(stringResource(R.string.child_label, task.childId), style = MaterialTheme.typography.caption)
             Spacer(modifier = Modifier.height(4.dp))
             Text(task.description, style = MaterialTheme.typography.h6)
             Spacer(modifier = Modifier.height(8.dp))
@@ -78,7 +79,7 @@ fun TaskReviewItem(
                 onClick = onApproveClick,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
-                Text("Approve Task")
+                Text(stringResource(R.string.approve_task))
             }
         }
     }
