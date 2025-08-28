@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -125,9 +126,9 @@ fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("Parent Device Setup", style = MaterialTheme.typography.h4, modifier = Modifier.padding(bottom = 16.dp))
+            Text(stringResource(R.string.parent_device_setup), style = MaterialTheme.typography.h4, modifier = Modifier.padding(bottom = 16.dp))
             Text(
-                "First, we need to register this device as the primary parent controller. This requires permission to read a unique device ID.",
+                stringResource(R.string.setup_description),
                 style = MaterialTheme.typography.body1,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 24.dp)
@@ -145,12 +146,12 @@ fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> 
                             requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
                         }
                     }) {
-                        Text("Register This Device")
+                        Text(stringResource(R.string.register_device))
                     }
                 }
                 is RegistrationState.Loading -> {
                     CircularProgressIndicator()
-                    Text(text = "Registering device...", modifier = Modifier.padding(top = 16.dp))
+                    Text(text = stringResource(R.string.registering_device), modifier = Modifier.padding(top = 16.dp))
                 }
                 is RegistrationState.Success -> {
                     // Handled by LaunchedEffect
@@ -163,16 +164,16 @@ fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> 
 @Composable
 fun DebugInfoView(debugState: DebugState, linkState: LinkGenerationState) {
     Column(modifier = Modifier.padding(top = 16.dp)) {
-        Text("---- DEBUG INFO ----", style = MaterialTheme.typography.caption)
-        Text("IMEI: ${debugState.imei ?: "Not set"}", style = MaterialTheme.typography.caption)
-        Text("Secret Key: ${debugState.secretKey ?: "Not set"}", style = MaterialTheme.typography.caption)
+        Text(stringResource(R.string.debug_info), style = MaterialTheme.typography.caption)
+        Text(stringResource(R.string.debug_imei, debugState.imei ?: stringResource(R.string.debug_not_set)), style = MaterialTheme.typography.caption)
+        Text(stringResource(R.string.debug_secret_key, debugState.secretKey ?: stringResource(R.string.debug_not_set)), style = MaterialTheme.typography.caption)
         val linkStatus = when(linkState) {
             is LinkGenerationState.Idle -> "Idle"
             is LinkGenerationState.Loading -> "Loading..."
             is LinkGenerationState.Success -> "Success: ${linkState.pairingToken}"
             is LinkGenerationState.Error -> "Error: ${linkState.message}"
         }
-        Text("Link Status: $linkStatus", style = MaterialTheme.typography.caption, modifier = Modifier.testTag("debug_link_status"))
+        Text(stringResource(R.string.link_status, linkStatus), style = MaterialTheme.typography.caption, modifier = Modifier.testTag("debug_link_status"))
     }
 }
 
@@ -185,16 +186,16 @@ fun LinkGenerationSection(linkState: LinkGenerationState, onGenerateClick: () ->
         when (linkState) {
             is LinkGenerationState.Idle -> {
                 Button(onClick = onGenerateClick) {
-                    Text("Generate Pairing Link")
+                    Text(stringResource(R.string.generate_pairing_link))
                 }
             }
             is LinkGenerationState.Loading -> {
                 CircularProgressIndicator()
-                Text(text = "Generating link...", modifier = Modifier.padding(top = 16.dp))
+                Text(text = stringResource(R.string.generating_link), modifier = Modifier.padding(top = 16.dp))
             }
             is LinkGenerationState.Success -> {
                 Text(
-                    text = "Link generated successfully!",
+                    text = stringResource(R.string.link_generated_success),
                     style = MaterialTheme.typography.h6
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -212,7 +213,7 @@ fun LinkGenerationSection(linkState: LinkGenerationState, onGenerateClick: () ->
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = onGenerateClick) {
-                    Text("Retry Link Generation")
+                    Text(stringResource(R.string.retry_link_generation))
                 }
             }
         }
