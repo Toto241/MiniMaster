@@ -12,7 +12,8 @@ For details on the project's structure, security policies, and contribution guid
 ## Features
 
 - **Parent & Child Apps:** A dedicated app for the parent to set rules and an app for the child to enforce them.
-- **Real-Time Locking:** Parents can instantly lock or unlock a child's device.
+- **Web Control Panel:** A PC-based web interface providing equivalent functionality to the parent mobile app.
+- **Real-Time Locking:** Parents can instantly lock or unlock a child's device from mobile or web.
 - **Task Management:** Create tasks with deadlines, review photo proofs, and approve completion.
 - **Secure Backend:** Logic is handled by secure Cloud Functions with hardened security rules.
 - **Real-Time Sync:** FCM instantly pushes rule changes and commands to the child device.
@@ -54,7 +55,41 @@ Follow these steps to get the project running locally for development.
     firebase deploy
     ```
 
-### 3. Android Apps Installation & Setup
+### 3. Web Control Panel Setup
+
+The web control panel provides PC-based access to all parent app functionality through a browser interface.
+
+1.  **Navigate to Web Control Directory:**
+    ```bash
+    cd web-control
+    ```
+
+2.  **Configure Firebase:**
+    - Open `app.js` and replace the `firebaseConfig` object with your actual Firebase project configuration
+    - Or copy `firebase-config.template.js` to `firebase-config.js` and fill in your details
+
+3.  **Serve the Web Interface:**
+    You can use any static web server or host it on Firebase Hosting:
+    
+    **Option A: Simple HTTP Server (for testing)**
+    ```bash
+    python3 -m http.server 8000
+    # Access at http://localhost:8000
+    ```
+    
+    **Option B: Firebase Hosting**
+    ```bash
+    firebase init hosting
+    # Copy web-control files to public directory
+    firebase deploy --only hosting
+    ```
+
+4.  **Access the Interface:**
+    - Open your browser and navigate to the served URL
+    - Login with the same Master IMEI and Secret Key used in the mobile app
+    - Enjoy full parental control functionality from your PC!
+
+### 4. Android Apps Installation & Setup
 
 1.  **Generate Gradle Wrapper (Required First Time):**
     The Gradle wrapper is necessary for reproducible builds. Run this command from the project root:
