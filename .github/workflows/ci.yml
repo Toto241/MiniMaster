@@ -4,22 +4,55 @@ jobs:
   functions:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm ci
-      - run: npm run lint
-      - run: npm test --silent
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with: 
+          node-version: 20
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run linting
+        run: npm run lint
+        
+      - name: Run backend tests
+        run: npm test --silent
   android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          
+      - name: Validate Android manifests
+        run: |
+          echo "Validating Android manifest files..."
+          # Check for common XML syntax issues
+          for manifest in masterApp/src/main/AndroidManifest.xml childApp/src/main/AndroidManifest.xml; do
+            if [ -f "$manifest" ]; then
+              echo "Checking $manifest..."
+              # Check for JavaScript-style comments in XML
+              if grep -q "{/\*\|/\*}" "$manifest"; then
+                echo "ERROR: Found JavaScript-style comments in $manifest"
+                grep -n "{/\*\|/\*}" "$manifest"
+                exit 1
+              fi
+              echo "✓ $manifest syntax appears valid"
+            fi
+          done
           
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -29,6 +62,7 @@ jobs:
         run: |
           if curl -f --connect-timeout 10 https://dl.google.com/dl/android/maven2/ > /dev/null 2>&1; then
             echo "google-maven-accessible=true" >> $GITHUB_OUTPUT
+            echo "✓ Google Maven repository is accessible"
           else
             echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
             echo "⚠️ Google Maven repository (dl.google.com) is not accessible from this environment"
@@ -36,15 +70,15 @@ jobs:
           
       - name: Run Android unit tests
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew testDebugUnitTest --continue --no-daemon
         
       - name: Check Kotlin code style  
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew ktlintCheck
+        run: ./gradlew ktlintCheck --continue --no-daemon
         
       - name: Build debug APKs
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --continue --no-daemon
         
       - name: Skip Android tests (Network Restricted)
         if: steps.network-test.outputs.google-maven-accessible == 'false'
