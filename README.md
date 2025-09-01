@@ -124,6 +124,14 @@ The backend functions have a comprehensive unit test suite. To run them:
 npm test
 ```
 
+### Android Manifest Validation
+Before building or testing Android apps, validate the manifest files:
+```bash
+# From the project root
+./validate_manifests.sh
+```
+This helps catch XML syntax errors that could cause build failures.
+
 ### Manual App Testing
 A detailed manual test plan is available in **[Testanleitung.md](Testanleitung.md)**. It covers all end-to-end user flows.
 
