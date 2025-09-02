@@ -478,6 +478,7 @@ input:checked + .slider:before {
         flex-direction: column;
         gap: 1rem;
         text-align: center;
+        padding: 1rem;
     }
 
     .action-bar {
@@ -488,10 +489,12 @@ input:checked + .slider:before {
 
     .action-buttons {
         justify-content: center;
+        flex-wrap: wrap;
     }
 
     .devices-list {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
     .device-header {
@@ -501,14 +504,92 @@ input:checked + .slider:before {
 
     .device-controls {
         align-items: stretch;
+        gap: 0.5rem;
     }
 
     .login-form {
         flex-direction: column;
         width: 100%;
+        gap: 1rem;
+    }
+
+    .login-form input {
+        width: 100%;
+        min-height: 44px; /* Touch-friendly minimum size */
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+
+    .login-form button {
+        min-height: 44px;
+        font-size: 16px;
     }
 
     .main-content {
         padding: 1rem;
+    }
+
+    .notification {
+        left: 1rem;
+        right: 1rem;
+        top: 10px;
+        width: auto;
+        font-size: 14px;
+    }
+
+    .task-card {
+        padding: 1rem;
+    }
+
+    .task-photo {
+        height: 150px;
+    }
+}
+
+/* Additional mobile optimizations for smaller screens */
+@media (max-width: 480px) {
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .device-card {
+        padding: 1rem;
+    }
+
+    .device-controls button {
+        padding: 0.75rem 1rem;
+        font-size: 14px;
+    }
+
+    .action-buttons button {
+        padding: 0.75rem 1rem;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .subscription-content {
+        padding: 1rem;
+    }
+
+    .task-card h4 {
+        font-size: 1.1rem;
+    }
+}
+
+/* Landscape orientation adjustments for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .header {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 0.5rem 1rem;
+    }
+
+    .login-form {
+        flex-direction: row;
+        width: auto;
+        gap: 0.5rem;
+    }
+
+    .main-content {
+        padding: 0.5rem 1rem;
     }
 }

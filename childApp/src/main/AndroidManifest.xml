@@ -5,6 +5,14 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Support different screen sizes and densities -->
+    <supports-screens 
+        android:smallScreens="true"
+        android:normalScreens="true" 
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:anyDensity="true" />
+
     <application
         android:name="com.google.pairing.PairingApplication" 
         android:allowBackup="true"
@@ -17,7 +25,9 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"> <!-- Ensure a base theme is set -->
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait"> <!-- Ensure a base theme is set -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
