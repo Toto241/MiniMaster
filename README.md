@@ -12,13 +12,14 @@ For details on the project's structure, security policies, and contribution guid
 ## Features
 
 - **Parent & Child Apps:** A dedicated app for the parent to set rules and an app for the child to enforce them.
-- **Web Control Panel:** A PC-based web interface providing equivalent functionality to the parent mobile app.
+- **Web Control Panel:** A PC-based web interface providing equivalent functionality to the parent mobile app with responsive design optimized for mobile devices.
 - **Real-Time Locking:** Parents can instantly lock or unlock a child's device from mobile or web.
 - **Task Management:** Create tasks with deadlines, review photo proofs, and approve completion.
 - **Secure Backend:** Logic is handled by secure Cloud Functions with hardened security rules.
 - **Real-Time Sync:** FCM instantly pushes rule changes and commands to the child device.
 - **Subscription Model:** Managed by Google Play Billing and verified by the backend.
-- **Internationalization:** The `childApp` supports English, German, French, and Chinese. The `masterApp` is currently English-only.
+- **Internationalization:** Both the `childApp` and `masterApp` support English, German, French, and Chinese (Simplified) with complete localization.
+- **Mobile-Optimized:** All applications include mobile display considerations with responsive layouts, touch-friendly controls, and multi-screen support.
 
 ## Current Status & Known Issues
 
