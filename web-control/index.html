@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini-Master PC Control Panel</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Mini-Master Control Panel</h1>
+            <div class="auth-section">
+                <div id="login-form" class="login-form">
+                    <input type="text" id="master-imei" placeholder="Master Device IMEI" required>
+                    <input type="password" id="secret-key" placeholder="Secret Key" required>
+                    <button onclick="login()">Login</button>
+                </div>
+                <div id="user-info" class="user-info" style="display: none;">
+                    <span id="logged-user">Logged in as: <span id="master-id"></span></span>
+                    <button onclick="logout()" class="logout-btn">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content" id="main-content" style="display: none;">
+            <div class="dashboard">
+                <div class="action-bar">
+                    <h2>Paired Devices</h2>
+                    <div class="action-buttons">
+                        <button onclick="showReviewTasks()" class="btn btn-secondary">Review Tasks</button>
+                        <button onclick="showSubscription()" class="btn btn-secondary">Go Premium</button>
+                    </div>
+                </div>
+
+                <div id="devices-list" class="devices-list">
+                    <div class="loading">Loading devices...</div>
+                </div>
+
+                <div id="task-creation-modal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <span class="close" onclick="closeTaskModal()">&times;</span>
+                        <h3>Create New Task</h3>
+                        <form onsubmit="createTask(event)">
+                            <input type="hidden" id="task-child-id">
+                            <div class="form-group">
+                                <label for="task-description">Task Description:</label>
+                                <textarea id="task-description" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="task-deadline">Deadline:</label>
+                                <input type="datetime-local" id="task-deadline" required>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" onclick="closeTaskModal()" class="btn btn-secondary">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Create Task</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="task-review-section" class="section" style="display: none;">
+                    <div class="section-header">
+                        <h3>Review Completed Tasks</h3>
+                        <button onclick="showDashboard()" class="btn btn-secondary">Back to Dashboard</button>
+                    </div>
+                    <div id="tasks-to-review" class="tasks-list">
+                        <div class="loading">Loading tasks...</div>
+                    </div>
+                </div>
+
+                <div id="subscription-section" class="section" style="display: none;">
+                    <div class="section-header">
+                        <h3>Subscription Management</h3>
+                        <button onclick="showDashboard()" class="btn btn-secondary">Back to Dashboard</button>
+                    </div>
+                    <div class="subscription-content">
+                        <p>Upgrade to Premium for additional features:</p>
+                        <ul>
+                            <li>Unlimited device pairing</li>
+                            <li>Advanced usage analytics</li>
+                            <li>Custom app blocking rules</li>
+                            <li>Priority support</li>
+                        </ul>
+                        <button class="btn btn-primary">Upgrade Now</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="notification" class="notification" style="display: none;"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

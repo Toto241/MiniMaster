@@ -3,6 +3,7 @@ package com.minimaster.masterapp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.Button
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Switch
@@ -13,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.util.concurrent.TimeUnit
@@ -34,14 +36,14 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Paired Devices", style = MaterialTheme.typography.h4)
+            Text(stringResource(R.string.paired_devices), style = MaterialTheme.typography.h4)
             Row {
                 Button(onClick = onNavigateToReview) {
-                    Text("Review Tasks")
+                    Text(stringResource(R.string.review_tasks))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = onNavigateToSubscription) {
-                    Text("Go Premium")
+                    Text(stringResource(R.string.go_premium))
                 }
             }
         }
@@ -74,19 +76,19 @@ fun ChildDeviceItem(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Child ID: ${child.id}", style = MaterialTheme.typography.h6)
+                    Text(text = stringResource(R.string.child_id_label, child.id), style = MaterialTheme.typography.h6)
                     Spacer(modifier = Modifier.height(4.dp))
                     val isOnline = child.lastSeen?.let {
                         val now = System.currentTimeMillis() / 1000
                         (now - it) < TimeUnit.MINUTES.toSeconds(20)
                     } ?: false
                     Text(
-                        text = if (isOnline) "Online" else "Offline",
+                        text = if (isOnline) stringResource(R.string.device_online) else stringResource(R.string.device_offline),
                         color = if (isOnline) Color.Green else Color.Gray
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Locked")
+                    Text(stringResource(R.string.device_locked))
                     Switch(
                         checked = child.isLocked,
                         onCheckedChange = onLockToggle
@@ -95,7 +97,7 @@ fun ChildDeviceItem(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onCreateTaskClick, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text("Create Task")
+                Text(stringResource(R.string.create_task))
             }
         }
     }
