@@ -5,6 +5,14 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Support different screen sizes and densities -->
+    <supports-screens 
+        android:smallScreens="true"
+        android:normalScreens="true" 
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:anyDensity="true" />
+
     <application
         android:name="com.google.pairing.PairingApplication"
         android:allowBackup="true"
@@ -12,12 +20,14 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"> <!-- Ensure a base theme is set -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait"> <!-- Ensure a base theme is set -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -30,10 +40,6 @@
                 <data android:scheme="minimaster" android:host="pair" />
             </intent-filter>
         </activity>
-
-        <!-- Firebase Messaging Service -->
-        <service
-            android:name=".RuleSyncService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
