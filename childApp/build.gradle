@@ -7,13 +7,13 @@ plugins {
 }
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 34
     namespace "com.google.pairing.child" // Added namespace
 
     defaultConfig {
         applicationId "com.google.pairing.child"
         minSdkVersion 21
-        targetSdkVersion 33
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
 
