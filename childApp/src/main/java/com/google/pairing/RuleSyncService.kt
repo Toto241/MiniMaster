@@ -78,9 +78,11 @@ class RuleSyncService : FirebaseMessagingService() {
                 // Update AccessibilityService with new rules
                 updateAccessibilityServiceRules(blockedApps)
                 
-                Log.d(TAG, "App rules updated: $blockedApps")
+                AppLogger.logRuleSyncEvent("app_blocking", "success", "Updated ${blockedApps.size} blocked apps")
+                
             } catch (e: Exception) {
                 Log.e(TAG, "Error parsing blocked apps", e)
+                AppLogger.logRuleSyncEvent("app_blocking", "error", "Failed to parse blocked apps: ${e.message}")
             }
         }
     }
