@@ -95,7 +95,7 @@ The web control panel provides PC-based access to all parent app functionality t
 1.  **Generate Gradle Wrapper (Required First Time):**
     The Gradle wrapper is necessary for reproducible builds. Run this command from the project root:
     ```bash
-    gradle wrapper --gradle-version 8.7 --distribution-type all
+    gradle wrapper --gradle-version 8.14.3 --distribution-type all
     ```
 2.  **Add Firebase Configuration:**
     - **For German-speaking users:** See detailed step-by-step instructions in [FIREBASE_EINRICHTUNG.md](./FIREBASE_EINRICHTUNG.md) (Deutsch)
