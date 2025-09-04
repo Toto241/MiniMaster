@@ -4,6 +4,8 @@ plugins {
     id 'kotlin-kapt'
     id 'com.google.dagger.hilt.android'
     id 'com.google.gms.google-services'
+    id 'com.google.firebase.firebase-perf' // Firebase Performance Monitoring
+    id 'com.google.firebase.crashlytics' // Firebase Crashlytics
 }
 
 android {
@@ -57,6 +59,8 @@ dependencies {
     // Firebase
     implementation 'com.google.firebase:firebase-firestore-ktx:24.8.0'
     implementation 'com.google.firebase:firebase-functions-ktx:20.4.0'
+    implementation 'com.google.firebase:firebase-perf-ktx:20.5.1' // Firebase Performance Monitoring
+    implementation 'com.google.firebase:firebase-crashlytics-ktx:18.5.1' // Firebase Crashlytics
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.1'
 
     // Hilt

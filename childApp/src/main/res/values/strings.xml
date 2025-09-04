@@ -26,4 +26,7 @@
 
     <!-- Error message displayed if saving the device/child ID to local storage fails after successful pairing. -->
     <string name="error_saving_child_id">Error saving device ID.</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Mini-Master parental control service that monitors app usage and enforces blocking rules to ensure safe device usage for children.</string>
 </resources>
