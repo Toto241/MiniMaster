@@ -1,5 +1,6 @@
 package com.google.pairing
 
+import android.content.Context
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -28,17 +29,96 @@ class RuleSyncService : FirebaseMessagingService() {
         // Check if message contains a data payload.
         remoteMessage.data.isNotEmpty().let {
             Log.d(TAG, "Message data payload: " + remoteMessage.data)
-
-            // Handle SYNC_RULES command
-            if (remoteMessage.data["command"] == "SYNC_RULES") {
-                Log.d(TAG, "SYNC_RULES command received. Triggering rule sync logic.")
-                // In a real application, you would trigger a background job here
-                // using WorkManager to fetch the latest rules from Firestore and apply them.
-                // For this implementation step, logging is sufficient to prove receipt.
-                // Example:
-                // val workRequest = OneTimeWorkRequestBuilder<RuleSyncWorker>().build()
-                // WorkManager.getInstance(this).enqueue(workRequest)
+            
+            // Handle different types of messages
+            when (remoteMessage.data["type"]) {
+                "device_lock" -> handleDeviceLockMessage(remoteMessage.data)
+                "app_rules" -> handleAppRulesUpdate(remoteMessage.data)
+                "sync_request" -> handleSyncRequest()
+                else -> {
+                    // Handle legacy SYNC_RULES command
+                    if (remoteMessage.data["command"] == "SYNC_RULES") {
+                        Log.d(TAG, "SYNC_RULES command received. Triggering rule sync logic.")
+                        handleSyncRequest()
+                    } else {
+                        Log.w(TAG, "Unknown message type or command: ${remoteMessage.data}")
+                    }
+                }
             }
+        }
+    }
+
+    private fun handleDeviceLockMessage(data: Map<String, String>) {
+        Log.d(TAG, "Handling device lock message")
+        val isLocked = data["locked"]?.toBoolean() ?: false
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val childId = childIdRepository.getChildId().first()
+                if (childId.isNotEmpty()) {
+                    // Update device lock status
+                    Log.d(TAG, "Device lock status updated: $isLocked for child: $childId")
+                    // TODO: Implement device locking logic if needed
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling device lock message", e)
+            }
+        }
+    }
+
+    private fun handleAppRulesUpdate(data: Map<String, String>) {
+        Log.d(TAG, "Handling app rules update")
+        val blockedAppsJson = data["blocked_apps"]
+        
+        if (!blockedAppsJson.isNullOrEmpty()) {
+            try {
+                // Parse blocked apps (assuming comma-separated list)
+                val blockedApps = blockedAppsJson.split(",").toSet()
+                
+                // Update AccessibilityService with new rules
+                updateAccessibilityServiceRules(blockedApps)
+                
+                Log.d(TAG, "App rules updated: $blockedApps")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing blocked apps", e)
+            }
+        }
+    }
+
+    private fun handleSyncRequest() {
+        Log.d(TAG, "Handling sync request")
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val childId = childIdRepository.getChildId().first()
+                if (childId.isNotEmpty()) {
+                    // Trigger sync with backend
+                    Log.d(TAG, "Syncing rules for child: $childId")
+                    // TODO: Implement rule sync logic with Firebase Functions
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during sync request", e)
+            }
+        }
+    }
+
+    private fun updateAccessibilityServiceRules(blockedApps: Set<String>) {
+        try {
+            // Try to communicate with AccessibilityService
+            val context = this.applicationContext
+            
+            // Use shared preferences to communicate with AccessibilityService
+            val sharedPrefs = context.getSharedPreferences("accessibility_rules", Context.MODE_PRIVATE)
+            with(sharedPrefs.edit()) {
+                putStringSet("blocked_apps", blockedApps)
+                putLong("last_update", System.currentTimeMillis())
+                apply()
+            }
+            
+            Log.d(TAG, "Updated accessibility rules in shared preferences")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating accessibility service rules", e)
         }
     }
 
@@ -48,38 +128,28 @@ class RuleSyncService : FirebaseMessagingService() {
      * FCM registration token is initially generated so this is where you would retrieve the token.
      */
     override fun onNewToken(token: String) {
-        Log.d(TAG, "Refreshed FCM token: $token")
-        // A coroutine is used to call suspend functions from the service context.
+        Log.d(TAG, "Refreshed token: $token")
+
         CoroutineScope(Dispatchers.IO).launch {
-            sendRegistrationToServer(token)
-        }
-    }
+            try {
+                val childId = childIdRepository.getChildId().first()
+                if (childId.isNotEmpty()) {
+                    // Update the token in the backend
+                    val data = hashMapOf(
+                        "childImei" to childId,
+                        "token" to token
+                    )
 
-    private suspend fun sendRegistrationToServer(token: String?) {
-        if (token == null) {
-            Log.w(TAG, "Cannot send null token to server.")
-            return
-        }
-        try {
-            val childId = childIdRepository.getChildId().first()
-            if (childId.isNullOrEmpty()) {
-                Log.w(TAG, "Cannot register FCM token, childId is not yet available.")
-                return
+                    functions
+                        .getHttpsCallable("registerFcmToken")
+                        .call(data)
+                        .await()
+
+                    Log.d(TAG, "FCM token updated for child: $childId")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating FCM token", e)
             }
-
-            val data = hashMapOf(
-                "childImei" to childId,
-                "token" to token
-            )
-
-            functions
-                .getHttpsCallable("registerFcmToken")
-                .call(data)
-                .await()
-
-            Log.d(TAG, "FCM token registered successfully for child $childId.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to register FCM token", e)
         }
     }
 }

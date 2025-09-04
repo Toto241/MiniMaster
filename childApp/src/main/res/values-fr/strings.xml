@@ -9,4 +9,7 @@
     <string name="error_code_expired">Le code de couplage a expiré.</string>
     <string name="error_invalid_code">Code de couplage invalide.</string>
     <string name="error_saving_child_id">Erreur lors de l\'enregistrement de l\'ID de l\'appareil.</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Service de contrôle parental Mini-Master qui surveille l\'utilisation des applications et applique les règles de blocage pour assurer une utilisation sûre de l\'appareil pour les enfants.</string>
 </resources>
