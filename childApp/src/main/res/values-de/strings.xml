@@ -9,4 +9,7 @@
     <string name="error_code_expired">Kopplungscode ist abgelaufen.</string>
     <string name="error_invalid_code">Ungültiger Kopplungscode.</string>
     <string name="error_saving_child_id">Fehler beim Speichern der Geräte-ID.</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Mini-Master Kindersicherungsdienst, der App-Nutzung überwacht und Sperrregeln durchsetzt, um sichere Gerätenutzung für Kinder zu gewährleisten.</string>
 </resources>
