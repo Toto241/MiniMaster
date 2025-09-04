@@ -21,7 +21,8 @@ Das Backend verwaltet die Geräteregistrierung und den Kopplungsprozess.
 ### 1.2. Android Apps (`masterApp` & `childApp`)
 
 1.  **Firebase-Konfiguration:**
-    *   Laden Sie die Konfigurationsdatei `google-services.json` von Ihrem Firebase-Projekt herunter.
+    *   **Neu:** Wenn Sie noch kein Firebase-Projekt haben, folgen Sie der detaillierten Anleitung in [FIREBASE_EINRICHTUNG.md](./FIREBASE_EINRICHTUNG.md)
+    *   Laden Sie die Konfigurationsdateien `google-services.json` von Ihrem Firebase-Projekt herunter.
     *   Kopieren Sie diese Datei sowohl in das `masterApp/`- als auch in das `childApp/`-Verzeichnis. **Dieser Schritt ist für die Kommunikation mit dem Backend zwingend erforderlich.**
 
 2.  **Gradle Wrapper generieren (falls nicht vorhanden):**
