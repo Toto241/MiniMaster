@@ -79,7 +79,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                 }
                 AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                     // Can be used for more granular monitoring if needed
-                    Log.v(TAG, "Window content changed in ${it.packageName}")
+                    AppLogger.logAccessibilityEvent("WINDOW_CONTENT_CHANGED", it.packageName?.toString() ?: "unknown")
                 }
             }
         }
@@ -116,7 +116,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             return
         }
 
-        Log.d(TAG, "Window state changed: $packageName")
+        AppLogger.logAccessibilityEvent("WINDOW_STATE_CHANGED", packageName, "detected")
         
         if (packageName != currentForegroundApp) {
             currentForegroundApp = packageName
@@ -185,8 +185,11 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             // Also try to close the blocked app if possible
             performGlobalAction(GLOBAL_ACTION_BACK)
             
+            AppLogger.logAppBlockingEvent(packageName, "parental_control_rule", true)
+            
         } catch (e: Exception) {
             Log.e(TAG, "Error blocking app $packageName", e)
+            AppLogger.logAppBlockingEvent(packageName, "blocking_error", false)
         }
     }
 
