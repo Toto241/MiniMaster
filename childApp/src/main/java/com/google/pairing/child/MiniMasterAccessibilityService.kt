@@ -1,4 +1,4 @@
-package com.google.pairing
+package com.google.pairing.child
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
