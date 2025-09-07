@@ -55,17 +55,27 @@ jobs:
         run: npm test --silent
   android:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Set working directory to repository root where Gradle files are located
+        working-directory: .
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
           
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/validate-gradle-wrapper@v3
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          
+      - name: Show Gradle version
+        run: ./gradlew --version
           
       - name: Validate Android manifests
         run: |
@@ -86,6 +96,9 @@ jobs:
           
       - name: Make gradlew executable
         run: chmod +x ./gradlew
+        
+      - name: Show Gradle version
+        run: ./gradlew --version
         
       - name: Test network access to Google Maven
         id: network-test
@@ -144,6 +157,10 @@ jobs:
     needs: android
     timeout-minutes: 60
     if: needs.android.result == 'success'
+    defaults:
+      run:
+        # Set working directory to repository root where Gradle files are located
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
