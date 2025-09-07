@@ -41,6 +41,11 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion "1.5.8"
     }
+    testOptions {
+        animationsDisabled = true
+        unitTests.isReturnDefaultValues = true
+        execution 'ANDROIDX_TEST_ORCHESTRATOR'
+    }
 }
 
 dependencies {
@@ -88,4 +93,5 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     androidTestImplementation "androidx.compose.ui:ui-test-junit4"
     debugImplementation "androidx.compose.ui:ui-test-manifest"
+    androidTestUtil 'androidx.test:orchestrator:1.4.2'
 }

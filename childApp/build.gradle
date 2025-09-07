@@ -84,6 +84,7 @@ dependencies {
     androidTestImplementation "androidx.compose.ui:ui-test-junit4" // Compose Testing
     debugImplementation "androidx.compose.ui:ui-test-manifest" // Compose Testing
     androidTestImplementation "org.mockito:mockito-android:5.3.1" // Mockito for Android tests
+    androidTestUtil 'androidx.test:orchestrator:1.4.2'
 }
 
 android {
@@ -92,6 +93,11 @@ android {
     }
     composeOptions {
         kotlinCompilerExtensionVersion "1.5.8" // Updated for Kotlin 1.8.20 and Compose BOM compatibility
+    }
+    testOptions {
+        animationsDisabled = true
+        unitTests.isReturnDefaultValues = true
+        execution 'ANDROIDX_TEST_ORCHESTRATOR'
     }
     // Ensure namespace is defined in the android block if not already. It's in the original.
 }
