@@ -88,7 +88,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion "1.4.6" // Updated for Kotlin 1.8.20 and Compose 1.5.x compatibility
+        kotlinCompilerExtensionVersion "1.5.4" // Updated for Kotlin 1.8.20 and Compose 1.5.x compatibility
     }
     // Ensure namespace is defined in the android block if not already. It's in the original.
 }
