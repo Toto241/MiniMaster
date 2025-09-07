@@ -51,11 +51,14 @@ dependencies {
     implementation 'com.google.firebase:firebase-storage-ktx:20.3.0' // Firebase Storage dependency
     implementation 'com.google.firebase:firebase-perf-ktx:20.5.1' // Firebase Performance Monitoring
     implementation 'com.google.firebase:firebase-crashlytics-ktx:18.5.1' // Firebase Crashlytics
+    
+    // Compose BOM - ensures all compose libraries use compatible versions
+    implementation platform('androidx.compose:compose-bom:2024.02.00')
     implementation 'androidx.activity:activity-compose:1.7.2' // Updated Activity Compose dependency
-    implementation "androidx.compose.ui:ui:1.5.4" // Updated Compose UI
-    implementation "androidx.compose.material:material:1.5.4" // Updated Compose Material
-    implementation "androidx.compose.ui:ui-tooling-preview:1.5.4" // Updated Compose UI Tooling Preview
-    debugImplementation "androidx.compose.ui:ui-tooling:1.5.4" // Added Compose UI Tooling for debug
+    implementation "androidx.compose.ui:ui" // Updated Compose UI
+    implementation "androidx.compose.material:material" // Updated Compose Material
+    implementation "androidx.compose.ui:ui-tooling-preview" // Updated Compose UI Tooling Preview
+    debugImplementation "androidx.compose.ui:ui-tooling" // Added Compose UI Tooling for debug
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.mockito:mockito-core:5.3.1' // Updated Mockito
     testImplementation 'org.mockito.kotlin:mockito-kotlin:5.1.0' // Updated Mockito-Kotlin
@@ -78,8 +81,8 @@ dependencies {
 
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    androidTestImplementation "androidx.compose.ui:ui-test-junit4:1.5.4" // Compose Testing
-    debugImplementation "androidx.compose.ui:ui-test-manifest:1.5.4" // Compose Testing
+    androidTestImplementation "androidx.compose.ui:ui-test-junit4" // Compose Testing
+    debugImplementation "androidx.compose.ui:ui-test-manifest" // Compose Testing
     androidTestImplementation "org.mockito:mockito-android:5.3.1" // Mockito for Android tests
 }
 
@@ -88,7 +91,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion "1.5.4" // Updated for Kotlin 1.8.20 and Compose 1.5.x compatibility
+        kotlinCompilerExtensionVersion "1.5.8" // Updated for Kotlin 1.8.20 and Compose BOM compatibility
     }
     // Ensure namespace is defined in the android block if not already. It's in the original.
 }
