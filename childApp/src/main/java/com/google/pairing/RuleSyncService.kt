@@ -58,7 +58,17 @@ class RuleSyncService : FirebaseMessagingService() {
                 if (childId.isNotEmpty()) {
                     // Update device lock status
                     Log.d(TAG, "Device lock status updated: $isLocked for child: $childId")
-                    // TODO: Implement device locking logic if needed
+                    
+                    // Implement device locking logic
+                    val context = this@RuleSyncService.applicationContext
+                    val sharedPrefs = context.getSharedPreferences("device_lock", Context.MODE_PRIVATE)
+                    with(sharedPrefs.edit()) {
+                        putBoolean("is_locked", isLocked)
+                        putLong("lock_timestamp", System.currentTimeMillis())
+                        apply()
+                    }
+                    
+                    Log.d(TAG, "Device lock state persisted: locked=$isLocked")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling device lock message", e)
@@ -96,10 +106,54 @@ class RuleSyncService : FirebaseMessagingService() {
                 if (childId.isNotEmpty()) {
                     // Trigger sync with backend
                     Log.d(TAG, "Syncing rules for child: $childId")
-                    // TODO: Implement rule sync logic with Firebase Functions
+                    
+                    // Implement rule sync logic with Firebase Functions
+                    syncRulesWithBackend(childId)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error during sync request", e)
+            }
+        }
+    }
+
+    private suspend fun syncRulesWithBackend(childId: String) {
+        try {
+            // Call Firebase Function to get latest rules for this child
+            val data = hashMapOf("childId" to childId)
+            
+            functions.getHttpsCallable("getRulesForChild")
+                .call(data)
+                .await()
+                .let { result ->
+                    val rulesData = result.data as? Map<String, Any>
+                    rulesData?.let { rules ->
+                        Log.d(TAG, "Retrieved rules from backend: $rules")
+                        
+                        // Process and apply rules
+                        val blockedApps = (rules["blockedApps"] as? List<String>)?.toSet() ?: emptySet()
+                        if (blockedApps.isNotEmpty()) {
+                            updateAccessibilityServiceRules(blockedApps)
+                            AppLogger.logRuleSyncEvent("rule_sync", "success", "Rules synchronized: ${blockedApps.size} blocked apps")
+                        }
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync rules with backend", e)
+            AppLogger.logRuleSyncEvent("rule_sync", "error", "Failed to sync with backend: ${e.message}")
+            
+            // Implement exponential backoff for retry logic
+            scheduleRetrySync()
+        }
+    }
+
+    private fun scheduleRetrySync() {
+        // Simple retry mechanism - could be enhanced with WorkManager for more robust scheduling
+        CoroutineScope(Dispatchers.IO).launch {
+            kotlinx.coroutines.delay(30000) // Wait 30 seconds before retry
+            Log.d(TAG, "Retrying rule sync...")
+            val childId = childIdRepository.getChildId().first()
+            if (childId.isNotEmpty()) {
+                syncRulesWithBackend(childId)
             }
         }
     }
