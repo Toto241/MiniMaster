@@ -16,13 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Gradle Wrapper
-        uses: gradle/actions/validate-gradle-wrapper@v3
+        uses: gradle/gradle-build-action@v3
+        with:
+          validate-wrapper: true
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
       - name: Gradle cache
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/gradle-build-action@v3
       - name: Show Gradle version
         run: ./gradlew --version
       - name: Build & Unit tests
