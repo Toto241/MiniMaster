@@ -37,6 +37,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 1
           
       - name: Set up Node.js
@@ -63,6 +64,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 1
           
       - name: Validate Gradle Wrapper
@@ -165,6 +167,8 @@ jobs:
         working-directory: .
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
