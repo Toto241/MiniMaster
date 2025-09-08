@@ -1,6 +1,7 @@
 # Ignore Node dependencies and build output
 node_modules/
 lib/
+coverage/
 
 # Ignore Android build directories
 **/build/
