@@ -22,7 +22,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate Gradle Wrapper
-        uses: gradle/actions/validate-gradle-wrapper@v3
+        uses: gradle/gradle-build-action@v3
+        with:
+          validate-wrapper: true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -44,8 +46,9 @@ jobs:
 
       - name: Dependency Submission
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        uses: gradle/actions/dependency-submission@v3
+        uses: gradle/gradle-build-action@v3
         with:
+          dependency-submission: true
           # Projekt im Repository-Root, daher working-directory: .
           working-directory: .
 
