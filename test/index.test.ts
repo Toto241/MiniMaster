@@ -4,27 +4,34 @@ import { db as getDbInstance } from "../firebase";
 
 // Mock the entire firebase-admin module
 jest.mock("firebase-admin", () => {
+  // We need a class that can be used with `instanceof`
+  class MockTimestamp {
+    constructor(public seconds: number, public nanoseconds: number) {}
+    toDate() {
+      return new Date(this.seconds * 1000 + this.nanoseconds / 1000000);
+    }
+    static fromDate(date: Date) {
+      const seconds = Math.floor(date.getTime() / 1000);
+      const nanoseconds = date.getMilliseconds() * 1000000;
+      return new MockTimestamp(seconds, nanoseconds);
+    }
+    static now() {
+      const now = new Date();
+      const seconds = Math.floor(now.getTime() / 1000);
+      const nanoseconds = now.getMilliseconds() * 1000000;
+      return new MockTimestamp(seconds, nanoseconds);
+    }
+  }
+
   const firestoreNamespace = () => ({
     collection: jest.fn(),
   });
 
-  const Timestamp = jest.fn((seconds, nanoseconds) => ({
-    seconds,
-    nanoseconds,
-  })) as any;
-  Timestamp.now = jest.fn(() => ({
-    seconds: Math.floor(Date.now() / 1000),
-    nanoseconds: 0,
-  }));
-  Timestamp.fromDate = jest.fn((date: Date) => ({
-    seconds: Math.floor(date.getTime() / 1000),
-    nanoseconds: 0,
-  }));
+  // Assign the class to the Timestamp property
+  (firestoreNamespace as any).Timestamp = MockTimestamp;
 
-  firestoreNamespace.Timestamp = Timestamp;
-
-  firestoreNamespace.FieldValue = {
-    serverTimestamp: jest.fn(),
+  (firestoreNamespace as any).FieldValue = {
+    serverTimestamp: () => "mock-server-timestamp",
   };
 
   return {
@@ -171,6 +178,206 @@ describe("Cloud Functions", () => {
       const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
       await expect(wrapped({ pairingToken: "expired-token", childImei: "child-imei" })).rejects.toThrow(/Pairing token has expired/);
       expect(deleteStub).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("validatePairingCode", () => {
+    beforeEach(() => {
+      collectionStub.mockImplementation((collectionName: string) => {
+        if (collectionName === "pairingCodes") {
+          return { doc: docStub };
+        }
+        return { doc: jest.fn() };
+      });
+    });
+
+    it("should validate a code and return the childId", async () => {
+      const future = new Date();
+      future.setDate(future.getDate() + 1);
+      const expiresAt = admin.firestore.Timestamp.fromDate(future);
+      getStub.mockResolvedValue({
+        exists: true,
+        data: () => ({ childId: "test-child-123", expiresAt }),
+      });
+
+      const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
+      const result = await wrapped({ pairingCode: "123456" });
+
+      expect(result).toEqual({ childId: "test-child-123" });
+      expect(deleteStub).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw 'not-found' for an invalid code", async () => {
+      getStub.mockResolvedValue({ exists: false });
+      const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
+      await expect(wrapped({ pairingCode: "000000" })).rejects.toThrow(/Invalid pairing code/);
+    });
+
+    it("should throw 'deadline-exceeded' for an expired code", async () => {
+      const past = new Date();
+      past.setDate(past.getDate() - 1);
+      const expiresAt = admin.firestore.Timestamp.fromDate(past);
+      getStub.mockResolvedValue({
+        exists: true,
+        data: () => ({ childId: "test-child-123", expiresAt }),
+      });
+
+      const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
+      await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Pairing code has expired/);
+      expect(deleteStub).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw 'internal' if code data is missing", async () => {
+      getStub.mockResolvedValue({ exists: true, data: () => undefined });
+      const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
+      await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Pairing code data is missing/);
+    });
+
+    it("should throw 'internal' if expiresAt is malformed", async () => {
+        getStub.mockResolvedValue({
+            exists: true,
+            data: () => ({ childId: "test-child-123", expiresAt: "not-a-timestamp" }),
+        });
+        const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
+        await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Invalid pairing code data structure/);
+    });
+
+    it("should throw 'internal' if childId is malformed", async () => {
+        const future = new Date();
+        future.setDate(future.getDate() + 1);
+        const expiresAt = admin.firestore.Timestamp.fromDate(future);
+        getStub.mockResolvedValue({
+            exists: true,
+            data: () => ({ childId: 123, expiresAt }), // Invalid childId
+        });
+        const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
+        await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Invalid pairing code data structure \(childId\)/);
+    });
+  });
+
+  describe("registerMasterDevice", () => {
+    beforeEach(() => {
+      collectionStub.mockImplementation((collectionName: string) => {
+        if (collectionName === "masters") {
+          return { doc: docStub };
+        }
+        return { doc: jest.fn() };
+      });
+    });
+
+    it("should register a new master device successfully", async () => {
+      getStub.mockResolvedValue({ exists: false });
+      setStub.mockResolvedValue(undefined);
+
+      const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
+      const result = await wrapped({ imei: "test-imei-123" });
+
+      expect(result).toHaveProperty("secretKey");
+      expect(typeof result.secretKey).toBe("string");
+      expect(setStub).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw 'already-exists' if the device is already registered", async () => {
+      getStub.mockResolvedValue({ exists: true });
+
+      const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
+      await expect(wrapped({ imei: "test-imei-123" })).rejects.toThrow(/This device has already been registered/);
+    });
+
+    it("should throw 'invalid-argument' if imei is missing", async () => {
+      const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
+      await expect(wrapped({})).rejects.toThrow(/The function must be called with a valid 'imei' string/);
+    });
+  });
+
+  describe("generatePairingLink", () => {
+    beforeEach(() => {
+        collectionStub.mockImplementation((collectionName: string) => {
+            if (collectionName === "masters" || collectionName === "pairingTokens") {
+                return { doc: docStub };
+            }
+            return { doc: jest.fn() };
+        });
+    });
+
+    it("should generate a pairing token successfully", async () => {
+        getStub.mockResolvedValue({ exists: true, data: () => ({ secretKey: "valid-secret" }) });
+        setStub.mockResolvedValue(undefined);
+
+        const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+        const result = await wrapped({ imei: "test-imei-123", secretKey: "valid-secret" });
+
+        expect(result).toHaveProperty("pairingToken");
+        expect(typeof result.pairingToken).toBe("string");
+        expect(setStub).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw 'unauthenticated' for an invalid imei or secret key", async () => {
+        getStub.mockResolvedValue({ exists: false });
+
+        const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+        await expect(wrapped({ imei: "invalid-imei", secretKey: "invalid-secret" })).rejects.toThrow(/Invalid IMEI or secret key/);
+    });
+
+    it("should throw 'invalid-argument' if imei or secretKey is missing", async () => {
+        const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
+        await expect(wrapped({ imei: "test-imei" })).rejects.toThrow(/Request must include a valid 'imei' and 'secretKey'/);
+        await expect(wrapped({ secretKey: "test-secret" })).rejects.toThrow(/Request must include a valid 'imei' and 'secretKey'/);
+    });
+  });
+
+  describe("setDeviceLocked", () => {
+    beforeEach(() => {
+        collectionStub.mockImplementation((collectionName: string) => {
+            if (collectionName === "masters" || collectionName === "children") {
+                return { doc: docStub };
+            }
+            return { doc: jest.fn() };
+        });
+    });
+
+    it("should set the device lock state to true", async () => {
+        getStub.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "valid-secret" }) }); // master
+        getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "test-imei" }) }); // child
+        updateStub.mockResolvedValue(undefined);
+
+        const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
+        const result = await wrapped({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: true });
+
+        expect(result).toEqual({ success: true, isLocked: true });
+        expect(updateStub).toHaveBeenCalledWith({ isLocked: true, updatedAt: "mock-server-timestamp" });
+    });
+
+    it("should set the device lock state to false", async () => {
+        getStub.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "valid-secret" }) }); // master
+        getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "test-imei" }) }); // child
+        updateStub.mockResolvedValue(undefined);
+
+        const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
+        const result = await wrapped({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: false });
+
+        expect(result).toEqual({ success: true, isLocked: false });
+        expect(updateStub).toHaveBeenCalledWith({ isLocked: false, updatedAt: "mock-server-timestamp" });
+    });
+
+    it("should throw 'unauthenticated' for invalid master credentials", async () => {
+        getStub.mockResolvedValue({ exists: false });
+
+        const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
+        await expect(wrapped({ masterImei: "invalid-imei", secretKey: "invalid-secret", childImei: "child-imei", isLocked: true })).rejects.toThrow(/Invalid master IMEI or secret key/);
+    });
+
+    it("should throw 'permission-denied' if master is not authorized for the child", async () => {
+        getStub.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "valid-secret" }) }); // master
+        getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "another-master" }) }); // child
+
+        const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
+        await expect(wrapped({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: true })).rejects.toThrow(/This master device is not authorized/);
+    });
+
+    it("should throw 'invalid-argument' for missing arguments", async () => {
+        const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
+        await expect(wrapped({})).rejects.toThrow(/Request must include valid/);
     });
   });
 });

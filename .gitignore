@@ -1,6 +1,7 @@
 # Ignore Node dependencies and build output
 node_modules/
 lib/
+coverage/
 
 # Ignore Android build directories
 **/build/
@@ -12,3 +13,4 @@ lib/
 # Local configuration files
 local.properties
 java_pid16808.hprof
+lib/

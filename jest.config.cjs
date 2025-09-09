@@ -10,7 +10,19 @@ const config = {
   // Optimize memory usage
   maxWorkers: 1,
   logHeapUsage: true,
-  detectOpenHandles: true
+  detectOpenHandles: true,
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'cobertura'],
+  coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
+  coverageThreshold: {
+    global: {
+      branches: 28,
+      functions: 36,
+      lines: 47,
+      statements: 48
+    }
+  }
 };
 
 module.exports = config;
