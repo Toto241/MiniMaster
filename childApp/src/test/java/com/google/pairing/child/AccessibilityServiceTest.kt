@@ -1,4 +1,4 @@
-package com.google.pairing
+package com.google.pairing.child
 
 import android.content.Context
 import org.junit.Before
