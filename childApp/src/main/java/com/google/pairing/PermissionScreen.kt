@@ -14,13 +14,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+/**
+ * A Composable screen that informs the user about the need for the Accessibility Service
+ * permission and provides a button to open the relevant system settings.
+ *
+ * This screen is a critical part of the onboarding flow after the device has been paired.
+ * The Accessibility Service is essential for the app's core functionality of monitoring
+ * and blocking other applications.
+ *
+ * @param onPermissionGranted A callback function that is invoked when the user clicks the
+ * button to open settings. In the current implementation, this optimistically assumes
+ * the user will grant the permission and proceeds with the onboarding flow. A more robust
+ * solution would involve checking the permission status after returning from settings.
+ */
 @Composable
 fun PermissionScreen(onPermissionGranted: () -> Unit) {
     val context = LocalContext.current
-
-    // This is a simplified check. A real app would use a service to check
-    // if the Accessibility Service is actually enabled.
-    // For now, we assume the user grants it when they click the button.
 
     Column(
         modifier = Modifier
@@ -43,8 +52,8 @@ fun PermissionScreen(onPermissionGranted: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(onClick = {
             openAccessibilitySettings(context)
-            // We can't know for sure if they granted it, so we'll proceed.
-            // A more robust implementation would re-check after returning from settings.
+            // This callback proceeds with the onboarding flow. A better implementation
+            // would listen for the service being enabled before calling this.
             onPermissionGranted()
         }) {
             Text("Open Settings")
@@ -52,6 +61,10 @@ fun PermissionScreen(onPermissionGranted: () -> Unit) {
     }
 }
 
+/**
+ * Opens the system's Accessibility settings screen.
+ * @param context The context from which to launch the intent.
+ */
 private fun openAccessibilitySettings(context: Context) {
     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
     context.startActivity(intent)

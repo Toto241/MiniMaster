@@ -15,6 +15,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 
+/**
+ * A screen for reviewing tasks that children have marked as complete.
+ *
+ * This screen displays a list of tasks that are in the "pending_approval" state.
+ * Each item shows the task description, the child who completed it, and the photo proof.
+ * The master user can then approve the task.
+ *
+ * @param viewModel The [DashboardViewModel] that provides the list of reviewable tasks and handles the approval action.
+ * @param onBack A callback to navigate back to the previous screen.
+ */
 @Composable
 fun TaskReviewScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
@@ -34,20 +44,23 @@ fun TaskReviewScreen(
                 .padding(16.dp)
         ) {
             if (tasksToReview.isEmpty()) {
-                Text(stringResource(R.string.no_tasks_to_review), style = MaterialTheme.typography.h6)
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.no_tasks_to_review), style = MaterialTheme.typography.h6)
+                }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     items(tasksToReview) { task ->
                         TaskReviewItem(
                             task = task,
-                            onApproveClick = {
-                                viewModel.approveTask(task.childId, task.taskId)
-                            }
+                            onApproveClick = { viewModel.approveTask(task.childId, task.taskId) }
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(stringResource(R.string.back_to_dashboard))
             }
@@ -55,6 +68,15 @@ fun TaskReviewScreen(
     }
 }
 
+/**
+ * A Composable that displays a single task awaiting review.
+ *
+ * It shows the task details and the photo proof in a [Card]. An "Approve" button
+ * allows the user to confirm the task's completion.
+ *
+ * @param task The [ReviewableTask] data to display.
+ * @param onApproveClick A callback invoked when the "Approve" button is clicked.
+ */
 @Composable
 fun TaskReviewItem(
     task: ReviewableTask,
@@ -68,7 +90,7 @@ fun TaskReviewItem(
             Spacer(modifier = Modifier.height(8.dp))
             AsyncImage(
                 model = task.photoUrl,
-                contentDescription = "Proof for ${task.description}",
+                contentDescription = stringResource(R.string.proof_for_task, task.description),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp),

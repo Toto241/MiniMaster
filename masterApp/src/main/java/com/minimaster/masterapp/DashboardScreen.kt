@@ -19,6 +19,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.util.concurrent.TimeUnit
 
+/**
+ * The main dashboard screen for the master application.
+ *
+ * This screen displays a list of all paired child devices and provides navigation buttons
+ * to other sections of the app like task review and subscriptions.
+ *
+ * @param viewModel The [DashboardViewModel] instance for accessing data and business logic.
+ * @param onNavigateToCreateTask A callback to navigate to the task creation screen for a specific child.
+ * @param onNavigateToReview A callback to navigate to the screen for reviewing completed tasks.
+ * @param onNavigateToSubscription A callback to navigate to the subscription management screen.
+ */
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
@@ -38,13 +49,9 @@ fun DashboardScreen(
         ) {
             Text(stringResource(R.string.paired_devices), style = MaterialTheme.typography.h4)
             Row {
-                Button(onClick = onNavigateToReview) {
-                    Text(stringResource(R.string.review_tasks))
-                }
+                Button(onClick = onNavigateToReview) { Text(stringResource(R.string.review_tasks)) }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = onNavigateToSubscription) {
-                    Text(stringResource(R.string.go_premium))
-                }
+                Button(onClick = onNavigateToSubscription) { Text(stringResource(R.string.go_premium)) }
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -52,9 +59,7 @@ fun DashboardScreen(
             items(children) { child ->
                 ChildDeviceItem(
                     child = child,
-                    onLockToggle = { isLocked ->
-                        viewModel.setDeviceLocked(child.id, isLocked)
-                    },
+                    onLockToggle = { isLocked -> viewModel.setDeviceLocked(child.id, isLocked) },
                     onCreateTaskClick = { onNavigateToCreateTask(child.id) }
                 )
             }
@@ -62,6 +67,16 @@ fun DashboardScreen(
     }
 }
 
+/**
+ * A Composable that displays a single child device in a [Card].
+ *
+ * It shows the child's ID, online status, and provides a [Switch] to remotely lock or
+ * unlock the device. It also includes a button to create a new task for this specific child.
+ *
+ * @param child The [ChildDevice] data to display.
+ * @param onLockToggle A callback invoked with the new state when the lock switch is toggled.
+ * @param onCreateTaskClick A callback invoked when the "Create Task" button is clicked.
+ */
 @Composable
 fun ChildDeviceItem(
     child: ChildDevice,
@@ -89,10 +104,7 @@ fun ChildDeviceItem(
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(stringResource(R.string.device_locked))
-                    Switch(
-                        checked = child.isLocked,
-                        onCheckedChange = onLockToggle
-                    )
+                    Switch(checked = child.isLocked, onCheckedChange = onLockToggle)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

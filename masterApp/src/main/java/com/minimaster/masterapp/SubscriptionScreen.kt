@@ -15,6 +15,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+/**
+ * A screen that displays available subscription products and allows the user to purchase them.
+ *
+ * It observes product details from the [SubscriptionViewModel] and launches the
+ * Google Play Billing purchase flow when a user decides to subscribe. It also
+ * triggers purchase verification for any new, unacknowledged purchases.
+ *
+ * @param viewModel The [SubscriptionViewModel] for handling billing logic.
+ */
 @Composable
 fun SubscriptionScreen(
     viewModel: SubscriptionViewModel = hiltViewModel()
@@ -23,7 +32,7 @@ fun SubscriptionScreen(
     val purchase by viewModel.purchaseStatus.collectAsState()
     val activity = LocalContext.current as Activity
 
-    // When a new purchase is detected, verify it.
+    // When a new purchase is completed, this effect triggers its verification.
     LaunchedEffect(purchase) {
         purchase?.let {
             if (!it.isAcknowledged) {
@@ -44,7 +53,9 @@ fun SubscriptionScreen(
                 .padding(16.dp)
         ) {
             if (productDetails.isEmpty()) {
-                Text(stringResource(R.string.loading_subscription))
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.loading_subscription))
+                }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(productDetails) { product ->
@@ -61,6 +72,15 @@ fun SubscriptionScreen(
     }
 }
 
+/**
+ * A Composable that displays a single subscription product in a [Card].
+ *
+ * It shows the product's name, description, and price, along with a button to initiate
+ * the purchase flow.
+ *
+ * @param product The [com.android.billingclient.api.ProductDetails] object to display.
+ * @param onSubscribeClick A callback invoked when the subscribe button is clicked.
+ */
 @Composable
 fun ProductItem(
     product: com.android.billingclient.api.ProductDetails,
@@ -72,10 +92,10 @@ fun ProductItem(
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = product.description, style = MaterialTheme.typography.body2)
             Spacer(modifier = Modifier.height(8.dp))
-            // This assumes a monthly/yearly subscription with one pricing phase.
+            // This assumes a simple subscription model with one base plan.
             val price = product.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
             Button(onClick = onSubscribeClick) {
-                Text(stringResource(R.string.subscribe_for_price, price ?: ""))
+                Text(stringResource(R.string.subscribe_for_price, price ?: "Price not available"))
             }
         }
     }

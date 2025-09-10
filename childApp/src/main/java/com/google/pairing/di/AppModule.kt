@@ -19,12 +19,25 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-private const val USER_PREFERENCES_NAME = "child_settings" // Name für die DataStore-Datei
+private const val USER_PREFERENCES_NAME = "child_settings"
 
+/**
+ * Hilt Module that provides singleton instances of app-level dependencies.
+ *
+ * This object is installed in the [SingletonComponent], meaning that any dependency
+ * provided here will have a single instance created for the entire application lifecycle.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    /**
+     * Provides a singleton instance of [DataStore<Preferences>].
+     * DataStore is used for persisting simple key-value data, such as user settings or IDs.
+     *
+     * @param appContext The application context, provided by Hilt.
+     * @return A singleton [DataStore] instance.
+     */
     @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext appContext: Context): DataStore<Preferences> {
@@ -33,22 +46,32 @@ object AppModule {
         )
     }
 
+    /**
+     * Provides a singleton instance of [FirebaseFunctions].
+     * It is configured to use the "europe-west1" region, which should match the deployment
+     * region of the cloud functions.
+     * @return A configured [FirebaseFunctions] instance.
+     */
     @Provides
     @Singleton
     fun provideFirebaseFunctions(): FirebaseFunctions {
-        // Passe die Region bei Bedarf an.
-        // Wenn keine Region angegeben wird, wird us-central1 verwendet.
-        // Die Region wurde im ViewModel als "europe-west1" festgelegt.
         return Firebase.functions("europe-west1")
     }
 
+    /**
+     * Provides a singleton instance of [FirebaseFirestore].
+     * @return The default [FirebaseFirestore] instance.
+     */
     @Provides
     @Singleton
     fun provideFirebaseFirestore(): FirebaseFirestore {
-        // Standard-Firestore-Instanz, falls sie noch an anderer Stelle benötigt wird.
         return Firebase.firestore
     }
 
+    /**
+     * Provides a singleton instance of [FirebaseStorage].
+     * @return The default [FirebaseStorage] instance.
+     */
     @Provides
     @Singleton
     fun provideFirebaseStorage(): FirebaseStorage {

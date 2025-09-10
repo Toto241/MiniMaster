@@ -8,14 +8,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
+/**
+ * A Composable screen for creating a new task for a child device.
+ *
+ * This screen provides a simple form with fields for the task description and deadline.
+ * The deadline input is simplified to a text field for a UNIX timestamp for this
+ * example, but a production app would use a proper Date/Time picker dialog.
+ *
+ * @param onTaskCreate A callback invoked with the description and deadline when the
+ * "Create Task" button is clicked and the inputs are valid.
+ * @param onBack A callback to navigate back to the previous screen.
+ */
 @Composable
 fun CreateTaskScreen(
     onTaskCreate: (description: String, deadline: Long) -> Unit,
     onBack: () -> Unit
 ) {
     var description by remember { mutableStateOf("") }
-    // In a real app, this would use a DatePickerDialog.
-    // For simplicity, we'll use a text field for the deadline in milliseconds.
+    // A real app should use a DatePickerDialog for a better user experience.
     var deadline by remember { mutableStateOf("") }
 
     Scaffold(
