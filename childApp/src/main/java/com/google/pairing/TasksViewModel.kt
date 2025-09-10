@@ -16,12 +16,35 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import android.net.Uri
 
+import android.net.Uri
+
+/**
+ * A data class representing a single task for the child.
+ *
+ * @property id The unique identifier of the task in Firestore.
+ * @property description A description of what the task entails.
+ * @property status The current status of the task (e.g., "pending", "pending_approval", "approved").
+ */
 data class Task(
     val id: String,
     val description: String,
     val status: String
 )
 
+/**
+ * A [ViewModel] responsible for managing the state and business logic for the tasks screen.
+ *
+ * This ViewModel:
+ * - Listens for real-time updates to the list of tasks from Firestore.
+ * - Provides a [StateFlow] of tasks for the UI to observe.
+ * - Handles the process of completing a task, which involves uploading a photo proof
+ *   to Firebase Storage and then calling a cloud function.
+ *
+ * @property firestore The [FirebaseFirestore] instance for database operations.
+ * @property storage The [FirebaseStorage] instance for file uploads.
+ * @property functions The [FirebaseFunctions] instance for calling backend logic.
+ * @property childIdRepository The repository for retrieving the device's ID.
+ */
 @HiltViewModel
 class TasksViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
@@ -31,6 +54,10 @@ class TasksViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    /**
+     * A [StateFlow] that emits the current list of tasks for the child device.
+     * The UI collects this flow to display the tasks.
+     */
     val tasks: StateFlow<List<Task>> = _tasks.asStateFlow()
 
     private val TAG = "TasksViewModel"
@@ -39,6 +66,10 @@ class TasksViewModel @Inject constructor(
         loadTasks()
     }
 
+    /**
+     * Sets up a real-time snapshot listener on the 'tasks' subcollection in Firestore.
+     * It retrieves the child's tasks, ordered by creation date, and updates the [_tasks] state flow.
+     */
     private fun loadTasks() {
         viewModelScope.launch {
             val childId = childIdRepository.getChildId().first()
@@ -69,6 +100,19 @@ class TasksViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Handles the process of completing a task that requires photo proof.
+     *
+     * This function performs two main operations:
+     * 1. It uploads the image from the given [photoUri] to a unique path in Firebase Storage.
+     * 2. It calls the `completeTask` cloud function with the task details and the URL of the
+     *    uploaded photo.
+     *
+     * The UI is updated automatically via the snapshot listener in [loadTasks].
+     *
+     * @param taskId The ID of the task to complete.
+     * @param photoUri The content [Uri] of the photo taken by the user.
+     */
     fun completeTaskWithPhoto(taskId: String, photoUri: Uri) {
         viewModelScope.launch {
             val childId = childIdRepository.getChildId().first()
@@ -96,9 +140,10 @@ class TasksViewModel @Inject constructor(
                     .await()
 
                 Log.d(TAG, "Task $taskId marked as complete.")
-                // The snapshot listener will automatically update the UI
+                // The UI will update automatically thanks to the real-time listener.
             } catch (e: Exception) {
                 Log.e(TAG, "Error completing task $taskId", e)
+                // Consider exposing this error to the UI via a StateFlow<Event<String>>
             }
         }
     }

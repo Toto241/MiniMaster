@@ -7,10 +7,19 @@ import { google } from "googleapis";
 import { db } from "./firebase";
 
 /**
- * Creates a new pairing code for a given childId.
+ * Creates a new, unique 6-digit pairing code for a given child device ID.
+ * The code is stored in Firestore and expires after 24 hours.
+ * This function is callable from a client application.
+ *
+ * @param {{childId: string}} data - The data passed to the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{pairingCode: string}>} A promise that resolves with the generated pairing code.
+ * @throws {functions.https.HttpsError} Throws an error if the childId is invalid,
+ * or if a unique code cannot be generated.
  */
-export const createPairingCode = functions.https.onCall(async (data, _context) => {
-  const childId = (data as any).childId;
+export const createPairingCode = functions.https.onCall(async (data: { childId: string }, _context) => {
+  const { childId } = data;
 
   if (!childId || typeof childId !== "string") {
     throw new functions.https.HttpsError(
@@ -59,11 +68,17 @@ export const createPairingCode = functions.https.onCall(async (data, _context) =
 });
 
 /**
- * Validates a given pairingCode, and if valid, returns the associated childId
- * and deletes the pairing code.
+ * Validates a given pairing code. If the code is valid and not expired,
+ * it returns the associated childId and deletes the code to prevent reuse.
+ *
+ * @param {{pairingCode: string}} data - The data passed to the function.
+ * @param {string} data.pairingCode - The 6-digit pairing code to validate.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{childId: string}>} A promise that resolves with the childId associated with the code.
+ * @throws {functions.https.HttpsError} Throws an error if the code is invalid, not found, expired, or malformed.
  */
-export const validatePairingCode = functions.https.onCall(async (data, _context) => {
-  const pairingCode = (data as any).pairingCode;
+export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string }, _context) => {
+  const { pairingCode } = data;
 
   if (!pairingCode || typeof pairingCode !== "string") {
     throw new functions.https.HttpsError(
@@ -151,17 +166,25 @@ export const validatePairingCode = functions.https.onCall(async (data, _context)
 );
 
 /**
- * Registers a new master device based on its IMEI.
+ * Registers a new master device using its IMEI (or another unique ID).
+ * If the device is not already registered, it creates a new entry in Firestore
+ * and returns a unique secret key for future authentication.
+ *
+ * @param {{imei: string}} data - The data passed to the function.
+ * @param {string} data.imei - The unique identifier for the master device.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{secretKey: string}>} A promise that resolves with the newly generated secret key.
+ * @throws {functions.https.HttpsError} Throws an error if the IMEI is invalid or already registered.
  */
 export const registerMasterDevice = functions.https.onCall(
-  async (data: any, _context: any) => {
-  const imei = (data as any).imei;
-  if (!imei || typeof imei !== "string") {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "The function must be called with a valid 'imei' string."
-    );
-  }
+  async (data: { imei: string }, _context: any) => {
+    const { imei } = data;
+    if (!imei || typeof imei !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The function must be called with a valid 'imei' string."
+      );
+    }
 
   const masterDeviceRef = db().collection("masters").doc(imei);
 
@@ -202,17 +225,26 @@ export const registerMasterDevice = functions.https.onCall(
 
 /**
  * Generates a single-use pairing token for an authenticated master device.
+ * This token can be used to link a new child device to this master account.
+ * The token is valid for 5 minutes.
+ *
+ * @param {{imei: string, secretKey: string}} data - The data passed to the function.
+ * @param {string} data.imei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{pairingToken: string}>} A promise that resolves with the generated pairing token.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const generatePairingLink = functions.https.onCall(
-  async (data: any, _context: any) => {
-  const { imei, secretKey } = data as any;
+  async (data: { imei: string, secretKey: string }, _context: any) => {
+    const { imei, secretKey } = data;
 
-  if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Request must include a valid 'imei' and 'secretKey'."
-    );
-  }
+    if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'imei' and 'secretKey'."
+      );
+    }
 
   const masterDeviceRef = db().collection("masters").doc(imei);
 
@@ -256,10 +288,20 @@ export const generatePairingLink = functions.https.onCall(
 
 /**
  * Sets the lock state for a specific child device.
+ * This function requires authentication from the master device.
+ *
+ * @param {{masterImei: string, secretKey: string, childImei: string, isLocked: boolean}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {string} data.childImei - The unique identifier of the child device to lock/unlock.
+ * @param {boolean} data.isLocked - The desired lock state.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean, isLocked: boolean}>} A promise that resolves with the new lock state.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const setDeviceLocked = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey, childImei, isLocked } = data as any;
+  async (data: { masterImei: string, secretKey: string, childImei: string, isLocked: boolean }, _context: any) => {
+    const { masterImei, secretKey, childImei, isLocked } = data;
 
     if (
       !masterImei || typeof masterImei !== "string" ||
@@ -312,11 +354,21 @@ export const setDeviceLocked = functions.https.onCall(
 );
 
 /**
- * Updates the app blacklist for a specific child device.
+ * Updates the list of blacklisted apps for a specific child device.
+ * This function requires authentication from the master device.
+ *
+ * @param {{masterImei: string, secretKey: string, childImei: string, appBlacklist: string[]}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {string[]} data.appBlacklist - An array of package names to be blacklisted.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const updateAppBlacklist = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey, childImei, appBlacklist } = data as any;
+  async (data: { masterImei: string, secretKey: string, childImei: string, appBlacklist: string[] }, _context: any) => {
+    const { masterImei, secretKey, childImei, appBlacklist } = data;
 
     if (
       !masterImei || typeof masterImei !== "string" ||
@@ -357,11 +409,21 @@ export const updateAppBlacklist = functions.https.onCall(
 );
 
 /**
- * Sets usage rules for a specific child device.
+ * Sets screen time usage rules for a specific child device.
+ * This function requires authentication from the master device.
+ *
+ * @param {{masterImei: string, secretKey: string, childImei: string, usageRules: object}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {object} data.usageRules - An object containing the usage rules to be applied.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const setUsageRules = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey, childImei, usageRules } = data as any;
+  async (data: { masterImei: string, secretKey: string, childImei: string, usageRules: object }, _context: any) => {
+    const { masterImei, secretKey, childImei, usageRules } = data;
     if (
       !masterImei || typeof masterImei !== "string" ||
       !secretKey || typeof secretKey !== "string" ||
@@ -402,10 +464,17 @@ export const setUsageRules = functions.https.onCall(
 
 /**
  * Records a heartbeat from a child device to indicate it's online.
+ * This function updates the `lastSeen` timestamp for the child device.
+ *
+ * @param {{childImei: string}} data - The data passed to the function.
+ * @param {string} data.childImei - The unique identifier of the child device sending the heartbeat.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if the childImei is invalid or the device is not found.
  */
 export const recordHeartbeat = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { childImei } = data as any;
+  async (data: { childImei: string }, _context: any) => {
+    const { childImei } = data;
 
     if (!childImei || typeof childImei !== "string") {
       throw new functions.https.HttpsError(
@@ -446,11 +515,19 @@ export const recordHeartbeat = functions.https.onCall(
 );
 
 /**
- * Registers or updates the FCM token for a child device, allowing it to receive push messages.
+ * Registers or updates the FCM token for a child device. This token is required
+ * to send push notifications (e.g., for rule synchronization) to the device.
+ *
+ * @param {{childImei: string, token: string}} data - The data passed to the function.
+ * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {string} data.token - The Firebase Cloud Messaging (FCM) registration token.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the device is not found.
  */
 export const registerFcmToken = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { childImei, token } = data as any;
+  async (data: { childImei: string, token: string }, _context: any) => {
+    const { childImei, token } = data;
 
     if (!childImei || typeof childImei !== "string" || !token || typeof token !== "string") {
       throw new functions.https.HttpsError(
@@ -482,7 +559,12 @@ export const registerFcmToken = functions.https.onCall(
 );
 
 /**
- * Firestore trigger (v2) that sends an FCM message to a child device when its data changes.
+ * A Firestore trigger (v2) that sends a "SYNC_RULES" command via FCM to a child
+ * device whenever its lock state, app blacklist, or usage rules are modified.
+ * This ensures the child device applies new settings in near real-time.
+ *
+ * @param {FirestoreEvent<Change<DocumentSnapshot> | undefined, {childId: string}>} event - The Firestore event object.
+ * @returns {Promise<void>} A promise that resolves when the operation is complete.
  */
 export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", async (event) => {
     const childId = event.params.childId;
@@ -528,11 +610,21 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   });
 
 /**
- * Creates a new task for a child device. Called by the master device.
+ * Creates a new task for a child device, assigned by an authenticated master device.
+ *
+ * @param {{masterImei: string, secretKey: string, childImei: string, description: string, deadlineISO: string}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {string} data.childImei - The unique identifier of the child device receiving the task.
+ * @param {string} data.description - The description of the task.
+ * @param {string} data.deadlineISO - The task's deadline in ISO 8601 format.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean, taskId: string}>} A promise that resolves with the new task's ID.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const createTask = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey, childImei, description, deadlineISO } = data as any;
+  async (data: { masterImei: string, secretKey: string, childImei: string, description: string, deadlineISO: string }, _context: any) => {
+    const { masterImei, secretKey, childImei, description, deadlineISO } = data;
 
     if (!masterImei || !secretKey || !childImei || !description || !deadlineISO) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -565,11 +657,20 @@ export const createTask = functions.https.onCall(
 );
 
 /**
- * Marks a task as complete from the child's side, attaching a photo proof URL.
+ * Marks a task as complete from the child's side and attaches a photo proof URL.
+ * The task status is updated to 'pending_approval'.
+ *
+ * @param {{childImei: string, taskId: string, photoUrl: string}} data - The data for the function.
+ * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {string} data.taskId - The ID of the task being completed.
+ * @param {string} data.photoUrl - The URL of the uploaded photo proof.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the task is not found.
  */
 export const completeTask = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { childImei, taskId, photoUrl } = data as any;
+  async (data: { childImei: string, taskId: string, photoUrl: string }, _context: any) => {
+    const { childImei, taskId, photoUrl } = data;
 
     if (!childImei || !taskId || !photoUrl) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -594,11 +695,21 @@ export const completeTask = functions.https.onCall(
 );
 
 /**
- * Approves a completed task. Called by the master device.
+ * Approves a completed task. This function is called by the master device after
+ * reviewing the photo proof. The task status is updated to 'approved'.
+ *
+ * @param {{masterImei: string, secretKey: string, childImei: string, taskId: string}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {string} data.childImei - The unique identifier of the child device that completed the task.
+ * @param {string} data.taskId - The ID of the task to approve.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const approveTask = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey, childImei, taskId } = data as any;
+  async (data: { masterImei: string, secretKey: string, childImei: string, taskId: string }, _context: any) => {
+    const { masterImei, secretKey, childImei, taskId } = data;
 
     if (!masterImei || !secretKey || !childImei || !taskId) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -625,11 +736,21 @@ export const approveTask = functions.https.onCall(
 );
 
 /**
- * Verifies a purchase with Google Play and grants entitlement.
+ * Verifies a Google Play subscription purchase and grants entitlement to the master device.
+ * It calls the Google Play Developer API to validate the purchase token.
+ *
+ * @param {{masterImei: string, secretKey: string, purchaseToken: string, sku: string}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {string} data.purchaseToken - The purchase token from the Google Play Billing library.
+ * @param {string} data.sku - The product ID (SKU) of the subscription.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean, subscriptionStatus: string}>} A promise that resolves with the new subscription status.
+ * @throws {functions.https.HttpsError} Throws an error if authentication or purchase verification fails.
  */
 export const verifyPurchase = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey, purchaseToken, sku } = data as any;
+  async (data: { masterImei: string, secretKey: string, purchaseToken: string, sku: string }, _context: any) => {
+    const { masterImei, secretKey, purchaseToken, sku } = data;
 
     if (!masterImei || !secretKey || !purchaseToken || !sku) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -673,11 +794,18 @@ export const verifyPurchase = functions.https.onCall(
 );
 
 /**
- * Gets the current subscription status for the master device.
+ * Gets the current subscription status for an authenticated master device.
+ *
+ * @param {{masterImei: string, secretKey: string}} data - The data for the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{subscriptionStatus: object}>} A promise that resolves with the subscription status object.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails.
  */
 export const getSubscriptionStatus = functions.https.onCall(
-  async (data: any, _context: any) => {
-    const { masterImei, secretKey } = data as any;
+  async (data: { masterImei: string, secretKey: string }, _context: any) => {
+    const { masterImei, secretKey } = data;
     if (!masterImei || !secretKey) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
@@ -693,7 +821,14 @@ export const getSubscriptionStatus = functions.https.onCall(
   }
 );
 
-async function verifyPlaySubscription(packageName: string, productId: string, purchaseToken: string) {
+/**
+ * Verifies a subscription's validity with the Google Play Developer API.
+ * @param {string} packageName - The application's package name.
+ * @param {string} productId - The subscription product ID (SKU).
+ * @param {string} purchaseToken - The token provided by the client upon purchase.
+ * @returns {Promise<boolean>} A promise that resolves to true if the subscription is active and valid.
+ */
+async function verifyPlaySubscription(packageName: string, productId: string, purchaseToken: string): Promise<boolean> {
   const auth = new google.auth.GoogleAuth({
     scopes: ["https://www.googleapis.com/auth/androidpublisher"],
   });
@@ -706,19 +841,27 @@ async function verifyPlaySubscription(packageName: string, productId: string, pu
 }
 
 /**
- * Validates a single-use pairing token, and if valid, creates a
- * permanent child device profile linked to the master device.
+ * Validates a single-use pairing token. If valid, it creates a permanent
+ * child device profile in Firestore, linking it to the master device that
+ * generated the token. The token is then deleted.
+ *
+ * @param {{pairingToken: string, childImei: string}} data - The data for the function.
+ * @param {string} data.pairingToken - The single-use token for pairing.
+ * @param {string} data.childImei - The unique identifier of the new child device.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{childId: string}>} A promise that resolves with the master device's ID, confirming the link.
+ * @throws {functions.https.HttpsError} Throws an error if the token is invalid, expired, or arguments are missing.
  */
 export const validatePairingToken = functions.https.onCall(
-  async (data: any, _context: any) => {
-  const { pairingToken, childImei } = data as any;
+  async (data: { pairingToken: string, childImei: string }, _context: any) => {
+    const { pairingToken, childImei } = data;
 
-  if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Request must include a valid 'pairingToken' and 'childImei'."
-    );
-  }
+    if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'pairingToken' and 'childImei'."
+      );
+    }
 
   const tokenRef = db().collection("pairingTokens").doc(pairingToken);
 

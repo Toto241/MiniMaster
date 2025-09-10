@@ -25,6 +25,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.util.Locale
 
+/**
+ * A Composable screen that displays a list of tasks assigned to the child.
+ *
+ * This screen observes the list of tasks from the [TasksViewModel] and displays
+ * them in a [LazyColumn]. It provides a callback to handle the completion of a task,
+ * which typically involves taking a photo.
+ *
+ * @param viewModel The [TasksViewModel] instance, provided by Hilt.
+ * @param onCompleteTaskClick A callback function that is invoked with the task ID
+ * when the user clicks the "Complete" button on a pending task.
+ */
 @Composable
 fun TasksScreen(
     viewModel: TasksViewModel = hiltViewModel(),
@@ -52,6 +63,15 @@ fun TasksScreen(
     }
 }
 
+/**
+ * A Composable that displays a single task item in a [Card].
+ *
+ * It shows the task description and its current status, formatted and color-coded.
+ * A "Complete" button is shown only if the task status is "pending".
+ *
+ * @param task The [Task] object to display.
+ * @param onCompleteClick A callback function to be invoked when the "Complete" button is clicked.
+ */
 @Composable
 fun TaskItem(task: Task, onCompleteClick: () -> Unit) {
     Card(elevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
