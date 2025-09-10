@@ -27,6 +27,16 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * The main and only activity for the Child App.
+ *
+ * This activity is the main entry point and handles the navigation logic between different
+ * screens of the application using Jetpack Compose Navigation. It is responsible for:
+ * - Observing the pairing and onboarding status to display the correct screen.
+ * - Handling deep links for device pairing.
+ * - Managing runtime permissions for device identifiers.
+ * - Coordinating camera actions for task photo proofs.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -40,6 +50,10 @@ class MainActivity : ComponentActivity() {
     private var photoUri: Uri? = null
     private var completingTaskId: String? = null
 
+    /**
+     * Activity result launcher for taking a picture. When the picture is successfully taken,
+     * it calls the [TasksViewModel] to upload the photo and complete the task.
+     */
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) {
             photoUri?.let { uri ->
@@ -50,26 +64,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Launcher for the READ_PHONE_STATE permission request
+    /**
+     * Activity result launcher for requesting the `READ_PHONE_STATE` permission.
+     * If the permission is granted, it proceeds with handling the pairing intent.
+     * If denied, it logs a warning.
+     */
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            // Permission is granted. Now we can proceed with the pairing token validation.
-            // It's safer to re-handle the intent here to ensure we have the token.
+            // Permission granted, re-process the intent to continue pairing.
             handleIntent(intent)
         } else {
-            // Handle the case where the user denies the permission.
-            // The ViewModel doesn't have an explicit state for this, but the UI will remain idle.
-
-            Log.w("MainActivity", "READ_PHONE_STATE permission denied by user.")
+            Log.w("MainActivity", "READ_PHONE_STATE permission was denied by the user.")
         }
     }
 
+    /**
+     * Sets up the initial content of the activity. It observes the child's pairing and
+     * onboarding state and sets the appropriate Composable content via [AppNavigation].
+     * @param savedInstanceState The previously saved instance state, if any.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         lifecycleScope.launch {
+            // Combine flows to react to changes in either childId or onboarding status.
             childIdProvider.childIdFlow.combine(onboardingRepository.onboardingCompleteFlow) { childId, onboardingComplete ->
                 childId to onboardingComplete
             }.collect { (childId, onboardingComplete) ->
@@ -78,17 +98,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
-        // Handle the deep link intent when the activity is created
     }
 
+    /**
+     * Defines the navigation graph for the application.
+     *
+     * It determines the starting screen based on whether the device is paired and
+     * whether the initial onboarding (permission granting) is complete.
+     *
+     * @param childId The unique ID of the child device. Null if not yet paired.
+     * @param onboardingComplete True if the user has completed the initial permission setup.
+     */
     @Composable
     fun AppNavigation(childId: String?, onboardingComplete: Boolean) {
         val navController = rememberNavController()
+        // Determine the appropriate start destination based on application state.
         val startDestination = when {
-            childId.isNullOrEmpty() -> "pairing"
-            !onboardingComplete -> "permission"
-            else -> "lock"
+            childId.isNullOrEmpty() -> "pairing" // Not paired yet
+            !onboardingComplete -> "permission"  // Paired but needs permissions
+            else -> "lock"                       // Paired and onboarded
         }
 
         NavHost(navController = navController, startDestination = startDestination) {
@@ -99,7 +127,7 @@ class MainActivity : ComponentActivity() {
                 PermissionScreen(onPermissionGranted = {
                     lifecycleScope.launch {
                         onboardingRepository.setOnboardingComplete()
-                        // Navigate to lock screen after setting flag
+                        // Navigate to lock screen, clearing the permission screen from back stack.
                         navController.navigate("lock") {
                             popUpTo("permission") { inclusive = true }
                         }
@@ -116,7 +144,8 @@ class MainActivity : ComponentActivity() {
                 TasksScreen(
                     viewModel = tasksViewModel,
                     onCompleteTaskClick = { taskId ->
-                        val (uri, file) = createTempImageFile()
+                        // Create a temporary file to store the photo proof.
+                        val (uri, _) = createTempImageFile()
                         photoUri = uri
                         completingTaskId = taskId
                         takePictureLauncher.launch(uri)
@@ -124,39 +153,53 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        // Handle initial deep link intent if the app was launched with one.
         handleIntent(intent)
     }
 
+    /**
+     * Creates a temporary image file in the app's cache directory.
+     * @return A [Pair] containing the [Uri] for the file (via FileProvider) and the [File] object itself.
+     */
     private fun createTempImageFile(): Pair<Uri, File> {
         val file = File.createTempFile("proof_", ".jpg", cacheDir)
         val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", file)
         return uri to file
     }
 
+    /**
+     * Called when the activity is re-launched while already running. This is crucial for
+     * handling deep links that are clicked when the app is in the background.
+     * @param intent The new intent that started the activity.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Handle deep link if the activity is already running
+        setIntent(intent) // Update the activity's intent
         handleIntent(intent)
     }
 
+    /**
+     * Parses an incoming [Intent] to check for a deep link with a pairing token.
+     * If a token is found, it initiates the permission check and token validation process.
+     * @param intent The intent to handle.
+     */
     private fun handleIntent(intent: Intent?) {
-        val action: String? = intent?.action
-        val data: Uri? = intent?.data
-
-        if (action == Intent.ACTION_VIEW && data != null) {
-            val token = data.lastPathSegment
+        if (intent?.action == Intent.ACTION_VIEW && intent.data != null) {
+            val token = intent.data?.lastPathSegment
             if (token != null) {
                 Log.d("MainActivity", "Deep link received with token: $token")
-                // We have a token, now we need the IMEI. This requires permission.
+                // Check for phone state permission before trying to get the IMEI.
                 when (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)) {
                     PackageManager.PERMISSION_GRANTED -> {
                         val imei = getImei(this)
                         if (imei != null) {
                             viewModel.validateToken(token, imei)
+                        } else {
+                            Log.e("MainActivity", "IMEI is null even with permission.")
                         }
                     }
                     else -> {
-                        // Request the permission. The result is handled by the launcher.
+                        // Request the permission. The result is handled by the requestPermissionLauncher.
                         requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
                     }
                 }
@@ -164,6 +207,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Retrieves the device's IMEI. This is a sensitive operation that requires
+     * the `READ_PHONE_STATE` permission.
+     *
+     * Note: Accessing IMEI is restricted in modern Android versions and is used here
+     * as a stable, unique device identifier for this specific proof-of-concept.
+     * In a production app, a non-resettable hardware ID should be avoided in favor of
+     * alternatives like `ANDROID_ID` or Firebase Installation ID.
+     *
+     * @param context The application context.
+     * @return The device's IMEI as a [String], or null if permission is denied or an error occurs.
+     */
     @SuppressLint("HardwareIds")
     private fun getImei(context: Context): String? {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
@@ -172,8 +227,8 @@ class MainActivity : ComponentActivity() {
         }
         return try {
             val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            // Use the appropriate method based on the Android API level.
             val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-
                 telephonyManager.imei
             } else {
                 @Suppress("DEPRECATION")
@@ -189,7 +244,6 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Log.e("MainActivity", "An unexpected error occurred while getting IMEI.", e)
             null
-
         }
     }
 }
