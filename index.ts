@@ -571,43 +571,57 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
     const newData = event.data?.after.data();
     const oldData = event.data?.before.data();
 
-    if (!newData || !oldData) {
-      functions.logger.log(`Data missing for child ${childId} update, skipping.`);
-      return;
+    if (!newData) {
+        functions.logger.info(`Child device ${childId} deleted, no action taken.`);
+        return;
+    }
+
+    if (!oldData) {
+        functions.logger.info(`New child device ${childId} created, no action taken on update.`);
+        return;
     }
 
     const fcmToken = newData.fcmToken;
-
-    if (!fcmToken) {
-      functions.logger.log(`Child ${childId} has no FCM token. No message sent.`);
-      return;
+    if (!fcmToken || typeof fcmToken !== 'string') {
+        functions.logger.warn(`No valid FCM token for child ${childId}, cannot send notification.`);
+        return;
     }
 
-    const lockChanged = newData.isLocked !== oldData.isLocked;
-    const blacklistChanged = JSON.stringify(newData.appBlacklist) !== JSON.stringify(oldData.appBlacklist);
-    const rulesChanged = JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules);
+    const payload: { [key: string]: string } = {};
 
-    if (lockChanged || blacklistChanged || rulesChanged) {
-        functions.logger.info(`Detected change for child ${childId}. Preparing to send FCM message.`);
-        const payload = {
-            data: {
-                command: "SYNC_RULES",
-                lastUpdated: String(new Date().getTime()),
-            },
-        };
-
-        try {
-            const message = {
-                data: payload.data,
-                token: fcmToken,
-            };
-            await getMessaging().send(message);
-            functions.logger.info(`Successfully sent SYNC_RULES command to child ${childId}.`);
-        } catch (error) {
-            functions.logger.error(`Failed to send FCM message to child ${childId}:`, error);
-        }
+    if (newData.isLocked !== oldData.isLocked) {
+        payload.isLocked = String(newData.isLocked);
     }
-  });
+
+    if (JSON.stringify(newData.appBlacklist) !== JSON.stringify(oldData.appBlacklist)) {
+        payload.appBlacklist = JSON.stringify(newData.appBlacklist);
+    }
+
+    if (JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules)) {
+        payload.usageRules = JSON.stringify(newData.usageRules);
+    }
+
+    if (Object.keys(payload).length === 0) {
+        functions.logger.info(`No relevant changes detected for child ${childId}.`);
+        return;
+    }
+
+    const message = {
+        token: fcmToken,
+        data: payload,
+        notification: {
+            title: "Device Settings Updated",
+            body: "Your device settings have been updated by your parent.",
+        },
+    };
+
+    try {
+        await getMessaging().send(message);
+        functions.logger.info(`Successfully sent FCM message to child ${childId} for data update.`);
+    } catch (error) {
+        functions.logger.error(`Failed to send FCM message to child ${childId}:`, error);
+    }
+});
 
 /**
  * Creates a new task for a child device, assigned by an authenticated master device.
