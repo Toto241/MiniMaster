@@ -12,20 +12,28 @@ const firebaseConfig = {
     appId: "your-app-id"
 };
 
-// Initialize Firebase
+// --- Global Variables ---
 let app, db, functions;
 let currentMasterImei = null;
 let currentSecretKey = null;
-let devicesListener = null;
+let devicesListener = null; // Firestore listener for real-time updates
 
-// Initialize Firebase when page loads
+/**
+ * Initializes the Firebase app, services, and attempts to restore the user's
+ * session from localStorage when the DOM is fully loaded.
+ */
 document.addEventListener('DOMContentLoaded', function() {
     try {
+        // Ensure firebase is available
+        if (typeof firebase === 'undefined') {
+            throw new Error('Firebase script not loaded. Please check your internet connection and script tags.');
+        }
+
         app = firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         functions = firebase.functions();
         
-        // Check if user was previously logged in
+        // Restore session if credentials are saved in localStorage
         const savedCredentials = localStorage.getItem('minimaster-credentials');
         if (savedCredentials) {
             const credentials = JSON.parse(savedCredentials);
@@ -35,20 +43,26 @@ document.addEventListener('DOMContentLoaded', function() {
             loadDevices();
         }
         
-        console.log('Firebase initialized successfully');
+        console.log('Firebase initialized successfully.');
     } catch (error) {
         console.error('Firebase initialization error:', error);
-        showNotification('Firebase configuration error. Please check the configuration.', 'error');
+        showNotification('Firebase configuration error. Please check your setup.', 'error');
     }
 });
 
-// Authentication functions
+// --- Authentication Functions ---
+
+/**
+ * Handles the login process. It takes credentials from the input fields,
+ * validates them against the Firestore 'masters' collection, and if successful,
+ * saves the session and loads the main dashboard.
+ */
 function login() {
     const masterImei = document.getElementById('master-imei').value.trim();
     const secretKey = document.getElementById('secret-key').value.trim();
     
     if (!masterImei || !secretKey) {
-        showNotification('Please enter both Master IMEI and Secret Key', 'error');
+        showNotification('Please enter both Master IMEI and Secret Key.', 'error');
         return;
     }
     
@@ -78,29 +92,37 @@ function login() {
         });
 }
 
+/**
+ * Logs the user out by clearing credentials, detaching Firestore listeners,
+ * and resetting the UI to the login screen.
+ */
 function logout() {
     currentMasterImei = null;
     currentSecretKey = null;
     localStorage.removeItem('minimaster-credentials');
     
-    // Stop listening to devices
+    // Detach the real-time listener to prevent memory leaks and unnecessary reads.
     if (devicesListener) {
         devicesListener();
         devicesListener = null;
     }
     
-    // Reset form
+    // Reset the login form fields.
     document.getElementById('master-imei').value = '';
     document.getElementById('secret-key').value = '';
     
-    // Show login form and hide main content
+    // Switch the view from the dashboard back to the login form.
     document.getElementById('login-form').style.display = 'flex';
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('main-content').style.display = 'none';
     
-    showNotification('Logged out successfully', 'info');
+    showNotification('Logged out successfully.', 'info');
 }
 
+/**
+ * Switches the UI from the login view to the main dashboard view.
+ * It hides the login form and displays the user's information and device controls.
+ */
 function showMainContent() {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('user-info').style.display = 'flex';
@@ -108,7 +130,12 @@ function showMainContent() {
     document.getElementById('master-id').textContent = currentMasterImei;
 }
 
-// Device management functions
+// --- Device Management Functions ---
+
+/**
+ * Fetches and displays the list of child devices associated with the logged-in master.
+ * It sets up a real-time Firestore listener to keep the device list updated.
+ */
 function loadDevices() {
     if (!currentMasterImei) return;
     
@@ -134,6 +161,10 @@ function loadDevices() {
         });
 }
 
+/**
+ * Renders the list of device cards into the UI.
+ * @param {Array<object>} devices - An array of device objects from Firestore.
+ */
 function renderDevices(devices) {
     const devicesListElement = document.getElementById('devices-list');
     
@@ -179,6 +210,11 @@ function renderDevices(devices) {
     devicesListElement.innerHTML = devicesHtml;
 }
 
+/**
+ * Calls the 'setDeviceLocked' Firebase Cloud Function to lock or unlock a child device.
+ * @param {string} childImei - The unique identifier of the child device.
+ * @param {boolean} isLocked - The desired new lock state.
+ */
 function toggleDeviceLock(childImei, isLocked) {
     const setDeviceLocked = functions.httpsCallable('setDeviceLocked');
     
@@ -198,25 +234,37 @@ function toggleDeviceLock(childImei, isLocked) {
     });
 }
 
-// Task management functions
+// --- Task Management Functions ---
+
+/**
+ * Opens the task creation modal and pre-fills the child ID.
+ * @param {string} childId - The ID of the child device for which to create the task.
+ */
 function openTaskModal(childId) {
     document.getElementById('task-child-id').value = childId;
     document.getElementById('task-description').value = '';
-    document.getElementById('task-deadline').value = '';
     
-    // Set default deadline to tomorrow
+    // Set a default deadline for tomorrow at 6 PM.
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(18, 0, 0, 0); // 6 PM
+    tomorrow.setHours(18, 0, 0, 0);
     document.getElementById('task-deadline').value = tomorrow.toISOString().slice(0, 16);
     
     document.getElementById('task-creation-modal').style.display = 'flex';
 }
 
+/**
+ * Closes the task creation modal.
+ */
 function closeTaskModal() {
     document.getElementById('task-creation-modal').style.display = 'none';
 }
 
+/**
+ * Handles the submission of the new task form. It calls the 'createTask'
+ * Firebase Cloud Function with the provided details.
+ * @param {Event} event - The form submission event.
+ */
 function createTask(event) {
     event.preventDefault();
     
@@ -246,6 +294,9 @@ function createTask(event) {
     });
 }
 
+/**
+ * Switches the view to the task review section and loads tasks pending approval.
+ */
 function showReviewTasks() {
     document.querySelector('.dashboard').style.display = 'none';
     document.getElementById('task-review-section').style.display = 'block';
@@ -254,11 +305,15 @@ function showReviewTasks() {
     loadTasksToReview();
 }
 
+/**
+ * Fetches all tasks with a 'pending_approval' status across all child devices
+ * associated with the current master account.
+ */
 function loadTasksToReview() {
     const tasksListElement = document.getElementById('tasks-to-review');
     tasksListElement.innerHTML = '<div class="loading">Loading tasks...</div>';
     
-    // Query all children to find tasks pending approval
+    // This requires querying each child's subcollection of tasks.
     db.collection('children')
         .where('masterImei', '==', currentMasterImei)
         .get()
@@ -296,6 +351,10 @@ function loadTasksToReview() {
         });
 }
 
+/**
+ * Renders the list of tasks awaiting review into the UI.
+ * @param {Array<object>} tasks - An array of task objects from Firestore.
+ */
 function renderTasksToReview(tasks) {
     const tasksListElement = document.getElementById('tasks-to-review');
     
@@ -305,16 +364,17 @@ function renderTasksToReview(tasks) {
     }
     
     const tasksHtml = tasks.map(task => {
+        const completedTime = task.completedAt ? new Date(task.completedAt.seconds * 1000).toLocaleString() : 'N/A';
         return `
             <div class="task-card">
                 <div class="task-header">
                     <div class="task-info">
                         <h4>Child: ${task.childId}</h4>
                         <p><strong>Task:</strong> ${task.description}</p>
-                        <p><strong>Completed:</strong> ${task.completedAt ? new Date(task.completedAt.seconds * 1000).toLocaleString() : 'Unknown'}</p>
+                        <p><strong>Completed:</strong> ${completedTime}</p>
                     </div>
                 </div>
-                ${task.photoUrl ? `<img src="${task.photoUrl}" alt="Task proof" class="task-photo">` : ''}
+                ${task.photoUrl ? `<a href="${task.photoUrl}" target="_blank" rel="noopener noreferrer"><img src="${task.photoUrl}" alt="Task proof" class="task-photo"></a>` : ''}
                 <div class="device-actions">
                     <button class="btn btn-success" onclick="approveTask('${task.childId}', '${task.taskId}')">
                         Approve Task
@@ -327,6 +387,11 @@ function renderTasksToReview(tasks) {
     tasksListElement.innerHTML = tasksHtml;
 }
 
+/**
+ * Calls the 'approveTask' Firebase Cloud Function to mark a task as approved.
+ * @param {string} childImei - The unique identifier of the child device.
+ * @param {string} taskId - The ID of the task to approve.
+ */
 function approveTask(childImei, taskId) {
     const approveTask = functions.httpsCallable('approveTask');
     
@@ -337,38 +402,55 @@ function approveTask(childImei, taskId) {
         taskId: taskId
     }).then(result => {
         showNotification('Task approved successfully!', 'success');
-        loadTasksToReview(); // Refresh the list
+        loadTasksToReview(); // Refresh the list after approval.
     }).catch(error => {
         console.error('Error approving task:', error);
         showNotification('Error approving task: ' + error.message, 'error');
     });
 }
 
+/**
+ * Switches the view to the subscription management section.
+ */
 function showSubscription() {
     document.querySelector('.dashboard').style.display = 'none';
     document.getElementById('task-review-section').style.display = 'none';
     document.getElementById('subscription-section').style.display = 'block';
 }
 
+/**
+ * Switches the view back to the main device dashboard.
+ */
 function showDashboard() {
     document.querySelector('.dashboard').style.display = 'block';
     document.getElementById('task-review-section').style.display = 'none';
     document.getElementById('subscription-section').style.display = 'none';
 }
 
-// Utility functions
+// --- Utility Functions ---
+
+/**
+ * Displays a notification message at the top of the screen.
+ * @param {string} message - The message to display.
+ * @param {'info'|'success'|'error'} [type='info'] - The type of notification, which affects its color.
+ */
 function showNotification(message, type = 'info') {
     const notification = document.getElementById('notification');
     notification.textContent = message;
     notification.className = `notification ${type}`;
     notification.style.display = 'block';
     
+    // The notification automatically hides after 5 seconds.
     setTimeout(() => {
         notification.style.display = 'none';
     }, 5000);
 }
 
-// Handle modal clicks (close when clicking outside)
+/**
+ * Global click handler to close the task creation modal if a click occurs
+ * outside of the modal's content area.
+ * @param {MouseEvent} event - The mouse click event.
+ */
 window.onclick = function(event) {
     const modal = document.getElementById('task-creation-modal');
     if (event.target === modal) {
