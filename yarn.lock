@@ -4125,7 +4125,7 @@ ts-deepmerge@^2.0.1:
   resolved "https://registry.npmjs.org/ts-deepmerge/-/ts-deepmerge-2.0.7.tgz"
   integrity sha512-3phiGcxPSSR47RBubQxPoZ+pqXsEsozLo4G4AlSrsMKTFg9TA3l+3he5BqpUi9wiuDbaHWXH/amlzQ49uEdXtg==
 
-ts-jest@^29.2.3:
+ts-jest@^29.4.1:
   version "29.4.1"
   resolved "https://registry.npmjs.org/ts-jest/-/ts-jest-29.4.1.tgz"
   integrity sha512-SaeUtjfpg9Uqu8IbeDKtdaS0g8lS6FT6OzM3ezrDfErPJPHNDo/Ey+VFGP1bQIDfagYDLyRpd7O15XpG1Es2Uw==
@@ -4199,7 +4199,7 @@ type-is@~1.6.18:
     media-typer "0.3.0"
     mime-types "~2.1.24"
 
-typescript@^5.8.3, typescript@>=2.7, typescript@>=4.2.0, "typescript@>=4.3 <6":
+typescript@^5.9.2, typescript@>=2.7, typescript@>=4.2.0, "typescript@>=4.3 <6":
   version "5.9.2"
   resolved "https://registry.npmjs.org/typescript/-/typescript-5.9.2.tgz"
   integrity sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==

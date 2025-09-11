@@ -11,6 +11,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+/**
+ * A Composable screen that handles the device pairing process.
+ *
+ * This screen is displayed when the app is opened but not yet paired with a master device.
+ * It primarily waits for a deep link to be received, which contains the pairing token.
+ * It also provides a text field for manual entry of a pairing code, though the primary
+ * flow is via deep link. The UI reacts to the [PairingState] from the [PairingViewModel].
+ *
+ * @param viewModel The [PairingViewModel] instance, typically provided by Hilt.
+ */
 @Composable
 fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
     val pairingState by viewModel.pairingState.collectAsState()
@@ -31,6 +41,7 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
+        // This text field is for manual pairing, which is a secondary flow.
         OutlinedTextField(
             value = pairingCode,
             onValueChange = { pairingCode = it },
@@ -38,29 +49,31 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
-                .testTag("PairingCodeTextField"), // Add test tag for UI tests
+                .testTag("PairingCodeTextField"),
             singleLine = true
         )
 
         Button(
             onClick = {
+                // The IMEI is retrieved and passed for validation.
+                // In a real app, this might be handled differently for privacy.
                 val imei = childImei ?: ""
                 viewModel.validateToken(pairingCode, imei)
             },
             enabled = pairingCode.isNotBlank() && pairingState !is PairingState.Loading,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("PairingButton") // Add test tag for UI tests
+                .testTag("PairingButton")
         ) {
             Text(stringResource(R.string.pairing_button_text))
         }
 
-        // Main status view
+        // The central area of the screen displays the current status of the pairing process.
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             when (val state = pairingState) {
                 is PairingState.Idle -> {
                     Text(
-                        text = "Waiting for pairing link...",
+                        text = stringResource(R.string.pairing_status_idle),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -68,14 +81,14 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Text(
-                            text = "Pairing device...",
+                            text = stringResource(R.string.pairing_status_loading),
                             modifier = Modifier.padding(top = 16.dp)
                         )
                     }
                 }
                 is PairingState.Success -> {
                     Text(
-                        text = "Pairing successful!",
+                        text = stringResource(R.string.pairing_status_success),
                         color = MaterialTheme.colors.primary
                     )
                 }
@@ -89,7 +102,7 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
             }
         }
 
-        // Debug section at the bottom
+        // A collapsible section for showing debug information.
         Button(onClick = { showDebugInfo = !showDebugInfo }) {
             Text(if (showDebugInfo) "Hide Debug Info" else "Show Debug Info")
         }
@@ -99,6 +112,12 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
     }
 }
 
+/**
+ * A simple Composable for displaying debug information about the pairing process.
+ *
+ * @param pairingState The current [PairingState] to display.
+ * @param childImei The child's IMEI, if available.
+ */
 @Composable
 fun DebugInfoView(pairingState: PairingState, childImei: String?) {
     Column(modifier = Modifier.padding(top = 16.dp), horizontalAlignment = Alignment.Start) {

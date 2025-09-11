@@ -14,6 +14,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
+/**
+ * A Composable screen that represents the main "home" screen of the child app
+ * when the device is not locked.
+ *
+ * This screen displays a welcome message and provides a button to navigate to the
+ * tasks screen. In a more complete application, this screen would likely be replaced
+ * by the device's actual home screen, with the lock functionality implemented as an
+ * overlay.
+ *
+ * @param childId The unique identifier for the child device, displayed in the message.
+ * @param onNavigateToTasks A callback function to be invoked when the user clicks the
+ * "View Tasks" button.
+ */
 @Composable
 fun LockScreen(childId: String, onNavigateToTasks: () -> Unit) {
     Column(
