@@ -12,25 +12,49 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
+/**
+ * Represents the different states of the master device registration process.
+ */
 sealed class RegistrationState {
+    /** The initial state before any registration attempt. */
     object Idle : RegistrationState()
+    /** The state when registration is in progress. */
     object Loading : RegistrationState()
+    /** The state when registration has succeeded. */
     data class Success(val successMessage: String) : RegistrationState()
+    /** The state when an error has occurred during registration. */
     data class Error(val message: String) : RegistrationState()
 }
 
+/**
+ * Represents the different states of the pairing link generation process.
+ */
 sealed class LinkGenerationState {
+    /** The initial state before any link generation attempt. */
     object Idle : LinkGenerationState()
+    /** The state when link generation is in progress. */
     object Loading : LinkGenerationState()
+    /** The state when the link has been successfully generated. */
     data class Success(val pairingToken: String) : LinkGenerationState()
+    /** The state when an error has occurred during link generation. */
     data class Error(val message: String) : LinkGenerationState()
 }
 
+/**
+ * A data class holding the master device's credentials for debugging purposes.
+ */
 data class DebugState(
     val imei: String? = null,
     val secretKey: String? = null
 )
 
+/**
+ * A [ViewModel] that manages the initial registration of the master device and the
+ * generation of pairing links for child devices.
+ *
+ * @property functions The [FirebaseFunctions] instance for backend calls.
+ * @property credentialsRepository The repository for persisting master credentials.
+ */
 @HiltViewModel
 class MasterViewModel @Inject constructor(
     private val functions: FirebaseFunctions,
@@ -38,24 +62,29 @@ class MasterViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _registrationState = MutableStateFlow<RegistrationState>(RegistrationState.Idle)
+    /** A [StateFlow] representing the current state of the device registration process. */
     val registrationState: StateFlow<RegistrationState> = _registrationState.asStateFlow()
 
     private val _linkGenerationState = MutableStateFlow<LinkGenerationState>(LinkGenerationState.Idle)
+    /** A [StateFlow] representing the current state of the pairing link generation process. */
     val linkGenerationState: StateFlow<LinkGenerationState> = _linkGenerationState.asStateFlow()
 
     private val _debugState = MutableStateFlow(DebugState())
+    /** A [StateFlow] holding the current credentials for debugging display. */
     val debugState: StateFlow<DebugState> = _debugState.asStateFlow()
 
     init {
         checkRegistrationStatus()
     }
 
+    /**
+     * Checks the [credentialsRepository] to see if the device is already registered.
+     * If credentials exist, it updates the [registrationState] to [RegistrationState.Success].
+     */
     private fun checkRegistrationStatus() {
         viewModelScope.launch {
             credentialsRepository.getCredentials.collect { (imei, secret) ->
-                // Update debug state with current credentials
                 _debugState.value = DebugState(imei = imei, secretKey = secret)
-                
                 if (!imei.isNullOrEmpty() && !secret.isNullOrEmpty()) {
                     _registrationState.value = RegistrationState.Success("Device already registered.")
                 }
@@ -63,6 +92,11 @@ class MasterViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Registers the device with the backend using its IMEI.
+     * On success, it saves the returned secret key to the [credentialsRepository].
+     * @param imei The unique identifier of the device to register.
+     */
     fun registerDevice(imei: String) {
         viewModelScope.launch {
             _registrationState.value = RegistrationState.Loading
@@ -71,25 +105,23 @@ class MasterViewModel @Inject constructor(
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
                 val key = (result.data as? Map<String, Any>)?.get("secretKey") as? String
                 if (key != null) {
-                    // Save credentials to repository
                     credentialsRepository.saveCredentials(imei, key)
-                    // Update debug state immediately for UI consistency
                     _debugState.value = DebugState(imei = imei, secretKey = key)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
                      _registrationState.value = RegistrationState.Error("Backend returned no secret key.")
                 }
             } catch (e: Exception) {
-                val errorMessage = if (e is FirebaseFunctionsException) {
-                    "Error (${e.code}): ${e.message}"
-                } else {
-                    e.message ?: "An unknown error occurred."
-                }
+                val errorMessage = if (e is FirebaseFunctionsException) "Error (${e.code}): ${e.message}" else e.message ?: "An unknown error occurred."
                 _registrationState.value = RegistrationState.Error(errorMessage)
             }
         }
     }
 
+    /**
+     * Generates a single-use pairing link (token) by calling a Firebase Function.
+     * Requires the device to be registered first.
+     */
     fun generateLink() {
         val currentState = debugState.value
         val currentImei = currentState.imei
@@ -108,16 +140,12 @@ class MasterViewModel @Inject constructor(
                 val result = functions.getHttpsCallable("generatePairingLink").call(data).await()
                 val token = (result.data as? Map<String, Any>)?.get("pairingToken") as? String
                 if (token != null) {
-                    _linkGenerationState.value = LinkGenerationState.Success("Pairing Token: $token")
+                    _linkGenerationState.value = LinkGenerationState.Success(token)
                 } else {
                     _linkGenerationState.value = LinkGenerationState.Error("Backend returned no token.")
                 }
             } catch (e: Exception) {
-                 val errorMessage = if (e is FirebaseFunctionsException) {
-                    "Error (${e.code}): ${e.message}"
-                } else {
-                    e.message ?: "An unknown error occurred."
-                }
+                 val errorMessage = if (e is FirebaseFunctionsException) "Error (${e.code}): ${e.message}" else e.message ?: "An unknown error occurred."
                 _linkGenerationState.value = LinkGenerationState.Error(errorMessage)
             }
         }
