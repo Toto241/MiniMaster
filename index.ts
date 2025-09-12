@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions";
+// Korrekte Typen für onCall-Request
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import * as admin from "firebase-admin"; // Still need for Timestamp/FieldValue
@@ -12,14 +13,15 @@ import { db } from "./firebase";
  * This function is callable from a client application.
  *
  * @param {{childId: string}} data - The data passed to the function.
+import { CallableContext, EventContext } from "firebase-functions/lib/common";
  * @param {string} data.childId - The unique identifier of the child device.
  * @param {functions.https.CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{pairingCode: string}>} A promise that resolves with the generated pairing code.
  * @throws {functions.https.HttpsError} Throws an error if the childId is invalid,
  * or if a unique code cannot be generated.
  */
-export const createPairingCode = functions.https.onCall(async (data: { childId: string }, _context) => {
-  const { childId } = data;
+export const createPairingCode = functions.https.onCall(async (request: functions.https.CallableRequest<{ childId: string }>) => {
+  const { childId } = request.data;
 
   if (!childId || typeof childId !== "string") {
     throw new functions.https.HttpsError(
@@ -77,8 +79,8 @@ export const createPairingCode = functions.https.onCall(async (data: { childId: 
  * @returns {Promise<{childId: string}>} A promise that resolves with the childId associated with the code.
  * @throws {functions.https.HttpsError} Throws an error if the code is invalid, not found, expired, or malformed.
  */
-export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string }, _context) => {
-  const { pairingCode } = data;
+export const validatePairingCode = functions.https.onCall(async (request: functions.https.CallableRequest<{ pairingCode: string }>) => {
+  const { pairingCode } = request.data;
 
   if (!pairingCode || typeof pairingCode !== "string") {
     throw new functions.https.HttpsError(
@@ -112,8 +114,8 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     const expiresAt = codeData.expiresAt as admin.firestore.Timestamp;
     const childId = codeData.childId as string;
 
-    if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
-        functions.logger.error(`Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
+  if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
+    functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
         await pairingCodeRef.delete();
         functions.logger.info(`Malformed pairing code ${pairingCode} deleted.`);
         throw new functions.https.HttpsError(
@@ -123,7 +125,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     }
 
     if (!childId || typeof childId !== "string") {
-        functions.logger.error(`Pairing code ${pairingCode} has invalid 'childId' field.`);
+    functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'childId' field.`);
         await pairingCodeRef.delete();
         functions.logger.info(`Malformed pairing code ${pairingCode} deleted.`);
         throw new functions.https.HttpsError(
@@ -177,8 +179,8 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
  * @throws {functions.https.HttpsError} Throws an error if the IMEI is invalid or already registered.
  */
 export const registerMasterDevice = functions.https.onCall(
-  async (data: { imei: string }, _context: any) => {
-    const { imei } = data;
+  async (request: functions.https.CallableRequest<{ imei: string }>) => {
+    const { imei } = request.data;
     if (!imei || typeof imei !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
@@ -236,8 +238,8 @@ export const registerMasterDevice = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const generatePairingLink = functions.https.onCall(
-  async (data: { imei: string, secretKey: string }, _context: any) => {
-    const { imei, secretKey } = data;
+  async (request: functions.https.CallableRequest<{ imei: string; secretKey: string }>) => {
+    const { imei, secretKey } = request.data;
 
     if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
       throw new functions.https.HttpsError(
@@ -300,8 +302,8 @@ export const generatePairingLink = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const setDeviceLocked = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string, childImei: string, isLocked: boolean }, _context: any) => {
-    const { masterImei, secretKey, childImei, isLocked } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string; childImei: string; isLocked: boolean }>) => {
+    const { masterImei, secretKey, childImei, isLocked } = request.data;
 
     if (
       !masterImei || typeof masterImei !== "string" ||
@@ -367,8 +369,8 @@ export const setDeviceLocked = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const updateAppBlacklist = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string, childImei: string, appBlacklist: string[] }, _context: any) => {
-    const { masterImei, secretKey, childImei, appBlacklist } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string; childImei: string; appBlacklist: string[] }>) => {
+    const { masterImei, secretKey, childImei, appBlacklist } = request.data;
 
     if (
       !masterImei || typeof masterImei !== "string" ||
@@ -422,8 +424,8 @@ export const updateAppBlacklist = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const setUsageRules = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string, childImei: string, usageRules: object }, _context: any) => {
-    const { masterImei, secretKey, childImei, usageRules } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string; childImei: string; usageRules: object }>) => {
+    const { masterImei, secretKey, childImei, usageRules } = request.data;
     if (
       !masterImei || typeof masterImei !== "string" ||
       !secretKey || typeof secretKey !== "string" ||
@@ -473,8 +475,8 @@ export const setUsageRules = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if the childImei is invalid or the device is not found.
  */
 export const recordHeartbeat = functions.https.onCall(
-  async (data: { childImei: string }, _context: any) => {
-    const { childImei } = data;
+  async (request: functions.https.CallableRequest<{ childImei: string }>) => {
+    const { childImei } = request.data;
 
     if (!childImei || typeof childImei !== "string") {
       throw new functions.https.HttpsError(
@@ -526,8 +528,8 @@ export const recordHeartbeat = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the device is not found.
  */
 export const registerFcmToken = functions.https.onCall(
-  async (data: { childImei: string, token: string }, _context: any) => {
-    const { childImei, token } = data;
+  async (request: functions.https.CallableRequest<{ childImei: string; token: string }>) => {
+    const { childImei, token } = request.data;
 
     if (!childImei || typeof childImei !== "string" || !token || typeof token !== "string") {
       throw new functions.https.HttpsError(
@@ -637,8 +639,8 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const createTask = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string, childImei: string, description: string, deadlineISO: string }, _context: any) => {
-    const { masterImei, secretKey, childImei, description, deadlineISO } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string; childImei: string; description: string; deadlineISO: string }>) => {
+    const { masterImei, secretKey, childImei, description, deadlineISO } = request.data;
 
     if (!masterImei || !secretKey || !childImei || !description || !deadlineISO) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -683,8 +685,8 @@ export const createTask = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the task is not found.
  */
 export const completeTask = functions.https.onCall(
-  async (data: { childImei: string, taskId: string, photoUrl: string }, _context: any) => {
-    const { childImei, taskId, photoUrl } = data;
+  async (request: functions.https.CallableRequest<{ childImei: string; taskId: string; photoUrl: string }>) => {
+    const { childImei, taskId, photoUrl } = request.data;
 
     if (!childImei || !taskId || !photoUrl) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -697,13 +699,17 @@ export const completeTask = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
     }
 
+    const current = taskDoc.data() as any;
+    if (current.status && current.status !== "pending") {
+      throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
+    }
     await taskRef.update({
       status: "pending_approval",
       photoUrl: photoUrl,
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-
-    functions.logger.info(`Task ${taskId} marked as complete by child ${childImei}`);
+    functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childImei}`);
     return { success: true };
   }
 );
@@ -722,8 +728,8 @@ export const completeTask = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const approveTask = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string, childImei: string, taskId: string }, _context: any) => {
-    const { masterImei, secretKey, childImei, taskId } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string; childImei: string; taskId: string }>) => {
+    const { masterImei, secretKey, childImei, taskId } = request.data;
 
     if (!masterImei || !secretKey || !childImei || !taskId) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -742,9 +748,16 @@ export const approveTask = functions.https.onCall(
     }
 
     const taskRef = childDeviceRef.collection("tasks").doc(taskId);
-    await taskRef.update({ status: "approved" });
-
-    functions.logger.info(`Task ${taskId} approved for child ${childImei}`);
+    const taskSnap = await taskRef.get();
+    if (!taskSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "Task not found.");
+    }
+    const taskData = taskSnap.data() as any;
+    if (taskData.status !== "pending_approval") {
+      throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
+    }
+    await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childImei} master=${masterImei}`);
     return { success: true };
   }
 );
@@ -763,8 +776,8 @@ export const approveTask = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication or purchase verification fails.
  */
 export const verifyPurchase = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string, purchaseToken: string, sku: string }, _context: any) => {
-    const { masterImei, secretKey, purchaseToken, sku } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string; purchaseToken: string; sku: string }>) => {
+    const { masterImei, secretKey, purchaseToken, sku } = request.data;
 
     if (!masterImei || !secretKey || !purchaseToken || !sku) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
@@ -818,8 +831,8 @@ export const verifyPurchase = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication fails.
  */
 export const getSubscriptionStatus = functions.https.onCall(
-  async (data: { masterImei: string, secretKey: string }, _context: any) => {
-    const { masterImei, secretKey } = data;
+  async (request: functions.https.CallableRequest<{ masterImei: string; secretKey: string }>) => {
+    const { masterImei, secretKey } = request.data;
     if (!masterImei || !secretKey) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
@@ -867,8 +880,8 @@ async function verifyPlaySubscription(packageName: string, productId: string, pu
  * @throws {functions.https.HttpsError} Throws an error if the token is invalid, expired, or arguments are missing.
  */
 export const validatePairingToken = functions.https.onCall(
-  async (data: { pairingToken: string, childImei: string }, _context: any) => {
-    const { pairingToken, childImei } = data;
+  async (request: functions.https.CallableRequest<{ pairingToken: string; childImei: string }>) => {
+    const { pairingToken, childImei } = request.data;
 
     if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
       throw new functions.https.HttpsError(
@@ -908,9 +921,10 @@ export const validatePairingToken = functions.https.onCall(
 
     await tokenRef.delete();
 
-    functions.logger.info(`Child device ${childImei} successfully paired with master ${tokenData.masterImei}.`);
-
-    return { childId: tokenData.masterImei };
+  functions.logger.info(`Child device ${childImei} successfully paired with master ${tokenData.masterImei}.`);
+  // API compatibility note: historically returned { childId: masterImei }. Keep for now; plan deprecation.
+  functions.logger.warn(`API_COMPAT validatePairingToken returning childId=masterImei (will deprecate) masterImei=${tokenData.masterImei}`);
+  return { childId: tokenData.masterImei };
 
   } catch (error) {
     if (error instanceof functions.https.HttpsError) {
