@@ -41,6 +41,8 @@ Das Backend verwaltet die Geräteregistrierung und den Kopplungsprozess.
 
 Diese Tests überprüfen den gesamten Kopplungs-Flow aus Benutzersicht.
 
+Hinweis: Neben dem im Dokument beschriebenen Token-Flow (einmaliger `pairingToken`, 5 Minuten gültig) existiert ein alternativer 6-stelliger Kopplungscode (`createPairingCode` / `validatePairingCode`), der 24 Stunden gültig ist. Dieser ist aktuell nicht für den UI-Fluss dokumentiert, kann aber über direkte Funktionsaufrufe (z.B. Firebase Emulator / callable Function Invocation) getestet werden.
+
 ---
 
 **Testfall M-01: Erfolgreiche Kopplung (Happy Path)**

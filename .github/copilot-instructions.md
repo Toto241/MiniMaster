@@ -1,243 +1,120 @@
-# Mini-Master: Parental Control Application Suite
+<!-- Compact, high-signal instructions for AI coding agents working in MiniMaster -->
+# Mini-Master: Agent Operations Guide (Concise)
 
-Mini-Master is a comprehensive Android parental control solution with a Node.js/Firebase backend, consisting of a `masterApp` (parent) and `childApp` (child) with Firebase Cloud Functions backend.
+Focus of this repository: Firebase Cloud Functions backend (TypeScript) + two Android apps (`masterApp` parent, `childApp` child) + simple web control. Many Android CI steps may be intentionally skipped in restricted / offline environments; backend tests and lint are the reliable always-green signal.
 
-**ALWAYS follow these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+## Core Mental Model
+1. All sensitive logic lives in backend Cloud Functions (`index.ts`). Clients are thin requesters.
+2. Firestore structure actually USED in functions is mostly flat (`masters`, `children`, `pairingCodes`, `pairingTokens`) although docs mention nested families—do NOT invent deeper paths unless code shows them.
+3. Pairing flows: `registerMasterDevice` -> `generatePairingLink` (5‑min token) OR `createPairingCode` (6‑digit / 24h) -> validation (`validatePairingCode` / token) -> child document creation.
+4. Real-time child enforcement: Changes in `children` trigger `onChildDeviceUpdateV2` (see tests) which sends selective FCM messages (only fields that changed: `isLocked`, `appBlacklist`, `usageRules`).
+5. Tests mock `firebase-admin` & `db()`; follow those patterns when adding new functions—keep input validation + typed error codes.
 
-## Working Effectively
-
-### Backend Setup and Testing
-- **Install Dependencies:** Always start with dependency installation from project root:
-  ```bash
-  npm install
-  ```
-  Takes ~40 seconds. Expect TypeScript version warnings (5.9.2 vs supported <5.6.0) but these are non-blocking.
-
-- **Run Backend Tests:** Comprehensive unit test suite for Cloud Functions:
-  ```bash
-  npm test
-  ```
-  **NEVER CANCEL:** Takes ~15-30 seconds. ALWAYS wait for completion. 7 tests covering pairing code creation and validation.
-
-- **Lint Code:** Check code quality before commits:
-  ```bash
-  npm run lint
-  ```
-  Takes ~5 seconds. Expect TypeScript version warning but linting passes.
-
-### Android Apps Setup
-**CRITICAL:** Android builds fail in restricted environments due to network access to dl.google.com being blocked.
-
-**Expected Error Message:**
-```
-Could not GET 'https://dl.google.com/dl/android/maven2/...'
-> dl.google.com
-```
-
-1. **Prerequisites (if building locally):**
-   - Download and place `google-services.json` in both `masterApp/` and `childApp/` directories
-   - Gradle wrapper is included (`./gradlew` exists)
-
-2. **Build Commands (only work with full network access):**
-   ```bash
-   # Make gradlew executable
-   chmod +x ./gradlew
-   
-   # Build debug APKs - NEVER CANCEL: Can take 5-15 minutes on first run
-   ./gradlew :masterApp:assembleDebug
-   ./gradlew :childApp:assembleDebug
-   
-   # Run Android unit tests - NEVER CANCEL: Takes 3-10 minutes  
-   ./gradlew testDebugUnitTest
-   
-   # Run instrumented tests (requires device/emulator)
-   ./gradlew :masterApp:connectedAndroidTest
-   ./gradlew :childApp:connectedAndroidTest
-   
-   # Check Kotlin code style
-   ./gradlew ktlintCheck
-   ```
-
-3. **Network Limitations Workaround:**
-   - In restricted environments, document that Android builds cannot be verified
-   - Reference the CI pipeline (`.github/workflows/ci.yml`) which runs these builds
-   - Focus on backend validation which works fully
-
-### Firebase Deployment
-**Note:** Firebase CLI may not be available in all environments.
-
+## Fast Validation Loop (ALWAYS)
 ```bash
-# Deploy all (requires Firebase CLI and authentication)
-firebase deploy
-
-# Deploy specific components
-firebase deploy --only functions
-firebase deploy --only firestore  
-firebase deploy --only storage
+npm install        # one-time / when deps change
+npm run lint       # ~5s, ignore TS version warning
+npm test           # ~15–30s (jest, memory flag already set)
 ```
+Optional type check (no emit): `npx tsc --noEmit` (silent on success).
 
-## Validation Scenarios
+## Adding / Modifying Cloud Functions
+- Pattern: Validate arguments early; throw `functions.https.HttpsError(code, message)` with precise codes: `invalid-argument`, `already-exists`, `unauthenticated`, `permission-denied`, `resource-exhausted`, `deadline-exceeded`, `internal`.
+- Use `admin.firestore.Timestamp.now()` for time; when creating expiries compute seconds manually (see `createPairingCode`). Keep retry caps (`maxAttempts=10`) to avoid infinite loops.
+- Return minimal shaped objects `{ pairingCode }`, `{ childId }`, `{ success: true }`—do not embed internal timestamps.
+- When reading docs: remove malformed data defensively (see validation branch deleting expired/malformed pairing codes) before throwing.
 
-### Backend Validation (Always Possible)
-1. **Run full test suite and ensure all pass:**
-   ```bash
-   npm test
-   ```
-   **Expected:** 7/7 tests passing covering:
-   - `createPairingCode`: 4 tests (success, collision retry, missing childId, max attempts)
-   - `validatePairingToken`: 3 tests (valid token, invalid token, expired token)
-   - Runtime: ~15-30 seconds
+## Writing Tests (Jest)
+- Wrap functions via `firebase-functions-test`: `const wrapped = testEnv.wrap(myFunctions.fnName)`.
+- Mock strategy already centralized: see `index.test.ts` for collision / expiry / malformed field tests. Replicate those scenarios for new functions: success, auth failure, malformed input, edge expiry.
+- Keep each new Firestore collection access behind `db().collection(name)` for easy spying.
 
-2. **Verify linting passes:**
-   ```bash
-   npm run lint
-   ```
-   **Expected:** No errors, TypeScript version warning is normal and safe to ignore
+## Android / CI Reality
+- Android Gradle steps frequently fail without Google Maven (`dl.google.com`) network; do NOT “fix” by removing those jobs—document skip like existing workflow (`ci.yml` network-test step).
+- Never block backend work waiting for Android build if network test fails; proceed with backend validation only.
 
-3. **Check TypeScript compilation:**
-   ```bash
-   npx tsc --noEmit
-   ```
-   **Expected:** No output (silent success)
+## Firestore & Messaging Conventions
+- Child updates: only send FCM fields that changed; keep payload small (`data` map with JSON-stringified arrays/objects where needed).
+- Do NOT introduce writes that bypass existing collections without updating tests + security rules (`firestore.rules`).
 
-### End-to-End Testing (Device Required)
-- **E2E Test Script:** `./run_e2e_test.sh` automates full pairing flow
-- **Requirements:** Android device/emulator with both apps installed
-- **NEVER CANCEL:** E2E tests can take 5-10 minutes for full flow
+## Files of Authority
+`index.ts` (functions), `firebase.ts` (singleton initialization), `test/index.test.ts` & `test/onChildDeviceUpdateV2.test.ts` (patterns), `.github/workflows/ci.yml` (network gating), `Testanleitung.md` (manual flows), `ARCHITECTURE.md` (conceptual—but note mismatch: families nesting not yet implemented).
 
-### CI Validation
-- **Always check CI status:** `.github/workflows/ci.yml` runs on push/PR
-- **Backend job:** npm ci, lint, test (always passes in clean environment)
-- **Android job:** Gradle builds and tests (may fail in restricted networks)
+## Planned Data Model Migration (Families)  ❗ (Point 1)
+Docs mention a hierarchical `families/{familyId}/children/{childId}` model, but current live code + rules intentionally use a flat layout (`masters`, `children`, nested `children/{id}/tasks`). A future migration would require:
+- New writes duplicating data into `families/{fid}/children` OR a one-shot backfill script.
+- Adjusted security rules (remove current explicit denial for `/families/**`).
+- Refactor every function touching `children` / `masters` (auth assumptions: masterImei links).
+Agents MUST NOT silently introduce the hierarchical path—open an explicit migration issue instead (include: phased dual-write plan, cleanup step, rule changes, test updates).
 
-## Build Times and Timeouts
+## FCM Event Strategy & Extension (Point 2)
+Current push surface: single Firestore trigger `onChildDeviceUpdateV2` pushing only changed keys among: `isLocked`, `appBlacklist`, `usageRules` with small `data` payload. To add new sync fields:
+1. Add field write in relevant callable (update child doc).
+2. Extend diff logic (compare old vs new) and JSON.stringify if object/array.
+3. Keep notification text generic unless a distinct UX path exists.
+4. Add unit test: one test per new diff branch + “no-change” safeguard.
+Do NOT add multiple overlapping triggers on the same path (retain single responsibility to avoid duplicate FCM sends).
 
-**CRITICAL TIMEOUT SETTINGS:**
-- **Backend tests:** 30+ seconds (set timeout to 60+ seconds)
-- **Backend dependency install:** 60+ seconds (set timeout to 120+ seconds)
-- **Android builds (first time):** 5-15 minutes (set timeout to 30+ minutes)
-- **Android tests:** 3-10 minutes (set timeout to 20+ minutes)
-- **E2E tests:** 5-10 minutes (set timeout to 20+ minutes)
+## Security Rules Mapping (Point 3)
+`firestore.rules` currently:
+- Allows auth-gated read/write on: `masters/*`, `children/*`, `children/*/tasks/*`, `pairingCodes/*`, `pairingTokens/*` (auth = request.auth != null). Fine-grained authorization is enforced in Cloud Functions (secretKey & master-child relation), NOT in rules.
+- Explicit DENY for legacy `/families/**` to prevent accidental use.
+- Task create/update schema validation (restricts allowed keys) — ensure new task fields go through a rules update FIRST or tasks will fail to write.
+Agent implication: When adding collections, mirror pattern: start permissive (auth required) + enforce logic server-side, then tighten later with rules & tests.
 
-**NEVER CANCEL these operations. They are expected to take significant time.**
+## Android Accessibility Service Gap (Point 4)
+Critical parental control feature (real app blocking / foreground monitoring) is NOT implemented—only permission scaffolding exists. Do NOT implement stub logic that claims enforcement. Any addition should:
+- Be introduced behind a feature flag.
+- Emit explicit logs tagging scope (e.g. `ACCESS_SVC_UNIMPLEMENTED` -> future grep).
+- Include design doc PR (threat model + battery impact + privacy notes) before code.
 
-## Known Limitations and Issues
-
-### Critical Issues (Per COMPREHENSIVE_ISSUES_ANALYSIS.md)
-1. **Android Manifest Syntax Error:** `masterApp/src/main/AndroidManifest.xml:14` has invalid XML syntax
-2. **Data Model Inconsistency:** Firestore rules use nested structure but Cloud Functions use flat structure
-3. **Missing Internationalization:** masterApp lacks i18n support despite documentation claims
-
-### Network Restrictions
-- **Google Maven Repository:** Access to `dl.google.com` is blocked in restricted environments
-- **Exact Error:** `Could not GET 'https://dl.google.com/dl/android/maven2/...' > dl.google.com`
-- **Affected Commands:** Any `./gradlew` command (build, test, tasks, etc.)
-- **Workaround:** Focus on backend validation; reference CI for Android builds
-- **Firebase CLI:** May not be available; document deployment commands for reference
-
-### Environment Compatibility
-- **Node.js Version:** Requires v20+ (specified in README)
-- **TypeScript Warning:** Version 5.9.2 vs supported <5.6.0 is expected and non-blocking
-
-## Common Tasks Reference
-
-### Repository Structure
-```
-MiniMaster/
-├── README.md              # Project overview and setup
-├── package.json           # Node.js dependencies and scripts  
-├── index.ts              # Firebase Cloud Functions
-├── firestore.rules       # Firestore security rules
-├── storage.rules         # Firebase Storage rules
-├── test/                 # Backend unit tests
-├── masterApp/            # Parent Android app
-├── childApp/             # Child Android app
-├── .github/workflows/    # CI/CD configuration
-└── run_e2e_test.sh      # End-to-end test automation
-```
-
-### Quick Commands Summary
+## Deployment / Environments (Point 5)
+Operational references: `RUNBOOK.md`, `PRODUCTION_DEPLOYMENT.md`.
+Minimal agent-safe steps (manual):
 ```bash
-# Essential validation (always works)
-npm install && npm run lint && npm test
-
-# TypeScript compilation check
-npx tsc --noEmit
-
-# Android validation (requires network access - will fail with dl.google.com error)
-chmod +x ./gradlew && ./gradlew testDebugUnitTest
-
-# Full build (network dependent)
-./gradlew assembleDebug
+firebase login
+firebase use <alias>      # ensure correct project
+firebase deploy --only functions,firestore,storage
 ```
+Secrets: Use `firebase functions:secrets:set` (do NOT hardcode). Purchase verification depends on Google Play API creds via ADC. Never embed service account JSON in repo.
+If adding new secret usage → add retrieval pattern (ADC or secret manager) + doc line in RUNBOOK.
 
-## Troubleshooting
+## Function → Collections → Side Effects (Point 6)
+| Function | Collections Read | Collections Write | Other Side Effects |
+|----------|------------------|-------------------|--------------------|
+| createPairingCode | pairingCodes (exist check) | pairingCodes (create) | log |
+| validatePairingCode | pairingCodes | pairingCodes (delete) | log |
+| registerMasterDevice | masters | masters (create) | log, uuid |
+| generatePairingLink | masters, pairingTokens | pairingTokens (create) | uuid, log |
+| setDeviceLocked | masters, children | children (update) | log |
+| updateAppBlacklist | masters, children | children (update) | log |
+| setUsageRules | masters, children | children (update) | log |
+| recordHeartbeat | children | children (update lastSeen) | log |
+| registerFcmToken | children | children (update fcmToken) | log |
+| onChildDeviceUpdateV2 (trigger) | children (before/after) | (none explicit) | getMessaging().send selective FCM |
+| createTask | masters, children | children/*/tasks (create) | log |
+| completeTask | children/*/tasks | children/*/tasks (update) | log |
+| approveTask | masters, children/*/tasks | children/*/tasks (update) | log |
+| verifyPurchase | masters | masters (update subscription) | Google Play API call |
+| getSubscriptionStatus | masters | (none) | — |
+| validatePairingToken | pairingTokens | children (create), pairingTokens (delete) | log |
 
-### When Android Commands Fail
-**Symptoms:** Any `./gradlew` command fails with `dl.google.com` network error
-**Solution:** This is expected in restricted environments. Focus on backend validation:
-```bash
-# Use these commands instead
-npm run lint    # Always works
-npm test       # Always works
-npx tsc --noEmit  # Always works
-```
+When adding a new function, decide: (a) does it mutate existing doc (update) vs create subcollection doc? (b) does it require FCM push extension? (c) security rule coverage? Add rows accordingly.
 
-### When Tests Fail
-**Backend Test Failures:**
-- Ensure `npm install` completed successfully
-- Check that Node.js v20+ is available
-- Memory issues: Tests use `--max-old-space-size=4096`
+## Common Pitfalls
+- Documentation mentions nested `families/{familyId}/children` but current implementation uses top-level `children` & `masters`. Stay consistent unless performing a coordinated migration (would require rules + data changes + tests).
+- Ignore TypeScript version support warning (<5.6.0) – do NOT downgrade; existing toolchain works.
+- Avoid adding heavy logic in tests; prefer simple mocks/spies like existing suites.
 
-**TypeScript Version Warning:**
-- Expected warning: "YOUR TYPESCRIPT VERSION: 5.9.2" vs supported <5.6.0
-- This is non-blocking and safe to ignore
-- Linting and compilation still work correctly
+## Safe Extension Checklist (before commit)
+1. Input validation added? (`typeof` checks + clear error code)
+2. No accidental deep Firestore paths?
+3. Expiry logic uses server timestamp, not client Date.now?
+4. Added tests: success + each distinct failure branch.
+5. `npm run lint && npm test` passes locally.
 
-### Quick Health Check
-Run this command to verify everything is working:
-```bash
-npm run lint && npm test && echo "✅ Repository is healthy"
-```
-Should complete in ~20-35 seconds total.
+## When Unsure
+Search in `index.ts` for similar pattern and replicate structure (logging, error handling, defensive deletes). Prefer minimal diff; keep logging via `functions.logger` consistent (info for expected, warn for user misuse, error for unexpected).
 
-## Testing Strategy
-
-### Unit Tests Coverage
-- **Backend:** 7 tests covering Cloud Functions (createPairingCode, validatePairingToken)
-- **Android:** Limited unit tests, documented in `Testanleitung.md`
-- **Missing:** Some ViewModels lack unit tests (see COMPREHENSIVE_ISSUES_ANALYSIS.md)
-
-### Manual Testing
-- **Reference:** Complete manual test scenarios in `Testanleitung.md`
-- **Languages:** Test plan includes German documentation
-- **End-to-End:** Covers full pairing flow between parent and child apps
-
-### Automated Testing
-- **CI Pipeline:** Runs on every push/PR
-- **E2E Script:** Automates device-based testing when hardware available
-- **Documentation:** `AUTOMATED_UX_TESTS_SUMMARY.md` details current coverage
-
-## Key Project Files
-
-### Configuration
-- `package.json` - Node.js project configuration
-- `tsconfig.json` - TypeScript configuration  
-- `jest.config.cjs` - Test configuration
-- `.eslintrc.js` - Linting rules
-- `firebase.ts` - Firebase initialization
-
-### Documentation
-- `README.md` - Main project documentation
-- `ARCHITECTURE.md` - System architecture overview
-- `Testanleitung.md` - Comprehensive testing guide (German)
-- `RUNBOOK.md` - Operations and deployment guide
-- `COMPREHENSIVE_ISSUES_ANALYSIS.md` - Known issues and fixes needed
-
-### Build and Deployment
-- `.github/workflows/ci.yml` - CI/CD pipeline
-- `build.gradle` - Root Gradle configuration
-- `settings.gradle` - Gradle project settings
-- `gradlew` / `gradlew.bat` - Gradle wrapper scripts
-
-Remember: **ALWAYS validate your changes with `npm test` and `npm run lint` before committing.** These are the most reliable validation steps available in any environment.
+---
+If you need clarification on: (a) planned migration to nested families model, (b) adding new FCM event types, or (c) Android-side service gaps (Accessibility Service), ask the maintainer before proceeding.
