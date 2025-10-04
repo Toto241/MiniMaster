@@ -1,5 +1,5 @@
 import fft from "firebase-functions-test";
-import * as admin from "firebase-admin";
+// import * as admin from "firebase-admin";  // Unused
 import { db as getDb } from "../firebase";
 
 // Reuse existing jest mocks pattern for firebase-admin (if needed could extend)
@@ -10,13 +10,15 @@ jest.mock("firebase-admin", () => {
     static now() { const d = new Date(); return new MockTimestamp(Math.floor(d.getTime()/1000), 0); }
     static fromDate(date: Date) { return new MockTimestamp(Math.floor(date.getTime()/1000),0); }
   }
+  
+  const firestoreNamespace = () => ({ collection: jest.fn() });
+  (firestoreNamespace as any).Timestamp = MockTimestamp;
+  (firestoreNamespace as any).FieldValue = { serverTimestamp: () => "mock-server-timestamp" };
+  
   return {
     ...original,
     initializeApp: jest.fn(),
-    firestore: () => ({ collection: jest.fn() }),
-    // Minimal FieldValue+Timestamp surface for tests that read comparisons
-    FieldValue: { serverTimestamp: () => "mock-server-timestamp" },
-    Timestamp: MockTimestamp
+    firestore: firestoreNamespace
   };
 });
 
@@ -27,7 +29,7 @@ let fns: any;
 let db: any;
 
 // Common spies
-let collectionSpy: jest.SpyInstance;
+// let collectionSpy: jest.SpyInstance;  // Unused
 let docMock: jest.Mock;
 let getMock: jest.Mock;
 let updateMock: jest.Mock;
@@ -43,7 +45,7 @@ beforeEach(() => {
   updateMock = jest.fn();
   setMock = jest.fn();
   docMock = jest.fn().mockReturnValue({ get: getMock, update: updateMock, set: setMock, collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ update: updateMock, get: getMock }) }) });
-  collectionSpy = jest.spyOn(db, "collection").mockImplementation((...args: unknown[]) => {
+  jest.spyOn(db, "collection").mockImplementation((..._args: unknown[]) => {
     return { doc: docMock } as any;
   });
 });
