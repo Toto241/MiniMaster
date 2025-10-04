@@ -1,5 +1,5 @@
 import fft from "firebase-functions-test";
-import * as admin from "firebase-admin";
+// import * as admin from "firebase-admin";  // Unused
 import { getMessaging } from "firebase-admin/messaging";
 
 // Mock the firebase-admin module, specifically messaging and firestore
