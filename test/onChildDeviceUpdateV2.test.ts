@@ -1,7 +1,7 @@
 import fft from "firebase-functions-test";
 import { wrapV2 } from "firebase-functions-test/lib/v2";
 // import * as admin from "firebase-admin";  // Unused
-import { getMessaging } from "firebase-admin/messaging";
+// import { getMessaging } from "firebase-admin/messaging";  // Unused - using mockSend directly
 
 // Mock firebase-admin/messaging module only
 const mockSend = jest.fn();
