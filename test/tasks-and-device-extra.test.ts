@@ -1,5 +1,5 @@
 import fft from "firebase-functions-test";
-import * as admin from "firebase-admin";
+// import * as admin from "firebase-admin";  // Unused
 import { db as getDb } from "../firebase";
 
 // Reuse existing jest mocks pattern for firebase-admin (if needed could extend)
@@ -27,7 +27,7 @@ let fns: any;
 let db: any;
 
 // Common spies
-let collectionSpy: jest.SpyInstance;
+// let collectionSpy: jest.SpyInstance;  // Unused
 let docMock: jest.Mock;
 let getMock: jest.Mock;
 let updateMock: jest.Mock;
@@ -43,7 +43,7 @@ beforeEach(() => {
   updateMock = jest.fn();
   setMock = jest.fn();
   docMock = jest.fn().mockReturnValue({ get: getMock, update: updateMock, set: setMock, collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ update: updateMock, get: getMock }) }) });
-  collectionSpy = jest.spyOn(db, "collection").mockImplementation((...args: unknown[]) => {
+  jest.spyOn(db, "collection").mockImplementation((..._args: unknown[]) => {
     return { doc: docMock } as any;
   });
 });
