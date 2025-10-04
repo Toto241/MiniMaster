@@ -10,13 +10,15 @@ jest.mock("firebase-admin", () => {
     static now() { const d = new Date(); return new MockTimestamp(Math.floor(d.getTime()/1000), 0); }
     static fromDate(date: Date) { return new MockTimestamp(Math.floor(date.getTime()/1000),0); }
   }
+  
+  const firestoreNamespace = () => ({ collection: jest.fn() });
+  (firestoreNamespace as any).Timestamp = MockTimestamp;
+  (firestoreNamespace as any).FieldValue = { serverTimestamp: () => "mock-server-timestamp" };
+  
   return {
     ...original,
     initializeApp: jest.fn(),
-    firestore: () => ({ collection: jest.fn() }),
-    // Minimal FieldValue+Timestamp surface for tests that read comparisons
-    FieldValue: { serverTimestamp: () => "mock-server-timestamp" },
-    Timestamp: MockTimestamp
+    firestore: firestoreNamespace
   };
 });
 
