@@ -16,6 +16,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import com.google.pairing.TaskStatus
+import com.google.pairing.LockScreen
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -31,6 +35,32 @@ import java.util.*
  * and can also detect if a user quickly switches to a blocked app.
  */
 class MiniMasterAccessibilityService : AccessibilityService() {
+
+    private var currentTaskStatus: TaskStatus = TaskStatus.ASSIGNED
+    private var unlockEndTime: Long = 0 // System.currentTimeMillis() + unlockDuration in ms
+
+    // BroadcastReceiver, um den Status vom TaskMonitoringService zu erhalten
+    private val taskStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.google.pairing.TASK_STATUS_UPDATE") {
+                val statusString = intent.getStringExtra("task_status")
+                val unlockDuration = intent.getLongExtra("unlock_duration", 0)
+
+                currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.ASSIGNED.value)
+
+                if (currentTaskStatus == TaskStatus.APPROVED && unlockDuration > 0) {
+                    // Startet den Timer für die Freischaltung
+                    unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // Minuten zu Millisekunden
+                    Log.d(TAG, "Task approved. Unlocking for $unlockDuration minutes. End time: $unlockEndTime")
+                } else if (currentTaskStatus != TaskStatus.APPROVED) {
+                    // Setzt den Timer zurück, wenn der Status nicht APPROVED ist
+                    unlockEndTime = 0
+                }
+            }
+        }
+    }
+
+    companion object {
 
     companion object {
         private const val TAG = "MiniMasterAccessService"
@@ -58,6 +88,9 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        // Registriert den Receiver
+        val filter = IntentFilter("com.google.pairing.TASK_STATUS_UPDATE")
+        registerReceiver(taskStatusReceiver, filter)
     }
 
     /**
@@ -96,6 +129,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(taskStatusReceiver)
         stopAppMonitoring()
         serviceScope.cancel()
         Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
@@ -159,10 +193,43 @@ class MiniMasterAccessibilityService : AccessibilityService() {
      */
     private fun onForegroundAppChanged(packageName: String) {
         Log.d(TAG, "Foreground app changed to: $packageName")
+
+        // 1. Task-basierte Sperrlogik (hat höchste Priorität)
+        if (isTaskLockActive()) {
+            // Wenn eine Aufgabe zugewiesen oder abgelehnt wurde UND der Timer abgelaufen ist
+            // oder nie gestartet wurde, wird die LockScreen-Activity gestartet.
+            val lockIntent = Intent(this, LockScreen::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                putExtra("lock_reason", "task_lock")
+            }
+            startActivity(lockIntent)
+            return // Task-Sperre hat Vorrang
+        }
+
+        // 2. Normale Sperrlogik (z.B. Zeitlimits)
         if (blockedApps.contains(packageName)) {
             blockApplication(packageName)
         }
         logAppUsage(packageName)
+    }
+
+    /**
+     * Überprüft, ob die Task-basierte Sperre aktiv sein muss.
+     */
+    private fun isTaskLockActive(): Boolean {
+        // Die Sperre ist NICHT aktiv, wenn der Status APPROVED ist UND die Freischaltzeit noch nicht abgelaufen ist.
+        if (currentTaskStatus == TaskStatus.APPROVED && System.currentTimeMillis() < unlockEndTime) {
+            return false
+        }
+
+        // Die Sperre ist aktiv, wenn eine Aufgabe zugewiesen, eingereicht oder abgelehnt wurde.
+        if (currentTaskStatus == TaskStatus.ASSIGNED || currentTaskStatus == TaskStatus.REJECTED || currentTaskStatus == TaskStatus.SUBMITTED) {
+            return true
+        }
+
+        // In allen anderen Fällen (z.B. keine Aufgabe oder genehmigte Aufgabe nach Ablauf der Zeit) ist die Task-Sperre nicht aktiv.
+        // Die normale Sperrlogik (Zeitlimits) greift dann.
+        return false
     }
 
     /**
