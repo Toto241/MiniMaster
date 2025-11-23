@@ -132,4 +132,35 @@ class AccessibilityServiceTest {
         assertTrue("Should contain user app", userApps.contains("com.example.userapp"))
         assertTrue("Should contain Facebook", userApps.contains("com.facebook.katana"))
     }
+
+    @Test
+    fun `usage rules should be parsed correctly`() {
+        // Given
+        val usageRulesJson = "{\"dailyLimitSeconds\": 3600}"
+
+        // When
+        val jsonObject = org.json.JSONObject(usageRulesJson)
+        val limit = jsonObject.optLong("dailyLimitSeconds", -1L)
+
+        // Then
+        assertEquals("Daily limit should be 3600", 3600L, limit)
+    }
+
+    @Test
+    fun `invalid usage rules should handle gracefully`() {
+        // Given
+        val invalidJson = "{invalid_json}"
+
+        // When
+        var limit = -1L
+        try {
+            val jsonObject = org.json.JSONObject(invalidJson)
+            limit = jsonObject.optLong("dailyLimitSeconds", -1L)
+        } catch (e: Exception) {
+            // Expected
+        }
+
+        // Then
+        assertEquals("Limit should remain default", -1L, limit)
+    }
 }
