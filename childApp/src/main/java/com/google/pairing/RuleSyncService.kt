@@ -47,13 +47,33 @@ class RuleSyncService : FirebaseMessagingService() {
 
         if (remoteMessage.data.isNotEmpty()) {
             Log.d(TAG, "Message data payload: " + remoteMessage.data)
-            
+
+            // Handle payload-only messages (from onChildDeviceUpdateV2)
+            if (remoteMessage.data.containsKey("isLocked")) {
+                handleDeviceLockMessage(remoteMessage.data)
+            }
+            if (remoteMessage.data.containsKey("appBlacklist") || remoteMessage.data.containsKey("blocked_apps")) {
+                handleAppRulesUpdate(remoteMessage.data)
+            }
+            if (remoteMessage.data.containsKey("usageRules")) {
+                handleUsageRulesUpdate(remoteMessage.data)
+            }
+
+            // Handle command-based messages
             when (remoteMessage.data["command"]) {
                 "SYNC_RULES" -> {
                     Log.d(TAG, "SYNC_RULES command received. Triggering rule sync logic.")
                     handleSyncRequest()
                 }
-                else -> Log.w(TAG, "Unknown command received: ${remoteMessage.data}")
+                else -> {
+                    // Log warning only if no known keys were processed
+                    if (!remoteMessage.data.containsKey("isLocked") &&
+                        !remoteMessage.data.containsKey("appBlacklist") &&
+                        !remoteMessage.data.containsKey("blocked_apps") &&
+                        !remoteMessage.data.containsKey("usageRules")) {
+                        Log.w(TAG, "Unknown command received: ${remoteMessage.data}")
+                    }
+                }
             }
         }
     }
@@ -89,17 +109,42 @@ class RuleSyncService : FirebaseMessagingService() {
      */
     private fun handleAppRulesUpdate(data: Map<String, String>) {
         Log.d(TAG, "Handling app rules update")
-        val blockedAppsJson = data["blocked_apps"]
-        
+        val blockedAppsJson = data["appBlacklist"] ?: data["blocked_apps"]
+
         if (!blockedAppsJson.isNullOrEmpty()) {
             try {
-                val blockedApps = blockedAppsJson.split(",").toSet()
+                val blockedApps = if (blockedAppsJson.trim().startsWith("[")) {
+                    // Parse JSON array
+                    val jsonArray = org.json.JSONArray(blockedAppsJson)
+                    val list = mutableListOf<String>()
+                    for (i in 0 until jsonArray.length()) {
+                        list.add(jsonArray.getString(i))
+                    }
+                    list.toSet()
+                } else {
+                    // Legacy comma separated
+                    blockedAppsJson.split(",").toSet()
+                }
                 updateAccessibilityServiceRules(blockedApps)
                 AppLogger.logRuleSyncEvent("app_blocking", "success", "Updated ${blockedApps.size} blocked apps")
             } catch (e: Exception) {
                 Log.e(TAG, "Error parsing blocked apps", e)
                 AppLogger.logRuleSyncEvent("app_blocking", "error", "Failed to parse blocked apps: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * Handles a direct command to update the usage rules.
+     * The rules are passed to the [MiniMasterAccessibilityService] via SharedPreferences.
+     * @param data The data map from the FCM message.
+     */
+    private fun handleUsageRulesUpdate(data: Map<String, String>) {
+        Log.d(TAG, "Handling usage rules update")
+        val usageRulesJson = data["usageRules"]
+
+        if (!usageRulesJson.isNullOrEmpty()) {
+            updateUsageRules(usageRulesJson)
         }
     }
 
@@ -132,14 +177,28 @@ class RuleSyncService : FirebaseMessagingService() {
             val data = hashMapOf("childId" to childId)
             val result = functions.getHttpsCallable("getRulesForChild").call(data).await()
             val rules = result.data as? Map<String, Any>
-            
+
             if (rules != null) {
                 Log.d(TAG, "Retrieved rules from backend: $rules")
-                val blockedApps = (rules["blockedApps"] as? List<String>)?.toSet() ?: emptySet()
-                if (blockedApps.isNotEmpty()) {
-                    updateAccessibilityServiceRules(blockedApps)
-                    AppLogger.logRuleSyncEvent("rule_sync", "success", "Rules synchronized: ${blockedApps.size} blocked apps")
+
+                // Handle blocked apps
+                val blockedAppsRaw = rules["appBlacklist"] ?: rules["blockedApps"]
+                val blockedApps = (blockedAppsRaw as? List<String>)?.toSet() ?: emptySet()
+                updateAccessibilityServiceRules(blockedApps)
+
+                // Handle usage rules
+                val usageRules = rules["usageRules"]
+                if (usageRules != null) {
+                    val json = org.json.JSONObject(usageRules as Map<*, *>).toString()
+                    updateUsageRules(json)
                 }
+
+                // Handle lock state
+                val isLocked = rules["isLocked"] as? Boolean ?: false
+                val sharedPrefs = applicationContext.getSharedPreferences("device_lock", Context.MODE_PRIVATE)
+                sharedPrefs.edit().putBoolean("is_locked", isLocked).apply()
+
+                AppLogger.logRuleSyncEvent("rule_sync", "success", "Rules synchronized: ${blockedApps.size} blocked apps")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync rules with backend", e)
@@ -179,6 +238,26 @@ class RuleSyncService : FirebaseMessagingService() {
             Log.d(TAG, "Updated accessibility rules in shared preferences")
         } catch (e: Exception) {
             Log.e(TAG, "Error updating accessibility service rules", e)
+        }
+    }
+
+    /**
+     * Persists the usage rules JSON string to SharedPreferences.
+     * @param usageRulesJson The JSON string representing usage rules.
+     */
+    private fun updateUsageRules(usageRulesJson: String) {
+        try {
+            val context = applicationContext
+            val sharedPrefs = context.getSharedPreferences("accessibility_rules", Context.MODE_PRIVATE)
+            sharedPrefs.edit()
+                .putString("usage_rules", usageRulesJson)
+                .putLong("last_update", System.currentTimeMillis())
+                .apply()
+            Log.d(TAG, "Updated usage rules in shared preferences")
+            AppLogger.logRuleSyncEvent("usage_rules", "success", "Updated usage rules")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating usage rules", e)
+            AppLogger.logRuleSyncEvent("usage_rules", "error", "Failed to update usage rules: ${e.message}")
         }
     }
 
