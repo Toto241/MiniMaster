@@ -43,7 +43,14 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var isServiceInitialized = false
     private val blockedApps = mutableSetOf<String>()
     private var lastRulesUpdateTimestamp = 0L
-    
+
+    // Usage tracking
+    private var usageRules: org.json.JSONObject? = null
+    private var dailyLimitMillis: Long = -1L
+    private var currentDayUsageMillis: Long = 0L
+    private var lastUsageCheckTime: Long = 0L
+    private var currentDayStart: Long = 0L
+
     /**
      * A [Runnable] that periodically checks the foreground app and for rule updates.
      */
@@ -51,6 +58,8 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         override fun run() {
             checkCurrentForegroundApp()
             checkForRuleUpdates()
+            updateUsageStats()
+            checkUsageLimits()
             handler.postDelayed(this, CHECK_INTERVAL)
         }
     }
@@ -74,6 +83,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         }
         serviceInfo = info
         isServiceInitialized = true
+        loadUsageData()
         startAppMonitoring()
         Log.d(TAG, "AccessibilityService connected and monitoring started.")
     }
@@ -162,6 +172,8 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         if (blockedApps.contains(packageName)) {
             blockApplication(packageName)
         }
+        // Force immediate check when app changes
+        checkUsageLimits()
         logAppUsage(packageName)
     }
 
@@ -219,11 +231,92 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             if (lastUpdate > lastRulesUpdateTimestamp) {
                 val newBlockedApps = sharedPrefs.getStringSet("blocked_apps", emptySet()) ?: emptySet()
                 updateBlockedApps(newBlockedApps)
+
+                val usageRulesJson = sharedPrefs.getString("usage_rules", null)
+                if (usageRulesJson != null) {
+                    parseUsageRules(usageRulesJson)
+                }
+
                 lastRulesUpdateTimestamp = lastUpdate
                 Log.d(TAG, "Rules updated from SharedPreferences: $newBlockedApps")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for rule updates", e)
+        }
+    }
+
+    private fun parseUsageRules(json: String) {
+        try {
+            usageRules = org.json.JSONObject(json)
+            // Example usage rule: { "dailyLimitSeconds": 3600 }
+            val dailyLimitSeconds = usageRules?.optLong("dailyLimitSeconds", -1L) ?: -1L
+            if (dailyLimitSeconds != -1L) {
+                dailyLimitMillis = dailyLimitSeconds * 1000
+            } else {
+                dailyLimitMillis = -1L
+            }
+            Log.d(TAG, "Parsed usage rules: dailyLimitMillis=$dailyLimitMillis")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing usage rules", e)
+        }
+    }
+
+    private fun loadUsageData() {
+        val sharedPrefs = getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+        currentDayStart = sharedPrefs.getLong("current_day_start", 0L)
+
+        // Reset if it's a new day
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val todayStart = calendar.timeInMillis
+
+        if (currentDayStart != todayStart) {
+            currentDayStart = todayStart
+            currentDayUsageMillis = 0L
+            sharedPrefs.edit()
+                .putLong("current_day_start", currentDayStart)
+                .putLong("current_day_usage", 0L)
+                .apply()
+        } else {
+            currentDayUsageMillis = sharedPrefs.getLong("current_day_usage", 0L)
+        }
+        lastUsageCheckTime = System.currentTimeMillis()
+    }
+
+    private fun updateUsageStats() {
+        val now = System.currentTimeMillis()
+
+        // Only track usage if we have a valid foreground app that is not system
+        if (currentForegroundApp != null &&
+            !currentForegroundApp!!.startsWith("com.android") &&
+            currentForegroundApp != packageName) {
+
+            val delta = now - lastUsageCheckTime
+            if (delta > 0 && delta < 5000) { // Sanity check for large jumps
+                currentDayUsageMillis += delta
+
+                // Persist occasionally or on destroy, doing it here every second is expensive but safe for PoC
+                getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+                    .edit()
+                    .putLong("current_day_usage", currentDayUsageMillis)
+                    .apply()
+            }
+        }
+        lastUsageCheckTime = now
+    }
+
+    private fun checkUsageLimits() {
+        if (dailyLimitMillis != -1L && currentDayUsageMillis > dailyLimitMillis) {
+            Log.i(TAG, "Daily limit exceeded: $currentDayUsageMillis > $dailyLimitMillis")
+            // Block current app if it's not a system app
+             if (currentForegroundApp != null &&
+                !currentForegroundApp!!.startsWith("com.android") &&
+                currentForegroundApp != packageName) {
+                blockApplication(currentForegroundApp!!)
+             }
         }
     }
 }
