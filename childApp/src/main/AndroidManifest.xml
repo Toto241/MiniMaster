@@ -67,6 +67,11 @@
         </receiver>
 
         <service
+            android:name=".TaskMonitoringService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
             android:name=".RuleSyncService"
             android:exported="false">
             <intent-filter>
