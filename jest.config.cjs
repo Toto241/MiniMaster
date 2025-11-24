@@ -8,8 +8,8 @@ const config = {
   transform: { 
     '^.+\\.tsx?$': ['ts-jest', { 
       tsconfig: 'tsconfig.json',
-      isolatedModules: true,  // Faster compilation, skip type checking
-      diagnostics: false,      // Disable type checking diagnostics
+      isolatedModules: true,  // Compile each file independently (no cross-file type checking)
+      diagnostics: false,      // Disable diagnostic output during compilation
     }] 
   },
   testTimeout: 10000,

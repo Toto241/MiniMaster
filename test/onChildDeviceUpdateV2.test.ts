@@ -177,13 +177,14 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: {},  // Empty document - wrapV2 converts this to trigger the !oldData check
+        before: {},  // Empty object - firebase-functions-test v2 processes this such that event.data.before.data() returns a falsy value
         after: newData,
       },
       params: { childId: "child123" },
     });
 
-    // Function explicitly checks `if (!oldData)` and returns early (line 634 in index.ts)
+    // Function explicitly checks `if (!oldData)` (line 634 in index.ts) which evaluates to true in this case,
+    // causing early return with no notification sent (verified by console.info log)
     expect(mockSend).not.toHaveBeenCalled();
   });
 
