@@ -1010,7 +1010,7 @@ export const validatePairingToken = functions.https.onCall(
 export const createTask = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Authorization Check (Master Role)
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
   // Assuming a role-based claim 'role: master' is set on the custom token.
   // Since the existing rules don't show custom claims, we'll rely on the caller being a master for now,
@@ -1019,17 +1019,17 @@ export const createTask = functions.https.onCall(async (data, context) => {
 
   const { childId, title, description, unlockDuration } = data;
 
-  if (!childId || !title || !description || typeof unlockDuration !== 'number' || unlockDuration <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid task data.');
+  if (!childId || !title || !description || typeof unlockDuration !== "number" || unlockDuration <= 0) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing or invalid task data.");
   }
 
   try {
     // 2. Verify child exists and belongs to the master (Crucial Security Step)
-    const childRef = db.collection('children').doc(childId);
+    const childRef = db.collection("children").doc(childId);
     const childDoc = await childRef.get();
 
     if (!childDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Child not found.');
+      throw new functions.https.HttpsError("not-found", "Child not found.");
     }
 
     // In a real system, we would check if childDoc.data().masterId === context.auth.uid
@@ -1043,12 +1043,12 @@ export const createTask = functions.https.onCall(async (data, context) => {
       description: description,
       unlockDuration: unlockDuration,
       assignedAt: admin.firestore.Timestamp.now(),
-      status: 'ASSIGNED', // Initial status
+      status: "ASSIGNED", // Initial status
       proofUrl: null,
       completedAt: null,
     };
 
-    const taskRef = await db.collection('children').doc(childId).collection('tasks').add(newTask);
+    const taskRef = await db.collection("children").doc(childId).collection("tasks").add(newTask);
 
     // 4. Send a notification to the child device (optional but recommended)
     // This part is a placeholder as the notification logic is not fully visible.
@@ -1061,8 +1061,8 @@ export const createTask = functions.https.onCall(async (data, context) => {
 
     return { taskId: taskRef.id };
   } catch (error) {
-    console.error('Error creating task:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to create task.');
+    console.error("Error creating task:", error);
+    throw new functions.https.HttpsError("internal", "Failed to create task.");
   }
 });
 
@@ -1077,22 +1077,22 @@ export const createTask = functions.https.onCall(async (data, context) => {
 export const submitTaskProof = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Authorization Check (Child Role)
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
 
   const { taskId, proofUrl } = data;
 
   if (!taskId || !proofUrl) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing taskId or proofUrl.');
+    throw new functions.https.HttpsError("invalid-argument", "Missing taskId or proofUrl.");
   }
 
   try {
     // 2. Get the task document
     // Assuming the task is nested under the child's document as per the existing rules
-    const taskQuerySnapshot = await db.collectionGroup('tasks').where(admin.firestore.FieldPath.documentId(), '==', taskId).limit(1).get();
+    const taskQuerySnapshot = await db.collectionGroup("tasks").where(admin.firestore.FieldPath.documentId(), "==", taskId).limit(1).get();
 
     if (taskQuerySnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Task not found.');
+      throw new functions.https.HttpsError("not-found", "Task not found.");
     }
 
     const taskDoc = taskQuerySnapshot.docs[0];
@@ -1100,12 +1100,12 @@ export const submitTaskProof = functions.https.onCall(async (data, context) => {
 
     // 3. Verify the task belongs to the calling child
     if (taskData.childId !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'Task does not belong to this child.');
+      throw new functions.https.HttpsError("permission-denied", "Task does not belong to this child.");
     }
 
     // 4. Update the task status and proof URL
     await taskDoc.ref.update({
-      status: 'SUBMITTED',
+      status: "SUBMITTED",
       proofUrl: proofUrl,
       updatedAt: admin.firestore.Timestamp.now(),
     });
@@ -1121,8 +1121,8 @@ export const submitTaskProof = functions.https.onCall(async (data, context) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error submitting task proof:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to submit task proof.');
+    console.error("Error submitting task proof:", error);
+    throw new functions.https.HttpsError("internal", "Failed to submit task proof.");
   }
 });
 
@@ -1137,21 +1137,21 @@ export const submitTaskProof = functions.https.onCall(async (data, context) => {
 export const reviewTask = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Authorization Check (Master Role)
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
 
   const { taskId, approved } = data;
 
-  if (!taskId || typeof approved !== 'boolean') {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing taskId or approved status.');
+  if (!taskId || typeof approved !== "boolean") {
+    throw new functions.https.HttpsError("invalid-argument", "Missing taskId or approved status.");
   }
 
   try {
     // 2. Get the task document
-    const taskQuerySnapshot = await db.collectionGroup('tasks').where(admin.firestore.FieldPath.documentId(), '==', taskId).limit(1).get();
+    const taskQuerySnapshot = await db.collectionGroup("tasks").where(admin.firestore.FieldPath.documentId(), "==", taskId).limit(1).get();
 
     if (taskQuerySnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Task not found.');
+      throw new functions.https.HttpsError("not-found", "Task not found.");
     }
 
     const taskDoc = taskQuerySnapshot.docs[0];
@@ -1159,10 +1159,10 @@ export const reviewTask = functions.https.onCall(async (data, context) => {
 
     // 3. Verify the task belongs to the calling master
     if (taskData.masterId !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'Task does not belong to this master.');
+      throw new functions.https.HttpsError("permission-denied", "Task does not belong to this master.");
     }
 
-    const newStatus = approved ? 'APPROVED' : 'REJECTED';
+    const newStatus = approved ? "APPROVED" : "REJECTED";
     const updateData: { status: string; completedAt?: admin.firestore.Timestamp; updatedAt: admin.firestore.Timestamp } = {
       status: newStatus,
       updatedAt: admin.firestore.Timestamp.now(),
@@ -1188,7 +1188,7 @@ export const reviewTask = functions.https.onCall(async (data, context) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error reviewing task:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to review task.');
+    console.error("Error reviewing task:", error);
+    throw new functions.https.HttpsError("internal", "Failed to review task.");
   }
 });
