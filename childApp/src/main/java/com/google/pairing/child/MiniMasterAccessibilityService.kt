@@ -2,26 +2,26 @@ package com.google.pairing.child
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
+import com.google.pairing.LockScreen
+import com.google.pairing.MainActivity
+import com.google.pairing.R
+import com.google.pairing.AppLogger
+import com.google.pairing.TaskStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
-import android.content.BroadcastReceiver
-import android.content.IntentFilter
-import com.google.pairing.TaskStatus
-import com.google.pairing.LockScreen
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Calendar
 
 /**
  * An [AccessibilityService] for monitoring foreground applications and implementing app blocking.
@@ -39,7 +39,10 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var currentTaskStatus: TaskStatus = TaskStatus.ASSIGNED
     private var unlockEndTime: Long = 0 // System.currentTimeMillis() + unlockDuration in ms
 
-    // BroadcastReceiver, um den Status vom TaskMonitoringService zu erhalten
+    /**
+     * BroadcastReceiver to receive task status updates from TaskMonitoringService.
+     * This allows the service to know if the device should be locked due to a pending task.
+     */
     private val taskStatusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.google.pairing.TASK_STATUS_UPDATE") {
@@ -49,18 +52,16 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                 currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.ASSIGNED.value)
 
                 if (currentTaskStatus == TaskStatus.APPROVED && unlockDuration > 0) {
-                    // Startet den Timer für die Freischaltung
-                    unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // Minuten zu Millisekunden
+                    // Start the timer for unlocking
+                    unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // minutes to milliseconds
                     Log.d(TAG, "Task approved. Unlocking for $unlockDuration minutes. End time: $unlockEndTime")
                 } else if (currentTaskStatus != TaskStatus.APPROVED) {
-                    // Setzt den Timer zurück, wenn der Status nicht APPROVED ist
+                    // Reset the timer if status is not APPROVED
                     unlockEndTime = 0
                 }
             }
         }
     }
-
-    companion object {
 
     companion object {
         private const val TAG = "MiniMasterAccessService"
@@ -74,7 +75,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private val blockedApps = mutableSetOf<String>()
     private var lastRulesUpdateTimestamp = 0L
 
-    // Usage tracking
+    // Usage tracking variables
     private var usageRules: org.json.JSONObject? = null
     private var dailyLimitMillis: Long = -1L
     private var currentDayUsageMillis: Long = 0L
@@ -99,7 +100,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        // Registriert den Receiver
+        // Register the receiver
         val filter = IntentFilter("com.google.pairing.TASK_STATUS_UPDATE")
         registerReceiver(taskStatusReceiver, filter)
     }
@@ -142,6 +143,11 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(taskStatusReceiver)
+        // Save final stats on destroy
+        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("current_day_usage", currentDayUsageMillis)
+            .apply()
         stopAppMonitoring()
         serviceScope.cancel()
         Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
@@ -206,19 +212,19 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private fun onForegroundAppChanged(packageName: String) {
         Log.d(TAG, "Foreground app changed to: $packageName")
 
-        // 1. Task-basierte Sperrlogik (hat höchste Priorität)
+        // 1. Task-based blocking logic (Highest Priority)
         if (isTaskLockActive()) {
-            // Wenn eine Aufgabe zugewiesen oder abgelehnt wurde UND der Timer abgelaufen ist
-            // oder nie gestartet wurde, wird die LockScreen-Activity gestartet.
+            // If a task is assigned or rejected AND the timer has expired (or never started),
+            // launch the LockScreen Activity.
             val lockIntent = Intent(this, LockScreen::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 putExtra("lock_reason", "task_lock")
             }
             startActivity(lockIntent)
-            return // Task-Sperre hat Vorrang
+            return // Task lock takes precedence
         }
 
-        // 2. Normale Sperrlogik (z.B. Zeitlimits)
+        // 2. Standard blocking logic (Blacklist / Time Limits)
         if (blockedApps.contains(packageName)) {
             blockApplication(packageName)
         }
@@ -228,21 +234,21 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Überprüft, ob die Task-basierte Sperre aktiv sein muss.
+     * Checks if the task-based lock should be active.
+     * @return True if the device should be locked due to a task.
      */
     private fun isTaskLockActive(): Boolean {
-        // Die Sperre ist NICHT aktiv, wenn der Status APPROVED ist UND die Freischaltzeit noch nicht abgelaufen ist.
+        // Lock is NOT active if status is APPROVED AND unlock time hasn't expired.
         if (currentTaskStatus == TaskStatus.APPROVED && System.currentTimeMillis() < unlockEndTime) {
             return false
         }
 
-        // Die Sperre ist aktiv, wenn eine Aufgabe zugewiesen, eingereicht oder abgelehnt wurde.
+        // Lock is active if a task is ASSIGNED, REJECTED, or SUBMITTED.
         if (currentTaskStatus == TaskStatus.ASSIGNED || currentTaskStatus == TaskStatus.REJECTED || currentTaskStatus == TaskStatus.SUBMITTED) {
             return true
         }
 
-        // In allen anderen Fällen (z.B. keine Aufgabe oder genehmigte Aufgabe nach Ablauf der Zeit) ist die Task-Sperre nicht aktiv.
-        // Die normale Sperrlogik (Zeitlimits) greift dann.
+        // In all other cases (e.g. no task or APPROVED + time expired), task lock is not active.
         return false
     }
 
@@ -378,17 +384,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         }
         lastUsageCheckTime = now
     }
-    override fun onDestroy() {
-        super.onDestroy()
-        // Save final stats on destroy
-        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
-            .edit()
-            .putLong("current_day_usage", currentDayUsageMillis)
-            .apply()
-        stopAppMonitoring()
-        serviceScope.cancel()
-        Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
-    }
+
     private fun checkUsageLimits() {
         if (dailyLimitMillis != -1L && currentDayUsageMillis > dailyLimitMillis) {
             Log.i(TAG, "Daily limit exceeded: $currentDayUsageMillis > $dailyLimitMillis")

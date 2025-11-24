@@ -243,12 +243,6 @@ function toggleDeviceLock(childImei, isLocked) {
  * Opens the task creation modal and pre-fills the child ID.
  * @param {string} childId - The ID of the child device for which to create the task.
  */
-// --- Task Management Functions ---
-
-/**
- * Opens the modal for assigning a new task to a specific child.
- * @param {string} childId - The ID of the child to assign the task to.
- */
 function openTaskModal(childId) {
     document.getElementById('task-child-id').value = childId;
     document.getElementById('task-title').value = '';
@@ -467,11 +461,6 @@ function renderTasksToReview(tasks) {
     tasksListElement.innerHTML = tasksHtml;
 }
 
-/**
- * Calls the 'approveTask' Firebase Cloud Function to mark a task as approved.
- * @param {string} childImei - The unique identifier of the child device.
- * @param {string} taskId - The ID of the task to approve.
- */
 /**
  * Calls the 'reviewTask' Firebase Cloud Function to approve or reject a task.
  * @param {string} taskId - The ID of the task to review.
