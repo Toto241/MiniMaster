@@ -33,7 +33,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['description', 'status', 'photoUrl', 'createdAt', 'updatedAt', 'deadline', 'completedAt'])
         && request.resource.data.description is string
         && request.resource.data.description.size() < 200
+        && request.resource.data.unlockDuration is number
         && request.resource.data.status is string
+        && request.resource.data.status in ['ASSIGNED', 'SUBMITTED', 'APPROVED', 'REJECTED']
         && (request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
         && request.resource.data.deadline is timestamp;
 
