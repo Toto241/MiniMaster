@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -82,6 +83,11 @@
                                 <button type="submit" class="btn btn-primary">Save Rules</button>
                             </div>
                         </form>
+
+                        <div class="chart-container" style="margin-top: 20px;">
+                             <h4>Usage History (Last 7 Days)</h4>
+                             <canvas id="usageChart"></canvas>
+                        </div>
                     </div>
                 </div>
 

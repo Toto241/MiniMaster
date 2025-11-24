@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -51,6 +52,10 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var lastUsageCheckTime: Long = 0L
     private var currentDayStart: Long = 0L
     private var lastStorageWriteTime: Long = 0L
+    private var lastBackendReportTime: Long = 0L
+
+    // Injected in a real app, but for PoC we instantiate lazily or get from entry point
+    private val functions by lazy { FirebaseFunctions.getInstance() }
 
     /**
      * A [Runnable] that periodically checks the foreground app and for rule updates.
@@ -314,6 +319,11 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                         .putLong("current_day_usage", currentDayUsageMillis)
                         .apply()
                     lastStorageWriteTime = now
+
+                    // Report to backend occasionally (e.g., every 5 minutes to avoid spamming)
+                    if (now - lastBackendReportTime > 300000) {
+                        reportUsageToBackend()
+                    }
                 }
             }
         }
@@ -327,9 +337,38 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             .edit()
             .putLong("current_day_usage", currentDayUsageMillis)
             .apply()
+
+        // Attempt final report
+        reportUsageToBackend()
+
         stopAppMonitoring()
         serviceScope.cancel()
         Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
+    }
+
+    private fun reportUsageToBackend() {
+        val childId = getSharedPreferences("child_prefs", Context.MODE_PRIVATE).getString("child_id", null)
+        if (childId == null) return
+
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val today = sdf.format(Date())
+
+        val data = hashMapOf(
+            "childId" to childId,
+            "date" to today,
+            "usageMillis" to currentDayUsageMillis
+        )
+
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                // Using call() without waiting for result to be fire-and-forget in this context
+                functions.getHttpsCallable("reportDailyUsage").call(data)
+                lastBackendReportTime = System.currentTimeMillis()
+                Log.d(TAG, "Usage reported to backend: $currentDayUsageMillis")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to report usage", e)
+            }
+        }
     }
 
     private fun checkUsageLimits() {
