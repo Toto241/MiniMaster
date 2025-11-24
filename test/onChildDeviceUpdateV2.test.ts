@@ -79,8 +79,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -103,8 +103,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -127,8 +127,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -143,8 +143,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -158,8 +158,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => null },
+        before: oldData,
+        after: null,
       },
       params: { childId: "child123" },
     });
@@ -167,18 +167,22 @@ describe("onChildDeviceUpdateV2", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  // Note: onDocumentUpdated typically doesn't fire on initial document creation
+  // (that's what onDocumentCreated is for). However, we test the edge case where
+  // oldData might be empty/undefined due to race conditions or manual triggers.
   it("should not send FCM message if oldData is missing (document created)", async () => {
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
 
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => null },
-        after: { data: () => newData },
+        before: {},  // Empty document (simulates creation-like scenario)
+        after: newData,
       },
       params: { childId: "child123" },
     });
 
+    // Function correctly detects document creation (empty oldData) and skips notification
     expect(mockSend).not.toHaveBeenCalled();
   });
 
