@@ -80,6 +80,8 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var currentDayUsageMillis: Long = 0L
     private var lastUsageCheckTime: Long = 0L
     private var currentDayStart: Long = 0L
+    private var lastStorageWriteTime: Long = 0L
+
 
     /**
      * A [Runnable] that periodically checks the foreground app and for rule updates.
@@ -364,17 +366,29 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             val delta = now - lastUsageCheckTime
             if (delta > 0 && delta < 5000) { // Sanity check for large jumps
                 currentDayUsageMillis += delta
-
-                // Persist occasionally or on destroy, doing it here every second is expensive but safe for PoC
-                getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
-                    .edit()
-                    .putLong("current_day_usage", currentDayUsageMillis)
-                    .apply()
+                // Persist occasionally (every 30 seconds) to save battery/IO
+                if (now - lastStorageWriteTime > 30000) {
+                    getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+                        .edit()
+                        .putLong("current_day_usage", currentDayUsageMillis)
+                        .apply()
+                    lastStorageWriteTime = now
+                }
             }
         }
         lastUsageCheckTime = now
     }
-
+    override fun onDestroy() {
+        super.onDestroy()
+        // Save final stats on destroy
+        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("current_day_usage", currentDayUsageMillis)
+            .apply()
+        stopAppMonitoring()
+        serviceScope.cancel()
+        Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
+    }
     private fun checkUsageLimits() {
         if (dailyLimitMillis != -1L && currentDayUsageMillis > dailyLimitMillis) {
             Log.i(TAG, "Daily limit exceeded: $currentDayUsageMillis > $dailyLimitMillis")
