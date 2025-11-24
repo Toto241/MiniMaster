@@ -202,6 +202,9 @@ function renderDevices(devices) {
                     <button class="btn btn-primary" onclick="openTaskModal('${device.id}')">
                         Create Task
                     </button>
+                    <button class="btn btn-secondary" onclick='openRulesModal(${JSON.stringify(device)})'>
+                        Configure Rules
+                    </button>
                 </div>
             </div>
         `;
@@ -293,6 +296,87 @@ function assignTask(event) {
         console.error('Error assigning task:', error);
         showNotification('Error assigning task: ' + error.message, 'error');
     });
+}
+
+// --- Rules Management Functions ---
+
+/**
+ * Opens the rules configuration modal and populates it with current device settings.
+ * @param {object} device - The device object containing current rules.
+ */
+function openRulesModal(device) {
+    document.getElementById('rules-child-id').value = device.id;
+
+    // Populate blocked apps
+    const blockedApps = device.appBlacklist || [];
+    document.getElementById('blocked-apps').value = blockedApps.join(', ');
+
+    // Populate daily limit
+    let dailyLimit = -1;
+    if (device.usageRules && device.usageRules.dailyLimitSeconds) {
+        dailyLimit = Math.floor(device.usageRules.dailyLimitSeconds / 60);
+    }
+    document.getElementById('daily-limit').value = dailyLimit;
+
+    document.getElementById('rules-modal').style.display = 'flex';
+}
+
+/**
+ * Closes the rules configuration modal.
+ */
+function closeRulesModal() {
+    document.getElementById('rules-modal').style.display = 'none';
+}
+
+/**
+ * Handles the submission of the rules form. It calls the relevant Cloud Functions.
+ * @param {Event} event - The form submission event.
+ */
+function saveRules(event) {
+    event.preventDefault();
+
+    const childImei = document.getElementById('rules-child-id').value;
+    const dailyLimitMinutes = parseInt(document.getElementById('daily-limit').value);
+    const blockedAppsStr = document.getElementById('blocked-apps').value;
+
+    const blockedApps = blockedAppsStr.split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    const usageRules = {};
+    if (dailyLimitMinutes >= 0) {
+        usageRules.dailyLimitSeconds = dailyLimitMinutes * 60;
+    }
+
+    const promises = [];
+
+    // Update Usage Rules
+    const setUsageRules = functions.httpsCallable('setUsageRules');
+    promises.push(setUsageRules({
+        masterImei: currentMasterImei,
+        secretKey: currentSecretKey,
+        childImei: childImei,
+        usageRules: usageRules
+    }));
+
+    // Update App Blacklist
+    const updateAppBlacklist = functions.httpsCallable('updateAppBlacklist');
+    promises.push(updateAppBlacklist({
+        masterImei: currentMasterImei,
+        secretKey: currentSecretKey,
+        childImei: childImei,
+        appBlacklist: blockedApps
+    }));
+
+    Promise.all(promises)
+        .then(() => {
+            showNotification('Rules updated successfully!', 'success');
+            closeRulesModal();
+        })
+        .catch(error => {
+            console.error('Error updating rules:', error);
+            showNotification('Error updating rules: ' + error.message, 'error');
+        });
 }
 
 /**
