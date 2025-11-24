@@ -259,6 +259,20 @@ export const generatePairingLink = functions.https.onCall(
       );
     }
 
+    // Subscription Check: Limit non-premium users to 1 child
+    const masterData = doc.data();
+    const isPremium = masterData?.subscription?.status === "active";
+
+    if (!isPremium) {
+      const childrenQuery = await db().collection("children").where("masterImei", "==", imei).get();
+      if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Free tier limited to 1 child device. Please upgrade to Premium."
+        );
+      }
+    }
+
     const pairingToken = uuidv4();
     const now = admin.firestore.Timestamp.now();
     const expiresAtSeconds = now.seconds + 5 * 60; // Token expires in 5 minutes
@@ -556,6 +570,59 @@ export const registerFcmToken = functions.https.onCall(
         }
         functions.logger.error(`Failed to register FCM token for child ${childImei}:`, error);
         throw new functions.https.HttpsError("internal", "Failed to register FCM token.", error);
+    }
+  }
+);
+
+/**
+ * Retrieves the current rules (lock state, app blacklist, usage rules) for a child device.
+ * This is called by the child device to synchronize its local state.
+ *
+ * @param {{childId: string}} data - The data passed to the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{isLocked: boolean, appBlacklist: string[], usageRules: object}>} A promise that resolves with the rules.
+ * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the device is not found.
+ */
+export const getRulesForChild = functions.https.onCall(
+  async (data: { childId: string }, _context: CallableContext) => {
+    const { childId } = data;
+
+    if (!childId || typeof childId !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'childId'."
+      );
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+
+    try {
+      const doc = await childDeviceRef.get();
+      if (!doc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Child device not found."
+        );
+      }
+
+      const data = doc.data();
+      return {
+        isLocked: data?.isLocked || false,
+        appBlacklist: data?.appBlacklist || [],
+        usageRules: data?.usageRules || {},
+      };
+
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      functions.logger.error(`Failed to get rules for child ${childId}:`, error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while retrieving rules.",
+        error
+      );
     }
   }
 );
