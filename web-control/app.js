@@ -17,6 +17,7 @@ let app, db, functions;
 let currentMasterImei = null;
 let currentSecretKey = null;
 let devicesListener = null; // Firestore listener for real-time updates
+let usageChartInstance = null;
 
 /**
  * Initializes the Firebase app, services, and attempts to restore the user's
@@ -318,6 +319,8 @@ function openRulesModal(device) {
     document.getElementById('daily-limit').value = dailyLimit;
 
     document.getElementById('rules-modal').style.display = 'flex';
+
+    loadUsageHistory(device.id);
 }
 
 /**
@@ -325,6 +328,61 @@ function openRulesModal(device) {
  */
 function closeRulesModal() {
     document.getElementById('rules-modal').style.display = 'none';
+    if (usageChartInstance) {
+        usageChartInstance.destroy();
+        usageChartInstance = null;
+    }
+}
+
+/**
+ * Loads usage history from Firestore and renders a chart.
+ * @param {string} childId
+ */
+function loadUsageHistory(childId) {
+    const ctx = document.getElementById('usageChart').getContext('2d');
+
+    // Calculate last 7 days dates
+    const dates = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().slice(0, 10)); // YYYY-MM-DD
+    }
+
+    // Prepare chart skeleton
+    if (usageChartInstance) usageChartInstance.destroy();
+    usageChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Screen Time (Minutes)',
+                data: Array(7).fill(0),
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // Fetch data for each date
+    dates.forEach((date, index) => {
+        db.collection('children').doc(childId).collection('usageHistory').doc(date).get()
+            .then(doc => {
+                if (doc.exists) {
+                    const millis = doc.data().totalUsageMillis || 0;
+                    const minutes = Math.round(millis / 60000);
+                    usageChartInstance.data.datasets[0].data[index] = minutes;
+                    usageChartInstance.update();
+                }
+            })
+            .catch(console.error);
+    });
 }
 
 /**
