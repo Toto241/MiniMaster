@@ -167,22 +167,23 @@ describe("onChildDeviceUpdateV2", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  // Note: onDocumentUpdated typically doesn't fire on initial document creation
-  // (that's what onDocumentCreated is for). However, we test the edge case where
-  // oldData might be empty/undefined due to race conditions or manual triggers.
+  // Tests the function's explicit handling of missing oldData (lines 634-637 in index.ts).
+  // When oldData is falsy/empty, the function correctly returns early with no notification,
+  // which is the intended behavior for document creation scenarios (though onDocumentUpdated
+  // typically doesn't fire on initial creation - that's what onDocumentCreated is for).
   it("should not send FCM message if oldData is missing (document created)", async () => {
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
 
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: {},  // Empty document (simulates creation-like scenario)
+        before: {},  // Empty document - wrapV2 converts this to trigger the !oldData check
         after: newData,
       },
       params: { childId: "child123" },
     });
 
-    // Function correctly detects document creation (empty oldData) and skips notification
+    // Function explicitly checks `if (!oldData)` and returns early (line 634 in index.ts)
     expect(mockSend).not.toHaveBeenCalled();
   });
 
