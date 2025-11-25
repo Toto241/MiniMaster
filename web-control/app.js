@@ -17,6 +17,7 @@ let app, db, functions;
 let currentMasterImei = null;
 let currentSecretKey = null;
 let devicesListener = null; // Firestore listener for real-time updates
+let usageChartInstance = null;
 
 /**
  * Initializes the Firebase app, services, and attempts to restore the user's
@@ -243,12 +244,6 @@ function toggleDeviceLock(childImei, isLocked) {
  * Opens the task creation modal and pre-fills the child ID.
  * @param {string} childId - The ID of the child device for which to create the task.
  */
-// --- Task Management Functions ---
-
-/**
- * Opens the modal for assigning a new task to a specific child.
- * @param {string} childId - The ID of the child to assign the task to.
- */
 function openTaskModal(childId) {
     document.getElementById('task-child-id').value = childId;
     document.getElementById('task-title').value = '';
@@ -326,6 +321,144 @@ function openRulesModal(device) {
  */
 function closeRulesModal() {
     document.getElementById('rules-modal').style.display = 'none';
+}
+
+/**
+ * Handles the submission of the rules form. It calls the relevant Cloud Functions.
+ * @param {Event} event - The form submission event.
+ */
+function saveRules(event) {
+    event.preventDefault();
+
+    const childImei = document.getElementById('rules-child-id').value;
+    const dailyLimitMinutes = parseInt(document.getElementById('daily-limit').value);
+    const blockedAppsStr = document.getElementById('blocked-apps').value;
+
+    const blockedApps = blockedAppsStr.split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    const usageRules = {};
+    if (dailyLimitMinutes >= 0) {
+        usageRules.dailyLimitSeconds = dailyLimitMinutes * 60;
+    }
+
+    const promises = [];
+
+    // Update Usage Rules
+    const setUsageRules = functions.httpsCallable('setUsageRules');
+    promises.push(setUsageRules({
+        masterImei: currentMasterImei,
+        secretKey: currentSecretKey,
+        childImei: childImei,
+        usageRules: usageRules
+    }));
+
+    // Update App Blacklist
+    const updateAppBlacklist = functions.httpsCallable('updateAppBlacklist');
+    promises.push(updateAppBlacklist({
+        masterImei: currentMasterImei,
+        secretKey: currentSecretKey,
+        childImei: childImei,
+        appBlacklist: blockedApps
+    }));
+
+    Promise.all(promises)
+        .then(() => {
+            showNotification('Rules updated successfully!', 'success');
+            closeRulesModal();
+        })
+        .catch(error => {
+            console.error('Error updating rules:', error);
+            showNotification('Error updating rules: ' + error.message, 'error');
+        });
+}
+
+// --- Rules Management Functions ---
+
+/**
+ * Opens the rules configuration modal and populates it with current device settings.
+ * @param {object} device - The device object containing current rules.
+ */
+function openRulesModal(device) {
+    document.getElementById('rules-child-id').value = device.id;
+
+    // Populate blocked apps
+    const blockedApps = device.appBlacklist || [];
+    document.getElementById('blocked-apps').value = blockedApps.join(', ');
+
+    // Populate daily limit
+    let dailyLimit = -1;
+    if (device.usageRules && device.usageRules.dailyLimitSeconds) {
+        dailyLimit = Math.floor(device.usageRules.dailyLimitSeconds / 60);
+    }
+    document.getElementById('daily-limit').value = dailyLimit;
+
+    document.getElementById('rules-modal').style.display = 'flex';
+
+    loadUsageHistory(device.id);
+}
+
+/**
+ * Closes the rules configuration modal.
+ */
+function closeRulesModal() {
+    document.getElementById('rules-modal').style.display = 'none';
+    if (usageChartInstance) {
+        usageChartInstance.destroy();
+        usageChartInstance = null;
+    }
+}
+
+/**
+ * Loads usage history from Firestore and renders a chart.
+ * @param {string} childId
+ */
+function loadUsageHistory(childId) {
+    const ctx = document.getElementById('usageChart').getContext('2d');
+
+    // Calculate last 7 days dates
+    const dates = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().slice(0, 10)); // YYYY-MM-DD
+    }
+
+    // Prepare chart skeleton
+    if (usageChartInstance) usageChartInstance.destroy();
+    usageChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Screen Time (Minutes)',
+                data: Array(7).fill(0),
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // Fetch data for each date
+    dates.forEach((date, index) => {
+        db.collection('children').doc(childId).collection('usageHistory').doc(date).get()
+            .then(doc => {
+                if (doc.exists) {
+                    const millis = doc.data().totalUsageMillis || 0;
+                    const minutes = Math.round(millis / 60000);
+                    usageChartInstance.data.datasets[0].data[index] = minutes;
+                    usageChartInstance.update();
+                }
+            })
+            .catch(console.error);
+    });
 }
 
 /**
@@ -467,11 +600,6 @@ function renderTasksToReview(tasks) {
     tasksListElement.innerHTML = tasksHtml;
 }
 
-/**
- * Calls the 'approveTask' Firebase Cloud Function to mark a task as approved.
- * @param {string} childImei - The unique identifier of the child device.
- * @param {string} taskId - The ID of the task to approve.
- */
 /**
  * Calls the 'reviewTask' Firebase Cloud Function to approve or reject a task.
  * @param {string} taskId - The ID of the task to review.
