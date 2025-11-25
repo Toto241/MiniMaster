@@ -2,23 +2,27 @@ package com.google.pairing.child
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
 import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
+import com.google.pairing.LockScreen
+import com.google.pairing.MainActivity
+import com.google.pairing.R
+import com.google.pairing.AppLogger
+import com.google.pairing.TaskStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Calendar
 
 /**
  * An [AccessibilityService] for monitoring foreground applications and implementing app blocking.
@@ -33,6 +37,33 @@ import java.util.*
  */
 class MiniMasterAccessibilityService : AccessibilityService() {
 
+    private var currentTaskStatus: TaskStatus = TaskStatus.ASSIGNED
+    private var unlockEndTime: Long = 0 // System.currentTimeMillis() + unlockDuration in ms
+
+    /**
+     * BroadcastReceiver to receive task status updates from TaskMonitoringService.
+     * This allows the service to know if the device should be locked due to a pending task.
+     */
+    private val taskStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.google.pairing.TASK_STATUS_UPDATE") {
+                val statusString = intent.getStringExtra("task_status")
+                val unlockDuration = intent.getLongExtra("unlock_duration", 0)
+
+                currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.ASSIGNED.value)
+
+                if (currentTaskStatus == TaskStatus.APPROVED && unlockDuration > 0) {
+                    // Start the timer for unlocking
+                    unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // minutes to milliseconds
+                    Log.d(TAG, "Task approved. Unlocking for $unlockDuration minutes. End time: $unlockEndTime")
+                } else if (currentTaskStatus != TaskStatus.APPROVED) {
+                    // Reset the timer if status is not APPROVED
+                    unlockEndTime = 0
+                }
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "MiniMasterAccessService"
         private const val CHECK_INTERVAL = 1000L // 1 second
@@ -44,8 +75,6 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var isServiceInitialized = false
     private val blockedApps = mutableSetOf<String>()
     private var lastRulesUpdateTimestamp = 0L
-
-    // Usage tracking
     private var usageRules: org.json.JSONObject? = null
     private var dailyLimitMillis: Long = -1L
     private var currentDayUsageMillis: Long = 0L
@@ -56,7 +85,6 @@ class MiniMasterAccessibilityService : AccessibilityService() {
 
     // Injected in a real app, but for PoC we instantiate lazily or get from entry point
     private val functions by lazy { FirebaseFunctions.getInstance() }
-
     /**
      * A [Runnable] that periodically checks the foreground app and for rule updates.
      */
@@ -73,6 +101,9 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        // Register the receiver
+        val filter = IntentFilter("com.google.pairing.TASK_STATUS_UPDATE")
+        registerReceiver(taskStatusReceiver, filter)
     }
 
     /**
@@ -112,6 +143,12 @@ class MiniMasterAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(taskStatusReceiver)
+        // Save final stats on destroy
+        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("current_day_usage", currentDayUsageMillis)
+            .apply()
         stopAppMonitoring()
         serviceScope.cancel()
         Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
@@ -175,6 +212,20 @@ class MiniMasterAccessibilityService : AccessibilityService() {
      */
     private fun onForegroundAppChanged(packageName: String) {
         Log.d(TAG, "Foreground app changed to: $packageName")
+
+        // 1. Task-based blocking logic (Highest Priority)
+        if (isTaskLockActive()) {
+            // If a task is assigned or rejected AND the timer has expired (or never started),
+            // launch the LockScreen Activity.
+            val lockIntent = Intent(this, LockScreen::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                putExtra("lock_reason", "task_lock")
+            }
+            startActivity(lockIntent)
+            return // Task lock takes precedence
+        }
+
+        // 2. Standard blocking logic (Blacklist / Time Limits)
         if (blockedApps.contains(packageName)) {
             blockApplication(packageName)
         }
@@ -311,7 +362,6 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             val delta = now - lastUsageCheckTime
             if (delta > 0 && delta < 5000) { // Sanity check for large jumps
                 currentDayUsageMillis += delta
-
                 // Persist occasionally (every 30 seconds) to save battery/IO
                 if (now - lastStorageWriteTime > 30000) {
                     getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
@@ -319,7 +369,6 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                         .putLong("current_day_usage", currentDayUsageMillis)
                         .apply()
                     lastStorageWriteTime = now
-
                     // Report to backend occasionally (e.g., every 5 minutes to avoid spamming)
                     if (now - lastBackendReportTime > 300000) {
                         reportUsageToBackend()
@@ -329,7 +378,6 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         }
         lastUsageCheckTime = now
     }
-
     override fun onDestroy() {
         super.onDestroy()
         // Save final stats on destroy
@@ -383,3 +431,4 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         }
     }
 }
+

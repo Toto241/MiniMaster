@@ -67,7 +67,7 @@ fun TasksScreen(
  * A Composable that displays a single task item in a [Card].
  *
  * It shows the task description and its current status, formatted and color-coded.
- * A "Complete" button is shown only if the task status is "pending".
+ * A "Complete" button is shown only if the task status is "ASSIGNED" (pending).
  *
  * @param task The [Task] object to display.
  * @param onCompleteClick A callback function to be invoked when the "Complete" button is clicked.
@@ -83,19 +83,25 @@ fun TaskItem(task: Task, onCompleteClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = task.description, style = MaterialTheme.typography.body1)
                 Spacer(modifier = Modifier.height(4.dp))
+
+                // Format status for display
+                val displayStatus = task.status.replace('_', ' ')
+                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+
                 Text(
-                    text = "Status: ${task.status.replace('_', ' ').replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}",
+                    text = "Status: $displayStatus",
                     style = MaterialTheme.typography.caption,
                     color = when (task.status) {
-                        "pending" -> Color.Red
-                        "pending_approval" -> Color(0xFFFFA500) // Orange
-                        "approved" -> Color.Green
+                        "ASSIGNED" -> Color.Red
+                        "SUBMITTED" -> Color(0xFFFFA500) // Orange
+                        "APPROVED" -> Color.Green
                         else -> Color.Gray
                     },
                     fontWeight = FontWeight.Bold
                 )
             }
-            if (task.status == "pending") {
+            // Show complete button only if status is ASSIGNED (or pending logic)
+            if (task.status == "ASSIGNED") {
                 Button(onClick = onCompleteClick) {
                     Text("Complete")
                 }

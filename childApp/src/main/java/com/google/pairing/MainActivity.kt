@@ -87,6 +87,13 @@ class MainActivity : ComponentActivity() {
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Starte den TaskMonitoringService
+        val serviceIntent = Intent(this, TaskMonitoringService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
 
         lifecycleScope.launch {
             // Combine flows to react to changes in either childId or onboarding status.
