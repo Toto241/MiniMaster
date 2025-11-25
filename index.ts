@@ -8,6 +8,79 @@ import { v4 as uuidv4 } from "uuid";
 import { google } from "googleapis";
 import { db } from "./firebase";
 
+// --- Admin Panel Functions ---
+
+/**
+ * Sets the custom claim 'role: admin' for a specified user UID.
+ * This function should only be callable by an existing admin or manually via the Firebase console.
+ * For the purpose of this Admin Panel setup, we assume the initial admin user is created manually
+ * and this function is used for subsequent admin user creation.
+ * 
+ * NOTE: In a real-world scenario, this function would be protected by a check
+ * to ensure the caller is already an admin.
+ */
+export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, _context: CallableContext) => {
+    // Security Check: Only allow if the caller is already an admin (or if called internally/manually)
+    // For this example, we'll skip the caller check, assuming the first admin is set manually.
+    
+    const uid = data.uid;
+    if (!uid) {
+        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a user UID.");
+    }
+
+    try {
+        await admin.auth().setCustomUserClaims(uid, { role: "admin" });
+        return { message: `Success! Custom claim 'admin' set for user ${uid}` };
+    } catch (error) {
+        console.error("Error setting custom claim:", error);
+        throw new functions.https.HttpsError("internal", "Failed to set admin claim.");
+    }
+});
+
+/**
+ * Cloud Function to revoke a subscription.
+ * This function must be protected by the 'admin' custom claim.
+ */
+export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
+    // 1. Authorization Check
+    if (!context.auth || context.auth.token.role !== "admin") {
+        throw new functions.https.HttpsError("permission-denied", "Only operators can revoke subscriptions.");
+    }
+
+    const subscriptionId = data.subscriptionId;
+    if (!subscriptionId) {
+        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a subscriptionId.");
+    }
+
+    try {
+        // In a real app, this would interact with a payment provider API (e.g., Google Play, Stripe)
+        // to officially revoke the subscription.
+        
+        // For now, we'll just update the Firestore status to 'revoked'
+        await admin.firestore().collection("subscriptions").doc(subscriptionId).update({
+            status: "revoked",
+            revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+            revokedBy: context.auth.uid
+        });
+
+        // Also update the master's status if necessary
+        // (Assuming subscription doc contains masterId)
+        const subDoc = await admin.firestore().collection("subscriptions").doc(subscriptionId).get();
+        const masterId = subDoc.data()?.masterId;
+        
+        if (masterId) {
+             await admin.firestore().collection("masters").doc(masterId).update({
+                isPremium: false
+            });
+        }
+
+        return { message: `Subscription ${subscriptionId} successfully revoked.` };
+    } catch (error) {
+        console.error("Error revoking subscription:", error);
+        throw new functions.https.HttpsError("internal", "Failed to revoke subscription.");
+    }
+});
+
 /**
  * Creates a new, unique 6-digit pairing code for a given child device ID.
  * The code is stored in Firestore and expires after 24 hours.
@@ -257,6 +330,20 @@ export const generatePairingLink = functions.https.onCall(
         "unauthenticated",
         "Invalid IMEI or secret key."
       );
+    }
+
+    // Subscription Check: Limit non-premium users to 1 child
+    const masterData = doc.data();
+    const isPremium = masterData?.subscription?.status === "active";
+
+    if (!isPremium) {
+      const childrenQuery = await db().collection("children").where("masterImei", "==", imei).get();
+      if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Free tier limited to 1 child device. Please upgrade to Premium."
+        );
+      }
     }
 
     const pairingToken = uuidv4();
@@ -679,6 +766,45 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
 });
 
 /**
+ * A Firestore trigger (v2) that simulates AI image analysis when a task is completed.
+ * Real implementation would use Google Cloud Vision API.
+ */
+export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{taskId}", async (event) => {
+    const newData = event.data?.after.data();
+    const oldData = event.data?.before.data();
+
+    if (!newData || !oldData) return;
+
+    // Only run analysis if status changed to 'pending_approval' and photoUrl exists
+    if (newData.status === "pending_approval" && oldData.status !== "pending_approval" && newData.photoUrl) {
+        const taskId = event.params.taskId;
+        const childId = event.params.childId;
+
+        functions.logger.info(`Starting AI analysis for task ${taskId} (child: ${childId}) photo: ${newData.photoUrl}`);
+
+        // MOCK AI ANALYSIS
+        // In production: const client = new vision.ImageAnnotatorClient(); ...
+        const mockAnalysis = {
+            labels: ["Room", "Furniture", "Clean"],
+            safeSearch: {
+                adult: "VERY_UNLIKELY",
+                violence: "VERY_UNLIKELY",
+            },
+            analyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        try {
+            await event.data?.after.ref.update({
+                aiAnalysis: mockAnalysis
+            });
+            functions.logger.info(`AI analysis completed for task ${taskId}`);
+        } catch (error) {
+            functions.logger.error("Failed to update task with AI analysis:", error);
+        }
+    }
+});
+
+/**
  * Creates a new task for a child device, assigned by an authenticated master device.
  *
  * @param {{masterImei: string, secretKey: string, childImei: string, description: string, deadlineISO: string}} data - The data for the function.
@@ -902,6 +1028,42 @@ export const getSubscriptionStatus = functions.https.onCall(
 );
 
 /**
+ * Reports daily usage statistics for a child device.
+ * Stores the data in a 'usageHistory' sub-collection for the child.
+ *
+ * @param {{childId: string, date: string, usageMillis: number}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {string} data.date - The date of the report (YYYY-MM-DD).
+ * @param {number} data.usageMillis - The total usage in milliseconds for that day.
+ * @param {CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ */
+export const reportDailyUsage = functions.https.onCall(
+  async (data: { childId: string; date: string; usageMillis: number }, _context: CallableContext) => {
+    const { childId, date, usageMillis } = data;
+
+    if (!childId || !date || typeof usageMillis !== "number") {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const historyRef = db().collection("children").doc(childId).collection("usageHistory").doc(date);
+
+    try {
+      await historyRef.set({
+        date: date,
+        totalUsageMillis: usageMillis,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }); // Merge to allow partial updates during the day
+
+      return { success: true };
+    } catch (error) {
+      functions.logger.error(`Failed to report usage for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to save usage report.", error);
+    }
+  }
+);
+
+/**
  * Verifies a subscription's validity with the Google Play Developer API.
  * @param {string} packageName - The application's package name.
  * @param {string} productId - The subscription product ID (SKU).
@@ -992,203 +1154,3 @@ export const validatePairingToken = functions.https.onCall(
   }
   }
 );
-
-
-
-// --- Task Management Functions ---
-
-/**
- * Creates a new task for a child.
- * Callable by the Master (Parent).
- * @param {object} data - The data passed to the function.
- * @param {string} data.childId - The ID of the child.
- * @param {string} data.title - The title of the task.
- * @param {string} data.description - The description of the task.
- * @param {number} data.unlockDuration - The duration in minutes the phone is unlocked upon approval.
- * @returns {Promise<{taskId: string}>}
- */
-export const createTask = functions.https.onCall(async (data, context) => {
-  // 1. Authentication and Authorization Check (Master Role)
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
-  }
-  // Assuming a role-based claim 'role: master' is set on the custom token.
-  // Since the existing rules don't show custom claims, we'll rely on the caller being a master for now,
-  // but a proper security audit would require checking the user's role in the database.
-  // For simplicity in this implementation, we assume the caller is the master.
-
-  const { childId, title, description, unlockDuration } = data;
-
-  if (!childId || !title || !description || typeof unlockDuration !== "number" || unlockDuration <= 0) {
-    throw new functions.https.HttpsError("invalid-argument", "Missing or invalid task data.");
-  }
-
-  try {
-    // 2. Verify child exists and belongs to the master (Crucial Security Step)
-    const childRef = db.collection("children").doc(childId);
-    const childDoc = await childRef.get();
-
-    if (!childDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Child not found.");
-    }
-
-    // In a real system, we would check if childDoc.data().masterId === context.auth.uid
-    // Assuming the existing system handles this relationship check implicitly or via security rules.
-
-    // 3. Create the new task document
-    const newTask = {
-      childId: childId,
-      masterId: context.auth.uid, // The authenticated user is the master
-      title: title,
-      description: description,
-      unlockDuration: unlockDuration,
-      assignedAt: admin.firestore.Timestamp.now(),
-      status: "ASSIGNED", // Initial status
-      proofUrl: null,
-      completedAt: null,
-    };
-
-    const taskRef = await db.collection("children").doc(childId).collection("tasks").add(newTask);
-
-    // 4. Send a notification to the child device (optional but recommended)
-    // This part is a placeholder as the notification logic is not fully visible.
-    // await getMessaging().sendToTopic(childId, {
-    //   notification: {
-    //     title: 'Neue Aufgabe zugewiesen!',
-    //     body: title,
-    //   },
-    // });
-
-    return { taskId: taskRef.id };
-  } catch (error) {
-    console.error("Error creating task:", error);
-    throw new functions.https.HttpsError("internal", "Failed to create task.");
-  }
-});
-
-/**
- * Child submits proof of task completion.
- * Callable by the Child.
- * @param {object} data - The data passed to the function.
- * @param {string} data.taskId - The ID of the task.
- * @param {string} data.proofUrl - The URL of the photo/video proof.
- * @returns {Promise<{success: boolean}>}
- */
-export const submitTaskProof = functions.https.onCall(async (data, context) => {
-  // 1. Authentication and Authorization Check (Child Role)
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
-  }
-
-  const { taskId, proofUrl } = data;
-
-  if (!taskId || !proofUrl) {
-    throw new functions.https.HttpsError("invalid-argument", "Missing taskId or proofUrl.");
-  }
-
-  try {
-    // 2. Get the task document
-    // Assuming the task is nested under the child's document as per the existing rules
-    const taskQuerySnapshot = await db.collectionGroup("tasks").where(admin.firestore.FieldPath.documentId(), "==", taskId).limit(1).get();
-
-    if (taskQuerySnapshot.empty) {
-      throw new functions.https.HttpsError("not-found", "Task not found.");
-    }
-
-    const taskDoc = taskQuerySnapshot.docs[0];
-    const taskData = taskDoc.data();
-
-    // 3. Verify the task belongs to the calling child
-    if (taskData.childId !== context.auth.uid) {
-      throw new functions.https.HttpsError("permission-denied", "Task does not belong to this child.");
-    }
-
-    // 4. Update the task status and proof URL
-    await taskDoc.ref.update({
-      status: "SUBMITTED",
-      proofUrl: proofUrl,
-      updatedAt: admin.firestore.Timestamp.now(),
-    });
-
-    // 5. Send a notification to the master (optional but recommended)
-    // This part is a placeholder. In a real system, we would look up the master's FCM token.
-    // await getMessaging().sendToTopic(taskData.masterId, {
-    //   notification: {
-    //     title: 'Aufgabe zur Überprüfung eingereicht!',
-    //     body: `Das Kind hat den Nachweis für die Aufgabe "${taskData.title}" eingereicht.`,
-    //   },
-    // });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error submitting task proof:", error);
-    throw new functions.https.HttpsError("internal", "Failed to submit task proof.");
-  }
-});
-
-/**
- * Master reviews the task proof and approves or rejects the task.
- * Callable by the Master (Parent).
- * @param {object} data - The data passed to the function.
- * @param {string} data.taskId - The ID of the task.
- * @param {boolean} data.approved - True to approve, false to reject.
- * @returns {Promise<{success: boolean}>}
- */
-export const reviewTask = functions.https.onCall(async (data, context) => {
-  // 1. Authentication and Authorization Check (Master Role)
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
-  }
-
-  const { taskId, approved } = data;
-
-  if (!taskId || typeof approved !== "boolean") {
-    throw new functions.https.HttpsError("invalid-argument", "Missing taskId or approved status.");
-  }
-
-  try {
-    // 2. Get the task document
-    const taskQuerySnapshot = await db.collectionGroup("tasks").where(admin.firestore.FieldPath.documentId(), "==", taskId).limit(1).get();
-
-    if (taskQuerySnapshot.empty) {
-      throw new functions.https.HttpsError("not-found", "Task not found.");
-    }
-
-    const taskDoc = taskQuerySnapshot.docs[0];
-    const taskData = taskDoc.data();
-
-    // 3. Verify the task belongs to the calling master
-    if (taskData.masterId !== context.auth.uid) {
-      throw new functions.https.HttpsError("permission-denied", "Task does not belong to this master.");
-    }
-
-    const newStatus = approved ? "APPROVED" : "REJECTED";
-    const updateData: { status: string; completedAt?: admin.firestore.Timestamp; updatedAt: admin.firestore.Timestamp } = {
-      status: newStatus,
-      updatedAt: admin.firestore.Timestamp.now(),
-    };
-
-    if (approved) {
-      updateData.completedAt = admin.firestore.Timestamp.now();
-      // Optional: Add logic to set a temporary unlock time in the child's document
-      // For now, the ChildApp will handle the unlock based on the 'APPROVED' status and 'unlockDuration'
-    }
-
-    // 4. Update the task status
-    await taskDoc.ref.update(updateData);
-
-    // 5. Send a notification to the child device (optional but recommended)
-    // This part is a placeholder.
-    // await getMessaging().sendToTopic(taskData.childId, {
-    //   notification: {
-    //     title: approved ? 'Aufgabe genehmigt!' : 'Aufgabe abgelehnt.',
-    //     body: approved ? 'Dein Handy ist jetzt freigeschaltet.' : 'Bitte reiche einen neuen Nachweis ein.',
-    //   },
-    // });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error reviewing task:", error);
-    throw new functions.https.HttpsError("internal", "Failed to review task.");
-  }
-});

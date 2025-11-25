@@ -12,10 +12,18 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * A foreground service that actively monitors the current task status.
+ *
+ * This service ensures that the app remains active and aware of the latest task state
+ * (e.g., if a task is assigned or approved), even when the app is in the background.
+ * It communicates updates to the [MiniMasterAccessibilityService] via broadcasts.
+ */
 @AndroidEntryPoint
 class TaskMonitoringService : Service() {
 
@@ -34,21 +42,28 @@ class TaskMonitoringService : Service() {
         startForegroundService()
     }
 
+    /**
+     * Starts monitoring the current task upon service start.
+     * It observes the task flow from [TaskRepository] and broadcasts updates.
+     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         serviceScope.launch {
             taskRepository.observeCurrentTask().collectLatest { task ->
-                // Hier wird die Logik zur Steuerung der Sperre implementiert
-                // Wir senden einen Broadcast oder aktualisieren einen SharedPreference-Wert,
-                // den der AccessibilityService lesen kann.
-                val intent = Intent("com.google.pairing.TASK_STATUS_UPDATE")
-                intent.putExtra("task_status", task?.status)
-                intent.putExtra("unlock_duration", task?.unlockDuration)
-                sendBroadcast(intent)
+                // Broadcast the task status so the AccessibilityService can enforce locks
+                // or unlock the device.
+                val broadcastIntent = Intent("com.google.pairing.TASK_STATUS_UPDATE")
+                broadcastIntent.putExtra("task_status", task?.status)
+                broadcastIntent.putExtra("unlock_duration", task?.unlockDuration)
+                sendBroadcast(broadcastIntent)
             }
         }
         return START_STICKY
     }
 
+    /**
+     * Initializes and starts the foreground service with a persistent notification.
+     * This is required for the service to keep running in the background on modern Android versions.
+     */
     private fun startForegroundService() {
         val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel(
@@ -59,12 +74,15 @@ class TaskMonitoringService : Service() {
         } else {
             null
         }
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel!!)
+
+        if (channel != null) {
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+        }
 
         val notification: Notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("MiniMaster Schutz ist aktiv")
-            .setContentText("Überwacht zugewiesene Aufgaben.")
-            .setSmallIcon(R.mipmap.ic_launcher) // Ersetzen Sie dies mit einem passenden Icon
+            .setContentTitle("MiniMaster Protection Active")
+            .setContentText("Monitoring assigned tasks.")
+            .setSmallIcon(R.mipmap.ic_launcher) // Replace with actual resource
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
@@ -76,6 +94,6 @@ class TaskMonitoringService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        serviceScope.coroutineContext.cancel()
+        serviceScope.cancel()
     }
 }
