@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import fft from "firebase-functions-test";
 import { wrapV2 } from "firebase-functions-test/lib/v2";
 // import * as admin from "firebase-admin";  // Unused
@@ -189,5 +190,3 @@ describe("onChildDeviceUpdateV2", () => {
   });
 
 });
-
-
