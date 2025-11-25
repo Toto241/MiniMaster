@@ -16,7 +16,7 @@ module.exports = {
   plugins: [
     '@typescript-eslint',
   ],
-  ignorePatterns: ['.eslintrc.js', 'web-control/**'],
+  ignorePatterns: ['.eslintrc.js', 'web-control/**', 'admin-panel/**'],
   rules: {
     'quotes': ['error', 'double'],
     '@typescript-eslint/no-explicit-any': 'off',
