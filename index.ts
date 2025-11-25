@@ -332,6 +332,20 @@ export const generatePairingLink = functions.https.onCall(
       );
     }
 
+    // Subscription Check: Limit non-premium users to 1 child
+    const masterData = doc.data();
+    const isPremium = masterData?.subscription?.status === "active";
+
+    if (!isPremium) {
+      const childrenQuery = await db().collection("children").where("masterImei", "==", imei).get();
+      if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Free tier limited to 1 child device. Please upgrade to Premium."
+        );
+      }
+    }
+
     const pairingToken = uuidv4();
     const now = admin.firestore.Timestamp.now();
     const expiresAtSeconds = now.seconds + 5 * 60; // Token expires in 5 minutes
@@ -634,6 +648,59 @@ export const registerFcmToken = functions.https.onCall(
 );
 
 /**
+ * Retrieves the current rules (lock state, app blacklist, usage rules) for a child device.
+ * This is called by the child device to synchronize its local state.
+ *
+ * @param {{childId: string}} data - The data passed to the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{isLocked: boolean, appBlacklist: string[], usageRules: object}>} A promise that resolves with the rules.
+ * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the device is not found.
+ */
+export const getRulesForChild = functions.https.onCall(
+  async (data: { childId: string }, _context: CallableContext) => {
+    const { childId } = data;
+
+    if (!childId || typeof childId !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'childId'."
+      );
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+
+    try {
+      const doc = await childDeviceRef.get();
+      if (!doc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Child device not found."
+        );
+      }
+
+      const data = doc.data();
+      return {
+        isLocked: data?.isLocked || false,
+        appBlacklist: data?.appBlacklist || [],
+        usageRules: data?.usageRules || {},
+      };
+
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      functions.logger.error(`Failed to get rules for child ${childId}:`, error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while retrieving rules.",
+        error
+      );
+    }
+  }
+);
+
+/**
  * A Firestore trigger (v2) that sends a "SYNC_RULES" command via FCM to a child
  * device whenever its lock state, app blacklist, or usage rules are modified.
  * This ensures the child device applies new settings in near real-time.
@@ -695,6 +762,45 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
         functions.logger.info(`Successfully sent FCM message to child ${childId} for data update.`);
     } catch (error) {
         functions.logger.error(`Failed to send FCM message to child ${childId}:`, error);
+    }
+});
+
+/**
+ * A Firestore trigger (v2) that simulates AI image analysis when a task is completed.
+ * Real implementation would use Google Cloud Vision API.
+ */
+export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{taskId}", async (event) => {
+    const newData = event.data?.after.data();
+    const oldData = event.data?.before.data();
+
+    if (!newData || !oldData) return;
+
+    // Only run analysis if status changed to 'pending_approval' and photoUrl exists
+    if (newData.status === "pending_approval" && oldData.status !== "pending_approval" && newData.photoUrl) {
+        const taskId = event.params.taskId;
+        const childId = event.params.childId;
+
+        functions.logger.info(`Starting AI analysis for task ${taskId} photo: ${newData.photoUrl}`);
+
+        // MOCK AI ANALYSIS
+        // In production: const client = new vision.ImageAnnotatorClient(); ...
+        const mockAnalysis = {
+            labels: ["Room", "Furniture", "Clean"],
+            safeSearch: {
+                adult: "VERY_UNLIKELY",
+                violence: "VERY_UNLIKELY",
+            },
+            analyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        try {
+            await event.data?.after.ref.update({
+                aiAnalysis: mockAnalysis
+            });
+            functions.logger.info(`AI analysis completed for task ${taskId}`);
+        } catch (error) {
+            functions.logger.error(`Failed to update task with AI analysis:`, error);
+        }
     }
 });
 
@@ -922,6 +1028,42 @@ export const getSubscriptionStatus = functions.https.onCall(
 );
 
 /**
+ * Reports daily usage statistics for a child device.
+ * Stores the data in a 'usageHistory' sub-collection for the child.
+ *
+ * @param {{childId: string, date: string, usageMillis: number}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {string} data.date - The date of the report (YYYY-MM-DD).
+ * @param {number} data.usageMillis - The total usage in milliseconds for that day.
+ * @param {CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ */
+export const reportDailyUsage = functions.https.onCall(
+  async (data: { childId: string; date: string; usageMillis: number }, _context: CallableContext) => {
+    const { childId, date, usageMillis } = data;
+
+    if (!childId || !date || typeof usageMillis !== "number") {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const historyRef = db().collection("children").doc(childId).collection("usageHistory").doc(date);
+
+    try {
+      await historyRef.set({
+        date: date,
+        totalUsageMillis: usageMillis,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }); // Merge to allow partial updates during the day
+
+      return { success: true };
+    } catch (error) {
+      functions.logger.error(`Failed to report usage for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to save usage report.", error);
+    }
+  }
+);
+
+/**
  * Verifies a subscription's validity with the Google Play Developer API.
  * @param {string} packageName - The application's package name.
  * @param {string} productId - The subscription product ID (SKU).
@@ -1030,7 +1172,7 @@ export const validatePairingToken = functions.https.onCall(
 export const createTask = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Authorization Check (Master Role)
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
   // Assuming a role-based claim 'role: master' is set on the custom token.
   // Since the existing rules don't show custom claims, we'll rely on the caller being a master for now,
@@ -1039,17 +1181,17 @@ export const createTask = functions.https.onCall(async (data, context) => {
 
   const { childId, title, description, unlockDuration } = data;
 
-  if (!childId || !title || !description || typeof unlockDuration !== 'number' || unlockDuration <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid task data.');
+  if (!childId || !title || !description || typeof unlockDuration !== "number" || unlockDuration <= 0) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing or invalid task data.");
   }
 
   try {
     // 2. Verify child exists and belongs to the master (Crucial Security Step)
-    const childRef = db.collection('children').doc(childId);
+    const childRef = db.collection("children").doc(childId);
     const childDoc = await childRef.get();
 
     if (!childDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Child not found.');
+      throw new functions.https.HttpsError("not-found", "Child not found.");
     }
 
     // In a real system, we would check if childDoc.data().masterId === context.auth.uid
@@ -1063,12 +1205,12 @@ export const createTask = functions.https.onCall(async (data, context) => {
       description: description,
       unlockDuration: unlockDuration,
       assignedAt: admin.firestore.Timestamp.now(),
-      status: 'ASSIGNED', // Initial status
+      status: "ASSIGNED", // Initial status
       proofUrl: null,
       completedAt: null,
     };
 
-    const taskRef = await db.collection('children').doc(childId).collection('tasks').add(newTask);
+    const taskRef = await db.collection("children").doc(childId).collection("tasks").add(newTask);
 
     // 4. Send a notification to the child device (optional but recommended)
     // This part is a placeholder as the notification logic is not fully visible.
@@ -1081,8 +1223,8 @@ export const createTask = functions.https.onCall(async (data, context) => {
 
     return { taskId: taskRef.id };
   } catch (error) {
-    console.error('Error creating task:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to create task.');
+    console.error("Error creating task:", error);
+    throw new functions.https.HttpsError("internal", "Failed to create task.");
   }
 });
 
@@ -1097,22 +1239,22 @@ export const createTask = functions.https.onCall(async (data, context) => {
 export const submitTaskProof = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Authorization Check (Child Role)
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
 
   const { taskId, proofUrl } = data;
 
   if (!taskId || !proofUrl) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing taskId or proofUrl.');
+    throw new functions.https.HttpsError("invalid-argument", "Missing taskId or proofUrl.");
   }
 
   try {
     // 2. Get the task document
     // Assuming the task is nested under the child's document as per the existing rules
-    const taskQuerySnapshot = await db.collectionGroup('tasks').where(admin.firestore.FieldPath.documentId(), '==', taskId).limit(1).get();
+    const taskQuerySnapshot = await db.collectionGroup("tasks").where(admin.firestore.FieldPath.documentId(), "==", taskId).limit(1).get();
 
     if (taskQuerySnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Task not found.');
+      throw new functions.https.HttpsError("not-found", "Task not found.");
     }
 
     const taskDoc = taskQuerySnapshot.docs[0];
@@ -1120,12 +1262,12 @@ export const submitTaskProof = functions.https.onCall(async (data, context) => {
 
     // 3. Verify the task belongs to the calling child
     if (taskData.childId !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'Task does not belong to this child.');
+      throw new functions.https.HttpsError("permission-denied", "Task does not belong to this child.");
     }
 
     // 4. Update the task status and proof URL
     await taskDoc.ref.update({
-      status: 'SUBMITTED',
+      status: "SUBMITTED",
       proofUrl: proofUrl,
       updatedAt: admin.firestore.Timestamp.now(),
     });
@@ -1141,8 +1283,8 @@ export const submitTaskProof = functions.https.onCall(async (data, context) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error submitting task proof:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to submit task proof.');
+    console.error("Error submitting task proof:", error);
+    throw new functions.https.HttpsError("internal", "Failed to submit task proof.");
   }
 });
 
@@ -1157,21 +1299,21 @@ export const submitTaskProof = functions.https.onCall(async (data, context) => {
 export const reviewTask = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Authorization Check (Master Role)
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
 
   const { taskId, approved } = data;
 
-  if (!taskId || typeof approved !== 'boolean') {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing taskId or approved status.');
+  if (!taskId || typeof approved !== "boolean") {
+    throw new functions.https.HttpsError("invalid-argument", "Missing taskId or approved status.");
   }
 
   try {
     // 2. Get the task document
-    const taskQuerySnapshot = await db.collectionGroup('tasks').where(admin.firestore.FieldPath.documentId(), '==', taskId).limit(1).get();
+    const taskQuerySnapshot = await db.collectionGroup("tasks").where(admin.firestore.FieldPath.documentId(), "==", taskId).limit(1).get();
 
     if (taskQuerySnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Task not found.');
+      throw new functions.https.HttpsError("not-found", "Task not found.");
     }
 
     const taskDoc = taskQuerySnapshot.docs[0];
@@ -1179,10 +1321,10 @@ export const reviewTask = functions.https.onCall(async (data, context) => {
 
     // 3. Verify the task belongs to the calling master
     if (taskData.masterId !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'Task does not belong to this master.');
+      throw new functions.https.HttpsError("permission-denied", "Task does not belong to this master.");
     }
 
-    const newStatus = approved ? 'APPROVED' : 'REJECTED';
+    const newStatus = approved ? "APPROVED" : "REJECTED";
     const updateData: { status: string; completedAt?: admin.firestore.Timestamp; updatedAt: admin.firestore.Timestamp } = {
       status: newStatus,
       updatedAt: admin.firestore.Timestamp.now(),
@@ -1208,7 +1350,7 @@ export const reviewTask = functions.https.onCall(async (data, context) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error reviewing task:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to review task.');
+    console.error("Error reviewing task:", error);
+    throw new functions.https.HttpsError("internal", "Failed to review task.");
   }
 });

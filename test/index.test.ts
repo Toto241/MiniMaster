@@ -80,8 +80,19 @@ describe("Cloud Functions", () => {
         }),
       }),
     });
+
+    // Mock for where() queries
+    const whereStub = jest.fn().mockReturnValue({
+      get: jest.fn().mockResolvedValue({
+        empty: true,
+        size: 0,
+        forEach: jest.fn()
+      })
+    });
+
     collectionStub = jest.spyOn(db, "collection").mockReturnValue({
       doc: docStub,
+      where: whereStub
     } as any);
   });
 
@@ -295,6 +306,14 @@ describe("Cloud Functions", () => {
         collectionStub.mockImplementation((collectionName: string) => {
             if (collectionName === "masters" || collectionName === "pairingTokens") {
                 return { doc: docStub };
+            }
+            // For children check (premium feature)
+            if (collectionName === "children") {
+                 return {
+                     where: jest.fn().mockReturnValue({
+                         get: jest.fn().mockResolvedValue({ empty: true, size: 0 })
+                     })
+                 };
             }
             return { doc: jest.fn() };
         });

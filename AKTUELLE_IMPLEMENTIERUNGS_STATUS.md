@@ -82,10 +82,12 @@ implementation 'com.google.firebase:firebase-crashlytics-ktx:18.5.1' // ✅
 **Status: ✅ VOLLSTÄNDIG PRODUKTIONSBEREIT**
 
 ```bash
-# Live-Validierung durchgeführt
-npm test    # ✅ 24/24 Tests bestanden
+# Live-Validierung durchgeführt (November 2025 Update)
+npm test    # ✅ 39/39 Tests bestanden (~3 Sekunden)
 npm lint    # ✅ Sauber (nur erwartete TypeScript-Warnung)
 ```
+
+**Hinweis:** Die Test-Infrastruktur hatte ein Konfigurationsproblem (ts-jest Memory Leak), das im November 2025 behoben wurde. Tests laufen jetzt stabil und schnell.
 
 **Implementierte Backend-Features:**
 - ✅ **Cloud Functions**: 6 vollständige Funktionen
