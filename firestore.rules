@@ -29,14 +29,17 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
       
       // Validate task data structure when writing
+      // Fields written by createTask: description, deadline, status, createdAt, masterImei
+      // Fields written by completeTask: status, photoUrl, completedAt, updatedAt
+      // Fields written by approveTask: status, updatedAt
+      // Fields written by analyzeTaskPhoto: aiAnalysis
       allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['description', 'status', 'photoUrl', 'createdAt', 'updatedAt', 'deadline', 'completedAt'])
+        && request.resource.data.keys().hasOnly(['description', 'status', 'photoUrl', 'createdAt', 'updatedAt', 'deadline', 'completedAt', 'masterImei', 'aiAnalysis'])
         && request.resource.data.description is string
-        && request.resource.data.description.size() < 200
-        && request.resource.data.unlockDuration is number
+        && request.resource.data.description.size() < 500
         && request.resource.data.status is string
-        && request.resource.data.status in ['ASSIGNED', 'SUBMITTED', 'APPROVED', 'REJECTED']
-        && (request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
+        && request.resource.data.status in ['pending', 'pending_approval', 'approved']
+        && (request.resource.data.photoUrl is string || request.resource.data.photoUrl == null || !('photoUrl' in request.resource.data))
         && request.resource.data.deadline is timestamp;
 
       // Allow delete for authenticated users (handled by Cloud Functions)
