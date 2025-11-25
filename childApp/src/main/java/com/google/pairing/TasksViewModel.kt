@@ -1,5 +1,6 @@
 package com.google.pairing
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,20 +11,18 @@ import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
-import android.net.Uri
-
-import android.net.Uri
 
 /**
- * A data class representing a single task for the child.
+ * A data class representing a single task for the child, used by the UI.
  *
  * @property id The unique identifier of the task in Firestore.
  * @property description A description of what the task entails.
- * @property status The current status of the task (e.g., "pending", "pending_approval", "approved").
+ * @property status The current status of the task (e.g., "ASSIGNED", "SUBMITTED", "APPROVED").
  */
 data class Task(
     val id: String,
@@ -79,7 +78,7 @@ class TasksViewModel @Inject constructor(
             }
 
             firestore.collection("children").document(childId).collection("tasks")
-                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .orderBy("assignedAt", Query.Direction.DESCENDING) // Changed from createdAt to assignedAt to match Model
                 .addSnapshotListener { snapshots, e ->
                     if (e != null) {
                         Log.w(TAG, "Listen failed.", e)
@@ -105,7 +104,7 @@ class TasksViewModel @Inject constructor(
      *
      * This function performs two main operations:
      * 1. It uploads the image from the given [photoUri] to a unique path in Firebase Storage.
-     * 2. It calls the `completeTask` cloud function with the task details and the URL of the
+     * 2. It calls the `submitTaskProof` cloud function with the task details and the URL of the
      *    uploaded photo.
      *
      * The UI is updated automatically via the snapshot listener in [loadTasks].
@@ -128,18 +127,17 @@ class TasksViewModel @Inject constructor(
                 val downloadUrl = photoRef.downloadUrl.await().toString()
                 Log.d(TAG, "Photo uploaded: $downloadUrl")
 
-                // 2. Call the completeTask Cloud Function
+                // 2. Call the submitTaskProof Cloud Function (Updated name)
                 val data = hashMapOf(
-                    "childImei" to childId,
                     "taskId" to taskId,
-                    "photoUrl" to downloadUrl
+                    "proofUrl" to downloadUrl
                 )
                 functions
-                    .getHttpsCallable("completeTask")
+                    .getHttpsCallable("submitTaskProof")
                     .call(data)
                     .await()
 
-                Log.d(TAG, "Task $taskId marked as complete.")
+                Log.d(TAG, "Task $taskId proof submitted.")
                 // The UI will update automatically thanks to the real-time listener.
             } catch (e: Exception) {
                 Log.e(TAG, "Error completing task $taskId", e)

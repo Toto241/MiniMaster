@@ -79,8 +79,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -103,8 +103,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -127,8 +127,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -143,8 +143,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => newData },
+        before: oldData,
+        after: newData,
       },
       params: { childId: "child123" },
     });
@@ -158,8 +158,8 @@ describe("onChildDeviceUpdateV2", () => {
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => oldData },
-        after: { data: () => null },
+        before: oldData,
+        after: null,
       },
       params: { childId: "child123" },
     });
@@ -167,18 +167,24 @@ describe("onChildDeviceUpdateV2", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  // Tests the function's explicit handling of missing oldData (lines 634-637 in index.ts).
+  // When oldData is falsy/empty, the function correctly returns early with no notification,
+  // which is the intended behavior for document creation scenarios (though onDocumentUpdated
+  // typically doesn't fire on initial creation - that's what onDocumentCreated is for).
   it("should not send FCM message if oldData is missing (document created)", async () => {
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
 
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     await wrapped({
       data: {
-        before: { data: () => null },
-        after: { data: () => newData },
+        before: {},  // Empty object - firebase-functions-test v2 processes this such that event.data.before.data() returns a falsy value
+        after: newData,
       },
       params: { childId: "child123" },
     });
 
+    // Function explicitly checks `if (!oldData)` (line 634 in index.ts) which evaluates to true in this case,
+    // causing early return with no notification sent (verified by console.info log)
     expect(mockSend).not.toHaveBeenCalled();
   });
 

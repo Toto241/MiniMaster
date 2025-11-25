@@ -2,26 +2,27 @@ package com.google.pairing.child
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
+import com.google.pairing.LockScreen
+import com.google.pairing.MainActivity
+import com.google.pairing.R
+import com.google.pairing.AppLogger
+import com.google.pairing.TaskStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
-import android.content.BroadcastReceiver
-import android.content.IntentFilter
-import com.google.pairing.TaskStatus
-import com.google.pairing.LockScreen
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Calendar
 
 /**
  * An [AccessibilityService] for monitoring foreground applications and implementing app blocking.
@@ -39,7 +40,10 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var currentTaskStatus: TaskStatus = TaskStatus.ASSIGNED
     private var unlockEndTime: Long = 0 // System.currentTimeMillis() + unlockDuration in ms
 
-    // BroadcastReceiver, um den Status vom TaskMonitoringService zu erhalten
+    /**
+     * BroadcastReceiver to receive task status updates from TaskMonitoringService.
+     * This allows the service to know if the device should be locked due to a pending task.
+     */
     private val taskStatusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.google.pairing.TASK_STATUS_UPDATE") {
@@ -49,18 +53,16 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                 currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.ASSIGNED.value)
 
                 if (currentTaskStatus == TaskStatus.APPROVED && unlockDuration > 0) {
-                    // Startet den Timer für die Freischaltung
-                    unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // Minuten zu Millisekunden
+                    // Start the timer for unlocking
+                    unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // minutes to milliseconds
                     Log.d(TAG, "Task approved. Unlocking for $unlockDuration minutes. End time: $unlockEndTime")
                 } else if (currentTaskStatus != TaskStatus.APPROVED) {
-                    // Setzt den Timer zurück, wenn der Status nicht APPROVED ist
+                    // Reset the timer if status is not APPROVED
                     unlockEndTime = 0
                 }
             }
         }
     }
-
-    companion object {
 
     companion object {
         private const val TAG = "MiniMasterAccessService"
@@ -73,7 +75,16 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var isServiceInitialized = false
     private val blockedApps = mutableSetOf<String>()
     private var lastRulesUpdateTimestamp = 0L
-    
+    private var usageRules: org.json.JSONObject? = null
+    private var dailyLimitMillis: Long = -1L
+    private var currentDayUsageMillis: Long = 0L
+    private var lastUsageCheckTime: Long = 0L
+    private var currentDayStart: Long = 0L
+    private var lastStorageWriteTime: Long = 0L
+    private var lastBackendReportTime: Long = 0L
+
+    // Injected in a real app, but for PoC we instantiate lazily or get from entry point
+    private val functions by lazy { FirebaseFunctions.getInstance() }
     /**
      * A [Runnable] that periodically checks the foreground app and for rule updates.
      */
@@ -81,6 +92,8 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         override fun run() {
             checkCurrentForegroundApp()
             checkForRuleUpdates()
+            updateUsageStats()
+            checkUsageLimits()
             handler.postDelayed(this, CHECK_INTERVAL)
         }
     }
@@ -88,7 +101,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        // Registriert den Receiver
+        // Register the receiver
         val filter = IntentFilter("com.google.pairing.TASK_STATUS_UPDATE")
         registerReceiver(taskStatusReceiver, filter)
     }
@@ -107,6 +120,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         }
         serviceInfo = info
         isServiceInitialized = true
+        loadUsageData()
         startAppMonitoring()
         Log.d(TAG, "AccessibilityService connected and monitoring started.")
     }
@@ -130,6 +144,11 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(taskStatusReceiver)
+        // Save final stats on destroy
+        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("current_day_usage", currentDayUsageMillis)
+            .apply()
         stopAppMonitoring()
         serviceScope.cancel()
         Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
@@ -194,58 +213,49 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private fun onForegroundAppChanged(packageName: String) {
         Log.d(TAG, "Foreground app changed to: $packageName")
 
-        // 1. Task-basierte Sperrlogik (hat höchste Priorität)
+        // 1. Task-based blocking logic (Highest Priority)
         if (isTaskLockActive()) {
-            // Wenn eine Aufgabe zugewiesen oder abgelehnt wurde UND der Timer abgelaufen ist
-            // oder nie gestartet wurde, wird die LockScreen-Activity gestartet.
+            // If a task is assigned or rejected AND the timer has expired (or never started),
+            // launch the LockScreen Activity.
             val lockIntent = Intent(this, LockScreen::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 putExtra("lock_reason", "task_lock")
             }
             startActivity(lockIntent)
-            return // Task-Sperre hat Vorrang
+            return // Task lock takes precedence
         }
 
-        // 2. Normale Sperrlogik (z.B. Zeitlimits)
+        // 2. Standard blocking logic (Blacklist / Time Limits)
         if (blockedApps.contains(packageName)) {
             blockApplication(packageName)
         }
+        // Force immediate check when app changes
+        checkUsageLimits()
         logAppUsage(packageName)
     }
 
     /**
-     * Überprüft, ob die Task-basierte Sperre aktiv sein muss.
-     */
-    private fun isTaskLockActive(): Boolean {
-        // Die Sperre ist NICHT aktiv, wenn der Status APPROVED ist UND die Freischaltzeit noch nicht abgelaufen ist.
-        if (currentTaskStatus == TaskStatus.APPROVED && System.currentTimeMillis() < unlockEndTime) {
-            return false
-        }
-
-        // Die Sperre ist aktiv, wenn eine Aufgabe zugewiesen, eingereicht oder abgelehnt wurde.
-        if (currentTaskStatus == TaskStatus.ASSIGNED || currentTaskStatus == TaskStatus.REJECTED || currentTaskStatus == TaskStatus.SUBMITTED) {
-            return true
-        }
-
-        // In allen anderen Fällen (z.B. keine Aufgabe oder genehmigte Aufgabe nach Ablauf der Zeit) ist die Task-Sperre nicht aktiv.
-        // Die normale Sperrlogik (Zeitlimits) greift dann.
-        return false
-    }
-
-    /**
-     * Blocks a given application by launching the [MainActivity] over it
+     * Blocks a given application by launching the [BlockingOverlayService] over it
      * and attempting to send a "back" action to close the blocked app.
      * @param packageName The package name of the app to block.
      */
     private fun blockApplication(packageName: String) {
         Log.i(TAG, "Blocking app: $packageName")
         try {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("blocked_app", packageName)
-            }
-            startActivity(intent)
+            // Attempt to trigger global back to close the app naturally
             performGlobalAction(GLOBAL_ACTION_BACK)
+
+            // Show system overlay
+            val intent = Intent(this, com.google.pairing.BlockingOverlayService::class.java).apply {
+                action = com.google.pairing.BlockingOverlayService.ACTION_SHOW_OVERLAY
+                putExtra(com.google.pairing.BlockingOverlayService.EXTRA_BLOCKED_PACKAGE, packageName)
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+
             AppLogger.logAppBlockingEvent(packageName, "parental_control_rule", true)
         } catch (e: Exception) {
             Log.e(TAG, "Error blocking app $packageName", e)
@@ -286,6 +296,12 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             if (lastUpdate > lastRulesUpdateTimestamp) {
                 val newBlockedApps = sharedPrefs.getStringSet("blocked_apps", emptySet()) ?: emptySet()
                 updateBlockedApps(newBlockedApps)
+
+                val usageRulesJson = sharedPrefs.getString("usage_rules", null)
+                if (usageRulesJson != null) {
+                    parseUsageRules(usageRulesJson)
+                }
+
                 lastRulesUpdateTimestamp = lastUpdate
                 Log.d(TAG, "Rules updated from SharedPreferences: $newBlockedApps")
             }
@@ -293,4 +309,126 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             Log.e(TAG, "Error checking for rule updates", e)
         }
     }
+
+    private fun parseUsageRules(json: String) {
+        try {
+            usageRules = org.json.JSONObject(json)
+            // Example usage rule: { "dailyLimitSeconds": 3600 }
+            val dailyLimitSeconds = usageRules?.optLong("dailyLimitSeconds", -1L) ?: -1L
+            if (dailyLimitSeconds != -1L) {
+                dailyLimitMillis = dailyLimitSeconds * 1000
+            } else {
+                dailyLimitMillis = -1L
+            }
+            Log.d(TAG, "Parsed usage rules: dailyLimitMillis=$dailyLimitMillis")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing usage rules", e)
+        }
+    }
+
+    private fun loadUsageData() {
+        val sharedPrefs = getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+        currentDayStart = sharedPrefs.getLong("current_day_start", 0L)
+
+        // Reset if it's a new day
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val todayStart = calendar.timeInMillis
+
+        if (currentDayStart != todayStart) {
+            currentDayStart = todayStart
+            currentDayUsageMillis = 0L
+            sharedPrefs.edit()
+                .putLong("current_day_start", currentDayStart)
+                .putLong("current_day_usage", 0L)
+                .apply()
+        } else {
+            currentDayUsageMillis = sharedPrefs.getLong("current_day_usage", 0L)
+        }
+        lastUsageCheckTime = System.currentTimeMillis()
+    }
+
+    private fun updateUsageStats() {
+        val now = System.currentTimeMillis()
+
+        // Only track usage if we have a valid foreground app that is not system
+        if (currentForegroundApp != null &&
+            !currentForegroundApp!!.startsWith("com.android") &&
+            currentForegroundApp != packageName) {
+
+            val delta = now - lastUsageCheckTime
+            if (delta > 0 && delta < 5000) { // Sanity check for large jumps
+                currentDayUsageMillis += delta
+                // Persist occasionally (every 30 seconds) to save battery/IO
+                if (now - lastStorageWriteTime > 30000) {
+                    getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+                        .edit()
+                        .putLong("current_day_usage", currentDayUsageMillis)
+                        .apply()
+                    lastStorageWriteTime = now
+                    // Report to backend occasionally (e.g., every 5 minutes to avoid spamming)
+                    if (now - lastBackendReportTime > 300000) {
+                        reportUsageToBackend()
+                    }
+                }
+            }
+        }
+        lastUsageCheckTime = now
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        // Save final stats on destroy
+        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("current_day_usage", currentDayUsageMillis)
+            .apply()
+
+        // Attempt final report
+        reportUsageToBackend()
+
+        stopAppMonitoring()
+        serviceScope.cancel()
+        Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
+    }
+
+    private fun reportUsageToBackend() {
+        val childId = getSharedPreferences("child_prefs", Context.MODE_PRIVATE).getString("child_id", null)
+        if (childId == null) return
+
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val today = sdf.format(Date())
+
+        val data = hashMapOf(
+            "childId" to childId,
+            "date" to today,
+            "usageMillis" to currentDayUsageMillis
+        )
+
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                // Using call() without waiting for result to be fire-and-forget in this context
+                functions.getHttpsCallable("reportDailyUsage").call(data)
+                lastBackendReportTime = System.currentTimeMillis()
+                Log.d(TAG, "Usage reported to backend: $currentDayUsageMillis")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to report usage", e)
+            }
+        }
+    }
+
+    private fun checkUsageLimits() {
+        if (dailyLimitMillis != -1L && currentDayUsageMillis > dailyLimitMillis) {
+            Log.i(TAG, "Daily limit exceeded: $currentDayUsageMillis > $dailyLimitMillis")
+            // Block current app if it's not a system app
+             if (currentForegroundApp != null &&
+                !currentForegroundApp!!.startsWith("com.android") &&
+                currentForegroundApp != packageName) {
+                blockApplication(currentForegroundApp!!)
+             }
+        }
+    }
 }
+
