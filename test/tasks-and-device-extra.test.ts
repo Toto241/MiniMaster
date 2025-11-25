@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import fft from "firebase-functions-test";
 // import * as admin from "firebase-admin";  // Unused
 import { db as getDb } from "../firebase";
