@@ -44,7 +44,10 @@ fun ProofSubmissionScreen(
     )
 
     // Temporäre Datei für die Kamera-Aufnahme
-    val tempImageFile = remember { File(context.cacheDir, "proof_temp.jpg") }
+        val tempImageFile = remember { 
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        File(context.cacheDir, "proof_temp.jpg") 
+    }
 
     Column(
         modifier = Modifier
@@ -73,7 +76,11 @@ fun ProofSubmissionScreen(
         Button(
             onClick = {
                 // Erstellt eine temporäre URI für die Kamera-App
-                imageUri = Uri.fromFile(tempImageFile)
+                                imageUri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    tempImageFile
+                )
                 cameraLauncher.launch(imageUri)
             },
             enabled = !isUploading
@@ -122,13 +129,15 @@ suspend fun uploadProofAndSubmit(taskId: String, uri: Uri): Boolean {
         val uploadTask = proofRef.putFile(uri).await()
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
 
-        // Ruft die Cloud Function auf
+                        // Hier müsste der ChildIdProvider injiziert werden, für dieses Beispiel nehmen wir eine vereinfachte Instanz an
+        val childIdProvider = object : ChildIdProvider { override fun getChildId(): String = "current_child_id" } // TODO: Replace with actual injected provider
         val taskRepository = TaskRepository(
             FirebaseFirestore.getInstance(),
             FirebaseFunctions.getInstance(),
-            // Hier müsste der ChildIdProvider injiziert werden, für dieses Beispiel nehmen wir eine vereinfachte Instanz an
-            object : ChildIdProvider { override fun getChildId(): String = "current_child_id" }
+            childIdProvider
         )
+        
+        // Ruft die Cloud Function auf
         taskRepository.submitTaskProof(taskId, downloadUrl)
     } catch (e: Exception) {
         e.printStackTrace()
