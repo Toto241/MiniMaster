@@ -246,13 +246,9 @@ function toggleDeviceLock(childImei, isLocked) {
  */
 function openTaskModal(childId) {
     document.getElementById('task-child-id').value = childId;
+    document.getElementById('task-title').value = '';
     document.getElementById('task-description').value = '';
-    
-    // Set a default deadline for tomorrow at 6 PM.
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(18, 0, 0, 0);
-    document.getElementById('task-deadline').value = tomorrow.toISOString().slice(0, 16);
+    document.getElementById('unlock-duration').value = 30; // Default value
     
     document.getElementById('task-creation-modal').style.display = 'flex';
 }
@@ -262,40 +258,120 @@ function openTaskModal(childId) {
  */
 function closeTaskModal() {
     document.getElementById('task-creation-modal').style.display = 'none';
+    document.getElementById('task-form').reset();
 }
 
 /**
- * Handles the submission of the new task form. It calls the 'createTask'
- * Firebase Cloud Function with the provided details.
+ * Calls the 'createTask' Firebase Cloud Function to assign a new task.
  * @param {Event} event - The form submission event.
  */
-function createTask(event) {
+function assignTask(event) {
     event.preventDefault();
-    
-    const childImei = document.getElementById('task-child-id').value;
+    const childId = document.getElementById('task-child-id').value;
+    const title = document.getElementById('task-title').value.trim();
     const description = document.getElementById('task-description').value.trim();
-    const deadline = document.getElementById('task-deadline').value;
-    
-    if (!description || !deadline) {
-        showNotification('Please fill in all fields', 'error');
+    const unlockDuration = parseInt(document.getElementById('unlock-duration').value, 10);
+
+    if (!childId || !title || !description || isNaN(unlockDuration) || unlockDuration <= 0) {
+        showNotification('Please fill all fields correctly.', 'error');
         return;
     }
-    
+
     const createTask = functions.httpsCallable('createTask');
     
     createTask({
+        childId: childId,
+        title: title,
+        description: description,
+        unlockDuration: unlockDuration
+    }).then(result => {
+        showNotification('Task assigned successfully! Task ID: ' + result.data.taskId, 'success');
+        closeTaskModal();
+    }).catch(error => {
+        console.error('Error assigning task:', error);
+        showNotification('Error assigning task: ' + error.message, 'error');
+    });
+}
+
+// --- Rules Management Functions ---
+
+/**
+ * Opens the rules configuration modal and populates it with current device settings.
+ * @param {object} device - The device object containing current rules.
+ */
+function openRulesModal(device) {
+    document.getElementById('rules-child-id').value = device.id;
+
+    // Populate blocked apps
+    const blockedApps = device.appBlacklist || [];
+    document.getElementById('blocked-apps').value = blockedApps.join(', ');
+
+    // Populate daily limit
+    let dailyLimit = -1;
+    if (device.usageRules && device.usageRules.dailyLimitSeconds) {
+        dailyLimit = Math.floor(device.usageRules.dailyLimitSeconds / 60);
+    }
+    document.getElementById('daily-limit').value = dailyLimit;
+
+    document.getElementById('rules-modal').style.display = 'flex';
+}
+
+/**
+ * Closes the rules configuration modal.
+ */
+function closeRulesModal() {
+    document.getElementById('rules-modal').style.display = 'none';
+}
+
+/**
+ * Handles the submission of the rules form. It calls the relevant Cloud Functions.
+ * @param {Event} event - The form submission event.
+ */
+function saveRules(event) {
+    event.preventDefault();
+
+    const childImei = document.getElementById('rules-child-id').value;
+    const dailyLimitMinutes = parseInt(document.getElementById('daily-limit').value);
+    const blockedAppsStr = document.getElementById('blocked-apps').value;
+
+    const blockedApps = blockedAppsStr.split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    const usageRules = {};
+    if (dailyLimitMinutes >= 0) {
+        usageRules.dailyLimitSeconds = dailyLimitMinutes * 60;
+    }
+
+    const promises = [];
+
+    // Update Usage Rules
+    const setUsageRules = functions.httpsCallable('setUsageRules');
+    promises.push(setUsageRules({
         masterImei: currentMasterImei,
         secretKey: currentSecretKey,
         childImei: childImei,
-        description: description,
-        deadlineISO: new Date(deadline).toISOString()
-    }).then(result => {
-        showNotification('Task created successfully!', 'success');
-        closeTaskModal();
-    }).catch(error => {
-        console.error('Error creating task:', error);
-        showNotification('Error creating task: ' + error.message, 'error');
-    });
+        usageRules: usageRules
+    }));
+
+    // Update App Blacklist
+    const updateAppBlacklist = functions.httpsCallable('updateAppBlacklist');
+    promises.push(updateAppBlacklist({
+        masterImei: currentMasterImei,
+        secretKey: currentSecretKey,
+        childImei: childImei,
+        appBlacklist: blockedApps
+    }));
+
+    Promise.all(promises)
+        .then(() => {
+            showNotification('Rules updated successfully!', 'success');
+            closeRulesModal();
+        })
+        .catch(error => {
+            console.error('Error updating rules:', error);
+            showNotification('Error updating rules: ' + error.message, 'error');
+        });
 }
 
 // --- Rules Management Functions ---
@@ -455,37 +531,27 @@ function loadTasksToReview() {
     const tasksListElement = document.getElementById('tasks-to-review');
     tasksListElement.innerHTML = '<div class="loading">Loading tasks...</div>';
     
-    // This requires querying each child's subcollection of tasks.
-    db.collection('children')
-        .where('masterImei', '==', currentMasterImei)
+    // Annahme: Master-ID ist der aktuelle Firebase Auth UID
+    const masterId = firebase.auth().currentUser?.uid || currentMasterImei;
+
+    // Da wir die Cloud Functions so implementiert haben, dass sie die Auth-Context nutzen,
+    // müssen wir hier die Firestore-Abfrage anpassen, um alle Tasks mit Status 'SUBMITTED'
+    // zu finden, die dem aktuellen Master gehören.
+    
+    // ACHTUNG: collectionGroup-Abfragen benötigen einen Index in Firestore.
+    firebase.firestore().collectionGroup('tasks')
+        .where('masterId', '==', masterId)
+        .where('status', '==', 'SUBMITTED')
         .get()
         .then(snapshot => {
-            const promises = [];
-            
-            snapshot.forEach(childDoc => {
-                const promise = childDoc.ref.collection('tasks')
-                    .where('status', '==', 'pending_approval')
-                    .get()
-                    .then(tasksSnapshot => {
-                        const tasks = [];
-                        tasksSnapshot.forEach(taskDoc => {
-                            tasks.push({
-                                childId: childDoc.id,
-                                taskId: taskDoc.id,
-                                ...taskDoc.data()
-                            });
-                        });
-                        return tasks;
-                    });
-                
-                promises.push(promise);
+            const tasks = [];
+            snapshot.forEach(doc => {
+                tasks.push({
+                    taskId: doc.id,
+                    ...doc.data()
+                });
             });
-            
-            return Promise.all(promises);
-        })
-        .then(results => {
-            const allTasks = results.flat();
-            renderTasksToReview(allTasks);
+            renderTasksToReview(tasks);
         })
         .catch(error => {
             console.error('Error loading tasks:', error);
@@ -506,20 +572,25 @@ function renderTasksToReview(tasks) {
     }
     
     const tasksHtml = tasks.map(task => {
-        const completedTime = task.completedAt ? new Date(task.completedAt.seconds * 1000).toLocaleString() : 'N/A';
+        const assignedTime = task.assignedAt ? new Date(task.assignedAt.seconds * 1000).toLocaleString() : 'N/A';
         return `
             <div class="task-card">
                 <div class="task-header">
                     <div class="task-info">
-                        <h4>Child: ${task.childId}</h4>
-                        <p><strong>Task:</strong> ${task.description}</p>
-                        <p><strong>Completed:</strong> ${completedTime}</p>
+                        <h4>Child ID: ${task.childId}</h4>
+                        <p><strong>Task:</strong> ${task.title}</p>
+                        <p><strong>Description:</strong> ${task.description}</p>
+                        <p><strong>Assigned:</strong> ${assignedTime}</p>
+                        <p><strong>Unlock Duration:</strong> ${task.unlockDuration} minutes</p>
                     </div>
                 </div>
-                ${task.photoUrl ? `<a href="${task.photoUrl}" target="_blank" rel="noopener noreferrer"><img src="${task.photoUrl}" alt="Task proof" class="task-photo"></a>` : ''}
-                <div class="device-actions">
-                    <button class="btn btn-success" onclick="approveTask('${task.childId}', '${task.taskId}')">
-                        Approve Task
+                ${task.proofUrl ? `<a href="${task.proofUrl}" target="_blank" rel="noopener noreferrer"><img src="${task.proofUrl}" alt="Task proof" class="task-photo"></a>` : '<p>No photo proof submitted.</p>'}
+                <div class="task-actions">
+                    <button class="btn btn-success" onclick="reviewTask('${task.taskId}', true)">
+                        Approve (Unlock)
+                    </button>
+                    <button class="btn btn-danger" onclick="reviewTask('${task.taskId}', false)">
+                        Reject
                     </button>
                 </div>
             </div>
@@ -530,24 +601,22 @@ function renderTasksToReview(tasks) {
 }
 
 /**
- * Calls the 'approveTask' Firebase Cloud Function to mark a task as approved.
- * @param {string} childImei - The unique identifier of the child device.
- * @param {string} taskId - The ID of the task to approve.
+ * Calls the 'reviewTask' Firebase Cloud Function to approve or reject a task.
+ * @param {string} taskId - The ID of the task to review.
+ * @param {boolean} approved - True to approve, false to reject.
  */
-function approveTask(childImei, taskId) {
-    const approveTask = functions.httpsCallable('approveTask');
+function reviewTask(taskId, approved) {
+    const reviewTask = functions.httpsCallable('reviewTask');
     
-    approveTask({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
-        taskId: taskId
+    reviewTask({
+        taskId: taskId,
+        approved: approved
     }).then(result => {
-        showNotification('Task approved successfully!', 'success');
-        loadTasksToReview(); // Refresh the list after approval.
+        showNotification('Task reviewed successfully! Status: ' + (approved ? 'Approved' : 'Rejected'), 'success');
+        loadTasksToReview(); // Refresh the list after review.
     }).catch(error => {
-        console.error('Error approving task:', error);
-        showNotification('Error approving task: ' + error.message, 'error');
+        console.error('Error reviewing task:', error);
+        showNotification('Error reviewing task: ' + error.message, 'error');
     });
 }
 
