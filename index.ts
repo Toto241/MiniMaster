@@ -259,6 +259,20 @@ export const generatePairingLink = functions.https.onCall(
       );
     }
 
+    // Subscription Check: Limit non-premium users to 1 child
+    const masterData = doc.data();
+    const isPremium = masterData?.subscription?.status === "active";
+
+    if (!isPremium) {
+      const childrenQuery = await db().collection("children").where("masterImei", "==", imei).get();
+      if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Free tier limited to 1 child device. Please upgrade to Premium."
+        );
+      }
+    }
+
     const pairingToken = uuidv4();
     const now = admin.firestore.Timestamp.now();
     const expiresAtSeconds = now.seconds + 5 * 60; // Token expires in 5 minutes
@@ -679,6 +693,45 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
 });
 
 /**
+ * A Firestore trigger (v2) that simulates AI image analysis when a task is completed.
+ * Real implementation would use Google Cloud Vision API.
+ */
+export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{taskId}", async (event) => {
+    const newData = event.data?.after.data();
+    const oldData = event.data?.before.data();
+
+    if (!newData || !oldData) return;
+
+    // Only run analysis if status changed to 'pending_approval' and photoUrl exists
+    if (newData.status === "pending_approval" && oldData.status !== "pending_approval" && newData.photoUrl) {
+        const taskId = event.params.taskId;
+        const childId = event.params.childId;
+
+        functions.logger.info(`Starting AI analysis for task ${taskId} photo: ${newData.photoUrl}`);
+
+        // MOCK AI ANALYSIS
+        // In production: const client = new vision.ImageAnnotatorClient(); ...
+        const mockAnalysis = {
+            labels: ["Room", "Furniture", "Clean"],
+            safeSearch: {
+                adult: "VERY_UNLIKELY",
+                violence: "VERY_UNLIKELY",
+            },
+            analyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        try {
+            await event.data?.after.ref.update({
+                aiAnalysis: mockAnalysis
+            });
+            functions.logger.info(`AI analysis completed for task ${taskId}`);
+        } catch (error) {
+            functions.logger.error(`Failed to update task with AI analysis:`, error);
+        }
+    }
+});
+
+/**
  * Creates a new task for a child device, assigned by an authenticated master device.
  *
  * @param {{masterImei: string, secretKey: string, childImei: string, description: string, deadlineISO: string}} data - The data for the function.
@@ -898,6 +951,42 @@ export const getSubscriptionStatus = functions.https.onCall(
 
     const subscription = masterDoc.data()?.subscription || { status: "none" };
     return { subscriptionStatus: subscription };
+  }
+);
+
+/**
+ * Reports daily usage statistics for a child device.
+ * Stores the data in a 'usageHistory' sub-collection for the child.
+ *
+ * @param {{childId: string, date: string, usageMillis: number}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {string} data.date - The date of the report (YYYY-MM-DD).
+ * @param {number} data.usageMillis - The total usage in milliseconds for that day.
+ * @param {CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ */
+export const reportDailyUsage = functions.https.onCall(
+  async (data: { childId: string; date: string; usageMillis: number }, _context: CallableContext) => {
+    const { childId, date, usageMillis } = data;
+
+    if (!childId || !date || typeof usageMillis !== "number") {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const historyRef = db().collection("children").doc(childId).collection("usageHistory").doc(date);
+
+    try {
+      await historyRef.set({
+        date: date,
+        totalUsageMillis: usageMillis,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }); // Merge to allow partial updates during the day
+
+      return { success: true };
+    } catch (error) {
+      functions.logger.error(`Failed to report usage for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to save usage report.", error);
+    }
   }
 );
 
