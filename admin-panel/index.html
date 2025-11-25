@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniMaster Operator Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>MiniMaster Operator Dashboard</h1>
+            <div id="auth-status" class="auth-status">
+                <span id="user-email"></span>
+                <button id="logout-btn" onclick="logout()" style="display: none;">Logout</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Login Section -->
+            <section id="login-section" class="section">
+                <h2>Operator Login</h2>
+                <form id="login-form">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </section>
+
+            <!-- Dashboard Section (Hidden until authorized) -->
+            <section id="dashboard-section" class="section" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <p id="stat-total-users">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Active Subscriptions</h3>
+                        <p id="stat-active-subs">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Tasks Assigned</h3>
+                        <p id="stat-total-tasks">--</p>
+                    </div>
+                </div>
+
+                <h2>User Management</h2>
+                <div class="user-search">
+                    <input type="text" id="user-search-input" placeholder="Search by Email or Child ID">
+                    <button onclick="searchUsers()" class="btn btn-secondary">Search</button>
+                </div>
+                <div id="user-list" class="data-list">
+                    <!-- User data will be rendered here -->
+                </div>
+
+                <h2>Subscription Monitoring</h2>
+                <div id="subscription-list" class="data-list">
+                    <!-- Subscription data will be rendered here -->
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification" style="display: none;"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

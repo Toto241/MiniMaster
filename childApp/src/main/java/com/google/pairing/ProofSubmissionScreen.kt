@@ -51,10 +51,11 @@ fun ProofSubmissionScreen(
             }
         }
     )
-
-    // Temporary file for the camera image
-    val tempImageFile = remember { File(context.cacheDir, "proof_temp.jpg") }
-
+    // Temporäre Datei für die Kamera-Aufnahme
+        val tempImageFile = remember { 
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        File(context.cacheDir, "proof_temp.jpg") 
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -81,8 +82,12 @@ fun ProofSubmissionScreen(
 
         Button(
             onClick = {
-                // Create a temporary URI for the camera app
-                imageUri = Uri.fromFile(tempImageFile)
+                // Erstellt eine temporäre URI für die Kamera-App
+                                imageUri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    tempImageFile
+                )
                 cameraLauncher.launch(imageUri)
             },
             enabled = !isUploading
@@ -134,31 +139,15 @@ suspend fun uploadProofAndSubmit(taskId: String, uri: Uri): Boolean {
     return try {
         val uploadTask = proofRef.putFile(uri).await()
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
-
-        // Calls the Cloud Function
+                        // Hier müsste der ChildIdProvider injiziert werden, für dieses Beispiel nehmen wir eine vereinfachte Instanz an
+        val childIdProvider = object : ChildIdProvider { override fun getChildId(): String = "current_child_id" } // TODO: Replace with actual injected provider
         val taskRepository = TaskRepository(
             FirebaseFirestore.getInstance(),
             FirebaseFunctions.getInstance(),
-            // Injecting a simplified provider for this example; in production, use Hilt injection
-            object : ChildIdProvider(
-                 // Passing a dummy repository just to satisfy the constructor, assuming ChildIdProvider is modified or we use a factory
-                 // Actually, this manual instantiation is tricky with Hilt.
-                 // Ideally, this function should be in a ViewModel.
-                 // For now, we will assume a simplified constructor or mock.
-                 // To fix this cleanly, we should move this logic to the ViewModel.
-                 // But sticking to the documentation task, I'll mock the dependency.
-                 // Note: This code block inside the Composable file is not ideal architecture.
-                 // I will assume the existing code works or is illustrative.
-                 // I will fix the instantiation issue by passing null or similar if possible, or just skip
-                 // the implementation detail here since I am documenting.
-                 // However, the code must compile.
-                 // Let's assume ChildIdProvider has a no-arg constructor or we can fake it.
-                 // Actually, I'll rely on the existing TaskRepository structure.
-                 // Since I can't easily instantiate ChildIdProvider here without its deps,
-                 // I will create a placeholder.
-                 com.google.pairing.ChildIdRepository(androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(produceFile = { java.io.File("dummy") }))
-            ) { override fun getChildId(): kotlinx.coroutines.flow.Flow<String?> = kotlinx.coroutines.flow.flowOf("current_child_id") }
+            childIdProvider
         )
+        
+        // Ruft die Cloud Function auf
         taskRepository.submitTaskProof(taskId, downloadUrl)
     } catch (e: Exception) {
         e.printStackTrace()

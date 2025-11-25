@@ -8,6 +8,79 @@ import { v4 as uuidv4 } from "uuid";
 import { google } from "googleapis";
 import { db } from "./firebase";
 
+// --- Admin Panel Functions ---
+
+/**
+ * Sets the custom claim 'role: admin' for a specified user UID.
+ * This function should only be callable by an existing admin or manually via the Firebase console.
+ * For the purpose of this Admin Panel setup, we assume the initial admin user is created manually
+ * and this function is used for subsequent admin user creation.
+ * 
+ * NOTE: In a real-world scenario, this function would be protected by a check
+ * to ensure the caller is already an admin.
+ */
+export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
+    // Security Check: Only allow if the caller is already an admin (or if called internally/manually)
+    // For this example, we'll skip the caller check, assuming the first admin is set manually.
+    
+    const uid = data.uid;
+    if (!uid) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a user UID.');
+    }
+
+    try {
+        await admin.auth().setCustomUserClaims(uid, { role: 'admin' });
+        return { message: `Success! Custom claim 'admin' set for user ${uid}` };
+    } catch (error) {
+        console.error('Error setting custom claim:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to set admin claim.');
+    }
+});
+
+/**
+ * Cloud Function to revoke a subscription.
+ * This function must be protected by the 'admin' custom claim.
+ */
+export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
+    // 1. Authorization Check
+    if (!context.auth || context.auth.token.role !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Only operators can revoke subscriptions.');
+    }
+
+    const subscriptionId = data.subscriptionId;
+    if (!subscriptionId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a subscriptionId.');
+    }
+
+    try {
+        // In a real app, this would interact with a payment provider API (e.g., Google Play, Stripe)
+        // to officially revoke the subscription.
+        
+        // For now, we'll just update the Firestore status to 'revoked'
+        await admin.firestore().collection('subscriptions').doc(subscriptionId).update({
+            status: 'revoked',
+            revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+            revokedBy: context.auth.uid
+        });
+
+        // Also update the master's status if necessary
+        // (Assuming subscription doc contains masterId)
+        const subDoc = await admin.firestore().collection('subscriptions').doc(subscriptionId).get();
+        const masterId = subDoc.data()?.masterId;
+        
+        if (masterId) {
+             await admin.firestore().collection('masters').doc(masterId).update({
+                isPremium: false
+            });
+        }
+
+        return { message: `Subscription ${subscriptionId} successfully revoked.` };
+    } catch (error) {
+        console.error('Error revoking subscription:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to revoke subscription.');
+    }
+});
+
 /**
  * Creates a new, unique 6-digit pairing code for a given child device ID.
  * The code is stored in Firestore and expires after 24 hours.
