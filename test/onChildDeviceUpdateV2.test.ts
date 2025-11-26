@@ -1,6 +1,10 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import fft from "firebase-functions-test";
+import { wrapV2 } from "firebase-functions-test/lib/v2";
+// import * as admin from "firebase-admin";  // Unused
+// import { getMessaging } from "firebase-admin/messaging";  // Unused - using mockSend directly
 
-// Mock getMessaging before importing anything that uses it
+// Mock firebase-admin/messaging module only
 const mockSend = jest.fn();
 jest.mock("firebase-admin/messaging", () => ({
   getMessaging: jest.fn(() => ({
@@ -8,38 +12,9 @@ jest.mock("firebase-admin/messaging", () => ({
   })),
 }));
 
-// For firebase-functions-test to work with makeDocumentSnapshot, 
-// we need the actual firebase-admin firestore functions available
-// Since we're mocking heavily, these trigger tests need to skip
-// the makeDocumentSnapshot approach and use a different strategy
 
-// Mock the firebase-admin module with firestore support
-jest.mock("firebase-admin", () => {
-  const original = jest.requireActual("firebase-admin");
-  
-  class MockTimestamp {
-    constructor(public seconds: number, public nanoseconds: number) {}
-    static now() { return new MockTimestamp(Date.now() / 1000, 0); }
-    static fromDate(date: Date) { return new MockTimestamp(date.getTime() / 1000, 0); }
-  }
-  
-  const firestoreNamespace = () => ({
-    collection: jest.fn(),
-  });
-  (firestoreNamespace as any).Timestamp = MockTimestamp;
-  (firestoreNamespace as any).FieldValue = {
-    serverTimestamp: jest.fn(() => "mock-server-timestamp"),
-  };
 
-  return {
-    ...original,
-    initializeApp: jest.fn(),
-    firestore: firestoreNamespace,
-    app: jest.fn(),
-  };
-});
-
-// Mock the db module
+// Mock the db module as well, if it's used in the functions
 jest.mock("../firebase", () => ({
   db: jest.fn(() => ({
     collection: jest.fn(() => ({
@@ -60,6 +35,7 @@ describe("onChildDeviceUpdateV2", () => {
   let myFunctions: any;
 
   beforeAll(() => {
+
     myFunctions = require("../index");
   });
 
@@ -71,29 +47,20 @@ describe("onChildDeviceUpdateV2", () => {
     mockSend.mockClear();
   });
 
-  // Helper to create mock change event for Firestore v2 triggers
-  // The event structure must match onDocumentUpdated's event format:
-  // event.data?.after.data() and event.data?.before.data()
-  const createMockEvent = (
-    beforeData: Record<string, any> | null,
-    afterData: Record<string, any> | null,
-    childId: string
-  ) => ({
-    data: afterData || beforeData ? {
-      before: { data: () => beforeData, exists: !!beforeData },
-      after: { data: () => afterData, exists: !!afterData },
-    } : undefined,
-    params: { childId },
-  });
-
   it("should send FCM message when isLocked changes", async () => {
     const oldData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
     const newData = { fcmToken: "test-token", isLocked: true, appBlacklist: [], usageRules: {} };
 
-    const event = createMockEvent(oldData, newData, "child123");
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
     
-    // Call the raw handler directly (v2 firestore triggers)
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    // For v2 firestore triggers, provide data before/after with data() methods
+    await wrapped({
+      data: {
+        before: oldData,
+        after: newData,
+      },
+      params: { childId: "child123" },
+    });
 
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith({
@@ -110,8 +77,14 @@ describe("onChildDeviceUpdateV2", () => {
     const oldData = { fcmToken: "test-token", isLocked: false, appBlacklist: ["app1"], usageRules: {} };
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: ["app1", "app2"], usageRules: {} };
 
-    const event = createMockEvent(oldData, newData, "child123");
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
+    await wrapped({
+      data: {
+        before: oldData,
+        after: newData,
+      },
+      params: { childId: "child123" },
+    });
 
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith({
@@ -128,8 +101,14 @@ describe("onChildDeviceUpdateV2", () => {
     const oldData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: { time: "2h" } };
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: { time: "3h" } };
 
-    const event = createMockEvent(oldData, newData, "child123");
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
+    await wrapped({
+      data: {
+        before: oldData,
+        after: newData,
+      },
+      params: { childId: "child123" },
+    });
 
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith({
@@ -146,8 +125,14 @@ describe("onChildDeviceUpdateV2", () => {
     const oldData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
 
-    const event = createMockEvent(oldData, newData, "child123");
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
+    await wrapped({
+      data: {
+        before: oldData,
+        after: newData,
+      },
+      params: { childId: "child123" },
+    });
 
     expect(mockSend).not.toHaveBeenCalled();
   });
@@ -156,8 +141,14 @@ describe("onChildDeviceUpdateV2", () => {
     const oldData = { isLocked: false, appBlacklist: [], usageRules: {} };
     const newData = { isLocked: true, appBlacklist: [], usageRules: {} };
 
-    const event = createMockEvent(oldData, newData, "child123");
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
+    await wrapped({
+      data: {
+        before: oldData,
+        after: newData,
+      },
+      params: { childId: "child123" },
+    });
 
     expect(mockSend).not.toHaveBeenCalled();
   });
@@ -165,20 +156,37 @@ describe("onChildDeviceUpdateV2", () => {
   it("should not send FCM message if newData is missing (document deleted)", async () => {
     const oldData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
 
-    const event = createMockEvent(oldData, null, "child123");
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
+    await wrapped({
+      data: {
+        before: oldData,
+        after: null,
+      },
+      params: { childId: "child123" },
+    });
 
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  // Tests the function's explicit handling of missing oldData (lines 634-637 in index.ts).
+  // When oldData is falsy/empty, the function correctly returns early with no notification,
+  // which is the intended behavior for document creation scenarios (though onDocumentUpdated
+  // typically doesn't fire on initial creation - that's what onDocumentCreated is for).
   it("should not send FCM message if oldData is missing (document created)", async () => {
     const newData = { fcmToken: "test-token", isLocked: false, appBlacklist: [], usageRules: {} };
 
-    const event = createMockEvent(null, newData, "child123");
-    await myFunctions.onChildDeviceUpdateV2.run(event);
+    const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
+    await wrapped({
+      data: {
+        before: {},  // Empty object - firebase-functions-test v2 processes this such that event.data.before.data() returns a falsy value
+        after: newData,
+      },
+      params: { childId: "child123" },
+    });
 
+    // Function explicitly checks `if (!oldData)` (line 634 in index.ts) which evaluates to true in this case,
+    // causing early return with no notification sent (verified by console.info log)
     expect(mockSend).not.toHaveBeenCalled();
   });
+
 });
-
-
