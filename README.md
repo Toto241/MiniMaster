@@ -48,12 +48,13 @@ The current prototype supports pairing, basic rule persistence (lock flag, app b
 
 The repository is a monorepo containing the following main components:
 
-- **/functions**: TypeScript Firebase Functions backend (business logic, pairing, tasks, subscription verification).
+- **Root**: TypeScript Firebase Functions backend (`index.ts`, `firebase.ts`) with business logic, pairing, tasks, subscription verification.
 - **/masterApp**: Android parent app (Kotlin / Compose).
 - **/childApp**: Android child app (Kotlin / Compose) – enforcement service missing.
 - **/web-control**: Minimal static web UI for parent actions.
 - **/firestore.rules**: Firestore security rules (flat schema, families disabled).
 - **/storage.rules**: Firebase Storage rules.
+- **/test**: Jest tests for Cloud Functions.
 
 ## Technology Stack
 
@@ -138,7 +139,7 @@ The web control panel provides PC-based access to all parent app functionality.
 Primary callable Cloud Functions (see `index.ts`):
 
 - Registration & Auth: `registerMasterDevice`, `generatePairingLink`, `validatePairingToken`, `createPairingCode`, `validatePairingCode`
-- Device Control: `setDeviceLocked`, `updateAppBlacklist`, `setUsageRules`, `registerFcmToken`, `recordHeartbeat`
+- Device Control: `setDeviceLocked`, `updateAppBlacklist`, `setUsageRules`, `registerFcmToken`, `recordHeartbeat`, `getRulesForChild`
 - Tasks: `createTask`, `completeTask`, `approveTask`
 - Subscription: `verifyPurchase`, `getSubscriptionStatus`
 - Trigger: `onChildDeviceUpdateV2` (diff-based FCM for `isLocked`, `appBlacklist`, `usageRules`)
@@ -146,6 +147,7 @@ Primary callable Cloud Functions (see `index.ts`):
 All business logic enforced server-side; Firestore is treated as authoritative state store.
 
 ### Current Data Model (Flat)
+
 Collections in active use: `masters`, `children`, nested `children/{childId}/tasks`, `pairingCodes`, `pairingTokens`.
 Documents or rules mentioning `families` represent a future migration target—currently disabled in `firestore.rules`.
 

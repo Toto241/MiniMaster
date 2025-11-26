@@ -43,6 +43,9 @@ jest.mock("firebase-admin", () => {
 
 const testEnv = fft();
 
+// Helper function to wrap data for firebase-functions v6 CallableRequest format
+const wrapData = <T>(data: T) => ({ data });
+
 describe("Cloud Functions", () => {
   let myFunctions: any;
   let db: admin.firestore.Firestore;
@@ -96,7 +99,7 @@ describe("Cloud Functions", () => {
       setStub.mockResolvedValue(undefined);
 
       const wrapped = testEnv.wrap(myFunctions.createPairingCode);
-      const result = await wrapped({ childId: "test-child-123" });
+      const result = await wrapped(wrapData({ childId: "test-child-123" }));
 
       expect(result).toHaveProperty("pairingCode");
       expect(typeof result.pairingCode).toBe("string");
@@ -111,7 +114,7 @@ describe("Cloud Functions", () => {
       setStub.mockResolvedValue(undefined);
 
       const wrapped = testEnv.wrap(myFunctions.createPairingCode);
-      const result = await wrapped({ childId: "test-child-456" });
+      const result = await wrapped(wrapData({ childId: "test-child-456" }));
 
       expect(result).toHaveProperty("pairingCode");
       expect(getStub).toHaveBeenCalledTimes(2);
@@ -120,14 +123,14 @@ describe("Cloud Functions", () => {
 
     it("should throw 'invalid-argument' if childId is missing", async () => {
       const wrapped = testEnv.wrap(myFunctions.createPairingCode);
-      await expect(wrapped({})).rejects.toThrow(/childId/);
+      await expect(wrapped(wrapData({}))).rejects.toThrow(/childId/);
     });
 
     it("should throw 'resource-exhausted' after max attempts", async () => {
       getStub.mockResolvedValue({ exists: true });
 
       const wrapped = testEnv.wrap(myFunctions.createPairingCode);
-      await expect(wrapped({ childId: "test-child-789" })).rejects.toThrow(/Could not create a unique pairing code/);
+      await expect(wrapped(wrapData({ childId: "test-child-789" }))).rejects.toThrow(/Could not create a unique pairing code/);
       expect(getStub).toHaveBeenCalledTimes(10);
     });
   });
@@ -152,7 +155,7 @@ describe("Cloud Functions", () => {
       });
 
       const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
-      const result = await wrapped({ pairingToken: "valid-token", childImei: "child-imei-456" });
+      const result = await wrapped(wrapData({ pairingToken: "valid-token", childImei: "child-imei-456" }));
 
       expect(result).toEqual({ childId: "parent-imei-123" });
       expect(collectionStub).toHaveBeenCalledWith("children");
@@ -163,7 +166,7 @@ describe("Cloud Functions", () => {
     it("should throw 'not-found' for an invalid token", async () => {
       getStub.mockResolvedValue({ exists: false });
       const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
-      await expect(wrapped({ pairingToken: "invalid-token", childImei: "child-imei" })).rejects.toThrow(/Pairing token is invalid/); // Updated to match exact error message
+      await expect(wrapped(wrapData({ pairingToken: "invalid-token", childImei: "child-imei" }))).rejects.toThrow(/Pairing token is invalid/);
     });
 
     it("should throw 'deadline-exceeded' for an expired token", async () => {
@@ -176,7 +179,7 @@ describe("Cloud Functions", () => {
       });
 
       const wrapped = testEnv.wrap(myFunctions.validatePairingToken);
-      await expect(wrapped({ pairingToken: "expired-token", childImei: "child-imei" })).rejects.toThrow(/Pairing token has expired/);
+      await expect(wrapped(wrapData({ pairingToken: "expired-token", childImei: "child-imei" }))).rejects.toThrow(/Pairing token has expired/);
       expect(deleteStub).toHaveBeenCalledTimes(1);
     });
   });
@@ -201,7 +204,7 @@ describe("Cloud Functions", () => {
       });
 
       const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
-      const result = await wrapped({ pairingCode: "123456" });
+      const result = await wrapped(wrapData({ pairingCode: "123456" }));
 
       expect(result).toEqual({ childId: "test-child-123" });
       expect(deleteStub).toHaveBeenCalledTimes(1);
@@ -210,7 +213,7 @@ describe("Cloud Functions", () => {
     it("should throw 'not-found' for an invalid code", async () => {
       getStub.mockResolvedValue({ exists: false });
       const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
-      await expect(wrapped({ pairingCode: "000000" })).rejects.toThrow(/Invalid pairing code/);
+      await expect(wrapped(wrapData({ pairingCode: "000000" }))).rejects.toThrow(/Invalid pairing code/);
     });
 
     it("should throw 'deadline-exceeded' for an expired code", async () => {
@@ -223,14 +226,14 @@ describe("Cloud Functions", () => {
       });
 
       const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
-      await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Pairing code has expired/);
+      await expect(wrapped(wrapData({ pairingCode: "123456" }))).rejects.toThrow(/Pairing code has expired/);
       expect(deleteStub).toHaveBeenCalledTimes(1);
     });
 
     it("should throw 'internal' if code data is missing", async () => {
       getStub.mockResolvedValue({ exists: true, data: () => undefined });
       const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
-      await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Pairing code data is missing/);
+      await expect(wrapped(wrapData({ pairingCode: "123456" }))).rejects.toThrow(/Pairing code data is missing/);
     });
 
     it("should throw 'internal' if expiresAt is malformed", async () => {
@@ -239,7 +242,7 @@ describe("Cloud Functions", () => {
             data: () => ({ childId: "test-child-123", expiresAt: "not-a-timestamp" }),
         });
         const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
-        await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Invalid pairing code data structure/);
+        await expect(wrapped(wrapData({ pairingCode: "123456" }))).rejects.toThrow(/Invalid pairing code data structure/);
     });
 
     it("should throw 'internal' if childId is malformed", async () => {
@@ -251,7 +254,7 @@ describe("Cloud Functions", () => {
             data: () => ({ childId: 123, expiresAt }), // Invalid childId
         });
         const wrapped = testEnv.wrap(myFunctions.validatePairingCode);
-        await expect(wrapped({ pairingCode: "123456" })).rejects.toThrow(/Invalid pairing code data structure \(childId\)/);
+        await expect(wrapped(wrapData({ pairingCode: "123456" }))).rejects.toThrow(/Invalid pairing code data structure \(childId\)/);
     });
   });
 
@@ -270,7 +273,7 @@ describe("Cloud Functions", () => {
       setStub.mockResolvedValue(undefined);
 
       const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
-      const result = await wrapped({ imei: "test-imei-123" });
+      const result = await wrapped(wrapData({ imei: "test-imei-123" }));
 
       expect(result).toHaveProperty("secretKey");
       expect(typeof result.secretKey).toBe("string");
@@ -281,12 +284,12 @@ describe("Cloud Functions", () => {
       getStub.mockResolvedValue({ exists: true });
 
       const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
-      await expect(wrapped({ imei: "test-imei-123" })).rejects.toThrow(/This device has already been registered/);
+      await expect(wrapped(wrapData({ imei: "test-imei-123" }))).rejects.toThrow(/This device has already been registered/);
     });
 
     it("should throw 'invalid-argument' if imei is missing", async () => {
       const wrapped = testEnv.wrap(myFunctions.registerMasterDevice);
-      await expect(wrapped({})).rejects.toThrow(/The function must be called with a valid 'imei' string/);
+      await expect(wrapped(wrapData({}))).rejects.toThrow(/The function must be called with a valid 'imei' string/);
     });
   });
 
@@ -305,7 +308,7 @@ describe("Cloud Functions", () => {
         setStub.mockResolvedValue(undefined);
 
         const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
-        const result = await wrapped({ imei: "test-imei-123", secretKey: "valid-secret" });
+        const result = await wrapped(wrapData({ imei: "test-imei-123", secretKey: "valid-secret" }));
 
         expect(result).toHaveProperty("pairingToken");
         expect(typeof result.pairingToken).toBe("string");
@@ -316,13 +319,13 @@ describe("Cloud Functions", () => {
         getStub.mockResolvedValue({ exists: false });
 
         const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
-        await expect(wrapped({ imei: "invalid-imei", secretKey: "invalid-secret" })).rejects.toThrow(/Invalid IMEI or secret key/);
+        await expect(wrapped(wrapData({ imei: "invalid-imei", secretKey: "invalid-secret" }))).rejects.toThrow(/Invalid IMEI or secret key/);
     });
 
     it("should throw 'invalid-argument' if imei or secretKey is missing", async () => {
         const wrapped = testEnv.wrap(myFunctions.generatePairingLink);
-        await expect(wrapped({ imei: "test-imei" })).rejects.toThrow(/Request must include a valid 'imei' and 'secretKey'/);
-        await expect(wrapped({ secretKey: "test-secret" })).rejects.toThrow(/Request must include a valid 'imei' and 'secretKey'/);
+        await expect(wrapped(wrapData({ imei: "test-imei" }))).rejects.toThrow(/Request must include a valid 'imei' and 'secretKey'/);
+        await expect(wrapped(wrapData({ secretKey: "test-secret" }))).rejects.toThrow(/Request must include a valid 'imei' and 'secretKey'/);
     });
   });
 
@@ -342,7 +345,7 @@ describe("Cloud Functions", () => {
         updateStub.mockResolvedValue(undefined);
 
         const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
-        const result = await wrapped({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: true });
+        const result = await wrapped(wrapData({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: true }));
 
         expect(result).toEqual({ success: true, isLocked: true });
         expect(updateStub).toHaveBeenCalledWith({ isLocked: true, updatedAt: "mock-server-timestamp" });
@@ -354,7 +357,7 @@ describe("Cloud Functions", () => {
         updateStub.mockResolvedValue(undefined);
 
         const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
-        const result = await wrapped({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: false });
+        const result = await wrapped(wrapData({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: false }));
 
         expect(result).toEqual({ success: true, isLocked: false });
         expect(updateStub).toHaveBeenCalledWith({ isLocked: false, updatedAt: "mock-server-timestamp" });
@@ -364,7 +367,7 @@ describe("Cloud Functions", () => {
         getStub.mockResolvedValue({ exists: false });
 
         const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
-        await expect(wrapped({ masterImei: "invalid-imei", secretKey: "invalid-secret", childImei: "child-imei", isLocked: true })).rejects.toThrow(/Invalid master IMEI or secret key/);
+        await expect(wrapped(wrapData({ masterImei: "invalid-imei", secretKey: "invalid-secret", childImei: "child-imei", isLocked: true }))).rejects.toThrow(/Invalid master IMEI or secret key/);
     });
 
     it("should throw 'permission-denied' if master is not authorized for the child", async () => {
@@ -372,12 +375,71 @@ describe("Cloud Functions", () => {
         getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "another-master" }) }); // child
 
         const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
-        await expect(wrapped({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: true })).rejects.toThrow(/This master device is not authorized/);
+        await expect(wrapped(wrapData({ masterImei: "test-imei", secretKey: "valid-secret", childImei: "child-imei", isLocked: true }))).rejects.toThrow(/This master device is not authorized/);
     });
 
     it("should throw 'invalid-argument' for missing arguments", async () => {
         const wrapped = testEnv.wrap(myFunctions.setDeviceLocked);
-        await expect(wrapped({})).rejects.toThrow(/Request must include valid/);
+        await expect(wrapped(wrapData({}))).rejects.toThrow(/Request must include valid/);
+    });
+  });
+
+  describe("getRulesForChild", () => {
+    beforeEach(() => {
+        collectionStub.mockImplementation((collectionName: string) => {
+            if (collectionName === "children") {
+                return { doc: docStub };
+            }
+            return { doc: jest.fn() };
+        });
+    });
+
+    it("should retrieve rules for a valid child device", async () => {
+        getStub.mockResolvedValue({
+            exists: true,
+            data: () => ({
+                isLocked: true,
+                appBlacklist: ["com.example.blocked"],
+                usageRules: { dailyLimit: 120 }
+            })
+        });
+
+        const wrapped = testEnv.wrap(myFunctions.getRulesForChild);
+        const result = await wrapped(wrapData({ childId: "test-child-123" }));
+
+        expect(result).toEqual({
+            isLocked: true,
+            blockedApps: ["com.example.blocked"],
+            usageRules: { dailyLimit: 120 }
+        });
+    });
+
+    it("should return default values for missing fields", async () => {
+        getStub.mockResolvedValue({
+            exists: true,
+            data: () => ({})
+        });
+
+        const wrapped = testEnv.wrap(myFunctions.getRulesForChild);
+        const result = await wrapped(wrapData({ childId: "test-child-123" }));
+
+        expect(result).toEqual({
+            isLocked: false,
+            blockedApps: [],
+            usageRules: {}
+        });
+    });
+
+    it("should throw 'not-found' for non-existent child", async () => {
+        getStub.mockResolvedValue({ exists: false });
+
+        const wrapped = testEnv.wrap(myFunctions.getRulesForChild);
+        await expect(wrapped(wrapData({ childId: "non-existent" }))).rejects.toThrow(/The specified child device does not exist/);
+    });
+
+    it("should throw 'invalid-argument' if childId is missing", async () => {
+        const wrapped = testEnv.wrap(myFunctions.getRulesForChild);
+        await expect(wrapped(wrapData({}))).rejects.toThrow(/Request must include a valid 'childId'/);
     });
   });
 });

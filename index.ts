@@ -13,7 +13,6 @@ import { db } from "./firebase";
  * This function is callable from a client application.
  *
  * @param {{childId: string}} data - The data passed to the function.
-import { CallableContext, EventContext } from "firebase-functions/lib/common";
  * @param {string} data.childId - The unique identifier of the child device.
  * @param {functions.https.CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{pairingCode: string}>} A promise that resolves with the generated pairing code.
@@ -937,6 +936,69 @@ export const validatePairingToken = functions.https.onCall(
       error
     );
   }
+  }
+);
+
+/**
+ * Retrieves the current rules (lock state, blocked apps, usage rules) for a child device.
+ * This function is called by the child app to sync rules from the backend.
+ *
+ * @param {{childId: string}} data - The data passed to the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {functions.https.CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{isLocked: boolean, blockedApps: string[], usageRules: object}>} The current rules for the child.
+ * @throws {functions.https.HttpsError} Throws an error if the childId is invalid or not found.
+ */
+export const getRulesForChild = functions.https.onCall(
+  async (request: functions.https.CallableRequest<{ childId: string }>) => {
+    const { childId } = request.data;
+
+    if (!childId || typeof childId !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Request must include a valid 'childId'."
+      );
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+
+    try {
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "The specified child device does not exist."
+        );
+      }
+
+      const childData = childDoc.data();
+      if (!childData) {
+        throw new functions.https.HttpsError(
+          "internal",
+          "Child device data is missing."
+        );
+      }
+
+      const rules = {
+        isLocked: childData.isLocked ?? false,
+        blockedApps: childData.appBlacklist ?? [],
+        usageRules: childData.usageRules ?? {},
+      };
+
+      functions.logger.info(`Rules retrieved for child ${childId}`);
+      return rules;
+
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      functions.logger.error(`Failed to retrieve rules for child ${childId}:`, error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while retrieving rules.",
+        error
+      );
+    }
   }
 );
 

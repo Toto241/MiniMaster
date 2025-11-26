@@ -1,64 +1,111 @@
-<!-- High-signal instructions for AI coding agents working in MiniMaster -->
-# Mini-Master: Focused Agent Guide
+<!-- High-signal instructions for AI coding agents working on MiniMaster -->
+# MiniMaster Agent Guide
 
-Backend (TypeScript Firebase Functions) + two Android apps + minimal web control. Treat backend tests + lint as primary quality gate; Android CI may be skipped when Google Maven blocked.
+Parental control suite: Firebase Cloud Functions (TypeScript) + two Android apps (Kotlin/Compose) + static web panel. **Prototype status** – actual device blocking not implemented.
 
-## Core Model
-1. Authoritative logic only in Cloud Functions (`index.ts`); clients just call.
-2. Active Firestore schema is FLAT: `masters`, `children`, `pairingCodes`, `pairingTokens`, nested `children/{childId}/tasks`. Ignore future `families/...` paths (explicitly denied in `firestore.rules`).
-3. Pairing: `registerMasterDevice` → (`generatePairingLink` 5m token OR `createPairingCode` 24h code) → `validatePairingToken|validatePairingCode` → child doc create.
-4. Differential sync: Firestore trigger `onChildDeviceUpdateV2` sends only changed keys among `isLocked`, `appBlacklist`, `usageRules` via FCM data payload.
-5. Time: always `admin.firestore.Timestamp.now()`; manual epoch math for expiries (see pairing code/token).
+## Architecture Overview
 
-## Dev Loop
-```bash
-npm install
-npm run lint
-npm test           # jest; mocks firebase-admin
 ```
-Optional: `npx tsc --noEmit` (type check). CI (`.github/workflows/ci.yml`) gates Android steps behind a network probe to `dl.google.com`.
+index.ts          → All callable Cloud Functions (auth, pairing, tasks, subscription)
+firebase.ts       → Singleton Firebase Admin init (lazy getters: db(), auth(), storage())
+firestore.rules   → Flat schema validation (families/* denied)
+masterApp/        → Parent Android app (Kotlin/Compose/Hilt)
+childApp/         → Child Android app (receives rules via FCM, no enforcement yet)
+web-control/      → Static JS panel for parent actions
+test/             → Jest tests with firebase-functions-test
+```
 
-## Function Pattern
-- Early input validation; throw `functions.https.HttpsError` using ONLY observed codes: `invalid-argument`, `already-exists`, `unauthenticated`, `permission-denied`, `resource-exhausted`, `deadline-exceeded`, `internal`, `not-found`, `failed-precondition` (Task state machine). See `ERROR_CODES.md` for matrix.
-- Defensive cleanup of malformed / expired docs before error (see `validatePairingCode`, token flows).
-- Return minimal objects (`{ success: true }`, `{ pairingCode }`, `{ childId }`). Legacy quirk: `validatePairingToken` returns `{ childId: masterImei }` (compat layer; plan deprecation → do NOT silently change without migration note).
-- For new diff-synced fields: update child doc write + extend trigger diff (stringify arrays/objects) + add unit test (change + no-change case).
+## Data Model (Flat Firestore)
+
+Collections: `masters`, `children`, `children/{childId}/tasks`, `pairingCodes`, `pairingTokens`
+
+**Do NOT add `families/...`** – rules explicitly deny. Task fields allowed: `description, status, photoUrl, createdAt, updatedAt, deadline, completedAt, masterImei`. Extending requires: `firestore.rules` update + unit test.
+
+## Cloud Function Patterns
+
+1. **Early validate** → throw `functions.https.HttpsError` (codes from `ERROR_CODES.md` only)
+2. **Auth via `masterImei` + `secretKey`** – no Firebase Auth tokens; re-check ownership before mutations
+3. **Corrupt/expired docs**: delete then throw (log with `DATA_CORRUPTION` prefix)
+4. **Minimal response payloads**; preserve `validatePairingToken` quirk: `{ childId: masterImei }`
+5. **Timestamps**: use `admin.firestore.Timestamp.now()` or `FieldValue.serverTimestamp()`
+
+```typescript
+// Pattern example from index.ts
+if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+  throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
+}
+```
+
+## Pairing Flow
+
+```
+registerMasterDevice → secretKey
+    ↓
+generatePairingLink (5m token) OR createPairingCode (6-digit, 24h)
+    ↓
+validatePairingToken/Code → creates child doc, deletes ephemeral doc
+    ↓
+onChildDeviceUpdateV2 trigger → FCM diff push (only changed keys)
+```
+
+## Task State Machine
+
+```
+pending → pending_approval (completeTask) → approved (approveTask)
+Invalid transitions → failed-precondition
+```
+
+## Development Commands
+
+```bash
+npm install          # Install dependencies
+npm run lint         # ESLint check
+npm test             # Jest tests (mocks firebase-admin)
+firebase deploy --only functions,firestore,storage  # Deploy after green tests
+firebase functions:secrets:set KEY                  # Manage secrets
+```
 
 ## Testing Conventions
-- Use `firebase-functions-test` wrap: `const wrapped = testEnv.wrap(fn)`.
-- Mocking: central jest mocks for `firebase-admin` Timestamp + FieldValue; mimic existing structure for new collection access via `db().collection(name)` to keep spying simple.
-- Cover: success | auth failure | malformed input | expiry edge | malformed stored data (delete + error).
 
-## Firestore Rules Awareness
-- Rules allow auth-gated flat access; fine-grained auth enforced server-side (IMEI + secretKey checks).
-- Tasks schema whitelist: `['description','status','photoUrl','createdAt','updatedAt','deadline','completedAt']`; adding a task field REQUIRES rule + test update BEFORE function writes it.
-- Do not introduce `families/...` without a migration plan issue (dual-write + rules change + tests).
+- Use `firebase-functions-test` wrapper; see `test/setup-env.ts` for emulator env vars
+- Mock `admin.firestore.Timestamp` as class with `now()`, `fromDate()`, `seconds/nanoseconds`
+- Cover: happy path, auth failure, invalid args, expiry boundary, malformed stored data (ensure cleanup), state transitions (`failed-precondition`)
+- No deep collection paths in tests
 
-## Messaging & Payload Size
-- Only include changed keys; stringify complex values. No new trigger duplicates—extend existing `onChildDeviceUpdateV2`.
-- Missing or invalid `fcmToken` → log warn, no throw.
+## Android Notes
 
-## Subscription Handling
-- `verifyPurchase` calls Google Play API; sets a 30‑day expiry snapshot (no background renewal). Extending logic → ensure idempotence + add a clock-skew test scenario.
+- **masterApp**: `com.minimaster.masterapp` – Hilt DI, Compose screens, Play Billing
+- **childApp**: `com.google.pairing` (+ `.child` subpackage) – FCM sync via `RuleSyncService`, `MiniMasterAccessibilityService` for app blocking
+- `getRulesForChild` function allows child device to pull current rules from backend
+- CI network probe skips Android build if `dl.google.com` unreachable (expected in restricted envs)
+- Run locally: `./gradlew assembleDebug`, `./gradlew testDebugUnitTest`
 
-## Secrets & Deployment
-```bash
-firebase login
-firebase use <alias>
-firebase deploy --only functions,firestore,storage
-```
-Never commit service account JSON. New secrets: use `firebase functions:secrets:set` + document retrieval in `RUNBOOK.md`.
+## Error Codes Reference
 
-## Safety Checklist (Commit Gate)
-1. Inputs validated with precise error codes (include `not-found` where appropriate).
-2. No unintended deep collection paths.
-3. Expiry logic uses server timestamp.
-4. Tests for every new branch (success + each failure + no-change trigger path).
-5. `npm run lint && npm test` clean.
+| Code | Usage |
+|------|-------|
+| `invalid-argument` | Missing/wrong type args (early throw) |
+| `unauthenticated` | Invalid IMEI/secretKey combo |
+| `permission-denied` | Master not owner of child |
+| `not-found` | Document doesn't exist |
+| `deadline-exceeded` | Expired pairing token/code |
+| `failed-precondition` | Invalid task state transition |
+| `already-exists` | IMEI already registered |
+| `resource-exhausted` | 10 pairing code collisions |
 
-## Escalate Before Acting If…
-- You need hierarchical families data model.
-- Adding new FCM sync surface beyond existing trigger.
-- Introducing real device blocking (Accessibility service not implemented yet).
+## Commit Checklist
 
-Stay minimal: replicate existing patterns; prefer small diffs with consistent `functions.logger` usage (info / warn / error).
+- [ ] `npm run lint && npm test` green
+- [ ] No new collection paths without rules update
+- [ ] Error codes match `ERROR_CODES.md`
+- [ ] New FCM diff fields added to trigger + tests (change/no-change branches)
+- [ ] No service account JSON committed
+
+## Key Files
+
+- `index.ts` – All Cloud Functions
+- `firebase.ts` – Admin SDK init pattern
+- `firestore.rules` – Schema enforcement
+- `ERROR_CODES.md` – Allowed HttpsError codes
+- `ARCHITECTURE.md` – Migration plans (flat→families)
+- `test/index.test.ts` – Jest test patterns
