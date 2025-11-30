@@ -19,9 +19,14 @@ import { db } from "./firebase";
  * NOTE: In a real-world scenario, this function would be protected by a check
  * to ensure the caller is already an admin.
  */
-export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, _context: CallableContext) => {
-    // Security Check: Only allow if the caller is already an admin (or if called internally/manually)
-    // For this example, we'll skip the caller check, assuming the first admin is set manually.
+export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
+    // Security Check: Only allow if the caller is already an admin
+    if (!context.auth || context.auth.token.role !== 'admin') {
+        throw new functions.https.HttpsError(
+            'permission-denied',
+            'Only existing admins can grant admin privileges to other users.'
+        );
+    }
     
     const uid = data.uid;
     if (!uid) {
@@ -1154,3 +1159,53 @@ export const validatePairingToken = functions.https.onCall(
   }
   }
 );
+
+// --- PUSH NOTIFICATIONS ---
+
+/**
+ * Cloud Function that triggers when a task document is updated.
+ * It sends a push notification to the master device when a task is submitted for review.
+ */
+export const onTaskStatusChange = functions.firestore
+    .document("/children/{childId}/tasks/{taskId}")
+    .onUpdate(async (change, context) => {
+        const newValue = change.after.data();
+        const previousValue = change.before.data();
+
+        // Check if the status has changed to SUBMITTED
+        if (newValue.status === 'SUBMITTED' && previousValue.status !== 'SUBMITTED') {
+            const masterImei = newValue.masterImei;
+            if (!masterImei) {
+                console.log("No masterImei found for this task. Cannot send notification.");
+                return;
+            }
+
+            // Get the master's FCM token from the masters collection
+            const masterDoc = await db().collection("masters").doc(masterImei).get();
+            const fcmToken = masterDoc.data()?.fcmToken;
+
+            if (!fcmToken) {
+                console.log(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
+                return;
+            }
+
+            const payload = {
+                notification: {
+                    title: 'Task Submitted for Review',
+                    body: `Your child has submitted the task "${newValue.title}" for your review.`,
+                    sound: "default"
+                },
+                data: {
+                    taskId: context.params.taskId,
+                    childId: context.params.childId
+                }
+            };
+
+            try {
+                await getMessaging().sendToDevice(fcmToken, payload);
+                console.log(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
+            } catch (error) {
+                console.error("Error sending notification:", error);
+            }
+        }
+    });
