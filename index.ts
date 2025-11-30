@@ -1251,3 +1251,62 @@ export const updateFCMToken = functions.https.onCall(async (data: { masterImei: 
         );
     }
 });
+
+/**
+ * Deletes a user account and all associated data.
+ * This function should be called when a user requests to delete their account.
+ */
+export const deleteUserAccount = functions.https.onCall(async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
+    const { masterImei, secretKey } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Request must include valid 'masterImei' and 'secretKey'."
+        );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Invalid master IMEI or secret key."
+        );
+    }
+
+    try {
+        // 1. Delete all children associated with the master
+        const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterImei).get();
+        const deleteChildrenPromises = childrenSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteChildrenPromises);
+
+        // 2. Delete all tasks associated with the master
+        const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterImei).get();
+        const deleteTasksPromises = tasksSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteTasksPromises);
+
+        // 3. Delete all subscriptions associated with the master
+        const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterImei).get();
+        const deleteSubsPromises = subsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteSubsPromises);
+
+        // 4. Delete the master document itself
+        await masterDeviceRef.delete();
+
+        // 5. Delete the Firebase Auth user (if using Firebase Auth)
+        // This part needs to be implemented when migrating to Firebase Auth tokens
+        // await admin.auth().deleteUser(masterDoc.data()?.uid);
+
+        functions.logger.info(`User account and all associated data deleted for master ${masterImei}.`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to delete user account for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while deleting the user account.",
+            error
+        );
+    }
+});
