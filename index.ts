@@ -1209,3 +1209,45 @@ export const onTaskStatusChange = functions.firestore
             }
         }
     });
+
+/**
+ * Updates the FCM token for a master device.
+ * This allows the backend to send push notifications to the correct device.
+ */
+export const updateFCMToken = functions.https.onCall(async (data: { masterImei: string; secretKey: string; fcmToken: string }, _context: CallableContext) => {
+    const { masterImei, secretKey, fcmToken } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string" || !fcmToken || typeof fcmToken !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Request must include valid 'masterImei', 'secretKey', and 'fcmToken'."
+        );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Invalid master IMEI or secret key."
+        );
+    }
+
+    try {
+        await masterDeviceRef.update({
+            fcmToken: fcmToken,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        functions.logger.info(`FCM token updated for master ${masterImei}.`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to update FCM token for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while updating the FCM token.",
+            error
+        );
+    }
+});
