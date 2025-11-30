@@ -92,6 +92,11 @@ function loadDashboardData() {
 }
 
 function loadStats() {
+    // Show loading indicators
+    document.getElementById("stat-total-users").innerHTML = "<span class='loading-spinner'></span>";
+    document.getElementById("stat-active-subs").innerHTML = "<span class='loading-spinner'></span>";
+    document.getElementById("stat-total-tasks").innerHTML = "<span class='loading-spinner'></span>";
+    
     // In a real scenario, this would call a secure Cloud Function to aggregate data
     // For now, we'll use direct Firestore queries (protected by admin rules)
     
@@ -182,8 +187,65 @@ function loadSubscriptions() {
 // --- Actions ---
 
 function viewUserDetails(masterId) {
-    showNotification(`Viewing details for Master ID: ${masterId}`, "info");
-    // Implement a modal or new view to show detailed user data
+    const modal = document.getElementById("user-details-modal");
+    const modalContent = document.getElementById("user-details-content");
+    
+    modalContent.innerHTML = "<div class='loading'>Loading user details...</div>";
+    modal.style.display = "block";
+    
+    // Load master data
+    db.collection("masters").doc(masterId).get().then(masterDoc => {
+        if (!masterDoc.exists) {
+            modalContent.innerHTML = "<div class='error'>User not found.</div>";
+            return;
+        }
+        
+        const masterData = masterDoc.data();
+        let html = `<h3>Master Details</h3>`;
+        html += `<p><strong>Master ID:</strong> ${masterId}</p>`;
+        html += `<p><strong>Email:</strong> ${masterData.email || "N/A"}</p>`;
+        html += `<p><strong>IMEI:</strong> ${masterData.imei || "N/A"}</p>`;
+        html += `<p><strong>Created At:</strong> ${masterData.createdAt ? new Date(masterData.createdAt.seconds * 1000).toLocaleString() : "N/A"}</p>`;
+        html += `<p><strong>Last Seen:</strong> ${masterData.lastSeen ? new Date(masterData.lastSeen.seconds * 1000).toLocaleString() : "N/A"}</p>`;
+        
+        // Load children
+        db.collection("children").where("masterImei", "==", masterId).get().then(childrenSnapshot => {
+            html += `<h4>Children (${childrenSnapshot.size})</h4>`;
+            if (childrenSnapshot.empty) {
+                html += "<p>No children linked.</p>";
+            } else {
+                html += "<ul>";
+                childrenSnapshot.forEach(childDoc => {
+                    const childData = childDoc.data();
+                    html += `<li><strong>${childDoc.id}</strong> - Locked: ${childData.isLocked ? "Yes" : "No"}</li>`;
+                });
+                html += "</ul>";
+            }
+            
+            // Load subscription
+            db.collection("subscriptions").where("masterId", "==", masterId).get().then(subSnapshot => {
+                html += `<h4>Subscription</h4>`;
+                if (subSnapshot.empty) {
+                    html += "<p>No active subscription.</p>";
+                } else {
+                    subSnapshot.forEach(subDoc => {
+                        const subData = subDoc.data();
+                        html += `<p><strong>Status:</strong> ${subData.status}</p>`;
+                        html += `<p><strong>Expires:</strong> ${subData.expiryDate ? new Date(subData.expiryDate.seconds * 1000).toLocaleDateString() : "N/A"}</p>`;
+                    });
+                }
+                
+                modalContent.innerHTML = html;
+            });
+        });
+    }).catch(error => {
+        console.error("Error loading user details:", error);
+        modalContent.innerHTML = `<div class='error'>Error loading details: ${error.message}</div>`;
+    });
+}
+
+function closeUserDetailsModal() {
+    document.getElementById("user-details-modal").style.display = "none";
 }
 
 function revokeSubscription(subscriptionId) {
@@ -206,14 +268,57 @@ function revokeSubscription(subscriptionId) {
 }
 
 function searchUsers() {
-    const query = document.getElementById("user-search-input").value.trim();
+    const query = document.getElementById("user-search-input").value.trim().toLowerCase();
     if (query.length < 3) {
         showNotification("Please enter at least 3 characters to search.", "info");
         return;
     }
     
-    // Implement search logic (e.g., call a Cloud Function for full-text search)
-    showNotification(`Searching for: ${query}`, "info");
+    const userListElement = document.getElementById("user-list");
+    userListElement.innerHTML = "<div class='loading'>Searching users...</div>";
+    
+    // Simple client-side search by IMEI or email
+    // In production, use a Cloud Function with Algolia or similar for full-text search
+    db.collection("masters").get().then(snapshot => {
+        const results = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const imei = (data.imei || "").toLowerCase();
+            const email = (data.email || "").toLowerCase();
+            
+            if (imei.includes(query) || email.includes(query) || doc.id.toLowerCase().includes(query)) {
+                results.push({ id: doc.id, data: data });
+            }
+        });
+        
+        if (results.length === 0) {
+            userListElement.innerHTML = "<div class='info'>No users found matching your search.</div>";
+            return;
+        }
+        
+        let html = "<table><tr><th>Master ID</th><th>Email</th><th>Children</th><th>Last Seen</th><th>Actions</th></tr>";
+        results.forEach(result => {
+            const data = result.data;
+            const lastSeen = data.lastSeen ? new Date(data.lastSeen.seconds * 1000).toLocaleString() : "N/A";
+            const email = data.email || "N/A";
+            
+            html += `
+                <tr>
+                    <td>${result.id}</td>
+                    <td>${email}</td>
+                    <td>${data.childCount || 0}</td>
+                    <td>${lastSeen}</td>
+                    <td><button onclick="viewUserDetails('${result.id}')" class="btn btn-secondary">View</button></td>
+                </tr>
+            `;
+        });
+        html += "</table>";
+        userListElement.innerHTML = html;
+        showNotification(`Found ${results.length} user(s) matching "${query}".`, "success");
+    }).catch(error => {
+        console.error("Error searching users:", error);
+        userListElement.innerHTML = "<div class='error'>Error searching users: " + error.message + "</div>";
+    });
 }
 
 // --- Utility ---
