@@ -31,9 +31,11 @@ The Mini-Master suite is designed to give parents control over their children's 
 *   **Remote Locking:** Instantly lock or unlock the child's device from the parent app or web panel.
 *   **App Blocking:** Blacklist specific applications to prevent their usage.
 *   **Usage Limits:** Set daily usage limits for the device.
-*   **Task System:** Assign tasks to children (e.g., "Clean your room"). Children submit photo proof, and parents can approve it to unlock the device or grant rewards.
+*   **Task-Based Unlocking:** Assign tasks to children (e.g., "Clean your room"). The child device remains locked until the child submits photo proof of task completion, which the parent can then approve or reject.
+*   **Push Notifications:** Parents receive real-time notifications when a child submits a task for review.
 *   **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
 *   **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
+*   **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
 
 ## Project Structure
 
@@ -133,7 +135,17 @@ The repository is organized as follows:
 
 ## Documentation
 
-Each source file in this repository is thoroughly documented. You can explore the code to understand specific implementations:
+Comprehensive documentation is available in the `docs/` directory:
+
+*   **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project to Firebase.
+*   **[Project Hardening Plan](docs/PROJECT_HARDENING_PLAN.md):** Overview of identified gaps and the plan to address them.
+*   **[Security Test Scenarios](docs/TEST_SCENARIOS_SECURITY.md):** Test cases to validate the security rules and authorization logic.
+*   **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements for production deployment.
+*   **[Task Unlock Architecture](docs/TASK_UNLOCK_ARCHITECTURE.md):** Detailed architecture of the task-based unlocking feature.
+*   **[Admin Panel Architecture](docs/ADMIN_PANEL_ARCHITECTURE.md):** Architecture and security design of the operator dashboard.
+*   **[Admin Panel Test Scenarios](docs/TEST_SCENARIOS_ADMIN_PANEL.md):** Test scenarios for the admin panel.
+
+Each source file in this repository is also thoroughly documented. You can explore the code to understand specific implementations:
 *   **Backend:** See `index.ts` for API endpoints and business logic.
 *   **Android:** See individual Kotlin files for UI and service logic documentation.
 

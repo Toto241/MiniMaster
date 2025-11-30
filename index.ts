@@ -19,9 +19,14 @@ import { db } from "./firebase";
  * NOTE: In a real-world scenario, this function would be protected by a check
  * to ensure the caller is already an admin.
  */
-export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, _context: CallableContext) => {
-    // Security Check: Only allow if the caller is already an admin (or if called internally/manually)
-    // For this example, we'll skip the caller check, assuming the first admin is set manually.
+export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
+    // Security Check: Only allow if the caller is already an admin
+    if (!context.auth || context.auth.token.role !== 'admin') {
+        throw new functions.https.HttpsError(
+            'permission-denied',
+            'Only existing admins can grant admin privileges to other users.'
+        );
+    }
     
     const uid = data.uid;
     if (!uid) {
@@ -1154,3 +1159,154 @@ export const validatePairingToken = functions.https.onCall(
   }
   }
 );
+
+// --- PUSH NOTIFICATIONS ---
+
+/**
+ * Cloud Function that triggers when a task document is updated.
+ * It sends a push notification to the master device when a task is submitted for review.
+ */
+export const onTaskStatusChange = functions.firestore
+    .document("/children/{childId}/tasks/{taskId}")
+    .onUpdate(async (change, context) => {
+        const newValue = change.after.data();
+        const previousValue = change.before.data();
+
+        // Check if the status has changed to SUBMITTED
+        if (newValue.status === 'SUBMITTED' && previousValue.status !== 'SUBMITTED') {
+            const masterImei = newValue.masterImei;
+            if (!masterImei) {
+                console.log("No masterImei found for this task. Cannot send notification.");
+                return;
+            }
+
+            // Get the master's FCM token from the masters collection
+            const masterDoc = await db().collection("masters").doc(masterImei).get();
+            const fcmToken = masterDoc.data()?.fcmToken;
+
+            if (!fcmToken) {
+                console.log(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
+                return;
+            }
+
+            const payload = {
+                notification: {
+                    title: 'Task Submitted for Review',
+                    body: `Your child has submitted the task "${newValue.title}" for your review.`,
+                    sound: "default"
+                },
+                data: {
+                    taskId: context.params.taskId,
+                    childId: context.params.childId
+                }
+            };
+
+            try {
+                await getMessaging().sendToDevice(fcmToken, payload);
+                console.log(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
+            } catch (error) {
+                console.error("Error sending notification:", error);
+            }
+        }
+    });
+
+/**
+ * Updates the FCM token for a master device.
+ * This allows the backend to send push notifications to the correct device.
+ */
+export const updateFCMToken = functions.https.onCall(async (data: { masterImei: string; secretKey: string; fcmToken: string }, _context: CallableContext) => {
+    const { masterImei, secretKey, fcmToken } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string" || !fcmToken || typeof fcmToken !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Request must include valid 'masterImei', 'secretKey', and 'fcmToken'."
+        );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Invalid master IMEI or secret key."
+        );
+    }
+
+    try {
+        await masterDeviceRef.update({
+            fcmToken: fcmToken,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        functions.logger.info(`FCM token updated for master ${masterImei}.`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to update FCM token for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while updating the FCM token.",
+            error
+        );
+    }
+});
+
+/**
+ * Deletes a user account and all associated data.
+ * This function should be called when a user requests to delete their account.
+ */
+export const deleteUserAccount = functions.https.onCall(async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
+    const { masterImei, secretKey } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Request must include valid 'masterImei' and 'secretKey'."
+        );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Invalid master IMEI or secret key."
+        );
+    }
+
+    try {
+        // 1. Delete all children associated with the master
+        const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterImei).get();
+        const deleteChildrenPromises = childrenSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteChildrenPromises);
+
+        // 2. Delete all tasks associated with the master
+        const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterImei).get();
+        const deleteTasksPromises = tasksSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteTasksPromises);
+
+        // 3. Delete all subscriptions associated with the master
+        const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterImei).get();
+        const deleteSubsPromises = subsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteSubsPromises);
+
+        // 4. Delete the master document itself
+        await masterDeviceRef.delete();
+
+        // 5. Delete the Firebase Auth user (if using Firebase Auth)
+        // This part needs to be implemented when migrating to Firebase Auth tokens
+        // await admin.auth().deleteUser(masterDoc.data()?.uid);
+
+        functions.logger.info(`User account and all associated data deleted for master ${masterImei}.`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to delete user account for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while deleting the user account.",
+            error
+        );
+    }
+});
