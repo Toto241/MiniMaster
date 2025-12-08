@@ -60,6 +60,24 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    // Rules for subscriptions collection (used by admin panel and verifyPurchase)
+    match /subscriptions/{subscriptionId} {
+      // Allow read/write for authenticated users only
+      // Note: Admin authorization is handled in Cloud Functions via custom claims
+      allow read, write: if isSignedIn();
+    }
+
+    // Rules for usage history sub-collection (used by reportDailyUsage)
+    match /children/{childId}/usageHistory/{date} {
+      allow read, write: if isSignedIn();
+      
+      // Validate usage history data structure
+      allow create, update: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['date', 'totalUsageMillis', 'updatedAt'])
+        && request.resource.data.date is string
+        && request.resource.data.totalUsageMillis is number;
+    }
+
     // Deny access to the old nested family structure to prevent confusion
     match /families/{familyId} {
       allow read, write: if false;

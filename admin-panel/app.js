@@ -1,3 +1,5 @@
+/* eslint-env browser */
+/* global firebase */
 // MiniMaster Operator Dashboard JavaScript
 
 // Firebase configuration (MUST be replaced with actual config)

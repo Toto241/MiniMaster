@@ -85,7 +85,8 @@ class RuleSyncService : FirebaseMessagingService() {
      */
     private fun handleDeviceLockMessage(data: Map<String, String>) {
         Log.d(TAG, "Handling device lock message")
-        val isLocked = data["locked"]?.toBoolean() ?: false
+        // Support both "isLocked" (from onChildDeviceUpdateV2) and legacy "locked" key
+        val isLocked = data["isLocked"]?.toBoolean() ?: data["locked"]?.toBoolean() ?: false
         
         CoroutineScope(Dispatchers.IO).launch {
             try {

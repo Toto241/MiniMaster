@@ -144,22 +144,51 @@ export const createPairingCode = functions.https.onCall(async (data: { childId: 
 
 /**
  * Validates a given pairing code. If the code is valid and not expired,
- * it returns the associated childId and deletes the code to prevent reuse.
+ * it creates a child device document linked to the master, then returns the
+ * associated childId and deletes the code to prevent reuse.
  *
- * @param {{pairingCode: string}} data - The data passed to the function.
+ * @param {{pairingCode: string, masterImei: string, secretKey: string}} data - The data passed to the function.
  * @param {string} data.pairingCode - The 6-digit pairing code to validate.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{childId: string}>} A promise that resolves with the childId associated with the code.
  * @throws {functions.https.HttpsError} Throws an error if the code is invalid, not found, expired, or malformed.
  */
-export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string }, _context: CallableContext) => {
-  const { pairingCode } = data;
+export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string; masterImei?: string; secretKey?: string }, _context: CallableContext) => {
+  const { pairingCode, masterImei, secretKey } = data;
 
   if (!pairingCode || typeof pairingCode !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
       "The function must be called with a 'pairingCode' string."
     );
+  }
+
+  // If master credentials are provided, verify them
+  if (masterImei && secretKey) {
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Invalid master IMEI or secret key."
+      );
+    }
+
+    // Subscription Check: Limit non-premium users to 1 child
+    const masterData = masterDoc.data();
+    const isPremium = masterData?.subscription?.status === "active";
+
+    if (!isPremium) {
+      const childrenQuery = await db().collection("children").where("masterImei", "==", masterImei).get();
+      if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Free tier limited to 1 child device. Please upgrade to Premium."
+        );
+      }
+    }
   }
 
   const pairingCodeRef = db().collection("pairingCodes").doc(pairingCode);
@@ -217,6 +246,17 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
         "deadline-exceeded",
         "Pairing code has expired."
       );
+    }
+
+    // Create child document if master credentials were provided
+    if (masterImei && secretKey) {
+      const childDeviceRef = db().collection("children").doc(childId);
+      await childDeviceRef.set({
+        childImei: childId,
+        masterImei: masterImei,
+        pairedAt: now,
+      });
+      functions.logger.info(`Child device ${childId} successfully paired with master ${masterImei} via pairing code.`);
     }
 
     await pairingCodeRef.delete();

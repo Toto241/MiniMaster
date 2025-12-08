@@ -1,3 +1,5 @@
+/* eslint-env browser */
+/* global firebase, Chart */
 // Mini-Master Web Control Panel JavaScript
 
 // Firebase configuration (you'll need to replace this with your actual config)
