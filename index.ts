@@ -19,9 +19,14 @@ import { db } from "./firebase";
  * NOTE: In a real-world scenario, this function would be protected by a check
  * to ensure the caller is already an admin.
  */
-export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, _context: CallableContext) => {
-    // Security Check: Only allow if the caller is already an admin (or if called internally/manually)
-    // For this example, we'll skip the caller check, assuming the first admin is set manually.
+export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
+    // Security Check: Only allow if the caller is already an admin
+    if (!context.auth || context.auth.token.role !== 'admin') {
+        throw new functions.https.HttpsError(
+            'permission-denied',
+            'Only existing admins can grant admin privileges to other users.'
+        );
+    }
     
     const uid = data.uid;
     if (!uid) {
@@ -1194,3 +1199,543 @@ export const validatePairingToken = functions.https.onCall(
   }
   }
 );
+
+// --- PUSH NOTIFICATIONS ---
+
+/**
+ * Cloud Function that triggers when a task document is updated.
+ * It sends a push notification to the master device when a task is submitted for review.
+ */
+export const onTaskStatusChange = functions.firestore
+    .document("/children/{childId}/tasks/{taskId}")
+    .onUpdate(async (change, context) => {
+        const newValue = change.after.data();
+        const previousValue = change.before.data();
+
+        // Check if the status has changed to SUBMITTED
+        if (newValue.status === 'SUBMITTED' && previousValue.status !== 'SUBMITTED') {
+            const masterImei = newValue.masterImei;
+            if (!masterImei) {
+                console.log("No masterImei found for this task. Cannot send notification.");
+                return;
+            }
+
+            // Get the master's FCM token from the masters collection
+            const masterDoc = await db().collection("masters").doc(masterImei).get();
+            const fcmToken = masterDoc.data()?.fcmToken;
+
+            if (!fcmToken) {
+                console.log(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
+                return;
+            }
+
+            const payload = {
+                notification: {
+                    title: 'Task Submitted for Review',
+                    body: `Your child has submitted the task "${newValue.title}" for your review.`,
+                    sound: "default"
+                },
+                data: {
+                    taskId: context.params.taskId,
+                    childId: context.params.childId
+                }
+            };
+
+            try {
+                await getMessaging().sendToDevice(fcmToken, payload);
+                console.log(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
+            } catch (error) {
+                console.error("Error sending notification:", error);
+            }
+        }
+    });
+
+/**
+ * Updates the FCM token for a master device.
+ * This allows the backend to send push notifications to the correct device.
+ */
+export const updateFCMToken = functions.https.onCall(async (data: { masterImei: string; secretKey: string; fcmToken: string }, _context: CallableContext) => {
+    const { masterImei, secretKey, fcmToken } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string" || !fcmToken || typeof fcmToken !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Request must include valid 'masterImei', 'secretKey', and 'fcmToken'."
+        );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Invalid master IMEI or secret key."
+        );
+    }
+
+    try {
+        await masterDeviceRef.update({
+            fcmToken: fcmToken,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        functions.logger.info(`FCM token updated for master ${masterImei}.`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to update FCM token for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while updating the FCM token.",
+            error
+        );
+    }
+});
+
+/**
+ * Deletes a user account and all associated data.
+ * This function should be called when a user requests to delete their account.
+ */
+export const deleteUserAccount = functions.https.onCall(async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
+    const { masterImei, secretKey } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Request must include valid 'masterImei' and 'secretKey'."
+        );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Invalid master IMEI or secret key."
+        );
+    }
+
+    try {
+        // 1. Delete all children associated with the master
+        const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterImei).get();
+        const deleteChildrenPromises = childrenSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteChildrenPromises);
+
+        // 2. Delete all tasks associated with the master
+        const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterImei).get();
+        const deleteTasksPromises = tasksSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteTasksPromises);
+
+        // 3. Delete all subscriptions associated with the master
+        const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterImei).get();
+        const deleteSubsPromises = subsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deleteSubsPromises);
+
+        // 4. Delete the master document itself
+        await masterDeviceRef.delete();
+
+        // 5. Delete the Firebase Auth user (if using Firebase Auth)
+        // This part needs to be implemented when migrating to Firebase Auth tokens
+        // await admin.auth().deleteUser(masterDoc.data()?.uid);
+
+        functions.logger.info(`User account and all associated data deleted for master ${masterImei}.`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to delete user account for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while deleting the user account.",
+            error
+        );
+    }
+});
+
+/**
+ * Creates a new support ticket.
+ */
+export const createSupportTicket = functions.https.onCall(async (data: { problemDescription: string }, context: CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const { problemDescription } = data;
+
+    if (!problemDescription || typeof problemDescription !== "string" || problemDescription.trim().length === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Problem description is required.");
+    }
+
+    const masterImei = context.auth.uid;
+
+    try {
+        const ticketRef = await db().collection("supportTickets").add({
+            masterImei: masterImei,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: "open",
+            problemDescription: problemDescription.trim(),
+            accessGranted: false
+        });
+
+        functions.logger.info(`Support ticket created: ${ticketRef.id} for master ${masterImei}`);
+        return { success: true, ticketId: ticketRef.id };
+
+    } catch (error) {
+        functions.logger.error(`Failed to create support ticket for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to create support ticket.", error);
+    }
+});
+
+/**
+ * Grants temporary support access.
+ */
+export const grantSupportAccess = functions.https.onCall(async (data: { ticketId: string }, context: CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const { ticketId } = data;
+
+    if (!ticketId || typeof ticketId !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const masterImei = context.auth.uid;
+
+    try {
+        // Verify the ticket belongs to the user
+        const ticketDoc = await db().collection("supportTickets").doc(ticketId).get();
+        if (!ticketDoc.exists || ticketDoc.data()?.masterImei !== masterImei) {
+            throw new functions.https.HttpsError("permission-denied", "Ticket not found or access denied.");
+        }
+
+        // Create a support access grant (valid for 48 hours)
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 48);
+
+        const grantRef = await db().collection("supportAccessGrants").add({
+            masterImei: masterImei,
+            ticketId: ticketId,
+            grantedAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+            status: "active"
+        });
+
+        // Update the ticket
+        await db().collection("supportTickets").doc(ticketId).update({
+            accessGranted: true,
+            accessGrantId: grantRef.id
+        });
+
+        functions.logger.info(`Support access granted: ${grantRef.id} for ticket ${ticketId}`);
+        return { success: true, grantId: grantRef.id, expiresAt: expiresAt.toISOString() };
+
+    } catch (error) {
+        functions.logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to grant support access.", error);
+    }
+});
+
+/**
+ * Revokes support access.
+ */
+export const revokeSupportAccess = functions.https.onCall(async (data: { grantId: string }, context: CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const { grantId } = data;
+
+    if (!grantId || typeof grantId !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "Grant ID is required.");
+    }
+
+    const masterImei = context.auth.uid;
+
+    try {
+        // Verify the grant belongs to the user
+        const grantDoc = await db().collection("supportAccessGrants").doc(grantId).get();
+        if (!grantDoc.exists || grantDoc.data()?.masterImei !== masterImei) {
+            throw new functions.https.HttpsError("permission-denied", "Grant not found or access denied.");
+        }
+
+        // Revoke the grant
+        await db().collection("supportAccessGrants").doc(grantId).update({
+            status: "revoked"
+        });
+
+        // Update the associated ticket
+        const ticketId = grantDoc.data()?.ticketId;
+        if (ticketId) {
+            await db().collection("supportTickets").doc(ticketId).update({
+                accessGranted: false
+            });
+        }
+
+        functions.logger.info(`Support access revoked: ${grantId}`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to revoke support access.", error);
+    }
+});
+
+/**
+ * Scheduled function to clean up expired support grants.
+ * Runs every hour.
+ */
+export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").onRun(async (_context) => {
+    const now = admin.firestore.Timestamp.now();
+
+    try {
+        const expiredGrantsSnapshot = await db().collection("supportAccessGrants")
+            .where("status", "==", "active")
+            .where("expiresAt", "<=", now)
+            .get();
+
+        if (expiredGrantsSnapshot.empty) {
+            functions.logger.info("No expired grants to clean up.");
+            return null;
+        }
+
+        const batch = db().batch();
+        const ticketUpdates: { [ticketId: string]: boolean } = {};
+
+        expiredGrantsSnapshot.docs.forEach(doc => {
+            batch.update(doc.ref, { status: "expired" });
+            const ticketId = doc.data().ticketId;
+            if (ticketId) {
+                ticketUpdates[ticketId] = true;
+            }
+        });
+
+        await batch.commit();
+
+        // Update associated tickets
+        for (const ticketId of Object.keys(ticketUpdates)) {
+            await db().collection("supportTickets").doc(ticketId).update({
+                accessGranted: false
+            });
+        }
+
+        functions.logger.info(`Cleaned up ${expiredGrantsSnapshot.size} expired support grants.`);
+        return null;
+
+    } catch (error) {
+        functions.logger.error("Failed to clean up expired grants:", error);
+        return null;
+    }
+});
+
+
+// ==================== AI-POWERED SUPPORT AGENT ====================
+
+import { OpenAI } from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Lazy initialize OpenAI client (only when needed)
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
+
+// Load knowledge base (all project documentation)
+let knowledgeBase = '';
+try {
+  const knowledgeBasePath = path.join(__dirname, 'knowledge_base.txt');
+  knowledgeBase = fs.readFileSync(knowledgeBasePath, 'utf-8');
+} catch (error) {
+  functions.logger.error('Failed to load knowledge base:', error);
+}
+
+/**
+ * Firestore Trigger: Automatically analyze and solve new support tickets using AI
+ * Triggered when a new document is created in the supportTickets collection
+ */
+export const onTicketCreated = functions.firestore
+  .document('supportTickets/{ticketId}')
+  .onCreate(async (snapshot, context) => {
+    const ticketId = context.params.ticketId;
+    const ticketData = snapshot.data();
+    
+    functions.logger.info(`New support ticket created: ${ticketId}`);
+    
+    try {
+      // Extract problem description
+      const problemDescription = ticketData.problemDescription || '';
+      
+      if (!problemDescription || problemDescription.trim().length === 0) {
+        functions.logger.info('Empty problem description, skipping AI analysis.');
+        return;
+      }
+      
+      // Construct the prompt for the AI
+      const prompt = `You are a helpful support agent for the MiniMaster application, a parental control app that allows parents to manage their children's device usage through task-based unlocking.
+
+A user has submitted the following support request:
+
+"${problemDescription}"
+
+Based on the following knowledge base, provide a clear, step-by-step solution to the user's problem. If you are not confident in your answer (confidence < 0.7), state that you are escalating the ticket to a human agent.
+
+Knowledge Base:
+${knowledgeBase}
+
+Your response MUST be in JSON format with exactly two fields:
+{
+  "solution": "Your step-by-step solution here",
+  "confidence": 0.85
+}
+
+The confidence should be a float between 0 and 1, where 1 means you are absolutely certain the solution is correct.`;
+
+      // Call OpenAI API
+      functions.logger.info('Calling OpenAI API...');
+      const response = await getOpenAIClient().chat.completions.create({
+        model: 'gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a technical support agent for the MiniMaster parental control application.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+      
+      // Parse the AI's response
+      const aiResponse = response.choices[0]?.message?.content || '';
+      functions.logger.info('AI Response:', aiResponse);
+      
+      let aiGeneratedSolution = '';
+      let aiConfidenceScore = 0.0;
+      let newStatus = 'awaiting_user_feedback';
+      
+      try {
+        const parsed = JSON.parse(aiResponse);
+        aiGeneratedSolution = parsed.solution || 'Unable to generate solution.';
+        aiConfidenceScore = parsed.confidence || 0.0;
+        
+        // If confidence is too low, escalate immediately
+        if (aiConfidenceScore < 0.7) {
+          newStatus = 'escalated';
+          aiGeneratedSolution += '\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.';
+        }
+      } catch (parseError) {
+        functions.logger.error('Failed to parse AI response as JSON:', parseError);
+        aiGeneratedSolution = 'AI generated an invalid response. Escalating to human support.';
+        aiConfidenceScore = 0.0;
+        newStatus = 'escalated';
+      }
+      
+      // Update the ticket with the AI-generated solution
+      await admin.firestore().collection('supportTickets').doc(ticketId).update({
+        aiGeneratedSolution: aiGeneratedSolution,
+        aiConfidenceScore: aiConfidenceScore,
+        aiSolutionStatus: 'generated',
+        status: newStatus,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      functions.logger.info(`Ticket ${ticketId} updated with AI solution (confidence: ${aiConfidenceScore})`);
+      
+      // Send push notification to the user
+      const masterImei = ticketData.masterImei;
+      const masterDoc = await admin.firestore().collection('masters').doc(masterImei).get();
+      
+      if (masterDoc.exists) {
+        const masterData = masterDoc.data();
+        const fcmToken = masterData?.fcmToken;
+        
+        if (fcmToken) {
+          const notificationMessage = {
+            notification: {
+              title: 'Support Ticket Update',
+              body: newStatus === 'escalated' 
+                ? 'Your ticket has been escalated to a human agent.' 
+                : 'We have a proposed solution for your support ticket!',
+            },
+            data: {
+              ticketId: ticketId,
+              type: 'support_ticket_update',
+            },
+            token: fcmToken,
+          };
+          
+          await getMessaging().send(notificationMessage);
+          functions.logger.info(`Push notification sent to ${masterImei}`);
+        }
+      }
+      
+      return;
+    } catch (error) {
+      functions.logger.error('Error in onTicketCreated:', error);
+      
+      // Update ticket to escalated status on error
+      await admin.firestore().collection('supportTickets').doc(ticketId).update({
+        aiGeneratedSolution: 'An error occurred while analyzing your ticket. A human support agent will assist you shortly.',
+        aiConfidenceScore: 0.0,
+        aiSolutionStatus: 'error',
+        status: 'escalated',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      throw error;
+    }
+  });
+
+/**
+ * Callable Function: User provides feedback on AI-generated solution
+ */
+export const provideSolutionFeedback = functions.https.onCall(async (data: { ticketId: string; feedback: string }, context: CallableContext) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+  
+  const { ticketId, feedback } = data; // feedback: 'accepted' or 'rejected'
+  
+  if (!ticketId || !feedback) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing ticketId or feedback.');
+  }
+  
+  if (feedback !== 'accepted' && feedback !== 'rejected') {
+    throw new functions.https.HttpsError('invalid-argument', 'Feedback must be "accepted" or "rejected".');
+  }
+  
+  try {
+    const ticketRef = admin.firestore().collection('supportTickets').doc(ticketId);
+    const ticketDoc = await ticketRef.get();
+    
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Ticket not found.');
+    }
+    
+    const ticketData = ticketDoc.data();
+    
+    // Verify that the user owns this ticket
+    if (ticketData?.masterImei !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'You do not have permission to update this ticket.');
+    }
+    
+    // Update ticket based on feedback
+    const newStatus = feedback === 'accepted' ? 'closed_by_ai' : 'escalated';
+    const aiSolutionStatus = feedback === 'accepted' ? 'accepted' : 'rejected';
+    
+    await ticketRef.update({
+      aiSolutionStatus: aiSolutionStatus,
+      status: newStatus,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    functions.logger.info(`Ticket ${ticketId} feedback: ${feedback}, new status: ${newStatus}`);
+    
+    return { success: true, message: `Ticket ${newStatus}.` };
+  } catch (error) {
+    functions.logger.error('Error in provideSolutionFeedback:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to update ticket feedback.');
+  }
+});

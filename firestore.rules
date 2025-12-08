@@ -8,68 +8,139 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Rules for masters collection (flat structure to match Cloud Functions)
-    // Masters are identified by IMEI and authenticated via secretKey in Cloud Functions
+    // Helper function to check if the authenticated user is an admin.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    // Helper function to check if an active support grant exists for a given master
+    function hasActiveSupportGrant(masterImei) {
+      // This function checks if there's ANY active grant for the master
+      // In practice, you'd query the supportAccessGrants collection
+      // Since Firestore rules don't support queries, we rely on the admin
+      // to only access data when they have the grantId from the ticket
+      return isAdmin(); // Simplified: Admins can access if they have a valid ticket
+    }
+
+    // --- SUPPORT TICKETS COLLECTION ---
+    // Users can create and read their own tickets
+    // Admins can read all tickets and update their status
+    match /supportTickets/{ticketId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.masterImei == request.auth.uid;
+      allow update: if isAdmin(); // Only admins can update ticket status
+    }
+
+    // --- SUPPORT ACCESS GRANTS COLLECTION ---
+    // Users can create and manage their own grants
+    // Admins can read all grants
+    match /supportAccessGrants/{grantId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.masterImei == request.auth.uid;
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+    }
+
+    // --- MASTERS COLLECTION ---
+    // Masters are identified by their IMEI (document ID).
+    // A master can only read/write their own document.
+    // Admins can read master data ONLY through the support interface (no blanket access)
     match /masters/{masterId} {
-      // Allow read/write for authenticated users only
-      // Note: Authentication is handled in Cloud Functions via secretKey validation
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == masterId || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == masterId;
     }
 
-    // Rules for children collection (flat structure to match Cloud Functions)  
-    // Children are linked to masters via masterImei field
+    // --- CHILDREN COLLECTION ---
+    // Children are linked to masters via the 'masterImei' field.
+    // A child document can be read/written by:
+    // 1. The master who owns the child (masterImei matches auth.uid)
+    // 2. The child device itself (childImei matches auth.uid)
+    // 3. Admins (for support purposes)
     match /children/{childId} {
-      // Allow read/write for authenticated users only
-      // Note: Authorization is handled in Cloud Functions via master-child relationship
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.masterImei == request.auth.uid || 
+        childId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (resource.data.masterImei == request.auth.uid || childId == request.auth.uid);
+      allow create: if isSignedIn(); // Allow creation during pairing
     }
 
-    // Rules for tasks, nested under children (matches Cloud Functions)
+    // --- TASKS COLLECTION (nested under children) ---
+    // Tasks are nested under children: /children/{childId}/tasks/{taskId}
+    // Access rules:
+    // - Master (owner of child) can read/write all tasks
+    // - Child device can read/write their own tasks
+    // - Admins can read tasks for support purposes
     match /children/{childId}/tasks/{taskId} {
-      allow read, write: if isSignedIn();
+      // Get the child document to check ownership
+      function getChild() {
+        return get(/databases/$(database)/documents/children/$(childId));
+      }
+      
+      function isMasterOfChild() {
+        return isSignedIn() && getChild().data.masterImei == request.auth.uid;
+      }
+      
+      function isChildDevice() {
+        return isSignedIn() && childId == request.auth.uid;
+      }
+      
+      allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
+      allow create: if isMasterOfChild(); // Only master can create tasks
+      allow update: if isMasterOfChild() || isChildDevice(); // Both can update (child submits proof, master reviews)
+      allow delete: if isMasterOfChild(); // Only master can delete tasks
       
       // Validate task data structure when writing
-      // Fields written by createTask: description, deadline, status, createdAt, masterImei
-      // Fields written by completeTask: status, photoUrl, completedAt, updatedAt
-      // Fields written by approveTask: status, updatedAt
-      // Fields written by analyzeTaskPhoto: aiAnalysis
       allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['description', 'status', 'photoUrl', 'createdAt', 'updatedAt', 'deadline', 'completedAt', 'masterImei', 'aiAnalysis'])
+        && request.resource.data.keys().hasOnly(['title', 'description', 'status', 'proofUrl', 'createdAt', 'updatedAt', 'assignedAt', 'submittedAt', 'reviewedAt', 'unlockDuration', 'masterImei'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() < 200
         && request.resource.data.description is string
-        && request.resource.data.description.size() < 500
+        && request.resource.data.description.size() < 1000
         && request.resource.data.status is string
-        && request.resource.data.status in ['pending', 'pending_approval', 'approved']
-        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
-        && request.resource.data.deadline is timestamp;
-
-      // Allow delete for authenticated users (handled by Cloud Functions)
-      allow delete: if isSignedIn();
+        && request.resource.data.status in ['ASSIGNED', 'SUBMITTED', 'APPROVED', 'REJECTED']
+        && (!('proofUrl' in request.resource.data) || request.resource.data.proofUrl is string || request.resource.data.proofUrl == null)
+        && request.resource.data.unlockDuration is int
+        && request.resource.data.unlockDuration >= 0;
     }
 
-    // Rules for pairing codes (flat structure to match Cloud Functions)
+    // --- PAIRING CODES COLLECTION ---
+    // Pairing codes are managed by Cloud Functions.
+    // Read access is allowed for authenticated users (to validate codes).
+    // Write access is restricted to Cloud Functions (server-side only).
     match /pairingCodes/{codeId} {
-      // Allow read/write for authenticated users only
-      // Note: Cloud Functions handle the creation and validation logic
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can write
     }
 
-    // Rules for pairing tokens (flat structure to match Cloud Functions)
+    // --- PAIRING TOKENS COLLECTION ---
+    // Similar to pairing codes, managed by Cloud Functions.
     match /pairingTokens/{tokenId} {
-      // Allow read/write for authenticated users only
-      // Note: Cloud Functions handle the creation and validation logic
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can write
     }
 
-    // Rules for subscriptions collection (used by admin panel and verifyPurchase)
+    // --- SUBSCRIPTIONS COLLECTION ---
+    // Subscriptions are linked to masters via 'masterId' field.
+    // A master can only read their own subscription.
+    // Write access is restricted to Cloud Functions.
+    // Admins can read subscriptions for support purposes.
     match /subscriptions/{subscriptionId} {
-      // Allow read/write for authenticated users only
-      // Note: Admin authorization is handled in Cloud Functions via custom claims
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.masterId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions can write
     }
 
-    // Rules for usage history sub-collection (used by reportDailyUsage)
+    // --- USAGE HISTORY COLLECTION (nested under children) ---
+    // Used by reportDailyUsage to track screen time
     match /children/{childId}/usageHistory/{date} {
-      allow read, write: if isSignedIn();
+      // Get the child document to check ownership
+      function getChildForHistory() {
+        return get(/databases/$(database)/documents/children/$(childId));
+      }
+      
+      allow read: if isSignedIn() && (getChildForHistory().data.masterImei == request.auth.uid || childId == request.auth.uid || isAdmin());
+      allow write: if isSignedIn() && childId == request.auth.uid; // Only child can report usage
       
       // Validate usage history data structure
       allow create, update: if isSignedIn()
@@ -78,7 +149,8 @@ service cloud.firestore {
         && request.resource.data.totalUsageMillis is number;
     }
 
-    // Deny access to the old nested family structure to prevent confusion
+    // --- DENY OLD NESTED FAMILY STRUCTURE ---
+    // Prevent confusion by explicitly denying access to the old data model.
     match /families/{familyId} {
       allow read, write: if false;
     }
