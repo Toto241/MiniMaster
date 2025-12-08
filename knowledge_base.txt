@@ -1,0 +1,1251 @@
+# Mini-Master: Parental Control Application Suite
+
+Mini-Master is a comprehensive parental control solution for Android with a Firebase backend. It consists of two Android apps (`masterApp` for parents, `childApp` for children) plus a lightweight web control panel. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Technology Stack](#technology-stack)
+- [Setup & Installation](#setup--installation)
+    - [Prerequisites](#prerequisites)
+    - [Firebase Setup](#firebase-setup)
+    - [Backend Setup](#backend-setup)
+    - [Android Apps Setup](#android-apps-setup)
+    - [Web Control Panel Setup](#web-control-panel-setup)
+- [Usage](#usage)
+- [Documentation](#documentation)
+- [Testing](#testing)
+- [License](#license)
+
+---
+
+## Overview
+
+The Mini-Master suite is designed to give parents control over their children's digital wellbeing. The `masterApp` acts as the command center, allowing parents to pair with child devices, set rules (like app blocking and usage limits), and assign tasks. The `childApp` runs on the child's device, enforcing these rules via an Accessibility Service and allowing the child to complete assigned tasks to earn screen time.
+
+## Features
+
+*   **Secure Pairing:** Pair devices securely using a 6-digit code or a time-limited link.
+*   **Remote Locking:** Instantly lock or unlock the child's device from the parent app or web panel.
+*   **App Blocking:** Blacklist specific applications to prevent their usage.
+*   **Usage Limits:** Set daily usage limits for the device.
+*   **Task-Based Unlocking:** Assign tasks to children (e.g., "Clean your room"). The child device remains locked until the child submits photo proof of task completion, which the parent can then approve or reject.
+*   **Push Notifications:** Parents receive real-time notifications when a child submits a task for review.
+*   **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
+*   **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
+*   **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
+
+## Project Structure
+
+The repository is organized as follows:
+
+*   **`/` (Root):** Contains the TypeScript Firebase Functions backend (`index.ts`, `firebase.ts`) and project configuration.
+*   **`/masterApp`:** The Android application for parents (Kotlin, Jetpack Compose, Hilt).
+*   **`/childApp`:** The Android application for children (Kotlin, Jetpack Compose, Hilt). Includes the `MiniMasterAccessibilityService` for enforcement.
+*   **`/web-control`:** A static web application for parental control.
+*   **`/test`:** Backend unit tests.
+*   **`/docs`:** Additional documentation and architecture guides.
+
+## Technology Stack
+
+*   **Backend:** TypeScript, Node.js, Firebase (Cloud Functions, Firestore, Authentication, Storage, Messaging).
+*   **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager, Retrofit/OkHttp (via Firebase SDKs).
+*   **Web Frontend:** HTML5, CSS3, Vanilla JavaScript.
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+
+*   **Node.js:** v18 or higher.
+*   **Firebase Account:** A Google account to create a Firebase project.
+*   **Firebase CLI:** Install globally via `npm install -g firebase-tools`.
+*   **Android Studio:** Latest version with Android SDK and JDK 17.
+
+### Firebase Setup
+
+1.  Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
+2.  Enable the following services:
+    *   **Firestore Database:** Start in Test Mode (secure rules later).
+    *   **Cloud Functions:** Required for backend logic.
+    *   **Authentication:** Enable "Anonymous" or "Email/Password" if needed (custom auth logic is currently used).
+    *   **Storage:** For storing task proof photos.
+3.  Add two Android apps to your project:
+    *   Parent App Package: `com.minimaster.masterapp`
+    *   Child App Package: `com.google.pairing` (Note: `com.google.pairing` is the current package ID for legacy reasons, ensure it matches your `build.gradle`).
+4.  Download the `google-services.json` file for each app.
+
+### Backend Setup
+
+1.  Navigate to the root directory of the repository.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Login to Firebase:
+    ```bash
+    firebase login
+    ```
+4.  Select your project:
+    ```bash
+    firebase use --add
+    ```
+5.  Deploy the functions and rules:
+    ```bash
+    firebase deploy
+    ```
+
+### Android Apps Setup
+
+1.  Place the `google-services.json` files:
+    *   Copy the parent app JSON to `masterApp/google-services.json`.
+    *   Copy the child app JSON to `childApp/google-services.json`.
+2.  Open the project root in Android Studio.
+3.  Sync Gradle files.
+4.  Build and run the `masterApp` on one device/emulator and `childApp` on another.
+
+### Web Control Panel Setup
+
+1.  Navigate to `web-control/`.
+2.  Copy `firebase-config.template.js` to `app.js` (or edit `app.js` directly if no template exists).
+3.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration (found in Firebase Console > Project Settings).
+4.  Serve the directory using a simple HTTP server:
+    ```bash
+    python3 -m http.server 8000
+    ```
+5.  Open `http://localhost:8000` in your browser.
+
+---
+
+## Usage
+
+1.  **Registration:** Open the Master App. Grant the necessary permissions to register the device.
+2.  **Pairing:**
+    *   **Option A (Code):** On the Master App, generate a pairing link/code. Open the Child App via the deep link or enter the code.
+    *   **Option B (QR):** (Future implementation)
+3.  **Setup Child Device:**
+    *   On the Child App, follow the onboarding flow.
+    *   **Crucial:** Grant "Accessibility Service" permission when prompted. This is required for app blocking to work.
+4.  **Management:**
+    *   Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
+    *   Monitor the child's status (Online/Offline).
+
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+*   **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project to Firebase.
+*   **[Project Hardening Plan](docs/PROJECT_HARDENING_PLAN.md):** Overview of identified gaps and the plan to address them.
+*   **[Security Test Scenarios](docs/TEST_SCENARIOS_SECURITY.md):** Test cases to validate the security rules and authorization logic.
+*   **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements for production deployment.
+*   **[Task Unlock Architecture](docs/TASK_UNLOCK_ARCHITECTURE.md):** Detailed architecture of the task-based unlocking feature.
+*   **[Admin Panel Architecture](docs/ADMIN_PANEL_ARCHITECTURE.md):** Architecture and security design of the operator dashboard.
+*   **[Admin Panel Test Scenarios](docs/TEST_SCENARIOS_ADMIN_PANEL.md):** Test scenarios for the admin panel.
+
+Each source file in this repository is also thoroughly documented. You can explore the code to understand specific implementations:
+*   **Backend:** See `index.ts` for API endpoints and business logic.
+*   **Android:** See individual Kotlin files for UI and service logic documentation.
+
+## Testing
+
+*   **Backend:** Run `npm test` to execute unit tests.
+*   **Android:** Use Android Studio to run instrumentation tests (if available).
+
+## License
+
+[License Information Here]
+# MiniMaster Admin Panel Architecture and Security Concept
+
+## 1. Goal
+To create a secure, functional, and maintainable web-based Admin Panel for MiniMaster operators, enabling user management, subscription monitoring, and key statistics viewing.
+
+## 2. Technology Stack
+*   **Frontend:** HTML, CSS, JavaScript (Single Page Application structure).
+*   **Backend/Database:** Firebase (Firestore, Authentication, Cloud Functions).
+*   **Hosting:** Firebase Hosting (Free Tier / Spark Plan).
+
+## 3. Security Concept (Crucial for Admin Panel)
+
+The Admin Panel must not rely on simple password protection or shared secrets. It must leverage Firebase Authentication with a specific authorization layer.
+
+### 3.1. Operator Authentication
+1.  **Firebase Authentication:** Operators will log in using standard Firebase Email/Password authentication.
+2.  **Custom Claims for Authorization:** After successful login, a Cloud Function will check if the authenticated user's UID is listed in a secure `operators` collection (or a hardcoded list in the function).
+3.  If authorized, the function will mint a **Custom Claim** on the user's Firebase Auth Token, e.g., `role: 'admin'`.
+4.  The Admin Panel frontend will check for this `role: 'admin'` claim upon loading to grant access.
+
+### 3.2. Data Access Control (Firestore Security Rules)
+All data access from the Admin Panel will be governed by strict Firestore Security Rules.
+
+```firestore
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only users with the 'admin' custom claim can read/write the entire database
+    match /{document=**} {
+      allow read, write: if request.auth.token.role == 'admin';
+    }
+  }
+}
+```
+*Note: This is a simplified rule. A more granular rule might be needed for specific collections.*
+
+### 3.3. API Access Control (Cloud Functions)
+All Cloud Functions used by the Admin Panel (e.g., `getUsers`, `revokeSubscription`) must verify the `admin` claim in the context.
+
+```typescript
+exports.getUsers = functions.https.onCall(async (data, context) => {
+    // 1. Authentication Check
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    // 2. Authorization Check (Custom Claim)
+    if (context.auth.token.role !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Only operators can access this data.');
+    }
+
+    // ... function logic ...
+});
+```
+
+## 4. Functional Requirements
+
+### 4.1. User Management
+*   **Overview:** Display total number of users (Masters and Children).
+*   **Search/Filter:** Ability to search users by email (Master) or device ID (Child).
+*   **Actions:** View user details, manually revoke subscription (calls a secure Cloud Function).
+
+### 4.2. Subscription Monitoring
+*   **Statistics:** Total active subscriptions, monthly recurring revenue (MRR - simplified estimate).
+*   **List:** List of currently active premium users.
+*   **Status Check:** Ability to manually trigger a subscription status check for a specific user.
+
+### 4.3. Key Statistics
+*   Total paired devices.
+*   Total tasks assigned (since feature launch).
+*   Task completion rate (Approved / Submitted).
+
+## 5. Implementation Plan (Frontend)
+1.  Create a new directory `MiniMaster/admin-panel/`.
+2.  Implement a simple login page using Firebase Auth.
+3.  Implement the main dashboard, conditionally rendered based on the `admin` claim.
+4.  Use Firebase SDK to fetch data (protected by the new Firestore Rules).
+5.  Implement UI components for data display and management actions.
+# AI-Powered Support Agent - Architecture
+
+This document outlines the architecture for an AI-powered automatic support agent for the MiniMaster project. The agent will analyze new support tickets, generate solutions using OpenAI, and propose them to the user.
+
+## 1. Core Concepts
+
+*   **Automation:** Automatically process new support tickets to provide instant solutions.
+*   **AI-Powered:** Leverage a Large Language Model (LLM) like OpenAI's GPT to understand user problems and generate human-like solutions.
+*   **Knowledge Base:** Provide the AI with a knowledge base of project documentation to ensure accurate and context-aware answers.
+*   **User Feedback Loop:** Allow users to accept the AI's solution or request human intervention, which helps improve the system over time.
+*   **Seamless Integration:** The AI agent acts as the first line of support, with a clear escalation path to a human operator.
+
+## 2. Data Model Changes (Firestore)
+
+We will extend the `supportTickets` collection with new fields:
+
+```json
+{
+  "ticketId": "<auto-id>",
+  "masterImei": "<user-imei>",
+  "createdAt": "<timestamp>",
+  "status": "open" | "awaiting_user_feedback" | "closed_by_ai" | "escalated" | "closed",
+  "problemDescription": "<user-provided-text>",
+  "accessGranted": true | false,
+  "accessGrantId": "<grant-id>",
+
+  // New AI-related fields
+  "aiGeneratedSolution": "<text-solution-generated-by-ai>",
+  "aiSolutionStatus": "pending" | "generated" | "accepted" | "rejected",
+  "aiConfidenceScore": 0.85 // (0.0 to 1.0)
+}
+```
+
+## 3. Knowledge Base
+
+To provide accurate solutions, the AI needs context about the MiniMaster project. We will create a simple knowledge base by concatenating all existing Markdown documentation files into a single text file (`knowledge_base.txt`).
+
+**Files to include:**
+*   `README.md`
+*   `docs/DEPLOYMENT_GUIDE.md`
+*   `docs/PRIVACY_POLICY.md`
+*   `docs/SUPPORT_INTERFACE_ARCHITECTURE.md`
+*   And all other relevant `.md` files.
+
+This `knowledge_base.txt` will be passed to the AI as part of the prompt.
+
+## 4. Backend (Cloud Functions)
+
+We will add a new Cloud Function triggered by the creation of a new support ticket.
+
+### `onTicketCreated` (Firestore Trigger)
+
+*   **Trigger:** `onCreate` on the `supportTickets` collection.
+*   **Action:**
+    1.  Reads the `problemDescription` from the new ticket.
+    2.  Constructs a prompt for the OpenAI API, including the user's problem and the content of `knowledge_base.txt`.
+    3.  Calls the OpenAI API (e.g., `gpt-4.1-mini`) to generate a solution.
+    4.  Parses the AI's response to extract the solution text and a confidence score.
+    5.  Updates the `supportTickets` document with the `aiGeneratedSolution`, `aiConfidenceScore`, and sets the status to `awaiting_user_feedback`.
+    6.  Triggers a push notification to the user with the proposed solution.
+
+## 5. OpenAI Integration
+
+*   We will use the `openai` npm package.
+*   The OpenAI API key will be stored securely as a Firebase environment variable (`process.env.OPENAI_API_KEY`).
+*   The prompt will be carefully engineered to instruct the AI to act as a MiniMaster support agent and provide clear, step-by-step solutions based on the provided knowledge base.
+
+**Example Prompt:**
+
+```
+You are a helpful support agent for the MiniMaster application. A user has submitted the following support request:
+
+"[USER_PROBLEM_DESCRIPTION]"
+
+Based on the following knowledge base, provide a clear, step-by-step solution to the user's problem. If you are not confident in your answer, state that you are escalating the ticket to a human agent.
+
+Knowledge Base:
+"[CONTENT_OF_KNOWLEDGE_BASE_TXT]"
+
+Your response should be in JSON format with two fields: "solution" (string) and "confidence" (float between 0 and 1).
+```
+
+## 6. Frontend UI/UX
+
+### Web-Control (Parent App)
+
+*   The "My Support Tickets" view will be updated to display the AI-generated solution.
+*   A new section will appear for tickets with status `awaiting_user_feedback`:
+    *   Displays the `aiGeneratedSolution`.
+    *   Provides two buttons: "This solved my problem" and "I still need help".
+
+### Admin Panel
+
+*   The support ticket list will show the new statuses (`awaiting_user_feedback`, `closed_by_ai`, `escalated`).
+*   The ticket detail view will display the `aiGeneratedSolution` and `aiConfidenceScore`.
+
+## 7. End-to-End Workflow
+
+1.  **User creates a ticket:** The `onTicketCreated` function is triggered.
+2.  **AI analyzes and solves:** The function calls OpenAI, gets a solution, and updates the ticket. Status becomes `awaiting_user_feedback`.
+3.  **User is notified:** A push notification informs the user that a solution has been proposed.
+4.  **User reviews solution:**
+    *   **If the user accepts:** The user clicks "This solved my problem". The ticket status is updated to `closed_by_ai`.
+    *   **If the user rejects:** The user clicks "I still need help". The ticket status is updated to `escalated`, and the human support team is notified (e.g., via email or a special view in the Admin Panel).
+5.  **Human intervention:** The human support team takes over `escalated` tickets.
+
+This architecture provides a powerful, automated first line of support while ensuring a smooth escalation path to human agents when needed.
+# Firebase Custom Auth Token Migration Guide
+
+This guide provides a step-by-step plan to migrate the MiniMaster project from the current `secretKey`-based authentication model to Firebase Custom Auth Tokens, which is the recommended secure authentication method.
+
+## Why Migrate?
+
+The current authentication model uses a custom `secretKey` that is passed from the client in every Cloud Function call. This model has several security vulnerabilities:
+
+*   **Client-Side Storage:** The `secretKey` is stored on the client device and can be extracted by an attacker.
+*   **No Expiration:** The `secretKey` does not expire, meaning a compromised key can be used indefinitely.
+*   **No Revocation:** There is no built-in mechanism to revoke a compromised `secretKey`.
+
+Firebase Custom Auth Tokens address all these issues by providing short-lived, cryptographically signed tokens that can be verified server-side.
+
+## Migration Overview
+
+The migration involves the following steps:
+
+1.  **Backend:** Generate custom tokens for users and update Cloud Functions to verify Firebase Auth tokens.
+2.  **Client Apps:** Update the apps to authenticate with Firebase Auth using custom tokens.
+3.  **Firestore Rules:** Update security rules to rely on `request.auth` instead of custom validation.
+
+## Step 1: Backend Changes
+
+### 1.1 Create a Custom Token Generation Function
+
+Add a new Cloud Function that generates a custom token for a user after verifying their `secretKey`:
+
+```typescript
+import * as admin from "firebase-admin";
+import * as functions from "firebase-functions";
+
+export const generateCustomToken = functions.https.onCall(async (data: { masterImei: string; secretKey: string }, _context) => {
+    const { masterImei, secretKey } = data;
+
+    if (!masterImei || !secretKey) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const masterDoc = await admin.firestore().collection("masters").doc(masterImei).get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError("unauthenticated", "Invalid credentials.");
+    }
+
+    // Generate a custom token
+    const customToken = await admin.auth().createCustomToken(masterImei, {
+        role: "master",
+        masterImei: masterImei,
+    });
+
+    return { customToken };
+});
+```
+
+### 1.2 Update Existing Cloud Functions
+
+Update all Cloud Functions to verify Firebase Auth tokens instead of the `secretKey`:
+
+**Before:**
+```typescript
+export const myFunction = functions.https.onCall(async (data: { masterImei: string; secretKey: string }, _context) => {
+    const { masterImei, secretKey } = data;
+    
+    const masterDoc = await admin.firestore().collection("masters").doc(masterImei).get();
+    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError("unauthenticated", "Invalid credentials.");
+    }
+    
+    // Function logic
+});
+```
+
+**After:**
+```typescript
+export const myFunction = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+    
+    const masterImei = context.auth.uid;
+    
+    // Function logic
+});
+```
+
+## Step 2: Client App Changes
+
+### 2.1 MasterApp (Android)
+
+1.  **Call the `generateCustomToken` function** after successful registration or login:
+    ```kotlin
+    val functions = Firebase.functions
+    val data = hashMapOf(
+        "masterImei" to masterImei,
+        "secretKey" to secretKey
+    )
+    
+    functions.getHttpsCallable("generateCustomToken")
+        .call(data)
+        .addOnSuccessListener { result ->
+            val customToken = (result.data as Map<*, *>)["customToken"] as String
+            signInWithCustomToken(customToken)
+        }
+    ```
+
+2.  **Sign in with the custom token:**
+    ```kotlin
+    Firebase.auth.signInWithCustomToken(customToken)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                // User is now authenticated
+            }
+        }
+    ```
+
+3.  **Remove `secretKey` from all function calls** and rely on Firebase Auth for authentication.
+
+### 2.2 ChildApp (Android)
+
+Follow the same steps as the MasterApp.
+
+### 2.3 Web-Control and Admin Panel
+
+1.  **Call the `generateCustomToken` function** after login.
+2.  **Sign in with the custom token:**
+    ```javascript
+    firebase.auth().signInWithCustomToken(customToken)
+        .then(() => {
+            // User is authenticated
+        });
+    ```
+
+## Step 3: Firestore Rules Changes
+
+Update your `firestore.rules` to rely on `request.auth` instead of custom validation:
+
+**Before:**
+```javascript
+match /masters/{masterImei} {
+  allow read, write: if request.auth != null;
+}
+```
+
+**After:**
+```javascript
+match /masters/{masterImei} {
+  allow read, write: if request.auth != null && request.auth.uid == masterImei;
+}
+```
+
+## Step 4: Gradual Rollout
+
+To avoid breaking existing users, implement a gradual rollout:
+
+1.  **Deploy the new `generateCustomToken` function** without removing the old authentication logic.
+2.  **Update the client apps** to use the new authentication flow.
+3.  **Monitor** the usage of the old `secretKey`-based authentication.
+4.  **Once all users have migrated**, remove the `secretKey` validation from Cloud Functions.
+
+## Benefits of Migration
+
+*   **Enhanced Security:** Tokens are short-lived and cryptographically signed.
+*   **Revocation:** Tokens can be revoked by disabling the user account.
+*   **Standardization:** Uses Firebase's built-in authentication system.
+*   **Better Integration:** Works seamlessly with other Firebase services.
+
+By following this guide, you can migrate to a more secure and robust authentication system.
+# ChildApp (Android) Logik: Aufgaben-basierte Sperre und Freischaltung
+
+Die Implementierung der Sperr- und Freischaltlogik erfolgt primär in der `childApp` (Android-Anwendung), da diese die Kontrolle über das Gerät des Kindes hat. Die Logik basiert auf der Überwachung des Aufgabenstatus in Firestore und der Nutzung eines **Accessibility Service** oder **Device Policy Manager** zur Gerätesperre.
+
+## 1. Task-Monitoring-Service
+
+Ein Hintergrunddienst (z.B. ein `Service` oder `Worker` in Android) muss die Firestore-Datenbank auf Änderungen im Aufgabenstatus überwachen.
+
+**Überwachungsziel:** Die neueste Aufgabe für das aktuelle `childId` in der Collection `/children/{childId}/tasks`.
+
+**Logik-Fluss:**
+
+1.  **Initialisierung:** Der Dienst abonniert den Firestore-Listener für die neueste Aufgabe.
+2.  **Status-Check:** Bei jeder Änderung der Aufgabe wird der `status` geprüft:
+    *   **`ASSIGNED` oder `REJECTED`:** Die Sperrlogik wird aktiviert.
+    *   **`APPROVED`:** Die Freischaltlogik wird aktiviert.
+    *   **`SUBMITTED`:** Die Sperre bleibt aktiv, aber die Benutzeroberfläche zeigt an, dass auf die Genehmigung des Elternteils gewartet wird.
+
+## 2. Sperr-Mechanismus (Lock Logic)
+
+Die Sperre wird aktiviert, wenn eine Aufgabe zugewiesen oder abgelehnt wurde.
+
+**Implementierung:**
+
+*   **Accessibility Service:** Der Service muss erkennen, wenn eine App gestartet wird, die nicht die MiniMaster-App ist.
+*   **Aktion:** Bei Erkennung einer nicht erlaubten App wird der Benutzer sofort auf eine spezielle **Lock-Activity** umgeleitet.
+*   **Lock-Activity (Aufgaben-Sperrbildschirm):**
+    *   Zeigt den `title` und die `description` der aktuellen Aufgabe an.
+    *   Enthält einen Button **"Nachweis einreichen"**.
+    *   **Kein** anderer Zugriff auf das Gerät ist möglich, bis die Aufgabe genehmigt wurde.
+
+## 3. Nachweis-Einreichung (Proof Submission)
+
+Die Lock-Activity muss die Funktionalität zur Einreichung des Nachweises bereitstellen.
+
+**Ablauf:**
+
+1.  Kind klickt auf **"Nachweis einreichen"**.
+2.  Die App öffnet eine Oberfläche zur **Fotoaufnahme** oder **Dateiauswahl**.
+3.  Das Foto wird in **Firebase Storage** hochgeladen (Pfad: `tasks/{taskId}/proof.jpg`).
+4.  Nach erfolgreichem Upload wird die Cloud Function `submitTaskProof` mit der `taskId` und der generierten `proofUrl` aufgerufen.
+5.  Der Task-Monitoring-Service erkennt den Statuswechsel zu `SUBMITTED` und die Lock-Activity ändert die Anzeige auf **"Warte auf Genehmigung durch Elternteil..."**.
+
+## 4. Freischalt-Mechanismus (Unlock Logic)
+
+Die Freischaltung erfolgt, wenn der Aufgabenstatus auf `APPROVED` wechselt.
+
+**Ablauf:**
+
+1.  Der Task-Monitoring-Service erkennt den Status `APPROVED`.
+2.  Der Dienst liest den Wert von `unlockDuration` (in Minuten) aus der Aufgabe.
+3.  Ein **Timer** wird gestartet, der für die Dauer von `unlockDuration` läuft.
+4.  **Aktion:** Während der Timer läuft, **deaktiviert** der Accessibility Service die Sperrlogik. Das Kind kann das Handy normal nutzen.
+5.  **Timer-Ende:** Nach Ablauf der `unlockDuration` wird die Sperrlogik **automatisch reaktiviert**. Der ChildApp-Dienst muss dann prüfen, ob eine neue Aufgabe zugewiesen wurde, oder ob die Standard-Sperrregeln (z.B. Zeitlimits) wieder greifen.
+
+**Zusätzliche Logik:**
+
+*   **Persistenz:** Der Freischalt-Timer muss auch nach einem Neustart des Geräts oder der App persistent sein (z.B. Speicherung des Endzeitpunkts in `SharedPreferences`).
+*   **Benachrichtigung:** Eine temporäre Benachrichtigung sollte dem Kind die verbleibende Freischaltzeit anzeigen.
+
+Dieses Dokument dient als Blaupause für die notwendigen Code-Änderungen in der `childApp/src/` Struktur.
+# MiniMaster Deployment & Hardening Guide (v2)
+
+This guide provides the necessary steps to deploy and secure the MiniMaster project, including the latest security hardening measures.
+
+## 1. Prerequisites
+
+1.  **Firebase Account:** You need a Firebase project.
+2.  **Firebase CLI:** Ensure you have the Firebase CLI installed (`npm install -g firebase-tools`).
+3.  **Code:** Clone the repository and check out the `feature/project-hardening` branch.
+
+## 2. Firebase Project Setup
+
+1.  **Authentication:** In the Firebase Console, go to **Authentication** -> **Sign-in method** and enable **Email/Password**.
+2.  **Firestore:** Go to **Firestore Database** and create a database in **Production mode**.
+3.  **Storage:** Go to **Storage** and set up a new storage bucket.
+
+## 3. Deployment Steps
+
+### Step 1: Deploy Firestore Security Rules
+
+The new, secure `firestore.rules` are critical. Deploy them first.
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+### Step 2: Deploy Cloud Functions
+
+This will deploy all functions, including the new `onTaskStatusChange` for notifications and the protected `setAdminClaim`.
+
+```bash
+firebase deploy --only functions
+```
+
+### Step 3: Configure and Deploy Hosting
+
+Your `firebase.json` file needs to be configured to host both the **Web-Control** and the **Admin Panel**.
+
+**firebase.json:**
+```json
+{
+  "hosting": [
+    {
+      "target": "web-control",
+      "public": "web-control",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ]
+    },
+    {
+      "target": "admin-panel",
+      "public": "admin-panel",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": ".",
+    "runtime": "nodejs16"
+  }
+}
+```
+
+**Deployment Command:**
+
+```bash
+firebase deploy --only hosting
+```
+
+## 4. Post-Deployment Hardening
+
+### Step 1: Create the First Admin User
+
+1.  In the Firebase Console, go to **Authentication** and manually create a new user with an email and password.
+2.  Copy the **User UID** of this new user.
+3.  Manually call the `setAdminClaim` function (e.g., from a temporary script or the Firebase Functions shell) to grant this user admin privileges. **This is a one-time manual step.**
+
+### Step 2: Update Firebase Config
+
+Replace the placeholder `firebaseConfig` in `admin-panel/app.js` and `web-control/app.js` with your actual Firebase project configuration keys.
+
+## 5. ChildApp (Android) Finalization
+
+1.  **Pairing Process:** During the pairing process, after a child device is successfully linked, you must call `ChildIdProviderImpl.setChildId()` to store the device's ID.
+2.  **FCM Token:** The MasterApp needs to register for Firebase Cloud Messaging (FCM) and store the FCM token in the corresponding master document in Firestore (in a field named `fcmToken`) for notifications to work.
+
+This guide provides the essential steps to get the project running securely. Further enhancements, such as a full migration to Firebase Auth tokens instead of the custom `secretKey` model, should be considered for long-term security.
+# Firebase App Check Setup Guide
+
+Firebase App Check helps protect your backend resources from abuse by ensuring that requests to your backend services originate from your authentic app. This guide provides instructions for setting up App Check in the MiniMaster project.
+
+## What is Firebase App Check?
+
+Firebase App Check works with platform-specific attestation providers to verify that requests come from your app and not from unauthorized third parties. It can protect:
+
+*   **Cloud Functions:** Prevent unauthorized function calls.
+*   **Firestore:** Ensure database access comes from legitimate clients.
+*   **Storage:** Protect file uploads and downloads.
+
+## Implementation Steps
+
+### Step 1: Enable App Check in Firebase Console
+
+1.  Go to the [Firebase Console](https://console.firebase.google.com/).
+2.  Select your project.
+3.  Navigate to **Build** → **App Check**.
+4.  Click **Get Started**.
+5.  Register your apps:
+    *   **For Android (ChildApp and MasterApp):**
+        *   Select **Play Integrity** as the provider (recommended for production).
+        *   For development, you can use **Debug** provider.
+    *   **For Web (Web-Control and Admin Panel):**
+        *   Select **reCAPTCHA v3** or **reCAPTCHA Enterprise**.
+
+### Step 2: Add App Check SDK to Android Apps
+
+1.  **Add the dependency** to `build.gradle` (app-level):
+    ```gradle
+    dependencies {
+        // ... other dependencies
+        implementation 'com.google.firebase:firebase-appcheck-playintegrity:17.1.1'
+        // For debug builds:
+        debugImplementation 'com.google.firebase:firebase-appcheck-debug:17.1.1'
+    }
+    ```
+
+2.  **Initialize App Check** in your `Application` class or `MainActivity`:
+    ```kotlin
+    import com.google.firebase.FirebaseApp
+    import com.google.firebase.appcheck.FirebaseAppCheck
+    import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+    
+    class MyApplication : Application() {
+        override fun onCreate() {
+            super.onCreate()
+            FirebaseApp.initializeApp(this)
+            val firebaseAppCheck = FirebaseAppCheck.getInstance()
+            firebaseAppCheck.installAppCheckProviderFactory(
+                PlayIntegrityAppCheckProviderFactory.getInstance()
+            )
+        }
+    }
+    ```
+
+3.  **For debug builds**, use the debug provider:
+    ```kotlin
+    import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+    
+    firebaseAppCheck.installAppCheckProviderFactory(
+        DebugAppCheckProviderFactory.getInstance()
+    )
+    ```
+
+### Step 3: Add App Check SDK to Web Apps
+
+1.  **Add the SDK** to `admin-panel/index.html` and `web-control/index.html`:
+    ```html
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
+    ```
+
+2.  **Initialize App Check** in `app.js`:
+    ```javascript
+    // After firebase.initializeApp(firebaseConfig);
+    const appCheck = firebase.appCheck();
+    appCheck.activate(
+        'YOUR_RECAPTCHA_V3_SITE_KEY', // Get this from Firebase Console
+        true // Use reCAPTCHA v3
+    );
+    ```
+
+### Step 4: Enforce App Check in Cloud Functions
+
+By default, App Check is not enforced. To require App Check tokens:
+
+1.  **Update Cloud Functions** to check for App Check tokens:
+    ```typescript
+    import { onCall, HttpsError } from "firebase-functions/v2/https";
+    
+    export const myFunction = onCall(
+        { enforceAppCheck: true }, // Enforce App Check
+        async (request) => {
+            // Your function logic
+        }
+    );
+    ```
+
+2.  **For existing v1 functions**, you can manually check the token:
+    ```typescript
+    export const myFunction = functions.https.onCall(async (data, context) => {
+        if (context.app === undefined) {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'The function must be called from an App Check verified app.'
+            );
+        }
+        // Your function logic
+    });
+    ```
+
+### Step 5: Enforce App Check in Firestore Rules
+
+Update your `firestore.rules` to require App Check:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Require App Check for all requests
+    match /{document=**} {
+      allow read, write: if request.auth != null && request.app.token != null;
+    }
+  }
+}
+```
+
+## Testing
+
+1.  **Debug Mode:** During development, use the debug provider to get debug tokens.
+2.  **Production:** Ensure Play Integrity and reCAPTCHA are properly configured before deploying to production.
+
+## Important Notes
+
+*   **Gradual Rollout:** Start with monitoring mode (don't enforce) to ensure your apps are correctly configured.
+*   **Metrics:** Monitor App Check metrics in the Firebase Console to detect issues.
+*   **Replay Protection:** App Check tokens are short-lived and can't be reused, providing strong protection against replay attacks.
+
+By implementing Firebase App Check, you significantly reduce the risk of abuse and unauthorized access to your backend resources.
+# Privacy Policy for MiniMaster
+
+**Last Updated:** 2025-11-30
+
+## 1. Introduction
+
+Welcome to MiniMaster. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile applications (MasterApp and ChildApp) and our web services. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the application.
+
+## 2. Collection of Your Information
+
+We may collect information about you in a variety of ways. The information we may collect via the Application includes:
+
+### Personal Data
+
+*   **Parent (Master) Information:** When you register as a parent, we may collect your email address and a unique device identifier (IMEI).
+*   **Child Information:** We collect a unique device identifier for each child device you pair.
+
+### Derivative Data
+
+*   **Usage Data:** Information about how you use the Application, such as the apps you block, the time limits you set, and the tasks you assign.
+*   **Device Information:** Information about your mobile device, including your mobile device ID, model, and manufacturer.
+
+### Financial Data
+
+We do not collect or store any financial information. All payments for subscriptions are processed through the Google Play Store.
+
+## 3. Use of Your Information
+
+Having accurate information about you permits us to provide you with a smooth, efficient, and customized experience. Specifically, we may use information collected about you via the Application to:
+
+*   Create and manage your account.
+*   Provide the core services of the Application, such as device locking, app blocking, and task management.
+*   Send you push notifications regarding the status of tasks.
+*   Monitor and analyze usage and trends to improve your experience with the Application.
+*   Notify you of updates to the Application.
+
+## 4. Disclosure of Your Information
+
+We do not share, sell, rent, or trade your information with any third parties for their promotional purposes.
+
+We may share information we have collected about you in certain situations. Your information may be disclosed as follows:
+
+*   **By Law or to Protect Rights:** If we believe the release of information about you is necessary to respond to legal process, to investigate or remedy potential violations of our policies, or to protect the rights, property, and safety of others, we may share your information as permitted or required by any applicable law, rule, or regulation.
+*   **Third-Party Service Providers:** We may share your information with third parties that perform services for us or on our behalf, including data analysis, email delivery, hosting services, and customer service. We use Firebase (a Google company) for our backend services, and their privacy policy can be found [here](https://policies.google.com/privacy).
+
+## 5. Security of Your Information
+
+We use administrative, technical, and physical security measures to help protect your personal information. While we have taken reasonable steps to secure the personal information you provide to us, please be aware that despite our efforts, no security measures are perfect or impenetrable, and no method of data transmission can be guaranteed against any interception or other type of misuse.
+
+## 6. Policy for Children
+
+We do not knowingly solicit information from or market to children under the age of 13. If you become aware of any data we have collected from children under age 13, please contact us using the contact information provided below.
+
+## 7. Support Requests and Temporary Data Access
+
+When you submit a support request through the Application, we collect the following information to process your request:
+
+*   Your Master IMEI
+*   The time of the request
+*   The problem description you provide
+
+**Temporary Data Access for Support Purposes:**
+
+For effective troubleshooting, you may voluntarily grant our support team **temporary access** to your account data. This access is:
+
+*   **Time-limited** to 48 hours.
+*   **Revocable by you** at any time within the Application.
+*   **Logged:** All access is recorded in an audit trail.
+
+Without your explicit consent, our support team has **no access** to your personal data.
+
+## 9. Data Deletion
+
+You may request to delete your account and all associated data at any time. To do so, please contact us at [your-email@example.com]. We will process your request within a reasonable timeframe.
+
+## 10. Contact Us
+
+If you have questions or comments about this Privacy Policy, please contact us at:
+
+[Your Company Name]
+[Your Email Address]
+[Your Website]
+# MiniMaster Project Hardening & Completion Plan
+
+This document outlines the identified gaps, security vulnerabilities, and missing features in the MiniMaster project. It also provides a concrete plan to address these issues to bring the project to a production-ready state.
+
+## 1. Identified Gaps and Vulnerabilities
+
+### 1.1. Critical Security Vulnerabilities
+
+*   **Insecure Firestore Rules:** The current rules (`firestore.rules`) are dangerously permissive. They allow any authenticated user to read and write data of any other user (`allow read, write: if isSignedIn();`). This is the most critical vulnerability and must be fixed.
+*   **Insecure Authentication Model:** The custom authentication model, which relies on passing a `secretKey` from the client in every Cloud Function call, is not secure. The standard approach is to use Firebase Auth tokens, which are automatically verified. The current model exposes the secret key on the client side.
+*   **Unprotected Admin Function:** The `setAdminClaim` Cloud Function is not protected. Any authenticated user could theoretically call it to make themselves an admin.
+
+### 1.2. Missing Core Functionality
+
+*   **Hardcoded Child ID:** In `ProofSubmissionScreen.kt`, the `childId` is hardcoded (`current_child_id`). This is a **blocker** that prevents the task feature from working correctly for any real device.
+*   **Missing User Notifications:** The Master user does not receive any notifications (e.g., push notifications) when a child submits a task for review or when a task is approved/rejected. This is a major UX gap.
+*   **Incomplete Admin Panel:** The Admin Panel is a scaffold. The "View Details" and "Search" functionalities are not implemented, and there is no pagination for long user lists.
+
+### 1.3. Missing Error Handling and UX
+
+*   **ChildApp Error Handling:** The `ProofSubmissionScreen.kt` has a `TODO` for proper error handling. If an image upload fails, the user is not notified.
+*   **No Loading Indicators:** The Web-Control and Admin Panel lack loading indicators, making the UI feel unresponsive when fetching data.
+
+### 1.4. Missing Test Scenarios
+
+*   **Security Rules:** There are no test scenarios to validate that a user *cannot* access or modify another user's data.
+*   **Edge Cases:** Tests for scenarios like network failure during upload, handling of large images, or race conditions are missing.
+*   **Admin Panel:** The existing test scenarios only cover the implemented scaffold, not the missing detailed views or actions.
+
+## 2. Implementation and Hardening Plan
+
+This plan prioritizes fixing the most critical security issues first.
+
+### Phase 1: Security Hardening (Highest Priority)
+
+1.  **Revamp Firestore Rules:** Rewrite `firestore.rules` from the ground up to enforce strict, user-specific access. A user should only be ableto read/write their own documents.
+2.  **Protect Admin Function:** Add an authorization check to the `setAdminClaim` function to ensure only existing admins can call it.
+3.  **Refactor to Firebase Auth (Long-term):** While a full refactor is a large task, the immediate step is to document this vulnerability and recommend migrating away from the `secretKey` model to standard Firebase Auth ID tokens.
+
+### Phase 2: Implement Missing Core Logic
+
+1.  **Implement Child ID Provider:** Create a mechanism (e.g., using SharedPreferences) to store and retrieve the actual `childId` on the device, removing the hardcoded value.
+2.  **Implement Push Notifications:** Create a new Cloud Function that triggers on task status updates (`onUpdate`) and sends a Firebase Cloud Messaging (FCM) notification to the corresponding Master device.
+3.  **Enhance Admin Panel:** Implement the "View Details" modal to show all of a user's data and add a basic search/filter functionality to the user list.
+
+### Phase 3: Add Missing Tests and Finalize
+
+1.  **Create Security Test Scenarios:** Write a new test document (`TEST_SCENARIOS_SECURITY.md`) that explicitly defines tests for validating the new, stricter Firestore Rules.
+2.  **Implement ChildApp Error Handling:** Add `Toast` messages or other UI feedback in `ProofSubmissionScreen.kt` to inform the user of upload failures.
+3.  **Update All Documentation:** Update the `DEPLOYMENT_GUIDE.md` and other documents to reflect the new security rules and implementation details.
+# MiniMaster Security Best Practices & Future Enhancements
+
+This document outlines the recommended security best practices and future enhancements to further secure the MiniMaster project.
+
+## 1. Authentication Model: `secretKey` vs. Firebase Auth Tokens
+
+**Current Model (Legacy):** The project currently uses a custom authentication model where a `secretKey` is passed from the client in every Cloud Function call. 
+
+**Vulnerability:** This model is **not secure**. The `secretKey` is stored on the client device and can be extracted, allowing an attacker to impersonate the user.
+
+**Recommended Enhancement (High Priority):**
+
+*   **Migrate to Firebase Custom Auth Tokens:** The entire authentication model should be refactored to use Firebase Custom Auth Tokens. This is the standard, secure way to handle authentication in Firebase.
+    1.  **Client-Side:** The client app should authenticate with Firebase Auth using a custom token generated by the backend.
+    2.  **Backend-Side:** The backend should generate a custom token for each user upon successful login. This token is then used by the client to sign in.
+    3.  **Cloud Functions:** All Cloud Functions should rely on the `context.auth` object to verify the user's identity. The `secretKey` should be removed from all function calls.
+
+## 2. Dependabot Vulnerabilities
+
+**Current Status:** The project has **30 open Dependabot alerts** (10 high, 17 moderate, 3 low). These vulnerabilities are in the project's dependencies and could be exploited.
+
+**Recommended Enhancement (High Priority):**
+
+*   **Update Dependencies:** Run `npm audit fix` or manually update the dependencies in `package.json` to the latest secure versions. This should be done regularly.
+
+## 3. Input Validation and Rate Limiting
+
+**Current Status:** Basic input validation is in place. However, there is no rate limiting on Cloud Function calls.
+
+**Vulnerability:** A malicious user could spam the Cloud Functions, leading to high costs and potential denial of service.
+
+**Recommended Enhancement (Medium Priority):**
+
+*   **Implement Rate Limiting:** Use a service like **Firebase App Check** to protect your backend from abuse. App Check ensures that requests to your backend services originate from your authentic app.
+*   **Stricter Input Validation:** Implement more comprehensive input validation on all Cloud Function parameters to prevent injection attacks and other vulnerabilities.
+
+## 4. Data Privacy and GDPR
+
+**Current Status:** The project stores user data, including IMEI numbers and email addresses.
+
+**Consideration:** Depending on the target audience and region, you may need to comply with data privacy regulations like **GDPR**.
+
+**Recommended Enhancement (Medium Priority):**
+
+*   **Privacy Policy:** Create and link a clear privacy policy that explains what data is collected and how it is used.
+*   **Data Anonymization:** Consider anonymizing or pseudonymizing data where possible.
+*   **Data Deletion:** Implement a mechanism for users to request the deletion of their data.
+
+By implementing these enhancements, the MiniMaster project can be made significantly more secure and robust, ready for a production environment.
+# GDPR-Compliant Support Interface - Architecture
+
+This document outlines the architecture for a GDPR-compliant support interface for the MiniMaster project. The core principle is **user consent** and **data minimization**.
+
+## 1. Core Concepts
+
+*   **Opt-In Model:** Users must explicitly grant support access. No data is accessible by the operator without consent.
+*   **Temporary Access:** Access is granted for a limited time (e.g., 48 hours) and can be revoked by the user at any time.
+*   **Data Minimization:** Only the necessary data for troubleshooting is made accessible.
+*   **Audit Trail:** All access and actions are logged.
+
+## 2. Data Model (Firestore)
+
+We will introduce two new collections:
+
+### `supportTickets`
+
+This collection stores all support requests.
+
+```json
+{
+  "ticketId": "<auto-id>",
+  "masterImei": "<user-imei>",
+  "createdAt": "<timestamp>",
+  "status": "open" | "in_progress" | "closed",
+  "problemDescription": "<user-provided-text>",
+  "accessGranted": true | false,
+  "accessGrantId": "<grant-id>" // (optional)
+}
+```
+
+### `supportAccessGrants`
+
+This collection stores the consent for temporary data access.
+
+```json
+{
+  "grantId": "<auto-id>",
+  "masterImei": "<user-imei>",
+  "grantedAt": "<timestamp>",
+  "expiresAt": "<timestamp>", // (e.g., 48 hours from grantedAt)
+  "status": "active" | "expired" | "revoked"
+}
+```
+
+## 3. Backend (Cloud Functions)
+
+We will add the following Cloud Functions:
+
+### `createSupportTicket`
+
+*   **Trigger:** Callable Function from Web-Control.
+*   **Action:** Creates a new document in the `supportTickets` collection.
+*   **Input:** `{ problemDescription: string }`
+*   **Authentication:** Requires authenticated user.
+
+### `grantSupportAccess`
+
+*   **Trigger:** Callable Function from Web-Control.
+*   **Action:**
+    1.  Creates a new document in `supportAccessGrants` with an expiration date.
+    2.  Updates the corresponding `supportTickets` document.
+*   **Input:** `{ ticketId: string }`
+*   **Authentication:** Requires authenticated user.
+
+### `revokeSupportAccess`
+
+*   **Trigger:** Callable Function from Web-Control.
+*   **Action:** Updates the status of the `supportAccessGrants` document to `revoked`.
+*   **Input:** `{ grantId: string }`
+*   **Authentication:** Requires authenticated user.
+
+### `cleanupExpiredGrants` (Scheduled Function)
+
+*   **Trigger:** Scheduled Function (e.g., runs every hour).
+*   **Action:** Queries for `supportAccessGrants` where `expiresAt` is in the past and updates the status to `expired`.
+
+## 4. Frontend UI/UX
+
+### Web-Control (Parent App)
+
+1.  **New "Support" Section:**
+    *   Form to create a new support ticket.
+    *   List of existing support tickets.
+    *   For each ticket, a button to "Grant Support Access".
+    *   If access is granted, a button to "Revoke Support Access".
+
+### Admin Panel
+
+1.  **New "Support Tickets" Tab:**
+    *   List of all support tickets.
+    *   Filter by status (open, in_progress, closed).
+    *   When a ticket is selected:
+        *   Display ticket details.
+        *   If access is granted, a "View User Data" button appears.
+        *   This button opens the existing "User Details" modal, but with a clear indication that this is a temporary support session.
+
+## 5. Security (Firestore Rules)
+
+We will update `firestore.rules` to protect the new collections:
+
+```javascript
+// Allow users to manage their own support tickets and grants
+match /supportTickets/{ticketId} {
+  allow read, create: if request.auth.uid == resource.data.masterImei;
+}
+
+match /supportAccessGrants/{grantId} {
+  allow read, create, update: if request.auth.uid == resource.data.masterImei;
+}
+
+// Allow admins to access support data ONLY if a valid grant exists
+function hasActiveSupportGrant(masterImei) {
+  return exists(/databases/$(database)/documents/supportAccessGrants/$(grantId)) &&
+         get(/databases/$(database)/documents/supportAccessGrants/$(grantId)).data.masterImei == masterImei &&
+         get(/databases/$(database)/documents/supportAccessGrants/$(grantId)).data.status == 'active';
+}
+
+// Example: Admin access to master data
+match /masters/{masterImei} {
+  allow read: if request.auth.token.role == 'admin' && hasActiveSupportGrant(masterImei);
+  // ... other rules
+}
+```
+
+## 6. End-to-End Workflow
+
+1.  **User has a problem:** The parent opens the Web-Control and navigates to the "Support" section.
+2.  **User creates a ticket:** The parent fills out the form and submits a new support ticket.
+3.  **Operator is notified:** The new ticket appears in the Admin Panel.
+4.  **Operator requests access:** The operator communicates with the user (e.g., via email) and requests temporary access.
+5.  **User grants access:** The parent clicks "Grant Support Access" in the Web-Control.
+6.  **Operator views data:** The operator can now view the user's data in the Admin Panel for the duration of the grant.
+7.  **Problem is solved:** The operator closes the ticket.
+8.  **Access expires:** The `cleanupExpiredGrants` function automatically revokes access after 48 hours, or the user revokes it manually.
+
+This architecture ensures that the support interface is both **functional** and **fully compliant with GDPR principles**.
+# Architektur-Design: Aufgaben-basierte Handy-Freischaltung
+
+Die neue Funktion ermöglicht es Eltern (MasterApp/Web-Control), Aufgaben zuzuweisen, deren Erledigung durch das Kind (ChildApp) nachgewiesen werden muss, um die Gerätesperre aufzuheben.
+
+## 1. Datenmodell-Erweiterung (Firestore)
+
+Eine neue Top-Level-Collection `tasks` wird eingeführt, die hierarchisch mit der `families` oder `children` Collection verknüpft ist. Angesichts der bestehenden Struktur wird eine Verknüpfung über die `childId` in der `tasks` Collection vorgeschlagen.
+
+| Feld | Typ | Beschreibung |
+| :--- | :--- | :--- |
+| `taskId` | String | Eindeutige ID (Dokument-ID) |
+| `childId` | String | ID des Kindes, dem die Aufgabe zugewiesen ist. |
+| `masterId` | String | ID des Elternteils, der die Aufgabe zugewiesen hat. |
+| `title` | String | Kurze Beschreibung der Aufgabe (z.B. "Zimmer aufräumen"). |
+| `description` | String | Detaillierte Anweisungen. |
+| `assignedAt` | Timestamp | Zeitpunkt der Zuweisung. |
+| `status` | String | **`ASSIGNED`**, **`SUBMITTED`**, **`APPROVED`**, **`REJECTED`**. |
+| `proofUrl` | String | URL zum Nachweis (z.B. Foto in Firebase Storage). Nur bei Status `SUBMITTED`. |
+| `unlockDuration` | Number | Dauer (in Minuten), für die das Handy nach Genehmigung freigeschaltet wird. |
+
+## 2. API-Erweiterung (Firebase Functions / `index.ts`)
+
+Es werden neue Endpunkte/Funktionen benötigt, um die Aufgaben zu verwalten und den Status zu aktualisieren.
+
+| Funktion | Methode | Beschreibung | Aufrufer |
+| :--- | :--- | :--- | :--- |
+| `createTask` | HTTPS/Callable | Erstellt eine neue Aufgabe und setzt den Status auf `ASSIGNED`. | MasterApp / Web-Control |
+| `submitTaskProof` | HTTPS/Callable | Kind lädt den Nachweis hoch (Foto/Text) und setzt den Status auf `SUBMITTED`. | ChildApp |
+| `reviewTask` | HTTPS/Callable | Elternteil genehmigt (`APPROVED`) oder lehnt ab (`REJECTED`). Bei `APPROVED` wird der Freischalt-Timer gestartet. | MasterApp / Web-Control |
+| `getPendingTask` | HTTPS/Callable | Ruft die aktuell zugewiesene Aufgabe für ein Kind ab. | ChildApp |
+
+## 3. ChildApp (Android) Logik
+
+Die Kernlogik basiert auf der bestehenden Geräte-Sperrfunktion (vermutlich über einen **Accessibility Service** oder **Device Policy Manager**).
+
+1.  **Sperr-Trigger:** Wenn die ChildApp feststellt, dass die zugewiesene Aufgabe den Status `ASSIGNED` oder `REJECTED` hat, wird die Sperre aktiviert.
+2.  **Freischalt-UI:** Anstelle des normalen Sperrbildschirms wird ein spezieller "Aufgaben-Sperrbildschirm" angezeigt, der die Details der Aufgabe und einen Button zum "Nachweis einreichen" enthält.
+3.  **Nachweis-Einreichung:** Der Button führt zu einer Oberfläche, auf der das Kind ein Foto aufnehmen/hochladen oder einen Textnachweis eingeben kann. Der Nachweis wird in Firebase Storage gespeichert und die `proofUrl` sowie der Status `SUBMITTED` werden über `submitTaskProof` an Firestore übermittelt.
+4.  **Freischaltung:** Die ChildApp überwacht den `status` der Aufgabe. Sobald der Status auf `APPROVED` wechselt, wird die Gerätesperre für die Dauer von `unlockDuration` aufgehoben.
+
+## 4. MasterApp / Web-Control Logik
+
+1.  **Aufgaben-Zuweisung:** UI zur Eingabe von Titel, Beschreibung und `unlockDuration`. Ruft `createTask` auf.
+2.  **Review-Dashboard:** Eine Liste aller Aufgaben mit dem Status `SUBMITTED`.
+3.  **Genehmigung:** UI zur Anzeige des `proofUrl` (Foto-Nachweis). Buttons für "Genehmigen" (`APPROVED`) oder "Ablehnen" (`REJECTED`). Ruft `reviewTask` auf.
+
+Dieses Design stellt sicher, dass die kritische Sperrlogik auf dem Gerät des Kindes verbleibt, aber durch den zentralen Aufgabenstatus in Firestore gesteuert wird. Die Nutzung von Firebase Storage für den Nachweis ist notwendig.
+# MiniMaster Security Hardening Test Scenarios
+
+This document outlines the critical test scenarios to validate the new, stricter security rules and the overall hardened state of the MiniMaster project.
+
+## Prerequisites
+
+1.  The new `firestore.rules` have been deployed.
+2.  The `setAdminClaim` function has been updated and deployed.
+3.  At least three test users exist in Firebase Authentication:
+    *   **User A (Admin):** Has the custom claim `role: 'admin'`. 
+    *   **User B (Master):** A regular Master user, owner of Child C.
+    *   **User C (Child):** A regular Child user, linked to Master B.
+    *   **User D (Unrelated Master):** A regular Master user, not linked to Child C.
+
+## Test Cases
+
+### 1. Firestore Rules Validation (Critical)
+
+| ID | Test Case | Action | Expected Result | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **SEC-FS-01** | **Master Isolation (Write):** User D attempts to write to User B's master document (`/masters/{user_B_uid}`). | Firestore Write | **PERMISSION_DENIED**. A user cannot modify another master's data. | |
+| **SEC-FS-02** | **Master Isolation (Read):** User D attempts to read User B's master document (`/masters/{user_B_uid}`). | Firestore Read | **PERMISSION_DENIED**. A user cannot read another master's data. | |
+| **SEC-FS-03** | **Child Data Access (Owner):** User B (Master) attempts to read Child C's document (`/children/{child_C_uid}`). | Firestore Read | **SUCCESS**. The owner can read their child's data. | |
+| **SEC-FS-04** | **Child Data Access (Unrelated):** User D (Unrelated Master) attempts to read Child C's document. | Firestore Read | **PERMISSION_DENIED**. An unrelated master cannot read another's child data. | |
+| **SEC-FS-05** | **Task Creation (Child):** User C (Child) attempts to create a new task under their own document. | Firestore Create | **PERMISSION_DENIED**. Only masters can create tasks. | |
+| **SEC-FS-06** | **Task Deletion (Child):** User C (Child) attempts to delete a task assigned to them. | Firestore Delete | **PERMISSION_DENIED**. Only masters can delete tasks. | |
+| **SEC-FS-07** | **Admin Full Access:** User A (Admin) attempts to read and write to any document in any collection. | Firestore Read/Write | **SUCCESS**. The admin has full override access. | |
+| **SEC-FS-08** | **Pairing Code Security:** Any user attempts to write to the `/pairingCodes` collection. | Firestore Write | **PERMISSION_DENIED**. Only Cloud Functions can create pairing codes. | |
+
+### 2. Cloud Function Authorization
+
+| ID | Test Case | Action | Expected Result | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **SEC-CF-01** | **`setAdminClaim` (Non-Admin):** User B (Master) attempts to call the `setAdminClaim` function. | Cloud Function Call | **PERMISSION_DENIED** HttpsError. The function correctly rejects calls from non-admins. | |
+| **SEC-CF-02** | **`setAdminClaim` (Admin):** User A (Admin) calls the `setAdminClaim` function to grant admin rights to another user. | Cloud Function Call | **SUCCESS**. The target user receives the `role: 'admin'` custom claim. | |
+
+### 3. ChildApp Logic Validation
+
+| ID | Test Case | Action | Expected Result | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **SEC-CA-01** | **Child ID Persistence:** Pair a new child device, then restart the app. | Open the app after restart. | The app correctly retrieves and uses the stored `childId` from SharedPreferences. The hardcoded value is no longer used. | |
+| **SEC-CA-02** | **Upload Failure UX:** Manually simulate a network error during the image upload in `ProofSubmissionScreen`. | Attempt to submit proof. | The `isUploading` state is correctly reset, and a `Toast` message "Failed to submit proof. Please try again." is displayed to the user. | |
+# Test-Szenarien: Aufgaben-basierte Handy-Freischaltung
+
+Dieses Dokument beschreibt die notwendigen Schritte, um die korrekte Funktion der neu implementierten Aufgaben-basierten Handy-Freischaltung zu verifizieren.
+
+## Voraussetzungen
+
+1.  Die Firebase-Funktionen (`createTask`, `submitTaskProof`, `reviewTask`) sind deployed.
+2.  Die Firestore Security Rules sind aktualisiert.
+3.  Die ChildApp und MasterApp/Web-Control sind mit den neuen API-Aufrufen und der Lock-Logik (gemäß `CHILDAPP_LOCK_LOGIC.md`) implementiert.
+4.  Ein Master-Account (Elternteil) und ein Child-Account (Kind) sind gepaart und authentifiziert.
+
+## Testfall 1: Erfolgreicher Aufgaben-Zyklus (Freischaltung)
+
+| Schritt | Akteur | Aktion | Erwartetes Ergebnis |
+| :--- | :--- | :--- | :--- |
+| **1. Zuweisung** | Master | Ruft `createTask` auf (z.B. über Web-Control) mit `unlockDuration: 30` Minuten. | Die Aufgabe erscheint in der ChildApp. Der Status in Firestore ist `ASSIGNED`. |
+| **2. Sperre** | Child | Versucht, eine andere App zu öffnen. | Die ChildApp leitet sofort zur **Lock-Activity** um. Die Lock-Activity zeigt die Aufgabendetails an. |
+| **3. Nachweis** | Child | Klickt auf "Nachweis einreichen", lädt ein Foto hoch und ruft `submitTaskProof` auf. | Das Foto wird in Firebase Storage gespeichert. Der Status in Firestore wechselt zu `SUBMITTED`. Die Lock-Activity zeigt "Warte auf Genehmigung..." an. |
+| **4. Genehmigung** | Master | Ruft `reviewTask` mit `approved: true` auf. | Der Status in Firestore wechselt zu `APPROVED`. |
+| **5. Freischaltung** | Child | | Die Lock-Activity verschwindet. Der Task-Monitoring-Service startet einen 30-Minuten-Timer. Das Handy ist für 30 Minuten normal nutzbar. |
+| **6. Timer-Ende** | System | 30 Minuten sind vergangen. | Die Sperrlogik wird reaktiviert. Die Lock-Activity erscheint wieder, falls keine neue Aufgabe zugewiesen wurde oder die Standard-Sperrregeln greifen. |
+
+## Testfall 2: Ablehnung der Aufgabe (Sperre bleibt aktiv)
+
+| Schritt | Akteur | Aktion | Erwartetes Ergebnis |
+| :--- | :--- | :--- | :--- |
+| **1-3. Zuweisung & Nachweis** | Master/Child | Wie in Testfall 1. Status ist `SUBMITTED`. | |
+| **4. Ablehnung** | Master | Ruft `reviewTask` mit `approved: false` auf. | Der Status in Firestore wechselt zu `REJECTED`. |
+| **5. Reaktivierung** | Child | | Die Lock-Activity bleibt aktiv und zeigt die Aufgabendetails an. Der Button "Nachweis einreichen" ist wieder verfügbar, um eine erneute Einreichung zu ermöglichen. |
+
+## Testfall 3: Sicherheitsprüfung (Unautorisierter Zugriff)
+
+| Schritt | Akteur | Aktion | Erwartetes Ergebnis |
+| :--- | :--- | :--- | :--- |
+| **1. Master-Zugriff** | Child | Versucht, `createTask` oder `reviewTask` aufzurufen. | Die Cloud Function gibt einen `permission-denied` oder `unauthenticated` Fehler zurück (basierend auf der Authentifizierung des Child-Tokens). |
+| **2. Child-Zugriff** | Master | Versucht, `submitTaskProof` aufzurufen. | Die Cloud Function gibt einen `permission-denied` oder `unauthenticated` Fehler zurück. |
+| **3. Falsche Child-ID** | Child A | Ruft `submitTaskProof` für eine Aufgabe auf, die Child B zugewiesen ist. | Die Cloud Function gibt einen `permission-denied` Fehler zurück. |
