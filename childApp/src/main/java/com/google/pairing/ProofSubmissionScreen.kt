@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
 import coil.compose.rememberImagePainter
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -103,12 +104,13 @@ fun ProofSubmissionScreen(
                     imageUri?.let { uri ->
                         coroutineScope.launch {
                             isUploading = true
-                            val success = uploadProofAndSubmit(task.taskId, uri)
+                            val success = uploadProofAndSubmit(task.taskId, uri, context)
                             isUploading = false
                             if (success) {
+                                Toast.makeText(context, "Proof submitted successfully!", Toast.LENGTH_SHORT).show()
                                 onProofSubmitted()
                             } else {
-                                // TODO: Handle error properly
+                                Toast.makeText(context, "Failed to submit proof. Please try again.", Toast.LENGTH_LONG).show()
                             }
                         }
                     }
@@ -132,15 +134,15 @@ fun ProofSubmissionScreen(
  * @param uri The URI of the photo to upload.
  * @return True if successful, false otherwise.
  */
-suspend fun uploadProofAndSubmit(taskId: String, uri: Uri): Boolean {
+suspend fun uploadProofAndSubmit(taskId: String, uri: Uri, context: android.content.Context): Boolean {
     val storageRef = FirebaseStorage.getInstance().reference
     val proofRef = storageRef.child("task_proofs/${taskId}/${System.currentTimeMillis()}.jpg")
 
     return try {
         val uploadTask = proofRef.putFile(uri).await()
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
-                        // Hier müsste der ChildIdProvider injiziert werden, für dieses Beispiel nehmen wir eine vereinfachte Instanz an
-        val childIdProvider = object : ChildIdProvider { override fun getChildId(): String = "current_child_id" } // TODO: Replace with actual injected provider
+                        // Use the actual ChildIdProvider implementation
+        val childIdProvider = ChildIdProviderImpl(context)
         val taskRepository = TaskRepository(
             FirebaseFirestore.getInstance(),
             FirebaseFunctions.getInstance(),

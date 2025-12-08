@@ -638,6 +638,7 @@ function showDashboard() {
     document.querySelector('.dashboard').style.display = 'block';
     document.getElementById('task-review-section').style.display = 'none';
     document.getElementById('subscription-section').style.display = 'none';
+    document.getElementById('support-section').style.display = 'none';
 }
 
 // --- Utility Functions ---
@@ -668,5 +669,163 @@ window.onclick = function(event) {
     const modal = document.getElementById('task-creation-modal');
     if (event.target === modal) {
         closeTaskModal();
+    }
+}
+
+
+// ==================== SUPPORT FUNCTIONS ====================
+
+function showSupport() {
+    document.querySelector('.dashboard').style.display = 'none';
+    document.getElementById('task-review-section').style.display = 'none';
+    document.getElementById('subscription-section').style.display = 'none';
+    document.getElementById('support-section').style.display = 'block';
+    loadSupportTickets();
+}
+
+async function createSupportTicket(event) {
+    event.preventDefault();
+    
+    const problemDescription = document.getElementById('problem-description').value;
+    
+    if (!problemDescription.trim()) {
+        showNotification('Please describe your problem.', 'error');
+        return;
+    }
+    
+    try {
+        const createTicket = functions.httpsCallable('createSupportTicket');
+        const result = await createTicket({ problemDescription });
+        
+        if (result.data.success) {
+            showNotification('Support ticket created successfully!', 'success');
+            document.getElementById('problem-description').value = '';
+            loadSupportTickets();
+        }
+    } catch (error) {
+        console.error('Error creating support ticket:', error);
+        showNotification('Failed to create support ticket: ' + error.message, 'error');
+    }
+}
+
+async function loadSupportTickets() {
+    const ticketsContainer = document.getElementById('support-tickets');
+    ticketsContainer.innerHTML = '<div class="loading">Loading tickets...</div>';
+    
+    try {
+        const snapshot = await db.collection('supportTickets')
+            .where('masterImei', '==', currentMasterImei)
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            ticketsContainer.innerHTML = '<p>No support tickets found.</p>';
+            return;
+        }
+        
+        let html = '';
+        snapshot.forEach(doc => {
+            const ticket = doc.data();
+            const createdAt = ticket.createdAt ? ticket.createdAt.toDate().toLocaleString() : 'N/A';
+            const statusClass = ticket.status === 'open' ? 'status-open' : ticket.status === 'in_progress' ? 'status-progress' : 'status-closed';
+            
+            html += `
+                <div class="ticket-card">
+                    <div class="ticket-header">
+                        <span class="ticket-id">Ticket #${doc.id.substring(0, 8)}</span>
+                        <span class="ticket-status ${statusClass}">${ticket.status}</span>
+                    </div>
+                    <div class="ticket-body">
+                        <p><strong>Created:</strong> ${createdAt}</p>
+                        <p><strong>Problem:</strong> ${ticket.problemDescription}</p>
+                        
+                        ${ticket.aiGeneratedSolution ? 
+                            `<div class="ai-solution">
+                                <h4>🤖 AI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%)</h4>
+                                <p>${ticket.aiGeneratedSolution.replace(/\n/g, '<br>')}</p>
+                                ${ticket.status === 'awaiting_user_feedback' ? 
+                                    `<div class="feedback-buttons">
+                                        <button onclick="provideFeedback('${doc.id}', 'accepted')" class="btn btn-success">✓ This solved my problem</button>
+                                        <button onclick="provideFeedback('${doc.id}', 'rejected')" class="btn btn-warning">✗ I still need help</button>
+                                    </div>` : 
+                                    ''
+                                }
+                            </div>` : 
+                            ''
+                        }
+                        
+                        ${ticket.accessGranted ? 
+                            `<p class="access-granted">✓ Support access granted (expires in 48h)</p>
+                             <button onclick="revokeAccess('${ticket.accessGrantId}')" class="btn btn-danger">Revoke Access</button>` :
+                            (ticket.status === 'escalated' || ticket.status === 'in_progress') ?
+                            `<button onclick="grantAccess('${doc.id}')" class="btn btn-primary">Grant Support Access</button>` :
+                            ''
+                        }
+                    </div>
+                </div>
+            `;
+        });
+        
+        ticketsContainer.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading support tickets:', error);
+        ticketsContainer.innerHTML = '<p>Error loading tickets.</p>';
+    }
+}
+
+async function grantAccess(ticketId) {
+    if (!confirm('This will grant the support team temporary access to your account data for 48 hours. Continue?')) {
+        return;
+    }
+    
+    try {
+        const grantAccess = functions.httpsCallable('grantSupportAccess');
+        const result = await grantAccess({ ticketId });
+        
+        if (result.data.success) {
+            showNotification('Support access granted successfully!', 'success');
+            loadSupportTickets();
+        }
+    } catch (error) {
+        console.error('Error granting access:', error);
+        showNotification('Failed to grant access: ' + error.message, 'error');
+    }
+}
+
+async function revokeAccess(grantId) {
+    if (!confirm('This will revoke support access to your account. Continue?')) {
+        return;
+    }
+    
+    try {
+        const revokeAccess = functions.httpsCallable('revokeSupportAccess');
+        const result = await revokeAccess({ grantId });
+        
+        if (result.data.success) {
+            showNotification('Support access revoked successfully!', 'success');
+            loadSupportTickets();
+        }
+    } catch (error) {
+        console.error('Error revoking access:', error);
+        showNotification('Failed to revoke access: ' + error.message, 'error');
+    }
+}
+
+
+async function provideFeedback(ticketId, feedback) {
+    try {
+        const provideSolutionFeedback = functions.httpsCallable('provideSolutionFeedback');
+        const result = await provideSolutionFeedback({ ticketId, feedback });
+        
+        if (result.data.success) {
+            const message = feedback === 'accepted' 
+                ? 'Great! The ticket has been closed.' 
+                : 'Your ticket has been escalated to a human support agent.';
+            showNotification(message, 'success');
+            loadSupportTickets();
+        }
+    } catch (error) {
+        console.error('Error providing feedback:', error);
+        showNotification('Failed to provide feedback: ' + error.message, 'error');
     }
 }
