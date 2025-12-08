@@ -1494,10 +1494,16 @@ import { OpenAI } from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialize OpenAI client (only when needed)
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
 
 // Load knowledge base (all project documentation)
 let knowledgeBase = '';
@@ -1551,7 +1557,7 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
 
       // Call OpenAI API
       functions.logger.info('Calling OpenAI API...');
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: 'gemini-2.5-flash',
         messages: [
           { role: 'system', content: 'You are a technical support agent for the MiniMaster parental control application.' },
