@@ -89,6 +89,9 @@ function loadDashboardData() {
     
     // 3. Load Subscriptions (simplified initial load)
     loadSubscriptions();
+    
+    // 4. Load Support Tickets
+    loadSupportTickets();
 }
 
 function loadStats() {
@@ -332,4 +335,102 @@ function showNotification(message, type = "info") {
     setTimeout(() => {
         notification.style.display = "none";
     }, 5000);
+}
+
+
+// ==================== SUPPORT TICKET MANAGEMENT ====================
+
+let currentTicketFilter = 'all';
+
+async function loadSupportTickets() {
+    const ticketsListElement = document.getElementById("support-tickets-list");
+    ticketsListElement.innerHTML = "<div class='loading'><div class='spinner'></div> Loading support tickets...</div>";
+    
+    try {
+        let query = db.collection("supportTickets");
+        
+        if (currentTicketFilter !== 'all') {
+            query = query.where("status", "==", currentTicketFilter);
+        }
+        
+        const snapshot = await query.orderBy("createdAt", "desc").get();
+        
+        if (snapshot.empty) {
+            ticketsListElement.innerHTML = "<div class='info'>No support tickets found.</div>";
+            return;
+        }
+        
+        let html = "<table><tr><th>Ticket ID</th><th>Master IMEI</th><th>Status</th><th>Created</th><th>Access Granted</th><th>Actions</th></tr>";
+        snapshot.forEach(doc => {
+            const ticket = doc.data();
+            const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
+            const statusClass = ticket.status === 'open' ? 'status-open' : ticket.status === 'in_progress' ? 'status-progress' : 'status-closed';
+            
+            html += `
+                <tr>
+                    <td>${doc.id.substring(0, 8)}</td>
+                    <td>${ticket.masterImei}</td>
+                    <td><span class="${statusClass}">${ticket.status}</span></td>
+                    <td>${createdAt}</td>
+                    <td>${ticket.accessGranted ? '✓ Yes' : '✗ No'}</td>
+                    <td>
+                        <button onclick="viewTicketDetails('${doc.id}')" class="btn btn-secondary">View</button>
+                        ${ticket.accessGranted ? 
+                            `<button onclick="viewUserDetails('${ticket.masterImei}')" class="btn btn-primary">View User Data</button>` : 
+                            ''}
+                        ${ticket.status !== 'closed' ? 
+                            `<button onclick="updateTicketStatus('${doc.id}', 'in_progress')" class="btn btn-secondary">Mark In Progress</button>
+                             <button onclick="updateTicketStatus('${doc.id}', 'closed')" class="btn btn-secondary">Close</button>` : 
+                            ''}
+                    </td>
+                </tr>
+            `;
+        });
+        html += "</table>";
+        ticketsListElement.innerHTML = html;
+    } catch (error) {
+        console.error("Error loading support tickets:", error);
+        ticketsListElement.innerHTML = "<div class='error'>Error loading support tickets: " + error.message + "</div>";
+    }
+}
+
+function filterTickets(status) {
+    currentTicketFilter = status;
+    loadSupportTickets();
+}
+
+async function viewTicketDetails(ticketId) {
+    try {
+        const doc = await db.collection("supportTickets").doc(ticketId).get();
+        if (!doc.exists) {
+            showNotification("Ticket not found.", "error");
+            return;
+        }
+        
+        const ticket = doc.data();
+        const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
+        
+        alert(`Ticket Details:\n\nTicket ID: ${ticketId}\nMaster IMEI: ${ticket.masterImei}\nStatus: ${ticket.status}\nCreated: ${createdAt}\nProblem Description:\n${ticket.problemDescription}`);
+    } catch (error) {
+        console.error("Error viewing ticket details:", error);
+        showNotification("Error viewing ticket details: " + error.message, "error");
+    }
+}
+
+async function updateTicketStatus(ticketId, newStatus) {
+    if (!confirm(`Are you sure you want to change the ticket status to "${newStatus}"?`)) {
+        return;
+    }
+    
+    try {
+        await db.collection("supportTickets").doc(ticketId).update({
+            status: newStatus
+        });
+        
+        showNotification("Ticket status updated successfully!", "success");
+        loadSupportTickets();
+    } catch (error) {
+        console.error("Error updating ticket status:", error);
+        showNotification("Error updating ticket status: " + error.message, "error");
+    }
 }

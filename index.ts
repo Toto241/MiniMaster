@@ -1310,3 +1310,179 @@ export const deleteUserAccount = functions.https.onCall(async (data: { masterIme
         );
     }
 });
+
+/**
+ * Creates a new support ticket.
+ */
+export const createSupportTicket = functions.https.onCall(async (data: { problemDescription: string }, context: CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const { problemDescription } = data;
+
+    if (!problemDescription || typeof problemDescription !== "string" || problemDescription.trim().length === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Problem description is required.");
+    }
+
+    const masterImei = context.auth.uid;
+
+    try {
+        const ticketRef = await db().collection("supportTickets").add({
+            masterImei: masterImei,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: "open",
+            problemDescription: problemDescription.trim(),
+            accessGranted: false
+        });
+
+        functions.logger.info(`Support ticket created: ${ticketRef.id} for master ${masterImei}`);
+        return { success: true, ticketId: ticketRef.id };
+
+    } catch (error) {
+        functions.logger.error(`Failed to create support ticket for master ${masterImei}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to create support ticket.", error);
+    }
+});
+
+/**
+ * Grants temporary support access.
+ */
+export const grantSupportAccess = functions.https.onCall(async (data: { ticketId: string }, context: CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const { ticketId } = data;
+
+    if (!ticketId || typeof ticketId !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const masterImei = context.auth.uid;
+
+    try {
+        // Verify the ticket belongs to the user
+        const ticketDoc = await db().collection("supportTickets").doc(ticketId).get();
+        if (!ticketDoc.exists || ticketDoc.data()?.masterImei !== masterImei) {
+            throw new functions.https.HttpsError("permission-denied", "Ticket not found or access denied.");
+        }
+
+        // Create a support access grant (valid for 48 hours)
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 48);
+
+        const grantRef = await db().collection("supportAccessGrants").add({
+            masterImei: masterImei,
+            ticketId: ticketId,
+            grantedAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+            status: "active"
+        });
+
+        // Update the ticket
+        await db().collection("supportTickets").doc(ticketId).update({
+            accessGranted: true,
+            accessGrantId: grantRef.id
+        });
+
+        functions.logger.info(`Support access granted: ${grantRef.id} for ticket ${ticketId}`);
+        return { success: true, grantId: grantRef.id, expiresAt: expiresAt.toISOString() };
+
+    } catch (error) {
+        functions.logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to grant support access.", error);
+    }
+});
+
+/**
+ * Revokes support access.
+ */
+export const revokeSupportAccess = functions.https.onCall(async (data: { grantId: string }, context: CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const { grantId } = data;
+
+    if (!grantId || typeof grantId !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "Grant ID is required.");
+    }
+
+    const masterImei = context.auth.uid;
+
+    try {
+        // Verify the grant belongs to the user
+        const grantDoc = await db().collection("supportAccessGrants").doc(grantId).get();
+        if (!grantDoc.exists || grantDoc.data()?.masterImei !== masterImei) {
+            throw new functions.https.HttpsError("permission-denied", "Grant not found or access denied.");
+        }
+
+        // Revoke the grant
+        await db().collection("supportAccessGrants").doc(grantId).update({
+            status: "revoked"
+        });
+
+        // Update the associated ticket
+        const ticketId = grantDoc.data()?.ticketId;
+        if (ticketId) {
+            await db().collection("supportTickets").doc(ticketId).update({
+                accessGranted: false
+            });
+        }
+
+        functions.logger.info(`Support access revoked: ${grantId}`);
+        return { success: true };
+
+    } catch (error) {
+        functions.logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to revoke support access.", error);
+    }
+});
+
+/**
+ * Scheduled function to clean up expired support grants.
+ * Runs every hour.
+ */
+export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").onRun(async (_context) => {
+    const now = admin.firestore.Timestamp.now();
+
+    try {
+        const expiredGrantsSnapshot = await db().collection("supportAccessGrants")
+            .where("status", "==", "active")
+            .where("expiresAt", "<=", now)
+            .get();
+
+        if (expiredGrantsSnapshot.empty) {
+            functions.logger.info("No expired grants to clean up.");
+            return null;
+        }
+
+        const batch = db().batch();
+        const ticketUpdates: { [ticketId: string]: boolean } = {};
+
+        expiredGrantsSnapshot.docs.forEach(doc => {
+            batch.update(doc.ref, { status: "expired" });
+            const ticketId = doc.data().ticketId;
+            if (ticketId) {
+                ticketUpdates[ticketId] = true;
+            }
+        });
+
+        await batch.commit();
+
+        // Update associated tickets
+        for (const ticketId of Object.keys(ticketUpdates)) {
+            await db().collection("supportTickets").doc(ticketId).update({
+                accessGranted: false
+            });
+        }
+
+        functions.logger.info(`Cleaned up ${expiredGrantsSnapshot.size} expired support grants.`);
+        return null;
+
+    } catch (error) {
+        functions.logger.error("Failed to clean up expired grants:", error);
+        return null;
+    }
+});
