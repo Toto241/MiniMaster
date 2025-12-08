@@ -1486,3 +1486,210 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
         return null;
     }
 });
+
+
+// ==================== AI-POWERED SUPPORT AGENT ====================
+
+import { OpenAI } from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Load knowledge base (all project documentation)
+let knowledgeBase = '';
+try {
+  const knowledgeBasePath = path.join(__dirname, 'knowledge_base.txt');
+  knowledgeBase = fs.readFileSync(knowledgeBasePath, 'utf-8');
+} catch (error) {
+  functions.logger.error('Failed to load knowledge base:', error);
+}
+
+/**
+ * Firestore Trigger: Automatically analyze and solve new support tickets using AI
+ * Triggered when a new document is created in the supportTickets collection
+ */
+export const onTicketCreated = functions.firestore
+  .document('supportTickets/{ticketId}')
+  .onCreate(async (snapshot, context) => {
+    const ticketId = context.params.ticketId;
+    const ticketData = snapshot.data();
+    
+    functions.logger.info(`New support ticket created: ${ticketId}`);
+    
+    try {
+      // Extract problem description
+      const problemDescription = ticketData.problemDescription || '';
+      
+      if (!problemDescription || problemDescription.trim().length === 0) {
+        functions.logger.info('Empty problem description, skipping AI analysis.');
+        return;
+      }
+      
+      // Construct the prompt for the AI
+      const prompt = `You are a helpful support agent for the MiniMaster application, a parental control app that allows parents to manage their children's device usage through task-based unlocking.
+
+A user has submitted the following support request:
+
+"${problemDescription}"
+
+Based on the following knowledge base, provide a clear, step-by-step solution to the user's problem. If you are not confident in your answer (confidence < 0.7), state that you are escalating the ticket to a human agent.
+
+Knowledge Base:
+${knowledgeBase}
+
+Your response MUST be in JSON format with exactly two fields:
+{
+  "solution": "Your step-by-step solution here",
+  "confidence": 0.85
+}
+
+The confidence should be a float between 0 and 1, where 1 means you are absolutely certain the solution is correct.`;
+
+      // Call OpenAI API
+      functions.logger.info('Calling OpenAI API...');
+      const response = await openai.chat.completions.create({
+        model: 'gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a technical support agent for the MiniMaster parental control application.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+      
+      // Parse the AI's response
+      const aiResponse = response.choices[0]?.message?.content || '';
+      functions.logger.info('AI Response:', aiResponse);
+      
+      let aiGeneratedSolution = '';
+      let aiConfidenceScore = 0.0;
+      let newStatus = 'awaiting_user_feedback';
+      
+      try {
+        const parsed = JSON.parse(aiResponse);
+        aiGeneratedSolution = parsed.solution || 'Unable to generate solution.';
+        aiConfidenceScore = parsed.confidence || 0.0;
+        
+        // If confidence is too low, escalate immediately
+        if (aiConfidenceScore < 0.7) {
+          newStatus = 'escalated';
+          aiGeneratedSolution += '\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.';
+        }
+      } catch (parseError) {
+        functions.logger.error('Failed to parse AI response as JSON:', parseError);
+        aiGeneratedSolution = 'AI generated an invalid response. Escalating to human support.';
+        aiConfidenceScore = 0.0;
+        newStatus = 'escalated';
+      }
+      
+      // Update the ticket with the AI-generated solution
+      await admin.firestore().collection('supportTickets').doc(ticketId).update({
+        aiGeneratedSolution: aiGeneratedSolution,
+        aiConfidenceScore: aiConfidenceScore,
+        aiSolutionStatus: 'generated',
+        status: newStatus,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      functions.logger.info(`Ticket ${ticketId} updated with AI solution (confidence: ${aiConfidenceScore})`);
+      
+      // Send push notification to the user
+      const masterImei = ticketData.masterImei;
+      const masterDoc = await admin.firestore().collection('masters').doc(masterImei).get();
+      
+      if (masterDoc.exists) {
+        const masterData = masterDoc.data();
+        const fcmToken = masterData?.fcmToken;
+        
+        if (fcmToken) {
+          const notificationMessage = {
+            notification: {
+              title: 'Support Ticket Update',
+              body: newStatus === 'escalated' 
+                ? 'Your ticket has been escalated to a human agent.' 
+                : 'We have a proposed solution for your support ticket!',
+            },
+            data: {
+              ticketId: ticketId,
+              type: 'support_ticket_update',
+            },
+            token: fcmToken,
+          };
+          
+          await getMessaging().send(notificationMessage);
+          functions.logger.info(`Push notification sent to ${masterImei}`);
+        }
+      }
+      
+      return;
+    } catch (error) {
+      functions.logger.error('Error in onTicketCreated:', error);
+      
+      // Update ticket to escalated status on error
+      await admin.firestore().collection('supportTickets').doc(ticketId).update({
+        aiGeneratedSolution: 'An error occurred while analyzing your ticket. A human support agent will assist you shortly.',
+        aiConfidenceScore: 0.0,
+        aiSolutionStatus: 'error',
+        status: 'escalated',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      throw error;
+    }
+  });
+
+/**
+ * Callable Function: User provides feedback on AI-generated solution
+ */
+export const provideSolutionFeedback = functions.https.onCall(async (data: { ticketId: string; feedback: string }, context: CallableContext) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+  
+  const { ticketId, feedback } = data; // feedback: 'accepted' or 'rejected'
+  
+  if (!ticketId || !feedback) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing ticketId or feedback.');
+  }
+  
+  if (feedback !== 'accepted' && feedback !== 'rejected') {
+    throw new functions.https.HttpsError('invalid-argument', 'Feedback must be "accepted" or "rejected".');
+  }
+  
+  try {
+    const ticketRef = admin.firestore().collection('supportTickets').doc(ticketId);
+    const ticketDoc = await ticketRef.get();
+    
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Ticket not found.');
+    }
+    
+    const ticketData = ticketDoc.data();
+    
+    // Verify that the user owns this ticket
+    if (ticketData?.masterImei !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'You do not have permission to update this ticket.');
+    }
+    
+    // Update ticket based on feedback
+    const newStatus = feedback === 'accepted' ? 'closed_by_ai' : 'escalated';
+    const aiSolutionStatus = feedback === 'accepted' ? 'accepted' : 'rejected';
+    
+    await ticketRef.update({
+      aiSolutionStatus: aiSolutionStatus,
+      status: newStatus,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    functions.logger.info(`Ticket ${ticketId} feedback: ${feedback}, new status: ${newStatus}`);
+    
+    return { success: true, message: `Ticket ${newStatus}.` };
+  } catch (error) {
+    functions.logger.error('Error in provideSolutionFeedback:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to update ticket feedback.');
+  }
+});

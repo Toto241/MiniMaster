@@ -736,10 +736,28 @@ async function loadSupportTickets() {
                     <div class="ticket-body">
                         <p><strong>Created:</strong> ${createdAt}</p>
                         <p><strong>Problem:</strong> ${ticket.problemDescription}</p>
+                        
+                        ${ticket.aiGeneratedSolution ? 
+                            `<div class="ai-solution">
+                                <h4>🤖 AI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%)</h4>
+                                <p>${ticket.aiGeneratedSolution.replace(/\n/g, '<br>')}</p>
+                                ${ticket.status === 'awaiting_user_feedback' ? 
+                                    `<div class="feedback-buttons">
+                                        <button onclick="provideFeedback('${doc.id}', 'accepted')" class="btn btn-success">✓ This solved my problem</button>
+                                        <button onclick="provideFeedback('${doc.id}', 'rejected')" class="btn btn-warning">✗ I still need help</button>
+                                    </div>` : 
+                                    ''
+                                }
+                            </div>` : 
+                            ''
+                        }
+                        
                         ${ticket.accessGranted ? 
                             `<p class="access-granted">✓ Support access granted (expires in 48h)</p>
                              <button onclick="revokeAccess('${ticket.accessGrantId}')" class="btn btn-danger">Revoke Access</button>` :
-                            `<button onclick="grantAccess('${doc.id}')" class="btn btn-primary">Grant Support Access</button>`
+                            (ticket.status === 'escalated' || ticket.status === 'in_progress') ?
+                            `<button onclick="grantAccess('${doc.id}')" class="btn btn-primary">Grant Support Access</button>` :
+                            ''
                         }
                     </div>
                 </div>
@@ -788,5 +806,24 @@ async function revokeAccess(grantId) {
     } catch (error) {
         console.error('Error revoking access:', error);
         showNotification('Failed to revoke access: ' + error.message, 'error');
+    }
+}
+
+
+async function provideFeedback(ticketId, feedback) {
+    try {
+        const provideSolutionFeedback = functions.httpsCallable('provideSolutionFeedback');
+        const result = await provideSolutionFeedback({ ticketId, feedback });
+        
+        if (result.data.success) {
+            const message = feedback === 'accepted' 
+                ? 'Great! The ticket has been closed.' 
+                : 'Your ticket has been escalated to a human support agent.';
+            showNotification(message, 'success');
+            loadSupportTickets();
+        }
+    } catch (error) {
+        console.error('Error providing feedback:', error);
+        showNotification('Failed to provide feedback: ' + error.message, 'error');
     }
 }

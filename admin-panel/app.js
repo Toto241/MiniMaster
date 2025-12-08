@@ -410,7 +410,8 @@ async function viewTicketDetails(ticketId) {
         const ticket = doc.data();
         const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
         
-        alert(`Ticket Details:\n\nTicket ID: ${ticketId}\nMaster IMEI: ${ticket.masterImei}\nStatus: ${ticket.status}\nCreated: ${createdAt}\nProblem Description:\n${ticket.problemDescription}`);
+        const aiSolution = ticket.aiGeneratedSolution ? `\n\nAI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%):\n${ticket.aiGeneratedSolution}` : '';
+        alert(`Ticket Details:\n\nTicket ID: ${ticketId}\nMaster IMEI: ${ticket.masterImei}\nStatus: ${ticket.status}\nCreated: ${createdAt}\nProblem Description:\n${ticket.problemDescription}${aiSolution}`);
     } catch (error) {
         console.error("Error viewing ticket details:", error);
         showNotification("Error viewing ticket details: " + error.message, "error");
