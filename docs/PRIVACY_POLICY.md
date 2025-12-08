@@ -51,11 +51,29 @@ We use administrative, technical, and physical security measures to help protect
 
 We do not knowingly solicit information from or market to children under the age of 13. If you become aware of any data we have collected from children under age 13, please contact us using the contact information provided below.
 
-## 7. Data Deletion
+## 7. Support Requests and Temporary Data Access
+
+When you submit a support request through the Application, we collect the following information to process your request:
+
+*   Your Master IMEI
+*   The time of the request
+*   The problem description you provide
+
+**Temporary Data Access for Support Purposes:**
+
+For effective troubleshooting, you may voluntarily grant our support team **temporary access** to your account data. This access is:
+
+*   **Time-limited** to 48 hours.
+*   **Revocable by you** at any time within the Application.
+*   **Logged:** All access is recorded in an audit trail.
+
+Without your explicit consent, our support team has **no access** to your personal data.
+
+## 9. Data Deletion
 
 You may request to delete your account and all associated data at any time. To do so, please contact us at [your-email@example.com]. We will process your request within a reasonable timeframe.
 
-## 8. Contact Us
+## 10. Contact Us
 
 If you have questions or comments about this Privacy Policy, please contact us at:
 

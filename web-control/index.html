@@ -36,6 +36,7 @@
                         <button onclick="showReviewTasks()" class="btn btn-secondary">Review Tasks</button>
                         <button onclick="showTaskAssignment()" class="btn btn-secondary">Assign Task</button>
                         <button onclick="showSubscription()" class="btn btn-secondary">Go Premium</button>
+                        <button onclick="showSupport()" class="btn btn-secondary">Support</button>
                     </div>
                 </div>
 
@@ -115,6 +116,28 @@
                             <li>Priority support</li>
                         </ul>
                         <button class="btn btn-primary">Upgrade Now</button>
+                    </div>
+                </div>
+
+                <div id="support-section" class="section" style="display: none;">
+                    <div class="section-header">
+                        <h3>Support</h3>
+                        <button onclick="showDashboard()" class="btn btn-secondary">Back to Dashboard</button>
+                    </div>
+                    <div class="support-content">
+                        <div class="create-ticket-form">
+                            <h4>Create Support Ticket</h4>
+                            <form onsubmit="createSupportTicket(event)">
+                                <textarea id="problem-description" placeholder="Describe your problem..." rows="5" required></textarea>
+                                <button type="submit" class="btn btn-primary">Submit Ticket</button>
+                            </form>
+                        </div>
+                        <div class="tickets-list">
+                            <h4>My Support Tickets</h4>
+                            <div id="support-tickets" class="tickets-container">
+                                <div class="loading">Loading tickets...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

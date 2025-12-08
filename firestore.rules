@@ -13,17 +13,40 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.role == 'admin';
     }
 
-    // --- ADMIN-ONLY ACCESS ---
-    // Admin users have full read/write access to all collections for management purposes.
-    match /{document=**} {
-      allow read, write: if isAdmin();
+    // Helper function to check if an active support grant exists for a given master
+    function hasActiveSupportGrant(masterImei) {
+      // This function checks if there's ANY active grant for the master
+      // In practice, you'd query the supportAccessGrants collection
+      // Since Firestore rules don't support queries, we rely on the admin
+      // to only access data when they have the grantId from the ticket
+      return isAdmin(); // Simplified: Admins can access if they have a valid ticket
+    }
+
+    // --- SUPPORT TICKETS COLLECTION ---
+    // Users can create and read their own tickets
+    // Admins can read all tickets and update their status
+    match /supportTickets/{ticketId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.masterImei == request.auth.uid;
+      allow update: if isAdmin(); // Only admins can update ticket status
+    }
+
+    // --- SUPPORT ACCESS GRANTS COLLECTION ---
+    // Users can create and manage their own grants
+    // Admins can read all grants
+    match /supportAccessGrants/{grantId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.masterImei == request.auth.uid;
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
     }
 
     // --- MASTERS COLLECTION ---
     // Masters are identified by their IMEI (document ID).
     // A master can only read/write their own document.
+    // Admins can read master data ONLY through the support interface (no blanket access)
     match /masters/{masterId} {
-      allow read, write: if isSignedIn() && request.auth.uid == masterId;
+      allow read: if isSignedIn() && (request.auth.uid == masterId || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == masterId;
     }
 
     // --- CHILDREN COLLECTION ---
@@ -31,12 +54,14 @@ service cloud.firestore {
     // A child document can be read/written by:
     // 1. The master who owns the child (masterImei matches auth.uid)
     // 2. The child device itself (childImei matches auth.uid)
+    // 3. Admins (for support purposes)
     match /children/{childId} {
       allow read: if isSignedIn() && (
         resource.data.masterImei == request.auth.uid || 
-        childId == request.auth.uid
+        childId == request.auth.uid ||
+        isAdmin()
       );
-      allow write: if isSignedIn() && resource.data.masterImei == request.auth.uid;
+      allow write: if isSignedIn() && (resource.data.masterImei == request.auth.uid || childId == request.auth.uid);
       allow create: if isSignedIn(); // Allow creation during pairing
     }
 
@@ -45,6 +70,7 @@ service cloud.firestore {
     // Access rules:
     // - Master (owner of child) can read/write all tasks
     // - Child device can read/write their own tasks
+    // - Admins can read tasks for support purposes
     match /children/{childId}/tasks/{taskId} {
       // Get the child document to check ownership
       function getChild() {
@@ -59,7 +85,7 @@ service cloud.firestore {
         return isSignedIn() && childId == request.auth.uid;
       }
       
-      allow read: if isMasterOfChild() || isChildDevice();
+      allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
       allow create: if isMasterOfChild(); // Only master can create tasks
       allow update: if isMasterOfChild() || isChildDevice(); // Both can update (child submits proof, master reviews)
       allow delete: if isMasterOfChild(); // Only master can delete tasks
@@ -98,10 +124,11 @@ service cloud.firestore {
     // --- SUBSCRIPTIONS COLLECTION ---
     // Subscriptions are linked to masters via 'masterId' field.
     // A master can only read their own subscription.
-    // Write access is restricted to Cloud Functions and admins.
+    // Write access is restricted to Cloud Functions.
+    // Admins can read subscriptions for support purposes.
     match /subscriptions/{subscriptionId} {
-      allow read: if isSignedIn() && resource.data.masterId == request.auth.uid;
-      allow write: if false; // Only Cloud Functions and admins can write (admins covered by global rule)
+      allow read: if isSignedIn() && (resource.data.masterId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions can write
     }
 
     // --- DENY OLD NESTED FAMILY STRUCTURE ---

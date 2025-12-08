@@ -62,6 +62,17 @@
                 <div id="subscription-list" class="data-list">
                     <!-- Subscription data will be rendered here -->
                 </div>
+
+                <h2>Support Tickets</h2>
+                <div class="support-filters">
+                    <button onclick="filterTickets('all')" class="btn btn-secondary">All</button>
+                    <button onclick="filterTickets('open')" class="btn btn-secondary">Open</button>
+                    <button onclick="filterTickets('in_progress')" class="btn btn-secondary">In Progress</button>
+                    <button onclick="filterTickets('closed')" class="btn btn-secondary">Closed</button>
+                </div>
+                <div id="support-tickets-list" class="data-list">
+                    <!-- Support tickets will be rendered here -->
+                </div>
             </section>
         </main>
 
