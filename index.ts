@@ -286,6 +286,63 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
 );
 
 /**
+ * Generates a Firebase Custom Auth Token for a master device.
+ * This allows the client to sign in with Firebase Auth and access Firestore securely.
+ *
+ * @param {{masterImei: string, secretKey: string}} data - The data passed to the function.
+ * @param {string} data.masterImei - The master device's unique identifier.
+ * @param {string} data.secretKey - The secret key for the master device.
+ * @param {CallableContext} _context - The context of the function call (unused).
+ * @returns {Promise<{customToken: string}>} A promise that resolves with the custom auth token.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails.
+ */
+export const generateCustomToken = functions.https.onCall(
+  async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
+    const { masterImei, secretKey } = data;
+
+    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The function must be called with a valid 'masterImei' and 'secretKey'."
+      );
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterImei);
+
+    try {
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Invalid master IMEI or secret key."
+        );
+      }
+
+      // Generate a custom token
+      // The uid will be the masterImei, ensuring it matches the Firestore document ID
+      const customToken = await admin.auth().createCustomToken(masterImei, {
+          role: "master",
+          masterImei: masterImei,
+      });
+
+      functions.logger.info(`Custom token generated for master ${masterImei}`);
+      return { customToken };
+
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      functions.logger.error("Error generating custom token:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while generating the token.",
+        error
+      );
+    }
+  }
+);
+
+/**
  * Registers a new master device using its IMEI (or another unique ID).
  * If the device is not already registered, it creates a new entry in Firestore
  * and returns a unique secret key for future authentication.
