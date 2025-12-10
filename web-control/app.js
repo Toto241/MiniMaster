@@ -57,8 +57,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /**
  * Handles the login process. It takes credentials from the input fields,
- * validates them against the Firestore 'masters' collection, and if successful,
- * saves the session and loads the main dashboard.
+ * calls the 'generateCustomToken' Cloud Function to get a Firebase Auth token,
+ * signs in with that token, and if successful, saves the session and loads the dashboard.
  */
 function login() {
     const masterImei = document.getElementById('master-imei').value.trim();
@@ -68,26 +68,29 @@ function login() {
         showNotification('Please enter both Master IMEI and Secret Key.', 'error');
         return;
     }
-    
-    // Validate credentials by trying to access master device data
-    db.collection('masters').doc(masterImei).get()
-        .then(doc => {
-            if (doc.exists && doc.data().secretKey === secretKey) {
-                currentMasterImei = masterImei;
-                currentSecretKey = secretKey;
-                
-                // Save credentials for next session
-                localStorage.setItem('minimaster-credentials', JSON.stringify({
-                    masterImei: masterImei,
-                    secretKey: secretKey
-                }));
-                
-                showMainContent();
-                loadDevices();
-                showNotification('Login successful!', 'success');
-            } else {
-                showNotification('Invalid credentials', 'error');
-            }
+
+    const generateCustomToken = firebase.functions().httpsCallable('generateCustomToken');
+
+    showNotification('Authenticating...', 'info');
+
+    generateCustomToken({ masterImei: masterImei, secretKey: secretKey })
+        .then(result => {
+            const customToken = result.data.customToken;
+            return firebase.auth().signInWithCustomToken(customToken);
+        })
+        .then(() => {
+            currentMasterImei = masterImei;
+            currentSecretKey = secretKey;
+
+            // Save credentials for next session
+            localStorage.setItem('minimaster-credentials', JSON.stringify({
+                masterImei: masterImei,
+                secretKey: secretKey
+            }));
+
+            showMainContent();
+            loadDevices();
+            showNotification('Login successful!', 'success');
         })
         .catch(error => {
             console.error('Login error:', error);
