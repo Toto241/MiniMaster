@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Spring Framework updated to 6.2.1 (CVE-2024-22262, CVE-2024-22259)
   - Nimbus JOSE+JWT updated to 9.47 (CVE-2023-52428)
   - BouncyCastle updated to 1.79
+  - Okio updated to 3.9.1 (Signed to Unsigned Conversion Error)
+  - JDOM2 updated to 2.0.6.1 (CVE-2021-33813 XXE Injection)
+  - Logback updated to 1.5.15 (CVE-2023-6378, CVE-2024-12798)
 
 ### Changed
 - Updated npm dependencies to latest compatible versions:
