@@ -28,61 +28,109 @@ allprojects {
         resolutionStrategy {
             // Force specific versions of transitive dependencies to mitigate CVEs
             // Updated December 2025 to address all known vulnerabilities
+            // Reference: https://github.com/Toto241/MiniMaster/security/dependabot
 
-            // CVE-2021-44228 ("Log4Shell") - Updated to latest patched version
-            force 'org.apache.logging.log4j:log4j-api:2.24.3'
-            force 'org.apache.logging.log4j:log4j-core:2.24.3'
+            // ============================================================
+            // PROTOCOL BUFFERS - CVE-2024-7254 (Potential DoS)
+            // ============================================================
+            force 'com.google.protobuf:protobuf-java:4.29.2'
+            force 'com.google.protobuf:protobuf-javalite:4.29.2'
+            force 'com.google.protobuf:protobuf-kotlin:4.29.2'
 
-            // CVE-2022-42003, CVE-2023-35116 - Jackson vulnerabilities
-            force 'com.fasterxml.jackson.core:jackson-databind:2.18.2'
-            force 'com.fasterxml.jackson.core:jackson-core:2.18.2'
-            force 'com.fasterxml.jackson.core:jackson-annotations:2.18.2'
+            // ============================================================
+            // OKHTTP & OKIO - Certificate validation & conversion errors
+            // ============================================================
+            force 'com.squareup.okhttp3:okhttp:4.12.0'
+            force 'com.squareup.okio:okio:3.9.1'
+            force 'com.squareup.okio:okio-jvm:3.9.1'
 
-            // CVE-2022-42889 ("Text4Shell") - Updated to latest
-            force 'org.apache.commons:commons-text:1.13.0'
+            // ============================================================
+            // JDOM2 - CVE-2021-33813 (XXE Injection)
+            // ============================================================
+            force 'org.jdom:jdom2:2.0.6.1'
 
-            // CVE-2022-31197 - PostgreSQL vulnerability
-            force 'org.postgresql:postgresql:42.7.4'
-
-            // CVE-2024-22262, CVE-2024-22259, CVE-2024-22243 - Spring vulnerabilities
-            force 'org.springframework:spring-core:6.2.1'
-            force 'org.springframework:spring-web:6.2.1'
-            force 'org.springframework:spring-webmvc:6.2.1'
-
-            // CVE-2023-52428 - Nimbus JOSE+JWT vulnerability
-            force 'com.nimbusds:nimbus-jose-jwt:9.47'
-
-            // CVE-2023-34062 - Reactor Netty vulnerability
-            force 'io.projectreactor.netty:reactor-netty-http:1.2.1'
-
-            // CVE-2024-47535 - Netty vulnerability
+            // ============================================================
+            // NETTY - Multiple CVEs (HTTP/2 DDoS, SslHandler crash, etc.)
+            // ============================================================
             force 'io.netty:netty-handler:4.1.116.Final'
             force 'io.netty:netty-codec:4.1.116.Final'
             force 'io.netty:netty-codec-http:4.1.116.Final'
             force 'io.netty:netty-codec-http2:4.1.116.Final'
             force 'io.netty:netty-common:4.1.116.Final'
+            force 'io.netty:netty-buffer:4.1.116.Final'
+            force 'io.netty:netty-transport:4.1.116.Final'
+            force 'io.netty:netty-resolver:4.1.116.Final'
 
-            // CVE-2024-7254 - Protocol Buffers vulnerability
-            force 'com.google.protobuf:protobuf-java:4.29.2'
-            force 'com.google.protobuf:protobuf-javalite:4.29.2'
-            force 'com.google.protobuf:protobuf-kotlin:4.29.2'
+            // ============================================================
+            // LOGBACK - CVE-2023-6378, CVE-2024-12798 (Serialization & Code Execution)
+            // ============================================================
+            force 'ch.qos.logback:logback-core:1.5.15'
+            force 'ch.qos.logback:logback-classic:1.5.15'
 
-            // CVE-2023-2976 - Guava vulnerability
-            force 'com.google.guava:guava:33.4.0-jre'
-
-            // CVE-2024-25710, CVE-2024-26308 - Apache Commons Compress
+            // ============================================================
+            // APACHE COMMONS COMPRESS - CVE-2024-25710, CVE-2024-26308
+            // ============================================================
             force 'org.apache.commons:commons-compress:1.27.1'
 
-            // CVE-2024-47561 - Apache Avro vulnerability
+            // ============================================================
+            // GUAVA - CVE-2023-2976, CVE-2020-8908 (Temp directory & info disclosure)
+            // ============================================================
+            force 'com.google.guava:guava:33.4.0-jre'
+            force 'com.google.guava:guava:33.4.0-android'
+
+            // ============================================================
+            // LOG4J - CVE-2021-44228 ("Log4Shell")
+            // ============================================================
+            force 'org.apache.logging.log4j:log4j-api:2.24.3'
+            force 'org.apache.logging.log4j:log4j-core:2.24.3'
+
+            // ============================================================
+            // JACKSON - CVE-2022-42003, CVE-2023-35116
+            // ============================================================
+            force 'com.fasterxml.jackson.core:jackson-databind:2.18.2'
+            force 'com.fasterxml.jackson.core:jackson-core:2.18.2'
+            force 'com.fasterxml.jackson.core:jackson-annotations:2.18.2'
+
+            // ============================================================
+            // APACHE COMMONS TEXT - CVE-2022-42889 ("Text4Shell")
+            // ============================================================
+            force 'org.apache.commons:commons-text:1.13.0'
+
+            // ============================================================
+            // POSTGRESQL - CVE-2022-31197
+            // ============================================================
+            force 'org.postgresql:postgresql:42.7.4'
+
+            // ============================================================
+            // SPRING FRAMEWORK - CVE-2024-22262, CVE-2024-22259, CVE-2024-22243
+            // ============================================================
+            force 'org.springframework:spring-core:6.2.1'
+            force 'org.springframework:spring-web:6.2.1'
+            force 'org.springframework:spring-webmvc:6.2.1'
+
+            // ============================================================
+            // NIMBUS JOSE+JWT - CVE-2023-52428
+            // ============================================================
+            force 'com.nimbusds:nimbus-jose-jwt:9.47'
+
+            // ============================================================
+            // REACTOR NETTY - CVE-2023-34062
+            // ============================================================
+            force 'io.projectreactor.netty:reactor-netty-http:1.2.1'
+
+            // ============================================================
+            // APACHE AVRO - CVE-2024-47561
+            // ============================================================
             force 'org.apache.avro:avro:1.12.0'
 
-            // OkHttp - ensure latest secure version
-            force 'com.squareup.okhttp3:okhttp:4.12.0'
-
-            // Gson - ensure latest version
+            // ============================================================
+            // GSON - Ensure latest version
+            // ============================================================
             force 'com.google.code.gson:gson:2.11.0'
 
-            // BouncyCastle - cryptography library security updates
+            // ============================================================
+            // BOUNCYCASTLE - Cryptography security updates
+            // ============================================================
             force 'org.bouncycastle:bcprov-jdk18on:1.79'
             force 'org.bouncycastle:bcpkix-jdk18on:1.79'
         }
