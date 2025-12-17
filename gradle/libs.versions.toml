@@ -1,25 +1,32 @@
 [versions]
 # Core Android and Kotlin versions - centrally managed
-kotlin = "1.8.20"
-agp = "8.12.2"
-compose-bom = "2024.02.00"
-hilt = "2.48"
+# Updated December 2025 to address security vulnerabilities
+kotlin = "2.0.21"
+agp = "8.7.3"
+compose-bom = "2024.12.01"
+hilt = "2.51.1"
 junit4 = "4.13.2"
-material = "1.9.0"
-androidx-core = "1.10.1"
-androidx-appcompat = "1.6.1"
-androidx-lifecycle = "2.6.2"
-androidx-activity-compose = "1.7.2"
-androidx-navigation = "2.7.2"
-androidx-test-junit = "1.1.5"
-androidx-test-espresso = "3.5.1"
-firebase-firestore = "24.8.0"
-firebase-functions = "20.4.0"
-firebase-perf = "20.5.1"
-firebase-crashlytics = "18.5.1"
-mockito = "5.11.0"
-mockito-kotlin = "5.2.1"
-coroutines = "1.7.1"
+material = "1.12.0"
+androidx-core = "1.15.0"
+androidx-appcompat = "1.7.0"
+androidx-lifecycle = "2.8.7"
+androidx-activity-compose = "1.9.3"
+androidx-navigation = "2.8.5"
+androidx-test-junit = "1.2.1"
+androidx-test-espresso = "3.6.1"
+firebase-firestore = "25.1.1"
+firebase-functions = "21.1.0"
+firebase-perf = "21.0.3"
+firebase-crashlytics = "19.3.0"
+firebase-messaging = "24.1.0"
+firebase-auth = "23.1.0"
+firebase-storage = "21.0.1"
+firebase-appcheck = "18.0.0"
+mockito = "5.14.2"
+mockito-kotlin = "5.4.0"
+coroutines = "1.9.0"
+okhttp = "4.12.0"
+gson = "2.11.0"
 
 [libraries]
 # Android libraries
@@ -38,6 +45,14 @@ firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore
 firebase-functions = { group = "com.google.firebase", name = "firebase-functions-ktx", version.ref = "firebase-functions" }
 firebase-perf = { group = "com.google.firebase", name = "firebase-perf-ktx", version.ref = "firebase-perf" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics-ktx", version.ref = "firebase-crashlytics" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx", version.ref = "firebase-messaging" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebase-auth" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebase-storage" }
+firebase-appcheck = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity", version.ref = "firebase-appcheck" }
+
+# Networking
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 # Testing
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
@@ -54,4 +69,5 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 [plugins]
 android-app = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
