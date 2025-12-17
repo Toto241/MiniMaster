@@ -294,9 +294,10 @@ describe("reportDailyUsage", () => {
 });
 
 describe("setAdminClaim", () => {
-  it("throws invalid-argument when uid is missing", async () => {
+  it("throws permission-denied when not admin", async () => {
     const wrapped = testEnv.wrap(fns.setAdminClaim);
-    await expect(wrapped({})).rejects.toThrow(/user UID/);
+    // Permission check comes before argument validation
+    await expect(wrapped({})).rejects.toThrow(/Only existing admins can grant admin privileges/);
   });
 });
 
