@@ -106,7 +106,7 @@ describe("generateCustomToken", () => {
   it("should throw error for missing arguments", async () => {
     const wrapped = testEnv.wrap(myFunctions.generateCustomToken);
 
-    // @ts-ignore
+    // @ts-expect-error: Testing missing arguments
     await expect(wrapped({ masterImei: "valid-imei" }))
       .rejects.toThrow("The function must be called with a valid 'masterImei' and 'secretKey'");
   });

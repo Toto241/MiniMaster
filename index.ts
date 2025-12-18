@@ -21,10 +21,10 @@ import { db } from "./firebase";
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
     // Security Check: Only allow if the caller is already an admin
-    if (!context.auth || context.auth.token.role !== 'admin') {
+    if (!context.auth || context.auth.token.role !== "admin") {
         throw new functions.https.HttpsError(
-            'permission-denied',
-            'Only existing admins can grant admin privileges to other users.'
+            "permission-denied",
+            "Only existing admins can grant admin privileges to other users."
         );
     }
     
@@ -1270,7 +1270,7 @@ export const onTaskStatusChange = functions.firestore
         const previousValue = change.before.data();
 
         // Check if the status has changed to SUBMITTED
-        if (newValue.status === 'SUBMITTED' && previousValue.status !== 'SUBMITTED') {
+        if (newValue.status === "SUBMITTED" && previousValue.status !== "SUBMITTED") {
             const masterImei = newValue.masterImei;
             if (!masterImei) {
                 console.log("No masterImei found for this task. Cannot send notification.");
@@ -1288,7 +1288,7 @@ export const onTaskStatusChange = functions.firestore
 
             const payload = {
                 notification: {
-                    title: 'Task Submitted for Review',
+                    title: "Task Submitted for Review",
                     body: `Your child has submitted the task "${newValue.title}" for your review.`,
                     sound: "default"
                 },
@@ -1587,9 +1587,9 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
 
 // ==================== AI-POWERED SUPPORT AGENT ====================
 
-import { OpenAI } from 'openai';
-import * as fs from 'fs';
-import * as path from 'path';
+import { OpenAI } from "openai";
+import * as fs from "fs";
+import * as path from "path";
 
 // Lazy initialize OpenAI client (only when needed)
 let openaiClient: OpenAI | null = null;
@@ -1603,12 +1603,12 @@ function getOpenAIClient(): OpenAI {
 }
 
 // Load knowledge base (all project documentation)
-let knowledgeBase = '';
+let knowledgeBase = "";
 try {
-  const knowledgeBasePath = path.join(__dirname, 'knowledge_base.txt');
-  knowledgeBase = fs.readFileSync(knowledgeBasePath, 'utf-8');
+  const knowledgeBasePath = path.join(__dirname, "knowledge_base.txt");
+  knowledgeBase = fs.readFileSync(knowledgeBasePath, "utf-8");
 } catch (error) {
-  functions.logger.error('Failed to load knowledge base:', error);
+  functions.logger.error("Failed to load knowledge base:", error);
 }
 
 /**
@@ -1616,7 +1616,7 @@ try {
  * Triggered when a new document is created in the supportTickets collection
  */
 export const onTicketCreated = functions.firestore
-  .document('supportTickets/{ticketId}')
+  .document("supportTickets/{ticketId}")
   .onCreate(async (snapshot, context) => {
     const ticketId = context.params.ticketId;
     const ticketData = snapshot.data();
@@ -1625,10 +1625,10 @@ export const onTicketCreated = functions.firestore
     
     try {
       // Extract problem description
-      const problemDescription = ticketData.problemDescription || '';
+      const problemDescription = ticketData.problemDescription || "";
       
       if (!problemDescription || problemDescription.trim().length === 0) {
-        functions.logger.info('Empty problem description, skipping AI analysis.');
+        functions.logger.info("Empty problem description, skipping AI analysis.");
         return;
       }
       
@@ -1653,47 +1653,47 @@ Your response MUST be in JSON format with exactly two fields:
 The confidence should be a float between 0 and 1, where 1 means you are absolutely certain the solution is correct.`;
 
       // Call OpenAI API
-      functions.logger.info('Calling OpenAI API...');
+      functions.logger.info("Calling OpenAI API...");
       const response = await getOpenAIClient().chat.completions.create({
-        model: 'gemini-2.5-flash',
+        model: "gemini-2.5-flash",
         messages: [
-          { role: 'system', content: 'You are a technical support agent for the MiniMaster parental control application.' },
-          { role: 'user', content: prompt }
+          { role: "system", content: "You are a technical support agent for the MiniMaster parental control application." },
+          { role: "user", content: prompt }
         ],
         temperature: 0.7,
         max_tokens: 1000,
       });
       
       // Parse the AI's response
-      const aiResponse = response.choices[0]?.message?.content || '';
-      functions.logger.info('AI Response:', aiResponse);
+      const aiResponse = response.choices[0]?.message?.content || "";
+      functions.logger.info("AI Response:", aiResponse);
       
-      let aiGeneratedSolution = '';
+      let aiGeneratedSolution = "";
       let aiConfidenceScore = 0.0;
-      let newStatus = 'awaiting_user_feedback';
+      let newStatus = "awaiting_user_feedback";
       
       try {
         const parsed = JSON.parse(aiResponse);
-        aiGeneratedSolution = parsed.solution || 'Unable to generate solution.';
+        aiGeneratedSolution = parsed.solution || "Unable to generate solution.";
         aiConfidenceScore = parsed.confidence || 0.0;
         
         // If confidence is too low, escalate immediately
         if (aiConfidenceScore < 0.7) {
-          newStatus = 'escalated';
-          aiGeneratedSolution += '\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.';
+          newStatus = "escalated";
+          aiGeneratedSolution += "\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.";
         }
       } catch (parseError) {
-        functions.logger.error('Failed to parse AI response as JSON:', parseError);
-        aiGeneratedSolution = 'AI generated an invalid response. Escalating to human support.';
+        functions.logger.error("Failed to parse AI response as JSON:", parseError);
+        aiGeneratedSolution = "AI generated an invalid response. Escalating to human support.";
         aiConfidenceScore = 0.0;
-        newStatus = 'escalated';
+        newStatus = "escalated";
       }
       
       // Update the ticket with the AI-generated solution
-      await admin.firestore().collection('supportTickets').doc(ticketId).update({
+      await admin.firestore().collection("supportTickets").doc(ticketId).update({
         aiGeneratedSolution: aiGeneratedSolution,
         aiConfidenceScore: aiConfidenceScore,
-        aiSolutionStatus: 'generated',
+        aiSolutionStatus: "generated",
         status: newStatus,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -1702,7 +1702,7 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
       
       // Send push notification to the user
       const masterImei = ticketData.masterImei;
-      const masterDoc = await admin.firestore().collection('masters').doc(masterImei).get();
+      const masterDoc = await admin.firestore().collection("masters").doc(masterImei).get();
       
       if (masterDoc.exists) {
         const masterData = masterDoc.data();
@@ -1711,14 +1711,14 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
         if (fcmToken) {
           const notificationMessage = {
             notification: {
-              title: 'Support Ticket Update',
-              body: newStatus === 'escalated' 
-                ? 'Your ticket has been escalated to a human agent.' 
-                : 'We have a proposed solution for your support ticket!',
+              title: "Support Ticket Update",
+              body: newStatus === "escalated"
+                ? "Your ticket has been escalated to a human agent."
+                : "We have a proposed solution for your support ticket!",
             },
             data: {
               ticketId: ticketId,
-              type: 'support_ticket_update',
+              type: "support_ticket_update",
             },
             token: fcmToken,
           };
@@ -1730,14 +1730,14 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
       
       return;
     } catch (error) {
-      functions.logger.error('Error in onTicketCreated:', error);
+      functions.logger.error("Error in onTicketCreated:", error);
       
       // Update ticket to escalated status on error
-      await admin.firestore().collection('supportTickets').doc(ticketId).update({
-        aiGeneratedSolution: 'An error occurred while analyzing your ticket. A human support agent will assist you shortly.',
+      await admin.firestore().collection("supportTickets").doc(ticketId).update({
+        aiGeneratedSolution: "An error occurred while analyzing your ticket. A human support agent will assist you shortly.",
         aiConfidenceScore: 0.0,
-        aiSolutionStatus: 'error',
-        status: 'escalated',
+        aiSolutionStatus: "error",
+        status: "escalated",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       
@@ -1750,37 +1750,37 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
  */
 export const provideSolutionFeedback = functions.https.onCall(async (data: { ticketId: string; feedback: string }, context: CallableContext) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
   }
   
   const { ticketId, feedback } = data; // feedback: 'accepted' or 'rejected'
   
   if (!ticketId || !feedback) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing ticketId or feedback.');
+    throw new functions.https.HttpsError("invalid-argument", "Missing ticketId or feedback.");
   }
   
-  if (feedback !== 'accepted' && feedback !== 'rejected') {
-    throw new functions.https.HttpsError('invalid-argument', 'Feedback must be "accepted" or "rejected".');
+  if (feedback !== "accepted" && feedback !== "rejected") {
+    throw new functions.https.HttpsError("invalid-argument", "Feedback must be \"accepted\" or \"rejected\".");
   }
   
   try {
-    const ticketRef = admin.firestore().collection('supportTickets').doc(ticketId);
+    const ticketRef = admin.firestore().collection("supportTickets").doc(ticketId);
     const ticketDoc = await ticketRef.get();
     
     if (!ticketDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Ticket not found.');
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
     
     const ticketData = ticketDoc.data();
     
     // Verify that the user owns this ticket
     if (ticketData?.masterImei !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'You do not have permission to update this ticket.');
+      throw new functions.https.HttpsError("permission-denied", "You do not have permission to update this ticket.");
     }
     
     // Update ticket based on feedback
-    const newStatus = feedback === 'accepted' ? 'closed_by_ai' : 'escalated';
-    const aiSolutionStatus = feedback === 'accepted' ? 'accepted' : 'rejected';
+    const newStatus = feedback === "accepted" ? "closed_by_ai" : "escalated";
+    const aiSolutionStatus = feedback === "accepted" ? "accepted" : "rejected";
     
     await ticketRef.update({
       aiSolutionStatus: aiSolutionStatus,
@@ -1792,7 +1792,7 @@ export const provideSolutionFeedback = functions.https.onCall(async (data: { tic
     
     return { success: true, message: `Ticket ${newStatus}.` };
   } catch (error) {
-    functions.logger.error('Error in provideSolutionFeedback:', error);
-    throw new functions.https.HttpsError('internal', 'Failed to update ticket feedback.');
+    functions.logger.error("Error in provideSolutionFeedback:", error);
+    throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
   }
 });

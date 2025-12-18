@@ -1,2 +1,6 @@
 .eslintrc.js
 web-control/**
+admin-panel/app.js
+admin-panel/appcheck-init.js
+scripts/run-security-tests.js
+scripts/setup-admin.js
