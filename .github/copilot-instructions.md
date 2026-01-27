@@ -135,6 +135,22 @@ firebase deploy --only functions,firestore,storage
 | `already-exists` | IMEI already registered |
 | `resource-exhausted` | Code collision limit (10) or free tier limit (1 child) |
 
+## Security & Code Quality
+
+### CodeQL Analysis
+- **Automated scans** run on push/PR to `main` + weekly scheduled scans
+- **Custom queries** in `codeql-custom-queries-actions/` (extends `codeql/actions-all`)
+- **Results** appear in GitHub Security tab → "Code scanning" alerts
+- **Common issues detected**: SQL injection (Firestore rules), XSS in web panel, insecure crypto in Android
+- **CI integration**: CodeQL must pass before merge (unless explicitly approved)
+
+### Security Patterns
+- Never commit `google-services.json` or `google-play-services.json`
+- Sensitive config (API keys, service accounts) via GitHub Secrets → environment variables
+- Firestore rules validate schema (prevent `families/*` access)
+- Auth checks in **every** Cloud Function (no rule-only access)
+- Photo uploads to Storage with security rules (authenticated + masterImei ownership check)
+
 ## Commit Checklist
 
 - [ ] `npm run lint && npm test` passes
@@ -142,9 +158,10 @@ firebase deploy --only functions,firestore,storage
 - [ ] Error codes match `ERROR_CODES.md`
 - [ ] FCM trigger changes: test both change and no-change branches
 - [ ] No `google-services.json` or service account keys committed
-- [ ] Android: `./gradlew lint` passes if Android code changed
+- [ ] Android: `./gradlew lint` + `./gradlew detektAll` passes if Android code changed
 - [ ] Firestore rules changes: verify legacy `families/*` deny still intact
 - [ ] New callable functions: include early validation + proper error codes
+- [ ] CodeQL security alerts resolved or documented (if any new warnings)
 
 ## Key Files Reference
 
@@ -158,6 +175,25 @@ firebase deploy --only functions,firestore,storage
 | `test/index.test.ts` | Main test suite patterns |
 | `test/setup-env.ts` | Emulator environment config |
 | `gradle/libs.versions.toml` | Android version catalog |
+| `.github/workflows/codeql-analysis.yml` | CodeQL scan config (JS + Java) |
+| `codeql-custom-queries-actions/` | Custom security query pack |
+
+---
+
+## CodeQL Workflow Details
+
+**File**: [`.github/workflows/codeql-analysis.yml`](.github/workflows/codeql-analysis.yml)
+
+**Languages scanned**: JavaScript (TypeScript), Java/Kotlin
+
+**Trigger points**:
+- On push to `main` (paths: *.ts, *.js, *.kt, *.java)
+- On PR to `main` (same paths)
+- Weekly schedule (Monday 2 AM UTC)
+
+**Custom queries**: Located in `codeql-custom-queries-actions/` with pack dependency on `codeql/actions-all` (v0.4.26)
+
+**Example custom query** (`example.ql`): Basic "Hello world" problem detector – extend this for domain-specific security checks (Firebase auth leaks, sensitive data logging, etc.)
 
 ---
 
