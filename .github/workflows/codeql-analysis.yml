@@ -1,0 +1,56 @@
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.ts'
+      - '**/*.js'
+      - '**/*.kt'
+      - '**/*.java'
+      - '.github/workflows/codeql-analysis.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.ts'
+      - '**/*.js'
+      - '**/*.kt'
+      - '**/*.java'
+  schedule:
+    # Weekly scan on Monday at 2 AM UTC
+    - cron: '0 2 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze Code (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript', 'java' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Initializes the CodeQL tools for scanning
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+          # Custom query pack for extra security checks
+          queries: security-and-quality,./codeql-custom-queries-actions
+
+      # Autobuild attempts to build any compiled languages
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      # Perform the analysis on the generated database
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{ matrix.language }}"
