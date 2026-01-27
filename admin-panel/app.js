@@ -206,7 +206,7 @@ function viewUserDetails(masterId) {
         }
         
         const masterData = masterDoc.data();
-        let html = `<h3>Master Details</h3>`;
+        let html = "<h3>Master Details</h3>";
         html += `<p><strong>Master ID:</strong> ${masterId}</p>`;
         html += `<p><strong>Email:</strong> ${masterData.email || "N/A"}</p>`;
         html += `<p><strong>IMEI:</strong> ${masterData.imei || "N/A"}</p>`;
@@ -229,7 +229,7 @@ function viewUserDetails(masterId) {
             
             // Load subscription
             db.collection("subscriptions").where("masterId", "==", masterId).get().then(subSnapshot => {
-                html += `<h4>Subscription</h4>`;
+                html += "<h4>Subscription</h4>";
                 if (subSnapshot.empty) {
                     html += "<p>No active subscription.</p>";
                 } else {
@@ -342,7 +342,7 @@ function showNotification(message, type = "info") {
 
 // ==================== SUPPORT TICKET MANAGEMENT ====================
 
-let currentTicketFilter = 'all';
+let currentTicketFilter = "all";
 
 async function loadSupportTickets() {
     const ticketsListElement = document.getElementById("support-tickets-list");
@@ -351,7 +351,7 @@ async function loadSupportTickets() {
     try {
         let query = db.collection("supportTickets");
         
-        if (currentTicketFilter !== 'all') {
+        if (currentTicketFilter !== "all") {
             query = query.where("status", "==", currentTicketFilter);
         }
         
@@ -366,7 +366,7 @@ async function loadSupportTickets() {
         snapshot.forEach(doc => {
             const ticket = doc.data();
             const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
-            const statusClass = ticket.status === 'open' ? 'status-open' : ticket.status === 'in_progress' ? 'status-progress' : 'status-closed';
+            const statusClass = ticket.status === "open" ? "status-open" : ticket.status === "in_progress" ? "status-progress" : "status-closed";
             
             html += `
                 <tr>
@@ -374,16 +374,16 @@ async function loadSupportTickets() {
                     <td>${ticket.masterImei}</td>
                     <td><span class="${statusClass}">${ticket.status}</span></td>
                     <td>${createdAt}</td>
-                    <td>${ticket.accessGranted ? '✓ Yes' : '✗ No'}</td>
+                    <td>${ticket.accessGranted ? "✓ Yes" : "✗ No"}</td>
                     <td>
                         <button onclick="viewTicketDetails('${doc.id}')" class="btn btn-secondary">View</button>
                         ${ticket.accessGranted ? 
                             `<button onclick="viewUserDetails('${ticket.masterImei}')" class="btn btn-primary">View User Data</button>` : 
-                            ''}
-                        ${ticket.status !== 'closed' ? 
+                            ""}
+                        ${ticket.status !== "closed" ? 
                             `<button onclick="updateTicketStatus('${doc.id}', 'in_progress')" class="btn btn-secondary">Mark In Progress</button>
                              <button onclick="updateTicketStatus('${doc.id}', 'closed')" class="btn btn-secondary">Close</button>` : 
-                            ''}
+                            ""}
                     </td>
                 </tr>
             `;
@@ -412,7 +412,7 @@ async function viewTicketDetails(ticketId) {
         const ticket = doc.data();
         const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
         
-        const aiSolution = ticket.aiGeneratedSolution ? `\n\nAI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%):\n${ticket.aiGeneratedSolution}` : '';
+        const aiSolution = ticket.aiGeneratedSolution ? `\n\nAI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%):\n${ticket.aiGeneratedSolution}` : "";
         alert(`Ticket Details:\n\nTicket ID: ${ticketId}\nMaster IMEI: ${ticket.masterImei}\nStatus: ${ticket.status}\nCreated: ${createdAt}\nProblem Description:\n${ticket.problemDescription}${aiSolution}`);
     } catch (error) {
         console.error("Error viewing ticket details:", error);
