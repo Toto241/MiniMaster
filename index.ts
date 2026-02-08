@@ -58,20 +58,19 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
     }
 
     try {
-        // In a real app, this would interact with a payment provider API (e.g., Google Play, Stripe)
-        // to officially revoke the subscription.
-        
-        // For now, we'll just update the Firestore status to 'revoked'
+        // Read the subscription document first to get the masterId
+        const subDoc = await admin.firestore().collection("subscriptions").doc(subscriptionId).get();
+        if (!subDoc.exists) {
+            throw new functions.https.HttpsError("not-found", "Subscription not found.");
+        }
+        const masterId = subDoc.data()?.masterId;
+
+        // Update the Firestore status to 'revoked'
         await admin.firestore().collection("subscriptions").doc(subscriptionId).update({
             status: "revoked",
             revokedAt: admin.firestore.FieldValue.serverTimestamp(),
             revokedBy: context.auth.uid
         });
-
-        // Also update the master's status if necessary
-        // (Assuming subscription doc contains masterId)
-        const subDoc = await admin.firestore().collection("subscriptions").doc(subscriptionId).get();
-        const masterId = subDoc.data()?.masterId;
         
         if (masterId) {
              await admin.firestore().collection("masters").doc(masterId).update({
@@ -1269,11 +1268,11 @@ export const onTaskStatusChange = functions.firestore
         const newValue = change.after.data();
         const previousValue = change.before.data();
 
-        // Check if the status has changed to SUBMITTED
-        if (newValue.status === "SUBMITTED" && previousValue.status !== "SUBMITTED") {
+        // Check if the status has changed to pending_approval
+        if (newValue.status === "pending_approval" && previousValue.status !== "pending_approval") {
             const masterImei = newValue.masterImei;
             if (!masterImei) {
-                console.log("No masterImei found for this task. Cannot send notification.");
+                functions.logger.warn("No masterImei found for this task. Cannot send notification.");
                 return;
             }
 
@@ -1282,15 +1281,15 @@ export const onTaskStatusChange = functions.firestore
             const fcmToken = masterDoc.data()?.fcmToken;
 
             if (!fcmToken) {
-                console.log(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
+                functions.logger.warn(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
                 return;
             }
 
-            const payload = {
+            const message = {
+                token: fcmToken,
                 notification: {
                     title: "Task Submitted for Review",
-                    body: `Your child has submitted the task "${newValue.title}" for your review.`,
-                    sound: "default"
+                    body: `Your child has submitted the task "${newValue.description || ""}" for your review.`,
                 },
                 data: {
                     taskId: context.params.taskId,
@@ -1299,10 +1298,10 @@ export const onTaskStatusChange = functions.firestore
             };
 
             try {
-                await getMessaging().sendToDevice(fcmToken, payload);
-                console.log(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
+                await getMessaging().send(message);
+                functions.logger.info(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
             } catch (error) {
-                console.error("Error sending notification:", error);
+                functions.logger.error("Error sending notification:", error);
             }
         }
     });
