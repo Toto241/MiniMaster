@@ -22,7 +22,7 @@ import javax.inject.Inject
  *
  * @property id The unique identifier of the task in Firestore.
  * @property description A description of what the task entails.
- * @property status The current status of the task (e.g., "ASSIGNED", "SUBMITTED", "APPROVED").
+ * @property status The current status of the task (e.g., "pending", "pending_approval", "approved").
  */
 data class Task(
     val id: String,
@@ -78,7 +78,7 @@ class TasksViewModel @Inject constructor(
             }
 
             firestore.collection("children").document(childId).collection("tasks")
-                .orderBy("assignedAt", Query.Direction.DESCENDING) // Changed from createdAt to assignedAt to match Model
+                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshots, e ->
                     if (e != null) {
                         Log.w(TAG, "Listen failed.", e)
@@ -127,13 +127,14 @@ class TasksViewModel @Inject constructor(
                 val downloadUrl = photoRef.downloadUrl.await().toString()
                 Log.d(TAG, "Photo uploaded: $downloadUrl")
 
-                // 2. Call the submitTaskProof Cloud Function (Updated name)
+                // 2. Call the completeTask Cloud Function
                 val data = hashMapOf(
+                    "childImei" to childId,
                     "taskId" to taskId,
-                    "proofUrl" to downloadUrl
+                    "photoUrl" to downloadUrl
                 )
                 functions
-                    .getHttpsCallable("submitTaskProof")
+                    .getHttpsCallable("completeTask")
                     .call(data)
                     .await()
 
