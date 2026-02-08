@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import coil.compose.rememberImagePainter
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -22,6 +23,9 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * A Composable screen for submitting proof (photo) for a task.
@@ -64,9 +68,7 @@ fun ProofSubmissionScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "Task: ${currentTask?.title ?: "Unknown"}", style = MaterialTheme.typography.h5)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Description: ${currentTask?.description ?: "None"}")
+        Text(text = "Task: ${currentTask?.description ?: "Unknown"}", style = MaterialTheme.typography.h5)
         Spacer(modifier = Modifier.height(32.dp))
 
         if (imageUri != null) {
@@ -141,16 +143,17 @@ suspend fun uploadProofAndSubmit(taskId: String, uri: Uri, context: android.cont
     return try {
         val uploadTask = proofRef.putFile(uri).await()
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
-                        // Use the actual ChildIdProvider implementation
+        // Use the actual ChildIdProvider implementation
         val childIdProvider = ChildIdProviderImpl(context)
+        val childImei = childIdProvider.childIdFlow.value ?: return false
         val taskRepository = TaskRepository(
             FirebaseFirestore.getInstance(),
             FirebaseFunctions.getInstance(),
             childIdProvider
         )
-        
-        // Ruft die Cloud Function auf
-        taskRepository.submitTaskProof(taskId, downloadUrl)
+
+        // Call the Cloud Function
+        taskRepository.submitTaskProof(childImei, taskId, downloadUrl)
     } catch (e: Exception) {
         e.printStackTrace()
         false
