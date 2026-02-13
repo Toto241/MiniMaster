@@ -1,2 +1,5 @@
 .eslintrc.js
 web-control/**
+coverage/**
+admin-panel/**
+scripts/**

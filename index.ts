@@ -55,6 +55,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
  */
 export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
     requireAdmin(context);
+  const adminUid = context.auth?.uid;
 
     const subscriptionId = data.subscriptionId;
     if (!subscriptionId) {
@@ -73,7 +74,7 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
         await admin.firestore().collection("subscriptions").doc(subscriptionId).update({
             status: "revoked",
             revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-            revokedBy: context.auth.uid
+          revokedBy: adminUid ?? "unknown-admin"
         });
         
         if (masterId) {

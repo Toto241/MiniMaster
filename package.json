@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "lint": "eslint . --ext .js,.ts",
-    "test": "node --max-old-space-size=4096 node_modules/.bin/jest --config jest.config.cjs",
+    "test": "node --max-old-space-size=4096 ./node_modules/jest/bin/jest.js --config jest.config.cjs",
     "test:ci": "jest --config jest.config.cjs --runInBand",
     "test:watch": "jest --watch"
   },

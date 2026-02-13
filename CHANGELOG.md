@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-02-13
+
+### Added
+- Added multi-layer backend test suites for higher quality confidence:
+  - Module tests: `test/module/firebase.module.test.ts`
+  - Integration tests: `test/integration/task-lifecycle.integration.test.ts`
+  - System tests: `test/system/access-control.system.test.ts`
+  - High-impact coverage suite: `test/coverage-high-impact.test.ts`
+- Added PR handoff documentation for this quality uplift in `pull_requests/PR_coverage_and_test_maturity_2026-02-13.md`.
+
+### Changed
+- Modernized backend callable tests to align with the current `context.auth` contract.
+- Stabilized lint and TS project scoping with `tsconfig.eslint.json` and updated ESLint ignore patterns.
+- Updated Jest/TypeScript isolated modules configuration to remove deprecated ts-jest config usage.
+
+### Fixed
+- Fixed Windows-incompatible test script invocation in `package.json` by switching to direct Jest JS entrypoint.
+- Fixed strict null-safety issue in `revokeSubscription` (`index.ts`) for `context.auth` handling.
+- Resolved historical failing test assumptions based on legacy payload authentication fields.
+
+### Quality
+- Achieved green backend verification gates:
+  - `npm run lint`
+  - `npx tsc --noEmit`
+  - `npm run test:ci --silent`
+  - `npm run test:ci -- --coverage --silent`
+- Coverage significantly increased and thresholds satisfied without lowering limits.
+
 ## [1.1.0] - 2025-12-17
 
 ### Security

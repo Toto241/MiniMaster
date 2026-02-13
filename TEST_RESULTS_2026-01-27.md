@@ -1,5 +1,38 @@
 # Software Test Results Report — 2026-01-27
 
+## Nachtrag (2026-02-13)
+
+### Aktueller Validierungsstand
+
+- `npm run lint`: ✅ erfolgreich
+- `npx tsc --noEmit`: ✅ erfolgreich
+- `npm run test:ci --silent`: ✅ 8/8 Suites, 55/55 Tests
+- `npm run test:ci -- --coverage --silent`: ✅ erfolgreich (Threshold erfüllt)
+
+### Neue Testebenen ergänzt
+
+- **Modultests**: `test/module/firebase.module.test.ts`
+- **Integrationstests**: `test/integration/task-lifecycle.integration.test.ts`
+- **Systemtests**: `test/system/access-control.system.test.ts`
+
+### Coverage (aktueller Stand)
+
+- All files: Statements 67.36%, Branches 57.22%, Functions 81.81%, Lines 67.12%
+- `firebase.ts`: Statements 94.73%, Branches 85.71%, Functions 100%, Lines 92.30%
+- `index.ts`: Statements 66.56%, Branches 56.62%, Functions 80.00%, Lines 66.61%
+
+### Bewertung Reifegrad (Tests)
+
+- **Funktionsstabilität**: hoch (alle aktuellen Suites grün).
+- **Testarchitektur**: verbessert durch klare Trennung von Modul-/Integrations-/Systemtests.
+- **Abdeckungsreife**: Zielwerte erreicht (`coverageThreshold` global: Statements 48%, Lines 47%).
+
+### Nächste Schritte (priorisiert)
+
+1. Branch-Coverage für verbleibende seltene Fehlerpfade (`internal`/`permission-denied`) weiter erhöhen.
+2. Android-Testpipeline (Unit + Instrumentation) regelmäßig mitlaufen lassen, um End-to-End-Reife zu erhöhen.
+3. Testdaten-/Mock-Factories konsolidieren, um Wartungskosten der Test-Suites zu senken.
+
 ## Executive Summary
 
 ✅ **All Backend Tests Passed Successfully**
