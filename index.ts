@@ -264,7 +264,7 @@ async function handleError(
     message: error.message,
     stack: error.stack,
     userId: context?.auth?.uid,
-    timestamp: new Date().toISOString(),
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
   };
   
   try {
@@ -272,11 +272,17 @@ async function handleError(
     await db().collection("error_logs").add(errorDetails);
     
     // Log to Cloud Logging
-    functions.logger.error("Function Error", errorDetails);
+    functions.logger.error("Function Error", { 
+      ...errorDetails, 
+      timestamp: new Date().toISOString() 
+    });
     
     // Optional: Alert for critical errors
     if (error instanceof AppError && error.severity === "critical") {
-      functions.logger.error("CRITICAL ERROR", errorDetails);
+      functions.logger.error("CRITICAL ERROR", { 
+        ...errorDetails, 
+        timestamp: new Date().toISOString() 
+      });
     }
   } catch (loggingError) {
     functions.logger.error("Failed to log error", { error: loggingError });
@@ -2320,8 +2326,8 @@ export const sendDailyErrorReport = functions.pubsub
             // Aggregate errors from the last 24 hours
             const errorSnapshot = await db()
                 .collection("error_logs")
-                .where("timestamp", ">=", yesterday.toISOString())
-                .where("timestamp", "<", today.toISOString())
+                .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(yesterday))
+                .where("timestamp", "<", admin.firestore.Timestamp.fromDate(today))
                 .get();
             
             if (errorSnapshot.empty) {
