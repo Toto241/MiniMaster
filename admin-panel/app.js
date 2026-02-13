@@ -455,6 +455,9 @@ async function loadAuditLogs() {
             .orderBy("timestamp", "desc")
             .limit(100);
         
+        // Note: Multiple where() clauses on different fields require a composite index
+        // Firestore will prompt to create the index automatically on first query
+        
         if (action) {
             query = query.where("action", "==", action);
         }
@@ -468,14 +471,15 @@ async function loadAuditLogs() {
         }
         
         if (dateFrom) {
-            const fromDate = new Date(dateFrom);
+            const fromDate = firebase.firestore.Timestamp.fromDate(new Date(dateFrom));
             query = query.where("timestamp", ">=", fromDate);
         }
         
         if (dateTo) {
             const toDate = new Date(dateTo);
-            toDate.setHours(23, 59, 59);
-            query = query.where("timestamp", "<=", toDate);
+            toDate.setHours(23, 59, 59, 999);
+            const toTimestamp = firebase.firestore.Timestamp.fromDate(toDate);
+            query = query.where("timestamp", "<=", toTimestamp);
         }
         
         const snapshot = await query.get();
@@ -513,7 +517,17 @@ async function loadAuditLogs() {
         
     } catch (error) {
         console.error("Error loading audit logs:", error);
-        listElement.innerHTML = "<div class=\"error\">Error loading logs: " + error.message + "</div>";
+        
+        // Handle index creation prompt
+        if (error.code === "failed-precondition" && error.message.includes("index")) {
+            listElement.innerHTML = `<div class="error">
+                <p>This query requires a Firestore composite index.</p>
+                <p>Click the link in the browser console to create the index automatically.</p>
+                <p>After creating the index, refresh the page and try again.</p>
+            </div>`;
+        } else {
+            listElement.innerHTML = "<div class=\"error\">Error loading logs: " + error.message + "</div>";
+        }
     }
 }
 

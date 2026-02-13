@@ -175,7 +175,10 @@ await AuditLogger.logAuthEvent(
 1. **Check Admin Claim**: Ensure your user has `role: "admin"` custom claim
 2. **Verify Firestore Rules**: Deploy latest rules with `firebase deploy --only firestore`
 3. **Check Functions Logs**: View Cloud Functions logs for any write errors
-4. **Indexing Issues**: Create composite indexes if filtering by multiple fields
+4. **Composite Indexes**: When filtering by multiple fields (action + role, or with date ranges), Firestore requires composite indexes
+   - On first filtered query, Firestore will provide a link in the browser console to create the required index
+   - Click the link, wait for index creation to complete (1-5 minutes)
+   - Refresh the page and try the filter again
 
 ### Performance Optimization
 - Queries are limited to 100 results by default

@@ -139,7 +139,7 @@ class AuditLogger {
   ): Promise<void> {
     await this.log({
       userId,
-      userRole: (metadata.role as "master" | "child" | "admin") || "master",
+      userRole: (metadata.role as "master" | "child" | "admin") || "unknown" as any,
       action,
       resource: "auth",
       metadata,
@@ -161,7 +161,8 @@ class AuditLogger {
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
     requireAdmin(context);
-    const adminId = context.auth?.uid || "unknown";
+    // After requireAdmin, context.auth.uid is guaranteed to exist
+    const adminId = context.auth!.uid;
     
     const uid = data.uid;
     if (!uid) {
@@ -169,7 +170,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
             adminId,
             "admin",
             AuditAction.ADMIN_CLAIM_SET,
-            uid || "unknown",
+            "unknown",
             new Error("Invalid uid"),
             {}
         );
@@ -210,7 +211,8 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
  */
 export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
     requireAdmin(context);
-  const adminUid = context.auth?.uid || "unknown";
+  // After requireAdmin, context.auth.uid is guaranteed to exist
+  const adminUid = context.auth!.uid;
 
     const subscriptionId = data.subscriptionId;
     if (!subscriptionId) {
@@ -218,7 +220,7 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
             adminUid,
             "admin",
             AuditAction.SUBSCRIPTION_REVOKED,
-            subscriptionId || "unknown",
+            "unknown",
             new Error("Invalid subscriptionId"),
             {}
         );
@@ -245,7 +247,7 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
         await admin.firestore().collection("subscriptions").doc(subscriptionId).update({
             status: "revoked",
             revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-          revokedBy: adminUid ?? "unknown-admin"
+          revokedBy: adminUid
         });
         
         if (masterId) {
