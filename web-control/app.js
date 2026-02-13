@@ -15,9 +15,8 @@ const firebaseConfig = {
 };
 
 // --- Global Variables ---
-let app, db, functions;
+let app, db, functions, auth;
 let currentMasterImei = null;
-let currentSecretKey = null;
 let devicesListener = null; // Firestore listener for real-time updates
 let usageChartInstance = null;
 
@@ -35,16 +34,20 @@ document.addEventListener('DOMContentLoaded', function() {
         app = firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         functions = firebase.functions();
+        auth = firebase.auth();
         
-        // Restore session if credentials are saved in localStorage
-        const savedCredentials = localStorage.getItem('minimaster-credentials');
-        if (savedCredentials) {
-            const credentials = JSON.parse(savedCredentials);
-            currentMasterImei = credentials.masterImei;
-            currentSecretKey = credentials.secretKey;
-            showMainContent();
-            loadDevices();
-        }
+        // Set up Firebase Auth state listener
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // User is authenticated
+                currentMasterImei = user.uid;
+                showMainContent();
+                loadDevices();
+            } else {
+                // User is not authenticated, show login
+                showLogin();
+            }
+        });
         
         console.log('Firebase initialized successfully.');
     } catch (error) {
@@ -52,6 +55,15 @@ document.addEventListener('DOMContentLoaded', function() {
         showNotification('Firebase configuration error. Please check your setup.', 'error');
     }
 });
+
+/**
+ * Shows the login form
+ */
+function showLogin() {
+    document.getElementById('login-form').style.display = 'flex';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('main-content').style.display = 'none';
+}
 
 // --- Authentication Functions ---
 
@@ -80,13 +92,9 @@ function login() {
         })
         .then(() => {
             currentMasterImei = masterImei;
-            currentSecretKey = secretKey;
 
-            // Save credentials for next session
-            localStorage.setItem('minimaster-credentials', JSON.stringify({
-                masterImei: masterImei,
-                secretKey: secretKey
-            }));
+            // Save only IMEI for session persistence (secretKey is NOT stored)
+            localStorage.setItem('minimaster-imei', masterImei);
 
             showMainContent();
             loadDevices();
@@ -103,26 +111,26 @@ function login() {
  * and resetting the UI to the login screen.
  */
 function logout() {
-    currentMasterImei = null;
-    currentSecretKey = null;
-    localStorage.removeItem('minimaster-credentials');
-    
-    // Detach the real-time listener to prevent memory leaks and unnecessary reads.
-    if (devicesListener) {
-        devicesListener();
-        devicesListener = null;
-    }
-    
-    // Reset the login form fields.
-    document.getElementById('master-imei').value = '';
-    document.getElementById('secret-key').value = '';
-    
-    // Switch the view from the dashboard back to the login form.
-    document.getElementById('login-form').style.display = 'flex';
-    document.getElementById('user-info').style.display = 'none';
-    document.getElementById('main-content').style.display = 'none';
-    
-    showNotification('Logged out successfully.', 'info');
+    // Sign out from Firebase Auth
+    firebase.auth().signOut().then(() => {
+        currentMasterImei = null;
+        localStorage.removeItem('minimaster-imei');
+        
+        // Detach the real-time listener to prevent memory leaks and unnecessary reads.
+        if (devicesListener) {
+            devicesListener();
+            devicesListener = null;
+        }
+        
+        // Reset the login form fields.
+        document.getElementById('master-imei').value = '';
+        document.getElementById('secret-key').value = '';
+        
+        showNotification('Logged out successfully.', 'info');
+    }).catch(error => {
+        console.error('Logout error:', error);
+        showNotification('Error during logout: ' + error.message, 'error');
+    });
 }
 
 /**
@@ -222,16 +230,14 @@ function renderDevices(devices) {
 
 /**
  * Calls the 'setDeviceLocked' Firebase Cloud Function to lock or unlock a child device.
- * @param {string} childImei - The unique identifier of the child device.
+ * @param {string} childId - The unique identifier of the child device.
  * @param {boolean} isLocked - The desired new lock state.
  */
-function toggleDeviceLock(childImei, isLocked) {
+function toggleDeviceLock(childId, isLocked) {
     const setDeviceLocked = functions.httpsCallable('setDeviceLocked');
     
     setDeviceLocked({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childId,
         isLocked: isLocked
     }).then(result => {
         showNotification(`Device ${isLocked ? 'locked' : 'unlocked'} successfully`, 'success');
@@ -291,9 +297,7 @@ function assignTask(event) {
     const deadlineISO = deadlineDate.toISOString();
 
     createTask({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childId,
+        childId: childId,
         description: title + ' - ' + description,
         deadlineISO: deadlineISO
     }).then(result => {
@@ -399,7 +403,7 @@ function loadUsageHistory(childId) {
 function saveRules(event) {
     event.preventDefault();
 
-    const childImei = document.getElementById('rules-child-id').value;
+    const childId = document.getElementById('rules-child-id').value;
     const dailyLimitMinutes = parseInt(document.getElementById('daily-limit').value);
     const blockedAppsStr = document.getElementById('blocked-apps').value;
 
@@ -417,18 +421,14 @@ function saveRules(event) {
     // Update Usage Rules
     const setUsageRules = functions.httpsCallable('setUsageRules');
     promises.push(setUsageRules({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childId,
         usageRules: usageRules
     }));
 
     // Update App Blacklist
     const updateAppBlacklist = functions.httpsCallable('updateAppBlacklist');
     promises.push(updateAppBlacklist({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childId,
         appBlacklist: blockedApps
     }));
 
@@ -528,15 +528,13 @@ function renderTasksToReview(tasks) {
 /**
  * Calls the 'approveTask' Firebase Cloud Function to approve a completed task.
  * @param {string} taskId - The ID of the task to approve.
- * @param {string} childImei - The ID of the child device.
+ * @param {string} childId - The ID of the child device.
  */
-function approveTaskReview(taskId, childImei) {
+function approveTaskReview(taskId, childId) {
     const approveTask = functions.httpsCallable('approveTask');
 
     approveTask({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childId,
         taskId: taskId
     }).then(result => {
         showNotification('Task approved successfully!', 'success');
