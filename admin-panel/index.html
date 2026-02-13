@@ -73,6 +73,48 @@
                 <div id="support-tickets-list" class="data-list">
                     <!-- Support tickets will be rendered here -->
                 </div>
+
+                <h2>Audit Logs</h2>
+                <div class="filters">
+                    <select id="auditActionFilter">
+                        <option value="">All Actions</option>
+                        <option value="device.locked">Device Locked</option>
+                        <option value="device.unlocked">Device Unlocked</option>
+                        <option value="device.paired">Device Paired</option>
+                        <option value="device.registered">Device Registered</option>
+                        <option value="task.created">Task Created</option>
+                        <option value="task.completed">Task Completed</option>
+                        <option value="task.approved">Task Approved</option>
+                        <option value="task.rejected">Task Rejected</option>
+                        <option value="rules.usage_updated">Usage Rules Updated</option>
+                        <option value="admin.claim_set">Admin Claim Set</option>
+                        <option value="admin.subscription_revoked">Subscription Revoked</option>
+                        <option value="auth.login_failure">Login Failures</option>
+                        <option value="auth.token_generated">Token Generated</option>
+                    </select>
+                    
+                    <select id="auditUserRoleFilter">
+                        <option value="">All Roles</option>
+                        <option value="master">Master</option>
+                        <option value="child">Child</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                    
+                    <select id="auditStatusFilter">
+                        <option value="">All Status</option>
+                        <option value="success">Success</option>
+                        <option value="failure">Failure</option>
+                    </select>
+                    
+                    <input type="date" id="auditDateFrom" placeholder="From Date">
+                    <input type="date" id="auditDateTo" placeholder="To Date">
+                    
+                    <button onclick="loadAuditLogs()" class="btn btn-primary">Filter</button>
+                    <button onclick="exportAuditLogs()" class="btn btn-secondary">Export CSV</button>
+                </div>
+                <div id="audit-log-list" class="audit-log-container">
+                    <!-- Populated by JavaScript -->
+                </div>
             </section>
         </main>
 
@@ -85,6 +127,16 @@
             <span class="close" onclick="closeUserDetailsModal()">&times;</span>
             <div id="user-details-content">
                 <!-- User details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Details Modal -->
+    <div id="audit-details-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeAuditDetailsModal()">&times;</span>
+            <div id="audit-details-content">
+                <!-- Audit details will be loaded here -->
             </div>
         </div>
     </div>

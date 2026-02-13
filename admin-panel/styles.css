@@ -275,3 +275,92 @@ input[type="text"] {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* --- Audit Log Styles --- */
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.audit-table th {
+    background-color: #f5f5f5;
+    padding: 10px;
+    text-align: left;
+    font-weight: bold;
+    border-bottom: 2px solid #ddd;
+}
+
+.audit-table td {
+    padding: 8px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.audit-table tr.status-failure {
+    background-color: #ffebee;
+}
+
+.audit-table tr.status-success:hover,
+.audit-table tr.status-failure:hover {
+    background-color: #f0f0f0;
+}
+
+.badge {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.badge.status-success {
+    background-color: #4caf50;
+    color: white;
+}
+
+.badge.status-failure {
+    background-color: #f44336;
+    color: white;
+}
+
+.filters {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filters select,
+.filters input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.filters select {
+    min-width: 150px;
+}
+
+.filters input[type="date"] {
+    min-width: 150px;
+}
+
+.audit-log-container {
+    margin-top: 15px;
+    overflow-x: auto;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.85em;
+}
+
+.modal-content pre {
+    background-color: #f5f5f5;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.9em;
+}

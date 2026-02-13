@@ -437,3 +437,173 @@ async function updateTicketStatus(ticketId, newStatus) {
         showNotification("Error updating ticket status: " + error.message, "error");
     }
 }
+
+// --- Audit Logs Functions ---
+
+async function loadAuditLogs() {
+    const listElement = document.getElementById("audit-log-list");
+    listElement.innerHTML = "<div class=\"loading\">Loading audit logs...</div>";
+    
+    const action = document.getElementById("auditActionFilter").value;
+    const role = document.getElementById("auditUserRoleFilter").value;
+    const status = document.getElementById("auditStatusFilter").value;
+    const dateFrom = document.getElementById("auditDateFrom").value;
+    const dateTo = document.getElementById("auditDateTo").value;
+    
+    try {
+        let query = db.collection("audit_logs")
+            .orderBy("timestamp", "desc")
+            .limit(100);
+        
+        if (action) {
+            query = query.where("action", "==", action);
+        }
+        
+        if (role) {
+            query = query.where("userRole", "==", role);
+        }
+        
+        if (status) {
+            query = query.where("status", "==", status);
+        }
+        
+        if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            query = query.where("timestamp", ">=", fromDate);
+        }
+        
+        if (dateTo) {
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59);
+            query = query.where("timestamp", "<=", toDate);
+        }
+        
+        const snapshot = await query.get();
+        
+        if (snapshot.empty) {
+            listElement.innerHTML = "<div class=\"info\">No audit logs found.</div>";
+            return;
+        }
+        
+        let html = "<table class=\"audit-table\">";
+        html += "<tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Resource</th><th>Status</th><th>Details</th></tr>";
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const timestamp = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : "N/A";
+            const statusClass = data.status === "success" ? "status-success" : "status-failure";
+            
+            html += `
+                <tr class="${statusClass}">
+                    <td>${timestamp}</td>
+                    <td>${escapeHtml(data.userId)}</td>
+                    <td>${escapeHtml(data.userRole)}</td>
+                    <td>${escapeHtml(data.action)}</td>
+                    <td>${escapeHtml(data.resource)}</td>
+                    <td><span class="badge ${statusClass}">${data.status}</span></td>
+                    <td>
+                        <button onclick="viewAuditDetails('${doc.id}')" class="btn btn-sm">View</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += "</table>";
+        listElement.innerHTML = html;
+        
+    } catch (error) {
+        console.error("Error loading audit logs:", error);
+        listElement.innerHTML = "<div class=\"error\">Error loading logs: " + error.message + "</div>";
+    }
+}
+
+async function viewAuditDetails(logId) {
+    const modal = document.getElementById("audit-details-modal");
+    const content = document.getElementById("audit-details-content");
+    
+    content.innerHTML = "<div class=\"loading\">Loading...</div>";
+    modal.style.display = "block";
+    
+    try {
+        const doc = await db.collection("audit_logs").doc(logId).get();
+        const data = doc.data();
+        
+        let html = "<h3>Audit Log Details</h3>";
+        html += `<p><strong>ID:</strong> ${logId}</p>`;
+        html += `<p><strong>Timestamp:</strong> ${new Date(data.timestamp.seconds * 1000).toLocaleString()}</p>`;
+        html += `<p><strong>User ID:</strong> ${escapeHtml(data.userId)}</p>`;
+        html += `<p><strong>User Role:</strong> ${escapeHtml(data.userRole)}</p>`;
+        html += `<p><strong>Action:</strong> ${escapeHtml(data.action)}</p>`;
+        html += `<p><strong>Resource:</strong> ${escapeHtml(data.resource)}</p>`;
+        html += `<p><strong>Status:</strong> <span class="badge ${data.status === 'success' ? 'status-success' : 'status-failure'}">${data.status}</span></p>`;
+        
+        if (data.errorMessage) {
+            html += `<p><strong>Error:</strong> <span class="error">${escapeHtml(data.errorMessage)}</span></p>`;
+        }
+        
+        if (data.metadata && Object.keys(data.metadata).length > 0) {
+            html += "<h4>Metadata:</h4>";
+            html += "<pre>" + escapeHtml(JSON.stringify(data.metadata, null, 2)) + "</pre>";
+        }
+        
+        content.innerHTML = html;
+        
+    } catch (error) {
+        content.innerHTML = "<div class=\"error\">Error: " + error.message + "</div>";
+    }
+}
+
+function closeAuditDetailsModal() {
+    document.getElementById("audit-details-modal").style.display = "none";
+}
+
+async function exportAuditLogs() {
+    showNotification("Generating CSV...", "info");
+    
+    try {
+        const query = db.collection("audit_logs")
+            .orderBy("timestamp", "desc")
+            .limit(10000); // Max export
+        
+        const snapshot = await query.get();
+        
+        let csv = "Timestamp,User ID,User Role,Action,Resource,Status,Error Message\n";
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const timestamp = data.timestamp ? new Date(data.timestamp.seconds * 1000).toISOString() : "";
+            const errorMsg = (data.errorMessage || "").replace(/,/g, ";").replace(/\n/g, " ");
+            
+            csv += `${timestamp},${data.userId},${data.userRole},${data.action},${data.resource},${data.status},"${errorMsg}"\n`;
+        });
+        
+        // Download CSV
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `audit-logs-${new Date().toISOString()}.csv`;
+        a.click();
+        
+        showNotification("CSV exported successfully", "success");
+        
+    } catch (error) {
+        console.error("Error exporting audit logs:", error);
+        showNotification("Export failed: " + error.message, "error");
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    if (typeof text !== "string") {
+        return text;
+    }
+    const map = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
