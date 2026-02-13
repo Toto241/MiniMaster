@@ -393,4 +393,39 @@ describe("coverage high impact callable suite", () => {
       provideSolutionFeedback({ ticketId: "ticket-1", feedback: "invalid" }, asMaster)
     ).rejects.toThrow(/accepted/);
   });
+
+  it("deckt abgelaufenen Pairing-Token und ungültiges FCM-Update ab", async () => {
+    const validatePairingToken = testEnv.wrap(fns.validatePairingToken);
+    const updateFCMToken = testEnv.wrap(fns.updateFCMToken);
+
+    const expiredMs = Date.now() - 60_000;
+    state.pairingTokens["tok-expired"] = {
+      masterImei: "m1",
+      expiresAt: { seconds: Math.floor(expiredMs / 1000), nanoseconds: 0 },
+    };
+
+    await expect(validatePairingToken({ pairingToken: "tok-expired" }, asChild)).rejects.toThrow(/expired/);
+    await expect(updateFCMToken({ fcmToken: "" }, asMaster)).rejects.toThrow(/fcmToken/);
+  });
+
+  it("deckt negative Purchase-Verifikation ab", async () => {
+    const verifyPurchase = testEnv.wrap(fns.verifyPurchase);
+    mockSubscriptionGet.mockResolvedValueOnce({
+      data: {
+        purchaseState: 1,
+        expiryTimeMillis: Date.now() - 1,
+      },
+    });
+
+    await expect(verifyPurchase({ purchaseToken: "pt-invalid", sku: "premium_monthly" }, asMaster)).rejects.toThrow(/verification failed/i);
+  });
+
+  it("deckt Support-Feedback-Permission-Fehlerpfad ab", async () => {
+    const provideSolutionFeedback = testEnv.wrap(fns.provideSolutionFeedback);
+    state.supportTickets["ticket-foreign"] = { masterImei: "other-master", status: "open" };
+
+    await expect(
+      provideSolutionFeedback({ ticketId: "ticket-foreign", feedback: "accepted" }, asMaster)
+    ).rejects.toThrow(/Failed to update ticket feedback/);
+  });
 });

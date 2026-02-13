@@ -60,7 +60,9 @@ Sie benötigen ein Google-Konto, um auf die Firebase Console zuzugreifen.
 1. Klicken Sie auf **"google-services.json herunterladen"**
 2. Speichern Sie die Datei auf Ihrem Computer
 3. **WICHTIG:** Kopieren Sie diese Datei in das `masterApp/` Verzeichnis Ihres Mini-Master Projekts
-4. Klicken Sie auf **"Weiter"** und **"Weiter zur Konsole"**
+4. **SICHERHEIT:** `google-services.json` bleibt lokal und darf niemals ins Repository committed werden.
+5. Für Orientierung ist nur das sichere Template versioniert: `masterApp/google-services.template.json`
+6. Klicken Sie auf **"Weiter"** und **"Weiter zur Konsole"**
 
 ### 3. Child App (Kinder-App) hinzufügen
 
@@ -69,6 +71,8 @@ Sie benötigen ein Google-Konto, um auf die Firebase Console zuzugreifen.
 3. Geben Sie den **App-Spitznamen** ein: `Child App`
 4. Laden Sie die **zweite** `google-services.json` Datei herunter
 5. **WICHTIG:** Kopieren Sie diese Datei in das `childApp/` Verzeichnis Ihres Mini-Master Projekts
+6. **SICHERHEIT:** `google-services.json` bleibt lokal und darf niemals ins Repository committed werden.
+7. Für Orientierung ist nur das sichere Template versioniert: `childApp/google-services.template.json`
 
 ## Teil 4: Projekt-Konfiguration abschließen
 
@@ -96,6 +100,10 @@ MiniMaster/
 ```
 
 **Kritisch wichtig:** Beide Apps benötigen ihre eigene `google-services.json` Datei mit den korrekten Package-Namen!
+
+**Repository-Sicherheitsregel:**
+- `google-services.json` wird durch `.gitignore` ausgeschlossen.
+- Nur Template-Dateien (`google-services.template.json`) sind im Repository erlaubt.
 
 ## Teil 6: Firebase CLI einrichten (für Backend-Deployment)
 

@@ -103,6 +103,10 @@ The repository is organized as follows:
 1.  Place the `google-services.json` files:
     *   Copy the parent app JSON to `masterApp/google-services.json`.
     *   Copy the child app JSON to `childApp/google-services.json`.
+    *   Keep both files **local only**. They are ignored by git and must never be committed.
+    *   Repository-safe placeholders are available as:
+        *   `masterApp/google-services.template.json`
+        *   `childApp/google-services.template.json`
 2.  Open the project root in Android Studio.
 3.  Sync Gradle files.
 4.  Build and run the `masterApp` on one device/emulator and `childApp` on another.

@@ -6,7 +6,7 @@
 
 - `npm run lint`: ✅ erfolgreich
 - `npx tsc --noEmit`: ✅ erfolgreich
-- `npm run test:ci --silent`: ✅ 8/8 Suites, 55/55 Tests
+- `npm run test:ci --silent`: ✅ 8/8 Suites, 58/58 Tests
 - `npm run test:ci -- --coverage --silent`: ✅ erfolgreich (Threshold erfüllt)
 
 ### Neue Testebenen ergänzt
@@ -17,9 +17,9 @@
 
 ### Coverage (aktueller Stand)
 
-- All files: Statements 67.36%, Branches 57.22%, Functions 81.81%, Lines 67.12%
+- All files: Statements 68.56%, Branches 58.40%, Functions 81.81%, Lines 68.34%
 - `firebase.ts`: Statements 94.73%, Branches 85.71%, Functions 100%, Lines 92.30%
-- `index.ts`: Statements 66.56%, Branches 56.62%, Functions 80.00%, Lines 66.61%
+- `index.ts`: Statements 67.79%, Branches 57.83%, Functions 80.00%, Lines 67.85%
 
 ### Bewertung Reifegrad (Tests)
 

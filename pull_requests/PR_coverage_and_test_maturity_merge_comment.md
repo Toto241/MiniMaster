@@ -10,8 +10,8 @@ Diese PR ist aus Qualitätssicht bereit für den Merge.
 
 ### Ergebnis
 - Test-Suites: **8/8 passed**
-- Tests: **55/55 passed**
-- Coverage gesamt: **Statements 67.36%, Lines 67.12%** (Thresholds erfüllt)
+- Tests: **58/58 passed**
+- Coverage gesamt: **Statements 68.56%, Lines 68.34%** (Thresholds erfüllt)
 
 ### Hinweis zum Risiko
 - Produktionslogik wurde nur minimal angepasst (`index.ts` / `revokeSubscription` Null-Safety).
