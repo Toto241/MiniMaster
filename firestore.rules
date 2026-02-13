@@ -148,6 +148,14 @@ service cloud.firestore {
         && request.resource.data.totalUsageMillis is number;
     }
 
+    // --- AUDIT LOGS COLLECTION ---
+    // Used for GDPR compliance and security monitoring
+    // Only admins can read audit logs; Cloud Functions write via Admin SDK
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Cloud Functions (Admin SDK) can write
+    }
+
     // --- DENY OLD NESTED FAMILY STRUCTURE ---
     // Prevent confusion by explicitly denying access to the old data model.
     match /families/{familyId} {

@@ -1640,6 +1640,7 @@ export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: st
 /**
  * Deletes a user account and all associated data.
  * This function should be called when a user requests to delete their account.
+ * Includes comprehensive audit logging for GDPR compliance.
  */
 export const deleteUserAccount = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
     const masterId = requireAuth(context);
@@ -1652,19 +1653,32 @@ export const deleteUserAccount = functions.https.onCall(async (_data: Record<str
         );
     }
 
+    // Log deletion request BEFORE deletion for GDPR proof
+    await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "ACCOUNT_DELETION_REQUESTED",
+        "master",
+        masterId,
+        { timestamp: Date.now() }
+    );
+
     try {
         // 1. Delete all children associated with the master
         const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
+        const childrenCount = childrenSnapshot.size;
         const deleteChildrenPromises = childrenSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deleteChildrenPromises);
 
         // 2. Delete all tasks associated with the master
         const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterId).get();
+        const tasksCount = tasksSnapshot.size;
         const deleteTasksPromises = tasksSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deleteTasksPromises);
 
         // 3. Delete all subscriptions associated with the master
         const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
+        const subsCount = subsSnapshot.size;
         const deleteSubsPromises = subsSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deleteSubsPromises);
 
@@ -1676,10 +1690,40 @@ export const deleteUserAccount = functions.https.onCall(async (_data: Record<str
         await admin.auth().deleteUser(masterId);
 
         functions.logger.info(`User account and all associated data deleted for master ${masterId}.`);
+
+        // Log successful deletion
+        await AuditLogger.logSuccess(
+            masterId,
+            "master",
+            "ACCOUNT_DELETED",
+            "master",
+            masterId,
+            { 
+                childrenDeleted: childrenCount,
+                tasksDeleted: tasksCount,
+                subscriptionsDeleted: subsCount,
+            }
+        );
+
         return { success: true };
 
     } catch (error) {
+        // Log failure
+        await AuditLogger.logFailure(
+            masterId,
+            "master",
+            "ACCOUNT_DELETED",
+            "master",
+            masterId,
+            error instanceof Error ? error.message : String(error)
+        );
+
         functions.logger.error(`Failed to delete user account for master ${masterId}:`, error);
+        
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        
         throw new functions.https.HttpsError(
             "internal",
             "An unexpected error occurred while deleting the user account.",
@@ -2076,3 +2120,150 @@ export const provideSolutionFeedback = functions.https.onCall(async (data: { tic
     throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
   }
 });
+
+// --- Health Check & GDPR Functions ---
+
+/**
+ * Health check endpoint for monitoring system status.
+ * Tests connectivity to Firestore and Auth services.
+ */
+export const healthCheck = functions.https.onRequest(async (req, res) => {
+  const checks = {
+    firestore: false,
+    auth: false,
+    timestamp: new Date().toISOString(),
+  };
+  
+  try {
+    // Test Firestore connectivity
+    await db().collection("_health").doc("check").set({ timestamp: Date.now() });
+    checks.firestore = true;
+  } catch (error) {
+    functions.logger.error("Firestore health check failed", error);
+  }
+  
+  try {
+    // Test Auth connectivity
+    await admin.auth().listUsers(1);
+    checks.auth = true;
+  } catch (error) {
+    functions.logger.error("Auth health check failed", error);
+  }
+  
+  const isHealthy = checks.firestore && checks.auth;
+  
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? "healthy" : "unhealthy",
+    checks,
+  });
+});
+
+/**
+ * Export all user data for GDPR compliance (right to data portability).
+ * Returns a JSON string containing all data associated with the authenticated master user.
+ */
+export const exportUserData = functions.https.onCall(
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    
+    try {
+      // Collect all user data
+      const userData: Record<string, any> = {};
+      
+      // Master data
+      const masterDoc = await db().collection("masters").doc(masterId).get();
+      userData.master = masterDoc.data();
+      
+      // Children
+      const childrenSnapshot = await db()
+        .collection("children")
+        .where("masterImei", "==", masterId)
+        .get();
+      userData.children = childrenSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      
+      // Tasks (for all children)
+      const tasks: any[] = [];
+      for (const child of childrenSnapshot.docs) {
+        const tasksSnapshot = await db()
+          .collection("children")
+          .doc(child.id)
+          .collection("tasks")
+          .get();
+        tasks.push(...tasksSnapshot.docs.map(doc => ({
+          id: doc.id,
+          childId: child.id,
+          ...doc.data(),
+        })));
+      }
+      userData.tasks = tasks;
+      
+      // Subscriptions
+      const subscriptionsSnapshot = await db()
+        .collection("subscriptions")
+        .where("masterId", "==", masterId)
+        .get();
+      userData.subscriptions = subscriptionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      
+      // Audit logs (last 90 days for GDPR compliance)
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      
+      const auditLogsSnapshot = await db()
+        .collection("audit_logs")
+        .where("userId", "==", masterId)
+        .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+        .get();
+      userData.auditLogs = auditLogsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      
+      // Log the export request
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "DATA_EXPORTED",
+        "master",
+        masterId,
+        { 
+          childrenCount: userData.children.length,
+          tasksCount: userData.tasks.length,
+          auditLogsCount: userData.auditLogs.length,
+        }
+      );
+      
+      functions.logger.info(`Data export completed for master ${masterId}`);
+      
+      // Return as downloadable JSON
+      return { data: JSON.stringify(userData, null, 2) };
+    } catch (error) {
+      // Log failure
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        "DATA_EXPORTED",
+        "master",
+        masterId,
+        error instanceof Error ? error.message : String(error)
+      );
+
+      functions.logger.error(`Error exporting data for master ${masterId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while exporting user data.",
+        error
+      );
+    }
+  }
+);

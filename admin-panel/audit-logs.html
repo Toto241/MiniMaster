@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs - MiniMaster Admin</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔍 Audit Logs</h1>
+            <div class="auth-status">
+                <span id="user-email"></span>
+                <a href="index.html" class="btn btn-secondary">Back to Dashboard</a>
+                <button id="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </header>
+        
+        <!-- Filters -->
+        <section class="filters section">
+            <h2>Filters</h2>
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label for="user-filter">User ID:</label>
+                    <input type="text" id="user-filter" placeholder="Filter by User ID">
+                </div>
+                <div class="filter-item">
+                    <label for="action-filter">Action:</label>
+                    <select id="action-filter">
+                        <option value="">All Actions</option>
+                        <option value="DEVICE_LOCK_CHANGED">Device Lock</option>
+                        <option value="TASK_CREATED">Task Created</option>
+                        <option value="TASK_COMPLETED">Task Completed</option>
+                        <option value="TASK_APPROVED">Task Approved</option>
+                        <option value="BLACKLIST_UPDATED">Blacklist Updated</option>
+                        <option value="USAGE_RULES_UPDATED">Usage Rules Updated</option>
+                        <option value="PAIRING_CODE_CREATED">Pairing Code Created</option>
+                        <option value="DEVICE_PAIRED">Device Paired</option>
+                        <option value="ACCOUNT_DELETED">Account Deleted</option>
+                        <option value="DATA_EXPORTED">Data Exported</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="result-filter">Result:</label>
+                    <select id="result-filter">
+                        <option value="">All Results</option>
+                        <option value="success">Success</option>
+                        <option value="failure">Failure</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="date-from">From:</label>
+                    <input type="date" id="date-from">
+                </div>
+                <div class="filter-item">
+                    <label for="date-to">To:</label>
+                    <input type="date" id="date-to">
+                </div>
+                <div class="filter-actions">
+                    <button onclick="applyFilters()" class="btn btn-primary">Apply Filters</button>
+                    <button onclick="clearFilters()" class="btn btn-secondary">Clear</button>
+                    <button onclick="exportLogs()" class="btn btn-success">Export CSV</button>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Stats Summary -->
+        <section class="stats section">
+            <div class="stat-card">
+                <h3>Total Logs</h3>
+                <p id="stat-total">--</p>
+            </div>
+            <div class="stat-card">
+                <h3>Success Rate</h3>
+                <p id="stat-success-rate">--</p>
+            </div>
+            <div class="stat-card">
+                <h3>Failed Actions</h3>
+                <p id="stat-failures">--</p>
+            </div>
+        </section>
+        
+        <!-- Logs Table -->
+        <section class="section">
+            <h2>Audit Log Entries</h2>
+            <div class="table-container">
+                <table id="logs-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>User ID</th>
+                            <th>Role</th>
+                            <th>Action</th>
+                            <th>Resource</th>
+                            <th>Result</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-tbody">
+                        <tr><td colspan="7">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="pagination" class="pagination">
+                <button onclick="loadPreviousPage()" id="prev-btn" disabled>Previous</button>
+                <span id="page-info">Page 1</span>
+                <button onclick="loadNextPage()" id="next-btn">Next</button>
+            </div>
+        </section>
+        
+        <!-- Details Modal -->
+        <div id="details-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>Log Details</h2>
+                <pre id="details-content"></pre>
+            </div>
+        </div>
+    </div>
+    
+    <script src="appcheck-init.js"></script>
+    <script src="app.js"></script>
+    <script src="audit-logs.js"></script>
+</body>
+</html>
