@@ -3,9 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ==================== HELPER FUNCTIONS ====================
+
     // Helper function to check if a user is authenticated.
     function isSignedIn() {
       return request.auth != null;
+    }
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
     // Helper function to check if the authenticated user is an admin.
@@ -21,8 +31,13 @@ service cloud.firestore {
       // to only access data when they have the grantId from the ticket
       return isAdmin(); // Simplified: Admins can access if they have a valid ticket
     }
+    
+    // Validates IMEI format (15 digits)
+    function isValidIMEI(imei) {
+      return imei is string && imei.matches('^[0-9]{15}$');
+    }
 
-    // --- SUPPORT TICKETS COLLECTION ---
+    // ==================== SUPPORT TICKETS COLLECTION ====================
     // Users can create and read their own tickets
     // Admins can read all tickets and update their status
     match /supportTickets/{ticketId} {
@@ -31,7 +46,7 @@ service cloud.firestore {
       allow update: if isAdmin(); // Only admins can update ticket status
     }
 
-    // --- SUPPORT ACCESS GRANTS COLLECTION ---
+    // ==================== SUPPORT ACCESS GRANTS COLLECTION ====================
     // Users can create and manage their own grants
     // Admins can read all grants
     match /supportAccessGrants/{grantId} {
@@ -40,16 +55,21 @@ service cloud.firestore {
       allow update: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
     }
 
-    // --- MASTERS COLLECTION ---
+    // ==================== MASTERS COLLECTION ====================
     // Masters are identified by their IMEI (document ID).
     // A master can only read/write their own document.
     // Admins can read master data ONLY through the support interface (no blanket access)
     match /masters/{masterId} {
-      allow read: if isSignedIn() && (request.auth.uid == masterId || isAdmin());
-      allow write: if isSignedIn() && request.auth.uid == masterId;
+      allow read: if isSignedIn() && (isOwner(masterId) || isAdmin());
+      allow create: if isSignedIn() && isOwner(masterId) &&
+                      request.resource.data.keys().hasOnly(['imei', 'uid', 'role', 'createdAt', 'email', 'childCount', 'secretKey', 'isPremium', 'lastSeen']) &&
+                      isValidIMEI(request.resource.data.imei);
+      allow update: if isSignedIn() && isOwner(masterId) &&
+                      !('secretKey' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if false; // Only Cloud Functions can delete
     }
 
-    // --- CHILDREN COLLECTION ---
+    // ==================== CHILDREN COLLECTION ====================
     // Children are linked to masters via the 'masterImei' field.
     // A child document can be read/written by:
     // 1. The master who owns the child (masterImei matches auth.uid)
@@ -62,11 +82,18 @@ service cloud.firestore {
         isAdmin()
       );
       allow create: if false; // Only Cloud Functions (Admin SDK) can create
-      allow update: if isSignedIn() && (resource.data.masterImei == request.auth.uid || childId == request.auth.uid);
+      allow update: if isSignedIn() && (
+        resource.data.masterImei == request.auth.uid || 
+        childId == request.auth.uid
+      ) && (
+        // Validate that critical fields are not modified by unauthorized users
+        !('masterImei' in request.resource.data.diff(resource.data).affectedKeys()) ||
+        isAdmin()
+      );
       allow delete: if isSignedIn() && (resource.data.masterImei == request.auth.uid || isAdmin());
     }
 
-    // --- TASKS COLLECTION (nested under children) ---
+    // ==================== TASKS COLLECTION (nested under children) ====================
     // Tasks are nested under children: /children/{childId}/tasks/{taskId}
     // Access rules:
     // - Master (owner of child) can read/write all tasks
@@ -92,21 +119,18 @@ service cloud.firestore {
       allow delete: if isMasterOfChild(); // Only master can delete tasks
       
       // Validate task data structure when writing
-      allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['title', 'description', 'status', 'proofUrl', 'createdAt', 'updatedAt', 'assignedAt', 'submittedAt', 'reviewedAt', 'unlockDuration', 'masterImei'])
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() < 200
-        && request.resource.data.description is string
-        && request.resource.data.description.size() < 1000
-        && request.resource.data.status is string
-        && request.resource.data.status in ['ASSIGNED', 'SUBMITTED', 'APPROVED', 'REJECTED']
-        && (!('proofUrl' in request.resource.data) || request.resource.data.proofUrl is string || request.resource.data.proofUrl == null)
-        && request.resource.data.unlockDuration is int
-        && request.resource.data.unlockDuration >= 0;
+      allow create, update: if isSignedIn() &&
+        request.resource.data.keys().hasOnly(['title', 'description', 'status', 'proofUrl', 'photoUrl', 'createdAt', 'updatedAt', 'assignedAt', 'submittedAt', 'reviewedAt', 'unlockDuration', 'masterImei', 'deadline', 'completedAt', 'aiAnalysis']) &&
+        (!('description' in request.resource.data) || (
+          request.resource.data.description is string &&
+          request.resource.data.description.size() > 0 &&
+          request.resource.data.description.size() <= 5000
+        )) &&
+        (!('status' in request.resource.data) || 
+          request.resource.data.status in ['pending', 'pending_approval', 'approved', 'rejected', 'ASSIGNED', 'SUBMITTED', 'APPROVED', 'REJECTED']);
     }
 
-    // --- PAIRING CODES COLLECTION ---
+    // ==================== PAIRING CODES COLLECTION ====================
     // Pairing codes are managed by Cloud Functions.
     // Read access is allowed for authenticated users (to validate codes).
     // Write access is restricted to Cloud Functions (server-side only).
@@ -114,13 +138,13 @@ service cloud.firestore {
       allow read, write: if false; // Only Cloud Functions (Admin SDK)
     }
 
-    // --- PAIRING TOKENS COLLECTION ---
+    // ==================== PAIRING TOKENS COLLECTION ====================
     // Similar to pairing codes, managed by Cloud Functions.
     match /pairingTokens/{tokenId} {
       allow read, write: if false; // Only Cloud Functions (Admin SDK)
     }
 
-    // --- SUBSCRIPTIONS COLLECTION ---
+    // ==================== SUBSCRIPTIONS COLLECTION ====================
     // Subscriptions are linked to masters via 'masterId' field.
     // A master can only read their own subscription.
     // Write access is restricted to Cloud Functions.
@@ -130,7 +154,7 @@ service cloud.firestore {
       allow write: if false; // Only Cloud Functions can write
     }
 
-    // --- USAGE HISTORY COLLECTION (nested under children) ---
+    // ==================== USAGE HISTORY COLLECTION (nested under children) ====================
     // Used by reportDailyUsage to track screen time
     match /children/{childId}/usageHistory/{date} {
       // Get the child document to check ownership
@@ -142,18 +166,31 @@ service cloud.firestore {
       allow write: if isSignedIn() && childId == request.auth.uid; // Only child can report usage
       
       // Validate usage history data structure
-      allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['date', 'totalUsageMillis', 'updatedAt'])
-        && request.resource.data.date is string
-        && request.resource.data.totalUsageMillis is number;
+      allow create, update: if isSignedIn() &&
+        request.resource.data.keys().hasOnly(['date', 'totalUsageMillis', 'updatedAt']) &&
+        request.resource.data.date is string &&
+        request.resource.data.totalUsageMillis is number;
+    }
+    
+    // ==================== RATE LIMITS COLLECTION ====================
+    // Used to track API rate limiting per user per function
+    match /rate_limits/{userId}/calls/{functionName} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && isOwner(userId);
     }
 
-    // --- DENY OLD NESTED FAMILY STRUCTURE ---
+    // ==================== DENY OLD NESTED FAMILY STRUCTURE ====================
     // Prevent confusion by explicitly denying access to the old data model.
     match /families/{familyId} {
       allow read, write: if false;
     }
     match /families/{familyId}/children/{childId} {
+      allow read, write: if false;
+    }
+    
+    // ==================== DENY ALL OTHER PATHS ====================
+    // Explicitly deny access to any undocumented paths
+    match /{document=**} {
       allow read, write: if false;
     }
   }
