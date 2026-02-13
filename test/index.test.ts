@@ -133,3 +133,83 @@ describe("callable contracts", () => {
     expect(setStub).toHaveBeenCalled();
   });
 });
+
+describe("audit logging", () => {
+  let addStub: jest.Mock;
+  let collectionSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    addStub = jest.fn().mockResolvedValue({ id: "log123" });
+    collectionSpy = jest.spyOn(db, "collection");
+  });
+
+  afterEach(() => {
+    collectionSpy.mockRestore();
+  });
+
+  it("setDeviceLocked writes audit log on success", async () => {
+    // Setup main mocks
+    getStub.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+    getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1", isLocked: false }) });
+    updateStub.mockResolvedValue(undefined);
+
+    // Mock audit_logs collection
+    collectionSpy.mockImplementation((path: string) => {
+      if (path === "audit_logs") {
+        return { add: addStub } as any;
+      }
+      // Default mock for other collections
+      return {
+        doc: jest.fn().mockReturnValue({
+          get: getStub,
+          update: updateStub,
+        }),
+      } as any;
+    });
+
+    const wrapped = testEnv.wrap(fns.setDeviceLocked);
+    await wrapped({ childId: "c1", isLocked: true }, asMaster);
+
+    // Verify audit log was written
+    expect(addStub).toHaveBeenCalled();
+    const logEntry = addStub.mock.calls[0][0];
+    expect(logEntry.userId).toBe("m1");
+    expect(logEntry.userRole).toBe("master");
+    expect(logEntry.action).toBe("DEVICE_LOCK_CHANGED");
+    expect(logEntry.result).toBe("success");
+    expect(logEntry.metadata).toEqual({ isLocked: true, previousState: false });
+  });
+
+  it("updateAppBlacklist writes audit log with app counts", async () => {
+    const previousBlacklist = ["app1", "app2"];
+    const newBlacklist = ["app1", "app2", "app3"];
+
+    getStub.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+    getStub.mockResolvedValueOnce({ 
+      exists: true, 
+      data: () => ({ masterImei: "m1", appBlacklist: previousBlacklist }) 
+    });
+    updateStub.mockResolvedValue(undefined);
+
+    collectionSpy.mockImplementation((path: string) => {
+      if (path === "audit_logs") {
+        return { add: addStub } as any;
+      }
+      return {
+        doc: jest.fn().mockReturnValue({
+          get: getStub,
+          update: updateStub,
+        }),
+      } as any;
+    });
+
+    const wrapped = testEnv.wrap(fns.updateAppBlacklist);
+    await wrapped({ childId: "c1", appBlacklist: newBlacklist }, asMaster);
+
+    expect(addStub).toHaveBeenCalled();
+    const logEntry = addStub.mock.calls[0][0];
+    expect(logEntry.action).toBe("BLACKLIST_UPDATED");
+    expect(logEntry.metadata.appCount).toBe(3);
+    expect(logEntry.metadata.previousCount).toBe(2);
+  });
+});
