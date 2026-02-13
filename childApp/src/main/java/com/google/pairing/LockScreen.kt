@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
  * A Composable screen that represents the main "home" screen of the child app
@@ -39,10 +39,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun LockScreen(
     childId: String,
     onNavigateToTasks: () -> Unit,
-    taskViewModel: TaskViewModel = viewModel()
+    taskViewModel: TaskViewModel = hiltViewModel()
 ) {
     val currentTask by taskViewModel.currentTask.collectAsState()
-    val isTaskLock = currentTask != null && (currentTask!!.status == TaskStatus.ASSIGNED.value || currentTask!!.status == TaskStatus.REJECTED.value || currentTask!!.status == TaskStatus.SUBMITTED.value)
+    val isTaskLock = currentTask != null && (currentTask!!.status == TaskStatus.PENDING.value || currentTask!!.status == TaskStatus.REJECTED.value || currentTask!!.status == TaskStatus.PENDING_APPROVAL.value)
 
     if (isTaskLock) {
         TaskLockScreenContent(task = currentTask!!)
@@ -85,13 +85,11 @@ fun TaskLockScreenContent(task: TaskModel) {
         Text(text = "Task Required", style = MaterialTheme.typography.h4, color = Color.Red)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(text = "Title: ${task.title}", style = MaterialTheme.typography.h6)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Description: ${task.description}", style = MaterialTheme.typography.body1)
+        Text(text = task.description, style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(32.dp))
 
         when (TaskStatus.fromString(task.status)) {
-            TaskStatus.ASSIGNED, TaskStatus.REJECTED -> {
+            TaskStatus.PENDING, TaskStatus.REJECTED -> {
                 Text(
                     text = if (task.status == TaskStatus.REJECTED.value)
                         "Proof rejected. Please submit again."
@@ -104,7 +102,7 @@ fun TaskLockScreenContent(task: TaskModel) {
                     Text("Submit Proof")
                 }
             }
-            TaskStatus.SUBMITTED -> {
+            TaskStatus.PENDING_APPROVAL -> {
                 Text(text = "Proof submitted. Waiting for parent approval.", color = Color.Blue)
                 Spacer(modifier = Modifier.height(16.dp))
                 CircularProgressIndicator()
