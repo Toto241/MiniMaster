@@ -21,6 +21,133 @@ function requireAdmin(context: CallableContext): void {
   }
 }
 
+// --- Audit Logging System ---
+
+/**
+ * Enum of all tracked audit actions.
+ */
+enum AuditAction {
+  // Device Management
+  DEVICE_REGISTERED = "device.registered",
+  DEVICE_PAIRED = "device.paired",
+  DEVICE_LOCKED = "device.locked",
+  DEVICE_UNLOCKED = "device.unlocked",
+  
+  // Task Management
+  TASK_CREATED = "task.created",
+  TASK_COMPLETED = "task.completed",
+  TASK_APPROVED = "task.approved",
+  TASK_REJECTED = "task.rejected",
+  
+  // Rules & Restrictions
+  APP_BLACKLIST_UPDATED = "rules.blacklist_updated",
+  USAGE_RULES_UPDATED = "rules.usage_updated",
+  
+  // Admin Actions
+  ADMIN_CLAIM_SET = "admin.claim_set",
+  SUPPORT_ACCESS_GRANTED = "admin.support_granted",
+  SUPPORT_ACCESS_REVOKED = "admin.support_revoked",
+  SUBSCRIPTION_REVOKED = "admin.subscription_revoked",
+  
+  // Auth Events
+  LOGIN_SUCCESS = "auth.login_success",
+  LOGIN_FAILURE = "auth.login_failure",
+  TOKEN_GENERATED = "auth.token_generated",
+  
+  // Data Access
+  USER_DATA_ACCESSED = "data.user_accessed",
+  USER_DATA_DELETED = "data.user_deleted",
+}
+
+/**
+ * Interface for audit log entries in Firestore.
+ */
+interface AuditLogEntry {
+  id?: string;
+  timestamp: admin.firestore.FieldValue;
+  userId: string;
+  userRole: "master" | "child" | "admin";
+  action: AuditAction;
+  resource: string;
+  metadata: Record<string, unknown>;
+  ipAddress?: string;
+  userAgent?: string;
+  status: "success" | "failure";
+  errorMessage?: string;
+}
+
+/**
+ * Audit Logger utility class for logging security-critical operations.
+ */
+class AuditLogger {
+  private static async log(entry: Omit<AuditLogEntry, "id" | "timestamp">): Promise<void> {
+    try {
+      await db().collection("audit_logs").add({
+        ...entry,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      // Log to Cloud Functions Logger as fallback
+      functions.logger.error("Failed to write audit log:", {
+        entry,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  static async logSuccess(
+    userId: string,
+    userRole: "master" | "child" | "admin",
+    action: AuditAction,
+    resource: string,
+    metadata: Record<string, unknown> = {}
+  ): Promise<void> {
+    await this.log({
+      userId,
+      userRole,
+      action,
+      resource,
+      metadata,
+      status: "success",
+    });
+  }
+
+  static async logFailure(
+    userId: string,
+    userRole: "master" | "child" | "admin",
+    action: AuditAction,
+    resource: string,
+    error: Error,
+    metadata: Record<string, unknown> = {}
+  ): Promise<void> {
+    await this.log({
+      userId,
+      userRole,
+      action,
+      resource,
+      metadata,
+      status: "failure",
+      errorMessage: error.message,
+    });
+  }
+
+  static async logAuthEvent(
+    userId: string,
+    action: AuditAction,
+    success: boolean,
+    metadata: Record<string, unknown> = {}
+  ): Promise<void> {
+    await this.log({
+      userId,
+      userRole: (metadata.role as "master" | "child" | "admin") || "master",
+      action,
+      resource: "auth",
+      metadata,
+      status: success ? "success" : "failure",
+    });
+  }
+}
+
 // --- Admin Panel Functions ---
 
 /**
@@ -34,31 +161,67 @@ function requireAdmin(context: CallableContext): void {
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
     requireAdmin(context);
+    const adminId = context.auth?.uid || "unknown";
     
     const uid = data.uid;
     if (!uid) {
+        await AuditLogger.logFailure(
+            adminId,
+            "admin",
+            AuditAction.ADMIN_CLAIM_SET,
+            uid || "unknown",
+            new Error("Invalid uid"),
+            {}
+        );
         throw new functions.https.HttpsError("invalid-argument", "The function must be called with a user UID.");
     }
 
     try {
         await admin.auth().setCustomUserClaims(uid, { role: "admin" });
-        return { message: `Success! Custom claim 'admin' set for user ${uid}` };
+        
+        await AuditLogger.logSuccess(
+            adminId,
+            "admin",
+            AuditAction.ADMIN_CLAIM_SET,
+            uid,
+            { targetUser: uid }
+        );
+        
+        return { message: `Success! Custom claim "admin" set for user ${uid}` };
     } catch (error) {
         console.error("Error setting custom claim:", error);
+        
+        await AuditLogger.logFailure(
+            adminId,
+            "admin",
+            AuditAction.ADMIN_CLAIM_SET,
+            uid,
+            error as Error,
+            { targetUser: uid }
+        );
+        
         throw new functions.https.HttpsError("internal", "Failed to set admin claim.");
     }
 });
 
 /**
  * Cloud Function to revoke a subscription.
- * This function must be protected by the 'admin' custom claim.
+ * This function must be protected by the "admin" custom claim.
  */
 export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
     requireAdmin(context);
-  const adminUid = context.auth?.uid;
+  const adminUid = context.auth?.uid || "unknown";
 
     const subscriptionId = data.subscriptionId;
     if (!subscriptionId) {
+        await AuditLogger.logFailure(
+            adminUid,
+            "admin",
+            AuditAction.SUBSCRIPTION_REVOKED,
+            subscriptionId || "unknown",
+            new Error("Invalid subscriptionId"),
+            {}
+        );
         throw new functions.https.HttpsError("invalid-argument", "The function must be called with a subscriptionId.");
     }
 
@@ -66,6 +229,14 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
         // Read the subscription document first to get the masterId
         const subDoc = await admin.firestore().collection("subscriptions").doc(subscriptionId).get();
         if (!subDoc.exists) {
+            await AuditLogger.logFailure(
+                adminUid,
+                "admin",
+                AuditAction.SUBSCRIPTION_REVOKED,
+                subscriptionId,
+                new Error("Subscription not found"),
+                {}
+            );
             throw new functions.https.HttpsError("not-found", "Subscription not found.");
         }
         const masterId = subDoc.data()?.masterId;
@@ -83,9 +254,29 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
             });
         }
 
+        await AuditLogger.logSuccess(
+            adminUid,
+            "admin",
+            AuditAction.SUBSCRIPTION_REVOKED,
+            subscriptionId,
+            { masterId, subscriptionId }
+        );
+
         return { message: `Subscription ${subscriptionId} successfully revoked.` };
     } catch (error) {
         console.error("Error revoking subscription:", error);
+        
+        if (!(error instanceof functions.https.HttpsError)) {
+            await AuditLogger.logFailure(
+                adminUid,
+                "admin",
+                AuditAction.SUBSCRIPTION_REVOKED,
+                subscriptionId,
+                error as Error,
+                {}
+            );
+        }
+        
         throw new functions.https.HttpsError("internal", "Failed to revoke subscription.");
     }
 });
@@ -160,6 +351,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
   const childId = requireAuth(context);
 
   if (!pairingCode || typeof pairingCode !== "string") {
+    await AuditLogger.logFailure(
+      childId,
+      "child",
+      AuditAction.DEVICE_PAIRED,
+      childId,
+      new Error("Invalid pairingCode"),
+      { pairingCode }
+    );
     throw new functions.https.HttpsError(
       "invalid-argument",
       "The function must be called with a 'pairingCode' string."
@@ -173,6 +372,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
 
     if (!doc.exists) {
       functions.logger.warn(`Pairing code ${pairingCode} not found.`);
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        AuditAction.DEVICE_PAIRED,
+        childId,
+        new Error("Pairing code not found"),
+        { pairingCode }
+      );
       throw new functions.https.HttpsError(
         "not-found",
         "Invalid pairing code."
@@ -217,6 +424,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       functions.logger.info(`Pairing code ${pairingCode} has expired.`);
       await pairingCodeRef.delete();
       functions.logger.info(`Expired pairing code ${pairingCode} deleted.`);
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        AuditAction.DEVICE_PAIRED,
+        childId,
+        new Error("Pairing code expired"),
+        { pairingCode, masterId }
+      );
       throw new functions.https.HttpsError(
         "deadline-exceeded",
         "Pairing code has expired."
@@ -225,6 +440,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
 
     const masterDoc = await db().collection("masters").doc(masterId).get();
     if (!masterDoc.exists) {
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        AuditAction.DEVICE_PAIRED,
+        childId,
+        new Error("Master account not found"),
+        { pairingCode, masterId }
+      );
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
@@ -235,6 +458,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     if (!isPremium) {
       const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
       if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        await AuditLogger.logFailure(
+          childId,
+          "child",
+          AuditAction.DEVICE_PAIRED,
+          childId,
+          new Error("Free tier limit exceeded"),
+          { pairingCode, masterId }
+        );
         throw new functions.https.HttpsError(
           "resource-exhausted",
           "Free tier limited to 1 child device. Please upgrade to Premium."
@@ -253,6 +484,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     await pairingCodeRef.delete();
     functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
 
+    await AuditLogger.logSuccess(
+      childId,
+      "child",
+      AuditAction.DEVICE_PAIRED,
+      childId,
+      { masterId, pairingCode }
+    );
+
     return { childId: childId };
 
   } catch (error) {
@@ -262,6 +501,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     }
     
     functions.logger.error(`Unexpected error validating code ${pairingCode}:`, error);
+    await AuditLogger.logFailure(
+      childId,
+      "child",
+      AuditAction.DEVICE_PAIRED,
+      childId,
+      error as Error,
+      { pairingCode }
+    );
     throw new functions.https.HttpsError(
       "internal",
       "An unexpected error occurred while validating the pairing code.",
@@ -282,9 +529,25 @@ export const generateCustomToken = functions.https.onCall(
     try {
       const user = await admin.auth().getUser(uid);
       const customToken = await admin.auth().createCustomToken(uid, user.customClaims || {});
+      
+      await AuditLogger.logAuthEvent(
+        uid,
+        AuditAction.TOKEN_GENERATED,
+        true,
+        { role: user.customClaims?.role || "unknown" }
+      );
+      
       return { customToken };
     } catch (error) {
       functions.logger.error("Error generating custom token:", error);
+      
+      await AuditLogger.logAuthEvent(
+        uid,
+        AuditAction.TOKEN_GENERATED,
+        false,
+        { reason: error instanceof Error ? error.message : String(error) }
+      );
+      
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while generating the token.",
@@ -308,6 +571,14 @@ export const registerMasterDevice = functions.https.onCall(
     const masterId = requireAuth(context);
     const { imei } = data;
     if (!imei || typeof imei !== "string") {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.DEVICE_REGISTERED,
+        masterId,
+        new Error("Invalid imei"),
+        {}
+      );
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with a valid 'imei' string."
@@ -334,6 +605,15 @@ export const registerMasterDevice = functions.https.onCall(
     await admin.auth().setCustomUserClaims(masterId, { role: "master" });
 
     functions.logger.info(`Master account registered for uid: ${masterId}`);
+    
+    await AuditLogger.logSuccess(
+      masterId,
+      "master",
+      AuditAction.DEVICE_REGISTERED,
+      masterId,
+      { imei }
+    );
+    
     return { masterId: masterId };
 
   } catch (error) {
@@ -341,6 +621,16 @@ export const registerMasterDevice = functions.https.onCall(
       throw error;
     }
     functions.logger.error("Error registering master device:", error);
+    
+    await AuditLogger.logFailure(
+      masterId,
+      "master",
+      AuditAction.DEVICE_REGISTERED,
+      masterId,
+      error as Error,
+      { imei }
+    );
+    
     throw new functions.https.HttpsError(
       "internal",
       "An unexpected error occurred while registering the device.",
@@ -438,6 +728,14 @@ export const setDeviceLocked = functions.https.onCall(
       !childId || typeof childId !== "string" ||
       typeof isLocked !== "boolean"
     ) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        isLocked ? AuditAction.DEVICE_LOCKED : AuditAction.DEVICE_UNLOCKED,
+        childId || "unknown",
+        new Error("Invalid childId or isLocked"),
+        { isLocked }
+      );
       throw new functions.https.HttpsError(
         "invalid-argument",
         "Request must include valid 'childId' and 'isLocked' boolean."
@@ -447,12 +745,28 @@ export const setDeviceLocked = functions.https.onCall(
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        isLocked ? AuditAction.DEVICE_LOCKED : AuditAction.DEVICE_UNLOCKED,
+        childId,
+        new Error("Master account not found"),
+        { isLocked }
+      );
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        isLocked ? AuditAction.DEVICE_LOCKED : AuditAction.DEVICE_UNLOCKED,
+        childId,
+        new Error("Ownership verification failed"),
+        { isLocked, actualOwner: childDoc.data()?.masterImei }
+      );
       throw new functions.https.HttpsError(
         "permission-denied",
         "This master device is not authorized to control the specified child device."
@@ -460,16 +774,37 @@ export const setDeviceLocked = functions.https.onCall(
     }
 
     try {
+      const previousState = childDoc.data()?.isLocked;
+      
       await childDeviceRef.update({
         isLocked: isLocked,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       functions.logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
+      
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        isLocked ? AuditAction.DEVICE_LOCKED : AuditAction.DEVICE_UNLOCKED,
+        childId,
+        { previousState, newState: isLocked }
+      );
+      
       return { success: true, isLocked: isLocked };
 
     } catch (error) {
       functions.logger.error(`Failed to set lock state for child ${childId}:`, error);
+      
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        isLocked ? AuditAction.DEVICE_LOCKED : AuditAction.DEVICE_UNLOCKED,
+        childId,
+        error as Error,
+        { isLocked }
+      );
+      
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while updating the device lock state.",
@@ -550,6 +885,14 @@ export const setUsageRules = functions.https.onCall(
       !childId || typeof childId !== "string" ||
       typeof usageRules !== "object" || usageRules === null
     ) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.USAGE_RULES_UPDATED,
+        childId || "unknown",
+        new Error("Invalid childId or usageRules"),
+        {}
+      );
       throw new functions.https.HttpsError(
         "invalid-argument",
         "Request must include valid 'childId' and 'usageRules' object."
@@ -559,12 +902,28 @@ export const setUsageRules = functions.https.onCall(
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.USAGE_RULES_UPDATED,
+        childId,
+        new Error("Master account not found"),
+        {}
+      );
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.USAGE_RULES_UPDATED,
+        childId,
+        new Error("Ownership verification failed"),
+        { actualOwner: childDoc.data()?.masterImei }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
     }
 
@@ -574,9 +933,28 @@ export const setUsageRules = functions.https.onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
+      
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        AuditAction.USAGE_RULES_UPDATED,
+        childId,
+        { rulesUpdated: Object.keys(usageRules).length }
+      );
+      
       return { success: true };
     } catch (error) {
       functions.logger.error(`Failed to set usage rules for child ${childId}:`, error);
+      
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.USAGE_RULES_UPDATED,
+        childId,
+        error as Error,
+        {}
+      );
+      
       throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
     }
   }
@@ -842,32 +1220,82 @@ export const createTask = functions.https.onCall(
     const { childId, description, deadlineISO } = data;
 
     if (!childId || !description || !deadlineISO) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_CREATED,
+        childId || "unknown",
+        new Error("Missing required fields"),
+        {}
+      );
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_CREATED,
+        childId,
+        new Error("Master account not found"),
+        {}
+      );
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_CREATED,
+        childId,
+        new Error("Ownership verification failed"),
+        { actualOwner: childDoc.data()?.masterImei }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
     }
 
-    const taskRef = childDeviceRef.collection("tasks").doc();
-    await taskRef.set({
-      description: description,
-      deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
-      status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      masterImei: masterId, // Denormalize for easier querying
-    });
+    try {
+      const taskRef = childDeviceRef.collection("tasks").doc();
+      await taskRef.set({
+        description: description,
+        deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        masterImei: masterId, // Denormalize for easier querying
+      });
 
-    functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
-    return { success: true, taskId: taskRef.id };
+      functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
+      
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        AuditAction.TASK_CREATED,
+        taskRef.id,
+        { 
+          childId,
+          description: description.substring(0, 100),
+          deadline: deadlineISO
+        }
+      );
+      
+      return { success: true, taskId: taskRef.id };
+      
+    } catch (error) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_CREATED,
+        childId,
+        error as Error,
+        { description: description.substring(0, 100) }
+      );
+      throw error;
+    }
   }
 );
 
@@ -888,6 +1316,14 @@ export const completeTask = functions.https.onCall(
     const { taskId, photoUrl } = data;
 
     if (!taskId || !photoUrl) {
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        AuditAction.TASK_COMPLETED,
+        taskId || "unknown",
+        new Error("Missing required fields"),
+        {}
+      );
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
@@ -895,21 +1331,60 @@ export const completeTask = functions.https.onCall(
 
     const taskDoc = await taskRef.get();
     if (!taskDoc.exists) {
+        await AuditLogger.logFailure(
+          childId,
+          "child",
+          AuditAction.TASK_COMPLETED,
+          taskId,
+          new Error("Task not found"),
+          {}
+        );
         throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
     }
 
     const current = taskDoc.data() as any;
     if (current.status && current.status !== "pending") {
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        AuditAction.TASK_COMPLETED,
+        taskId,
+        new Error("Invalid task state transition"),
+        { currentStatus: current.status }
+      );
       throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
     }
-    await taskRef.update({
-      status: "pending_approval",
-      photoUrl: photoUrl,
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
-    return { success: true };
+    
+    try {
+      await taskRef.update({
+        status: "pending_approval",
+        photoUrl: photoUrl,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
+      
+      await AuditLogger.logSuccess(
+        childId,
+        "child",
+        AuditAction.TASK_COMPLETED,
+        taskId,
+        { photoUrl }
+      );
+      
+      return { success: true };
+      
+    } catch (error) {
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        AuditAction.TASK_COMPLETED,
+        taskId,
+        error as Error,
+        {}
+      );
+      throw error;
+    }
   }
 );
 
@@ -930,33 +1405,96 @@ export const approveTask = functions.https.onCall(
     const { childId, taskId } = data;
 
     if (!childId || !taskId) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId || "unknown",
+        new Error("Missing required fields"),
+        {}
+      );
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId,
+        new Error("Master account not found"),
+        {}
+      );
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId,
+        new Error("Ownership verification failed"),
+        { childId, actualOwner: childDoc.data()?.masterImei }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
     }
 
     const taskRef = childDeviceRef.collection("tasks").doc(taskId);
     const taskSnap = await taskRef.get();
     if (!taskSnap.exists) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId,
+        new Error("Task not found"),
+        { childId }
+      );
       throw new functions.https.HttpsError("not-found", "Task not found.");
     }
     const taskData = taskSnap.data() as any;
     if (taskData.status !== "pending_approval") {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId,
+        new Error("Invalid task state"),
+        { childId, currentStatus: taskData.status }
+      );
       throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
     }
-    await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
-    return { success: true };
+    
+    try {
+      await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
+      
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId,
+        { childId }
+      );
+      
+      return { success: true };
+      
+    } catch (error) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        AuditAction.TASK_APPROVED,
+        taskId,
+        error as Error,
+        { childId }
+      );
+      throw error;
+    }
   }
 );
 
@@ -1704,3 +2242,38 @@ export const provideSolutionFeedback = functions.https.onCall(async (data: { tic
     throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
   }
 });
+
+/**
+ * Scheduled function to clean up old audit logs.
+ * Runs on the 1st of every month at midnight UTC.
+ * Deletes logs older than 6 months in batches of 500.
+ */
+export const cleanupOldAuditLogs = functions.pubsub
+  .schedule("0 0 1 * *")
+  .timeZone("UTC")
+  .onRun(async (_context) => {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const oldLogsQuery = db()
+      .collection("audit_logs")
+      .where("timestamp", "<", admin.firestore.Timestamp.fromDate(sixMonthsAgo))
+      .limit(500); // Process in batches
+    
+    const snapshot = await oldLogsQuery.get();
+    
+    if (snapshot.empty) {
+      functions.logger.info("No old audit logs to delete");
+      return null;
+    }
+    
+    const batch = db().batch();
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    
+    functions.logger.info(`Deleted ${snapshot.size} audit logs older than 6 months`);
+    return null;
+  });
