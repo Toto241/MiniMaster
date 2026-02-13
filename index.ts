@@ -253,6 +253,7 @@ class AppError extends Error {
  * @param context - The callable context (may be null)
  * @param functionName - The name of the function where the error occurred
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handleError(
   error: Error,
   context: CallableContext | null,
@@ -2298,6 +2299,91 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
         return null;
     }
 });
+
+/**
+ * Scheduled Function: Send daily error report
+ * Runs daily at 9 AM Europe/Berlin timezone
+ * Aggregates all errors from the last 24 hours and logs a summary
+ */
+export const sendDailyErrorReport = functions.pubsub
+    .schedule("0 9 * * *") // Daily at 9 AM
+    .timeZone("Europe/Berlin")
+    .onRun(async (_context) => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        try {
+            // Aggregate errors from the last 24 hours
+            const errorSnapshot = await db()
+                .collection("error_logs")
+                .where("timestamp", ">=", yesterday.toISOString())
+                .where("timestamp", "<", today.toISOString())
+                .get();
+            
+            if (errorSnapshot.empty) {
+                functions.logger.info("Daily Error Report: No errors in the last 24 hours ✅");
+                return null;
+            }
+            
+            // Group errors by function
+            const errorsByFunction: Record<string, number> = {};
+            const errorsByType: Record<string, number> = {};
+            
+            errorSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                const functionName = data.functionName || "unknown";
+                const errorMessage = data.message || "unknown";
+                
+                errorsByFunction[functionName] = (errorsByFunction[functionName] || 0) + 1;
+                errorsByType[errorMessage] = (errorsByType[errorMessage] || 0) + 1;
+            });
+            
+            // Sort by count
+            const sortedFunctions = Object.entries(errorsByFunction)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 10); // Top 10
+            
+            const sortedErrors = Object.entries(errorsByType)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 5); // Top 5
+            
+            // Build report
+            const report = `
+╔════════════════════════════════════════════════════════════════
+║ Daily Error Report - ${today.toDateString()}
+╠════════════════════════════════════════════════════════════════
+║ Total Errors: ${errorSnapshot.size}
+║
+║ Top Errors by Function:
+${sortedFunctions.map(([name, count]) => "║   - " + name + ": " + count).join("\n")}
+║
+║ Top Error Messages:
+${sortedErrors.map(([msg, count]) => "║   - " + msg.substring(0, 60) + "...: " + count).join("\n")}
+╚════════════════════════════════════════════════════════════════
+            `;
+            
+            functions.logger.warn(report);
+            
+            // Optional: Store summary for dashboard
+            await db().collection("error_summaries").add({
+                date: today,
+                totalErrors: errorSnapshot.size,
+                errorsByFunction,
+                errorsByType,
+                generatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            
+            return null;
+            
+        } catch (error) {
+            functions.logger.error("Failed to generate daily error report:", error);
+            return null;
+        }
+    });
 
 
 // ==================== AI-POWERED SUPPORT AGENT ====================
