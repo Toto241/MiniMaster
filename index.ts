@@ -8,6 +8,28 @@ import { v4 as uuidv4 } from "uuid";
 import { google } from "googleapis";
 import { db } from "./firebase";
 
+// --- Audit Logging Interfaces ---
+
+/**
+ * Interface for audit log entries in Firestore.
+ * Used for GDPR compliance and security monitoring.
+ */
+interface AuditLogEntry {
+  timestamp: admin.firestore.FieldValue;
+  userId: string;
+  userRole: string;
+  action: string;
+  resource: string;
+  resourceId: string;
+  metadata?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+  result: "success" | "failure";
+  errorMessage?: string;
+}
+
+// --- Helper Functions ---
+
 function requireAuth(context: CallableContext): string {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
@@ -18,6 +40,132 @@ function requireAuth(context: CallableContext): string {
 function requireAdmin(context: CallableContext): void {
   if (!context.auth || context.auth.token.role !== "admin") {
     throw new functions.https.HttpsError("permission-denied", "Admin privileges required.");
+  }
+}
+
+// --- Audit Logging System ---
+
+/**
+ * AuditLogger class for recording all critical actions in the system.
+ * Writes audit logs to Firestore for compliance (GDPR) and security monitoring.
+ * Includes fallback to console logging if Firestore writes fail.
+ */
+class AuditLogger {
+  /**
+   * Writes an audit log entry to Firestore.
+   * @param entry - The audit log entry (without timestamp)
+   */
+  static async log(entry: Omit<AuditLogEntry, "timestamp">): Promise<void> {
+    try {
+      await db().collection("audit_logs").add({
+        ...entry,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      // Fallback to console.error if Firestore fails
+      functions.logger.error("Failed to write audit log", {
+        entry,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Logs a successful action.
+   */
+  static async logSuccess(
+    userId: string,
+    userRole: string,
+    action: string,
+    resource: string,
+    resourceId: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.log({
+      userId,
+      userRole,
+      action,
+      resource,
+      resourceId,
+      metadata,
+      result: "success",
+    });
+  }
+
+  /**
+   * Logs a failed action.
+   */
+  static async logFailure(
+    userId: string | null,
+    userRole: string | null,
+    action: string,
+    resource: string,
+    resourceId: string,
+    errorMessage: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.log({
+      userId: userId || "anonymous",
+      userRole: userRole || "unknown",
+      action,
+      resource,
+      resourceId,
+      metadata,
+      result: "failure",
+      errorMessage,
+    });
+  }
+}
+
+// --- Performance Monitoring System ---
+
+/**
+ * PerformanceMonitor class for tracking function execution times.
+ * Logs performance metrics and warns about slow functions.
+ */
+class PerformanceMonitor {
+  /**
+   * Wraps a function to track its execution time.
+   * @param functionName - Name of the function being tracked
+   * @param operation - The async operation to track
+   */
+  static async trackFunction<T>(
+    functionName: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const startTime = Date.now();
+    
+    try {
+      const result = await operation();
+      const duration = Date.now() - startTime;
+      
+      // Log performance metrics
+      functions.logger.info(`Performance: ${functionName}`, {
+        functionName,
+        duration,
+        status: "success",
+      });
+      
+      // Warn if function takes more than 5 seconds
+      if (duration > 5000) {
+        functions.logger.warn(`Slow function detected: ${functionName}`, {
+          duration,
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      functions.logger.error(`Performance: ${functionName} (failed)`, {
+        functionName,
+        duration,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      
+      throw error;
+    }
   }
 }
 
@@ -105,14 +253,14 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
 export const createPairingCode = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
   const masterId = requireAuth(context);
 
-  const pairingCodesRef = db().collection("pairingCodes");
-  const maxAttempts = 10; // Verhindert eine Endlosschleife
+  try {
+    const pairingCodesRef = db().collection("pairingCodes");
+    const maxAttempts = 10; // Verhindert eine Endlosschleife
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
 
-    try {
       const doc = await pairingCodeDocRef.get();
       if (!doc.exists) {
         const now = admin.firestore.Timestamp.now();
@@ -126,22 +274,46 @@ export const createPairingCode = functions.https.onCall(async (_data: Record<str
         });
 
         functions.logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
+
+        await AuditLogger.logSuccess(
+          masterId,
+          "master",
+          "PAIRING_CODE_CREATED",
+          "pairingCode",
+          pairingCode,
+          { expiresAt: new Date(expiresAt.seconds * 1000).toISOString() } // Convert Timestamp to ISO string
+        );
+
         return { pairingCode: pairingCode };
       }
-    } catch (error) {
-      functions.logger.error("Error checking for pairing code uniqueness:", error);
-      throw new functions.https.HttpsError(
-        "internal",
-        "An unexpected error occurred while creating the pairing code.",
-        error
-      );
     }
-  }
 
-  throw new functions.https.HttpsError(
-    "resource-exhausted",
-    "Could not create a unique pairing code. Please try again later."
-  );
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Could not create a unique pairing code. Please try again later."
+    );
+  } catch (error) {
+    await AuditLogger.logFailure(
+      masterId,
+      "master",
+      "PAIRING_CODE_CREATED",
+      "pairingCode",
+      masterId,
+      error instanceof Error ? error.message : String(error)
+    );
+
+    functions.logger.error("Error creating pairing code:", error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      "internal",
+      "An unexpected error occurred while creating the pairing code.",
+      error
+    );
+  }
 });
 
 /**
@@ -253,9 +425,28 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     await pairingCodeRef.delete();
     functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
 
+    await AuditLogger.logSuccess(
+      masterId,
+      "master",
+      "DEVICE_PAIRED",
+      "child",
+      childId,
+      { pairingCode, isPremium }
+    );
+
     return { childId: childId };
 
   } catch (error) {
+    await AuditLogger.logFailure(
+      masterId,
+      "master",
+      "DEVICE_PAIRED",
+      "child",
+      childId,
+      error instanceof Error ? error.message : String(error),
+      { pairingCode }
+    );
+
     if (error instanceof functions.https.HttpsError) {
         functions.logger.warn(`Validation failed for code ${pairingCode}:`, error.message, error.code, error.details);
         throw error;
@@ -434,42 +625,71 @@ export const setDeviceLocked = functions.https.onCall(
     const masterId = requireAuth(context);
     const { childId, isLocked } = data;
 
-    if (
-      !childId || typeof childId !== "string" ||
-      typeof isLocked !== "boolean"
-    ) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Request must include valid 'childId' and 'isLocked' boolean."
-      );
-    }
-
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
-
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "This master device is not authorized to control the specified child device."
-      );
-    }
-
     try {
+      if (
+        !childId || typeof childId !== "string" ||
+        typeof isLocked !== "boolean"
+      ) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Request must include valid 'childId' and 'isLocked' boolean."
+        );
+      }
+
+      const masterDeviceRef = db().collection("masters").doc(masterId);
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+
+      const childDeviceRef = db().collection("children").doc(childId);
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "This master device is not authorized to control the specified child device."
+        );
+      }
+
+      const previousState = childDoc.data()?.isLocked;
+
       await childDeviceRef.update({
         isLocked: isLocked,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       functions.logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
+
+      // Audit log success
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "DEVICE_LOCK_CHANGED",
+        "child",
+        childId,
+        { isLocked, previousState }
+      );
+
       return { success: true, isLocked: isLocked };
 
     } catch (error) {
+      // Audit log failure
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        "DEVICE_LOCK_CHANGED",
+        "child",
+        childId,
+        error instanceof Error ? error.message : String(error),
+        { isLocked }
+      );
+
       functions.logger.error(`Failed to set lock state for child ${childId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while updating the device lock state.",
@@ -495,37 +715,69 @@ export const updateAppBlacklist = functions.https.onCall(
     const masterId = requireAuth(context);
     const { childId, appBlacklist } = data;
 
-    if (
-      !childId || typeof childId !== "string" ||
-      !Array.isArray(appBlacklist)
-    ) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Request must include valid 'childId' and 'appBlacklist' array."
-      );
-    }
-
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
-
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
-    }
-
     try {
+      if (
+        !childId || typeof childId !== "string" ||
+        !Array.isArray(appBlacklist)
+      ) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Request must include valid 'childId' and 'appBlacklist' array."
+        );
+      }
+
+      const masterDeviceRef = db().collection("masters").doc(masterId);
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+
+      const childDeviceRef = db().collection("children").doc(childId);
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
+      }
+
+      const previousBlacklist = childDoc.data()?.appBlacklist || [];
+
       await childDeviceRef.update({
         appBlacklist: appBlacklist,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       functions.logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
+
+      // Audit log success
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "BLACKLIST_UPDATED",
+        "child",
+        childId,
+        { 
+          appCount: appBlacklist.length, 
+          previousCount: previousBlacklist.length 
+        }
+      );
+
       return { success: true };
     } catch (error) {
+      // Audit log failure
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        "BLACKLIST_UPDATED",
+        "child",
+        childId,
+        error instanceof Error ? error.message : String(error),
+        { appCount: appBlacklist?.length }
+      );
+
       functions.logger.error(`Failed to update blacklist for child ${childId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
       throw new functions.https.HttpsError("internal", "Failed to update app blacklist.", error);
     }
   }
@@ -546,37 +798,65 @@ export const setUsageRules = functions.https.onCall(
   async (data: { childId: string; usageRules: object }, context: CallableContext) => {
     const masterId = requireAuth(context);
     const { childId, usageRules } = data;
-    if (
-      !childId || typeof childId !== "string" ||
-      typeof usageRules !== "object" || usageRules === null
-    ) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Request must include valid 'childId' and 'usageRules' object."
-      );
-    }
-
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
-
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
-    }
 
     try {
+      if (
+        !childId || typeof childId !== "string" ||
+        typeof usageRules !== "object" || usageRules === null
+      ) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Request must include valid 'childId' and 'usageRules' object."
+        );
+      }
+
+      const masterDeviceRef = db().collection("masters").doc(masterId);
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+
+      const childDeviceRef = db().collection("children").doc(childId);
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
+      }
+
+      const previousRules = childDoc.data()?.usageRules;
+
       await childDeviceRef.update({
         usageRules: usageRules,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
+
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "USAGE_RULES_UPDATED",
+        "child",
+        childId,
+        { usageRules, previousRules }
+      );
+
       return { success: true };
     } catch (error) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        "USAGE_RULES_UPDATED",
+        "child",
+        childId,
+        error instanceof Error ? error.message : String(error),
+        { usageRules }
+      );
+
       functions.logger.error(`Failed to set usage rules for child ${childId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
       throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
     }
   }
@@ -841,33 +1121,63 @@ export const createTask = functions.https.onCall(
     const masterId = requireAuth(context);
     const { childId, description, deadlineISO } = data;
 
-    if (!childId || !description || !deadlineISO) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    try {
+      if (!childId || !description || !deadlineISO) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+      }
+
+      const masterDeviceRef = db().collection("masters").doc(masterId);
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+
+      const childDeviceRef = db().collection("children").doc(childId);
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+      }
+
+      const taskRef = childDeviceRef.collection("tasks").doc();
+      await taskRef.set({
+        description: description,
+        deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        masterImei: masterId, // Denormalize for easier querying
+      });
+
+      functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
+
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "TASK_CREATED",
+        "task",
+        taskRef.id,
+        { childId, description, deadlineISO }
+      );
+
+      return { success: true, taskId: taskRef.id };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        "TASK_CREATED",
+        "task",
+        childId,
+        error instanceof Error ? error.message : String(error),
+        { description, deadlineISO }
+      );
+
+      functions.logger.error(`Failed to create task for child ${childId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
+      throw new functions.https.HttpsError("internal", "Failed to create task.", error);
     }
-
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
-
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
-    }
-
-    const taskRef = childDeviceRef.collection("tasks").doc();
-    await taskRef.set({
-      description: description,
-      deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
-      status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      masterImei: masterId, // Denormalize for easier querying
-    });
-
-    functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
-    return { success: true, taskId: taskRef.id };
   }
 );
 
@@ -887,29 +1197,60 @@ export const completeTask = functions.https.onCall(
     const childId = requireAuth(context);
     const { taskId, photoUrl } = data;
 
-    if (!taskId || !photoUrl) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
+    try {
+      if (!taskId || !photoUrl) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+      }
 
-    const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
+      const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
 
-    const taskDoc = await taskRef.get();
-    if (!taskDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
-    }
+      const taskDoc = await taskRef.get();
+      if (!taskDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
+      }
 
-    const current = taskDoc.data() as any;
-    if (current.status && current.status !== "pending") {
-      throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
+      const current = taskDoc.data() as any;
+      if (current.status && current.status !== "pending") {
+        throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
+      }
+
+      await taskRef.update({
+        status: "pending_approval",
+        photoUrl: photoUrl,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
+
+      await AuditLogger.logSuccess(
+        childId,
+        "child",
+        "TASK_COMPLETED",
+        "task",
+        taskId,
+        { photoUrl, previousStatus: current.status, description: current.description }
+      );
+
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        childId,
+        "child",
+        "TASK_COMPLETED",
+        "task",
+        taskId,
+        error instanceof Error ? error.message : String(error),
+        { photoUrl }
+      );
+
+      functions.logger.error(`Failed to complete task ${taskId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
+      throw new functions.https.HttpsError("internal", "Failed to complete task.", error);
     }
-    await taskRef.update({
-      status: "pending_approval",
-      photoUrl: photoUrl,
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
-    return { success: true };
   }
 );
 
@@ -929,34 +1270,65 @@ export const approveTask = functions.https.onCall(
     const masterId = requireAuth(context);
     const { childId, taskId } = data;
 
-    if (!childId || !taskId) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
+    try {
+      if (!childId || !taskId) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+      }
 
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
+      const masterDeviceRef = db().collection("masters").doc(masterId);
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
 
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
-    }
+      const childDeviceRef = db().collection("children").doc(childId);
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+      }
 
-    const taskRef = childDeviceRef.collection("tasks").doc(taskId);
-    const taskSnap = await taskRef.get();
-    if (!taskSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "Task not found.");
+      const taskRef = childDeviceRef.collection("tasks").doc(taskId);
+      const taskSnap = await taskRef.get();
+      if (!taskSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Task not found.");
+      }
+      const taskData = taskSnap.data() as any;
+      if (taskData.status !== "pending_approval") {
+        throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
+      }
+
+      await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
+
+      await AuditLogger.logSuccess(
+        masterId,
+        "master",
+        "TASK_APPROVED",
+        "task",
+        taskId,
+        { childId, description: taskData.description, photoUrl: taskData.photoUrl }
+      );
+
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        masterId,
+        "master",
+        "TASK_APPROVED",
+        "task",
+        taskId,
+        error instanceof Error ? error.message : String(error),
+        { childId }
+      );
+
+      functions.logger.error(`Failed to approve task ${taskId}:`, error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
+      throw new functions.https.HttpsError("internal", "Failed to approve task.", error);
     }
-    const taskData = taskSnap.data() as any;
-    if (taskData.status !== "pending_approval") {
-      throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
-    }
-    await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
-    return { success: true };
   }
 );
 
