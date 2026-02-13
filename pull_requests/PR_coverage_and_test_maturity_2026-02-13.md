@@ -36,17 +36,17 @@ Diese Änderung stabilisiert die Backend-Qualitätssicherung vollständig:
 
 ## Ergebnis / Metriken
 - Test-Suites: **8/8 passed**
-- Tests: **55/55 passed**
+- Tests: **58/58 passed**
 - Coverage gesamt:
-  - Statements: **67.36%**
-  - Branches: **57.22%**
+  - Statements: **68.56%**
+  - Branches: **58.40%**
   - Functions: **81.81%**
-  - Lines: **67.12%**
+  - Lines: **68.34%**
 - Coverage `index.ts`:
-  - Statements: **66.56%**
-  - Branches: **56.62%**
+  - Statements: **67.79%**
+  - Branches: **57.83%**
   - Functions: **80.00%**
-  - Lines: **66.61%**
+  - Lines: **67.85%**
 
 ## Verifikation (lokal)
 - `npm run lint`

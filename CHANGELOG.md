@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed strict null-safety issue in `revokeSubscription` (`index.ts`) for `context.auth` handling.
 - Resolved historical failing test assumptions based on legacy payload authentication fields.
 
+### Security
+- Removed committed Firebase app config files (`masterApp/google-services.json`, `childApp/google-services.json`) from the repository.
+- Added git protection rules to prevent future commits of `google-services.json` and `GoogleService-Info.plist`.
+- Added safe template placeholders (`google-services.template.json`) for local setup guidance.
+
 ### Quality
 - Achieved green backend verification gates:
   - `npm run lint`
