@@ -8,11 +8,68 @@ import { v4 as uuidv4 } from "uuid";
 import { google } from "googleapis";
 import { db } from "./firebase";
 
-function requireAuth(context: CallableContext): string {
+// --- Validation Utilities ---
+
+/**
+ * Validation utilities for input data
+ */
+class ValidationUtils {
+  /**
+   * Validates IMEI format (15 digits)
+   */
+  static isValidIMEI(imei: string): boolean {
+    return typeof imei === "string" && /^\d{15}$/.test(imei);
+  }
+
+  /**
+   * Validates child ID format (any non-empty string for now, can be IMEI or other ID)
+   */
+  static isValidChildId(childId: string): boolean {
+    return typeof childId === "string" && childId.length > 0;
+  }
+}
+
+// --- Auth Helper Functions ---
+
+/**
+ * Requires authentication and optionally validates role
+ * @param context CallableContext from the function call
+ * @param allowedRoles Optional array of allowed roles (e.g., ["master", "admin"])
+ * @returns The authenticated user's UID
+ */
+function requireAuth(context: CallableContext, allowedRoles?: string[]): string {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
   }
-  return context.auth.uid;
+  
+  const userId = context.auth.uid;
+  const userRole = context.auth.token.role as string | undefined;
+  
+  // Optional: Check if role is allowed
+  if (allowedRoles && allowedRoles.length > 0) {
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        `This operation requires one of the following roles: ${allowedRoles.join(", ")}`
+      );
+    }
+  }
+  
+  return userId;
+}
+
+/**
+ * Requires authentication with "master" role
+ */
+function requireMaster(context: CallableContext): string {
+  return requireAuth(context, ["master"]);
+}
+
+/**
+ * Requires authentication with "child" role
+ */
+function requireChild(context: CallableContext): string {
+  return requireAuth(context, ["child"]);
 }
 
 function requireAdmin(context: CallableContext): void {
@@ -274,8 +331,9 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
 /**
  * Issues a fresh Firebase custom token for the currently authenticated user.
  * Use this to rotate tokens or refresh claims after role updates.
+ * @deprecated Use refreshCustomToken instead
  */
-export const generateCustomToken = functions.https.onCall(
+export const refreshCustomToken = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     const uid = requireAuth(context);
 
@@ -285,6 +343,179 @@ export const generateCustomToken = functions.https.onCall(
       return { customToken };
     } catch (error) {
       functions.logger.error("Error generating custom token:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while generating the token.",
+        error
+      );
+    }
+  }
+);
+
+/**
+ * Bootstrap function: Generate Custom Token for Master Devices
+ * This allows clients to transition from secretKey auth to Firebase Auth.
+ * Once authenticated, clients should use Firebase Auth tokens for subsequent calls.
+ * 
+ * @param data Object containing masterImei and secretKey
+ * @returns Promise with customToken
+ */
+export const generateCustomToken = functions.https.onCall(
+  async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
+    const { masterImei, secretKey } = data;
+    
+    // Validation
+    if (!ValidationUtils.isValidIMEI(masterImei)) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid IMEI format. IMEI must be 15 digits.");
+    }
+    
+    if (!secretKey || typeof secretKey !== "string" || secretKey.length < 32) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid secretKey format.");
+    }
+    
+    // Verify secretKey from Firestore
+    const masterRef = db().collection("masters").doc(masterImei);
+    const masterDoc = await masterRef.get();
+    
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master device not found.");
+    }
+    
+    const storedSecretKey = masterDoc.data()?.secretKey;
+    
+    if (storedSecretKey !== secretKey) {
+      functions.logger.warn(`Failed login attempt for master ${masterImei}: Invalid secretKey`);
+      throw new functions.https.HttpsError("permission-denied", "Invalid credentials.");
+    }
+    
+    try {
+      // Create or get Firebase Auth user for this IMEI
+      let uid: string;
+      try {
+        const user = await admin.auth().getUser(masterImei);
+        uid = user.uid;
+      } catch (_error) {
+        // User doesn't exist, create one
+        const newUser = await admin.auth().createUser({
+          uid: masterImei,
+          disabled: false,
+        });
+        uid = newUser.uid;
+        
+        // Set custom claims
+        await admin.auth().setCustomUserClaims(uid, {
+          role: "master",
+          imei: masterImei
+        });
+        
+        functions.logger.info(`Created Firebase Auth user for master ${masterImei}`);
+      }
+      
+      // Ensure user has correct role claim
+      const user = await admin.auth().getUser(uid);
+      if (!user.customClaims?.role) {
+        await admin.auth().setCustomUserClaims(uid, {
+          role: "master",
+          imei: masterImei
+        });
+      }
+      
+      // Generate Custom Token with role claim
+      const customToken = await admin.auth().createCustomToken(masterImei, {
+        role: "master",
+        imei: masterImei
+      });
+      
+      functions.logger.info(`Generated custom token for master ${masterImei}`);
+      return { customToken };
+      
+    } catch (error) {
+      functions.logger.error(`Error generating custom token for master ${masterImei}:`, error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An unexpected error occurred while generating the token.",
+        error
+      );
+    }
+  }
+);
+
+/**
+ * Bootstrap function: Generate Custom Token for Child Devices
+ * Allows child devices to authenticate using their child IMEI.
+ * The child must already be paired with a master device.
+ * 
+ * @param data Object containing childImei
+ * @returns Promise with customToken
+ */
+export const generateChildToken = functions.https.onCall(
+  async (data: { childImei: string }, _context: CallableContext) => {
+    const { childImei } = data;
+    
+    // Validation
+    if (!ValidationUtils.isValidIMEI(childImei)) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid IMEI format. IMEI must be 15 digits.");
+    }
+    
+    // Verify child exists and is paired
+    const childRef = db().collection("children").doc(childImei);
+    const childDoc = await childRef.get();
+    
+    if (!childDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Child device not found. Please pair with a master device first.");
+    }
+    
+    const childData = childDoc.data();
+    const masterImei = childData?.masterImei;
+    
+    if (!masterImei) {
+      functions.logger.error(`DATA_CORRUPTION Child ${childImei} exists but has no masterImei field`);
+      throw new functions.https.HttpsError("internal", "Child device data is corrupted.");
+    }
+    
+    try {
+      // Create or get Firebase Auth user for this child
+      let uid: string;
+      try {
+        const user = await admin.auth().getUser(childImei);
+        uid = user.uid;
+      } catch (_error) {
+        // User doesn't exist, create one
+        const newUser = await admin.auth().createUser({
+          uid: childImei,
+          disabled: false,
+        });
+        uid = newUser.uid;
+        
+        // Set custom claims
+        await admin.auth().setCustomUserClaims(uid, {
+          role: "child",
+          masterImei: masterImei
+        });
+        
+        functions.logger.info(`Created Firebase Auth user for child ${childImei}`);
+      }
+      
+      // Ensure user has correct role claim
+      const user = await admin.auth().getUser(uid);
+      if (!user.customClaims?.role) {
+        await admin.auth().setCustomUserClaims(uid, {
+          role: "child",
+          masterImei: masterImei
+        });
+      }
+      
+      // Generate Custom Token with child role
+      const customToken = await admin.auth().createCustomToken(childImei, {
+        role: "child",
+        masterImei: masterImei
+      });
+      
+      functions.logger.info(`Generated custom token for child ${childImei}`);
+      return { customToken };
+      
+    } catch (error) {
+      functions.logger.error(`Error generating custom token for child ${childImei}:`, error);
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while generating the token.",
