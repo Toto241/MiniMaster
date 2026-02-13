@@ -54,8 +54,8 @@ class TaskRepository @Inject constructor(
             .collection("children")
             .document(childId)
             .collection("tasks")
-            .whereIn("status", listOf(TaskStatus.ASSIGNED.value, TaskStatus.SUBMITTED.value, TaskStatus.REJECTED.value))
-            .orderBy("assignedAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .whereIn("status", listOf(TaskStatus.PENDING.value, TaskStatus.PENDING_APPROVAL.value, TaskStatus.REJECTED.value))
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(1)
 
         val subscription = taskQuery.addSnapshotListener { snapshot, e ->
@@ -74,19 +74,21 @@ class TaskRepository @Inject constructor(
     /**
      * Calls the Cloud Function to submit a proof for a specific task.
      *
+     * @param childImei The child device's unique identifier.
      * @param taskId The ID of the task.
-     * @param proofUrl The URL of the uploaded proof image.
+     * @param photoUrl The URL of the uploaded proof image.
      * @return True if the submission was successful, false otherwise.
      */
-    suspend fun submitTaskProof(taskId: String, proofUrl: String): Boolean {
+    suspend fun submitTaskProof(childImei: String, taskId: String, photoUrl: String): Boolean {
         val data = hashMapOf(
+            "childImei" to childImei,
             "taskId" to taskId,
-            "proofUrl" to proofUrl
+            "photoUrl" to photoUrl
         )
 
         return try {
             functions
-                .getHttpsCallable("submitTaskProof")
+                .getHttpsCallable("completeTask")
                 .call(data)
                 .await()
             true

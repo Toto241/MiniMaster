@@ -23,6 +23,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * An [AccessibilityService] for monitoring foreground applications and implementing app blocking.
@@ -37,7 +39,7 @@ import java.util.Calendar
  */
 class MiniMasterAccessibilityService : AccessibilityService() {
 
-    private var currentTaskStatus: TaskStatus = TaskStatus.ASSIGNED
+    private var currentTaskStatus: TaskStatus = TaskStatus.PENDING
     private var unlockEndTime: Long = 0 // System.currentTimeMillis() + unlockDuration in ms
 
     /**
@@ -50,7 +52,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                 val statusString = intent.getStringExtra("task_status")
                 val unlockDuration = intent.getLongExtra("unlock_duration", 0)
 
-                currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.ASSIGNED.value)
+                currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.PENDING.value)
 
                 if (currentTaskStatus == TaskStatus.APPROVED && unlockDuration > 0) {
                     // Start the timer for unlocking
@@ -141,19 +143,6 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         stopAppMonitoring()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        unregisterReceiver(taskStatusReceiver)
-        // Save final stats on destroy
-        getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
-            .edit()
-            .putLong("current_day_usage", currentDayUsageMillis)
-            .apply()
-        stopAppMonitoring()
-        serviceScope.cancel()
-        Log.d(TAG, "MiniMasterAccessibilityService destroyed.")
-    }
-
     /**
      * Starts the periodic check runnable.
      */
@@ -215,9 +204,9 @@ class MiniMasterAccessibilityService : AccessibilityService() {
 
         // 1. Task-based blocking logic (Highest Priority)
         if (isTaskLockActive()) {
-            // If a task is assigned or rejected AND the timer has expired (or never started),
-            // launch the LockScreen Activity.
-            val lockIntent = Intent(this, LockScreen::class.java).apply {
+            // If a task is pending or rejected AND the timer has expired (or never started),
+            // launch the MainActivity with lock screen intent.
+            val lockIntent = Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 putExtra("lock_reason", "task_lock")
             }
@@ -273,6 +262,19 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             Log.i(TAG, "App usage logged: $packageName")
             // In a real app, this would call a function to send data to a backend.
         }
+    }
+
+    /**
+     * Checks whether the device should be task-locked.
+     * Returns true if there is a pending or rejected task and no active unlock period.
+     */
+    private fun isTaskLockActive(): Boolean {
+        // If the task is approved and we're within the unlock window, not locked
+        if (currentTaskStatus == TaskStatus.APPROVED && unlockEndTime > System.currentTimeMillis()) {
+            return false
+        }
+        // If the task is pending or rejected, the device should be locked
+        return currentTaskStatus == TaskStatus.PENDING || currentTaskStatus == TaskStatus.REJECTED
     }
 
     /**
@@ -380,6 +382,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     }
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(taskStatusReceiver)
         // Save final stats on destroy
         getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
             .edit()

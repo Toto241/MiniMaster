@@ -92,16 +92,17 @@ fun TaskItem(task: Task, onCompleteClick: () -> Unit) {
                     text = "Status: $displayStatus",
                     style = MaterialTheme.typography.caption,
                     color = when (task.status) {
-                        "ASSIGNED" -> Color.Red
-                        "SUBMITTED" -> Color(0xFFFFA500) // Orange
-                        "APPROVED" -> Color.Green
+                        "pending" -> Color.Red
+                        "pending_approval" -> Color(0xFFFFA500) // Orange
+                        "approved" -> Color.Green
+                        "rejected" -> Color.Red
                         else -> Color.Gray
                     },
                     fontWeight = FontWeight.Bold
                 )
             }
-            // Show complete button only if status is ASSIGNED (or pending logic)
-            if (task.status == "ASSIGNED") {
+            // Show complete button only if status is pending
+            if (task.status == "pending") {
                 Button(onClick = onCompleteClick) {
                     Text("Complete")
                 }
