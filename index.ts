@@ -8,6 +8,140 @@ import { v4 as uuidv4 } from "uuid";
 import { google } from "googleapis";
 import { db } from "./firebase";
 
+// ==================== VALIDATION UTILITIES ====================
+
+/**
+ * Utility functions for input validation and sanitization.
+ * Used to protect against invalid data, injection attacks, and ensure data integrity.
+ */
+const ValidationUtils = {
+  /**
+   * Validates IMEI format (exactly 15 digits)
+   */
+  isValidIMEI: (imei: string): boolean => {
+    return /^[0-9]{15}$/.test(imei);
+  },
+
+  /**
+   * Validates email format (RFC 5322 compliant)
+   */
+  isValidEmail: (email: string): boolean => {
+    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+  },
+
+  /**
+   * Validates child ID format (IMEI or UUID)
+   */
+  isValidChildId: (childId: string): boolean => {
+    // IMEI (15 digits) or UUID format
+    return /^[0-9]{15}$/.test(childId) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(childId);
+  },
+
+  /**
+   * Sanitizes string input by trimming to max length and removing potentially dangerous characters
+   */
+  sanitizeString: (input: string, maxLength: number = 1000): string => {
+    if (!input || typeof input !== "string") {
+      return "";
+    }
+    return input.slice(0, maxLength).replace(/[<>]/g, "");
+  },
+
+  /**
+   * Validates pairing code format (exactly 6 digits)
+   */
+  isValidPairingCode: (code: string): boolean => {
+    return /^[0-9]{6}$/.test(code);
+  },
+
+  /**
+   * Validates UUID format
+   */
+  isValidUUID: (uuid: string): boolean => {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
+  },
+
+  /**
+   * Validates that a string is non-empty and within length bounds
+   */
+  isValidString: (str: string, minLength: number = 1, maxLength: number = 1000): boolean => {
+    return typeof str === "string" && str.trim().length >= minLength && str.length <= maxLength;
+  },
+};
+
+// ==================== RATE LIMITING ====================
+
+/**
+ * Rate limit configuration per Cloud Function.
+ * Controls how many requests a user can make within a time window.
+ */
+interface RateLimitConfig {
+  maxRequests: number;  // Maximum number of requests allowed
+  windowMs: number;     // Time window in milliseconds
+}
+
+const RateLimits: { [key: string]: RateLimitConfig } = {
+  setDeviceLocked: { maxRequests: 10, windowMs: 60000 },      // 10 calls/min
+  createTask: { maxRequests: 5, windowMs: 60000 },            // 5 calls/min
+  validatePairingCode: { maxRequests: 3, windowMs: 300000 },  // 3 calls/5min
+  validatePairingToken: { maxRequests: 3, windowMs: 300000 }, // 3 calls/5min
+  completePairing: { maxRequests: 3, windowMs: 300000 },      // 3 calls/5min
+  default: { maxRequests: 20, windowMs: 60000 },              // 20 calls/min default
+};
+
+/**
+ * Checks if a user has exceeded the rate limit for a specific function.
+ * Uses Firestore to track request timestamps per user per function.
+ * 
+ * @param userId - The ID of the user making the request
+ * @param functionName - The name of the Cloud Function being called
+ * @throws {functions.https.HttpsError} Throws resource-exhausted error if rate limit exceeded
+ */
+async function checkRateLimit(
+  userId: string,
+  functionName: string
+): Promise<void> {
+  const config = RateLimits[functionName] || RateLimits.default;
+  const now = Date.now();
+  const windowStart = now - config.windowMs;
+
+  const rateLimitRef = db()
+    .collection("rate_limits")
+    .doc(userId)
+    .collection("calls")
+    .doc(functionName);
+
+  try {
+    const doc = await rateLimitRef.get();
+    const data = doc.data() || { calls: [], window: windowStart };
+
+    // Filter out calls outside the current time window
+    const recentCalls = (data.calls || []).filter((timestamp: number) => timestamp > windowStart);
+
+    if (recentCalls.length >= config.maxRequests) {
+      const waitTimeSeconds = Math.ceil((recentCalls[0] + config.windowMs - now) / 1000);
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        `Rate limit exceeded. Max ${config.maxRequests} requests per ${config.windowMs / 1000}s. Please wait ${waitTimeSeconds}s.`
+      );
+    }
+
+    // Add current timestamp and save
+    recentCalls.push(now);
+    await rateLimitRef.set({ calls: recentCalls, window: windowStart });
+  } catch (error) {
+    // If the error is already an HttpsError, re-throw it
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    // Otherwise, log and allow the request (fail open for availability)
+    functions.logger.error(`Rate limit check failed for ${userId}/${functionName}:`, error);
+  }
+}
+
+// ==================== AUTHENTICATION HELPERS ====================
+
 function requireAuth(context: CallableContext): string {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
@@ -159,10 +293,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
   const { pairingCode } = data;
   const childId = requireAuth(context);
 
-  if (!pairingCode || typeof pairingCode !== "string") {
+  // Rate limiting
+  await checkRateLimit(childId, "validatePairingCode");
+
+  // Validate pairing code format (must be 6 digits)
+  if (!pairingCode || typeof pairingCode !== "string" || !ValidationUtils.isValidPairingCode(pairingCode)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
-      "The function must be called with a 'pairingCode' string."
+      "Invalid pairing code format. Must be exactly 6 digits."
     );
   }
 
@@ -307,10 +445,12 @@ export const registerMasterDevice = functions.https.onCall(
   async (data: { imei: string }, context: CallableContext) => {
     const masterId = requireAuth(context);
     const { imei } = data;
-    if (!imei || typeof imei !== "string") {
+
+    // Validate IMEI format (must be exactly 15 digits)
+    if (!imei || typeof imei !== "string" || !ValidationUtils.isValidIMEI(imei)) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "The function must be called with a valid 'imei' string."
+        "Invalid IMEI format. Must be exactly 15 digits."
       );
     }
 
@@ -434,13 +574,21 @@ export const setDeviceLocked = functions.https.onCall(
     const masterId = requireAuth(context);
     const { childId, isLocked } = data;
 
-    if (
-      !childId || typeof childId !== "string" ||
-      typeof isLocked !== "boolean"
-    ) {
+    // Rate limiting
+    await checkRateLimit(masterId, "setDeviceLocked");
+
+    // Strict input validation
+    if (!childId || typeof childId !== "string" || !ValidationUtils.isValidChildId(childId)) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include valid 'childId' and 'isLocked' boolean."
+        "Invalid childId format. Must be 15-digit IMEI or valid UUID."
+      );
+    }
+
+    if (typeof isLocked !== "boolean") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "isLocked must be a boolean value."
       );
     }
 
@@ -841,8 +989,56 @@ export const createTask = functions.https.onCall(
     const masterId = requireAuth(context);
     const { childId, description, deadlineISO } = data;
 
-    if (!childId || !description || !deadlineISO) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    // Rate limiting
+    await checkRateLimit(masterId, "createTask");
+
+    // Validate childId format
+    if (!childId || typeof childId !== "string" || !ValidationUtils.isValidChildId(childId)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Invalid childId format. Must be 15-digit IMEI or valid UUID."
+      );
+    }
+
+    // Validate and sanitize description (max 5000 chars)
+    if (!description || typeof description !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Description is required and must be a string."
+      );
+    }
+
+    if (description.length > 5000) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Description must not exceed 5000 characters."
+      );
+    }
+
+    const sanitizedDescription = ValidationUtils.sanitizeString(description, 5000);
+
+    // Validate deadline format
+    if (!deadlineISO || typeof deadlineISO !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Deadline is required in ISO 8601 format."
+      );
+    }
+
+    // Validate that deadline is a valid date and in the future
+    const deadlineDate = new Date(deadlineISO);
+    if (isNaN(deadlineDate.getTime())) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Invalid deadline format. Must be a valid ISO 8601 date."
+      );
+    }
+
+    if (deadlineDate.getTime() <= Date.now()) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Deadline must be in the future."
+      );
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
@@ -859,8 +1055,8 @@ export const createTask = functions.https.onCall(
 
     const taskRef = childDeviceRef.collection("tasks").doc();
     await taskRef.set({
-      description: description,
-      deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
+      description: sanitizedDescription,
+      deadline: admin.firestore.Timestamp.fromDate(deadlineDate),
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       masterImei: masterId, // Denormalize for easier querying
@@ -1111,10 +1307,14 @@ export const validatePairingToken = functions.https.onCall(
     const { pairingToken } = data;
     const childId = requireAuth(context);
 
-    if (!pairingToken || typeof pairingToken !== "string") {
+    // Rate limiting
+    await checkRateLimit(childId, "validatePairingToken");
+
+    // Validate pairing token format (must be a valid UUID)
+    if (!pairingToken || typeof pairingToken !== "string" || !ValidationUtils.isValidUUID(pairingToken)) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include a valid 'pairingToken'."
+        "Invalid pairing token format. Must be a valid UUID."
       );
     }
 
