@@ -148,6 +148,9 @@ Comprehensive documentation is available in the `docs/` directory:
 *   **[Task Unlock Architecture](docs/TASK_UNLOCK_ARCHITECTURE.md):** Detailed architecture of the task-based unlocking feature.
 *   **[Admin Panel Architecture](docs/ADMIN_PANEL_ARCHITECTURE.md):** Architecture and security design of the operator dashboard.
 *   **[Admin Panel Test Scenarios](docs/TEST_SCENARIOS_ADMIN_PANEL.md):** Test scenarios for the admin panel.
+*   **[PC Admin App MVP Requirements](docs/PC_ADMIN_APP_MVP_REQUIREMENTS.md):** Scope, data model, screens, roles, and delivery plan for the desktop admin software.
+*   **[PC Admin Compliance Checklist](docs/PC_ADMIN_COMPLIANCE_CHECKLIST.md):** Market-specific compliance and go-live control checklist.
+*   **[PC Admin AI Support Workflow](docs/PC_ADMIN_AI_SUPPORT_WORKFLOW.md):** End-to-end KI-gestützter Ticket- und Eskalationsprozess.
 
 Each source file in this repository is also thoroughly documented. You can explore the code to understand specific implementations:
 *   **Backend:** See `index.ts` for API endpoints and business logic.
