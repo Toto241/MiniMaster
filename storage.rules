@@ -7,21 +7,38 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Helper function to check if the authenticated user is an admin.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    // Helper function to fetch a child document for ownership checks.
+    function getChild(childId) {
+      return firestore.get(/databases/(default)/documents/children/$(childId));
+    }
+
+    // Helper function to check if the caller is the master of a child.
+    function isMasterOfChild(childId) {
+      return isSignedIn() && getChild(childId).data.masterImei == request.auth.uid;
+    }
+
     // Storage rules for child photos using flat structure to match Cloud Functions
     // Photos are stored under children/{childId}/photos/{fileName}
     match /children/{childId}/photos/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == childId || isMasterOfChild(childId) || isAdmin());
 
       allow write: if isSignedIn()
+                   && (request.auth.uid == childId || isMasterOfChild(childId) || isAdmin())
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*'); // Only images
     }
 
     // Alternative path for task proof photos
     match /proofs/{childId}/{taskId}/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == childId || isMasterOfChild(childId) || isAdmin());
 
       allow write: if isSignedIn()
+                   && (request.auth.uid == childId || isMasterOfChild(childId) || isAdmin())
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*'); // Only images
     }

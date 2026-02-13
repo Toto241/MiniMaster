@@ -8,6 +8,19 @@ import { v4 as uuidv4 } from "uuid";
 import { google } from "googleapis";
 import { db } from "./firebase";
 
+function requireAuth(context: CallableContext): string {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  }
+  return context.auth.uid;
+}
+
+function requireAdmin(context: CallableContext): void {
+  if (!context.auth || context.auth.token.role !== "admin") {
+    throw new functions.https.HttpsError("permission-denied", "Admin privileges required.");
+  }
+}
+
 // --- Admin Panel Functions ---
 
 /**
@@ -20,13 +33,7 @@ import { db } from "./firebase";
  * to ensure the caller is already an admin.
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
-    // Security Check: Only allow if the caller is already an admin
-    if (!context.auth || context.auth.token.role !== "admin") {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Only existing admins can grant admin privileges to other users."
-        );
-    }
+    requireAdmin(context);
     
     const uid = data.uid;
     if (!uid) {
@@ -47,10 +54,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
  * This function must be protected by the 'admin' custom claim.
  */
 export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
-    // 1. Authorization Check
-    if (!context.auth || context.auth.token.role !== "admin") {
-        throw new functions.https.HttpsError("permission-denied", "Only operators can revoke subscriptions.");
-    }
+    requireAdmin(context);
 
     const subscriptionId = data.subscriptionId;
     if (!subscriptionId) {
@@ -98,15 +102,8 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
  * @throws {functions.https.HttpsError} Throws an error if the childId is invalid,
  * or if a unique code cannot be generated.
  */
-export const createPairingCode = functions.https.onCall(async (data: { childId: string }, _context: CallableContext) => {
-  const { childId } = data;
-
-  if (!childId || typeof childId !== "string") {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "The function must be called with a valid 'childId' string."
-    );
-  }
+export const createPairingCode = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+  const masterId = requireAuth(context);
 
   const pairingCodesRef = db().collection("pairingCodes");
   const maxAttempts = 10; // Verhindert eine Endlosschleife
@@ -123,12 +120,12 @@ export const createPairingCode = functions.https.onCall(async (data: { childId: 
         const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
 
         await pairingCodeDocRef.set({
-          childId: childId,
+          masterId: masterId,
           createdAt: now,
           expiresAt: expiresAt,
         });
 
-        functions.logger.info(`Pairing code ${pairingCode} created for childId ${childId}`);
+        functions.logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
         return { pairingCode: pairingCode };
       }
     } catch (error) {
@@ -152,48 +149,21 @@ export const createPairingCode = functions.https.onCall(async (data: { childId: 
  * it creates a child device document linked to the master, then returns the
  * associated childId and deletes the code to prevent reuse.
  *
- * @param {{pairingCode: string, masterImei: string, secretKey: string}} data - The data passed to the function.
+ * @param {{pairingCode: string}} data - The data passed to the function.
  * @param {string} data.pairingCode - The 6-digit pairing code to validate.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{childId: string}>} A promise that resolves with the childId associated with the code.
  * @throws {functions.https.HttpsError} Throws an error if the code is invalid, not found, expired, or malformed.
  */
-export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string; masterImei?: string; secretKey?: string }, _context: CallableContext) => {
-  const { pairingCode, masterImei, secretKey } = data;
+export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string }, context: CallableContext) => {
+  const { pairingCode } = data;
+  const childId = requireAuth(context);
 
   if (!pairingCode || typeof pairingCode !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
       "The function must be called with a 'pairingCode' string."
     );
-  }
-
-  // If master credentials are provided, verify them
-  if (masterImei && secretKey) {
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError(
-        "unauthenticated",
-        "Invalid master IMEI or secret key."
-      );
-    }
-
-    // Subscription Check: Limit non-premium users to 1 child
-    const masterData = masterDoc.data();
-    const isPremium = masterData?.subscription?.status === "active";
-
-    if (!isPremium) {
-      const childrenQuery = await db().collection("children").where("masterImei", "==", masterImei).get();
-      if (!childrenQuery.empty && childrenQuery.size >= 1) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "Free tier limited to 1 child device. Please upgrade to Premium."
-        );
-      }
-    }
   }
 
   const pairingCodeRef = db().collection("pairingCodes").doc(pairingCode);
@@ -219,7 +189,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     }
 
     const expiresAt = codeData.expiresAt as admin.firestore.Timestamp;
-    const childId = codeData.childId as string;
+    const masterId = (codeData.masterId || codeData.masterImei) as string | undefined;
 
   if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
     functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
@@ -231,13 +201,13 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
         );
     }
 
-    if (!childId || typeof childId !== "string") {
-    functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'childId' field.`);
+    if (!masterId || typeof masterId !== "string") {
+    functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'masterId' field.`);
         await pairingCodeRef.delete();
         functions.logger.info(`Malformed pairing code ${pairingCode} deleted.`);
         throw new functions.https.HttpsError(
             "internal",
-            "Invalid pairing code data structure (childId)."
+            "Invalid pairing code data structure (masterId)."
         );
     }
 
@@ -253,16 +223,32 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       );
     }
 
-    // Create child document if master credentials were provided
-    if (masterImei && secretKey) {
-      const childDeviceRef = db().collection("children").doc(childId);
-      await childDeviceRef.set({
-        childImei: childId,
-        masterImei: masterImei,
-        pairedAt: now,
-      });
-      functions.logger.info(`Child device ${childId} successfully paired with master ${masterImei} via pairing code.`);
+    const masterDoc = await db().collection("masters").doc(masterId).get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
+
+    // Subscription Check: Limit non-premium users to 1 child
+    const masterData = masterDoc.data();
+    const isPremium = masterData?.subscription?.status === "active";
+
+    if (!isPremium) {
+      const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
+      if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Free tier limited to 1 child device. Please upgrade to Premium."
+        );
+      }
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+    await childDeviceRef.set({
+      childImei: childId,
+      masterImei: masterId,
+      pairedAt: now,
+    }, { merge: true });
+    functions.logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
 
     await pairingCodeRef.delete();
     functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
@@ -286,52 +272,18 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
 );
 
 /**
- * Generates a Firebase Custom Auth Token for a master device.
- * This allows the client to sign in with Firebase Auth and access Firestore securely.
- *
- * @param {{masterImei: string, secretKey: string}} data - The data passed to the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
- * @param {CallableContext} _context - The context of the function call (unused).
- * @returns {Promise<{customToken: string}>} A promise that resolves with the custom auth token.
- * @throws {functions.https.HttpsError} Throws an error if authentication fails.
+ * Issues a fresh Firebase custom token for the currently authenticated user.
+ * Use this to rotate tokens or refresh claims after role updates.
  */
 export const generateCustomToken = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
-    const { masterImei, secretKey } = data;
-
-    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The function must be called with a valid 'masterImei' and 'secretKey'."
-      );
-    }
-
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const uid = requireAuth(context);
 
     try {
-      const masterDoc = await masterDeviceRef.get();
-      if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-        throw new functions.https.HttpsError(
-          "unauthenticated",
-          "Invalid master IMEI or secret key."
-        );
-      }
-
-      // Generate a custom token
-      // The uid will be the masterImei, ensuring it matches the Firestore document ID
-      const customToken = await admin.auth().createCustomToken(masterImei, {
-          role: "master",
-          masterImei: masterImei,
-      });
-
-      functions.logger.info(`Custom token generated for master ${masterImei}`);
+      const user = await admin.auth().getUser(uid);
+      const customToken = await admin.auth().createCustomToken(uid, user.customClaims || {});
       return { customToken };
-
     } catch (error) {
-      if (error instanceof functions.https.HttpsError) {
-        throw error;
-      }
       functions.logger.error("Error generating custom token:", error);
       throw new functions.https.HttpsError(
         "internal",
@@ -343,18 +295,17 @@ export const generateCustomToken = functions.https.onCall(
 );
 
 /**
- * Registers a new master device using its IMEI (or another unique ID).
- * If the device is not already registered, it creates a new entry in Firestore
- * and returns a unique secret key for future authentication.
+ * Registers a master account for the authenticated user.
+ * Creates a Firestore master document and assigns the "master" role claim.
  *
  * @param {{imei: string}} data - The data passed to the function.
  * @param {string} data.imei - The unique identifier for the master device.
  * @param {CallableContext} _context - The context of the function call (unused).
- * @returns {Promise<{secretKey: string}>} A promise that resolves with the newly generated secret key.
- * @throws {functions.https.HttpsError} Throws an error if the IMEI is invalid or already registered.
+ * @returns {Promise<{masterId: string}>} A promise that resolves with the master UID.
  */
 export const registerMasterDevice = functions.https.onCall(
-  async (data: { imei: string }, _context: CallableContext) => {
+  async (data: { imei: string }, context: CallableContext) => {
+    const masterId = requireAuth(context);
     const { imei } = data;
     if (!imei || typeof imei !== "string") {
       throw new functions.https.HttpsError(
@@ -363,28 +314,27 @@ export const registerMasterDevice = functions.https.onCall(
       );
     }
 
-  const masterDeviceRef = db().collection("masters").doc(imei);
+  const masterDeviceRef = db().collection("masters").doc(masterId);
 
   try {
     const doc = await masterDeviceRef.get();
     if (doc.exists) {
-      throw new functions.https.HttpsError(
-        "already-exists",
-        "This device has already been registered."
-      );
+      return { masterId: masterId };
     }
 
-    const secretKey = uuidv4();
     const now = admin.firestore.Timestamp.now();
 
     await masterDeviceRef.set({
       imei: imei,
-      secretKey: secretKey,
+      uid: masterId,
+      role: "master",
       createdAt: now,
     });
 
-    functions.logger.info(`Master device registered with IMEI: ${imei}`);
-    return { secretKey: secretKey };
+    await admin.auth().setCustomUserClaims(masterId, { role: "master" });
+
+    functions.logger.info(`Master account registered for uid: ${masterId}`);
+    return { masterId: masterId };
 
   } catch (error) {
     if (error instanceof functions.https.HttpsError) {
@@ -405,32 +355,23 @@ export const registerMasterDevice = functions.https.onCall(
  * This token can be used to link a new child device to this master account.
  * The token is valid for 5 minutes.
  *
- * @param {{imei: string, secretKey: string}} data - The data passed to the function.
- * @param {string} data.imei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
+ * @param {{}} data - The data passed to the function.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{pairingToken: string}>} A promise that resolves with the generated pairing token.
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const generatePairingLink = functions.https.onCall(
-  async (data: { imei: string; secretKey: string }, _context: CallableContext) => {
-    const { imei, secretKey } = data;
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const masterId = requireAuth(context);
 
-    if (!imei || typeof imei !== "string" || !secretKey || typeof secretKey !== "string") {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Request must include a valid 'imei' and 'secretKey'."
-      );
-    }
-
-  const masterDeviceRef = db().collection("masters").doc(imei);
+  const masterDeviceRef = db().collection("masters").doc(masterId);
 
   try {
     const doc = await masterDeviceRef.get();
-    if (!doc.exists || doc.data()?.secretKey !== secretKey) {
+    if (!doc.exists) {
       throw new functions.https.HttpsError(
-        "unauthenticated",
-        "Invalid IMEI or secret key."
+        "not-found",
+        "Master account not found."
       );
     }
 
@@ -439,7 +380,7 @@ export const generatePairingLink = functions.https.onCall(
     const isPremium = masterData?.subscription?.status === "active";
 
     if (!isPremium) {
-      const childrenQuery = await db().collection("children").where("masterImei", "==", imei).get();
+      const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
       if (!childrenQuery.empty && childrenQuery.size >= 1) {
         throw new functions.https.HttpsError(
           "resource-exhausted",
@@ -455,12 +396,12 @@ export const generatePairingLink = functions.https.onCall(
 
     const tokenRef = db().collection("pairingTokens").doc(pairingToken);
     await tokenRef.set({
-      masterImei: imei,
+      masterId: masterId,
       createdAt: now,
       expiresAt: expiresAt,
     });
 
-    functions.logger.info(`Pairing token created for master IMEI: ${imei}`);
+    functions.logger.info(`Pairing token created for masterId: ${masterId}`);
     return { pairingToken: pairingToken };
 
   } catch (error) {
@@ -481,43 +422,37 @@ export const generatePairingLink = functions.https.onCall(
  * Sets the lock state for a specific child device.
  * This function requires authentication from the master device.
  *
- * @param {{masterImei: string, secretKey: string, childImei: string, isLocked: boolean}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
- * @param {string} data.childImei - The unique identifier of the child device to lock/unlock.
+ * @param {{childId: string, isLocked: boolean}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device to lock/unlock.
  * @param {boolean} data.isLocked - The desired lock state.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{success: boolean, isLocked: boolean}>} A promise that resolves with the new lock state.
  * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const setDeviceLocked = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string; childImei: string; isLocked: boolean }, _context: CallableContext) => {
-    const { masterImei, secretKey, childImei, isLocked } = data;
+  async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { childId, isLocked } = data;
 
     if (
-      !masterImei || typeof masterImei !== "string" ||
-      !secretKey || typeof secretKey !== "string" ||
-      !childImei || typeof childImei !== "string" ||
+      !childId || typeof childId !== "string" ||
       typeof isLocked !== "boolean"
     ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include valid 'masterImei', 'secretKey', 'childImei', and 'isLocked' boolean."
+        "Request must include valid 'childId' and 'isLocked' boolean."
       );
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError(
-        "unauthenticated",
-        "Invalid master IMEI or secret key."
-      );
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
       throw new functions.https.HttpsError(
         "permission-denied",
         "This master device is not authorized to control the specified child device."
@@ -530,11 +465,11 @@ export const setDeviceLocked = functions.https.onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Lock state for child ${childImei} set to ${isLocked} by master ${masterImei}.`);
+      functions.logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
       return { success: true, isLocked: isLocked };
 
     } catch (error) {
-      functions.logger.error(`Failed to set lock state for child ${childImei}:`, error);
+      functions.logger.error(`Failed to set lock state for child ${childId}:`, error);
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while updating the device lock state.",
@@ -548,40 +483,37 @@ export const setDeviceLocked = functions.https.onCall(
  * Updates the list of blacklisted apps for a specific child device.
  * This function requires authentication from the master device.
  *
- * @param {{masterImei: string, secretKey: string, childImei: string, appBlacklist: string[]}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
- * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {{childId: string, appBlacklist: string[]}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device.
  * @param {string[]} data.appBlacklist - An array of package names to be blacklisted.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
  * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const updateAppBlacklist = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string; childImei: string; appBlacklist: string[] }, _context: CallableContext) => {
-    const { masterImei, secretKey, childImei, appBlacklist } = data;
+  async (data: { childId: string; appBlacklist: string[] }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { childId, appBlacklist } = data;
 
     if (
-      !masterImei || typeof masterImei !== "string" ||
-      !secretKey || typeof secretKey !== "string" ||
-      !childImei || typeof childImei !== "string" ||
+      !childId || typeof childId !== "string" ||
       !Array.isArray(appBlacklist)
     ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include valid 'masterImei', 'secretKey', 'childImei', and 'appBlacklist' array."
+        "Request must include valid 'childId' and 'appBlacklist' array."
       );
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
       throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
     }
 
@@ -590,10 +522,10 @@ export const updateAppBlacklist = functions.https.onCall(
         appBlacklist: appBlacklist,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      functions.logger.info(`App blacklist for child ${childImei} updated by master ${masterImei}.`);
+      functions.logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     } catch (error) {
-      functions.logger.error(`Failed to update blacklist for child ${childImei}:`, error);
+      functions.logger.error(`Failed to update blacklist for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to update app blacklist.", error);
     }
   }
@@ -603,39 +535,36 @@ export const updateAppBlacklist = functions.https.onCall(
  * Sets screen time usage rules for a specific child device.
  * This function requires authentication from the master device.
  *
- * @param {{masterImei: string, secretKey: string, childImei: string, usageRules: object}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
- * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {{childId: string, usageRules: object}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device.
  * @param {object} data.usageRules - An object containing the usage rules to be applied.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
  * @throws {functions.https.HttpsError} Throws an error if authentication fails, permissions are denied, or arguments are invalid.
  */
 export const setUsageRules = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string; childImei: string; usageRules: object }, _context: CallableContext) => {
-    const { masterImei, secretKey, childImei, usageRules } = data;
+  async (data: { childId: string; usageRules: object }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { childId, usageRules } = data;
     if (
-      !masterImei || typeof masterImei !== "string" ||
-      !secretKey || typeof secretKey !== "string" ||
-      !childImei || typeof childImei !== "string" ||
+      !childId || typeof childId !== "string" ||
       typeof usageRules !== "object" || usageRules === null
     ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include valid 'masterImei', 'secretKey', 'childImei', and 'usageRules' object."
+        "Request must include valid 'childId' and 'usageRules' object."
       );
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
       throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
     }
 
@@ -644,10 +573,10 @@ export const setUsageRules = functions.https.onCall(
         usageRules: usageRules,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      functions.logger.info(`Usage rules for child ${childImei} updated by master ${masterImei}.`);
+      functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     } catch (error) {
-      functions.logger.error(`Failed to set usage rules for child ${childImei}:`, error);
+      functions.logger.error(`Failed to set usage rules for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
     }
   }
@@ -657,24 +586,14 @@ export const setUsageRules = functions.https.onCall(
  * Records a heartbeat from a child device to indicate it's online.
  * This function updates the `lastSeen` timestamp for the child device.
  *
- * @param {{childImei: string}} data - The data passed to the function.
- * @param {string} data.childImei - The unique identifier of the child device sending the heartbeat.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
  * @throws {functions.https.HttpsError} Throws an error if the childImei is invalid or the device is not found.
  */
 export const recordHeartbeat = functions.https.onCall(
-  async (data: { childImei: string }, _context: CallableContext) => {
-    const { childImei } = data;
-
-    if (!childImei || typeof childImei !== "string") {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Request must include a valid 'childImei'."
-      );
-    }
-
-    const childDeviceRef = db().collection("children").doc(childImei);
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const childId = requireAuth(context);
+    const childDeviceRef = db().collection("children").doc(childId);
 
     try {
       const childDoc = await childDeviceRef.get();
@@ -695,7 +614,7 @@ export const recordHeartbeat = functions.https.onCall(
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
-      functions.logger.error(`Failed to record heartbeat for child ${childImei}:`, error);
+      functions.logger.error(`Failed to record heartbeat for child ${childId}:`, error);
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while recording heartbeat.",
@@ -709,25 +628,25 @@ export const recordHeartbeat = functions.https.onCall(
  * Registers or updates the FCM token for a child device. This token is required
  * to send push notifications (e.g., for rule synchronization) to the device.
  *
- * @param {{childImei: string, token: string}} data - The data passed to the function.
- * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {{token: string}} data - The data passed to the function.
  * @param {string} data.token - The Firebase Cloud Messaging (FCM) registration token.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
  * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the device is not found.
  */
 export const registerFcmToken = functions.https.onCall(
-  async (data: { childImei: string; token: string }, _context: CallableContext) => {
-    const { childImei, token } = data;
+  async (data: { token: string }, context: CallableContext) => {
+    const childId = requireAuth(context);
+    const { token } = data;
 
-    if (!childImei || typeof childImei !== "string" || !token || typeof token !== "string") {
+    if (!token || typeof token !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include a valid 'childImei' and 'token'."
+        "Request must include a valid 'token'."
       );
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    const childDeviceRef = db().collection("children").doc(childId);
 
     try {
       const doc = await childDeviceRef.get();
@@ -736,14 +655,14 @@ export const registerFcmToken = functions.https.onCall(
       }
 
       await childDeviceRef.update({ fcmToken: token });
-      functions.logger.info(`FCM token for child ${childImei} has been registered.`);
+      functions.logger.info(`FCM token for child ${childId} has been registered.`);
       return { success: true };
 
     } catch (error) {
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        functions.logger.error(`Failed to register FCM token for child ${childImei}:`, error);
+      functions.logger.error(`Failed to register FCM token for child ${childId}:`, error);
         throw new functions.https.HttpsError("internal", "Failed to register FCM token.", error);
     }
   }
@@ -909,10 +828,8 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
 /**
  * Creates a new task for a child device, assigned by an authenticated master device.
  *
- * @param {{masterImei: string, secretKey: string, childImei: string, description: string, deadlineISO: string}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
- * @param {string} data.childImei - The unique identifier of the child device receiving the task.
+ * @param {{childId: string, description: string, deadlineISO: string}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device receiving the task.
  * @param {string} data.description - The description of the task.
  * @param {string} data.deadlineISO - The task's deadline in ISO 8601 format.
  * @param {CallableContext} _context - The context of the function call (unused).
@@ -920,22 +837,23 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const createTask = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string; childImei: string; description: string; deadlineISO: string }, _context: CallableContext) => {
-    const { masterImei, secretKey, childImei, description, deadlineISO } = data;
+  async (data: { childId: string; description: string; deadlineISO: string }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { childId, description, deadlineISO } = data;
 
-    if (!masterImei || !secretKey || !childImei || !description || !deadlineISO) {
+    if (!childId || !description || !deadlineISO) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
       throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
     }
 
@@ -945,10 +863,10 @@ export const createTask = functions.https.onCall(
       deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      masterImei: masterImei, // Denormalize for easier querying
+      masterImei: masterId, // Denormalize for easier querying
     });
 
-    functions.logger.info(`Task ${taskRef.id} created for child ${childImei}`);
+    functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
     return { success: true, taskId: taskRef.id };
   }
 );
@@ -957,8 +875,7 @@ export const createTask = functions.https.onCall(
  * Marks a task as complete from the child's side and attaches a photo proof URL.
  * The task status is updated to 'pending_approval'.
  *
- * @param {{childImei: string, taskId: string, photoUrl: string}} data - The data for the function.
- * @param {string} data.childImei - The unique identifier of the child device.
+ * @param {{taskId: string, photoUrl: string}} data - The data for the function.
  * @param {string} data.taskId - The ID of the task being completed.
  * @param {string} data.photoUrl - The URL of the uploaded photo proof.
  * @param {CallableContext} _context - The context of the function call (unused).
@@ -966,14 +883,15 @@ export const createTask = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if arguments are invalid or the task is not found.
  */
 export const completeTask = functions.https.onCall(
-  async (data: { childImei: string; taskId: string; photoUrl: string }, _context: CallableContext) => {
-    const { childImei, taskId, photoUrl } = data;
+  async (data: { taskId: string; photoUrl: string }, context: CallableContext) => {
+    const childId = requireAuth(context);
+    const { taskId, photoUrl } = data;
 
-    if (!childImei || !taskId || !photoUrl) {
+    if (!taskId || !photoUrl) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
-    const taskRef = db().collection("children").doc(childImei).collection("tasks").doc(taskId);
+    const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
 
     const taskDoc = await taskRef.get();
     if (!taskDoc.exists) {
@@ -990,7 +908,7 @@ export const completeTask = functions.https.onCall(
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childImei}`);
+    functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
     return { success: true };
   }
 );
@@ -999,32 +917,31 @@ export const completeTask = functions.https.onCall(
  * Approves a completed task. This function is called by the master device after
  * reviewing the photo proof. The task status is updated to 'approved'.
  *
- * @param {{masterImei: string, secretKey: string, childImei: string, taskId: string}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
- * @param {string} data.childImei - The unique identifier of the child device that completed the task.
+ * @param {{childId: string, taskId: string}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device that completed the task.
  * @param {string} data.taskId - The ID of the task to approve.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const approveTask = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string; childImei: string; taskId: string }, _context: CallableContext) => {
-    const { masterImei, secretKey, childImei, taskId } = data;
+  async (data: { childId: string; taskId: string }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { childId, taskId } = data;
 
-    if (!masterImei || !secretKey || !childImei || !taskId) {
+    if (!childId || !taskId) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterImei) {
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
       throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
     }
 
@@ -1038,7 +955,7 @@ export const approveTask = functions.https.onCall(
       throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
     }
     await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childImei} master=${masterImei}`);
+    functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
     return { success: true };
   }
 );
@@ -1047,9 +964,7 @@ export const approveTask = functions.https.onCall(
  * Verifies a Google Play subscription purchase and grants entitlement to the master device.
  * It calls the Google Play Developer API to validate the purchase token.
  *
- * @param {{masterImei: string, secretKey: string, purchaseToken: string, sku: string}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
+ * @param {{purchaseToken: string, sku: string}} data - The data for the function.
  * @param {string} data.purchaseToken - The purchase token from the Google Play Billing library.
  * @param {string} data.sku - The product ID (SKU) of the subscription.
  * @param {CallableContext} _context - The context of the function call (unused).
@@ -1057,17 +972,18 @@ export const approveTask = functions.https.onCall(
  * @throws {functions.https.HttpsError} Throws an error if authentication or purchase verification fails.
  */
 export const verifyPurchase = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string; purchaseToken: string; sku: string }, _context: CallableContext) => {
-    const { masterImei, secretKey, purchaseToken, sku } = data;
+  async (data: { purchaseToken: string; sku: string }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { purchaseToken, sku } = data;
 
-    if (!masterImei || !secretKey || !purchaseToken || !sku) {
+    if (!purchaseToken || !sku) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
     const isPurchaseValid = await verifyPlaySubscription(
@@ -1092,10 +1008,10 @@ export const verifyPurchase = functions.https.onCall(
           expiresAt: expiresAt,
         },
       });
-      functions.logger.info(`Subscription ${sku} activated for master ${masterImei}.`);
+      functions.logger.info(`Subscription ${sku} activated for master ${masterId}.`);
       return { success: true, subscriptionStatus: "active" };
     } else {
-      functions.logger.warn(`Invalid purchase token received for master ${masterImei}.`);
+      functions.logger.warn(`Invalid purchase token received for master ${masterId}.`);
       throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
     }
   }
@@ -1104,24 +1020,18 @@ export const verifyPurchase = functions.https.onCall(
 /**
  * Gets the current subscription status for an authenticated master device.
  *
- * @param {{masterImei: string, secretKey: string}} data - The data for the function.
- * @param {string} data.masterImei - The master device's unique identifier.
- * @param {string} data.secretKey - The secret key for the master device.
+ * @param {{}} data - The data for the function.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{subscriptionStatus: object}>} A promise that resolves with the subscription status object.
  * @throws {functions.https.HttpsError} Throws an error if authentication fails.
  */
 export const getSubscriptionStatus = functions.https.onCall(
-  async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
-    const { masterImei, secretKey } = data;
-    if (!masterImei || !secretKey) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
-
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid master credentials.");
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
     const subscription = masterDoc.data()?.subscription || { status: "none" };
@@ -1141,10 +1051,11 @@ export const getSubscriptionStatus = functions.https.onCall(
  * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
  */
 export const reportDailyUsage = functions.https.onCall(
-  async (data: { childId: string; date: string; usageMillis: number }, _context: CallableContext) => {
-    const { childId, date, usageMillis } = data;
+  async (data: { date: string; usageMillis: number }, context: CallableContext) => {
+    const childId = requireAuth(context);
+    const { date, usageMillis } = data;
 
-    if (!childId || !date || typeof usageMillis !== "number") {
+    if (!date || typeof usageMillis !== "number") {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
@@ -1189,21 +1100,21 @@ async function verifyPlaySubscription(packageName: string, productId: string, pu
  * child device profile in Firestore, linking it to the master device that
  * generated the token. The token is then deleted.
  *
- * @param {{pairingToken: string, childImei: string}} data - The data for the function.
+ * @param {{pairingToken: string}} data - The data for the function.
  * @param {string} data.pairingToken - The single-use token for pairing.
- * @param {string} data.childImei - The unique identifier of the new child device.
  * @param {CallableContext} _context - The context of the function call (unused).
  * @returns {Promise<{childId: string}>} A promise that resolves with the master device's ID, confirming the link.
  * @throws {functions.https.HttpsError} Throws an error if the token is invalid, expired, or arguments are missing.
  */
 export const validatePairingToken = functions.https.onCall(
-  async (data: { pairingToken: string; childImei: string }, _context: CallableContext) => {
-    const { pairingToken, childImei } = data;
+  async (data: { pairingToken: string }, context: CallableContext) => {
+    const { pairingToken } = data;
+    const childId = requireAuth(context);
 
-    if (!pairingToken || typeof pairingToken !== "string" || !childImei || typeof childImei !== "string") {
+    if (!pairingToken || typeof pairingToken !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Request must include a valid 'pairingToken' and 'childImei'."
+        "Request must include a valid 'pairingToken'."
       );
     }
 
@@ -1223,25 +1134,29 @@ export const validatePairingToken = functions.https.onCall(
     }
 
     const expiresAt = tokenData.expiresAt as admin.firestore.Timestamp;
+    const masterId = (tokenData.masterId || tokenData.masterImei) as string | undefined;
     const now = admin.firestore.Timestamp.now();
     if (now.seconds > expiresAt.seconds) {
       await tokenRef.delete();
       throw new functions.https.HttpsError("deadline-exceeded", "Pairing token has expired.");
     }
 
-    const childDeviceRef = db().collection("children").doc(childImei);
+    if (!masterId || typeof masterId !== "string") {
+      await tokenRef.delete();
+      throw new functions.https.HttpsError("internal", "Pairing token data is missing masterId.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
     await childDeviceRef.set({
-      childImei: childImei,
-      masterImei: tokenData.masterImei,
+      childImei: childId,
+      masterImei: masterId,
       pairedAt: now,
     });
 
     await tokenRef.delete();
 
-  functions.logger.info(`Child device ${childImei} successfully paired with master ${tokenData.masterImei}.`);
-  // API compatibility note: historically returned { childId: masterImei }. Keep for now; plan deprecation.
-  functions.logger.warn(`API_COMPAT validatePairingToken returning childId=masterImei (will deprecate) masterImei=${tokenData.masterImei}`);
-  return { childId: tokenData.masterImei };
+  functions.logger.info(`Child device ${childId} successfully paired with master ${masterId}.`);
+  return { childId: childId, masterId: masterId };
 
   } catch (error) {
     if (error instanceof functions.https.HttpsError) {
@@ -1311,22 +1226,23 @@ export const onTaskStatusChange = functions.firestore
  * Updates the FCM token for a master device.
  * This allows the backend to send push notifications to the correct device.
  */
-export const updateFCMToken = functions.https.onCall(async (data: { masterImei: string; secretKey: string; fcmToken: string }, _context: CallableContext) => {
-    const { masterImei, secretKey, fcmToken } = data;
+export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: string }, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const { fcmToken } = data;
 
-    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string" || !fcmToken || typeof fcmToken !== "string") {
+    if (!fcmToken || typeof fcmToken !== "string") {
         throw new functions.https.HttpsError(
             "invalid-argument",
-            "Request must include valid 'masterImei', 'secretKey', and 'fcmToken'."
+            "Request must include valid 'fcmToken'."
         );
     }
 
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+    if (!masterDoc.exists) {
         throw new functions.https.HttpsError(
-            "unauthenticated",
-            "Invalid master IMEI or secret key."
+            "not-found",
+            "Master account not found."
         );
     }
 
@@ -1336,11 +1252,11 @@ export const updateFCMToken = functions.https.onCall(async (data: { masterImei: 
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        functions.logger.info(`FCM token updated for master ${masterImei}.`);
+        functions.logger.info(`FCM token updated for master ${masterId}.`);
         return { success: true };
 
     } catch (error) {
-        functions.logger.error(`Failed to update FCM token for master ${masterImei}:`, error);
+        functions.logger.error(`Failed to update FCM token for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
             "An unexpected error occurred while updating the FCM token.",
@@ -1353,38 +1269,30 @@ export const updateFCMToken = functions.https.onCall(async (data: { masterImei: 
  * Deletes a user account and all associated data.
  * This function should be called when a user requests to delete their account.
  */
-export const deleteUserAccount = functions.https.onCall(async (data: { masterImei: string; secretKey: string }, _context: CallableContext) => {
-    const { masterImei, secretKey } = data;
-
-    if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "Request must include valid 'masterImei' and 'secretKey'."
-        );
-    }
-
-    const masterDeviceRef = db().collection("masters").doc(masterImei);
+export const deleteUserAccount = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+    const masterId = requireAuth(context);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+    if (!masterDoc.exists) {
         throw new functions.https.HttpsError(
-            "unauthenticated",
-            "Invalid master IMEI or secret key."
+            "not-found",
+            "Master account not found."
         );
     }
 
     try {
         // 1. Delete all children associated with the master
-        const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterImei).get();
+        const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
         const deleteChildrenPromises = childrenSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deleteChildrenPromises);
 
         // 2. Delete all tasks associated with the master
-        const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterImei).get();
+        const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterId).get();
         const deleteTasksPromises = tasksSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deleteTasksPromises);
 
         // 3. Delete all subscriptions associated with the master
-        const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterImei).get();
+        const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
         const deleteSubsPromises = subsSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deleteSubsPromises);
 
@@ -1393,13 +1301,13 @@ export const deleteUserAccount = functions.https.onCall(async (data: { masterIme
 
         // 5. Delete the Firebase Auth user (if using Firebase Auth)
         // This part needs to be implemented when migrating to Firebase Auth tokens
-        // await admin.auth().deleteUser(masterDoc.data()?.uid);
+        await admin.auth().deleteUser(masterId);
 
-        functions.logger.info(`User account and all associated data deleted for master ${masterImei}.`);
+        functions.logger.info(`User account and all associated data deleted for master ${masterId}.`);
         return { success: true };
 
     } catch (error) {
-        functions.logger.error(`Failed to delete user account for master ${masterImei}:`, error);
+        functions.logger.error(`Failed to delete user account for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
             "An unexpected error occurred while deleting the user account.",
@@ -1655,7 +1563,7 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
       // Call OpenAI API
       functions.logger.info("Calling OpenAI API...");
       const response = await getOpenAIClient().chat.completions.create({
-        model: "gemini-2.5-flash",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "You are a technical support agent for the MiniMaster parental control application." },
           { role: "user", content: prompt }

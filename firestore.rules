@@ -61,8 +61,9 @@ service cloud.firestore {
         childId == request.auth.uid ||
         isAdmin()
       );
-      allow write: if isSignedIn() && (resource.data.masterImei == request.auth.uid || childId == request.auth.uid);
-      allow create: if isSignedIn(); // Allow creation during pairing
+      allow create: if false; // Only Cloud Functions (Admin SDK) can create
+      allow update: if isSignedIn() && (resource.data.masterImei == request.auth.uid || childId == request.auth.uid);
+      allow delete: if isSignedIn() && (resource.data.masterImei == request.auth.uid || isAdmin());
     }
 
     // --- TASKS COLLECTION (nested under children) ---
@@ -110,15 +111,13 @@ service cloud.firestore {
     // Read access is allowed for authenticated users (to validate codes).
     // Write access is restricted to Cloud Functions (server-side only).
     match /pairingCodes/{codeId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Only Cloud Functions can write
+      allow read, write: if false; // Only Cloud Functions (Admin SDK)
     }
 
     // --- PAIRING TOKENS COLLECTION ---
     // Similar to pairing codes, managed by Cloud Functions.
     match /pairingTokens/{tokenId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Only Cloud Functions can write
+      allow read, write: if false; // Only Cloud Functions (Admin SDK)
     }
 
     // --- SUBSCRIPTIONS COLLECTION ---
