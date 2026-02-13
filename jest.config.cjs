@@ -8,7 +8,6 @@ const config = {
   transform: { 
     '^.+\\.tsx?$': ['ts-jest', { 
       tsconfig: 'tsconfig.json',
-      isolatedModules: true,  // Compile each file independently (no cross-file type checking)
       diagnostics: false,      // Disable diagnostic output during compilation
     }] 
   },

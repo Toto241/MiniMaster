@@ -1,25 +1,13 @@
-
 import fft from "firebase-functions-test";
 import * as myFunctions from "../index";
 
 const testEnv = fft();
 
-// Create mock instances
-const mockFirestoreInstance = {
-  collection: jest.fn(),
-  doc: jest.fn(),
-};
-
 const mockAuthInstance = {
+  getUser: jest.fn(),
   createCustomToken: jest.fn(),
 };
 
-// Mock ./firebase.ts
-jest.mock("../firebase", () => ({
-  db: jest.fn(() => mockFirestoreInstance),
-}));
-
-// Mock firebase-admin
 jest.mock("firebase-admin", () => ({
   auth: () => mockAuthInstance,
   firestore: {
@@ -28,12 +16,11 @@ jest.mock("firebase-admin", () => ({
     },
     FieldValue: {
       serverTimestamp: jest.fn(),
-    }
-  }
+    },
+  },
 }));
 
 describe("generateCustomToken", () => {
-
   afterAll(() => {
     testEnv.cleanup();
   });
@@ -42,72 +29,27 @@ describe("generateCustomToken", () => {
     jest.clearAllMocks();
   });
 
-  it("should generate a custom token for valid credentials", async () => {
+  it("liefert Token für authentifizierten Nutzer", async () => {
     const wrapped = testEnv.wrap(myFunctions.generateCustomToken);
-
-    // Mock Firestore chain: db().collection("masters").doc(imei).get()
-    const mockDoc = {
-      get: jest.fn().mockResolvedValue({
-        exists: true,
-        data: () => ({ secretKey: "valid-secret" })
-      })
-    };
-
-    mockFirestoreInstance.collection.mockReturnValue({
-      doc: jest.fn().mockReturnValue(mockDoc)
-    });
-
-    // Mock Auth
+    mockAuthInstance.getUser.mockResolvedValue({ customClaims: { role: "master" } });
     mockAuthInstance.createCustomToken.mockResolvedValue("mock-custom-token");
 
-    const result = await wrapped({ masterImei: "valid-imei", secretKey: "valid-secret" });
+    const result = await wrapped({}, { auth: { uid: "master-1", token: { role: "master" } } });
 
     expect(result).toEqual({ customToken: "mock-custom-token" });
-    expect(mockFirestoreInstance.collection).toHaveBeenCalledWith("masters");
-    expect(mockDoc.get).toHaveBeenCalled();
-    expect(mockAuthInstance.createCustomToken).toHaveBeenCalledWith("valid-imei", expect.objectContaining({ role: "master" }));
+    expect(mockAuthInstance.getUser).toHaveBeenCalledWith("master-1");
+    expect(mockAuthInstance.createCustomToken).toHaveBeenCalledWith("master-1", { role: "master" });
   });
 
-  it("should throw error for invalid secret key", async () => {
+  it("wirft unauthenticated ohne Auth-Kontext", async () => {
     const wrapped = testEnv.wrap(myFunctions.generateCustomToken);
-
-    const mockDoc = {
-      get: jest.fn().mockResolvedValue({
-        exists: true,
-        data: () => ({ secretKey: "real-secret" })
-      })
-    };
-
-    mockFirestoreInstance.collection.mockReturnValue({
-      doc: jest.fn().mockReturnValue(mockDoc)
-    });
-
-    await expect(wrapped({ masterImei: "valid-imei", secretKey: "wrong-secret" }))
-      .rejects.toThrow("Invalid master IMEI or secret key");
+    await expect(wrapped({})).rejects.toThrow(/authenticated/);
   });
 
-  it("should throw error if master does not exist", async () => {
+  it("wirft internal bei Auth-Backend-Fehler", async () => {
     const wrapped = testEnv.wrap(myFunctions.generateCustomToken);
+    mockAuthInstance.getUser.mockRejectedValue(new Error("auth backend unavailable"));
 
-    const mockDoc = {
-      get: jest.fn().mockResolvedValue({
-        exists: false
-      })
-    };
-
-    mockFirestoreInstance.collection.mockReturnValue({
-      doc: jest.fn().mockReturnValue(mockDoc)
-    });
-
-    await expect(wrapped({ masterImei: "unknown-imei", secretKey: "any-secret" }))
-      .rejects.toThrow("Invalid master IMEI or secret key");
-  });
-
-  it("should throw error for missing arguments", async () => {
-    const wrapped = testEnv.wrap(myFunctions.generateCustomToken);
-
-    // @ts-ignore
-    await expect(wrapped({ masterImei: "valid-imei" }))
-      .rejects.toThrow("The function must be called with a valid 'masterImei' and 'secretKey'");
+    await expect(wrapped({}, { auth: { uid: "master-1", token: { role: "master" } } })).rejects.toThrow(/generating the token/i);
   });
 });
