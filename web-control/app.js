@@ -2,16 +2,29 @@
 /* global firebase, Chart */
 // Mini-Master Web Control Panel JavaScript
 
-// Firebase configuration (you'll need to replace this with your actual config)
+// Firebase configuration - uses environment variables
+// For development: copy .env.example to .env and fill in values
+// Note: Environment variables are accessed differently in plain HTML/JS vs build tools
+// Since this is a static HTML page, we check for both import.meta.env (Vite) and window.ENV
 const firebaseConfig = {
-    // This should be replaced with actual Firebase config
-    // You can get this from your Firebase console
-    apiKey: "your-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "your-app-id"
+    apiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_API_KEY) || 
+            (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_API_KEY) || 
+            "your-api-key",
+    authDomain: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN) || 
+                (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_AUTH_DOMAIN) || 
+                "your-project.firebaseapp.com",
+    projectId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_PROJECT_ID) || 
+               (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_PROJECT_ID) || 
+               "your-project-id",
+    storageBucket: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET) || 
+                   (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_STORAGE_BUCKET) || 
+                   "your-project.appspot.com",
+    messagingSenderId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID) || 
+                       (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_MESSAGING_SENDER_ID) || 
+                       "123456789",
+    appId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_APP_ID) || 
+           (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_APP_ID) || 
+           "your-app-id"
 };
 
 // --- Global Variables ---
@@ -30,6 +43,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Ensure firebase is available
         if (typeof firebase === 'undefined') {
             throw new Error('Firebase script not loaded. Please check your internet connection and script tags.');
+        }
+        
+        // Validate Firebase configuration
+        if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "your-api-key") {
+            console.error('Firebase configuration missing. Check .env file');
+            showNotification('Configuration error: Firebase not configured. Contact administrator.', 'error');
+            return;
         }
 
         app = firebase.initializeApp(firebaseConfig);
@@ -56,6 +76,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // --- Authentication Functions ---
 
 /**
+ * Validates IMEI format (15 digits)
+ */
+function validateIMEI(imei) {
+    return /^[0-9]{15}$/.test(imei);
+}
+
+/**
  * Handles the login process. It takes credentials from the input fields,
  * calls the 'generateCustomToken' Cloud Function to get a Firebase Auth token,
  * signs in with that token, and if successful, saves the session and loads the dashboard.
@@ -66,6 +93,18 @@ function login() {
     
     if (!masterImei || !secretKey) {
         showNotification('Please enter both Master IMEI and Secret Key.', 'error');
+        return;
+    }
+    
+    // Validate IMEI format
+    if (!validateIMEI(masterImei)) {
+        showNotification('Invalid IMEI format. Must be exactly 15 digits.', 'error');
+        return;
+    }
+    
+    // Validate secret key length (should be a secure random string)
+    if (secretKey.length < 32) {
+        showNotification('Invalid secret key format. Key appears too short.', 'error');
         return;
     }
 

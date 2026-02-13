@@ -21,3 +21,13 @@ lib/
 
 # Keep only safe templates in git
 !**/google-services.template.json
+
+# Environment files (sensitive configs)
+.env
+.env.local
+.env.production
+.env.development
+admin-panel/.env
+admin-panel/.env.local
+web-control/.env
+web-control/.env.local

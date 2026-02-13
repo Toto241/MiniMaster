@@ -2,20 +2,42 @@
 /* global firebase */
 // MiniMaster Operator Dashboard JavaScript
 
-// Firebase configuration (MUST be replaced with actual config)
+// Firebase configuration - uses environment variables
+// For development: copy .env.example to .env and fill in values
+// Note: Environment variables are accessed differently in plain HTML/JS vs build tools
+// Since this is a static HTML page, we check for both import.meta.env (Vite) and window.ENV
 const firebaseConfig = {
-    apiKey: "your-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "your-app-id"
+    apiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_API_KEY) || 
+            (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_API_KEY) || 
+            "your-api-key",
+    authDomain: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN) || 
+                (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_AUTH_DOMAIN) || 
+                "your-project.firebaseapp.com",
+    projectId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_PROJECT_ID) || 
+               (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_PROJECT_ID) || 
+               "your-project-id",
+    storageBucket: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET) || 
+                   (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_STORAGE_BUCKET) || 
+                   "your-project.appspot.com",
+    messagingSenderId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID) || 
+                       (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_MESSAGING_SENDER_ID) || 
+                       "123456789",
+    appId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_APP_ID) || 
+           (typeof window !== 'undefined' && window.ENV?.VITE_FIREBASE_APP_ID) || 
+           "your-app-id"
 };
 
 let app, auth, db, functions;
 
 document.addEventListener("DOMContentLoaded", function() {
     try {
+        // Validate Firebase configuration
+        if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "your-api-key") {
+            console.error('Firebase configuration missing. Check .env file');
+            showNotification('Configuration error: Firebase not configured. Contact administrator.', 'error');
+            return;
+        }
+        
         app = firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
         db = firebase.firestore();
@@ -51,10 +73,25 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // --- Authentication ---
 
+function validateEmail(email) {
+    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+}
+
 function handleLogin(event) {
     event.preventDefault();
-    const email = document.getElementById("login-email").value;
-    const password = document.getElementById("login-password").value;
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value.trim();
+    
+    // Validate email format
+    if (!validateEmail(email)) {
+        showNotification("Invalid email format.", "error");
+        return;
+    }
+    
+    if (!password || password.length < 6) {
+        showNotification("Password must be at least 6 characters.", "error");
+        return;
+    }
 
     auth.signInWithEmailAndPassword(email, password)
         .catch(error => {
