@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import fft from "firebase-functions-test";
+import * as admin from "firebase-admin";
 
 type DocData = Record<string, any>;
-const admin = require("firebase-admin");
 
 const state: {
   masters: Record<string, DocData>;
