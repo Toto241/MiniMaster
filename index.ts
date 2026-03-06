@@ -1135,6 +1135,13 @@ export const validatePairingToken = functions.https.onCall(
 
     const expiresAt = tokenData.expiresAt as admin.firestore.Timestamp;
     const masterId = (tokenData.masterId || tokenData.masterImei) as string | undefined;
+
+    if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
+      functions.logger.error(`DATA_CORRUPTION Pairing token ${pairingToken} has invalid 'expiresAt' field.`);
+      await tokenRef.delete();
+      throw new functions.https.HttpsError("internal", "Invalid pairing token data structure.");
+    }
+
     const now = admin.firestore.Timestamp.now();
     if (now.seconds > expiresAt.seconds) {
       await tokenRef.delete();
@@ -1183,6 +1190,11 @@ export const onTaskStatusChange = functions.firestore
     .onUpdate(async (change, context) => {
         const newValue = change.after.data();
         const previousValue = change.before.data();
+
+        if (!newValue || !previousValue) {
+            functions.logger.warn(`Task update ${context.params.taskId} has missing before/after data. Skipping notification.`);
+            return;
+        }
 
         // Check if the status has changed to pending_approval
         if (newValue.status === "pending_approval" && previousValue.status !== "pending_approval") {
