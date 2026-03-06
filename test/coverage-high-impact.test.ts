@@ -2,6 +2,7 @@
 import fft from "firebase-functions-test";
 
 type DocData = Record<string, any>;
+const admin = require("firebase-admin");
 
 const state: {
   masters: Record<string, DocData>;
@@ -274,7 +275,7 @@ beforeEach(() => {
   };
 
   const expiresMs = Date.now() + 24 * 60 * 60 * 1000;
-  const validUntil = { seconds: Math.floor(expiresMs / 1000), nanoseconds: (expiresMs % 1000) * 1_000_000 };
+  const validUntil = admin.firestore.Timestamp.fromMillis(expiresMs);
   state.pairingTokens["tok-valid"] = { masterImei: "m1", expiresAt: validUntil };
 
   mockSubscriptionGet.mockResolvedValue({
@@ -401,11 +402,23 @@ describe("coverage high impact callable suite", () => {
     const expiredMs = Date.now() - 60_000;
     state.pairingTokens["tok-expired"] = {
       masterImei: "m1",
-      expiresAt: { seconds: Math.floor(expiredMs / 1000), nanoseconds: 0 },
+      expiresAt: admin.firestore.Timestamp.fromMillis(expiredMs),
     };
 
     await expect(validatePairingToken({ pairingToken: "tok-expired" }, asChild)).rejects.toThrow(/expired/);
     await expect(updateFCMToken({ fcmToken: "" }, asMaster)).rejects.toThrow(/fcmToken/);
+  });
+
+  it("bereinigt beschädigte Pairing-Token mit ungültigem expiresAt", async () => {
+    const validatePairingToken = testEnv.wrap(fns.validatePairingToken);
+    state.pairingTokens["tok-corrupt"] = {
+      masterImei: "m1",
+      expiresAt: { seconds: 123, nanoseconds: 0 },
+    };
+
+    await expect(validatePairingToken({ pairingToken: "tok-corrupt" }, asChild))
+      .rejects.toThrow(/Invalid pairing token data structure/);
+    expect(state.pairingTokens["tok-corrupt"]).toBeUndefined();
   });
 
   it("deckt negative Purchase-Verifikation ab", async () => {
