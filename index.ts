@@ -21,6 +21,274 @@ function requireAdmin(context: CallableContext): void {
   }
 }
 
+// --- Audit Logging Infrastructure ---
+
+/**
+ * Type definition for all possible audit actions in the system.
+ * Each action represents a specific operation that should be logged.
+ */
+type AuditAction = 
+  // Device Management
+  | "device.register"
+  | "device.lock"
+  | "device.unlock"
+  | "device.pair"
+  | "device.unpair"
+  | "device.delete"
+  // Task Management
+  | "task.create"
+  | "task.update"
+  | "task.delete"
+  | "task.approve"
+  | "task.reject"
+  | "task.complete"
+  // Rule Management
+  | "rules.update_blacklist"
+  | "rules.update_usage"
+  | "rules.update_screen_time"
+  // Authentication
+  | "auth.login"
+  | "auth.logout"
+  | "auth.token_generated"
+  | "auth.token_revoked"
+  // Admin Actions
+  | "admin.grant_support_access"
+  | "admin.revoke_support_access"
+  | "admin.set_admin_claim"
+  | "admin.user_impersonation"
+  | "admin.revoke_subscription"
+  // Subscription
+  | "subscription.verify_purchase"
+  | "subscription.activated"
+  // System
+  | "system.heartbeat"
+  | "system.error";
+
+/**
+ * Interface representing a single audit log entry.
+ */
+interface AuditLog {
+  timestamp: admin.firestore.Timestamp;
+  userId: string;              // uid (masterImei or childImei)
+  userRole: "master" | "child" | "admin" | "support" | "unknown";
+  action: AuditAction;
+  resource: string;            // e.g. "children/123456789012345"
+  resourceType: "device" | "task" | "rule" | "subscription" | "user" | "system";
+  status: "success" | "failure" | "denied";
+  metadata: {
+    [key: string]: any;        // Additional context data
+  };
+  ipAddress?: string;
+  userAgent?: string;
+  errorMessage?: string;       // For failures
+  duration?: number;           // Execution time in ms
+}
+
+/**
+ * Centralized Audit Logger utility class.
+ * Handles all audit logging operations and ensures consistent logging across the system.
+ */
+class AuditLogger {
+  private static collection = () => db().collection("audit_logs");
+
+  /**
+   * Log an audit event to Firestore and Cloud Logging.
+   * @param action - The action being performed
+   * @param userId - The user performing the action
+   * @param userRole - The role of the user
+   * @param resource - The resource being acted upon
+   * @param resourceType - The type of resource
+   * @param status - Whether the action succeeded, failed, or was denied
+   * @param metadata - Additional context data
+   * @param error - Optional error object for failures
+   */
+  static async log(
+    action: AuditAction,
+    userId: string,
+    userRole: string,
+    resource: string,
+    resourceType: string,
+    status: "success" | "failure" | "denied",
+    metadata: Record<string, any> = {},
+    error?: Error
+  ): Promise<void> {
+    try {
+      const logEntry: AuditLog = {
+        timestamp: admin.firestore.FieldValue.serverTimestamp() as admin.firestore.Timestamp,
+        userId,
+        userRole: userRole as any,
+        action,
+        resource,
+        resourceType: resourceType as any,
+        status,
+        metadata,
+        errorMessage: error?.message,
+      };
+
+      await this.collection().add(logEntry);
+
+      // Parallel: Log to Cloud Logging for external systems
+      if (status === "failure" || status === "denied") {
+        functions.logger.error("Audit Event", {
+          action,
+          userId,
+          status,
+          error: error?.message,
+        });
+      } else {
+        functions.logger.info("Audit Event", { action, userId, status });
+      }
+    } catch (loggingError) {
+      // If logging fails, don't crash the main function
+      functions.logger.error("Failed to write audit log", { error: loggingError });
+    }
+  }
+
+  /**
+   * Helper method for logging successful operations.
+   * @param action - The action that succeeded
+   * @param context - The callable context
+   * @param resource - The resource that was acted upon
+   * @param resourceType - The type of resource
+   * @param metadata - Additional context data
+   */
+  static async logSuccess(
+    action: AuditAction,
+    context: CallableContext,
+    resource: string,
+    resourceType: string,
+    metadata: Record<string, any> = {}
+  ): Promise<void> {
+    if (!context.auth) return;
+    
+    await this.log(
+      action,
+      context.auth.uid,
+      (context.auth.token.role as string) || "unknown",
+      resource,
+      resourceType,
+      "success",
+      metadata
+    );
+  }
+
+  /**
+   * Helper method for logging failed operations.
+   * @param action - The action that failed
+   * @param context - The callable context (may be null for unauthenticated requests)
+   * @param resource - The resource that was being acted upon
+   * @param resourceType - The type of resource
+   * @param error - The error that occurred
+   * @param metadata - Additional context data
+   */
+  static async logFailure(
+    action: AuditAction,
+    context: CallableContext | null,
+    resource: string,
+    resourceType: string,
+    error: Error,
+    metadata: Record<string, any> = {}
+  ): Promise<void> {
+    await this.log(
+      action,
+      context?.auth?.uid || "anonymous",
+      (context?.auth?.token?.role as string) || "unknown",
+      resource,
+      resourceType,
+      "failure",
+      metadata,
+      error
+    );
+  }
+
+  /**
+   * Helper method for logging denied access attempts.
+   * @param action - The action that was denied
+   * @param context - The callable context
+   * @param resource - The resource that access was denied to
+   * @param resourceType - The type of resource
+   * @param reason - The reason for denial
+   * @param metadata - Additional context data
+   */
+  static async logDenied(
+    action: AuditAction,
+    context: CallableContext,
+    resource: string,
+    resourceType: string,
+    reason: string,
+    metadata: Record<string, any> = {}
+  ): Promise<void> {
+    if (!context.auth) return;
+    
+    await this.log(
+      action,
+      context.auth.uid,
+      (context.auth.token.role as string) || "unknown",
+      resource,
+      resourceType,
+      "denied",
+      { ...metadata, reason }
+    );
+  }
+}
+
+/**
+ * Custom error class with severity levels for better error tracking.
+ */
+class AppError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public severity: "low" | "medium" | "high" | "critical",
+    public metadata: Record<string, any> = {}
+  ) {
+    super(message);
+    this.name = "AppError";
+  }
+}
+
+/**
+ * Centralized error handler that logs errors to Firestore and Cloud Logging.
+ * @param error - The error to handle
+ * @param context - The callable context (may be null)
+ * @param functionName - The name of the function where the error occurred
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function handleError(
+  error: Error,
+  context: CallableContext | null,
+  functionName: string
+): Promise<void> {
+  const errorDetails = {
+    functionName,
+    message: error.message,
+    stack: error.stack,
+    userId: context?.auth?.uid,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  
+  try {
+    // Log to Firestore
+    await db().collection("error_logs").add(errorDetails);
+    
+    // Log to Cloud Logging
+    functions.logger.error("Function Error", { 
+      ...errorDetails, 
+      timestamp: new Date().toISOString() 
+    });
+    
+    // Optional: Alert for critical errors
+    if (error instanceof AppError && error.severity === "critical") {
+      functions.logger.error("CRITICAL ERROR", { 
+        ...errorDetails, 
+        timestamp: new Date().toISOString() 
+      });
+    }
+  } catch (loggingError) {
+    functions.logger.error("Failed to log error", { error: loggingError });
+  }
+}
+
 // --- Admin Panel Functions ---
 
 /**
@@ -33,18 +301,43 @@ function requireAdmin(context: CallableContext): void {
  * to ensure the caller is already an admin.
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
-    requireAdmin(context);
+    const startTime = Date.now();
     
-    const uid = data.uid;
-    if (!uid) {
-        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a user UID.");
-    }
-
     try {
+        requireAdmin(context);
+        
+        const uid = data.uid;
+        if (!uid) {
+            throw new functions.https.HttpsError("invalid-argument", "The function must be called with a user UID.");
+        }
+
         await admin.auth().setCustomUserClaims(uid, { role: "admin" });
+        
+        // Log successful admin claim grant
+        await AuditLogger.logSuccess(
+            "admin.set_admin_claim",
+            context,
+            `users/${uid}`,
+            "user",
+            { targetUserId: uid, duration: Date.now() - startTime }
+        );
+        
         return { message: `Success! Custom claim 'admin' set for user ${uid}` };
     } catch (error) {
+        // Log failure
+        await AuditLogger.logFailure(
+            "admin.set_admin_claim",
+            context,
+            `users/${data.uid || "unknown"}`,
+            "user",
+            error as Error,
+            { targetUserId: data.uid }
+        );
+        
         console.error("Error setting custom claim:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         throw new functions.https.HttpsError("internal", "Failed to set admin claim.");
     }
 });
@@ -54,15 +347,17 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
  * This function must be protected by the 'admin' custom claim.
  */
 export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
-    requireAdmin(context);
-  const adminUid = context.auth?.uid;
-
-    const subscriptionId = data.subscriptionId;
-    if (!subscriptionId) {
-        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a subscriptionId.");
-    }
-
+    const startTime = Date.now();
+    
     try {
+        requireAdmin(context);
+        const adminUid = context.auth?.uid;
+
+        const subscriptionId = data.subscriptionId;
+        if (!subscriptionId) {
+            throw new functions.https.HttpsError("invalid-argument", "The function must be called with a subscriptionId.");
+        }
+
         // Read the subscription document first to get the masterId
         const subDoc = await admin.firestore().collection("subscriptions").doc(subscriptionId).get();
         if (!subDoc.exists) {
@@ -74,18 +369,40 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
         await admin.firestore().collection("subscriptions").doc(subscriptionId).update({
             status: "revoked",
             revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-          revokedBy: adminUid ?? "unknown-admin"
+            revokedBy: adminUid ?? "unknown-admin"
         });
         
         if (masterId) {
-             await admin.firestore().collection("masters").doc(masterId).update({
+            await admin.firestore().collection("masters").doc(masterId).update({
                 isPremium: false
             });
         }
 
+        // Log successful revocation
+        await AuditLogger.logSuccess(
+            "admin.revoke_subscription",
+            context,
+            `subscriptions/${subscriptionId}`,
+            "subscription",
+            { subscriptionId, masterId, duration: Date.now() - startTime }
+        );
+
         return { message: `Subscription ${subscriptionId} successfully revoked.` };
     } catch (error) {
+        // Log failure
+        await AuditLogger.logFailure(
+            "admin.revoke_subscription",
+            context,
+            `subscriptions/${data.subscriptionId}`,
+            "subscription",
+            error as Error,
+            { subscriptionId: data.subscriptionId }
+        );
+        
         console.error("Error revoking subscription:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         throw new functions.https.HttpsError("internal", "Failed to revoke subscription.");
     }
 });
@@ -103,16 +420,17 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
  * or if a unique code cannot be generated.
  */
 export const createPairingCode = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+  const startTime = Date.now();
   const masterId = requireAuth(context);
 
   const pairingCodesRef = db().collection("pairingCodes");
   const maxAttempts = 10; // Verhindert eine Endlosschleife
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
+  try {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
 
-    try {
       const doc = await pairingCodeDocRef.get();
       if (!doc.exists) {
         const now = admin.firestore.Timestamp.now();
@@ -125,23 +443,52 @@ export const createPairingCode = functions.https.onCall(async (_data: Record<str
           expiresAt: expiresAt,
         });
 
+        await AuditLogger.logSuccess(
+          "device.pair",
+          context,
+          `pairingCodes/${pairingCode}`,
+          "device",
+          { codeType: "6digit", expiresIn: "24h", duration: Date.now() - startTime }
+        );
+
         functions.logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
         return { pairingCode: pairingCode };
       }
-    } catch (error) {
-      functions.logger.error("Error checking for pairing code uniqueness:", error);
+    }
+
+    // Resource exhausted - log and throw
+    await AuditLogger.logFailure(
+      "device.pair",
+      context,
+      `masters/${masterId}`,
+      "device",
+      new Error("Could not create unique pairing code after 10 attempts"),
+      { codeType: "6digit", maxAttempts }
+    );
+
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Could not create a unique pairing code. Please try again later."
+    );
+  } catch (error) {
+    // Only log if not already an HttpsError (which was already logged above)
+    if (!(error instanceof functions.https.HttpsError)) {
+      await AuditLogger.logFailure(
+        "device.pair",
+        context,
+        `masters/${masterId}`,
+        "device",
+        error as Error,
+        { codeType: "6digit" }
+      );
       throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred while creating the pairing code.",
         error
       );
     }
+    throw error;
   }
-
-  throw new functions.https.HttpsError(
-    "resource-exhausted",
-    "Could not create a unique pairing code. Please try again later."
-  );
 });
 
 /**
@@ -156,6 +503,7 @@ export const createPairingCode = functions.https.onCall(async (_data: Record<str
  * @throws {functions.https.HttpsError} Throws an error if the code is invalid, not found, expired, or malformed.
  */
 export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string }, context: CallableContext) => {
+  const startTime = Date.now();
   const { pairingCode } = data;
   const childId = requireAuth(context);
 
@@ -235,6 +583,14 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     if (!isPremium) {
       const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
       if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        await AuditLogger.logDenied(
+          "device.pair",
+          context,
+          `children/${childId}`,
+          "device",
+          "Free tier limited to 1 child device",
+          { masterId, childCount: childrenQuery.size }
+        );
         throw new functions.https.HttpsError(
           "resource-exhausted",
           "Free tier limited to 1 child device. Please upgrade to Premium."
@@ -253,9 +609,32 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     await pairingCodeRef.delete();
     functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
 
+    await AuditLogger.logSuccess(
+      "device.pair",
+      context,
+      `children/${childId}`,
+      "device",
+      { masterId, pairingMethod: "code", duration: Date.now() - startTime }
+    );
+
     return { childId: childId };
 
   } catch (error) {
+    // Only log if not already logged (e.g., logDenied was already called for free tier limit)
+    if (error instanceof functions.https.HttpsError && error.code === "resource-exhausted") {
+      // Already logged with logDenied above
+      throw error;
+    }
+    
+    await AuditLogger.logFailure(
+      "device.pair",
+      context,
+      `children/${childId}`,
+      "device",
+      error as Error,
+      { pairingMethod: "code" }
+    );
+    
     if (error instanceof functions.https.HttpsError) {
         functions.logger.warn(`Validation failed for code ${pairingCode}:`, error.message, error.code, error.details);
         throw error;
@@ -277,13 +656,31 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
  */
 export const generateCustomToken = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
     const uid = requireAuth(context);
 
     try {
       const user = await admin.auth().getUser(uid);
       const customToken = await admin.auth().createCustomToken(uid, user.customClaims || {});
+      
+      await AuditLogger.logSuccess(
+        "auth.token_generated",
+        context,
+        `users/${uid}`,
+        "user",
+        { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime }
+      );
+      
       return { customToken };
     } catch (error) {
+      await AuditLogger.logFailure(
+        "auth.token_generated",
+        context,
+        `users/${uid}`,
+        "user",
+        error as Error
+      );
+      
       functions.logger.error("Error generating custom token:", error);
       throw new functions.https.HttpsError(
         "internal",
@@ -305,6 +702,7 @@ export const generateCustomToken = functions.https.onCall(
  */
 export const registerMasterDevice = functions.https.onCall(
   async (data: { imei: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { imei } = data;
     if (!imei || typeof imei !== "string") {
@@ -319,6 +717,13 @@ export const registerMasterDevice = functions.https.onCall(
   try {
     const doc = await masterDeviceRef.get();
     if (doc.exists) {
+      await AuditLogger.logSuccess(
+        "device.register",
+        context,
+        `masters/${masterId}`,
+        "device",
+        { imei, alreadyExists: true, duration: Date.now() - startTime }
+      );
       return { masterId: masterId };
     }
 
@@ -333,10 +738,27 @@ export const registerMasterDevice = functions.https.onCall(
 
     await admin.auth().setCustomUserClaims(masterId, { role: "master" });
 
+    await AuditLogger.logSuccess(
+      "device.register",
+      context,
+      `masters/${masterId}`,
+      "device",
+      { imei, duration: Date.now() - startTime }
+    );
+
     functions.logger.info(`Master account registered for uid: ${masterId}`);
     return { masterId: masterId };
 
   } catch (error) {
+    await AuditLogger.logFailure(
+      "device.register",
+      context,
+      `masters/${masterId}`,
+      "device",
+      error as Error,
+      { imei }
+    );
+    
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
@@ -362,6 +784,7 @@ export const registerMasterDevice = functions.https.onCall(
  */
 export const generatePairingLink = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
 
   const masterDeviceRef = db().collection("masters").doc(masterId);
@@ -382,6 +805,14 @@ export const generatePairingLink = functions.https.onCall(
     if (!isPremium) {
       const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
       if (!childrenQuery.empty && childrenQuery.size >= 1) {
+        await AuditLogger.logDenied(
+          "device.pair",
+          context,
+          `masters/${masterId}`,
+          "device",
+          "Free tier limited to 1 child device",
+          { childCount: childrenQuery.size }
+        );
         throw new functions.https.HttpsError(
           "resource-exhausted",
           "Free tier limited to 1 child device. Please upgrade to Premium."
@@ -401,10 +832,27 @@ export const generatePairingLink = functions.https.onCall(
       expiresAt: expiresAt,
     });
 
+    await AuditLogger.logSuccess(
+      "device.pair",
+      context,
+      `pairingTokens/${pairingToken}`,
+      "device",
+      { tokenType: "link", expiresIn: "5min", duration: Date.now() - startTime }
+    );
+
     functions.logger.info(`Pairing token created for masterId: ${masterId}`);
     return { pairingToken: pairingToken };
 
   } catch (error) {
+    await AuditLogger.logFailure(
+      "device.pair",
+      context,
+      `masters/${masterId}`,
+      "device",
+      error as Error,
+      { tokenType: "link" }
+    );
+    
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
@@ -431,6 +879,7 @@ export const generatePairingLink = functions.https.onCall(
  */
 export const setDeviceLocked = functions.https.onCall(
   async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { childId, isLocked } = data;
 
@@ -453,6 +902,14 @@ export const setDeviceLocked = functions.https.onCall(
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        isLocked ? "device.lock" : "device.unlock",
+        context,
+        `children/${childId}`,
+        "device",
+        "Master not authorized for this child",
+        { childId, isLocked }
+      );
       throw new functions.https.HttpsError(
         "permission-denied",
         "This master device is not authorized to control the specified child device."
@@ -465,10 +922,27 @@ export const setDeviceLocked = functions.https.onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      await AuditLogger.logSuccess(
+        isLocked ? "device.lock" : "device.unlock",
+        context,
+        `children/${childId}`,
+        "device",
+        { childId, isLocked, duration: Date.now() - startTime }
+      );
+
       functions.logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
       return { success: true, isLocked: isLocked };
 
     } catch (error) {
+      await AuditLogger.logFailure(
+        isLocked ? "device.lock" : "device.unlock",
+        context,
+        `children/${childId}`,
+        "device",
+        error as Error,
+        { childId, isLocked }
+      );
+      
       functions.logger.error(`Failed to set lock state for child ${childId}:`, error);
       throw new functions.https.HttpsError(
         "internal",
@@ -492,6 +966,7 @@ export const setDeviceLocked = functions.https.onCall(
  */
 export const updateAppBlacklist = functions.https.onCall(
   async (data: { childId: string; appBlacklist: string[] }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { childId, appBlacklist } = data;
 
@@ -514,6 +989,14 @@ export const updateAppBlacklist = functions.https.onCall(
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "rules.update_blacklist",
+        context,
+        `children/${childId}`,
+        "rule",
+        "Master not authorized for this child",
+        { childId, appCount: appBlacklist.length }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
     }
 
@@ -522,9 +1005,27 @@ export const updateAppBlacklist = functions.https.onCall(
         appBlacklist: appBlacklist,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      
+      await AuditLogger.logSuccess(
+        "rules.update_blacklist",
+        context,
+        `children/${childId}`,
+        "rule",
+        { childId, appCount: appBlacklist.length, duration: Date.now() - startTime }
+      );
+      
       functions.logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     } catch (error) {
+      await AuditLogger.logFailure(
+        "rules.update_blacklist",
+        context,
+        `children/${childId}`,
+        "rule",
+        error as Error,
+        { childId, appCount: appBlacklist.length }
+      );
+      
       functions.logger.error(`Failed to update blacklist for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to update app blacklist.", error);
     }
@@ -544,6 +1045,7 @@ export const updateAppBlacklist = functions.https.onCall(
  */
 export const setUsageRules = functions.https.onCall(
   async (data: { childId: string; usageRules: object }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { childId, usageRules } = data;
     if (
@@ -565,6 +1067,14 @@ export const setUsageRules = functions.https.onCall(
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "rules.update_usage",
+        context,
+        `children/${childId}`,
+        "rule",
+        "Master not authorized for this child",
+        { childId }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
     }
 
@@ -573,9 +1083,27 @@ export const setUsageRules = functions.https.onCall(
         usageRules: usageRules,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      
+      await AuditLogger.logSuccess(
+        "rules.update_usage",
+        context,
+        `children/${childId}`,
+        "rule",
+        { childId, duration: Date.now() - startTime }
+      );
+      
       functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     } catch (error) {
+      await AuditLogger.logFailure(
+        "rules.update_usage",
+        context,
+        `children/${childId}`,
+        "rule",
+        error as Error,
+        { childId }
+      );
+      
       functions.logger.error(`Failed to set usage rules for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
     }
@@ -592,6 +1120,7 @@ export const setUsageRules = functions.https.onCall(
  */
 export const recordHeartbeat = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
     const childId = requireAuth(context);
     const childDeviceRef = db().collection("children").doc(childId);
 
@@ -608,9 +1137,26 @@ export const recordHeartbeat = functions.https.onCall(
         lastSeen: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      await AuditLogger.logSuccess(
+        "system.heartbeat",
+        context,
+        `children/${childId}`,
+        "system",
+        { childId, duration: Date.now() - startTime }
+      );
+
       return { success: true };
 
     } catch (error) {
+      await AuditLogger.logFailure(
+        "system.heartbeat",
+        context,
+        `children/${childId}`,
+        "system",
+        error as Error,
+        { childId }
+      );
+      
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
@@ -636,6 +1182,7 @@ export const recordHeartbeat = functions.https.onCall(
  */
 export const registerFcmToken = functions.https.onCall(
   async (data: { token: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const childId = requireAuth(context);
     const { token } = data;
 
@@ -655,10 +1202,28 @@ export const registerFcmToken = functions.https.onCall(
       }
 
       await childDeviceRef.update({ fcmToken: token });
+      
+      await AuditLogger.logSuccess(
+        "device.register",
+        context,
+        `children/${childId}`,
+        "device",
+        { tokenType: "fcm", childId, duration: Date.now() - startTime }
+      );
+      
       functions.logger.info(`FCM token for child ${childId} has been registered.`);
       return { success: true };
 
     } catch (error) {
+        await AuditLogger.logFailure(
+          "device.register",
+          context,
+          `children/${childId}`,
+          "device",
+          error as Error,
+          { tokenType: "fcm", childId }
+        );
+        
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
@@ -838,6 +1403,7 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
  */
 export const createTask = functions.https.onCall(
   async (data: { childId: string; description: string; deadlineISO: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { childId, description, deadlineISO } = data;
 
@@ -854,20 +1420,48 @@ export const createTask = functions.https.onCall(
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "task.create",
+        context,
+        `children/${childId}/tasks`,
+        "task",
+        "Master not authorized for this child",
+        { childId, description }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
     }
 
-    const taskRef = childDeviceRef.collection("tasks").doc();
-    await taskRef.set({
-      description: description,
-      deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
-      status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      masterImei: masterId, // Denormalize for easier querying
-    });
+    try {
+      const taskRef = childDeviceRef.collection("tasks").doc();
+      await taskRef.set({
+        description: description,
+        deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        masterImei: masterId, // Denormalize for easier querying
+      });
 
-    functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
-    return { success: true, taskId: taskRef.id };
+      await AuditLogger.logSuccess(
+        "task.create",
+        context,
+        `children/${childId}/tasks/${taskRef.id}`,
+        "task",
+        { childId, taskId: taskRef.id, description, deadline: deadlineISO, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
+      return { success: true, taskId: taskRef.id };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "task.create",
+        context,
+        `children/${childId}/tasks`,
+        "task",
+        error as Error,
+        { childId, description }
+      );
+      throw error;
+    }
   }
 );
 
@@ -884,6 +1478,7 @@ export const createTask = functions.https.onCall(
  */
 export const completeTask = functions.https.onCall(
   async (data: { taskId: string; photoUrl: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const childId = requireAuth(context);
     const { taskId, photoUrl } = data;
 
@@ -893,23 +1488,45 @@ export const completeTask = functions.https.onCall(
 
     const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
 
-    const taskDoc = await taskRef.get();
-    if (!taskDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
-    }
+    try {
+      const taskDoc = await taskRef.get();
+      if (!taskDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
+      }
 
-    const current = taskDoc.data() as any;
-    if (current.status && current.status !== "pending") {
-      throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
+      const current = taskDoc.data() as any;
+      if (current.status && current.status !== "pending") {
+        throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
+      }
+      
+      await taskRef.update({
+        status: "pending_approval",
+        photoUrl: photoUrl,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      await AuditLogger.logSuccess(
+        "task.complete",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        { childId, taskId, duration: Date.now() - startTime }
+      );
+      
+      functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "task.complete",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        error as Error,
+        { childId, taskId }
+      );
+      throw error;
     }
-    await taskRef.update({
-      status: "pending_approval",
-      photoUrl: photoUrl,
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
-    return { success: true };
   }
 );
 
@@ -926,6 +1543,7 @@ export const completeTask = functions.https.onCall(
  */
 export const approveTask = functions.https.onCall(
   async (data: { childId: string; taskId: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { childId, taskId } = data;
 
@@ -942,21 +1560,51 @@ export const approveTask = functions.https.onCall(
     const childDeviceRef = db().collection("children").doc(childId);
     const childDoc = await childDeviceRef.get();
     if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "task.approve",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        "Master not authorized for this child",
+        { childId, taskId }
+      );
       throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
     }
 
-    const taskRef = childDeviceRef.collection("tasks").doc(taskId);
-    const taskSnap = await taskRef.get();
-    if (!taskSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "Task not found.");
+    try {
+      const taskRef = childDeviceRef.collection("tasks").doc(taskId);
+      const taskSnap = await taskRef.get();
+      if (!taskSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Task not found.");
+      }
+      const taskData = taskSnap.data() as any;
+      if (taskData.status !== "pending_approval") {
+        throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
+      }
+      
+      await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      
+      await AuditLogger.logSuccess(
+        "task.approve",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        { childId, taskId, duration: Date.now() - startTime }
+      );
+      
+      functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "task.approve",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        error as Error,
+        { childId, taskId }
+      );
+      throw error;
     }
-    const taskData = taskSnap.data() as any;
-    if (taskData.status !== "pending_approval") {
-      throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
-    }
-    await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
-    return { success: true };
   }
 );
 
@@ -973,6 +1621,7 @@ export const approveTask = functions.https.onCall(
  */
 export const verifyPurchase = functions.https.onCall(
   async (data: { purchaseToken: string; sku: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { purchaseToken, sku } = data;
 
@@ -981,38 +1630,71 @@ export const verifyPurchase = functions.https.onCall(
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
+    
+    try {
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
 
-    const isPurchaseValid = await verifyPlaySubscription(
-        "com.minimaster.masterapp",
-        sku,
-        purchaseToken
-    ).catch((e) => {
-        functions.logger.error("Error verifying Google Play purchase:", e);
-        return false;
-    });
-
-    if (isPurchaseValid) {
-      const now = admin.firestore.Timestamp.now();
-      const subscriptionType = sku;
-      const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 30 * 24 * 60 * 60 * 1000);
-
-      await masterDeviceRef.update({
-        subscription: {
-          status: "active",
-          type: subscriptionType,
-          startedAt: now,
-          expiresAt: expiresAt,
-        },
+      const isPurchaseValid = await verifyPlaySubscription(
+          "com.minimaster.masterapp",
+          sku,
+          purchaseToken
+      ).catch((e) => {
+          functions.logger.error("Error verifying Google Play purchase:", e);
+          return false;
       });
-      functions.logger.info(`Subscription ${sku} activated for master ${masterId}.`);
-      return { success: true, subscriptionStatus: "active" };
-    } else {
-      functions.logger.warn(`Invalid purchase token received for master ${masterId}.`);
-      throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
+
+      if (isPurchaseValid) {
+        const now = admin.firestore.Timestamp.now();
+        const subscriptionType = sku;
+        const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 30 * 24 * 60 * 60 * 1000);
+
+        await masterDeviceRef.update({
+          subscription: {
+            status: "active",
+            type: subscriptionType,
+            startedAt: now,
+            expiresAt: expiresAt,
+          },
+        });
+        
+        await AuditLogger.logSuccess(
+          "subscription.verify_purchase",
+          context,
+          `masters/${masterId}`,
+          "subscription",
+          { masterId, sku, subscriptionType, duration: Date.now() - startTime }
+        );
+        
+        functions.logger.info(`Subscription ${sku} activated for master ${masterId}.`);
+        return { success: true, subscriptionStatus: "active" };
+      } else {
+        await AuditLogger.logFailure(
+          "subscription.verify_purchase",
+          context,
+          `masters/${masterId}`,
+          "subscription",
+          new Error("Purchase verification failed"),
+          { masterId, sku }
+        );
+        
+        functions.logger.warn(`Invalid purchase token received for master ${masterId}.`);
+        throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
+      }
+    } catch (error) {
+      if (!(error instanceof functions.https.HttpsError)) {
+        await AuditLogger.logFailure(
+          "subscription.verify_purchase",
+          context,
+          `masters/${masterId}`,
+          "subscription",
+          error as Error,
+          { masterId, sku }
+        );
+      }
+      throw error;
     }
   }
 );
@@ -1052,6 +1734,7 @@ export const getSubscriptionStatus = functions.https.onCall(
  */
 export const reportDailyUsage = functions.https.onCall(
   async (data: { date: string; usageMillis: number }, context: CallableContext) => {
+    const startTime = Date.now();
     const childId = requireAuth(context);
     const { date, usageMillis } = data;
 
@@ -1068,8 +1751,25 @@ export const reportDailyUsage = functions.https.onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true }); // Merge to allow partial updates during the day
 
+      await AuditLogger.logSuccess(
+        "system.heartbeat",
+        context,
+        `children/${childId}/usageHistory/${date}`,
+        "system",
+        { childId, date, usageMillis, duration: Date.now() - startTime }
+      );
+
       return { success: true };
     } catch (error) {
+      await AuditLogger.logFailure(
+        "system.heartbeat",
+        context,
+        `children/${childId}/usageHistory/${date}`,
+        "system",
+        error as Error,
+        { childId, date }
+      );
+      
       functions.logger.error(`Failed to report usage for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to save usage report.", error);
     }
@@ -1108,6 +1808,7 @@ async function verifyPlaySubscription(packageName: string, productId: string, pu
  */
 export const validatePairingToken = functions.https.onCall(
   async (data: { pairingToken: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const { pairingToken } = data;
     const childId = requireAuth(context);
 
@@ -1162,10 +1863,27 @@ export const validatePairingToken = functions.https.onCall(
 
     await tokenRef.delete();
 
+    await AuditLogger.logSuccess(
+      "device.pair",
+      context,
+      `children/${childId}`,
+      "device",
+      { masterId, pairingMethod: "token", duration: Date.now() - startTime }
+    );
+
   functions.logger.info(`Child device ${childId} successfully paired with master ${masterId}.`);
   return { childId: childId, masterId: masterId };
 
   } catch (error) {
+    await AuditLogger.logFailure(
+      "device.pair",
+      context,
+      `children/${childId}`,
+      "device",
+      error as Error,
+      { pairingMethod: "token" }
+    );
+    
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
@@ -1239,6 +1957,7 @@ export const onTaskStatusChange = functions.firestore
  * This allows the backend to send push notifications to the correct device.
  */
 export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: string }, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const { fcmToken } = data;
 
@@ -1250,24 +1969,42 @@ export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: st
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-        throw new functions.https.HttpsError(
-            "not-found",
-            "Master account not found."
-        );
-    }
-
+    
     try {
+        const masterDoc = await masterDeviceRef.get();
+        if (!masterDoc.exists) {
+            throw new functions.https.HttpsError(
+                "not-found",
+                "Master account not found."
+            );
+        }
+
         await masterDeviceRef.update({
             fcmToken: fcmToken,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
+        await AuditLogger.logSuccess(
+            "device.register",
+            context,
+            `masters/${masterId}`,
+            "device",
+            { tokenType: "fcm", masterId, duration: Date.now() - startTime }
+        );
+
         functions.logger.info(`FCM token updated for master ${masterId}.`);
         return { success: true };
 
     } catch (error) {
+        await AuditLogger.logFailure(
+            "device.register",
+            context,
+            `masters/${masterId}`,
+            "device",
+            error as Error,
+            { tokenType: "fcm", masterId }
+        );
+        
         functions.logger.error(`Failed to update FCM token for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
@@ -1282,17 +2019,19 @@ export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: st
  * This function should be called when a user requests to delete their account.
  */
 export const deleteUserAccount = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
     const masterId = requireAuth(context);
     const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-        throw new functions.https.HttpsError(
-            "not-found",
-            "Master account not found."
-        );
-    }
-
+    
     try {
+        const masterDoc = await masterDeviceRef.get();
+        if (!masterDoc.exists) {
+            throw new functions.https.HttpsError(
+                "not-found",
+                "Master account not found."
+            );
+        }
+
         // 1. Delete all children associated with the master
         const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
         const deleteChildrenPromises = childrenSnapshot.docs.map(doc => doc.ref.delete());
@@ -1315,10 +2054,33 @@ export const deleteUserAccount = functions.https.onCall(async (_data: Record<str
         // This part needs to be implemented when migrating to Firebase Auth tokens
         await admin.auth().deleteUser(masterId);
 
+        await AuditLogger.logSuccess(
+            "device.delete",
+            context,
+            `masters/${masterId}`,
+            "device",
+            { 
+                masterId, 
+                childrenDeleted: childrenSnapshot.size,
+                tasksDeleted: tasksSnapshot.size,
+                subscriptionsDeleted: subsSnapshot.size,
+                duration: Date.now() - startTime 
+            }
+        );
+
         functions.logger.info(`User account and all associated data deleted for master ${masterId}.`);
         return { success: true };
 
     } catch (error) {
+        await AuditLogger.logFailure(
+            "device.delete",
+            context,
+            `masters/${masterId}`,
+            "device",
+            error as Error,
+            { masterId }
+        );
+        
         functions.logger.error(`Failed to delete user account for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
@@ -1366,6 +2128,7 @@ export const createSupportTicket = functions.https.onCall(async (data: { problem
  * Grants temporary support access.
  */
 export const grantSupportAccess = functions.https.onCall(async (data: { ticketId: string }, context: CallableContext) => {
+    const startTime = Date.now();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1382,6 +2145,14 @@ export const grantSupportAccess = functions.https.onCall(async (data: { ticketId
         // Verify the ticket belongs to the user
         const ticketDoc = await db().collection("supportTickets").doc(ticketId).get();
         if (!ticketDoc.exists || ticketDoc.data()?.masterImei !== masterImei) {
+            await AuditLogger.logDenied(
+                "admin.grant_support_access",
+                context,
+                `supportTickets/${ticketId}`,
+                "system",
+                "Ticket not found or access denied",
+                { ticketId }
+            );
             throw new functions.https.HttpsError("permission-denied", "Ticket not found or access denied.");
         }
 
@@ -1403,10 +2174,27 @@ export const grantSupportAccess = functions.https.onCall(async (data: { ticketId
             accessGrantId: grantRef.id
         });
 
+        await AuditLogger.logSuccess(
+            "admin.grant_support_access",
+            context,
+            `supportAccessGrants/${grantRef.id}`,
+            "system",
+            { ticketId, grantId: grantRef.id, expiresAt: expiresAt.toISOString(), duration: Date.now() - startTime }
+        );
+
         functions.logger.info(`Support access granted: ${grantRef.id} for ticket ${ticketId}`);
         return { success: true, grantId: grantRef.id, expiresAt: expiresAt.toISOString() };
 
     } catch (error) {
+        await AuditLogger.logFailure(
+            "admin.grant_support_access",
+            context,
+            `supportTickets/${ticketId}`,
+            "system",
+            error as Error,
+            { ticketId }
+        );
+        
         functions.logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
         throw new functions.https.HttpsError("internal", "Failed to grant support access.", error);
     }
@@ -1416,6 +2204,7 @@ export const grantSupportAccess = functions.https.onCall(async (data: { ticketId
  * Revokes support access.
  */
 export const revokeSupportAccess = functions.https.onCall(async (data: { grantId: string }, context: CallableContext) => {
+    const startTime = Date.now();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1432,6 +2221,14 @@ export const revokeSupportAccess = functions.https.onCall(async (data: { grantId
         // Verify the grant belongs to the user
         const grantDoc = await db().collection("supportAccessGrants").doc(grantId).get();
         if (!grantDoc.exists || grantDoc.data()?.masterImei !== masterImei) {
+            await AuditLogger.logDenied(
+                "admin.revoke_support_access",
+                context,
+                `supportAccessGrants/${grantId}`,
+                "system",
+                "Grant not found or access denied",
+                { grantId }
+            );
             throw new functions.https.HttpsError("permission-denied", "Grant not found or access denied.");
         }
 
@@ -1448,10 +2245,27 @@ export const revokeSupportAccess = functions.https.onCall(async (data: { grantId
             });
         }
 
+        await AuditLogger.logSuccess(
+            "admin.revoke_support_access",
+            context,
+            `supportAccessGrants/${grantId}`,
+            "system",
+            { grantId, ticketId, duration: Date.now() - startTime }
+        );
+
         functions.logger.info(`Support access revoked: ${grantId}`);
         return { success: true };
 
     } catch (error) {
+        await AuditLogger.logFailure(
+            "admin.revoke_support_access",
+            context,
+            `supportAccessGrants/${grantId}`,
+            "system",
+            error as Error,
+            { grantId }
+        );
+        
         functions.logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
         throw new functions.https.HttpsError("internal", "Failed to revoke support access.", error);
     }
@@ -1503,6 +2317,91 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
         return null;
     }
 });
+
+/**
+ * Scheduled Function: Send daily error report
+ * Runs daily at 9 AM Europe/Berlin timezone
+ * Aggregates all errors from the last 24 hours and logs a summary
+ */
+export const sendDailyErrorReport = functions.pubsub
+    .schedule("0 9 * * *") // Daily at 9 AM
+    .timeZone("Europe/Berlin")
+    .onRun(async (_context) => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        try {
+            // Aggregate errors from the last 24 hours
+            const errorSnapshot = await db()
+                .collection("error_logs")
+                .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(yesterday))
+                .where("timestamp", "<", admin.firestore.Timestamp.fromDate(today))
+                .get();
+            
+            if (errorSnapshot.empty) {
+                functions.logger.info("Daily Error Report: No errors in the last 24 hours ✅");
+                return null;
+            }
+            
+            // Group errors by function
+            const errorsByFunction: Record<string, number> = {};
+            const errorsByType: Record<string, number> = {};
+            
+            errorSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                const functionName = data.functionName || "unknown";
+                const errorMessage = data.message || "unknown";
+                
+                errorsByFunction[functionName] = (errorsByFunction[functionName] || 0) + 1;
+                errorsByType[errorMessage] = (errorsByType[errorMessage] || 0) + 1;
+            });
+            
+            // Sort by count
+            const sortedFunctions = Object.entries(errorsByFunction)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 10); // Top 10
+            
+            const sortedErrors = Object.entries(errorsByType)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 5); // Top 5
+            
+            // Build report
+            const report = `
+╔════════════════════════════════════════════════════════════════
+║ Daily Error Report - ${today.toDateString()}
+╠════════════════════════════════════════════════════════════════
+║ Total Errors: ${errorSnapshot.size}
+║
+║ Top Errors by Function:
+${sortedFunctions.map(([name, count]) => "║   - " + name + ": " + count).join("\n")}
+║
+║ Top Error Messages:
+${sortedErrors.map(([msg, count]) => "║   - " + msg.substring(0, 60) + "...: " + count).join("\n")}
+╚════════════════════════════════════════════════════════════════
+            `;
+            
+            functions.logger.warn(report);
+            
+            // Optional: Store summary for dashboard
+            await db().collection("error_summaries").add({
+                date: today,
+                totalErrors: errorSnapshot.size,
+                errorsByFunction,
+                errorsByType,
+                generatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            
+            return null;
+            
+        } catch (error) {
+            functions.logger.error("Failed to generate daily error report:", error);
+            return null;
+        }
+    });
 
 
 // ==================== AI-POWERED SUPPORT AGENT ====================

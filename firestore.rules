@@ -156,5 +156,29 @@ service cloud.firestore {
     match /families/{familyId}/children/{childId} {
       allow read, write: if false;
     }
+
+    // --- AUDIT LOGS COLLECTION ---
+    // Audit logs track all system operations for compliance and security
+    // Read-only for admins, write access only via Cloud Functions
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // --- PERFORMANCE METRICS COLLECTION ---
+    // Performance metrics track function execution times and success rates
+    // Read-only for admins, write access only via Cloud Functions
+    match /performance_metrics/{metricId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // --- ERROR LOGS COLLECTION ---
+    // Error logs track all system errors for debugging and monitoring
+    // Read-only for admins, write access only via Cloud Functions
+    match /error_logs/{errorId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Cloud Functions can write
+    }
   }
 }
