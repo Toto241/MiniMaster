@@ -1,801 +1,330 @@
-openapi: 3.0.3
-info:
-  title: Mini-Master Cloud Functions API
-  description: API documentation for Mini-Master Firebase Cloud Functions
-  version: 1.0.0
-  contact:
-    name: Mini-Master Team
-  license:
-    name: ISC
-
-servers:
-  - url: https://us-central1-{project-id}.cloudfunctions.net
-    description: Firebase Cloud Functions endpoint
-    variables:
-      project-id:
-        default: minimaster-dev
-        description: Firebase project ID
-
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  schemas:
-    PairingCodeRequest:
-      type: object
-      required:
-        - childId
-      properties:
-        childId:
-          type: string
-          description: Unique identifier for the child device
-          example: "child-device-123"
-          minLength: 1
-          maxLength: 100
-
-    PairingCodeResponse:
-      type: object
-      properties:
-        pairingCode:
-          type: string
-          description: Six-digit pairing code valid for 24 hours
-          example: "123456"
-          pattern: "^[0-9]{6}$"
-
-    ValidatePairingRequest:
-      type: object
-      required:
-        - pairingCode
-        - childImei
-      properties:
-        pairingCode:
-          type: string
-          description: Six-digit pairing code to validate
-          example: "123456"
-          pattern: "^[0-9]{6}$"
-        childImei:
-          type: string
-          description: IMEI of the child device
-          example: "123456789012345"
-          minLength: 15
-          maxLength: 17
-
-    ValidatePairingResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          description: Whether pairing was successful
-          example: true
-        childId:
-          type: string
-          description: The childId that was paired
-          example: "child-device-123"
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: object
-          properties:
-            code:
-              type: string
-              description: Firebase Functions error code
-              enum:
-                - "invalid-argument"
-                - "not-found"
-                - "deadline-exceeded"
-                - "resource-exhausted"
-                - "internal"
-            message:
-              type: string
-              description: Human-readable error message
-            details:
-              type: object
-              description: Additional error details
-
-paths:
-  /createPairingCode:
-    post:
-      summary: Create a new pairing code
-      description: |
-        Generates a unique 6-digit pairing code for device pairing.
-        The code is valid for 24 hours and can be used once.
-      operationId: createPairingCode
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PairingCodeRequest'
-            examples:
-              basic:
-                summary: Basic pairing code request
-                value:
-                  childId: "child-device-123"
-      responses:
-        '200':
-          description: Pairing code created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PairingCodeResponse'
-              examples:
-                success:
-                  summary: Successful response
-                  value:
-                    pairingCode: "123456"
-        '400':
-          description: Invalid request parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                invalid_child_id:
-                  summary: Missing or invalid childId
-                  value:
-                    error:
-                      code: "invalid-argument"
-                      message: "The function must be called with a valid 'childId' string."
-        '429':
-          description: Too many pairing code generation attempts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                resource_exhausted:
-                  summary: Max attempts exceeded
-                  value:
-                    error:
-                      code: "resource-exhausted"
-                      message: "Failed to generate a unique pairing code after maximum attempts."
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /validatePairingToken:
-    post:
-      summary: Validate a pairing code and create device pairing
-      description: |
-        Validates a pairing code and creates a permanent pairing between
-        master and child devices. The pairing code is consumed upon successful validation.
-      operationId: validatePairingToken
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ValidatePairingRequest'
-            examples:
-              basic:
-                summary: Basic validation request
-                value:
-                  pairingCode: "123456"
-                  childImei: "123456789012345"
-      responses:
-        '200':
-          description: Pairing validated and created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidatePairingResponse'
-              examples:
-                success:
-                  summary: Successful pairing
-                  value:
-                    success: true
-                    childId: "child-device-123"
-        '400':
-          description: Invalid request parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Pairing code not found or invalid
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                not_found:
-                  summary: Invalid pairing code
-                  value:
-                    error:
-                      code: "not-found"
-                      message: "Invalid or expired pairing code."
-        '408':
-          description: Pairing code expired
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                expired:
-                  summary: Expired pairing code
-                  value:
-                    error:
-                      code: "deadline-exceeded"
-                      message: "Pairing code has expired."
-
-  /registerMasterDevice:
-    post:
-      summary: Register a new master (parent) device
-      description: |
-        Registers a new master device and returns a secret key for authentication.
-        Store the secretKey securely - it's required for all subsequent API calls.
-      operationId: registerMasterDevice
-      tags: [Authentication]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei]
-              properties:
-                masterImei:
-                  type: string
-                  description: Unique identifier for the master device
-      responses:
-        '200':
-          description: Device registered successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  secretKey:
-                    type: string
-                    description: Secret key for authentication (store securely!)
-        '409':
-          description: Device already registered
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /generatePairingLink:
-    post:
-      summary: Generate a time-limited pairing link (token)
-      description: |
-        Creates a UUID token valid for 5 minutes for device pairing via deep link.
-      operationId: generatePairingLink
-      tags: [Pairing]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-      responses:
-        '200':
-          description: Pairing link generated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  pairingToken:
-                    type: string
-                    format: uuid
-                  expiresIn:
-                    type: number
-                    description: Token validity in seconds (300)
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-
-  /setChildLockState:
-    post:
-      summary: Lock or unlock a child device
-      description: |
-        Sets the lock state for a child device. When locked, the child device
-        restricts app access based on configured rules.
-      operationId: setChildLockState
-      tags: [Device Control]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, childImei, isLocked]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                childImei:
-                  type: string
-                isLocked:
-                  type: boolean
-      responses:
-        '200':
-          description: Lock state updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-
-  /updateAppBlacklist:
-    post:
-      summary: Update the list of blocked apps
-      description: |
-        Sets the list of package names that should be blocked on the child device.
-      operationId: updateAppBlacklist
-      tags: [Device Control]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, childImei, appBlacklist]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                childImei:
-                  type: string
-                appBlacklist:
-                  type: array
-                  items:
-                    type: string
-                  description: List of package names to block
-      responses:
-        '200':
-          description: Blacklist updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-
-  /setUsageRules:
-    post:
-      summary: Set usage rules for a child device
-      description: |
-        Configures usage limits and schedules for the child device.
-      operationId: setUsageRules
-      tags: [Device Control]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, childImei, usageRules]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                childImei:
-                  type: string
-                usageRules:
-                  type: object
-                  properties:
-                    dailyLimitSeconds:
-                      type: integer
-                    allowedTimeRanges:
-                      type: array
-                      items:
-                        type: object
-      responses:
-        '200':
-          description: Rules updated
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-
-  /createTask:
-    post:
-      summary: Create a new task for a child
-      description: |
-        Creates a task that the child must complete to earn rewards or unlock features.
-      operationId: createTask
-      tags: [Tasks]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, childImei, description, deadlineISO]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                childImei:
-                  type: string
-                description:
-                  type: string
-                deadlineISO:
-                  type: string
-                  format: date-time
-      responses:
-        '200':
-          description: Task created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  taskId:
-                    type: string
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-
-  /completeTask:
-    post:
-      summary: Mark a task as completed (by child)
-      description: |
-        Child submits task completion with optional photo proof.
-        Transitions task from 'pending' to 'pending_approval'.
-      operationId: completeTask
-      tags: [Tasks]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [childImei, taskId]
-              properties:
-                childImei:
-                  type: string
-                taskId:
-                  type: string
-                photoUrl:
-                  type: string
-                  format: uri
-      responses:
-        '200':
-          description: Task marked for approval
-        '412':
-          description: Invalid task state transition
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /approveTask:
-    post:
-      summary: Approve a completed task (by master)
-      description: |
-        Master approves a task that child has completed.
-        Transitions task from 'pending_approval' to 'approved'.
-      operationId: approveTask
-      tags: [Tasks]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, childImei, taskId]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                childImei:
-                  type: string
-                taskId:
-                  type: string
-      responses:
-        '200':
-          description: Task approved
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '412':
-          description: Task not in pending_approval state
-
-  /registerFcmToken:
-    post:
-      summary: Register FCM token for a child device
-      description: |
-        Registers the Firebase Cloud Messaging token for push notifications.
-      operationId: registerFcmToken
-      tags: [Device Control]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [childImei, fcmToken]
-              properties:
-                childImei:
-                  type: string
-                fcmToken:
-                  type: string
-      responses:
-        '200':
-          description: Token registered
-        '404':
-          description: Child device not found
-
-  /recordHeartbeat:
-    post:
-      summary: Record child device heartbeat
-      description: |
-        Child device sends periodic heartbeat to update lastSeen timestamp.
-      operationId: recordHeartbeat
-      tags: [Device Control]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [childId]
-              properties:
-                childId:
-                  type: string
-      responses:
-        '200':
-          description: Heartbeat recorded
-        '404':
-          description: Child device not found
-
-  /verifyPurchase:
-    post:
-      summary: Verify a Google Play purchase
-      description: |
-        Verifies a subscription purchase token with Google Play and updates subscription status.
-      operationId: verifyPurchase
-      tags: [Subscription]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, purchaseToken, productId]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                purchaseToken:
-                  type: string
-                productId:
-                  type: string
-      responses:
-        '200':
-          description: Purchase verified
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  subscription:
-                    type: object
-
-  /getSubscriptionStatus:
-    post:
-      summary: Get subscription status for a master device
-      description: |
-        Returns the current subscription status and tier for a master device.
-      operationId: getSubscriptionStatus
-      tags: [Subscription]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-      responses:
-        '200':
-          description: Subscription status
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  subscriptionStatus:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                        enum: [none, active, expired, cancelled]
-                      type:
-                        type: string
-                        enum: [free, premium]
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-
-  /reportDailyUsage:
-    post:
-      summary: Report daily usage statistics
-      description: |
-        Child device reports daily screen time usage for tracking.
-      operationId: reportDailyUsage
-      tags: [Device Control]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [childId, date, usageMillis]
-              properties:
-                childId:
-                  type: string
-                date:
-                  type: string
-                  format: date
-                  example: "2025-12-08"
-                usageMillis:
-                  type: integer
-                  description: Total usage in milliseconds
-      responses:
-        '200':
-          description: Usage reported
-
-  /setAdminClaim:
-    post:
-      summary: Set admin claim on a user (admin only)
-      description: |
-        Sets the 'admin' custom claim on a Firebase Auth user.
-        Requires the caller to already have admin privileges.
-      operationId: setAdminClaim
-      tags: [Admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [uid]
-              properties:
-                uid:
-                  type: string
-                  description: Firebase Auth UID to grant admin privileges
-      responses:
-        '200':
-          description: Admin claim set
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-
-  /revokeSubscription:
-    post:
-      summary: Revoke a subscription (admin only)
-      description: |
-        Admin endpoint to revoke a user's subscription.
-      operationId: revokeSubscription
-      tags: [Admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [subscriptionId]
-              properties:
-                subscriptionId:
-                  type: string
-      responses:
-        '200':
-          description: Subscription revoked
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-
-  /analyzeTaskPhoto:
-    post:
-      summary: AI analysis of task completion photo
-      description: |
-        Uses AI to analyze a photo submitted for task completion.
-        Returns analysis results for master review.
-      operationId: analyzeTaskPhoto
-      tags: [Tasks]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [masterImei, secretKey, childImei, taskId]
-              properties:
-                masterImei:
-                  type: string
-                secretKey:
-                  type: string
-                childImei:
-                  type: string
-                taskId:
-                  type: string
-      responses:
-        '200':
-          description: Analysis complete
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  analysis:
-                    type: string
-
-components:
-  responses:
-    Unauthenticated:
-      description: Invalid master IMEI or secret key
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: "unauthenticated"
-              message: "Invalid master IMEI or secret key."
-    PermissionDenied:
-      description: Master not authorized for this child device
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: "permission-denied"
-              message: "Master is not authorized to manage this child device."
-
-tags:
-  - name: Pairing
-    description: Device pairing operations (codes and tokens)
-  - name: Authentication
-    description: Device registration and authentication
-  - name: Device Control
-    description: Lock state, blacklist, usage rules, FCM
-  - name: Tasks
-    description: Task management (create, complete, approve)
-  - name: Subscription
-    description: In-app purchase and subscription management
-  - name: Admin
-    description: Administrative operations (requires admin privileges)
+-openapi: 3.0.3
+-info:
+-  title: Mini-Master Cloud Functions API
+-  description: API documentation for Mini-Master Firebase Cloud Functions
+-  version: 1.1.0
+-  contact:
+-    name: Mini-Master Team
+-  license:
+-    name: ISC
+-
+-servers:
+-  - url: https://us-central1-{projectId}.cloudfunctions.net
+-    description: Firebase Cloud Functions endpoint
+-    variables:
+-      projectId:
+-        default: minimaster-dev
+-        description: Firebase project ID
+-
+-components:
+-  securitySchemes:
+-    BearerAuth:
+-      type: http
+-      scheme: bearer
+-      bearerFormat: JWT
+-      description: "Firebase Authentication ID token. Must be passed in the Authorization header as `Bearer <token>`."
+-
+-  schemas:
+-    ErrorResponse:
+-      type: object
+-      properties:
+-        error:
+-          type: object
+-          properties:
+-            code:
+-              type: string
+-              description: Firebase Functions error code
+-              enum:
+-                - "invalid-argument"
+-                - "not-found"
+-                - "deadline-exceeded"
+-                - "resource-exhausted"
+-                - "permission-denied"
+-                - "unauthenticated"
+-                - "internal"
+-            message:
+-              type: string
+-              description: Human-readable error message
+-            details:
+-              type: object
+-              description: Additional error details
+-
+-    SuccessResponse:
+-      type: object
+-      properties:
+-        success:
+-          type: boolean
+-          description: Indicates if the operation was successful.
+-          example: true
+-
+-paths:
+-  # ==================== Pairing ====================
+-  /createPairingCode:
+-    post:
+-      summary: Create a new pairing code
+-      description: Generates a unique 6-digit pairing code for device pairing, valid for 24 hours.
+-      operationId: createPairingCode
+-      tags: [Pairing]
+-      security:
+-        - BearerAuth: []
+-      responses:
+-        '200':
+-          description: Pairing code created successfully
+-          content:
+-            application/json:
+-              schema:
+-                type: object
+-                properties:
+-                  pairingCode:
+-                    type: string
+-                    example: "123456"
+-        '401':
+-          $ref: '#/components/responses/Unauthenticated'
+-        '429':
+-          $ref: '#/components/responses/RateLimited'
+-
+-  /validatePairingToken:
+-    post:
+-      summary: Validate a pairing token and create device pairing
+-      description: Validates a pairing code and creates a permanent pairing between master and child devices.
+-      operationId: validatePairingToken
+-      tags: [Pairing]
+-      security:
+-        - BearerAuth: []
+-      requestBody:
+-        required: true
+-        content:
+-          application/json:
+-            schema:
+-              type: object
+-              required: [pairingToken]
+-              properties:
+-                pairingToken:
+-                  type: string
+-                  format: uuid
+-      responses:
+-        '200':
+-          description: Pairing validated and created successfully
+-          content:
+-            application/json:
+-              schema:
+-                type: object
+-                properties:
+-                  childId:
+-                    type: string
+-        '401':
+-          $ref: '#/components/responses/Unauthenticated'
+-        '404':
+-          description: Token not found or invalid.
+-
+-  # ==================== Task Management ====================
+-  /createTask:
+-    post:
+-      summary: Create a new task for a child
+-      operationId: createTask
+-      tags: [Task Management]
+-      security:
+-        - BearerAuth: []
+-      requestBody:
+-        required: true
+-        content:
+-          application/json:
+-            schema:
+-              type: object
+-              required: [childId, description]
+-              properties:
+-                childId: { type: string }
+-                description: { type: string }
+-                deadline: { type: string, format: date-time }
+-      responses:
+-        '200':
+-          description: Task created successfully
+-          content:
+-            application/json:
+-              schema:
+-                type: object
+-                properties:
+-                  taskId: { type: string }
+-        '401':
+-          $ref: '#/components/responses/Unauthenticated'
+-        '403':
+-          $ref: '#/components/responses/PermissionDenied'
+-
+-  /approveTask:
+-    post:
+-      summary: Approve a completed task
+-      operationId: approveTask
+-      tags: [Task Management]
+-      security:
+-        - BearerAuth: []
+-      requestBody:
+-        required: true
+-        content:
+-          application/json:
+-            schema:
+-              type: object
+-              required: [childId, taskId]
+-              properties:
+-                childId: { type: string }
+-                taskId: { type: string }
+-      responses:
+-        '200': { $ref: '#/components/responses/Success' }
+-        '401': { $ref: '#/components/responses/Unauthenticated' }
+-        '403': { $ref: '#/components/responses/PermissionDenied' }
+-        '404': { description: "Task or child not found." }
+-        '412': { description: "Task not in pending_approval state." }
+-
+-  /rejectTask:
+-    post:
+-      summary: Reject a completed task
+-      description: Rejects a task and optionally provides a reason.
+-      operationId: rejectTask
+-      tags: [Task Management]
+-      security:
+-        - BearerAuth: []
+-      requestBody:
+-        required: true
+-        content:
+-          application/json:
+-            schema:
+-              type: object
+-              required: [childId, taskId]
+-              properties:
+-                childId: { type: string }
+-                taskId: { type: string }
+-                reason: { type: string, description: "Optional reason for rejection." }
+-      responses:
+-        '200': { $ref: '#/components/responses/Success' }
+-        '401': { $ref: '#/components/responses/Unauthenticated' }
+-        '403': { $ref: '#/components/responses/PermissionDenied' }
+-        '404': { description: "Task or child not found." }
+-        '412': { description: "Task not in pending_approval state." }
+-
+-  # ==================== Device Control ====================
+-  /setDeviceLocked:
+-    post:
+-      summary: Lock or unlock a child device
+-      operationId: setDeviceLocked
+-      tags: [Device Control]
+-      security:
+-        - BearerAuth: []
+-      requestBody:
+-        required: true
+-        content:
+-          application/json:
+-            schema:
+-              type: object
+-              required: [childId, isLocked]
+-              properties:
+-                childId: { type: string }
+-                isLocked: { type: boolean }
+-      responses:
+-        '200': { $ref: '#/components/responses/Success' }
+-        '401': { $ref: '#/components/responses/Unauthenticated' }
+-        '403': { $ref: '#/components/responses/PermissionDenied' }
+-
+-  # ==================== User Data & Compliance ====================
+-  /exportUserData:
+-    post:
+-      summary: Export all user data (DSAR)
+-      description: Exports all data associated with the authenticated user account for GDPR/DSAR compliance.
+-      operationId: exportUserData
+-      tags: [User Management]
+-      security:
+-        - BearerAuth: []
+-      responses:
+-        '200':
+-          description: User data exported successfully.
+-          content:
+-            application/json:
+-              schema:
+-                type: object
+-                properties:
+-                  success: { type: boolean, example: true }
+-                  data: { type: object, description: "A JSON object containing all user data." }
+-        '401': { $ref: '#/components/responses/Unauthenticated' }
+-        '429': { $ref: '#/components/responses/RateLimited' }
+-
+-  /deleteUserAccount:
+-    post:
+-      summary: Delete user account and all data
+-      operationId: deleteUserAccount
+-      tags: [User Management]
+-      security:
+-        - BearerAuth: []
+-      responses:
+-        '200': { $ref: '#/components/responses/Success' }
+-        '401': { $ref: '#/components/responses/Unauthenticated' }
+-
+-  # ==================== Security & Admin ====================
+-  /setAdminClaim:
+-    post:
+-      summary: Set admin role for a user (Admin only)
+-      operationId: setAdminClaim
+-      tags: [Admin]
+-      security:
+-        - BearerAuth: []
+-      requestBody:
+-        required: true
+-        content:
+-          application/json:
+-            schema:
+-              type: object
+-              required: [uid]
+-              properties:
+-                uid: { type: string, description: "The UID of the user to grant admin role." }
+-      responses:
+-        '200': { $ref: '#/components/responses/Success' }
+-        '401': { $ref: '#/components/responses/Unauthenticated' }
+-        '403': { $ref: '#/components/responses/PermissionDenied' }
+-
+-components:
+-  responses:
+-    Unauthenticated:
+-      description: Authentication failed. The request did not include a valid Firebase Auth ID token.
+-      content:
+-        application/json:
+-          schema:
+-            $ref: '#/components/schemas/ErrorResponse'
+-          example:
+-            error:
+-              code: "unauthenticated"
+-              message: "User must be authenticated."
+-    PermissionDenied:
+-      description: The authenticated user does not have permission to perform this action.
+-      content:
+-        application/json:
+-          schema:
+-            $ref: '#/components/schemas/ErrorResponse'
+-          example:
+-            error:
+-              code: "permission-denied"
+-              message: "Admin privileges required."
+-    RateLimited:
+-      description: The user has sent too many requests in a given amount of time.
+-      content:
+-        application/json:
+-          schema:
+-            $ref: '#/components/schemas/ErrorResponse'
+-          example:
+-            error:
+-              code: "resource-exhausted"
+-              message: "Too many requests. Please try again later."
+-    Success:
+-      description: The operation was successful.
+-      content:
+-        application/json:
+-          schema:
+-            $ref: '#/components/schemas/SuccessResponse'
+-
+-tags:
+-  - name: Pairing
+-    description: Device pairing and token management.
+-  - name: Task Management
+-    description: Creating and managing tasks for children.
+-  - name: Device Control
+-    description: Locking, unlocking, and managing child devices.
+-  - name: User Management
+-    description: User account lifecycle and data management.
+-  - name: Admin
+-    description: Administrative functions.

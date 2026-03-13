@@ -21,6 +21,71 @@ function requireAdmin(context: CallableContext): void {
   }
 }
 
+// --- Rate Limiting Infrastructure ---
+
+/**
+ * In-memory rate limiter using a sliding window approach.
+ * Tracks request counts per user within a configurable time window.
+ * In a multi-instance deployment, consider using Firestore or Redis for distributed rate limiting.
+ */
+const rateLimitStore: Map<string, { count: number; windowStart: number }> = new Map();
+
+/**
+ * Checks if a user has exceeded the rate limit for a given action.
+ * @param userId - The unique identifier of the user.
+ * @param action - The action being rate-limited (used as a namespace).
+ * @param maxRequests - Maximum number of requests allowed in the window.
+ * @param windowMs - The time window in milliseconds (default: 60 seconds).
+ * @throws {functions.https.HttpsError} Throws "resource-exhausted" if rate limit is exceeded.
+ */
+function checkRateLimit(
+  userId: string,
+  action: string,
+  maxRequests: number = 30,
+  windowMs: number = 60000
+): void {
+  const key = `${action}:${userId}`;
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+
+  if (!entry || now - entry.windowStart > windowMs) {
+    rateLimitStore.set(key, { count: 1, windowStart: now });
+    return;
+  }
+
+  entry.count++;
+  if (entry.count > maxRequests) {
+    functions.logger.warn(`Rate limit exceeded for user ${userId} on action ${action}`);
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Too many requests. Please try again later."
+    );
+  }
+}
+
+/**
+ * Validates Firebase App Check token if present.
+ * When enforced, rejects requests without a valid App Check token.
+ * @param context - The callable context.
+ * @param enforce - Whether to enforce App Check (reject if missing). Default: false (log-only mode).
+ */
+function validateAppCheck(context: CallableContext, enforce: boolean = false): void {
+  if (!context.app && enforce) {
+    functions.logger.warn("App Check token missing or invalid.", {
+      uid: context.auth?.uid || "anonymous",
+    });
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "App Check verification failed. Please update your app."
+    );
+  }
+  if (!context.app) {
+    functions.logger.info("App Check token not present (log-only mode).", {
+      uid: context.auth?.uid || "anonymous",
+    });
+  }
+}
+
 // --- Audit Logging Infrastructure ---
 
 /**
@@ -881,6 +946,8 @@ export const setDeviceLocked = functions.https.onCall(
   async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context);
+    checkRateLimit(masterId, "setDeviceLocked", 30);
     const { childId, isLocked } = data;
 
     if (
@@ -1402,9 +1469,11 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const createTask = functions.https.onCall(
-  async (data: { childId: string; description: string; deadlineISO: string }, context: CallableContext) => {
+  async (data: { childId: string; description: string; deadline?: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context);
+    checkRateLimit(masterId, "createTask", 20);
     const { childId, description, deadlineISO } = data;
 
     if (!childId || !description || !deadlineISO) {
@@ -1545,6 +1614,8 @@ export const approveTask = functions.https.onCall(
   async (data: { childId: string; taskId: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context);
+    checkRateLimit(masterId, "approveTask", 30);
     const { childId, taskId } = data;
 
     if (!childId || !taskId) {
@@ -1609,6 +1680,97 @@ export const approveTask = functions.https.onCall(
 );
 
 /**
+ * Rejects a task that was submitted for approval by a child.
+ * Only the master who owns the child can reject the task.
+ * The task must be in "pending_approval" state.
+ * An optional reason can be provided to give feedback to the child.
+ *
+ * @param {{childId: string, taskId: string, reason?: string}} data - The data for the function.
+ * @param {string} data.childId - The unique identifier of the child device.
+ * @param {string} data.taskId - The unique identifier of the task to reject.
+ * @param {string} [data.reason] - Optional reason for rejection.
+ * @param {CallableContext} context - The context of the function call.
+ * @returns {Promise<{success: boolean}>} A promise that resolves with a success status.
+ * @throws {functions.https.HttpsError} Throws an error if validation, authorization, or state transition fails.
+ */
+export const rejectTask = functions.https.onCall(
+  async (data: { childId: string; taskId: string; reason?: string }, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    validateAppCheck(context);
+    checkRateLimit(masterId, "rejectTask", 30);
+    const { childId, taskId, reason } = data;
+
+    if (!childId || !taskId) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields: childId and taskId.");
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterId);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "task.reject",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        "Master not authorized for this child",
+        { childId, taskId }
+      );
+      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+    }
+
+    try {
+      const taskRef = childDeviceRef.collection("tasks").doc(taskId);
+      const taskSnap = await taskRef.get();
+      if (!taskSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Task not found.");
+      }
+      const taskData = taskSnap.data() as any;
+      if (taskData.status !== "pending_approval") {
+        throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
+      }
+
+      const updateData: any = {
+        status: "rejected",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (reason && typeof reason === "string") {
+        updateData.rejectionReason = reason.trim();
+      }
+
+      await taskRef.update(updateData);
+
+      await AuditLogger.logSuccess(
+        "task.reject",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        { childId, taskId, reason: reason || "none", duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`TASK_REJECTED taskId=${taskId} child=${childId} master=${masterId} reason=${reason || "none"}`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "task.reject",
+        context,
+        `children/${childId}/tasks/${taskId}`,
+        "task",
+        error as Error,
+        { childId, taskId }
+      );
+      throw error;
+    }
+  }
+);
+
+/**
  * Verifies a Google Play subscription purchase and grants entitlement to the master device.
  * It calls the Google Play Developer API to validate the purchase token.
  *
@@ -1623,6 +1785,8 @@ export const verifyPurchase = functions.https.onCall(
   async (data: { purchaseToken: string; sku: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context);
+    checkRateLimit(masterId, "verifyPurchase", 10);
     const { purchaseToken, sku } = data;
 
     if (!purchaseToken || !sku) {
@@ -2403,6 +2567,146 @@ ${sortedErrors.map(([msg, count]) => "║   - " + msg.substring(0, 60) + "...: "
         }
     });
 
+
+// ==================== SUBSCRIPTION EXPIRY CHECK ====================
+
+/**
+ * Scheduled function that runs daily at midnight to check for expired subscriptions.
+ * If a subscription's expiresAt timestamp is in the past and the status is still "active",
+ * it updates the status to "expired" and logs the event.
+ */
+export const checkExpiredSubscriptions = functions.pubsub
+    .schedule("0 0 * * *") // Daily at midnight
+    .timeZone("Europe/Berlin")
+    .onRun(async (_context) => {
+        const now = admin.firestore.Timestamp.now();
+
+        try {
+            // Query all masters with active subscriptions that have expired
+            const expiredSnapshot = await db().collection("masters")
+                .where("subscription.status", "==", "active")
+                .where("subscription.expiresAt", "<=", now)
+                .get();
+
+            if (expiredSnapshot.empty) {
+                functions.logger.info("Subscription Check: No expired subscriptions found.");
+                return null;
+            }
+
+            const batch = db().batch();
+            let count = 0;
+
+            expiredSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, {
+                    "subscription.status": "expired",
+                    "subscription.expiredAt": now,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                count++;
+            });
+
+            await batch.commit();
+
+            functions.logger.info(`Subscription Check: ${count} subscription(s) marked as expired.`);
+            return null;
+
+        } catch (error) {
+            functions.logger.error("Failed to check expired subscriptions:", error);
+            return null;
+        }
+    });
+
+// ==================== DSAR DATA EXPORT ====================
+
+/**
+ * Exports all user data associated with the authenticated master account.
+ * This function supports GDPR/DSAR (Data Subject Access Request) compliance
+ * by returning all stored personal data in a structured JSON format.
+ *
+ * @param {Record<string, never>} _data - No input data required.
+ * @param {CallableContext} context - The context of the function call.
+ * @returns {Promise<object>} A promise that resolves with all user data.
+ * @throws {functions.https.HttpsError} Throws an error if authentication fails.
+ */
+export const exportUserData = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    validateAppCheck(context);
+    checkRateLimit(masterId, "exportUserData", 5, 3600000); // Max 5 exports per hour
+
+    try {
+        // 1. Master profile data
+        const masterDoc = await db().collection("masters").doc(masterId).get();
+        if (!masterDoc.exists) {
+            throw new functions.https.HttpsError("not-found", "Master account not found.");
+        }
+        const masterData = masterDoc.data();
+
+        // 2. Children data
+        const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
+        const childrenData: any[] = [];
+        for (const childDoc of childrenSnapshot.docs) {
+            const childInfo = childDoc.data();
+            // Get tasks for each child
+            const tasksSnapshot = await childDoc.ref.collection("tasks").get();
+            const tasks = tasksSnapshot.docs.map(t => ({ id: t.id, ...t.data() }));
+            // Get usage history for each child
+            const usageSnapshot = await childDoc.ref.collection("usageHistory").get();
+            const usageHistory = usageSnapshot.docs.map(u => ({ id: u.id, ...u.data() }));
+            childrenData.push({
+                id: childDoc.id,
+                ...childInfo,
+                tasks,
+                usageHistory,
+            });
+        }
+
+        // 3. Subscription data
+        const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
+        const subscriptions = subsSnapshot.docs.map(s => ({ id: s.id, ...s.data() }));
+
+        // 4. Support tickets
+        const ticketsSnapshot = await db().collection("supportTickets").where("masterImei", "==", masterId).get();
+        const supportTickets = ticketsSnapshot.docs.map(t => ({ id: t.id, ...t.data() }));
+
+        // 5. Audit logs related to this user
+        const auditSnapshot = await db().collection("audit_logs")
+            .where("userId", "==", masterId)
+            .orderBy("timestamp", "desc")
+            .limit(500)
+            .get();
+        const auditLogs = auditSnapshot.docs.map(a => ({ id: a.id, ...a.data() }));
+
+        const exportData = {
+            exportedAt: new Date().toISOString(),
+            masterId,
+            masterProfile: masterData,
+            children: childrenData,
+            subscriptions,
+            supportTickets,
+            auditLogs,
+        };
+
+        await AuditLogger.logSuccess(
+            "device.delete", // Reusing closest audit action
+            context,
+            `masters/${masterId}`,
+            "user",
+            { action: "data_export", duration: Date.now() - startTime }
+        );
+
+        functions.logger.info(`Data export completed for master ${masterId}.`);
+        return { success: true, data: exportData };
+
+    } catch (error) {
+        functions.logger.error(`Failed to export data for master ${masterId}:`, error);
+        throw new functions.https.HttpsError(
+            "internal",
+            "An unexpected error occurred while exporting user data.",
+            error
+        );
+    }
+});
 
 // ==================== AI-POWERED SUPPORT AGENT ====================
 

@@ -21,6 +21,15 @@
             </div>
         </header>
 
+        <!-- Navigation Tabs -->
+        <nav id="dashboard-nav" class="dashboard-nav" style="display: none;">
+            <button class="nav-tab active" onclick="switchTab('overview')">Overview</button>
+            <button class="nav-tab" onclick="switchTab('users')">Users</button>
+            <button class="nav-tab" onclick="switchTab('subscriptions')">Subscriptions</button>
+            <button class="nav-tab" onclick="switchTab('support')">Support Tickets</button>
+            <button class="nav-tab" onclick="switchTab('compliance')">Compliance</button>
+        </nav>
+
         <main class="main-content">
             <!-- Login Section -->
             <section id="login-section" class="section">
@@ -34,52 +43,129 @@
 
             <!-- Dashboard Section (Hidden until authorized) -->
             <section id="dashboard-section" class="section" style="display: none;">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Total Users</h3>
-                        <p id="stat-total-users">--</p>
+
+                <!-- Tab: Overview / KPI Dashboard -->
+                <div id="tab-overview" class="tab-content active">
+                    <h2>KPI Dashboard</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Total Users</h3>
+                            <p id="stat-total-users">--</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Active Subscriptions</h3>
+                            <p id="stat-active-subs">--</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total Tasks</h3>
+                            <p id="stat-total-tasks">--</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Open Tickets</h3>
+                            <p id="stat-open-tickets">--</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Children Paired</h3>
+                            <p id="stat-total-children">--</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Errors (24h)</h3>
+                            <p id="stat-errors-24h">--</p>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Active Subscriptions</h3>
-                        <p id="stat-active-subs">--</p>
+
+                    <div class="quick-links" style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                        <h3 style="margin-top: 0;">Quick Links</h3>
+                        <a href="logs.html" class="btn btn-primary" style="display: inline-block; text-decoration: none; margin-right: 10px;">View Audit Logs</a>
+                        <button onclick="refreshAllStats()" class="btn btn-secondary">Refresh Stats</button>
                     </div>
-                    <div class="stat-card">
-                        <h3>Total Tasks Assigned</h3>
-                        <p id="stat-total-tasks">--</p>
+
+                    <!-- Error Summary Section -->
+                    <h3>Recent Error Summary</h3>
+                    <div id="error-summary" class="data-list">
+                        <div class="info">Click "Refresh Stats" to load error summaries.</div>
                     </div>
                 </div>
 
-                <div class="quick-links" style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-                    <h3 style="margin-top: 0;">Quick Links</h3>
-                    <a href="logs.html" class="btn btn-primary" style="display: inline-block; text-decoration: none; margin-right: 10px;">
-                        🔍 View Audit Logs
-                    </a>
+                <!-- Tab: Users -->
+                <div id="tab-users" class="tab-content" style="display: none;">
+                    <h2>User Management</h2>
+                    <div class="user-search">
+                        <input type="text" id="user-search-input" placeholder="Search by Email or Master ID">
+                        <button onclick="searchUsers()" class="btn btn-secondary">Search</button>
+                        <button onclick="loadUsers()" class="btn btn-secondary">Show All</button>
+                    </div>
+                    <div id="user-list" class="data-list">
+                        <!-- User data will be rendered here -->
+                    </div>
+                    <div id="user-pagination" class="pagination"></div>
                 </div>
 
-                <h2>User Management</h2>
-                <div class="user-search">
-                    <input type="text" id="user-search-input" placeholder="Search by Email or Child ID">
-                    <button onclick="searchUsers()" class="btn btn-secondary">Search</button>
-                </div>
-                <div id="user-list" class="data-list">
-                    <!-- User data will be rendered here -->
+                <!-- Tab: Subscriptions -->
+                <div id="tab-subscriptions" class="tab-content" style="display: none;">
+                    <h2>Subscription Monitoring</h2>
+                    <div class="sub-filters">
+                        <button onclick="filterSubscriptions('all')" class="btn btn-secondary">All</button>
+                        <button onclick="filterSubscriptions('active')" class="btn btn-secondary">Active</button>
+                        <button onclick="filterSubscriptions('expired')" class="btn btn-secondary">Expired</button>
+                    </div>
+                    <div id="subscription-list" class="data-list">
+                        <!-- Subscription data will be rendered here -->
+                    </div>
+                    <div id="sub-pagination" class="pagination"></div>
                 </div>
 
-                <h2>Subscription Monitoring</h2>
-                <div id="subscription-list" class="data-list">
-                    <!-- Subscription data will be rendered here -->
+                <!-- Tab: Support Tickets -->
+                <div id="tab-support" class="tab-content" style="display: none;">
+                    <h2>Support Tickets</h2>
+                    <div class="support-filters">
+                        <button onclick="filterTickets('all')" class="btn btn-secondary">All</button>
+                        <button onclick="filterTickets('open')" class="btn btn-secondary">Open</button>
+                        <button onclick="filterTickets('awaiting_user_feedback')" class="btn btn-secondary">Awaiting Feedback</button>
+                        <button onclick="filterTickets('escalated')" class="btn btn-secondary">Escalated</button>
+                        <button onclick="filterTickets('in_progress')" class="btn btn-secondary">In Progress</button>
+                        <button onclick="filterTickets('closed')" class="btn btn-secondary">Closed</button>
+                    </div>
+                    <div id="support-tickets-list" class="data-list">
+                        <!-- Support tickets will be rendered here -->
+                    </div>
+                    <div id="ticket-pagination" class="pagination"></div>
                 </div>
 
-                <h2>Support Tickets</h2>
-                <div class="support-filters">
-                    <button onclick="filterTickets('all')" class="btn btn-secondary">All</button>
-                    <button onclick="filterTickets('open')" class="btn btn-secondary">Open</button>
-                    <button onclick="filterTickets('in_progress')" class="btn btn-secondary">In Progress</button>
-                    <button onclick="filterTickets('closed')" class="btn btn-secondary">Closed</button>
+                <!-- Tab: Compliance -->
+                <div id="tab-compliance" class="tab-content" style="display: none;">
+                    <h2>Compliance &amp; Data Management</h2>
+                    <div class="compliance-section">
+                        <h3>DSAR (Data Subject Access Request)</h3>
+                        <p>Export all data associated with a specific user for GDPR compliance.</p>
+                        <div class="dsar-form">
+                            <input type="text" id="dsar-master-id" placeholder="Enter Master ID">
+                            <button onclick="triggerDsarExport()" class="btn btn-primary">Export User Data</button>
+                        </div>
+                        <div id="dsar-result" class="data-list" style="margin-top: 15px;"></div>
+                    </div>
+
+                    <div class="compliance-section" style="margin-top: 30px;">
+                        <h3>Data Deletion Request</h3>
+                        <p>Permanently delete all data associated with a user account.</p>
+                        <div class="dsar-form">
+                            <input type="text" id="delete-master-id" placeholder="Enter Master ID">
+                            <button onclick="triggerAccountDeletion()" class="btn btn-danger">Delete User Account</button>
+                        </div>
+                    </div>
+
+                    <div class="compliance-section" style="margin-top: 30px;">
+                        <h3>Audit Log Export</h3>
+                        <p>Export audit logs for a specific time period.</p>
+                        <div class="dsar-form">
+                            <input type="date" id="audit-start-date">
+                            <input type="date" id="audit-end-date">
+                            <button onclick="exportAuditLogs()" class="btn btn-primary">Export Audit Logs</button>
+                        </div>
+                        <div id="audit-export-result" class="data-list" style="margin-top: 15px;"></div>
+                    </div>
                 </div>
-                <div id="support-tickets-list" class="data-list">
-                    <!-- Support tickets will be rendered here -->
-                </div>
+
             </section>
         </main>
 
@@ -92,6 +178,16 @@
             <span class="close" onclick="closeUserDetailsModal()">&times;</span>
             <div id="user-details-content">
                 <!-- User details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Ticket Details Modal -->
+    <div id="ticket-details-modal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <span class="close" onclick="closeTicketDetailsModal()">&times;</span>
+            <div id="ticket-details-content">
+                <!-- Ticket details will be loaded here -->
             </div>
         </div>
     </div>
