@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "minimaster-app"
+  },
+  "targets": {
+    "minimaster-app": {
+      "hosting": {
+        "web-control": [
+          "minimaster-web-control"
+        ],
+        "admin-panel": [
+          "minimaster-admin-panel"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

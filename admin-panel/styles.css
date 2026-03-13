@@ -275,3 +275,196 @@ input[type="text"] {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* --- Navigation Tabs --- */
+.dashboard-nav {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 20px;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-tab {
+    padding: 10px 20px;
+    border: none;
+    background: #f8f9fa;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #6c757d;
+    transition: all 0.3s;
+}
+
+.nav-tab:hover {
+    background: #e9ecef;
+}
+
+.nav-tab.active {
+    background: #007bff;
+    color: white;
+}
+
+/* --- Pagination --- */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+    padding: 10px;
+}
+
+/* --- Status Badges --- */
+.status-open {
+    background: #ffc107;
+    color: #333;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-escalated {
+    background: #dc3545;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-progress {
+    background: #17a2b8;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-awaiting {
+    background: #fd7e14;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-closed {
+    background: #6c757d;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-active {
+    background: #28a745;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-expired {
+    background: #dc3545;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+/* --- Modal Large --- */
+.modal-large {
+    max-width: 800px;
+}
+
+/* --- Ticket Detail Styles --- */
+.ticket-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+}
+
+.ticket-description,
+.ticket-ai-solution {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+    margin: 10px 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.ticket-ai-solution {
+    border-left-color: #28a745;
+}
+
+.ticket-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+/* --- Compliance Section --- */
+.compliance-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dsar-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dsar-form input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.success-box {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+/* --- Small Buttons --- */
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+/* --- Support Filters --- */
+.support-filters,
+.sub-filters {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .dashboard-nav {
+        flex-wrap: wrap;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .ticket-detail-grid {
+        grid-template-columns: 1fr;
+    }
+}

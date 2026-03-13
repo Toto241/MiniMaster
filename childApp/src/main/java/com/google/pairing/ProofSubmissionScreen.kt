@@ -88,7 +88,7 @@ fun ProofSubmissionScreen(
                 // Erstellt eine temporäre URI für die Kamera-App
                                 imageUri = FileProvider.getUriForFile(
                     context,
-                    "${context.packageName}.fileprovider",
+                    "${context.packageName}.provider",
                     tempImageFile
                 )
                 cameraLauncher.launch(imageUri)

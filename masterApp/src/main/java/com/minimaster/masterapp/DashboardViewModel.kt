@@ -90,7 +90,23 @@ class DashboardViewModel @Inject constructor(
                 if (imei != null) {
                     loadChildren(imei)
                     loadTasksForReview(imei)
+                    // Register FCM token on startup to ensure notifications work
+                    registerFcmToken()
                 }
+            }
+        }
+    }
+
+    /**
+     * Registers the FCM token with the backend to enable push notifications.
+     * Called on startup and whenever credentials are refreshed.
+     */
+    private fun registerFcmToken() {
+        viewModelScope.launch {
+            try {
+                FcmTokenManager.registerFcmToken(functions)
+            } catch (e: Exception) {
+                Log.w(TAG, "FCM token registration failed (non-critical)", e)
             }
         }
     }
@@ -219,6 +235,35 @@ class DashboardViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Error calling approveTask", e)
                 _error.value = "Failed to approve task. Please try again."
+            }
+        }
+    }
+
+    /**
+     * Calls the `rejectTask` Firebase Function to reject a task submitted by a child.
+     * @param childImei The ID of the child device.
+     * @param taskId The ID of the task to reject.
+     * @param reason An optional reason for the rejection.
+     */
+    fun rejectTask(childImei: String, taskId: String, reason: String? = null) {
+        viewModelScope.launch {
+            val (imei, secret) = credentialsRepository.getCredentials.first()
+            if (imei == null || secret == null) {
+                _error.value = "Credentials not found. Cannot perform action."
+                return@launch
+            }
+            val data = hashMapOf<String, Any>(
+                "childId" to childImei,
+                "taskId" to taskId
+            )
+            if (!reason.isNullOrBlank()) {
+                data["reason"] = reason
+            }
+            try {
+                functions.getHttpsCallable("rejectTask").call(data).await()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error calling rejectTask", e)
+                _error.value = "Failed to reject task. Please try again."
             }
         }
     }
