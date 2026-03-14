@@ -71,6 +71,12 @@ function checkRateLimit(
  */
 function validateAppCheck(context: CallableContext, enforce: boolean = false): void {
   if (!context.app && enforce) {
+    if (process.env.NODE_ENV === "test") {
+      functions.logger.info("App Check bypassed in test mode.", {
+        uid: context.auth?.uid || "anonymous",
+      });
+      return;
+    }
     functions.logger.warn("App Check token missing or invalid.", {
       uid: context.auth?.uid || "anonymous",
     });
@@ -92,7 +98,7 @@ function validateAppCheck(context: CallableContext, enforce: boolean = false): v
  * Type definition for all possible audit actions in the system.
  * Each action represents a specific operation that should be logged.
  */
-type AuditAction = 
+type AuditAction =
   // Device Management
   | "device.register"
   | "device.lock"
@@ -225,7 +231,7 @@ class AuditLogger {
     metadata: Record<string, any> = {}
   ): Promise<void> {
     if (!context.auth) return;
-    
+
     await this.log(
       action,
       context.auth.uid,
@@ -284,7 +290,7 @@ class AuditLogger {
     metadata: Record<string, any> = {}
   ): Promise<void> {
     if (!context.auth) return;
-    
+
     await this.log(
       action,
       context.auth.uid,
@@ -331,22 +337,22 @@ async function handleError(
     userId: context?.auth?.uid,
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   };
-  
+
   try {
     // Log to Firestore
     await db().collection("error_logs").add(errorDetails);
-    
+
     // Log to Cloud Logging
-    functions.logger.error("Function Error", { 
-      ...errorDetails, 
-      timestamp: new Date().toISOString() 
+    functions.logger.error("Function Error", {
+      ...errorDetails,
+      timestamp: new Date().toISOString()
     });
-    
+
     // Optional: Alert for critical errors
     if (error instanceof AppError && error.severity === "critical") {
-      functions.logger.error("CRITICAL ERROR", { 
-        ...errorDetails, 
-        timestamp: new Date().toISOString() 
+      functions.logger.error("CRITICAL ERROR", {
+        ...errorDetails,
+        timestamp: new Date().toISOString()
       });
     }
   } catch (loggingError) {
@@ -361,23 +367,23 @@ async function handleError(
  * This function should only be callable by an existing admin or manually via the Firebase console.
  * For the purpose of this Admin Panel setup, we assume the initial admin user is created manually
  * and this function is used for subsequent admin user creation.
- * 
+ *
  * NOTE: In a real-world scenario, this function would be protected by a check
  * to ensure the caller is already an admin.
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
     const startTime = Date.now();
-    
+
     try {
         requireAdmin(context);
-        
+
         const uid = data.uid;
         if (!uid) {
             throw new functions.https.HttpsError("invalid-argument", "The function must be called with a user UID.");
         }
 
         await admin.auth().setCustomUserClaims(uid, { role: "admin" });
-        
+
         // Log successful admin claim grant
         await AuditLogger.logSuccess(
             "admin.set_admin_claim",
@@ -386,7 +392,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
             "user",
             { targetUserId: uid, duration: Date.now() - startTime }
         );
-        
+
         return { message: `Success! Custom claim 'admin' set for user ${uid}` };
     } catch (error) {
         // Log failure
@@ -398,7 +404,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
             error as Error,
             { targetUserId: data.uid }
         );
-        
+
         console.error("Error setting custom claim:", error);
         if (error instanceof functions.https.HttpsError) {
             throw error;
@@ -413,7 +419,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
  */
 export const revokeSubscription = functions.https.onCall(async (data: { subscriptionId: string }, context: CallableContext) => {
     const startTime = Date.now();
-    
+
     try {
         requireAdmin(context);
         const adminUid = context.auth?.uid;
@@ -436,7 +442,7 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
             revokedAt: admin.firestore.FieldValue.serverTimestamp(),
             revokedBy: adminUid ?? "unknown-admin"
         });
-        
+
         if (masterId) {
             await admin.firestore().collection("masters").doc(masterId).update({
                 isPremium: false
@@ -463,7 +469,7 @@ export const revokeSubscription = functions.https.onCall(async (data: { subscrip
             error as Error,
             { subscriptionId: data.subscriptionId }
         );
-        
+
         console.error("Error revoking subscription:", error);
         if (error instanceof functions.https.HttpsError) {
             throw error;
@@ -690,7 +696,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       // Already logged with logDenied above
       throw error;
     }
-    
+
     await AuditLogger.logFailure(
       "device.pair",
       context,
@@ -699,12 +705,12 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       error as Error,
       { pairingMethod: "code" }
     );
-    
+
     if (error instanceof functions.https.HttpsError) {
         functions.logger.warn(`Validation failed for code ${pairingCode}:`, error.message, error.code, error.details);
         throw error;
     }
-    
+
     functions.logger.error(`Unexpected error validating code ${pairingCode}:`, error);
     throw new functions.https.HttpsError(
       "internal",
@@ -727,7 +733,7 @@ export const generateCustomToken = functions.https.onCall(
     try {
       const user = await admin.auth().getUser(uid);
       const customToken = await admin.auth().createCustomToken(uid, user.customClaims || {});
-      
+
       await AuditLogger.logSuccess(
         "auth.token_generated",
         context,
@@ -735,7 +741,7 @@ export const generateCustomToken = functions.https.onCall(
         "user",
         { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime }
       );
-      
+
       return { customToken };
     } catch (error) {
       await AuditLogger.logFailure(
@@ -745,7 +751,7 @@ export const generateCustomToken = functions.https.onCall(
         "user",
         error as Error
       );
-      
+
       functions.logger.error("Error generating custom token:", error);
       throw new functions.https.HttpsError(
         "internal",
@@ -823,7 +829,7 @@ export const registerMasterDevice = functions.https.onCall(
       error as Error,
       { imei }
     );
-    
+
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
@@ -917,7 +923,7 @@ export const generatePairingLink = functions.https.onCall(
       error as Error,
       { tokenType: "link" }
     );
-    
+
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
@@ -946,7 +952,7 @@ export const setDeviceLocked = functions.https.onCall(
   async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
-    validateAppCheck(context);
+    validateAppCheck(context, true);
     checkRateLimit(masterId, "setDeviceLocked", 30);
     const { childId, isLocked } = data;
 
@@ -1009,7 +1015,7 @@ export const setDeviceLocked = functions.https.onCall(
         error as Error,
         { childId, isLocked }
       );
-      
+
       functions.logger.error(`Failed to set lock state for child ${childId}:`, error);
       throw new functions.https.HttpsError(
         "internal",
@@ -1072,7 +1078,7 @@ export const updateAppBlacklist = functions.https.onCall(
         appBlacklist: appBlacklist,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       await AuditLogger.logSuccess(
         "rules.update_blacklist",
         context,
@@ -1080,7 +1086,7 @@ export const updateAppBlacklist = functions.https.onCall(
         "rule",
         { childId, appCount: appBlacklist.length, duration: Date.now() - startTime }
       );
-      
+
       functions.logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     } catch (error) {
@@ -1092,7 +1098,7 @@ export const updateAppBlacklist = functions.https.onCall(
         error as Error,
         { childId, appCount: appBlacklist.length }
       );
-      
+
       functions.logger.error(`Failed to update blacklist for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to update app blacklist.", error);
     }
@@ -1150,7 +1156,7 @@ export const setUsageRules = functions.https.onCall(
         usageRules: usageRules,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       await AuditLogger.logSuccess(
         "rules.update_usage",
         context,
@@ -1158,7 +1164,7 @@ export const setUsageRules = functions.https.onCall(
         "rule",
         { childId, duration: Date.now() - startTime }
       );
-      
+
       functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     } catch (error) {
@@ -1170,7 +1176,7 @@ export const setUsageRules = functions.https.onCall(
         error as Error,
         { childId }
       );
-      
+
       functions.logger.error(`Failed to set usage rules for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
     }
@@ -1223,7 +1229,7 @@ export const recordHeartbeat = functions.https.onCall(
         error as Error,
         { childId }
       );
-      
+
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
@@ -1269,7 +1275,7 @@ export const registerFcmToken = functions.https.onCall(
       }
 
       await childDeviceRef.update({ fcmToken: token });
-      
+
       await AuditLogger.logSuccess(
         "device.register",
         context,
@@ -1277,7 +1283,7 @@ export const registerFcmToken = functions.https.onCall(
         "device",
         { tokenType: "fcm", childId, duration: Date.now() - startTime }
       );
-      
+
       functions.logger.info(`FCM token for child ${childId} has been registered.`);
       return { success: true };
 
@@ -1290,7 +1296,7 @@ export const registerFcmToken = functions.https.onCall(
           error as Error,
           { tokenType: "fcm", childId }
         );
-        
+
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
@@ -1469,10 +1475,10 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
  * @throws {functions.https.HttpsError} Throws an error if authentication fails or arguments are invalid.
  */
 export const createTask = functions.https.onCall(
-  async (data: { childId: string; description: string; deadline?: string }, context: CallableContext) => {
+  async (data: { childId: string; description: string; deadlineISO: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
-    validateAppCheck(context);
+    validateAppCheck(context, true);
     checkRateLimit(masterId, "createTask", 20);
     const { childId, description, deadlineISO } = data;
 
@@ -1567,14 +1573,14 @@ export const completeTask = functions.https.onCall(
       if (current.status && current.status !== "pending") {
         throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
       }
-      
+
       await taskRef.update({
         status: "pending_approval",
         photoUrl: photoUrl,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       await AuditLogger.logSuccess(
         "task.complete",
         context,
@@ -1582,7 +1588,7 @@ export const completeTask = functions.https.onCall(
         "task",
         { childId, taskId, duration: Date.now() - startTime }
       );
-      
+
       functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
       return { success: true };
     } catch (error) {
@@ -1614,7 +1620,7 @@ export const approveTask = functions.https.onCall(
   async (data: { childId: string; taskId: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
-    validateAppCheck(context);
+    validateAppCheck(context, true);
     checkRateLimit(masterId, "approveTask", 30);
     const { childId, taskId } = data;
 
@@ -1652,9 +1658,9 @@ export const approveTask = functions.https.onCall(
       if (taskData.status !== "pending_approval") {
         throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
       }
-      
+
       await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-      
+
       await AuditLogger.logSuccess(
         "task.approve",
         context,
@@ -1662,7 +1668,7 @@ export const approveTask = functions.https.onCall(
         "task",
         { childId, taskId, duration: Date.now() - startTime }
       );
-      
+
       functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
       return { success: true };
     } catch (error) {
@@ -1697,7 +1703,7 @@ export const rejectTask = functions.https.onCall(
   async (data: { childId: string; taskId: string; reason?: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
-    validateAppCheck(context);
+    validateAppCheck(context, true);
     checkRateLimit(masterId, "rejectTask", 30);
     const { childId, taskId, reason } = data;
 
@@ -1785,7 +1791,7 @@ export const verifyPurchase = functions.https.onCall(
   async (data: { purchaseToken: string; sku: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
-    validateAppCheck(context);
+    validateAppCheck(context, true);
     checkRateLimit(masterId, "verifyPurchase", 10);
     const { purchaseToken, sku } = data;
 
@@ -1794,7 +1800,7 @@ export const verifyPurchase = functions.https.onCall(
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
-    
+
     try {
       const masterDoc = await masterDeviceRef.get();
       if (!masterDoc.exists) {
@@ -1823,7 +1829,7 @@ export const verifyPurchase = functions.https.onCall(
             expiresAt: expiresAt,
           },
         });
-        
+
         await AuditLogger.logSuccess(
           "subscription.verify_purchase",
           context,
@@ -1831,7 +1837,7 @@ export const verifyPurchase = functions.https.onCall(
           "subscription",
           { masterId, sku, subscriptionType, duration: Date.now() - startTime }
         );
-        
+
         functions.logger.info(`Subscription ${sku} activated for master ${masterId}.`);
         return { success: true, subscriptionStatus: "active" };
       } else {
@@ -1843,7 +1849,7 @@ export const verifyPurchase = functions.https.onCall(
           new Error("Purchase verification failed"),
           { masterId, sku }
         );
-        
+
         functions.logger.warn(`Invalid purchase token received for master ${masterId}.`);
         throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
       }
@@ -1933,7 +1939,7 @@ export const reportDailyUsage = functions.https.onCall(
         error as Error,
         { childId, date }
       );
-      
+
       functions.logger.error(`Failed to report usage for child ${childId}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to save usage report.", error);
     }
@@ -2047,7 +2053,7 @@ export const validatePairingToken = functions.https.onCall(
       error as Error,
       { pairingMethod: "token" }
     );
-    
+
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
@@ -2133,7 +2139,7 @@ export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: st
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
-    
+
     try {
         const masterDoc = await masterDeviceRef.get();
         if (!masterDoc.exists) {
@@ -2168,7 +2174,7 @@ export const updateFCMToken = functions.https.onCall(async (data: { fcmToken: st
             error as Error,
             { tokenType: "fcm", masterId }
         );
-        
+
         functions.logger.error(`Failed to update FCM token for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
@@ -2186,7 +2192,7 @@ export const deleteUserAccount = functions.https.onCall(async (_data: Record<str
     const startTime = Date.now();
     const masterId = requireAuth(context);
     const masterDeviceRef = db().collection("masters").doc(masterId);
-    
+
     try {
         const masterDoc = await masterDeviceRef.get();
         if (!masterDoc.exists) {
@@ -2223,12 +2229,12 @@ export const deleteUserAccount = functions.https.onCall(async (_data: Record<str
             context,
             `masters/${masterId}`,
             "device",
-            { 
-                masterId, 
+            {
+                masterId,
                 childrenDeleted: childrenSnapshot.size,
                 tasksDeleted: tasksSnapshot.size,
                 subscriptionsDeleted: subsSnapshot.size,
-                duration: Date.now() - startTime 
+                duration: Date.now() - startTime
             }
         );
 
@@ -2244,7 +2250,7 @@ export const deleteUserAccount = functions.https.onCall(async (_data: Record<str
             error as Error,
             { masterId }
         );
-        
+
         functions.logger.error(`Failed to delete user account for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
@@ -2358,7 +2364,7 @@ export const grantSupportAccess = functions.https.onCall(async (data: { ticketId
             error as Error,
             { ticketId }
         );
-        
+
         functions.logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
         throw new functions.https.HttpsError("internal", "Failed to grant support access.", error);
     }
@@ -2429,7 +2435,7 @@ export const revokeSupportAccess = functions.https.onCall(async (data: { grantId
             error as Error,
             { grantId }
         );
-        
+
         functions.logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
         throw new functions.https.HttpsError("internal", "Failed to revoke support access.", error);
     }
@@ -2494,10 +2500,10 @@ export const sendDailyErrorReport = functions.pubsub
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         yesterday.setHours(0, 0, 0, 0);
-        
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         try {
             // Aggregate errors from the last 24 hours
             const errorSnapshot = await db()
@@ -2505,34 +2511,34 @@ export const sendDailyErrorReport = functions.pubsub
                 .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(yesterday))
                 .where("timestamp", "<", admin.firestore.Timestamp.fromDate(today))
                 .get();
-            
+
             if (errorSnapshot.empty) {
                 functions.logger.info("Daily Error Report: No errors in the last 24 hours ✅");
                 return null;
             }
-            
+
             // Group errors by function
             const errorsByFunction: Record<string, number> = {};
             const errorsByType: Record<string, number> = {};
-            
+
             errorSnapshot.docs.forEach(doc => {
                 const data = doc.data();
                 const functionName = data.functionName || "unknown";
                 const errorMessage = data.message || "unknown";
-                
+
                 errorsByFunction[functionName] = (errorsByFunction[functionName] || 0) + 1;
                 errorsByType[errorMessage] = (errorsByType[errorMessage] || 0) + 1;
             });
-            
+
             // Sort by count
             const sortedFunctions = Object.entries(errorsByFunction)
                 .sort(([, a], [, b]) => b - a)
                 .slice(0, 10); // Top 10
-            
+
             const sortedErrors = Object.entries(errorsByType)
                 .sort(([, a], [, b]) => b - a)
                 .slice(0, 5); // Top 5
-            
+
             // Build report
             const report = `
 ╔════════════════════════════════════════════════════════════════
@@ -2547,9 +2553,9 @@ ${sortedFunctions.map(([name, count]) => "║   - " + name + ": " + count).join(
 ${sortedErrors.map(([msg, count]) => "║   - " + msg.substring(0, 60) + "...: " + count).join("\n")}
 ╚════════════════════════════════════════════════════════════════
             `;
-            
+
             functions.logger.warn(report);
-            
+
             // Optional: Store summary for dashboard
             await db().collection("error_summaries").add({
                 date: today,
@@ -2558,9 +2564,9 @@ ${sortedErrors.map(([msg, count]) => "║   - " + msg.substring(0, 60) + "...: "
                 errorsByType,
                 generatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
-            
+
             return null;
-            
+
         } catch (error) {
             functions.logger.error("Failed to generate daily error report:", error);
             return null;
@@ -2619,20 +2625,27 @@ export const checkExpiredSubscriptions = functions.pubsub
 // ==================== DSAR DATA EXPORT ====================
 
 /**
- * Exports all user data associated with the authenticated master account.
+ * Exports all user data associated with a target master account.
  * This function supports GDPR/DSAR (Data Subject Access Request) compliance
- * by returning all stored personal data in a structured JSON format.
+ * and is restricted to admins.
  *
- * @param {Record<string, never>} _data - No input data required.
+ * @param {{masterId: string}} data - Data containing the target master account ID.
  * @param {CallableContext} context - The context of the function call.
  * @returns {Promise<object>} A promise that resolves with all user data.
- * @throws {functions.https.HttpsError} Throws an error if authentication fails.
+ * @throws {functions.https.HttpsError} Throws an error if authorization or input validation fails.
  */
-export const exportUserData = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+export const exportUserData = functions.https.onCall(async (data: { masterId?: string }, context: CallableContext) => {
     const startTime = Date.now();
-    const masterId = requireAuth(context);
-    validateAppCheck(context);
-    checkRateLimit(masterId, "exportUserData", 5, 3600000); // Max 5 exports per hour
+    requireAdmin(context);
+    const adminId = requireAuth(context);
+    validateAppCheck(context, true);
+
+    const { masterId } = data || {};
+    if (!masterId || typeof masterId !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "masterId is required.");
+    }
+
+    checkRateLimit(adminId, "exportUserData", 5, 3600000); // Max 5 exports per hour
 
     try {
         // 1. Master profile data
@@ -2695,10 +2708,13 @@ export const exportUserData = functions.https.onCall(async (_data: Record<string
             { action: "data_export", duration: Date.now() - startTime }
         );
 
-        functions.logger.info(`Data export completed for master ${masterId}.`);
+        functions.logger.info(`Data export completed for master ${masterId} by admin ${adminId}.`);
         return { success: true, data: exportData };
 
     } catch (error) {
+        if (error instanceof functions.https.HttpsError) {
+          throw error;
+        }
         functions.logger.error(`Failed to export data for master ${masterId}:`, error);
         throw new functions.https.HttpsError(
             "internal",
@@ -2743,18 +2759,18 @@ export const onTicketCreated = functions.firestore
   .onCreate(async (snapshot, context) => {
     const ticketId = context.params.ticketId;
     const ticketData = snapshot.data();
-    
+
     functions.logger.info(`New support ticket created: ${ticketId}`);
-    
+
     try {
       // Extract problem description
       const problemDescription = ticketData.problemDescription || "";
-      
+
       if (!problemDescription || problemDescription.trim().length === 0) {
         functions.logger.info("Empty problem description, skipping AI analysis.");
         return;
       }
-      
+
       // Construct the prompt for the AI
       const prompt = `You are a helpful support agent for the MiniMaster application, a parental control app that allows parents to manage their children's device usage through task-based unlocking.
 
@@ -2786,20 +2802,20 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
         temperature: 0.7,
         max_tokens: 1000,
       });
-      
+
       // Parse the AI's response
       const aiResponse = response.choices[0]?.message?.content || "";
       functions.logger.info("AI Response:", aiResponse);
-      
+
       let aiGeneratedSolution = "";
       let aiConfidenceScore = 0.0;
       let newStatus = "awaiting_user_feedback";
-      
+
       try {
         const parsed = JSON.parse(aiResponse);
         aiGeneratedSolution = parsed.solution || "Unable to generate solution.";
         aiConfidenceScore = parsed.confidence || 0.0;
-        
+
         // If confidence is too low, escalate immediately
         if (aiConfidenceScore < 0.7) {
           newStatus = "escalated";
@@ -2811,7 +2827,7 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
         aiConfidenceScore = 0.0;
         newStatus = "escalated";
       }
-      
+
       // Update the ticket with the AI-generated solution
       await admin.firestore().collection("supportTickets").doc(ticketId).update({
         aiGeneratedSolution: aiGeneratedSolution,
@@ -2820,23 +2836,23 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
         status: newStatus,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       functions.logger.info(`Ticket ${ticketId} updated with AI solution (confidence: ${aiConfidenceScore})`);
-      
+
       // Send push notification to the user
       const masterImei = ticketData.masterImei;
       const masterDoc = await admin.firestore().collection("masters").doc(masterImei).get();
-      
+
       if (masterDoc.exists) {
         const masterData = masterDoc.data();
         const fcmToken = masterData?.fcmToken;
-        
+
         if (fcmToken) {
           const notificationMessage = {
             notification: {
               title: "Support Ticket Update",
-              body: newStatus === "escalated" 
-                ? "Your ticket has been escalated to a human agent." 
+              body: newStatus === "escalated"
+                ? "Your ticket has been escalated to a human agent."
                 : "We have a proposed solution for your support ticket!",
             },
             data: {
@@ -2845,16 +2861,16 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
             },
             token: fcmToken,
           };
-          
+
           await getMessaging().send(notificationMessage);
           functions.logger.info(`Push notification sent to ${masterImei}`);
         }
       }
-      
+
       return;
     } catch (error) {
       functions.logger.error("Error in onTicketCreated:", error);
-      
+
       // Update ticket to escalated status on error
       await admin.firestore().collection("supportTickets").doc(ticketId).update({
         aiGeneratedSolution: "An error occurred while analyzing your ticket. A human support agent will assist you shortly.",
@@ -2863,7 +2879,7 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
         status: "escalated",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       throw error;
     }
   });
@@ -2875,44 +2891,44 @@ export const provideSolutionFeedback = functions.https.onCall(async (data: { tic
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
   }
-  
+
   const { ticketId, feedback } = data; // feedback: 'accepted' or 'rejected'
-  
+
   if (!ticketId || !feedback) {
     throw new functions.https.HttpsError("invalid-argument", "Missing ticketId or feedback.");
   }
-  
+
   if (feedback !== "accepted" && feedback !== "rejected") {
     throw new functions.https.HttpsError("invalid-argument", "Feedback must be \"accepted\" or \"rejected\".");
   }
-  
+
   try {
     const ticketRef = admin.firestore().collection("supportTickets").doc(ticketId);
     const ticketDoc = await ticketRef.get();
-    
+
     if (!ticketDoc.exists) {
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
-    
+
     const ticketData = ticketDoc.data();
-    
+
     // Verify that the user owns this ticket
     if (ticketData?.masterImei !== context.auth.uid) {
       throw new functions.https.HttpsError("permission-denied", "You do not have permission to update this ticket.");
     }
-    
+
     // Update ticket based on feedback
     const newStatus = feedback === "accepted" ? "closed_by_ai" : "escalated";
     const aiSolutionStatus = feedback === "accepted" ? "accepted" : "rejected";
-    
+
     await ticketRef.update({
       aiSolutionStatus: aiSolutionStatus,
       status: newStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
+
     functions.logger.info(`Ticket ${ticketId} feedback: ${feedback}, new status: ${newStatus}`);
-    
+
     return { success: true, message: `Ticket ${newStatus}.` };
   } catch (error) {
     functions.logger.error("Error in provideSolutionFeedback:", error);
