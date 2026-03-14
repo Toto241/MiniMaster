@@ -43,9 +43,9 @@ let updateStub: jest.Mock;
 let setStub: jest.Mock;
 let deleteStub: jest.Mock;
 
-const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
-const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
-const asChild = { auth: { uid: "c1", token: {} } };
+const asMaster = { auth: { uid: "m1", token: { role: "master" } }, app: { appId: "test-app" } };
+const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } }, app: { appId: "test-app" } };
+const asChild = { auth: { uid: "c1", token: {} }, app: { appId: "test-app" } };
 
 beforeAll(() => {
   fns = require("../index");

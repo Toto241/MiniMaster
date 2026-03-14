@@ -37,7 +37,7 @@ describe("Firestore Security Rules - Structural Validation", () => {
     });
 
     it("should have rules for tasks subcollection", () => {
-      expect(rulesContent).toContain("match /tasks/{taskId}");
+      expect(rulesContent).toContain("match /children/{childId}/tasks/{taskId}");
     });
 
     it("should have rules for supportTickets collection", () => {
