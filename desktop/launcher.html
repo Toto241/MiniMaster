@@ -21,14 +21,14 @@
       font-family: "Segoe UI", "Calibri", sans-serif;
       background: var(--bg);
       color: var(--ink);
-      min-height: 100vh;
+      min-block-size: 100vh;
       display: grid;
       place-items: center;
       padding: 24px;
     }
 
     .shell {
-      width: min(920px, 100%);
+      inline-size: min(920px, 100%);
       background: var(--card);
       border-radius: 20px;
       box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
@@ -49,7 +49,7 @@
     }
 
     .grid {
-      margin-top: 24px;
+      margin-block-start: 24px;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 16px;
@@ -73,7 +73,7 @@
 
     .desc {
       color: var(--muted);
-      min-height: 44px;
+      min-block-size: 44px;
       margin: 0;
     }
 
@@ -81,7 +81,7 @@
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: auto;
+      margin-block-start: auto;
     }
 
     .btn {
@@ -110,7 +110,7 @@
     }
 
     .hint {
-      margin-top: 18px;
+      margin-block-start: 18px;
       font-size: .9rem;
       color: var(--muted);
     }

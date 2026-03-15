@@ -1,243 +1,487 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>MiniMaster Operator Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css">
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <h1>MiniMaster Operator Dashboard</h1>
-            <div id="auth-status" class="auth-status">
-                <span id="user-email"></span>
-                <button id="logout-btn" onclick="logout()" style="display: none;">Logout</button>
-            </div>
-        </header>
-
-        <!-- Navigation Tabs -->
-        <nav id="dashboard-nav" class="dashboard-nav" style="display: none;">
-            <button class="nav-tab active" onclick="switchTab('overview', event)">Overview</button>
-            <button class="nav-tab" onclick="switchTab('users', event)">Users</button>
-            <button class="nav-tab" onclick="switchTab('subscriptions', event)">Subscriptions</button>
-            <button class="nav-tab" onclick="switchTab('support', event)">Support Tickets</button>
-            <button class="nav-tab" onclick="switchTab('compliance', event)">Compliance</button>
-            <button class="nav-tab" onclick="switchTab('setup', event)">Cloud Setup & Assistant</button>
-        </nav>
-
-        <main class="main-content">
-            <!-- Login Section -->
-            <section id="login-section" class="section">
-                <h2>Operator Login</h2>
-                <form id="login-form">
-                    <input type="email" id="login-email" placeholder="Email" required>
-                    <input type="password" id="login-password" placeholder="Password" required>
-                    <button type="submit" class="btn btn-primary">Login</button>
-                </form>
-            </section>
-
-            <!-- Dashboard Section (Hidden until authorized) -->
-            <section id="dashboard-section" class="section" style="display: none;">
-
-                <!-- Tab: Overview / KPI Dashboard -->
-                <div id="tab-overview" class="tab-content active">
-                    <h2>KPI Dashboard</h2>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <h3>Total Users</h3>
-                            <p id="stat-total-users">--</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Active Subscriptions</h3>
-                            <p id="stat-active-subs">--</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Total Tasks</h3>
-                            <p id="stat-total-tasks">--</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Open Tickets</h3>
-                            <p id="stat-open-tickets">--</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Children Paired</h3>
-                            <p id="stat-total-children">--</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Errors (24h)</h3>
-                            <p id="stat-errors-24h">--</p>
-                        </div>
-                    </div>
-
-                    <div class="quick-links" style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-                        <h3 style="margin-top: 0;">Quick Links</h3>
-                        <a href="logs.html" class="btn btn-primary" style="display: inline-block; text-decoration: none; margin-right: 10px;">View Audit Logs</a>
-                        <button onclick="refreshAllStats()" class="btn btn-secondary">Refresh Stats</button>
-                    </div>
-
-                    <!-- Error Summary Section -->
-                    <h3>Recent Error Summary</h3>
-                    <div id="error-summary" class="data-list">
-                        <div class="info">Click "Refresh Stats" to load error summaries.</div>
-                    </div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#0f172a" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <title>MiniMaster Operator Dashboard</title>
+        <link rel="manifest" href="manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="icon.svg" />
+        <link rel="stylesheet" href="styles.css" />
+        <!-- Firebase SDKs -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <header class="header">
+                <h1>MiniMaster Operator Dashboard</h1>
+                <div id="auth-status" class="auth-status">
+                    <span id="user-email"></span>
+                    <button
+                        id="logout-btn"
+                        onclick="logout()"
+                        style="display: none"
+                    >
+                        Logout
+                    </button>
                 </div>
+            </header>
 
-                <!-- Tab: Users -->
-                <div id="tab-users" class="tab-content" style="display: none;">
-                    <h2>User Management</h2>
-                    <div class="user-search">
-                        <input type="text" id="user-search-input" placeholder="Search by Email or Master ID">
-                        <button onclick="searchUsers()" class="btn btn-secondary">Search</button>
-                        <button onclick="loadUsers()" class="btn btn-secondary">Show All</button>
-                    </div>
-                    <div id="user-list" class="data-list">
-                        <!-- User data will be rendered here -->
-                    </div>
-                    <div id="user-pagination" class="pagination"></div>
-                </div>
+            <!-- Navigation Tabs -->
+            <nav id="dashboard-nav" class="dashboard-nav" style="display: none">
+                <button
+                    class="nav-tab active"
+                    onclick="switchTab('overview', event)"
+                >
+                    Overview
+                </button>
+                <button class="nav-tab" onclick="switchTab('users', event)">
+                    Users
+                </button>
+                <button
+                    class="nav-tab"
+                    onclick="switchTab('subscriptions', event)"
+                >
+                    Subscriptions
+                </button>
+                <button class="nav-tab" onclick="switchTab('support', event)">
+                    Support Tickets
+                </button>
+                <button
+                    class="nav-tab"
+                    onclick="switchTab('compliance', event)"
+                >
+                    Compliance
+                </button>
+                <button class="nav-tab" onclick="switchTab('setup', event)">
+                    Cloud Setup & Assistant
+                </button>
+            </nav>
 
-                <!-- Tab: Subscriptions -->
-                <div id="tab-subscriptions" class="tab-content" style="display: none;">
-                    <h2>Subscription Monitoring</h2>
-                    <div class="sub-filters">
-                        <button onclick="filterSubscriptions('all')" class="btn btn-secondary">All</button>
-                        <button onclick="filterSubscriptions('active')" class="btn btn-secondary">Active</button>
-                        <button onclick="filterSubscriptions('expired')" class="btn btn-secondary">Expired</button>
-                    </div>
-                    <div id="subscription-list" class="data-list">
-                        <!-- Subscription data will be rendered here -->
-                    </div>
-                    <div id="sub-pagination" class="pagination"></div>
-                </div>
+            <main class="main-content">
+                <!-- Login Section -->
+                <section id="login-section" class="section">
+                    <h2>Operator Login</h2>
+                    <form id="login-form">
+                        <input
+                            type="email"
+                            id="login-email"
+                            placeholder="Email"
+                            required
+                        />
+                        <input
+                            type="password"
+                            id="login-password"
+                            placeholder="Password"
+                            required
+                        />
+                        <button type="submit" class="btn btn-primary">
+                            Login
+                        </button>
+                    </form>
+                </section>
 
-                <!-- Tab: Support Tickets -->
-                <div id="tab-support" class="tab-content" style="display: none;">
-                    <h2>Support Tickets</h2>
-                    <div class="support-filters">
-                        <button onclick="filterTickets('all')" class="btn btn-secondary">All</button>
-                        <button onclick="filterTickets('open')" class="btn btn-secondary">Open</button>
-                        <button onclick="filterTickets('awaiting_user_feedback')" class="btn btn-secondary">Awaiting Feedback</button>
-                        <button onclick="filterTickets('escalated')" class="btn btn-secondary">Escalated</button>
-                        <button onclick="filterTickets('in_progress')" class="btn btn-secondary">In Progress</button>
-                        <button onclick="filterTickets('closed')" class="btn btn-secondary">Closed</button>
-                    </div>
-                    <div id="support-tickets-list" class="data-list">
-                        <!-- Support tickets will be rendered here -->
-                    </div>
-                    <div id="ticket-pagination" class="pagination"></div>
-                </div>
-
-                <!-- Tab: Compliance -->
-                <div id="tab-compliance" class="tab-content" style="display: none;">
-                    <h2>Compliance &amp; Data Management</h2>
-                    <div class="compliance-section">
-                        <h3>DSAR (Data Subject Access Request)</h3>
-                        <p>Export all data associated with a specific user for GDPR compliance.</p>
-                        <div class="dsar-form">
-                            <input type="text" id="dsar-master-id" placeholder="Enter Master ID">
-                            <button onclick="triggerDsarExport()" class="btn btn-primary">Export User Data</button>
-                        </div>
-                        <div id="dsar-result" class="data-list" style="margin-top: 15px;"></div>
-                    </div>
-
-                    <div class="compliance-section" style="margin-top: 30px;">
-                        <h3>Data Deletion Request</h3>
-                        <p>Permanently delete all data associated with a user account.</p>
-                        <div class="dsar-form">
-                            <input type="text" id="delete-master-id" placeholder="Enter Master ID">
-                            <button onclick="triggerAccountDeletion()" class="btn btn-danger">Delete User Account</button>
-                        </div>
-                    </div>
-
-                    <div class="compliance-section" style="margin-top: 30px;">
-                        <h3>Audit Log Export</h3>
-                        <p>Export audit logs for a specific time period.</p>
-                        <div class="dsar-form">
-                            <input type="date" id="audit-start-date">
-                            <input type="date" id="audit-end-date">
-                            <button onclick="exportAuditLogs()" class="btn btn-primary">Export Audit Logs</button>
-                        </div>
-                        <div id="audit-export-result" class="data-list" style="margin-top: 15px;"></div>
-                    </div>
-                </div>
-
-                <!-- Tab: Setup Assistant -->
-                <div id="tab-setup" class="tab-content" style="display: none;">
-                    <h2>Cloud Integration &amp; Operator Assistant</h2>
-
-                    <div class="setup-grid">
-                        <div class="setup-card">
-                            <h3>Integration Health Check</h3>
-                            <p>Validiert die Anbindung an zentrale Cloud-Dienste (Auth, Firestore, Functions) und prüft kritische Sammlungen/Funktionen.</p>
-                            <div class="setup-actions">
-                                <button onclick="runFullSetupValidation()" class="btn btn-primary">Run Full Validation</button>
-                                <button onclick="exportSetupReport()" class="btn btn-secondary">Export Setup Report</button>
+                <!-- Dashboard Section (Hidden until authorized) -->
+                <section
+                    id="dashboard-section"
+                    class="section"
+                    style="display: none"
+                >
+                    <!-- Tab: Overview / KPI Dashboard -->
+                    <div id="tab-overview" class="tab-content active">
+                        <h2>KPI Dashboard</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h3>Total Users</h3>
+                                <p id="stat-total-users">--</p>
                             </div>
-                            <div id="setup-check-results" class="data-list" style="margin-top: 15px;">
-                                <div class="info">Noch keine Validierung ausgeführt.</div>
+                            <div class="stat-card">
+                                <h3>Active Subscriptions</h3>
+                                <p id="stat-active-subs">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Total Tasks</h3>
+                                <p id="stat-total-tasks">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Open Tickets</h3>
+                                <p id="stat-open-tickets">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Children Paired</h3>
+                                <p id="stat-total-children">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Errors (24h)</h3>
+                                <p id="stat-errors-24h">--</p>
                             </div>
                         </div>
 
-                        <div class="setup-card">
-                            <h3>Operator Onboarding Checklist</h3>
-                            <p>Geführte Inbetriebnahme für Betreiber. Checkpoints werden lokal im Browser gespeichert.</p>
-                            <div id="setup-checklist" class="setup-checklist"></div>
+                        <div
+                            class="quick-links"
+                            style="
+                                margin: 20px 0;
+                                padding: 15px;
+                                background: #f5f5f5;
+                                border-radius: 8px;
+                            "
+                        >
+                            <h3 style="margin-block-start: 0">Quick Links</h3>
+                            <a
+                                href="logs.html"
+                                class="btn btn-primary"
+                                style="
+                                    display: inline-block;
+                                    text-decoration: none;
+                                    margin-inline-end: 10px;
+                                "
+                                >View Audit Logs</a
+                            >
+                            <button
+                                onclick="refreshAllStats()"
+                                class="btn btn-secondary"
+                            >
+                                Refresh Stats
+                            </button>
+                        </div>
+
+                        <!-- Error Summary Section -->
+                        <h3>Recent Error Summary</h3>
+                        <div id="error-summary" class="data-list">
+                            <div class="info">
+                                Click "Refresh Stats" to load error summaries.
+                            </div>
                         </div>
                     </div>
 
-                    <div class="setup-card" style="margin-top: 20px;">
-                        <h3>Operator Assistant</h3>
-                        <p>Fragen zur Integration, Deployment, Rollen und Troubleshooting direkt im Panel klären.</p>
-                        <div class="assistant-box">
-                            <div id="assistant-chat" class="assistant-chat">
-                                <div class="assistant-msg assistant">Hallo! Ich helfe bei Setup, Cloud-Integration und Betreiber-Workflows. Stelle eine Frage wie: "Wie prüfe ich Admin-Rechte?"</div>
+                    <!-- Tab: Users -->
+                    <div
+                        id="tab-users"
+                        class="tab-content"
+                        style="display: none"
+                    >
+                        <h2>User Management</h2>
+                        <div class="user-search">
+                            <input
+                                type="text"
+                                id="user-search-input"
+                                placeholder="Search by Email or Master ID"
+                            />
+                            <button
+                                onclick="searchUsers()"
+                                class="btn btn-secondary"
+                            >
+                                Search
+                            </button>
+                            <button
+                                onclick="loadUsers()"
+                                class="btn btn-secondary"
+                            >
+                                Show All
+                            </button>
+                        </div>
+                        <div id="user-list" class="data-list">
+                            <!-- User data will be rendered here -->
+                        </div>
+                        <div id="user-pagination" class="pagination"></div>
+                    </div>
+
+                    <!-- Tab: Subscriptions -->
+                    <div
+                        id="tab-subscriptions"
+                        class="tab-content"
+                        style="display: none"
+                    >
+                        <h2>Subscription Monitoring</h2>
+                        <div class="sub-filters">
+                            <button
+                                onclick="filterSubscriptions('all')"
+                                class="btn btn-secondary"
+                            >
+                                All
+                            </button>
+                            <button
+                                onclick="filterSubscriptions('active')"
+                                class="btn btn-secondary"
+                            >
+                                Active
+                            </button>
+                            <button
+                                onclick="filterSubscriptions('expired')"
+                                class="btn btn-secondary"
+                            >
+                                Expired
+                            </button>
+                        </div>
+                        <div id="subscription-list" class="data-list">
+                            <!-- Subscription data will be rendered here -->
+                        </div>
+                        <div id="sub-pagination" class="pagination"></div>
+                    </div>
+
+                    <!-- Tab: Support Tickets -->
+                    <div
+                        id="tab-support"
+                        class="tab-content"
+                        style="display: none"
+                    >
+                        <h2>Support Tickets</h2>
+                        <div class="support-filters">
+                            <button
+                                onclick="filterTickets('all')"
+                                class="btn btn-secondary"
+                            >
+                                All
+                            </button>
+                            <button
+                                onclick="filterTickets('open')"
+                                class="btn btn-secondary"
+                            >
+                                Open
+                            </button>
+                            <button
+                                onclick="
+                                    filterTickets('awaiting_user_feedback')
+                                "
+                                class="btn btn-secondary"
+                            >
+                                Awaiting Feedback
+                            </button>
+                            <button
+                                onclick="filterTickets('escalated')"
+                                class="btn btn-secondary"
+                            >
+                                Escalated
+                            </button>
+                            <button
+                                onclick="filterTickets('in_progress')"
+                                class="btn btn-secondary"
+                            >
+                                In Progress
+                            </button>
+                            <button
+                                onclick="filterTickets('closed')"
+                                class="btn btn-secondary"
+                            >
+                                Closed
+                            </button>
+                        </div>
+                        <div id="support-tickets-list" class="data-list">
+                            <!-- Support tickets will be rendered here -->
+                        </div>
+                        <div id="ticket-pagination" class="pagination"></div>
+                    </div>
+
+                    <!-- Tab: Compliance -->
+                    <div
+                        id="tab-compliance"
+                        class="tab-content"
+                        style="display: none"
+                    >
+                        <h2>Compliance &amp; Data Management</h2>
+                        <div class="compliance-section">
+                            <h3>DSAR (Data Subject Access Request)</h3>
+                            <p>
+                                Export all data associated with a specific user
+                                for GDPR compliance.
+                            </p>
+                            <div class="dsar-form">
+                                <input
+                                    type="text"
+                                    id="dsar-master-id"
+                                    placeholder="Enter Master ID"
+                                />
+                                <button
+                                    onclick="triggerDsarExport()"
+                                    class="btn btn-primary"
+                                >
+                                    Export User Data
+                                </button>
                             </div>
-                            <div class="assistant-input-row">
-                                <input type="text" id="assistant-input" placeholder="Frage eingeben...">
-                                <button onclick="askOperatorAssistant()" class="btn btn-primary">Ask</button>
+                            <div
+                                id="dsar-result"
+                                class="data-list"
+                                style="margin-block-start: 15px"
+                            ></div>
+                        </div>
+
+                        <div
+                            class="compliance-section"
+                            style="margin-block-start: 30px"
+                        >
+                            <h3>Data Deletion Request</h3>
+                            <p>
+                                Permanently delete all data associated with a
+                                user account.
+                            </p>
+                            <div class="dsar-form">
+                                <input
+                                    type="text"
+                                    id="delete-master-id"
+                                    placeholder="Enter Master ID"
+                                />
+                                <button
+                                    onclick="triggerAccountDeletion()"
+                                    class="btn btn-danger"
+                                >
+                                    Delete User Account
+                                </button>
+                            </div>
+                        </div>
+
+                        <div
+                            class="compliance-section"
+                            style="margin-block-start: 30px"
+                        >
+                            <h3>Audit Log Export</h3>
+                            <p>Export audit logs for a specific time period.</p>
+                            <div class="dsar-form">
+                                <input type="date" id="audit-start-date" />
+                                <input type="date" id="audit-end-date" />
+                                <button
+                                    onclick="exportAuditLogs()"
+                                    class="btn btn-primary"
+                                >
+                                    Export Audit Logs
+                                </button>
+                            </div>
+                            <div
+                                id="audit-export-result"
+                                class="data-list"
+                                style="margin-block-start: 15px"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Setup Assistant -->
+                    <div
+                        id="tab-setup"
+                        class="tab-content"
+                        style="display: none"
+                    >
+                        <h2>Cloud Integration &amp; Operator Assistant</h2>
+
+                        <div class="setup-grid">
+                            <div class="setup-card">
+                                <h3>Integration Health Check</h3>
+                                <p>
+                                    Validiert die Anbindung an zentrale
+                                    Cloud-Dienste (Auth, Firestore, Functions)
+                                    und prüft kritische Sammlungen/Funktionen.
+                                </p>
+                                <div class="setup-actions">
+                                    <button
+                                        onclick="runFullSetupValidation()"
+                                        class="btn btn-primary"
+                                    >
+                                        Run Full Validation
+                                    </button>
+                                    <button
+                                        onclick="exportSetupReport()"
+                                        class="btn btn-secondary"
+                                    >
+                                        Export Setup Report
+                                    </button>
+                                </div>
+                                <div
+                                    id="setup-check-results"
+                                    class="data-list"
+                                    style="margin-block-start: 15px"
+                                >
+                                    <div class="info">
+                                        Noch keine Validierung ausgeführt.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="setup-card">
+                                <h3>Operator Onboarding Checklist</h3>
+                                <p>
+                                    Geführte Inbetriebnahme für Betreiber.
+                                    Checkpoints werden lokal im Browser
+                                    gespeichert.
+                                </p>
+                                <div
+                                    id="setup-checklist"
+                                    class="setup-checklist"
+                                ></div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="setup-card"
+                            style="margin-block-start: 20px"
+                        >
+                            <h3>Operator Assistant</h3>
+                            <p>
+                                Fragen zur Integration, Deployment, Rollen und
+                                Troubleshooting direkt im Panel klären.
+                            </p>
+                            <div class="assistant-box">
+                                <div id="assistant-chat" class="assistant-chat">
+                                    <div class="assistant-msg assistant">
+                                        Hallo! Ich helfe bei Setup,
+                                        Cloud-Integration und
+                                        Betreiber-Workflows. Stelle eine Frage
+                                        wie: "Wie prüfe ich Admin-Rechte?"
+                                    </div>
+                                </div>
+                                <div class="assistant-input-row">
+                                    <input
+                                        type="text"
+                                        id="assistant-input"
+                                        placeholder="Frage eingeben..."
+                                    />
+                                    <button
+                                        onclick="askOperatorAssistant()"
+                                        class="btn btn-primary"
+                                    >
+                                        Ask
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </section>
+            </main>
+
+            <div
+                id="notification"
+                class="notification"
+                style="display: none"
+            ></div>
+        </div>
+
+        <!-- User Details Modal -->
+        <div id="user-details-modal" class="modal" style="display: none">
+            <div class="modal-content">
+                <span class="close" onclick="closeUserDetailsModal()"
+                    >&times;</span
+                >
+                <div id="user-details-content">
+                    <!-- User details will be loaded here -->
                 </div>
-
-            </section>
-        </main>
-
-        <div id="notification" class="notification" style="display: none;"></div>
-    </div>
-
-    <!-- User Details Modal -->
-    <div id="user-details-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close" onclick="closeUserDetailsModal()">&times;</span>
-            <div id="user-details-content">
-                <!-- User details will be loaded here -->
             </div>
         </div>
-    </div>
 
-    <!-- Ticket Details Modal -->
-    <div id="ticket-details-modal" class="modal" style="display: none;">
-        <div class="modal-content modal-large">
-            <span class="close" onclick="closeTicketDetailsModal()">&times;</span>
-            <div id="ticket-details-content">
-                <!-- Ticket details will be loaded here -->
+        <!-- Ticket Details Modal -->
+        <div id="ticket-details-modal" class="modal" style="display: none">
+            <div class="modal-content modal-large">
+                <span class="close" onclick="closeTicketDetailsModal()"
+                    >&times;</span
+                >
+                <div id="ticket-details-content">
+                    <!-- Ticket details will be loaded here -->
+                </div>
             </div>
         </div>
-    </div>
 
-    <script src="app.js"></script>
-    <script src="pwa-register.js"></script>
-</body>
+        <script src="app.js"></script>
+        <script src="pwa-register.js"></script>
+    </body>
 </html>

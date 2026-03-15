@@ -93,7 +93,8 @@ beforeEach(() => {
   resetState();
 
   // Construct a Firestore mock that routes to state
-  jest.spyOn(db, "collection").mockImplementation((coll: string) => {
+  jest.spyOn(db, "collection").mockImplementation((...args: unknown[]) => {
+    const coll = String(args[0] ?? "");
     const collData = state[coll] || {};
     return {
       doc: jest.fn((docId: string) => {

@@ -267,7 +267,7 @@ async function runFullSetupValidation() {
         html += `<tr><td>${result.check}</td><td><span class="${className}">${result.status.toUpperCase()}</span></td><td>${escapeHtml(result.message)}</td></tr>`;
     });
     html += "</table>";
-    html += `<div style="margin-top: 10px;"><strong>Summary:</strong> ${ok} OK, ${warn} WARN, ${errorCount} ERROR</div>`;
+    html += `<div style="margin-block-start: 10px;"><strong>Summary:</strong> ${ok} OK, ${warn} WARN, ${errorCount} ERROR</div>`;
 
     resultEl.innerHTML = html;
     showNotification("Setup validation completed.", errorCount > 0 ? "error" : "success");
@@ -615,7 +615,7 @@ async function viewUserDetails(masterId) {
 
         // Actions
         html += `<h4>Actions</h4>`;
-        html += `<button onclick="triggerDsarExportForUser('${masterId}')" class="btn btn-primary" style="margin-right: 10px;">Export User Data (DSAR)</button>`;
+        html += `<button onclick="triggerDsarExportForUser('${masterId}')" class="btn btn-primary" style="margin-inline-end: 10px;">Export User Data (DSAR)</button>`;
         html += `<button onclick="revokeUserSubscription('${masterId}')" class="btn btn-danger">Revoke Subscription</button>`;
 
         modalContent.innerHTML = html;
@@ -831,7 +831,7 @@ async function viewTicketDetails(ticketId) {
 
         // Admin response section
         html += `<h4>Admin Response</h4>`;
-        html += `<textarea id="admin-response-text" rows="4" style="width: 100%; margin-bottom: 10px;" placeholder="Enter admin response...">${ticket.adminResponse || ""}</textarea>`;
+        html += `<textarea id="admin-response-text" rows="4" style="inline-size: 100%; margin-block-end: 10px;" placeholder="Enter admin response...">${ticket.adminResponse || ""}</textarea>`;
 
         // Action buttons
         html += `<div class="ticket-actions">`;

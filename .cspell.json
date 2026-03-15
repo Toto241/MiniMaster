@@ -1,6 +1,7 @@
 {
   "version": "0.2",
-  "language": "de",
+  "language": "de,en",
+  "allowCompoundWords": true,
   "words": [
   "firestore",
   "callable",
@@ -388,6 +389,24 @@
     "copilot",
     "instructions",
     "Linting",
-    "Timestamps"
+    "Timestamps",
+    "androidx",
+    "kotlinx",
+    "hilt",
+    "dagger",
+    "javax",
+    "openai",
+    "gemini",
+    "GEMINI",
+    "OPENAI",
+    "DSAR",
+    "dsar",
+    "appcheck",
+    "launcher",
+    "Panel",
+    "Panels",
+    "UsageRules",
+    "ViewModel",
+    "Imei"
   ]
 }

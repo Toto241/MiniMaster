@@ -8,7 +8,7 @@
     "test": "node --max-old-space-size=4096 ./node_modules/jest/bin/jest.js --config jest.config.cjs",
     "test:ci": "jest --config jest.config.cjs --runInBand",
     "test:watch": "jest --watch",
-    "desktop:start": "electron desktop/main.js"
+    "desktop-start": "electron desktop/main.js"
   },
   "keywords": [],
   "author": "",

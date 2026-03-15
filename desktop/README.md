@@ -7,7 +7,7 @@ Native Desktop-Oberfläche (Electron) für die vorhandenen PC-Panels.
 Vom Repository-Root:
 
 ```bash
-npm run desktop:start
+npx electron desktop/main.js
 ```
 
 ## Enthaltene Oberflächen
