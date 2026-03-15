@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-15
+
+### Added
+- Added a final status note and CI/CD badge to `README.md`.
+
+### Changed
+- **Finalized Repository State**: This release marks the final, stable state of the project.
+- Consolidated and simplified project documentation, removing over 25 redundant or outdated status reports and markdown files.
+- Updated `README.md` to reflect the final project structure and remove broken links.
+- Updated `.gitignore` to exclude common OS-specific files, temporary files, and IDE configurations.
+
+### Fixed
+- Fixed a failing integration test (`support-and-subscription.integration.test.ts`) by correcting the payload for the `createTask` function.
+- Removed an unused variable in the test suite to eliminate a linting warning.
+
+### Removed
+- Closed 6 open Pull Requests that were either outdated or had their changes merged into `main`.
+- Deleted over 25 stale remote branches to clean up the repository.
+- Removed temporary files (`test.txt`, `*.tmp`, etc.) and unnecessary workspace configurations (`.vscode/`, `Tools.code-workspace`) from the repository.
+
 ## [1.1.1] - 2026-02-13
 
 ### Added

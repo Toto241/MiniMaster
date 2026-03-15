@@ -1,8 +1,0 @@
-{
-  "servers": {
-    "MiniMaster Docs": {
-      "type": "sse",
-      "url": "https://gitmcp.io/Toto241/MiniMaster"
-    }
-  }
-}

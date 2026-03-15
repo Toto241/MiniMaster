@@ -56,7 +56,7 @@ let setStub: jest.Mock;
 let addStub: jest.Mock;
 
 const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
-const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
+// const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
 
 beforeAll(() => {
   fns = require("../../index");
@@ -150,10 +150,8 @@ describe("Task Lifecycle - Complete Flow", () => {
     const createResult = await createWrapped(
       {
         childId: "c1",
-        title: "Do homework",
         description: "Complete math homework",
-        deadline: new Date().toISOString(),
-        unlockDurationMinutes: 30,
+        deadlineISO: new Date().toISOString(),
       },
       asMaster
     );
