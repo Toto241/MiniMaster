@@ -36,6 +36,8 @@ The Mini-Master suite is designed to give parents control over their children's 
 *   **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
 *   **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
 *   **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
+*   **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
+*   **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
 
 ## Project Structure
 
@@ -91,6 +93,14 @@ The repository is organized as follows:
 1.  Navigate to `web-control/`.
 2.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration from the Firebase Console.
 3.  Serve the directory using a simple HTTP server (e.g., `python3 -m http.server 8000`).
+
+### Desktop Launcher Setup (PC)
+
+1.  Install dependencies in repository root: `npm install`
+2.  Start desktop launcher: `npm run desktop:start`
+3.  Use launcher to open:
+    * Parent panel (`web-control`)
+    * Operator dashboard (`admin-panel`)
 
 ---
 

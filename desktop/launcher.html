@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniMaster Desktop</title>
+  <style>
+    :root {
+      --bg: linear-gradient(120deg, #eaf2ff 0%, #f8fbff 45%, #eefaf2 100%);
+      --ink: #10243f;
+      --card: #ffffff;
+      --primary: #1f6feb;
+      --secondary: #0f172a;
+      --muted: #5b6b80;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Calibri", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .shell {
+      width: min(920px, 100%);
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+      padding: 28px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: 0.2px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .grid {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 18px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .desc {
+      color: var(--muted);
+      min-height: 44px;
+      margin: 0;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(31, 111, 235, 0.2);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-dark {
+      background: var(--secondary);
+      color: #fff;
+    }
+
+    .hint {
+      margin-top: 18px;
+      font-size: .9rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <h1>MiniMaster Desktop Launcher</h1>
+    <p>Alle PC-Oberflächen sind hier gebündelt: Eltern-Panel und Operator/Admin-Panel.</p>
+
+    <section class="grid">
+      <article class="card">
+        <h2 class="title">Eltern Control Panel</h2>
+        <p class="desc">Geräte sperren/entsperren, Aufgaben erstellen, Regeln setzen, Support-Fälle verwalten.</p>
+        <div class="row">
+          <a class="btn btn-primary" href="../web-control/index.html">Panel öffnen</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2 class="title">Operator Dashboard</h2>
+        <p class="desc">KPI-Übersicht, Nutzerverwaltung, Subscriptions, Compliance und Support-Tickets.</p>
+        <div class="row">
+          <a class="btn btn-dark" href="../admin-panel/index.html">Dashboard öffnen</a>
+          <a class="btn" href="../admin-panel/logs.html">Audit Logs</a>
+        </div>
+      </article>
+    </section>
+
+    <p class="hint">Hinweis: Für volle Funktionalität müssen die Firebase-Konfigurationen in den Web-Panels gesetzt sein.</p>
+  </main>
+</body>
+</html>

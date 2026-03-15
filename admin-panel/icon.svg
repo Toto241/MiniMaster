@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="MiniMaster Admin">
+  <rect width="128" height="128" rx="24" fill="#0f172a"/>
+  <path d="M32 38h64v52H32z" fill="#ffffff" opacity="0.95"/>
+  <path d="M44 50h40M44 62h28M44 74h18" stroke="#0f172a" stroke-width="6" stroke-linecap="round"/>
+</svg>
