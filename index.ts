@@ -131,6 +131,8 @@ type AuditAction =
   // Subscription
   | "subscription.verify_purchase"
   | "subscription.activated"
+  | "subscription.trial_started"
+  | "subscription.trial_expired"
   // System
   | "system.heartbeat"
   | "system.error";
@@ -358,6 +360,35 @@ async function handleError(
   } catch (loggingError) {
     functions.logger.error("Failed to log error", { error: loggingError });
   }
+}
+
+// --- Subscription & Trial Access Check ---
+
+/** Trial period: 7 days. The trial end timestamp is calculated at registration time. */
+
+/**
+ * Checks if a master account has active access to the service.
+ * Access is granted if the user has an active subscription OR is within the 7-day trial period.
+ * @param masterData - The Firestore document data for the master account.
+ * @returns {boolean} True if the user has active access, false otherwise.
+ */
+function hasActiveAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
+  if (!masterData) return false;
+  const subscription = masterData.subscription;
+  if (!subscription) return false;
+
+  // Active paid subscription
+  if (subscription.status === "active") return true;
+
+  // Active trial period
+  if (subscription.status === "trial" && subscription.trialEndsAt) {
+    const trialEnd = subscription.trialEndsAt instanceof admin.firestore.Timestamp
+      ? subscription.trialEndsAt.toMillis()
+      : subscription.trialEndsAt;
+    return Date.now() < trialEnd;
+  }
+
+  return false;
 }
 
 // --- Admin Panel Functions ---
@@ -647,26 +678,21 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    // Subscription Check: Limit non-premium users to 1 child
+    // Subscription/Trial Check: Require active access (trial or paid subscription)
     const masterData = masterDoc.data();
-    const isPremium = masterData?.subscription?.status === "active";
-
-    if (!isPremium) {
-      const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
-      if (!childrenQuery.empty && childrenQuery.size >= 1) {
-        await AuditLogger.logDenied(
-          "device.pair",
-          context,
-          `children/${childId}`,
-          "device",
-          "Free tier limited to 1 child device",
-          { masterId, childCount: childrenQuery.size }
-        );
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "Free tier limited to 1 child device. Please upgrade to Premium."
-        );
-      }
+    if (!hasActiveAccess(masterData)) {
+      await AuditLogger.logDenied(
+        "device.pair",
+        context,
+        `children/${childId}`,
+        "device",
+        "No active subscription or trial. Please subscribe to continue.",
+        { masterId, subscriptionStatus: masterData?.subscription?.status || "none" }
+      );
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        "Your trial has expired. Please subscribe to continue using Mini-Master."
+      );
     }
 
     const childDeviceRef = db().collection("children").doc(childId);
@@ -800,11 +826,20 @@ export const registerMasterDevice = functions.https.onCall(
 
     const now = admin.firestore.Timestamp.now();
 
+    const trialEndsAt = new admin.firestore.Timestamp(
+      now.seconds + 7 * 24 * 60 * 60, now.nanoseconds
+    );
+
     await masterDeviceRef.set({
       imei: imei,
       uid: masterId,
       role: "master",
       createdAt: now,
+      subscription: {
+        status: "trial",
+        trialStartedAt: now,
+        trialEndsAt: trialEndsAt,
+      },
     });
 
     await admin.auth().setCustomUserClaims(masterId, { role: "master" });
@@ -869,26 +904,21 @@ export const generatePairingLink = functions.https.onCall(
       );
     }
 
-    // Subscription Check: Limit non-premium users to 1 child
+    // Subscription/Trial Check: Require active access (trial or paid subscription)
     const masterData = doc.data();
-    const isPremium = masterData?.subscription?.status === "active";
-
-    if (!isPremium) {
-      const childrenQuery = await db().collection("children").where("masterImei", "==", masterId).get();
-      if (!childrenQuery.empty && childrenQuery.size >= 1) {
-        await AuditLogger.logDenied(
-          "device.pair",
-          context,
-          `masters/${masterId}`,
-          "device",
-          "Free tier limited to 1 child device",
-          { childCount: childrenQuery.size }
-        );
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "Free tier limited to 1 child device. Please upgrade to Premium."
-        );
-      }
+    if (!hasActiveAccess(masterData)) {
+      await AuditLogger.logDenied(
+        "device.pair",
+        context,
+        `masters/${masterId}`,
+        "device",
+        "No active subscription or trial. Please subscribe to continue.",
+        { subscriptionStatus: masterData?.subscription?.status || "none" }
+      );
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        "Your trial has expired. Please subscribe to continue using Mini-Master."
+      );
     }
 
     const pairingToken = uuidv4();
@@ -1887,7 +1917,20 @@ export const getSubscriptionStatus = functions.https.onCall(
     }
 
     const subscription = masterDoc.data()?.subscription || { status: "none" };
-    return { subscriptionStatus: subscription };
+    const result: Record<string, any> = { subscriptionStatus: subscription };
+
+    // Add computed fields for client convenience
+    if (subscription.status === "trial" && subscription.trialEndsAt) {
+      const trialEnd = subscription.trialEndsAt instanceof admin.firestore.Timestamp
+        ? subscription.trialEndsAt.toMillis()
+        : subscription.trialEndsAt;
+      const remainingMs = trialEnd - Date.now();
+      result.trialDaysRemaining = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+      result.isTrialActive = remainingMs > 0;
+    }
+
+    result.hasAccess = hasActiveAccess(masterDoc.data());
+    return result;
   }
 );
 
@@ -2588,32 +2631,48 @@ export const checkExpiredSubscriptions = functions.pubsub
         const now = admin.firestore.Timestamp.now();
 
         try {
-            // Query all masters with active subscriptions that have expired
-            const expiredSnapshot = await db().collection("masters")
+            // 1. Check expired paid subscriptions
+            const expiredSubSnapshot = await db().collection("masters")
                 .where("subscription.status", "==", "active")
                 .where("subscription.expiresAt", "<=", now)
                 .get();
 
-            if (expiredSnapshot.empty) {
-                functions.logger.info("Subscription Check: No expired subscriptions found.");
-                return null;
-            }
-
             const batch = db().batch();
-            let count = 0;
+            let subCount = 0;
 
-            expiredSnapshot.docs.forEach(doc => {
+            expiredSubSnapshot.docs.forEach(doc => {
                 batch.update(doc.ref, {
                     "subscription.status": "expired",
                     "subscription.expiredAt": now,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
-                count++;
+                subCount++;
             });
 
-            await batch.commit();
+            // 2. Check expired trial periods
+            const expiredTrialSnapshot = await db().collection("masters")
+                .where("subscription.status", "==", "trial")
+                .where("subscription.trialEndsAt", "<=", now)
+                .get();
 
-            functions.logger.info(`Subscription Check: ${count} subscription(s) marked as expired.`);
+            let trialCount = 0;
+
+            expiredTrialSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, {
+                    "subscription.status": "trial_expired",
+                    "subscription.trialExpiredAt": now,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                trialCount++;
+            });
+
+            if (subCount > 0 || trialCount > 0) {
+                await batch.commit();
+            }
+
+            functions.logger.info(
+                `Subscription Check: ${subCount} subscription(s) and ${trialCount} trial(s) marked as expired.`
+            );
             return null;
 
         } catch (error) {

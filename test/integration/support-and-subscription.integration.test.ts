@@ -21,6 +21,9 @@ jest.mock("firebase-admin", () => {
     static fromDate(date: Date) {
       return new MockTimestamp(Math.floor(date.getTime() / 1000), 0);
     }
+    toMillis() {
+      return this.seconds * 1000 + Math.floor(this.nanoseconds / 1_000_000);
+    }
   }
 
   const firestoreNamespace = () => ({ collection: jest.fn() });
@@ -193,5 +196,77 @@ describe("Authentication edge cases", () => {
         await expect(wrapped({})).rejects.toThrow();
       }
     }
+  });
+});
+
+// ==================== Trial & Subscription Access Control ====================
+
+describe("Trial & Subscription Access Control", () => {
+  it("getSubscriptionStatus returns trial info with days remaining", async () => {
+    const admin = require("firebase-admin");
+    const now = admin.firestore.Timestamp.now();
+    const trialEndsAt = new admin.firestore.Timestamp(now.seconds + 5 * 24 * 60 * 60, 0); // 5 days left
+
+    getStub.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({
+        subscription: {
+          status: "trial",
+          trialStartedAt: now,
+          trialEndsAt: trialEndsAt,
+        },
+      }),
+    });
+
+    const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+    const result = await wrapped({}, asMaster);
+
+    expect(result.subscriptionStatus.status).toBe("trial");
+    expect(result.hasAccess).toBe(true);
+    expect(result.isTrialActive).toBe(true);
+    expect(result.trialDaysRemaining).toBeGreaterThan(0);
+    expect(result.trialDaysRemaining).toBeLessThanOrEqual(5);
+  });
+
+  it("getSubscriptionStatus returns hasAccess=false for expired trial", async () => {
+    const admin = require("firebase-admin");
+    const now = admin.firestore.Timestamp.now();
+    const trialEndsAt = new admin.firestore.Timestamp(now.seconds - 1 * 24 * 60 * 60, 0); // 1 day ago
+
+    getStub.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({
+        subscription: {
+          status: "trial",
+          trialStartedAt: new admin.firestore.Timestamp(now.seconds - 8 * 24 * 60 * 60, 0),
+          trialEndsAt: trialEndsAt,
+        },
+      }),
+    });
+
+    const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+    const result = await wrapped({}, asMaster);
+
+    expect(result.subscriptionStatus.status).toBe("trial");
+    expect(result.hasAccess).toBe(false);
+    expect(result.isTrialActive).toBe(false);
+    expect(result.trialDaysRemaining).toBe(0);
+  });
+
+  it("getSubscriptionStatus returns hasAccess=false for trial_expired status", async () => {
+    getStub.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({
+        subscription: {
+          status: "trial_expired",
+        },
+      }),
+    });
+
+    const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+    const result = await wrapped({}, asMaster);
+
+    expect(result.subscriptionStatus.status).toBe("trial_expired");
+    expect(result.hasAccess).toBe(false);
   });
 });
