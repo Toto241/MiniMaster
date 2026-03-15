@@ -4,3 +4,4 @@ coverage/**
 admin-panel/**
 scripts/**
 desktop/**
+lib/**

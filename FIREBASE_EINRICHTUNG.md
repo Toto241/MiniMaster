@@ -1,5 +1,7 @@
 # Firebase-Projekt Einrichtung und Konfiguration
 
+<!-- markdownlint-disable MD022 MD031 MD032 MD034 MD040 -->
+
 Schritt-für-Schritt-Anleitung: Firebase-Projekt einrichten und `google-services.json` herunterladen
 
 ## Vorbemerkung
@@ -67,7 +69,7 @@ Sie benötigen ein Google-Konto, um auf die Firebase Console zuzugreifen.
 ### 3. Child App (Kinder-App) hinzufügen
 
 1. Wiederholen Sie die Schritte 1-2 aus dem vorherigen Abschnitt
-2. Verwenden Sie diesmal den **Package-Name**: `com.google.pairing.child`
+2. Verwenden Sie diesmal den **Package-Name**: `com.google.pairing`
 3. Geben Sie den **App-Spitznamen** ein: `Child App`
 4. Laden Sie die **zweite** `google-services.json` Datei herunter
 5. **WICHTIG:** Kopieren Sie diese Datei in das `childApp/` Verzeichnis Ihres Mini-Master Projekts

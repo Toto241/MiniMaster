@@ -1,0 +1,41 @@
+# MiniMaster Operator Dashboard
+
+Web-Dashboard fuer Betreiber/Admins.
+
+## Funktionen
+
+- KPI Uebersicht (Users, Tasks, Tickets, Errors)
+- User- und Subscription-Verwaltung
+- Support-Ticket-Management
+- Compliance-Exports (DSAR, Audit)
+- Cloud Setup & Assistant Tab (Health Checks, Checkliste, Setup-Report)
+
+## Setup
+
+1. Firebase-Konfiguration in `admin-panel/app.js` setzen (`firebaseConfig` Platzhalter ersetzen).
+2. Sicherstellen, dass der Benutzer in Firebase Auth existiert und den Claim `role: "admin"` besitzt.
+3. Hosting bereitstellen oder lokal statisch ausliefern.
+
+## Admin-User anlegen
+
+Mit lokalem `serviceAccountKey.json` im Projektroot:
+
+```bash
+node scripts/setup-admin.js <email> <passwort>
+```
+
+## Lokal starten
+
+Das Panel ist statisch und kann mit einem beliebigen HTTP-Server gestartet werden, z. B.:
+
+```bash
+python -m http.server 8080
+```
+
+Dann `http://localhost:8080/admin-panel/` aufrufen.
+
+## Troubleshooting
+
+- Login erfolgreich, aber "Access Denied": Admin-Claim fehlt oder Token nicht erneuert.
+- Firebase init Fehler: Platzhalter in `firebaseConfig` wurden nicht ersetzt.
+- Keine Daten sichtbar: Firestore Rules/Collections oder Berechtigungen pruefen.
