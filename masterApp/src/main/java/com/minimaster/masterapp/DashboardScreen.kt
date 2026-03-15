@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Button
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedButton
 import androidx.compose.material.Switch
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +36,8 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
     onNavigateToCreateTask: (String) -> Unit,
     onNavigateToReview: () -> Unit,
-    onNavigateToSubscription: () -> Unit
+    onNavigateToSubscription: () -> Unit,
+    onNavigateToUsageRules: (String) -> Unit = {}
 ) {
     val children by viewModel.children.collectAsState()
 
@@ -60,7 +62,8 @@ fun DashboardScreen(
                 ChildDeviceItem(
                     child = child,
                     onLockToggle = { isLocked -> viewModel.setDeviceLocked(child.id, isLocked) },
-                    onCreateTaskClick = { onNavigateToCreateTask(child.id) }
+                    onCreateTaskClick = { onNavigateToCreateTask(child.id) },
+                    onUsageRulesClick = { onNavigateToUsageRules(child.id) }
                 )
             }
         }
@@ -81,7 +84,8 @@ fun DashboardScreen(
 fun ChildDeviceItem(
     child: ChildDevice,
     onLockToggle: (Boolean) -> Unit,
-    onCreateTaskClick: () -> Unit
+    onCreateTaskClick: () -> Unit,
+    onUsageRulesClick: () -> Unit = {}
 ) {
     Card(elevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -108,8 +112,16 @@ fun ChildDeviceItem(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onCreateTaskClick, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text(stringResource(R.string.create_task))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+            ) {
+                Button(onClick = onCreateTaskClick) {
+                    Text(stringResource(R.string.create_task))
+                }
+                OutlinedButton(onClick = onUsageRulesClick) {
+                    Text("Usage Rules")
+                }
             }
         }
     }

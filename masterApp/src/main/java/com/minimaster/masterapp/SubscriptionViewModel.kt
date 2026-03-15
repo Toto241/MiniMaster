@@ -10,7 +10,6 @@ import com.google.firebase.functions.FirebaseFunctions
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -30,8 +29,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SubscriptionViewModel @Inject constructor(
     private val billingClientWrapper: BillingClientWrapper,
-    private val functions: FirebaseFunctions,
-    private val credentialsRepository: MasterCredentialsRepository
+    private val functions: FirebaseFunctions
 ) : ViewModel() {
 
     /** A [StateFlow] that emits the list of available subscription products. */
@@ -66,23 +64,22 @@ class SubscriptionViewModel @Inject constructor(
      */
     fun verifyPurchase(purchase: com.android.billingclient.api.Purchase) {
         viewModelScope.launch {
-            val (imei, secret) = credentialsRepository.getCredentials.first()
-            if (imei == null || secret == null) {
-                Log.e(TAG, "Cannot verify purchase, master credentials not found.")
+            val sku = purchase.products.firstOrNull()
+            if (sku == null) {
+                Log.e(TAG, "Cannot verify purchase, no product ID found.")
                 return@launch
             }
 
+            // Auth is handled by Firebase Auth token — no masterImei/secretKey needed
             val data = hashMapOf(
-                "masterImei" to imei,
-                "secretKey" to secret,
                 "purchaseToken" to purchase.purchaseToken,
-                "sku" to purchase.products.firstOrNull()
+                "sku" to sku
             )
             try {
                 functions.getHttpsCallable("verifyPurchase").call(data).await()
-                Log.d(TAG, "Purchase verification successful.")
+                Log.d(TAG, "Purchase verification successful for $sku.")
             } catch (e: Exception) {
-                Log.e(TAG, "Purchase verification failed.", e)
+                Log.e(TAG, "Purchase verification failed for $sku.", e)
             }
         }
     }

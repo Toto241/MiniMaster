@@ -9,11 +9,11 @@ jest.mock("firebase-admin", () => {
     static now() { const d = new Date(); return new MockTimestamp(Math.floor(d.getTime()/1000), 0); }
     static fromDate(date: Date) { return new MockTimestamp(Math.floor(date.getTime()/1000),0); }
   }
-  
+
   const firestoreNamespace = () => ({ collection: jest.fn() });
   (firestoreNamespace as any).Timestamp = MockTimestamp;
   (firestoreNamespace as any).FieldValue = { serverTimestamp: () => "mock-server-timestamp" };
-  
+
   return {
     ...original,
     initializeApp: jest.fn(),
@@ -43,19 +43,19 @@ beforeEach(() => {
   getMock = jest.fn();
   updateMock = jest.fn();
   setMock = jest.fn();
-  const subDocMock = jest.fn().mockReturnValue({ 
-    update: updateMock, 
-    get: getMock, 
-    set: setMock 
+  const subDocMock = jest.fn().mockReturnValue({
+    update: updateMock,
+    get: getMock,
+    set: setMock
   });
-  const subCollectionMock = jest.fn().mockReturnValue({ 
-    doc: subDocMock 
+  const subCollectionMock = jest.fn().mockReturnValue({
+    doc: subDocMock
   });
-  docMock = jest.fn().mockReturnValue({ 
-    get: getMock, 
-    update: updateMock, 
-    set: setMock, 
-    collection: subCollectionMock 
+  docMock = jest.fn().mockReturnValue({
+    get: getMock,
+    update: updateMock,
+    set: setMock,
+    collection: subCollectionMock
   });
   jest.spyOn(db, "collection").mockImplementation((..._args: unknown[]) => {
     return { doc: docMock } as any;
@@ -239,14 +239,14 @@ describe("getSubscriptionStatus", () => {
     });
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
-    expect(res).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true });
+    expect(res).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true, childLimit: 1 });
   });
 
   it("returns none status if no subscription", async () => {
     getMock.mockResolvedValue({ exists: true, data: () => ({ secretKey: "sec" }) });
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
-    expect(res).toEqual({ subscriptionStatus: { status: "none" }, hasAccess: false });
+    expect(res).toEqual({ subscriptionStatus: { status: "none" }, hasAccess: false, childLimit: 1 });
   });
 
   it("throws not-found if master document is missing", async () => {

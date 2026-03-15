@@ -1,0 +1,401 @@
+/**
+ * Device Management Cloud Functions.
+ * Handles device locking, blacklist management, usage rules, heartbeat, and FCM registration.
+ */
+import * as functions from "firebase-functions/v1";
+import type { CallableContext } from "firebase-functions/v1/https";
+import * as admin from "firebase-admin";
+import { db } from "../firebase";
+import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
+
+export const setDeviceLocked = functions.https.onCall(
+  async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    validateAppCheck(context, true);
+    checkRateLimit(masterId, "setDeviceLocked", 30);
+    const { childId, isLocked } = data;
+
+    if (!childId || typeof childId !== "string" || typeof isLocked !== "boolean") {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'isLocked' boolean.");
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterId);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        isLocked ? "device.lock" : "device.unlock", context,
+        `children/${childId}`, "device",
+        "Master not authorized for this child", { childId, isLocked }
+      );
+      throw new functions.https.HttpsError("permission-denied", "This master device is not authorized to control the specified child device.");
+    }
+
+    try {
+      await childDeviceRef.update({
+        isLocked: isLocked,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await AuditLogger.logSuccess(
+        isLocked ? "device.lock" : "device.unlock", context,
+        `children/${childId}`, "device",
+        { childId, isLocked, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
+      return { success: true, isLocked: isLocked };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        isLocked ? "device.lock" : "device.unlock", context,
+        `children/${childId}`, "device", error as Error, { childId, isLocked }
+      );
+      functions.logger.error(`Failed to set lock state for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while updating the device lock state.", error);
+    }
+  }
+);
+
+export const updateAppBlacklist = functions.https.onCall(
+  async (data: { childId: string; appBlacklist: string[] }, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    const { childId, appBlacklist } = data;
+
+    if (!childId || typeof childId !== "string" || !Array.isArray(appBlacklist)) {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'appBlacklist' array.");
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterId);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "rules.update_blacklist", context, `children/${childId}`, "rule",
+        "Master not authorized for this child", { childId, appCount: appBlacklist.length }
+      );
+      throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
+    }
+
+    try {
+      await childDeviceRef.update({
+        appBlacklist: appBlacklist,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await AuditLogger.logSuccess(
+        "rules.update_blacklist", context, `children/${childId}`, "rule",
+        { childId, appCount: appBlacklist.length, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "rules.update_blacklist", context, `children/${childId}`, "rule",
+        error as Error, { childId, appCount: appBlacklist.length }
+      );
+      functions.logger.error(`Failed to update blacklist for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to update app blacklist.", error);
+    }
+  }
+);
+
+export const setUsageRules = functions.https.onCall(
+  async (data: { childId: string; usageRules: object }, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    const { childId, usageRules } = data;
+
+    if (!childId || typeof childId !== "string" || typeof usageRules !== "object" || usageRules === null) {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'usageRules' object.");
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterId);
+    const masterDoc = await masterDeviceRef.get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+    const childDoc = await childDeviceRef.get();
+    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+      await AuditLogger.logDenied(
+        "rules.update_usage", context, `children/${childId}`, "rule",
+        "Master not authorized for this child", { childId }
+      );
+      throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
+    }
+
+    try {
+      await childDeviceRef.update({
+        usageRules: usageRules,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await AuditLogger.logSuccess(
+        "rules.update_usage", context, `children/${childId}`, "rule",
+        { childId, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "rules.update_usage", context, `children/${childId}`, "rule",
+        error as Error, { childId }
+      );
+      functions.logger.error(`Failed to set usage rules for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to set usage rules.", error);
+    }
+  }
+);
+
+export const getRulesForChild = functions.https.onCall(
+  async (data: { childId: string }, _context: CallableContext) => {
+    const { childId } = data;
+
+    if (!childId || typeof childId !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include a valid 'childId'.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+
+    try {
+      const doc = await childDeviceRef.get();
+      if (!doc.exists) {
+        throw new functions.https.HttpsError("not-found", "Child device not found.");
+      }
+
+      const childData = doc.data();
+      return {
+        isLocked: childData?.isLocked || false,
+        appBlacklist: childData?.appBlacklist || [],
+        usageRules: childData?.usageRules || {},
+      };
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error(`Failed to get rules for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while retrieving rules.", error);
+    }
+  }
+);
+
+export const recordHeartbeat = functions.https.onCall(
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
+    const childId = requireAuth(context);
+    const childDeviceRef = db().collection("children").doc(childId);
+
+    try {
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "The specified child device does not exist.");
+      }
+
+      await childDeviceRef.update({
+        lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await AuditLogger.logSuccess(
+        "system.heartbeat", context, `children/${childId}`, "system",
+        { childId, duration: Date.now() - startTime }
+      );
+
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "system.heartbeat", context, `children/${childId}`, "system",
+        error as Error, { childId }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error(`Failed to record heartbeat for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while recording heartbeat.", error);
+    }
+  }
+);
+
+export const registerFcmToken = functions.https.onCall(
+  async (data: { token: string }, context: CallableContext) => {
+    const startTime = Date.now();
+    const childId = requireAuth(context);
+    const { token } = data;
+
+    if (!token || typeof token !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include a valid 'token'.");
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+
+    try {
+      const doc = await childDeviceRef.get();
+      if (!doc.exists) {
+        throw new functions.https.HttpsError("not-found", "Child device not found.");
+      }
+
+      await childDeviceRef.update({ fcmToken: token });
+
+      await AuditLogger.logSuccess(
+        "device.register", context, `children/${childId}`, "device",
+        { tokenType: "fcm", childId, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`FCM token for child ${childId} has been registered.`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "device.register", context, `children/${childId}`, "device",
+        error as Error, { tokenType: "fcm", childId }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error(`Failed to register FCM token for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to register FCM token.", error);
+    }
+  }
+);
+
+export const updateFCMToken = functions.https.onCall(
+  async (data: { fcmToken: string }, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    const { fcmToken } = data;
+
+    if (!fcmToken || typeof fcmToken !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'fcmToken'.");
+    }
+
+    const masterDeviceRef = db().collection("masters").doc(masterId);
+
+    try {
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+
+      await masterDeviceRef.update({
+        fcmToken: fcmToken,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await AuditLogger.logSuccess(
+        "device.register", context, `masters/${masterId}`, "device",
+        { tokenType: "fcm", masterId, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`FCM token updated for master ${masterId}.`);
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "device.register", context, `masters/${masterId}`, "device",
+        error as Error, { tokenType: "fcm", masterId }
+      );
+      functions.logger.error(`Failed to update FCM token for master ${masterId}:`, error);
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while updating the FCM token.", error);
+    }
+  }
+);
+
+export const reportDailyUsage = functions.https.onCall(
+  async (data: { date: string; usageMillis: number }, context: CallableContext) => {
+    const startTime = Date.now();
+    const childId = requireAuth(context);
+    const { date, usageMillis } = data;
+
+    if (!date || typeof usageMillis !== "number") {
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    const historyRef = db().collection("children").doc(childId).collection("usageHistory").doc(date);
+
+    try {
+      await historyRef.set({
+        date: date,
+        totalUsageMillis: usageMillis,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await AuditLogger.logSuccess(
+        "system.heartbeat", context, `children/${childId}/usageHistory/${date}`, "system",
+        { childId, date, usageMillis, duration: Date.now() - startTime }
+      );
+
+      return { success: true };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "system.heartbeat", context, `children/${childId}/usageHistory/${date}`, "system",
+        error as Error, { childId, date }
+      );
+      functions.logger.error(`Failed to report usage for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to save usage report.", error);
+    }
+  }
+);
+
+/**
+ * Reports a tamper event from the child device (e.g., accessibility service disabled,
+ * device admin removal attempt). Stores the event and notifies the parent via FCM.
+ */
+export const reportTamperEvent = functions.https.onCall(
+  async (data: { childId: string; eventType: string; timestamp: number }, _context: CallableContext) => {
+    const { childId, eventType, timestamp } = data;
+
+    if (!childId || !eventType) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing childId or eventType.");
+    }
+
+    // Look up the child to find the parent (masterImei)
+    const childDoc = await db().collection("children").doc(childId).get();
+    if (!childDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Child device not found.");
+    }
+
+    const masterImei = childDoc.data()?.masterImei;
+    if (!masterImei) {
+      throw new functions.https.HttpsError("not-found", "No parent linked to this child.");
+    }
+
+    try {
+      // Store tamper event
+      await db().collection("children").doc(childId).collection("tamperEvents").add({
+        eventType,
+        timestamp: timestamp || Date.now(),
+        reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Send FCM notification to parent
+      const masterDoc = await db().collection("masters").doc(masterImei).get();
+      const fcmToken = masterDoc.data()?.fcmToken;
+      if (fcmToken) {
+        await admin.messaging().send({
+          token: fcmToken,
+          notification: {
+            title: "⚠️ Tamper Alert",
+            body: `Child device reported: ${eventType.replace(/_/g, " ")}`,
+          },
+          data: {
+            type: "tamper_alert",
+            childId,
+            eventType,
+          },
+        });
+      }
+
+      functions.logger.warn(`Tamper event from child ${childId}: ${eventType}`);
+      return { success: true };
+    } catch (error) {
+      functions.logger.error(`Failed to process tamper event for child ${childId}:`, error);
+      throw new functions.https.HttpsError("internal", "Failed to process tamper event.");
+    }
+  }
+);
