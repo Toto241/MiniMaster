@@ -3,7 +3,8 @@
 <!-- markdownlint-disable MD004 MD022 MD029 MD030 MD032 MD041 -->
 
 > [!NOTE]
-> This repository is in its final, stable state. All development activities have been completed, and the project is production-ready.
+> Current status: actively maintained prototype with production-oriented backend hardening.
+> Core flows are usable; some enforcement capabilities are intentionally still in rollout.
 
 [![CI/CD Status](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml)
 
@@ -81,9 +82,18 @@ The repository is organized as follows:
 ### Backend Setup
 
 1.  Navigate to the root directory and install dependencies: `npm install`
-2.  Login to Firebase: `firebase login`
-3.  Select your project: `firebase use --add`
-4.  Deploy the functions and rules: `firebase deploy`
+2.  Build backend TypeScript: `npm run build`
+3.  Login to Firebase: `firebase login`
+4.  Select your project: `firebase use --add`
+5.  Deploy the functions and rules: `firebase deploy`
+
+### AI Provider Setup (Support Automation)
+
+Set environment variables for ticket automation:
+
+- Preferred: `GEMINI_API_KEY`
+- Optional model override: `GEMINI_MODEL` (default: `gemini-2.0-flash`)
+- Fallback provider: `OPENAI_API_KEY`
 
 ### Android Apps Setup
 
@@ -94,12 +104,12 @@ The repository is organized as follows:
 
 1.  Navigate to `web-control/`.
 2.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration from the Firebase Console.
-3.  Serve the directory using a simple HTTP server (e.g., `python3 -m http.server 8000`).
+3.  Serve the directory using a simple HTTP server (e.g., `python -m http.server 8000`).
 
 ### Desktop Launcher Setup (PC)
 
 1.  Install dependencies in repository root: `npm install`
-2.  Start desktop launcher: `npx electron desktop/main.js`
+2.  Start desktop launcher: `npm run desktop-start`
 3.  Use launcher to open:
     - Parent panel (`web-control`)
     - Operator dashboard (`admin-panel`)

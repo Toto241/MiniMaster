@@ -4,6 +4,7 @@
   "description": "This repository contains the experimental implementation of the child application of the **Mini‑Master** project and accompanying Firebase Cloud Functions.",
   "main": "lib/index.js",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "lint": "eslint . --ext .js,.ts",
     "test": "node --max-old-space-size=4096 ./node_modules/jest/bin/jest.js --config jest.config.cjs",
     "test:ci": "jest --config jest.config.cjs --runInBand",

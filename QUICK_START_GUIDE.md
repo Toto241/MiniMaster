@@ -1,92 +1,102 @@
-# MiniMaster - Quick Start Guide for New Operators
+# MiniMaster - Quick Start (aktueller Stand)
 
-Welcome to MiniMaster! This guide will walk you through the process of setting up and deploying the MiniMaster project for the first time.
+Diese Anleitung bringt ein neues Operator-Setup schnell auf einen lauffaehigen Stand.
 
-## Step 1: Clone the Repository
-
-First, clone the MiniMaster repository to your local machine:
+## 1. Repository klonen
 
 ```bash
 git clone https://github.com/Toto241/MiniMaster.git
 cd MiniMaster
 ```
 
-## Step 2: Install Dependencies
-
-Install the necessary Node.js dependencies:
+## 2. Abhaengigkeiten installieren und Projekt pruefen
 
 ```bash
 npm install
+npm run build
+npm run lint
+npm test
 ```
 
-## Step 3: Set Up Your Firebase Project
+## 3. Firebase-Projekt vorbereiten
 
-1.  **Create a Firebase Project:** Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
-2.  **Enable Services:** Enable **Authentication**, **Firestore**, and **Storage**.
-3.  **Get Service Account Key:**
-    *   Go to **Project Settings** > **Service Accounts**.
-    *   Click **Generate New Private Key**.
-    *   Save the downloaded JSON file as `serviceAccountKey.json` in the project root.
+1. Projekt in der Firebase Console erstellen.
+2. Services aktivieren:
+    - Authentication
+    - Firestore
+    - Storage
+    - Functions
+3. Android-Apps registrieren:
+    - Master App: `com.minimaster.masterapp`
+    - Child App: `com.google.pairing`
+4. Je App die passende `google-services.json` lokal ablegen:
+    - `masterApp/google-services.json`
+    - `childApp/google-services.json`
 
-## Step 4: Update Firebase Configuration
+Wichtig: Die JSON-Dateien sind geheim und bleiben lokal.
 
-Run the `update-firebase-config.sh` script to update the Firebase configuration in the web apps:
+## 4. Web-Konfiguration setzen
+
+Option A (Script, Bash/WSL/Git Bash):
 
 ```bash
 ./scripts/update-firebase-config.sh
 ```
 
-Follow the prompts to enter your Firebase project configuration.
+Option B (manuell):
 
-## Step 5: Deploy the Project
+1. `admin-panel/app.js` und `web-control/app.js` oeffnen.
+2. Die Platzhalter in `firebaseConfig` durch echte Projektwerte ersetzen.
 
-Run the `deploy.sh` script to deploy all components to Firebase:
+## 5. AI Provider konfigurieren (Support-Automation)
+
+MiniMaster nutzt Gemini bevorzugt, OpenAI als Fallback.
+
+Setze die Umgebungsvariablen lokal oder in deinem Deploy-Umfeld:
+
+```bash
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.0-flash
+
+# optionaler Fallback
+OPENAI_API_KEY=...
+```
+
+## 6. Erstes Admin-Konto erstellen
+
+Service Account Key lokal als `serviceAccountKey.json` im Projektroot ablegen und danach:
+
+```bash
+node scripts/setup-admin.js <admin-email> <admin-passwort>
+```
+
+## 7. Deployment
+
+Schnellweg:
 
 ```bash
 ./deploy.sh
 ```
 
-This will deploy:
-*   Firestore Security Rules
-*   Firestore Indexes
-*   Cloud Functions
-*   Hosting (Web-Control & Admin Panel)
-
-## Step 6: Create the First Admin User
-
-Run the `setup-admin.js` script to create the first admin user:
+Oder gezielt mit Firebase CLI:
 
 ```bash
-node scripts/setup-admin.js <your-admin-email> <your-admin-password>
+firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 ```
 
-**Example:**
-```bash
-node scripts/setup-admin.js admin@minimaster.com MySecurePassword123
-```
+## 8. UIs starten und pruefen
 
-## Step 7: Run Security Tests
-
-Run the automated security tests to verify your setup:
+1. Operator Panel: `admin-panel/index.html` (Hosting-URL)
+2. Parent Web Panel: `web-control/index.html` (Hosting-URL)
+3. Desktop Launcher (Electron):
 
 ```bash
-node scripts/run-security-tests.js
+npm run desktop-start
 ```
 
-Follow the prompts to complete the tests.
+## Weiterfuehrende Doku
 
-## Step 8: Access Your Applications
-
-*   **Admin Panel:** Open the Admin Panel URL provided by Firebase Hosting.
-*   **Web-Control:** Open the Web-Control URL provided by Firebase Hosting.
-*   **ChildApp / MasterApp:** Build and run the Android apps from Android Studio.
-
-## Congratulations!
-
-You have successfully deployed the MiniMaster project. For more detailed information, please refer to the documentation in the `docs/` directory.
-
-### Key Documents
-
-*   **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Detailed deployment instructions.
-*   **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
-*   **[Auth Token Migration Guide](docs/AUTH_TOKEN_MIGRATION_GUIDE.md):** Guide to migrating to Firebase Auth Tokens.
+- `README.md`
+- `docs/DEPLOYMENT_GUIDE.md`
+- `PRODUCTION_DEPLOYMENT.md`
+- `docs/SECURITY_BEST_PRACTICES.md`

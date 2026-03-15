@@ -1,96 +1,99 @@
-# MiniMaster Deployment & Hardening Guide (v2)
+# MiniMaster Deployment Guide (aktualisiert)
 
-This guide provides the necessary steps to deploy and secure the MiniMaster project, including the latest security hardening measures.
+Stand: 2026-03-15
 
-## 1. Prerequisites
+Diese Anleitung beschreibt den aktuellen Deploy- und Inbetriebnahmepfad fuer Backend, Hosting und Operator-Setup.
 
-1.  **Firebase Account:** You need a Firebase project.
-2.  **Firebase CLI:** Ensure you have the Firebase CLI installed (`npm install -g firebase-tools`).
-3.  **Code:** Clone the repository and check out the `feature/project-hardening` branch.
+## 1. Voraussetzungen
 
-## 2. Firebase Project Setup
+1. Firebase-Projekt mit Blaze-Tarif
+2. Firebase CLI installiert (`npm install -g firebase-tools`)
+3. Node.js 18+
+4. Lokaler Checkout von `main`
 
-1.  **Authentication:** In the Firebase Console, go to **Authentication** -> **Sign-in method** and enable **Email/Password**.
-2.  **Firestore:** Go to **Firestore Database** and create a database in **Production mode**.
-3.  **Storage:** Go to **Storage** and set up a new storage bucket.
-
-## 3. Deployment Steps
-
-### Step 1: Deploy Firestore Security Rules
-
-The new, secure `firestore.rules` are critical. Deploy them first.
+## 2. Lokale Vorbereitung
 
 ```bash
-firebase deploy --only firestore:rules
+npm install
+npm run build
+npm run lint
+npm test
+firebase login
+firebase use --add
 ```
 
-### Step 2: Deploy Cloud Functions
+## 3. Firebase-Konfiguration
 
-This will deploy all functions, including the new `onTaskStatusChange` for notifications and the protected `setAdminClaim`.
+In der Firebase Console aktivieren:
+
+1. Authentication
+2. Firestore
+3. Storage
+4. Functions
+
+Android Apps registrieren:
+
+1. `com.minimaster.masterapp`
+2. `com.google.pairing`
+
+## 4. Web-Konfiguration
+
+Die Platzhalter in `admin-panel/app.js` und `web-control/app.js` muessen mit dem echten `firebaseConfig` ersetzt werden.
+
+Optionales Hilfsskript (Bash/WSL/Git Bash):
 
 ```bash
-firebase deploy --only functions
+./scripts/update-firebase-config.sh
 ```
 
-### Step 3: Configure and Deploy Hosting
+## 5. AI-Konfiguration (Support)
 
-Your `firebase.json` file needs to be configured to host both the **Web-Control** and the **Admin Panel**.
+Fuer automatische Ticket-Loesung:
 
-**firebase.json:**
-```json
-{
-  "hosting": [
-    {
-      "target": "web-control",
-      "public": "web-control",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ]
-    },
-    {
-      "target": "admin-panel",
-      "public": "admin-panel",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ]
-    }
-  ],
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "functions": {
-    "source": ".",
-    "runtime": "nodejs16"
-  }
-}
-```
+1. Primär: `GEMINI_API_KEY`
+2. Optional: `GEMINI_MODEL` (Default: `gemini-2.0-flash`)
+3. Fallback: `OPENAI_API_KEY`
 
-**Deployment Command:**
+## 6. Deployment ausfuehren
+
+Alles zusammen:
 
 ```bash
-firebase deploy --only hosting
+firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 ```
 
-## 4. Post-Deployment Hardening
+Oder per Script:
 
-### Step 1: Create the First Admin User
+```bash
+./deploy.sh
+```
 
-1.  In the Firebase Console, go to **Authentication** and manually create a new user with an email and password.
-2.  Copy the **User UID** of this new user.
-3.  Manually call the `setAdminClaim` function (e.g., from a temporary script or the Firebase Functions shell) to grant this user admin privileges. **This is a one-time manual step.**
+## 7. Operator/Admin freischalten
 
-### Step 2: Update Firebase Config
+Erstadmin erstellen (lokaler Service Account Key als `serviceAccountKey.json` im Projektroot erforderlich):
 
-Replace the placeholder `firebaseConfig` in `admin-panel/app.js` and `web-control/app.js` with your actual Firebase project configuration keys.
+```bash
+node scripts/setup-admin.js <email> <passwort>
+```
 
-## 5. ChildApp (Android) Finalization
+Danach Login im Operator-Dashboard pruefen (`admin-panel/index.html`).
 
-1.  **Pairing Process:** During the pairing process, after a child device is successfully linked, you must call `ChildIdProviderImpl.setChildId()` to store the device's ID.
-2.  **FCM Token:** The MasterApp needs to register for Firebase Cloud Messaging (FCM) and store the FCM token in the corresponding master document in Firestore (in a field named `fcmToken`) for notifications to work.
+## 8. Validierung nach Deploy
 
-This guide provides the essential steps to get the project running securely. Further enhancements, such as a full migration to Firebase Auth tokens instead of the custom `secretKey` model, should be considered for long-term security.
+1. Operator-Dashboard Login (Admin-Claim)
+2. Cloud Setup & Assistant Tab: Full Validation starten
+3. Parent Web Panel Login und Device-Sync pruefen
+4. Support-Ticket-Workflow inkl. Feedback-Pflicht pruefen
+
+## 9. CI/CD Hinweise
+
+1. Gradle-Wrapper-Validierung laeuft ueber `gradle/actions/wrapper-validation@v3`
+2. Workflows:
+   - `.github/workflows/ci.yml`
+   - `.github/workflows/android-ci.yml`
+   - `.github/workflows/deploy.yml`
+
+## 10. Bekannte Grenzen
+
+1. Child-App-Blocking ist weiterhin als Prototype gekennzeichnet (siehe `ACCESSIBILITY_SERVICE_GUIDE.md` und `ARCHITECTURE.md`).
+2. Firestore-Datenmodell ist bewusst flat (`masters`, `children`, ...), kein `families/*`.
