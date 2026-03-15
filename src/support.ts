@@ -14,6 +14,18 @@ import { AuditLogger } from "./shared";
 
 // ==================== AI CLIENT ====================
 
+type AiTicketResponse = {
+  solution: string;
+  confidence: number;
+};
+
+type AiGenerationResult = {
+  provider: "gemini" | "openai" | "test-stub";
+  rawResponse: string;
+};
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+
 let openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
@@ -22,6 +34,110 @@ function getOpenAIClient(): OpenAI {
     });
   }
   return openaiClient;
+}
+
+async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not set.");
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1000,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+
+  const rawResponse = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || "")
+    .join("") || "";
+
+  return {
+    provider: "gemini",
+    rawResponse,
+  };
+}
+
+async function generateWithOpenAI(prompt: string): Promise<AiGenerationResult> {
+  const response = await getOpenAIClient().chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: "You are a technical support agent for the MiniMaster parental control application." },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 1000,
+  });
+
+  return {
+    provider: "openai",
+    rawResponse: response.choices[0]?.message?.content || "",
+  };
+}
+
+async function generateAiCompletion(prompt: string): Promise<AiGenerationResult> {
+  // Keep tests deterministic and isolated from external model providers.
+  if (process.env.NODE_ENV === "test") {
+    return {
+      provider: "test-stub",
+      rawResponse: JSON.stringify({
+        solution: "Test solution generated in stub mode.",
+        confidence: 0.85,
+      }),
+    };
+  }
+
+  if (process.env.GEMINI_API_KEY) {
+    functions.logger.info(`Calling Gemini API with model ${GEMINI_MODEL}...`);
+    return generateWithGemini(prompt);
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    functions.logger.warn("GEMINI_API_KEY missing. Falling back to OpenAI.");
+    return generateWithOpenAI(prompt);
+  }
+
+  throw new Error("No AI provider configured. Set GEMINI_API_KEY (preferred) or OPENAI_API_KEY.");
+}
+
+function parseAiTicketResponse(rawResponse: string): AiTicketResponse {
+  try {
+    const parsed = JSON.parse(rawResponse) as Partial<AiTicketResponse>;
+    return {
+      solution: parsed.solution || "Unable to generate solution.",
+      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
+    };
+  } catch {
+    return {
+      solution: "AI generated an invalid response. Escalating to human support.",
+      confidence: 0,
+    };
+  }
 }
 
 let knowledgeBase = "";
@@ -36,14 +152,17 @@ try {
 // ==================== SUPPORT TICKETS ====================
 
 export const createSupportTicket = functions.https.onCall(
-  async (data: { problemDescription: string }, context: CallableContext) => {
+  async (data: { problemDescription: string; allowSupportAccess: boolean; consentSource?: string }, context: CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
 
-    const { problemDescription } = data;
+    const { problemDescription, allowSupportAccess, consentSource } = data;
     if (!problemDescription || typeof problemDescription !== "string" || problemDescription.trim().length === 0) {
       throw new functions.https.HttpsError("invalid-argument", "Problem description is required.");
+    }
+    if (typeof allowSupportAccess !== "boolean") {
+      throw new functions.https.HttpsError("invalid-argument", "allowSupportAccess (boolean) is required.");
     }
 
     const masterImei = context.auth.uid;
@@ -55,7 +174,29 @@ export const createSupportTicket = functions.https.onCall(
         status: "open",
         problemDescription: problemDescription.trim(),
         accessGranted: false,
+        supportAccessConsent: allowSupportAccess,
+        supportAccessConsentSource: consentSource || "unknown",
+        supportAccessConsentAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      if (allowSupportAccess) {
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 48);
+
+        const grantRef = await db().collection("supportAccessGrants").add({
+          masterImei: masterImei,
+          ticketId: ticketRef.id,
+          grantedAt: admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+          status: "active",
+          consentMode: "at_ticket_creation",
+        });
+
+        await db().collection("supportTickets").doc(ticketRef.id).update({
+          accessGranted: true,
+          accessGrantId: grantRef.id,
+        });
+      }
 
       functions.logger.info(`Support ticket created: ${ticketRef.id} for master ${masterImei}`);
       return { success: true, ticketId: ticketRef.id };
@@ -248,18 +389,8 @@ Your response MUST be in JSON format with exactly two fields:
 
 The confidence should be a float between 0 and 1, where 1 means you are absolutely certain the solution is correct.`;
 
-      functions.logger.info("Calling OpenAI API...");
-      const response = await getOpenAIClient().chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a technical support agent for the MiniMaster parental control application." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
-
-      const aiResponse = response.choices[0]?.message?.content || "";
+      const generation = await generateAiCompletion(prompt);
+      const aiResponse = generation.rawResponse;
       functions.logger.info("AI Response:", aiResponse);
 
       let aiGeneratedSolution = "";
@@ -267,9 +398,9 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
       let newStatus = "awaiting_user_feedback";
 
       try {
-        const parsed = JSON.parse(aiResponse);
-        aiGeneratedSolution = parsed.solution || "Unable to generate solution.";
-        aiConfidenceScore = parsed.confidence || 0.0;
+        const parsed = parseAiTicketResponse(aiResponse);
+        aiGeneratedSolution = parsed.solution;
+        aiConfidenceScore = parsed.confidence;
 
         if (aiConfidenceScore < 0.7) {
           newStatus = "escalated";
@@ -285,6 +416,8 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
       await admin.firestore().collection("supportTickets").doc(ticketId).update({
         aiGeneratedSolution: aiGeneratedSolution,
         aiConfidenceScore: aiConfidenceScore,
+        aiProvider: generation.provider,
+        aiModel: generation.provider === "gemini" ? GEMINI_MODEL : (generation.provider === "openai" ? "gpt-4o" : "test-stub"),
         aiSolutionStatus: "generated",
         status: newStatus,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -336,18 +469,21 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
   });
 
 export const provideSolutionFeedback = functions.https.onCall(
-  async (data: { ticketId: string; feedback: string }, context: CallableContext) => {
+  async (data: { ticketId: string; feedback: string; comment?: string }, context: CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
 
-    const { ticketId, feedback } = data;
+    const { ticketId, feedback, comment } = data;
     if (!ticketId || !feedback) {
       throw new functions.https.HttpsError("invalid-argument", "Missing ticketId or feedback.");
     }
 
     if (feedback !== "accepted" && feedback !== "rejected") {
       throw new functions.https.HttpsError("invalid-argument", "Feedback must be \"accepted\" or \"rejected\".");
+    }
+    if (feedback === "rejected" && (!comment || typeof comment !== "string" || comment.trim().length === 0)) {
+      throw new functions.https.HttpsError("invalid-argument", "Comment is required when feedback is rejected.");
     }
 
     try {
@@ -369,6 +505,8 @@ export const provideSolutionFeedback = functions.https.onCall(
       await ticketRef.update({
         aiSolutionStatus: aiSolutionStatus,
         status: newStatus,
+        userFeedbackComment: feedback === "rejected" ? comment?.trim() : null,
+        userFeedbackAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 

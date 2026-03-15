@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
         app = firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         functions = firebase.functions();
-        
+
         // Restore session if credentials are saved in localStorage
         const savedCredentials = localStorage.getItem('minimaster-credentials');
         if (savedCredentials) {
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showMainContent();
             loadDevices();
         }
-        
+
         console.log('Firebase initialized successfully.');
     } catch (error) {
         console.error('Firebase initialization error:', error);
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function login() {
     const masterImei = document.getElementById('master-imei').value.trim();
     const secretKey = document.getElementById('secret-key').value.trim();
-    
+
     if (!masterImei || !secretKey) {
         showNotification('Please enter both Master IMEI and Secret Key.', 'error');
         return;
@@ -106,22 +106,22 @@ function logout() {
     currentMasterImei = null;
     currentSecretKey = null;
     localStorage.removeItem('minimaster-credentials');
-    
+
     // Detach the real-time listener to prevent memory leaks and unnecessary reads.
     if (devicesListener) {
         devicesListener();
         devicesListener = null;
     }
-    
+
     // Reset the login form fields.
     document.getElementById('master-imei').value = '';
     document.getElementById('secret-key').value = '';
-    
+
     // Switch the view from the dashboard back to the login form.
     document.getElementById('login-form').style.display = 'flex';
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('main-content').style.display = 'none';
-    
+
     showNotification('Logged out successfully.', 'info');
 }
 
@@ -144,10 +144,10 @@ function showMainContent() {
  */
 function loadDevices() {
     if (!currentMasterImei) return;
-    
+
     const devicesListElement = document.getElementById('devices-list');
     devicesListElement.innerHTML = '<div class="loading">Loading devices...</div>';
-    
+
     // Listen to real-time updates of children collection
     devicesListener = db.collection('children')
         .where('masterImei', '==', currentMasterImei)
@@ -159,7 +159,7 @@ function loadDevices() {
                     ...doc.data()
                 });
             });
-            
+
             renderDevices(devices);
         }, error => {
             console.error('Error loading devices:', error);
@@ -173,17 +173,17 @@ function loadDevices() {
  */
 function renderDevices(devices) {
     const devicesListElement = document.getElementById('devices-list');
-    
+
     if (devices.length === 0) {
         devicesListElement.innerHTML = '<div class="loading">No paired devices found. Use the mobile app to pair devices.</div>';
         return;
     }
-    
+
     const devicesHtml = devices.map(device => {
         const lastSeenSeconds = device.lastSeen ? (device.lastSeen.seconds || 0) : 0;
         const isOnline = lastSeenSeconds > 0 ?
             (Date.now() / 1000 - lastSeenSeconds) < (20 * 60) : false; // 20 minutes
-        
+
         return `
             <div class="device-card">
                 <div class="device-header">
@@ -198,7 +198,7 @@ function renderDevices(devices) {
                         <div class="lock-control">
                             <span>Locked</span>
                             <label class="switch">
-                                <input type="checkbox" ${device.isLocked ? 'checked' : ''} 
+                                <input type="checkbox" ${device.isLocked ? 'checked' : ''}
                                        onchange="toggleDeviceLock('${device.id}', this.checked)">
                                 <span class="slider"></span>
                             </label>
@@ -216,7 +216,7 @@ function renderDevices(devices) {
             </div>
         `;
     }).join('');
-    
+
     devicesListElement.innerHTML = devicesHtml;
 }
 
@@ -227,7 +227,7 @@ function renderDevices(devices) {
  */
 function toggleDeviceLock(childImei, isLocked) {
     const setDeviceLocked = functions.httpsCallable('setDeviceLocked');
-    
+
     setDeviceLocked({
         masterImei: currentMasterImei,
         secretKey: currentSecretKey,
@@ -238,7 +238,7 @@ function toggleDeviceLock(childImei, isLocked) {
     }).catch(error => {
         console.error('Error toggling device lock:', error);
         showNotification('Error changing device lock: ' + error.message, 'error');
-        
+
         // Revert the switch if there was an error
         loadDevices();
     });
@@ -255,7 +255,7 @@ function openTaskModal(childId) {
     document.getElementById('task-title').value = '';
     document.getElementById('task-description').value = '';
     document.getElementById('unlock-duration').value = 30; // Default value
-    
+
     document.getElementById('task-creation-modal').style.display = 'flex';
 }
 
@@ -450,7 +450,7 @@ function showReviewTasks() {
     document.querySelector('.dashboard').style.display = 'none';
     document.getElementById('task-review-section').style.display = 'block';
     document.getElementById('subscription-section').style.display = 'none';
-    
+
     loadTasksToReview();
 }
 
@@ -461,7 +461,7 @@ function showReviewTasks() {
 function loadTasksToReview() {
     const tasksListElement = document.getElementById('tasks-to-review');
     tasksListElement.innerHTML = '<div class="loading">Loading tasks...</div>';
-    
+
     // Query tasks assigned by this master that are pending approval
     firebase.firestore().collectionGroup('tasks')
         .where('masterImei', '==', currentMasterImei)
@@ -493,12 +493,12 @@ function loadTasksToReview() {
  */
 function renderTasksToReview(tasks) {
     const tasksListElement = document.getElementById('tasks-to-review');
-    
+
     if (tasks.length === 0) {
         tasksListElement.innerHTML = '<div class="loading">No tasks pending review.</div>';
         return;
     }
-    
+
     const tasksHtml = tasks.map(task => {
         const createdTime = task.createdAt ? new Date(task.createdAt.seconds * 1000).toLocaleString() : 'N/A';
         // Derive childId from the Firestore document path (parent collection's parent doc ID)
@@ -521,7 +521,7 @@ function renderTasksToReview(tasks) {
             </div>
         `;
     }).join('');
-    
+
     tasksListElement.innerHTML = tasksHtml;
 }
 
@@ -578,7 +578,7 @@ function showNotification(message, type = 'info') {
     notification.textContent = message;
     notification.className = `notification ${type}`;
     notification.style.display = 'block';
-    
+
     // The notification automatically hides after 5 seconds.
     setTimeout(() => {
         notification.style.display = 'none';
@@ -610,21 +610,30 @@ function showSupport() {
 
 async function createSupportTicket(event) {
     event.preventDefault();
-    
+
     const problemDescription = document.getElementById('problem-description').value;
-    
+    const consentValue = document.querySelector('input[name="support-access-consent"]:checked')?.value;
+    const allowSupportAccess = consentValue === 'yes';
+    const consentSource = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+
     if (!problemDescription.trim()) {
         showNotification('Please describe your problem.', 'error');
         return;
     }
-    
+    if (!consentValue) {
+        showNotification('Please answer the support access question (Yes/No).', 'error');
+        return;
+    }
+
     try {
         const createTicket = functions.httpsCallable('createSupportTicket');
-        const result = await createTicket({ problemDescription });
-        
+        const result = await createTicket({ problemDescription, allowSupportAccess, consentSource });
+
         if (result.data.success) {
             showNotification('Support ticket created successfully!', 'success');
             document.getElementById('problem-description').value = '';
+            const checkedConsent = document.querySelector('input[name="support-access-consent"]:checked');
+            if (checkedConsent) checkedConsent.checked = false;
             loadSupportTickets();
         }
     } catch (error) {
@@ -636,24 +645,24 @@ async function createSupportTicket(event) {
 async function loadSupportTickets() {
     const ticketsContainer = document.getElementById('support-tickets');
     ticketsContainer.innerHTML = '<div class="loading">Loading tickets...</div>';
-    
+
     try {
         const snapshot = await db.collection('supportTickets')
             .where('masterImei', '==', currentMasterImei)
             .orderBy('createdAt', 'desc')
             .get();
-        
+
         if (snapshot.empty) {
             ticketsContainer.innerHTML = '<p>No support tickets found.</p>';
             return;
         }
-        
+
         let html = '';
         snapshot.forEach(doc => {
             const ticket = doc.data();
             const createdAt = ticket.createdAt ? ticket.createdAt.toDate().toLocaleString() : 'N/A';
             const statusClass = ticket.status === 'open' ? 'status-open' : ticket.status === 'in_progress' ? 'status-progress' : 'status-closed';
-            
+
             html += `
                 <div class="ticket-card">
                     <div class="ticket-header">
@@ -663,23 +672,28 @@ async function loadSupportTickets() {
                     <div class="ticket-body">
                         <p><strong>Created:</strong> ${createdAt}</p>
                         <p><strong>Problem:</strong> ${ticket.problemDescription}</p>
-                        
-                        ${ticket.aiGeneratedSolution ? 
+
+                        ${ticket.aiGeneratedSolution ?
                             `<div class="ai-solution">
                                 <h4>🤖 AI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%)</h4>
                                 <p>${ticket.aiGeneratedSolution.replace(/\n/g, '<br>')}</p>
-                                ${ticket.status === 'awaiting_user_feedback' ? 
+                                ${ticket.status === 'awaiting_user_feedback' ?
                                     `<div class="feedback-buttons">
                                         <button onclick="provideFeedback('${doc.id}', 'accepted')" class="btn btn-success">✓ This solved my problem</button>
-                                        <button onclick="provideFeedback('${doc.id}', 'rejected')" class="btn btn-warning">✗ I still need help</button>
-                                    </div>` : 
+                                        <button onclick="showRejectFeedbackForm('${doc.id}')" class="btn btn-warning">✗ I still need help</button>
+                                    </div>` :
                                     ''
                                 }
-                            </div>` : 
+                                <div id="reject-feedback-form-${doc.id}" class="reject-feedback-form" style="display:none;">
+                                    <label for="reject-comment-${doc.id}"><strong>Please tell us what is still not working:</strong></label>
+                                    <textarea id="reject-comment-${doc.id}" rows="3" placeholder="Required comment..."></textarea>
+                                    <button onclick="submitRejectedFeedback('${doc.id}')" class="btn btn-warning">Submit No + Comment</button>
+                                </div>
+                            </div>` :
                             ''
                         }
-                        
-                        ${ticket.accessGranted ? 
+
+                        ${ticket.accessGranted ?
                             `<p class="access-granted">✓ Support access granted (expires in 48h)</p>
                              <button onclick="revokeAccess('${ticket.accessGrantId}')" class="btn btn-danger">Revoke Access</button>` :
                             (ticket.status === 'escalated' || ticket.status === 'in_progress') ?
@@ -690,7 +704,7 @@ async function loadSupportTickets() {
                 </div>
             `;
         });
-        
+
         ticketsContainer.innerHTML = html;
     } catch (error) {
         console.error('Error loading support tickets:', error);
@@ -702,11 +716,11 @@ async function grantAccess(ticketId) {
     if (!confirm('This will grant the support team temporary access to your account data for 48 hours. Continue?')) {
         return;
     }
-    
+
     try {
         const grantAccess = functions.httpsCallable('grantSupportAccess');
         const result = await grantAccess({ ticketId });
-        
+
         if (result.data.success) {
             showNotification('Support access granted successfully!', 'success');
             loadSupportTickets();
@@ -721,11 +735,11 @@ async function revokeAccess(grantId) {
     if (!confirm('This will revoke support access to your account. Continue?')) {
         return;
     }
-    
+
     try {
         const revokeAccess = functions.httpsCallable('revokeSupportAccess');
         const result = await revokeAccess({ grantId });
-        
+
         if (result.data.success) {
             showNotification('Support access revoked successfully!', 'success');
             loadSupportTickets();
@@ -738,13 +752,38 @@ async function revokeAccess(grantId) {
 
 
 async function provideFeedback(ticketId, feedback) {
+    await submitFeedback(ticketId, feedback);
+}
+
+function showRejectFeedbackForm(ticketId) {
+    const form = document.getElementById(`reject-feedback-form-${ticketId}`);
+    if (form) {
+        form.style.display = 'block';
+    }
+}
+
+async function submitRejectedFeedback(ticketId) {
+    const commentField = document.getElementById(`reject-comment-${ticketId}`);
+    const comment = commentField ? commentField.value.trim() : '';
+    if (!comment) {
+        showNotification('A comment is required when selecting No.', 'error');
+        return;
+    }
+    await submitFeedback(ticketId, 'rejected', comment);
+}
+
+async function submitFeedback(ticketId, feedback, comment = '') {
     try {
         const provideSolutionFeedback = functions.httpsCallable('provideSolutionFeedback');
-        const result = await provideSolutionFeedback({ ticketId, feedback });
-        
+        const payload = { ticketId, feedback };
+        if (feedback === 'rejected') {
+            payload.comment = comment;
+        }
+        const result = await provideSolutionFeedback(payload);
+
         if (result.data.success) {
-            const message = feedback === 'accepted' 
-                ? 'Great! The ticket has been closed.' 
+            const message = feedback === 'accepted'
+                ? 'Great! The ticket has been closed.'
                 : 'Your ticket has been escalated to a human support agent.';
             showNotification(message, 'success');
             loadSupportTickets();

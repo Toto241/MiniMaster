@@ -135,6 +135,11 @@
                             <h4>Create Support Ticket</h4>
                             <form onsubmit="createSupportTicket(event)">
                                 <textarea id="problem-description" placeholder="Describe your problem..." rows="5" required></textarea>
+                                <div class="support-consent-box">
+                                    <p><strong>Darf der Support bei Bedarf auf Ihr Konto zugreifen (max. 48h)?</strong></p>
+                                    <label><input type="radio" name="support-access-consent" value="yes" required> Ja</label>
+                                    <label><input type="radio" name="support-access-consent" value="no" required> Nein</label>
+                                </div>
                                 <button type="submit" class="btn btn-primary">Submit Ticket</button>
                             </form>
                         </div>

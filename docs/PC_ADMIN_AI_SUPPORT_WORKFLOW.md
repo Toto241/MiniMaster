@@ -5,6 +5,11 @@ Stand: 2026-02-13
 ## Ziel
 Supportprobleme mit KI schneller lösen, ohne Governance, Datenschutz oder Qualität zu verletzen.
 
+## Modellstrategie
+- Primärmodell: **Google Gemini** (Server-seitig über `GEMINI_API_KEY`)
+- Fallback: OpenAI nur falls `GEMINI_API_KEY` nicht gesetzt ist und `OPENAI_API_KEY` vorhanden ist
+- Für Audit/Analyse wird der verwendete Provider pro Ticket gespeichert (`aiProvider`, `aiModel`)
+
 ## End-to-End Ablauf
 1. Ticket wird erstellt (Problemtext + Metadaten)
 2. Klassifikation (Kategorie, Schweregrad, Jurisdiktion)
@@ -16,6 +21,16 @@ Supportprobleme mit KI schneller lösen, ohne Governance, Datenschutz oder Quali
 6. Agent prüft, editiert, versendet
 7. Nutzerfeedback erfassen (gelöst/nicht gelöst)
 8. Ticket schließen oder weiter eskalieren
+
+## Verbindliche Nutzer-Rueckmeldung
+- Wenn KI den Status **awaiting_user_feedback** setzt, muss der Nutzer explizit mit **Ja** oder **Nein** antworten.
+- Bei **Nein** ist ein Kommentar verpflichtend.
+- Ohne Kommentar wird die Rueckmeldung serverseitig abgelehnt (Validierungsfehler).
+
+## Zugriffszustimmung (Mobilgeraete)
+- Beim Erstellen eines Support-Tickets wird die Zustimmung zur temporaeren Support-Einsicht explizit abgefragt (**Ja/Nein**).
+- Die Entscheidung wird im Ticket gespeichert (`supportAccessConsent`, `supportAccessConsentSource`, `supportAccessConsentAt`).
+- Bei Zustimmung kann der Zugriff befristet (48h) erteilt werden.
 
 ## Datenfelder je Ticket
 - Ticket-ID
@@ -55,6 +70,35 @@ Supportprobleme mit KI schneller lösen, ohne Governance, Datenschutz oder Quali
 - KI-Service nicht verfügbar -> sofort Human-Queue
 - Ungültige KI-Antwort -> fallback auf Standard-Playbook
 - Compliance-Sperre ausgelöst -> Ticket nur manuell bearbeitbar
+
+## Betreiber-Setup & Cloud-Integrations-Assistent (Neu)
+
+Das Operator Dashboard enthält einen dedizierten Tab **Cloud Setup & Assistant** mit folgenden Funktionen:
+
+1. **Integration Health Check**
+- Validiert Firebase-Konfiguration (keine Platzhalter)
+- Prüft Admin-Authentifizierung und Rolle (`role == admin`)
+- Prüft Firestore-Zugriff auf Kernsammlungen (`masters`, `children`, `supportTickets`, `audit_logs`)
+- Prüft Erreichbarkeit zentraler Callable Functions
+
+2. **Operator Onboarding Checklist**
+- Schrittweise Inbetriebnahme im UI (persistiert lokal im Browser)
+- Standardpunkte: Config, Auth/RBAC, Firestore, Functions, Support-Flow, Compliance-Flow
+
+3. **Operator Assistant**
+- In-Panel Assistent für typische Betreiberfragen
+- Themen: Firebase Setup, Claims/Rollen, Functions, Firestore Rules, Support-Tickets, DSAR/Audit
+- Gibt konkrete Handlungsanweisungen statt allgemeiner Antworten
+
+4. **Setup Report Export**
+- Export als JSON (Zeitpunkt, Umgebung, Checklistenstatus, Validierungsergebnisse)
+- Verwendbar als Betriebs-/Abnahme-Nachweis
+
+Empfohlene Reihenfolge für Go-Live:
+1. Full Validation ausführen
+2. Alle ERRORs beseitigen
+3. Support- und Compliance-Testfall durchlaufen
+4. Setup Report exportieren und ablegen
 
 ## Mindesttests
 - Unit: Klassifikation, Confidence-Grenzen, Eskalationsentscheidung

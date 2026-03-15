@@ -171,6 +171,15 @@ body {
     background-color: #45a049;
 }
 
+.btn-warning {
+    background-color: #ff9800;
+    color: white;
+}
+
+.btn-warning:hover {
+    background-color: #f57c00;
+}
+
 /* Device Cards */
 .devices-list {
     display: grid;
@@ -427,6 +436,38 @@ input:checked + .slider:before {
 
 .subscription-content li {
     margin-bottom: 0.5rem;
+}
+
+.support-consent-box {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 0.75rem 0;
+    background: #fafafa;
+}
+
+.support-consent-box label {
+    display: inline-flex;
+    gap: 0.4rem;
+    margin-right: 1rem;
+    margin-top: 0.4rem;
+}
+
+.reject-feedback-form {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid #ffd699;
+    border-radius: 6px;
+    background: #fff8ef;
+}
+
+.reject-feedback-form textarea {
+    width: 100%;
+    margin: 0.5rem 0;
+    min-height: 90px;
+    padding: 0.6rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
 }
 
 /* Loading and Notifications */

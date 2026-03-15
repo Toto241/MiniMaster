@@ -367,7 +367,11 @@ describe("coverage high impact callable suite", () => {
     const revokeSupportAccess = testEnv.wrap(fns.revokeSupportAccess);
     const provideSolutionFeedback = testEnv.wrap(fns.provideSolutionFeedback);
 
-    const createRes = await createSupportTicket({ problemDescription: "App blockiert nicht" }, asMaster);
+    const createRes = await createSupportTicket({
+      problemDescription: "App blockiert nicht",
+      allowSupportAccess: false,
+      consentSource: "test",
+    }, asMaster);
     expect(createRes.success).toBe(true);
 
     const ticketId = createRes.ticketId as string;
@@ -393,6 +397,10 @@ describe("coverage high impact callable suite", () => {
     await expect(
       provideSolutionFeedback({ ticketId: "ticket-1", feedback: "invalid" }, asMaster)
     ).rejects.toThrow(/accepted/);
+
+    await expect(
+      provideSolutionFeedback({ ticketId: "ticket-1", feedback: "rejected" }, asMaster)
+    ).rejects.toThrow(/Comment is required/);
   });
 
   it("deckt abgelaufenen Pairing-Token und ungültiges FCM-Update ab", async () => {
