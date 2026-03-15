@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -69,6 +70,15 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "MiniMasterAccessService"
         private const val CHECK_INTERVAL = 1000L // 1 second
+        // Settings package names that could be used to disable the service
+        private val SETTINGS_PACKAGES = setOf(
+            "com.android.settings",
+            "com.samsung.android.app.settings",
+            "com.miui.securitycenter",
+            "com.huawei.systemmanager",
+            "com.coloros.safecenter",
+            "com.oppo.safe"
+        )
     }
 
     private lateinit var serviceScope: CoroutineScope
@@ -85,6 +95,20 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var lastStorageWriteTime: Long = 0L
     private var lastBackendReportTime: Long = 0L
 
+    // Per-app usage tracking
+    private val perAppUsageMillis = mutableMapOf<String, Long>()
+    private val perAppLimitsMillis = mutableMapOf<String, Long>()
+
+    // Time window enforcement (allowed hours)
+    private var allowedStartHour: Int = -1  // -1 = no restriction
+    private var allowedEndHour: Int = -1
+    private var allowedStartMinute: Int = 0
+    private var allowedEndMinute: Int = 0
+
+    // Self-protection: detect if user navigates to settings to disable service
+    private var settingsAccessCount: Int = 0
+    private var lastSettingsAccessTime: Long = 0L
+
     // Injected in a real app, but for PoC we instantiate lazily or get from entry point
     private val functions by lazy { FirebaseFunctions.getInstance() }
     /**
@@ -96,6 +120,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             checkForRuleUpdates()
             updateUsageStats()
             checkUsageLimits()
+            checkTimeWindow()
             handler.postDelayed(this, CHECK_INTERVAL)
         }
     }
@@ -123,6 +148,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         serviceInfo = info
         isServiceInitialized = true
         loadUsageData()
+        loadPerAppUsageData()
         startAppMonitoring()
         Log.d(TAG, "AccessibilityService connected and monitoring started.")
     }
@@ -201,6 +227,13 @@ class MiniMasterAccessibilityService : AccessibilityService() {
      */
     private fun onForegroundAppChanged(packageName: String) {
         Log.d(TAG, "Foreground app changed to: $packageName")
+
+        // 0. Self-protection: detect if user accesses device settings to disable service
+        if (SETTINGS_PACKAGES.contains(packageName)) {
+            handleSettingsAccess(packageName)
+        } else {
+            settingsAccessCount = 0
+        }
 
         // 1. Task-based blocking logic (Highest Priority)
         if (isTaskLockActive()) {
@@ -315,13 +348,39 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private fun parseUsageRules(json: String) {
         try {
             usageRules = org.json.JSONObject(json)
-            // Example usage rule: { "dailyLimitSeconds": 3600 }
+
+            // Global daily limit
             val dailyLimitSeconds = usageRules?.optLong("dailyLimitSeconds", -1L) ?: -1L
-            if (dailyLimitSeconds != -1L) {
-                dailyLimitMillis = dailyLimitSeconds * 1000
-            } else {
-                dailyLimitMillis = -1L
+            dailyLimitMillis = if (dailyLimitSeconds != -1L) dailyLimitSeconds * 1000 else -1L
+
+            // Per-app limits: { "appLimits": { "com.example.game": 1800 } } (seconds)
+            val appLimits = usageRules?.optJSONObject("appLimits")
+            if (appLimits != null) {
+                perAppLimitsMillis.clear()
+                appLimits.keys().forEach { pkg ->
+                    val limitSeconds = appLimits.getLong(pkg)
+                    perAppLimitsMillis[pkg] = limitSeconds * 1000
+                }
+                Log.d(TAG, "Parsed per-app limits: ${perAppLimitsMillis.size} apps")
             }
+
+            // Time window: { "allowedHours": { "start": "08:00", "end": "20:00" } }
+            val allowedHours = usageRules?.optJSONObject("allowedHours")
+            if (allowedHours != null) {
+                val startParts = allowedHours.optString("start", "").split(":")
+                val endParts = allowedHours.optString("end", "").split(":")
+                if (startParts.size == 2 && endParts.size == 2) {
+                    allowedStartHour = startParts[0].toIntOrNull() ?: -1
+                    allowedStartMinute = startParts[1].toIntOrNull() ?: 0
+                    allowedEndHour = endParts[0].toIntOrNull() ?: -1
+                    allowedEndMinute = endParts[1].toIntOrNull() ?: 0
+                    Log.d(TAG, "Parsed time window: $allowedStartHour:$allowedStartMinute - $allowedEndHour:$allowedEndMinute")
+                }
+            } else {
+                allowedStartHour = -1
+                allowedEndHour = -1
+            }
+
             Log.d(TAG, "Parsed usage rules: dailyLimitMillis=$dailyLimitMillis")
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing usage rules", e)
@@ -364,12 +423,18 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             val delta = now - lastUsageCheckTime
             if (delta > 0 && delta < 5000) { // Sanity check for large jumps
                 currentDayUsageMillis += delta
+
+                // Per-app tracking
+                val currentUsage = perAppUsageMillis[currentForegroundApp] ?: 0L
+                perAppUsageMillis[currentForegroundApp!!] = currentUsage + delta
+
                 // Persist occasionally (every 30 seconds) to save battery/IO
                 if (now - lastStorageWriteTime > 30000) {
                     getSharedPreferences("usage_stats", Context.MODE_PRIVATE)
                         .edit()
                         .putLong("current_day_usage", currentDayUsageMillis)
                         .apply()
+                    savePerAppUsageData()
                     lastStorageWriteTime = now
                     // Report to backend occasionally (e.g., every 5 minutes to avoid spamming)
                     if (now - lastBackendReportTime > 300000) {
@@ -380,6 +445,66 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         }
         lastUsageCheckTime = now
     }
+    /**
+     * Called when the accessibility service is being unbound (disabled).
+     * Reports this to the parent as a potential tamper attempt.
+     */
+    override fun onUnbind(intent: Intent?): Boolean {
+        Log.w(TAG, "AccessibilityService is being disabled (tamper detection)")
+        reportTamperEvent("accessibility_service_disabled")
+        return super.onUnbind(intent)
+    }
+
+    /**
+     * Reports a tamper attempt to the backend so that the parent is notified.
+     */
+    private fun reportTamperEvent(eventType: String) {
+        val childId = getSharedPreferences("child_prefs", Context.MODE_PRIVATE)
+            .getString("child_id", null) ?: return
+
+        val data = hashMapOf(
+            "childId" to childId,
+            "eventType" to eventType,
+            "timestamp" to System.currentTimeMillis()
+        )
+
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                functions.getHttpsCallable("reportTamperEvent").call(data)
+                Log.d(TAG, "Tamper event reported: $eventType")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to report tamper event", e)
+            }
+        }
+
+        AppLogger.logWarning(TAG, "Tamper detected: $eventType", mapOf(
+            "event_type" to eventType,
+            "child_id" to childId
+        ))
+    }
+
+    /**
+     * Detects repeated access to device settings, which may indicate an attempt
+     * to disable the accessibility service or device admin.
+     */
+    private fun handleSettingsAccess(packageName: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastSettingsAccessTime < 60_000) {
+            settingsAccessCount++
+        } else {
+            settingsAccessCount = 1
+        }
+        lastSettingsAccessTime = now
+
+        Log.d(TAG, "Settings access detected: $packageName (count: $settingsAccessCount)")
+
+        // After 3 accesses within 60 seconds, report suspicious activity
+        if (settingsAccessCount >= 3) {
+            reportTamperEvent("repeated_settings_access")
+            settingsAccessCount = 0
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(taskStatusReceiver)
@@ -388,9 +513,13 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             .edit()
             .putLong("current_day_usage", currentDayUsageMillis)
             .apply()
+        savePerAppUsageData()
 
         // Attempt final report
         reportUsageToBackend()
+
+        // Report service destruction as potential tamper
+        reportTamperEvent("accessibility_service_destroyed")
 
         stopAppMonitoring()
         serviceScope.cancel()
@@ -423,15 +552,110 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     }
 
     private fun checkUsageLimits() {
+        // 1. Global daily limit
         if (dailyLimitMillis != -1L && currentDayUsageMillis > dailyLimitMillis) {
             Log.i(TAG, "Daily limit exceeded: $currentDayUsageMillis > $dailyLimitMillis")
-            // Block current app if it's not a system app
-             if (currentForegroundApp != null &&
+            if (currentForegroundApp != null &&
                 !currentForegroundApp!!.startsWith("com.android") &&
                 currentForegroundApp != packageName) {
                 blockApplication(currentForegroundApp!!)
-             }
+            }
+            return
         }
+
+        // 2. Per-app limits
+        if (currentForegroundApp != null && perAppLimitsMillis.isNotEmpty()) {
+            val appLimit = perAppLimitsMillis[currentForegroundApp]
+            val appUsage = perAppUsageMillis[currentForegroundApp] ?: 0L
+            if (appLimit != null && appUsage > appLimit) {
+                Log.i(TAG, "Per-app limit exceeded for $currentForegroundApp: $appUsage > $appLimit")
+                blockApplication(currentForegroundApp!!)
+            }
+        }
+    }
+
+    /**
+     * Checks if the current time is within the allowed usage window.
+     * Blocks all non-system apps if outside allowed hours.
+     */
+    private fun checkTimeWindow() {
+        if (allowedStartHour == -1 || allowedEndHour == -1) return
+
+        val calendar = Calendar.getInstance()
+        val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+        val currentMinute = calendar.get(Calendar.MINUTE)
+        val currentMinutes = currentHour * 60 + currentMinute
+        val startMinutes = allowedStartHour * 60 + allowedStartMinute
+        val endMinutes = allowedEndHour * 60 + allowedEndMinute
+
+        val isWithinWindow = if (startMinutes <= endMinutes) {
+            currentMinutes in startMinutes..endMinutes
+        } else {
+            // Overnight window (e.g., 22:00 - 07:00)
+            currentMinutes >= startMinutes || currentMinutes <= endMinutes
+        }
+
+        if (!isWithinWindow && currentForegroundApp != null &&
+            !currentForegroundApp!!.startsWith("com.android") &&
+            currentForegroundApp != packageName) {
+            Log.i(TAG, "Outside allowed time window ($allowedStartHour:$allowedStartMinute - $allowedEndHour:$allowedEndMinute)")
+            blockApplication(currentForegroundApp!!)
+        }
+    }
+
+    /**
+     * Loads per-app usage data from SharedPreferences.
+     */
+    private fun loadPerAppUsageData() {
+        try {
+            val sharedPrefs = getSharedPreferences("per_app_usage", Context.MODE_PRIVATE)
+            val todayStart = getTodayStartMillis()
+            val savedDayStart = sharedPrefs.getLong("day_start", 0L)
+
+            if (savedDayStart != todayStart) {
+                // New day: reset all per-app usage
+                sharedPrefs.edit().clear().putLong("day_start", todayStart).apply()
+                perAppUsageMillis.clear()
+            } else {
+                val usageJson = sharedPrefs.getString("app_usage_map", null)
+                if (usageJson != null) {
+                    val jsonObj = org.json.JSONObject(usageJson)
+                    jsonObj.keys().forEach { key ->
+                        perAppUsageMillis[key] = jsonObj.getLong(key)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading per-app usage data", e)
+        }
+    }
+
+    /**
+     * Saves per-app usage data to SharedPreferences.
+     */
+    private fun savePerAppUsageData() {
+        try {
+            val jsonObj = org.json.JSONObject()
+            perAppUsageMillis.forEach { (pkg, millis) ->
+                jsonObj.put(pkg, millis)
+            }
+            getSharedPreferences("per_app_usage", Context.MODE_PRIVATE)
+                .edit()
+                .putString("app_usage_map", jsonObj.toString())
+                .putLong("day_start", getTodayStartMillis())
+                .apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving per-app usage data", e)
+        }
+    }
+
+    private fun getTodayStartMillis(): Long {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.timeInMillis
     }
 }
 

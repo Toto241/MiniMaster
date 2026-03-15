@@ -5,11 +5,11 @@ const config = {
   roots: ['<rootDir>/test'],
   setupFiles: ['<rootDir>/test/setup-env.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
-  transform: { 
-    '^.+\\.tsx?$': ['ts-jest', { 
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
       diagnostics: false,      // Disable diagnostic output during compilation
-    }] 
+    }]
   },
   testTimeout: 10000,
   // Optimize memory usage
@@ -22,10 +22,10 @@ const config = {
   coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
   coverageThreshold: {
     global: {
-      branches: 28,
-      functions: 36,
-      lines: 47,
-      statements: 48
+      branches: 50,
+      functions: 70,
+      lines: 65,
+      statements: 65
     }
   }
 };

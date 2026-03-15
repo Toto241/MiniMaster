@@ -335,7 +335,7 @@ describe("coverage high impact callable suite", () => {
     const verifyPurchase = testEnv.wrap(fns.verifyPurchase);
     const updateFCMToken = testEnv.wrap(fns.updateFCMToken);
 
-    const verifyRes = await verifyPurchase({ purchaseToken: "pt", sku: "premium_monthly" }, asMaster);
+    const verifyRes = await verifyPurchase({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster);
     expect(verifyRes).toEqual({ success: true, subscriptionStatus: "active" });
 
     const fcmRes = await updateFCMToken({ fcmToken: "master-fcm" }, asMaster);
@@ -430,7 +430,7 @@ describe("coverage high impact callable suite", () => {
       },
     });
 
-    await expect(verifyPurchase({ purchaseToken: "pt-invalid", sku: "premium_monthly" }, asMaster)).rejects.toThrow(/verification failed/i);
+    await expect(verifyPurchase({ purchaseToken: "pt-invalid", sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/verification failed/i);
   });
 
   it("deckt Support-Feedback-Permission-Fehlerpfad ab", async () => {

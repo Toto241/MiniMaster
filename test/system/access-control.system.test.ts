@@ -56,6 +56,6 @@ describe("system: callable access control", () => {
     const getSubscriptionStatus = testEnv.wrap(fns.getSubscriptionStatus);
     const result = await getSubscriptionStatus({}, { auth: { uid: "m1", token: { role: "master" } } });
 
-    expect(result).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true });
+    expect(result).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true, childLimit: 1 });
   });
 });

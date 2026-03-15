@@ -62,13 +62,17 @@ class BlockingOverlayService : Service() {
 
         blockedPackageName = packageName
         val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        // Ideally inflate a layout XML, but for simplicity creating programmatically or assuming layout exists.
-        // Let's create a simple view programmatically to avoid resource issues in this environment
         val view = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor("#CC000000")) // Semi-transparent black
             setPadding(32, 32, 32, 32)
+        }
+
+        val iconView = android.widget.ImageView(this).apply {
+            setImageResource(android.R.drawable.ic_lock_lock)
+            setColorFilter(Color.WHITE)
+            setPadding(0, 0, 0, 24)
         }
 
         val title = TextView(this).apply {
@@ -80,7 +84,10 @@ class BlockingOverlayService : Service() {
         }
 
         val message = TextView(this).apply {
-            text = "This app is currently blocked by your parents."
+            text = if (packageName != null)
+                "The app \"$packageName\" is currently blocked by your parents."
+            else
+                "This app is currently blocked by your parents."
             textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -90,10 +97,6 @@ class BlockingOverlayService : Service() {
         val button = Button(this).apply {
             text = "Go Back"
             setOnClickListener {
-                // Trigger global back action via AccessibilityService (communicated via broadcast or shared pref)
-                // For now, we just minimize the overlay which effectively unblocks if the user went home
-                // But the AccessibilityService will re-trigger if they stay in the app.
-                // Best practice: Launch Home Screen
                 val homeIntent = Intent(Intent.ACTION_MAIN)
                 homeIntent.addCategory(Intent.CATEGORY_HOME)
                 homeIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -103,6 +106,7 @@ class BlockingOverlayService : Service() {
             }
         }
 
+        view.addView(iconView)
         view.addView(title)
         view.addView(message)
         view.addView(button)
@@ -115,10 +119,12 @@ class BlockingOverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            // FLAG_NOT_TOUCH_MODAL: allow button to receive touches
+            // FLAG_LAYOUT_IN_SCREEN: cover status bar
+            // FLAG_SHOW_WHEN_LOCKED: show over lock screen
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
             PixelFormat.TRANSLUCENT
         )
 

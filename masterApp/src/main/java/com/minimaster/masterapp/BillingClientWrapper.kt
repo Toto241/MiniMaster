@@ -73,17 +73,24 @@ class BillingClientWrapper @Inject constructor(
      * Queries for the details of the subscription products defined in the Google Play Console.
      * The product IDs are hardcoded here for simplicity.
      */
+    companion object {
+        /** v2 monetisation product IDs matching the backend (VALID_PRODUCT_IDS). */
+        const val SINGLE_CHILD_MONTHLY = "single_child_monthly"   // €1.99/month – 1 child
+        const val FAMILY_MONTHLY       = "family_monthly"          // €4.99/month – unlimited
+        const val SINGLE_CHILD_YEARLY  = "single_child_yearly"     // €19.99/year – 1 child
+        const val FAMILY_YEARLY        = "family_yearly"           // €49.99/year – unlimited
+    }
+
     private fun queryProducts() {
         val productList = listOf(
+            SINGLE_CHILD_MONTHLY, FAMILY_MONTHLY,
+            SINGLE_CHILD_YEARLY, FAMILY_YEARLY
+        ).map { id ->
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId("monthly_subscription_placeholder")
-                .setProductType(BillingClient.ProductType.SUBS)
-                .build(),
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId("yearly_subscription_placeholder")
+                .setProductId(id)
                 .setProductType(BillingClient.ProductType.SUBS)
                 .build()
-        )
+        }
         val params = QueryProductDetailsParams.newBuilder().setProductList(productList)
 
         billingClient.queryProductDetails(params.build()) { billingResult, productDetailsList ->
