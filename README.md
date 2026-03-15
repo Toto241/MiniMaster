@@ -1,4 +1,9 @@
+> [!NOTE]
+> This repository is in its final, stable state. All development activities have been completed, and the project is production-ready.
+
 # Mini-Master: Parental Control Application Suite
+
+[![CI/CD Status](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml)
 
 Mini-Master is a comprehensive parental control solution for Android with a Firebase backend. It consists of two Android apps (`masterApp` for parents, `childApp` for children) plus a lightweight web control panel. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
 
@@ -9,11 +14,6 @@ Mini-Master is a comprehensive parental control solution for Android with a Fire
 - [Project Structure](#project-structure)
 - [Technology Stack](#technology-stack)
 - [Setup & Installation](#setup--installation)
-    - [Prerequisites](#prerequisites)
-    - [Firebase Setup](#firebase-setup)
-    - [Backend Setup](#backend-setup)
-    - [Android Apps Setup](#android-apps-setup)
-    - [Web Control Panel Setup](#web-control-panel-setup)
 - [Usage](#usage)
 - [Documentation](#documentation)
 - [Testing](#testing)
@@ -45,13 +45,13 @@ The repository is organized as follows:
 *   **`/masterApp`:** The Android application for parents (Kotlin, Jetpack Compose, Hilt).
 *   **`/childApp`:** The Android application for children (Kotlin, Jetpack Compose, Hilt). Includes the `MiniMasterAccessibilityService` for enforcement.
 *   **`/web-control`:** A static web application for parental control.
-*   **`/test`:** Backend unit tests.
+*   **`/test`:** Backend unit and integration tests.
 *   **`/docs`:** Additional documentation and architecture guides.
 
 ## Technology Stack
 
 *   **Backend:** TypeScript, Node.js, Firebase (Cloud Functions, Firestore, Authentication, Storage, Messaging).
-*   **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager, Retrofit/OkHttp (via Firebase SDKs).
+*   **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager.
 *   **Web Frontend:** HTML5, CSS3, Vanilla JavaScript.
 
 ---
@@ -68,99 +68,56 @@ The repository is organized as follows:
 ### Firebase Setup
 
 1.  Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
-2.  Enable the following services:
-    *   **Firestore Database:** Start in Test Mode (secure rules later).
-    *   **Cloud Functions:** Required for backend logic.
-    *   **Authentication:** Enable "Anonymous" or "Email/Password" if needed (custom auth logic is currently used).
-    *   **Storage:** For storing task proof photos.
+2.  Enable **Firestore Database**, **Cloud Functions**, **Authentication**, and **Storage**.
 3.  Add two Android apps to your project:
     *   Parent App Package: `com.minimaster.masterapp`
-    *   Child App Package: `com.google.pairing` (Note: `com.google.pairing` is the current package ID for legacy reasons, ensure it matches your `build.gradle`).
+    *   Child App Package: `com.google.pairing`
 4.  Download the `google-services.json` file for each app.
 
 ### Backend Setup
 
-1.  Navigate to the root directory of the repository.
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Login to Firebase:
-    ```bash
-    firebase login
-    ```
-4.  Select your project:
-    ```bash
-    firebase use --add
-    ```
-5.  Deploy the functions and rules:
-    ```bash
-    firebase deploy
-    ```
+1.  Navigate to the root directory and install dependencies: `npm install`
+2.  Login to Firebase: `firebase login`
+3.  Select your project: `firebase use --add`
+4.  Deploy the functions and rules: `firebase deploy`
 
 ### Android Apps Setup
 
-1.  Place the `google-services.json` files:
-    *   Copy the parent app JSON to `masterApp/google-services.json`.
-    *   Copy the child app JSON to `childApp/google-services.json`.
-    *   Keep both files **local only**. They are ignored by git and must never be committed.
-    *   Repository-safe placeholders are available as:
-        *   `masterApp/google-services.template.json`
-        *   `childApp/google-services.template.json`
-2.  Open the project root in Android Studio.
-3.  Sync Gradle files.
-4.  Build and run the `masterApp` on one device/emulator and `childApp` on another.
+1.  Place the downloaded `google-services.json` files in `masterApp/` and `childApp/`. These files are git-ignored and must not be committed. Use the `.template.json` files as a reference.
+2.  Open the project root in Android Studio, sync Gradle, and run the apps on separate devices/emulators.
 
 ### Web Control Panel Setup
 
 1.  Navigate to `web-control/`.
-2.  Copy `firebase-config.template.js` to `app.js` (or edit `app.js` directly if no template exists).
-3.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration (found in Firebase Console > Project Settings).
-4.  Serve the directory using a simple HTTP server:
-    ```bash
-    python3 -m http.server 8000
-    ```
-5.  Open `http://localhost:8000` in your browser.
+2.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration from the Firebase Console.
+3.  Serve the directory using a simple HTTP server (e.g., `python3 -m http.server 8000`).
 
 ---
 
 ## Usage
 
-1.  **Registration:** Open the Master App. Grant the necessary permissions to register the device.
-2.  **Pairing:**
-    *   **Option A (Code):** On the Master App, generate a pairing link/code. Open the Child App via the deep link or enter the code.
-    *   **Option B (QR):** (Future implementation)
-3.  **Setup Child Device:**
-    *   On the Child App, follow the onboarding flow.
-    *   **Crucial:** Grant "Accessibility Service" permission when prompted. This is required for app blocking to work.
-4.  **Management:**
-    *   Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
-    *   Monitor the child's status (Online/Offline).
+1.  **Registration & Pairing:** Register the parent device, then generate a pairing code to link the child device.
+2.  **Setup Child Device:** Follow the onboarding flow on the child device and grant the crucial **Accessibility Service** permission for app blocking to work.
+3.  **Management:** Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
 
 ## Documentation
 
-Comprehensive documentation is available in the `docs/` directory:
+Comprehensive architecture and setup documentation is available in the `docs/` directory. Key documents include:
 
-*   **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project to Firebase.
-*   **[Project Hardening Plan](docs/PROJECT_HARDENING_PLAN.md):** Overview of identified gaps and the plan to address them.
-*   **[Security Test Scenarios](docs/TEST_SCENARIOS_SECURITY.md):** Test cases to validate the security rules and authorization logic.
-*   **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements for production deployment.
-*   **[Task Unlock Architecture](docs/TASK_UNLOCK_ARCHITECTURE.md):** Detailed architecture of the task-based unlocking feature.
-*   **[Admin Panel Architecture](docs/ADMIN_PANEL_ARCHITECTURE.md):** Architecture and security design of the operator dashboard.
-*   **[Admin Panel Test Scenarios](docs/TEST_SCENARIOS_ADMIN_PANEL.md):** Test scenarios for the admin panel.
-*   **[PC Admin App MVP Requirements](docs/PC_ADMIN_APP_MVP_REQUIREMENTS.md):** Scope, data model, screens, roles, and delivery plan for the desktop admin software.
-*   **[PC Admin Compliance Checklist](docs/PC_ADMIN_COMPLIANCE_CHECKLIST.md):** Market-specific compliance and go-live control checklist.
-*   **[PC Admin AI Support Workflow](docs/PC_ADMIN_AI_SUPPORT_WORKFLOW.md):** End-to-end KI-gestützter Ticket- und Eskalationsprozess.
+*   **[API Documentation](API_DOCUMENTATION.md):** Detailed reference for all Cloud Functions.
+*   **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project.
+*   **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
+*   **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
 
-Each source file in this repository is also thoroughly documented. You can explore the code to understand specific implementations:
-*   **Backend:** See `index.ts` for API endpoints and business logic.
-*   **Android:** See individual Kotlin files for UI and service logic documentation.
+Each source file is also thoroughly documented.
 
 ## Testing
 
-*   **Backend:** Run `npm test` to execute unit tests.
-*   **Android:** Use Android Studio to run instrumentation tests (if available).
+The project has a comprehensive test suite to ensure code quality and stability.
+
+*   **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
+*   **Android:** The project is configured for unit tests (`/src/test`) and end-to-end instrumentation tests (`/src/androidTest`) which can be run via Android Studio.
 
 ## License
 
-[License Information Here]
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

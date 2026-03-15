@@ -9,15 +9,27 @@ coverage/
 
 # IntelliJ/Android Studio project files
 .idea/
+*.iml
+
+# VS Code workspace files
+.vscode/
+*.code-workspace
 
 # Local configuration files
 local.properties
 *.hprof
-lib/
 
 # Firebase app configs (must never be committed)
 **/google-services.json
 **/GoogleService-Info.plist
-
 # Keep only safe templates in git
 !**/google-services.template.json
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+.tmp_*
+tmp_*
