@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-15
+
+### Added
+- **7-Day Free Trial**: New users automatically receive a 7-day trial period upon registration with full access to all features.
+- `hasActiveAccess()` helper function for centralized subscription/trial access checks.
+- `checkExpiredSubscriptions` now also detects and marks expired trials (`trial_expired` status).
+- `getSubscriptionStatus` returns enriched trial information including `trialDaysRemaining`, `isTrialActive`, and `hasAccess`.
+- 3 new integration tests covering trial lifecycle (active trial, expired trial, trial_expired status).
+- `toMillis()` method added to `MockTimestamp` in integration test mocks.
+
+### Changed
+- **Monetization Model**: Replaced the free-tier (1 child free) with a trial-based model. After the 7-day trial, a subscription is required even for a single child device.
+- `registerMasterDevice` now sets `subscription.status = "trial"` with `trialStartedAt` and `trialEndsAt` timestamps.
+- `validatePairingCode` and `generatePairingLink` now use `hasActiveAccess()` instead of the old `isPremium` check, blocking pairing when neither trial nor subscription is active.
+- Updated existing tests to expect the new `hasAccess` field in `getSubscriptionStatus` responses.
+
+### Removed
+- Removed the free-tier logic that allowed 1 child device without a subscription.
+
 ## [2.0.0] - 2026-03-15
 
 ### Added
