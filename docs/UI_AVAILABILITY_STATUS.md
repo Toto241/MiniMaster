@@ -1,5 +1,7 @@
 # UI Availability Status
 
+<!-- markdownlint-disable MD022 MD029 MD032 -->
+
 Stand: 2026-03-15
 
 ## Ziel
@@ -32,7 +34,7 @@ Sicherstellen, dass die Nutzeroberflächen auf Mobiltelefonen und PCs verfügbar
 - Status: Verfuegbar
 - Pfad: `desktop/`
 - Umsetzung: Electron-Launcher mit Einstieg fuer Parent-Panel und Operator-Dashboard
-- Start: `npm run desktop:start`
+- Startbefehl: `npx electron desktop/main.js`
 
 ## Technische Ergaenzungen
 - PWA Parent Panel:
@@ -45,7 +47,7 @@ Sicherstellen, dass die Nutzeroberflächen auf Mobiltelefonen und PCs verfügbar
   - `admin-panel/service-worker.js`
   - `admin-panel/pwa-register.js`
   - `admin-panel/icon.svg`
-- Desktop:
+- Desktop-Komponenten:
   - `desktop/main.js`
   - `desktop/preload.js`
   - `desktop/launcher.html`

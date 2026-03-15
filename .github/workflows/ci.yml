@@ -1,5 +1,5 @@
 name: CI
-on: 
+on:
   push:
     paths:
       - '**/*.ts'
@@ -38,19 +38,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
-        with: 
+        with:
           node-version: 20
           cache: 'npm'
-          
+
       - name: Install dependencies
         run: npm ci
-        
+
       - name: Run linting
         run: npm run lint
-        
+
       - name: Run backend tests
         run: npm test --silent
   android:
@@ -64,21 +64,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          
+
       - name: Validate Gradle Wrapper
-        uses: gradle/gradle-build-action@v3
-        with:
-          validate-wrapper: true
+        uses: gradle/actions/wrapper-validation@v3
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          
+
       - name: Show Gradle version
         run: ./gradlew --version
-          
+
       - name: Validate Android manifests
         run: |
           echo "Validating Android manifest files..."
@@ -95,13 +93,13 @@ jobs:
               echo "✓ $manifest syntax appears valid"
             fi
           done
-          
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-        
+
       - name: Show Gradle version
         run: ./gradlew --version
-        
+
       - name: Test network access to Google Maven
         id: network-test
         run: |
@@ -112,31 +110,31 @@ jobs:
             echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
             echo "⚠️ Google Maven repository (dl.google.com) is not accessible from this environment"
           fi
-          
+
       - name: Build (fail on deprecations in CI)
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         run: ./gradlew clean build -Dorg.gradle.warning.mode=all --continue --no-daemon
-        
+
       - name: Run Android unit tests
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         run: ./gradlew testDebugUnitTest --continue --no-daemon
-        
+
       - name: Detekt
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         run: ./gradlew detektAll --continue --no-daemon
-        
-      - name: Check Kotlin code style  
+
+      - name: Check Kotlin code style
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         run: ./gradlew ktlintCheck --continue --no-daemon
-        
+
       - name: Build debug APKs
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         run: ./gradlew assembleDebug --continue --no-daemon
-        
+
       - name: Generate Jacoco report
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         run: ./gradlew jacocoTestReport --continue --no-daemon || echo "Jacoco not configured, skipping coverage"
-        
+
       - name: Skip Android tests (Network Restricted)
         if: steps.network-test.outputs.google-maven-accessible == 'false'
         run: |
@@ -144,7 +142,7 @@ jobs:
           echo "::notice::Google Maven repository (dl.google.com) is not accessible from this CI environment"
           echo "::notice::This is a known limitation. Android builds work in environments with full network access"
           echo "::notice::Backend tests have been validated successfully"
-          
+
       - name: Upload reports
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         uses: actions/upload-artifact@v4
@@ -153,7 +151,7 @@ jobs:
           path: |
             **/build/reports/**
             **/build/jacoco/**
-            
+
   android-instrumentation:
     runs-on: ubuntu-latest
     needs: android

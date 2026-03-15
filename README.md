@@ -1,7 +1,9 @@
+# Mini-Master: Parental Control Application Suite
+
+<!-- markdownlint-disable MD004 MD022 MD029 MD030 MD032 MD041 -->
+
 > [!NOTE]
 > This repository is in its final, stable state. All development activities have been completed, and the project is production-ready.
-
-# Mini-Master: Parental Control Application Suite
 
 [![CI/CD Status](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml)
 
@@ -27,34 +29,34 @@ The Mini-Master suite is designed to give parents control over their children's 
 
 ## Features
 
-*   **Secure Pairing:** Pair devices securely using a 6-digit code or a time-limited link.
-*   **Remote Locking:** Instantly lock or unlock the child's device from the parent app or web panel.
-*   **App Blocking:** Blacklist specific applications to prevent their usage.
-*   **Usage Limits:** Set daily usage limits for the device.
-*   **Task-Based Unlocking:** Assign tasks to children (e.g., "Clean your room"). The child device remains locked until the child submits photo proof of task completion, which the parent can then approve or reject.
-*   **Push Notifications:** Parents receive real-time notifications when a child submits a task for review.
-*   **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
-*   **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
-*   **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
-*   **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
-*   **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
+- **Secure Pairing:** Pair devices securely using a 6-digit code or a time-limited link.
+- **Remote Locking:** Instantly lock or unlock the child's device from the parent app or web panel.
+- **App Blocking:** Blacklist specific applications to prevent their usage.
+- **Usage Limits:** Set daily usage limits for the device.
+- **Task-Based Unlocking:** Assign tasks to children (e.g., "Clean your room"). The child device remains locked until the child submits photo proof of task completion, which the parent can then approve or reject.
+- **Push Notifications:** Parents receive real-time notifications when a child submits a task for review.
+- **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
+- **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
+- **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
+- **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
+- **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
 
 ## Project Structure
 
 The repository is organized as follows:
 
-*   **`/` (Root):** Contains the TypeScript Firebase Functions backend (`index.ts`, `firebase.ts`) and project configuration.
-*   **`/masterApp`:** The Android application for parents (Kotlin, Jetpack Compose, Hilt).
-*   **`/childApp`:** The Android application for children (Kotlin, Jetpack Compose, Hilt). Includes the `MiniMasterAccessibilityService` for enforcement.
-*   **`/web-control`:** A static web application for parental control.
-*   **`/test`:** Backend unit and integration tests.
-*   **`/docs`:** Additional documentation and architecture guides.
+- **`/` (Root):** Contains the TypeScript Firebase Functions backend (`index.ts`, `firebase.ts`) and project configuration.
+- **`/masterApp`:** The Android application for parents (Kotlin, Jetpack Compose, Hilt).
+- **`/childApp`:** The Android application for children (Kotlin, Jetpack Compose, Hilt). Includes the `MiniMasterAccessibilityService` for enforcement.
+- **`/web-control`:** A static web application for parental control.
+- **`/test`:** Backend unit and integration tests.
+- **`/docs`:** Additional documentation and architecture guides.
 
 ## Technology Stack
 
-*   **Backend:** TypeScript, Node.js, Firebase (Cloud Functions, Firestore, Authentication, Storage, Messaging).
-*   **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager.
-*   **Web Frontend:** HTML5, CSS3, Vanilla JavaScript.
+- **Backend:** TypeScript, Node.js, Firebase (Cloud Functions, Firestore, Authentication, Storage, Messaging).
+- **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager.
+- **Web Frontend:** HTML5, CSS3, Vanilla JavaScript.
 
 ---
 
@@ -62,18 +64,18 @@ The repository is organized as follows:
 
 ### Prerequisites
 
-*   **Node.js:** v18 or higher.
-*   **Firebase Account:** A Google account to create a Firebase project.
-*   **Firebase CLI:** Install globally via `npm install -g firebase-tools`.
-*   **Android Studio:** Latest version with Android SDK and JDK 17.
+- **Node.js:** v18 or higher.
+- **Firebase Account:** A Google account to create a Firebase project.
+- **Firebase CLI:** Install globally via `npm install -g firebase-tools`.
+- **Android Studio:** Latest version with Android SDK and JDK 17.
 
 ### Firebase Setup
 
 1.  Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
 2.  Enable **Firestore Database**, **Cloud Functions**, **Authentication**, and **Storage**.
 3.  Add two Android apps to your project:
-    *   Parent App Package: `com.minimaster.masterapp`
-    *   Child App Package: `com.google.pairing`
+    - Parent App Package: `com.minimaster.masterapp`
+    - Child App Package: `com.google.pairing`
 4.  Download the `google-services.json` file for each app.
 
 ### Backend Setup
@@ -97,10 +99,10 @@ The repository is organized as follows:
 ### Desktop Launcher Setup (PC)
 
 1.  Install dependencies in repository root: `npm install`
-2.  Start desktop launcher: `npm run desktop:start`
+2.  Start desktop launcher: `npx electron desktop/main.js`
 3.  Use launcher to open:
-    * Parent panel (`web-control`)
-    * Operator dashboard (`admin-panel`)
+    - Parent panel (`web-control`)
+    - Operator dashboard (`admin-panel`)
 
 ---
 
@@ -114,10 +116,10 @@ The repository is organized as follows:
 
 Comprehensive architecture and setup documentation is available in the `docs/` directory. Key documents include:
 
-*   **[API Documentation](API_DOCUMENTATION.md):** Detailed reference for all Cloud Functions.
-*   **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project.
-*   **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
-*   **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
+- **[API Documentation](API_DOCUMENTATION.md):** Detailed reference for all Cloud Functions.
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project.
+- **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
+- **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
 
 Each source file is also thoroughly documented.
 
@@ -125,8 +127,8 @@ Each source file is also thoroughly documented.
 
 The project has a comprehensive test suite to ensure code quality and stability.
 
-*   **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
-*   **Android:** The project is configured for unit tests (`/src/test`) and end-to-end instrumentation tests (`/src/androidTest`) which can be run via Android Studio.
+- **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
+- **Android:** The project is configured for unit tests (`/src/test`) and end-to-end instrumentation tests (`/src/androidTest`) which can be run via Android Studio.
 
 ## License
 
