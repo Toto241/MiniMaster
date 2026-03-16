@@ -67,6 +67,11 @@
                 <!-- Login Section -->
                 <section id="login-section" class="section">
                     <h2>Operator Login</h2>
+                    <p>
+                        Dieses Admin-Tool ist ausschließlich für den Betreiber
+                        von MiniMaster vorgesehen (nicht für Eltern- oder
+                        Kinder-Accounts).
+                    </p>
                     <form id="login-form">
                         <input
                             type="email"
@@ -99,6 +104,10 @@
                             <div class="stat-card">
                                 <h3>Total Users</h3>
                                 <p id="stat-total-users">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Current Revenue (MRR)</h3>
+                                <p id="stat-current-revenue">--</p>
                             </div>
                             <div class="stat-card">
                                 <h3>Active Subscriptions</h3>
@@ -417,6 +426,51 @@
                             class="setup-card"
                             style="margin-block-start: 20px"
                         >
+                            <h3>Runtime Configuration (Cloud + KI)</h3>
+                            <p>
+                                Zentrale Betreiber-Konfiguration für
+                                Cloud-Dienste und KI-Verhalten. Änderungen
+                                werden in Firestore gespeichert und können vom
+                                Betriebsteam versioniert/freigegeben werden.
+                            </p>
+
+                            <div class="setup-grid" style="margin-block-start: 10px">
+                                <div>
+                                    <h4>Cloud Services</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 10px">
+                                        <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" />
+                                        <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" />
+                                        <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" />
+                                        <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4>KI / Support-Automation</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 10px">
+                                        <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. openai)" />
+                                        <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gpt-5-mini)" />
+                                        <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" />
+                                        <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" />
+                                        <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" />
+                                        <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="setup-actions" style="margin-block-start: 12px">
+                                <button onclick="loadOperatorConfig()" class="btn btn-secondary">Load Configuration</button>
+                                <button onclick="saveOperatorConfig()" class="btn btn-primary">Save Configuration</button>
+                                <button onclick="testAiConfiguration()" class="btn btn-secondary">Test KI-Konfiguration</button>
+                            </div>
+                            <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
+                                <div class="info">Noch keine Konfiguration geladen.</div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="setup-card"
+                            style="margin-block-start: 20px"
+                        >
                             <h3>Operator Assistant</h3>
                             <p>
                                 Fragen zur Integration, Deployment, Rollen und
@@ -426,7 +480,7 @@
                                 <div id="assistant-chat" class="assistant-chat">
                                     <div class="assistant-msg assistant">
                                         Hallo! Ich helfe bei Setup,
-                                        Cloud-Integration und
+                                        Cloud-Integration, KI-Konfiguration und
                                         Betreiber-Workflows. Stelle eine Frage
                                         wie: "Wie prüfe ich Admin-Rechte?"
                                     </div>
