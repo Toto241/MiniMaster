@@ -43,14 +43,23 @@
                 <button class="nav-tab" onclick="switchTab('users', event)">
                     Users
                 </button>
+                <button class="nav-tab" onclick="switchTab('devices', event)">
+                    Geräte
+                </button>
                 <button
                     class="nav-tab"
                     onclick="switchTab('subscriptions', event)"
                 >
                     Subscriptions
                 </button>
+                <button class="nav-tab" onclick="switchTab('pairing', event)">
+                    Pairing
+                </button>
                 <button class="nav-tab" onclick="switchTab('support', event)">
                     Support Tickets
+                </button>
+                <button class="nav-tab" onclick="switchTab('errorlogs', event)">
+                    Error Logs
                 </button>
                 <button
                     class="nav-tab"
@@ -59,7 +68,7 @@
                     Compliance
                 </button>
                 <button class="nav-tab" onclick="switchTab('setup', event)">
-                    Cloud Setup & Assistant
+                    Cloud Setup &amp; Assistant
                 </button>
             </nav>
 
@@ -159,6 +168,36 @@
                             </button>
                         </div>
 
+                        <!-- Subscription Expiry Warnings -->
+                        <div id="subscription-warnings" class="data-list" style="margin-block-end: 20px"></div>
+
+                        <!-- Performance Metrics -->
+                        <h3>Performance Metrics</h3>
+                        <div id="performance-metrics" class="data-list">
+                            <div class="info">Click "Refresh Stats" to load performance metrics.</div>
+                        </div>
+
+                        <!-- Security Status -->
+                        <h3>Security &amp; System Status</h3>
+                        <div class="stats-grid" style="margin-block-end: 20px">
+                            <div class="stat-card">
+                                <h3>App Check</h3>
+                                <p id="stat-appcheck-status" style="font-size:1em">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Firestore Indexes</h3>
+                                <p id="stat-indexes-status" style="font-size:1em">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Active Pairing Codes</h3>
+                                <p id="stat-active-pairing">--</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Trial Users</h3>
+                                <p id="stat-trial-users">--</p>
+                            </div>
+                        </div>
+
                         <!-- Error Summary Section -->
                         <h3>Recent Error Summary</h3>
                         <div id="error-summary" class="data-list">
@@ -200,6 +239,18 @@
                         <div id="user-pagination" class="pagination"></div>
                     </div>
 
+                    <!-- Tab: Devices (Children) -->
+                    <div id="tab-devices" class="tab-content" style="display: none">
+                        <h2>Geräte (Children Devices)</h2>
+                        <div class="user-search">
+                            <input type="text" id="device-search-input" placeholder="Suche nach Child-ID oder Master-ID" />
+                            <button onclick="searchDevices()" class="btn btn-secondary">Suchen</button>
+                            <button onclick="loadDevices()" class="btn btn-secondary">Alle anzeigen</button>
+                        </div>
+                        <div id="device-list" class="data-list"></div>
+                        <div id="device-pagination" class="pagination"></div>
+                    </div>
+
                     <!-- Tab: Subscriptions -->
                     <div
                         id="tab-subscriptions"
@@ -231,6 +282,23 @@
                             <!-- Subscription data will be rendered here -->
                         </div>
                         <div id="sub-pagination" class="pagination"></div>
+                    </div>
+
+                    <!-- Tab: Pairing -->
+                    <div id="tab-pairing" class="tab-content" style="display: none">
+                        <h2>Pairing-Codes &amp; Tokens</h2>
+                        <div class="sub-filters">
+                            <button onclick="loadPairingOverview('codes')" class="btn btn-secondary">Pairing Codes (6-stellig)</button>
+                            <button onclick="loadPairingOverview('tokens')" class="btn btn-secondary">Pairing Tokens (UUID)</button>
+                            <button onclick="loadPairingOverview('all')" class="btn btn-primary">Alle laden</button>
+                        </div>
+                        <div class="stats-grid" style="margin-block-end: 15px">
+                            <div class="stat-card"><h3>Aktive Codes</h3><p id="pairing-active-codes">--</p></div>
+                            <div class="stat-card"><h3>Abgelaufene Codes</h3><p id="pairing-expired-codes">--</p></div>
+                            <div class="stat-card"><h3>Aktive Tokens</h3><p id="pairing-active-tokens">--</p></div>
+                            <div class="stat-card"><h3>Abgelaufene Tokens</h3><p id="pairing-expired-tokens">--</p></div>
+                        </div>
+                        <div id="pairing-list" class="data-list"></div>
                     </div>
 
                     <!-- Tab: Support Tickets -->
@@ -286,6 +354,19 @@
                         <div id="ticket-pagination" class="pagination"></div>
                     </div>
 
+                    <!-- Tab: Error Logs -->
+                    <div id="tab-errorlogs" class="tab-content" style="display: none">
+                        <h2>Error Logs (durchsuchbar)</h2>
+                        <div class="user-search">
+                            <input type="text" id="errorlog-search-input" placeholder="Suche nach Funktionsname oder Fehlermeldung" />
+                            <input type="date" id="errorlog-date-filter" />
+                            <button onclick="searchErrorLogs()" class="btn btn-secondary">Suchen</button>
+                            <button onclick="loadErrorLogs()" class="btn btn-primary">Alle laden</button>
+                        </div>
+                        <div id="errorlog-list" class="data-list"></div>
+                        <div id="errorlog-pagination" class="pagination"></div>
+                    </div>
+
                     <!-- Tab: Compliance -->
                     <div
                         id="tab-compliance"
@@ -323,10 +404,10 @@
                             class="compliance-section"
                             style="margin-block-start: 30px"
                         >
-                            <h3>Data Deletion Request</h3>
+                            <h3>Data Deletion Request (GDPR Art. 17)</h3>
                             <p>
-                                Permanently delete all data associated with a
-                                user account.
+                                Permanent alle Daten eines Nutzers löschen – ruft direkt die Cloud Function
+                                <code>deleteUserAccount</code> auf. Löscht Master, Children, Tasks, Subscriptions.
                             </p>
                             <div class="dsar-form">
                                 <input
@@ -341,6 +422,7 @@
                                     Delete User Account
                                 </button>
                             </div>
+                            <div id="delete-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
 
                         <div
@@ -377,11 +459,11 @@
 
                         <div class="setup-grid">
                             <div class="setup-card">
-                                <h3>Integration Health Check</h3>
+                                <h3>Integration Health Check (alle Cloud Functions)</h3>
                                 <p>
                                     Validiert die Anbindung an zentrale
                                     Cloud-Dienste (Auth, Firestore, Functions)
-                                    und prüft kritische Sammlungen/Funktionen.
+                                    und prüft <strong>alle</strong> kritischen Sammlungen und Callable Functions.
                                 </p>
                                 <div class="setup-actions">
                                     <button
@@ -420,6 +502,17 @@
                                     class="setup-checklist"
                                 ></div>
                             </div>
+                        </div>
+
+                        <!-- Admin-Konto-Erstellung -->
+                        <div class="setup-card" style="margin-block-start: 20px">
+                            <h3>Admin-Konto erstellen / Admin-Claim vergeben</h3>
+                            <p>Bestehenden Firebase-Auth-User zum Operator/Admin hochstufen (nur für bereits authentifizierte Admins).</p>
+                            <div class="dsar-form">
+                                <input type="text" id="admin-target-uid" placeholder="User UID des neuen Admins" />
+                                <button onclick="grantAdminClaim()" class="btn btn-primary">Admin-Claim setzen</button>
+                            </div>
+                            <div id="admin-claim-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
 
                         <div
@@ -513,13 +606,21 @@
 
         <!-- User Details Modal -->
         <div id="user-details-modal" class="modal" style="display: none">
-            <div class="modal-content">
+            <div class="modal-content modal-large">
                 <span class="close" onclick="closeUserDetailsModal()"
                     >&times;</span
                 >
                 <div id="user-details-content">
                     <!-- User details will be loaded here -->
                 </div>
+            </div>
+        </div>
+
+        <!-- Device Details Modal -->
+        <div id="device-details-modal" class="modal" style="display: none">
+            <div class="modal-content modal-large">
+                <span class="close" onclick="closeDeviceDetailsModal()">&times;</span>
+                <div id="device-details-content"></div>
             </div>
         </div>
 

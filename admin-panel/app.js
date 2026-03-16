@@ -28,9 +28,13 @@ const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
     { key: "admin-auth", label: "Operator ist mit Admin-Claim authentifiziert" },
     { key: "firestore-access", label: "Firestore-Zugriff auf Kernsammlungen verifiziert" },
-    { key: "functions-access", label: "Callable Functions erreichbar" },
+    { key: "functions-access", label: "Alle Callable Functions erreichbar" },
+    { key: "appcheck-active", label: "App Check konfiguriert und aktiv" },
+    { key: "android-apps", label: "Android-Apps registriert (Master + Child)" },
+    { key: "ai-config", label: "KI-Provider konfiguriert (Gemini/OpenAI)" },
     { key: "support-workflow", label: "Support-Ticket-Workflow getestet" },
-    { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" }
+    { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" },
+    { key: "deploy-verified", label: "Deploy erfolgreich und Functions live" }
 ];
 
 
@@ -368,10 +372,21 @@ async function runFullSetupValidation() {
         });
     }
 
-    // Check 4: Callable functions reachability
+    // Check 4: Callable functions reachability (ALL critical functions)
     const functionChecks = [
         { name: "revokeSubscription", payload: { masterId: "health-check" } },
-        { name: "exportUserData", payload: { masterId: "health-check" } }
+        { name: "exportUserData", payload: { masterId: "health-check" } },
+        { name: "deleteUserAccount", payload: {} },
+        { name: "setAdminClaim", payload: { uid: "health-check" } },
+        { name: "registerMasterDevice", payload: { imei: "health-check" } },
+        { name: "generateCustomToken", payload: {} },
+        { name: "revokeUserTokens", payload: { uid: "health-check" } },
+        { name: "createPairingCode", payload: {} },
+        { name: "validatePairingCode", payload: { pairingCode: "000000" } },
+        { name: "setDeviceLocked", payload: { childId: "health-check", isLocked: false } },
+        { name: "updateAppBlacklist", payload: { childId: "health-check", appBlacklist: [] } },
+        { name: "verifyPurchase", payload: { purchaseToken: "health-check", sku: "test" } },
+        { name: "createSupportTicket", payload: { problemDescription: "health-check" } },
     ];
 
     for (const fn of functionChecks) {
@@ -495,6 +510,26 @@ function generateOperatorAssistantAnswer(question) {
         return "Compliance-Flow: DSAR Export für Test-Master auslösen, Audit-Logs für Zeitraum exportieren, Ergebnisse archivieren. Danach Setup-Report exportieren und als Betriebsnachweis ablegen.";
     }
 
+    if (q.includes("gerät") || q.includes("device") || q.includes("child") || q.includes("kind")) {
+        return "Geräte-Übersicht: Im Tab 'Geräte' werden alle verbundenen Kinderhandys angezeigt – mit Online-Ampel, Lock-Status, Blacklist-Anzahl und FCM-Token-Status. Im Detail-Modal findet man Tasks, Usage-History und App-Blacklist pro Gerät.";
+    }
+
+    if (q.includes("pairing") || q.includes("kopplung") || q.includes("code") || q.includes("token")) {
+        return "Pairing-Übersicht: Im Tab 'Pairing' sieht man alle Pairing-Codes (6-stellig, 24h gültig) und Pairing-Tokens (UUID, 5 Min gültig). Abgelaufene Einträge werden markiert. Filter nach Codes/Tokens/Alle möglich.";
+    }
+
+    if (q.includes("error") || q.includes("fehler") || q.includes("log")) {
+        return "Error Logs: Im Tab 'Error Logs' kann man nach Funktionsnamen, Fehlermeldung und Datum suchen. Jeder Eintrag zeigt Funktion, Nachricht, User-ID und Schweregrad. Paginated mit 25 Einträgen pro Seite.";
+    }
+
+    if (q.includes("performance") || q.includes("metrik") || q.includes("geschwindigkeit")) {
+        return "Performance: In der Übersicht werden die letzten 20 Performance-Metriken (Funktionsname, Dauer, Status) angezeigt. Bei hoher Latenz die betroffene Cloud Function auf Optimierungspotenzial prüfen.";
+    }
+
+    if (q.includes("subscription") || q.includes("abo") || q.includes("ablauf") || q.includes("trial")) {
+        return "Subscriptions: In der Übersicht werden Warnungen für ablaufende Trials (<7 Tage) und Abos angezeigt. Im User-Detail sind alle Abo-Infos sichtbar: Typ, Start, Ablauf, Kinderlimit, Purchase-Token. SKUs: single_child_monthly (€1.99), family_monthly (€4.99), single_child_yearly (€19.99), family_yearly (€49.99).";
+    }
+
     return "Empfohlener Ablauf: 1) Full Validation starten, 2) Fehler zuerst in Firebase-Config/Claims beheben, 3) Firestore/Functions erneut prüfen, 4) Support- und Compliance-Workflow testweise durchlaufen, 5) Setup-Report exportieren.";
 }
 
@@ -505,10 +540,13 @@ function loadDashboardData() {
     loadUsers();
     loadSubscriptions();
     loadSupportTickets();
+    loadDevices();
 }
 
 function refreshAllStats() {
     loadStats();
+    loadPerformanceMetrics();
+    loadSubscriptionWarnings();
     showNotification("Statistics refreshed.", "success");
 }
 
@@ -516,12 +554,22 @@ function loadStats() {
     // Show loading indicators
     const statIds = ["stat-total-users", "stat-current-revenue", "stat-active-subs", "stat-total-tasks", "stat-open-tickets", "stat-total-children", "stat-errors-24h"];
     statIds.forEach(id => {
-        document.getElementById(id).innerHTML = "<span class='loading-spinner'></span>";
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = "<span class='loading-spinner'></span>";
     });
 
     // 1. Total Users (Masters)
     db.collection("masters").get().then(snapshot => {
         document.getElementById("stat-total-users").textContent = snapshot.size;
+
+        // Count trial users
+        let trialCount = 0;
+        snapshot.forEach(doc => {
+            const sub = doc.data().subscription;
+            if (sub && sub.status === "trial") trialCount++;
+        });
+        const trialEl = document.getElementById("stat-trial-users");
+        if (trialEl) trialEl.textContent = trialCount;
     }).catch(() => {
         document.getElementById("stat-total-users").textContent = "Error";
     });
@@ -579,8 +627,35 @@ function loadStats() {
             document.getElementById("stat-errors-24h").textContent = "Error";
         });
 
-    // Load error summaries
+    // 7. Active Pairing Codes
+    const now = firebase.firestore.Timestamp.now();
+    db.collection("pairingCodes").get().then(snapshot => {
+        let activeCount = 0;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.expiresAt && data.expiresAt.seconds > now.seconds) activeCount++;
+        });
+        const el = document.getElementById("stat-active-pairing");
+        if (el) el.textContent = activeCount;
+    }).catch(() => {
+        const el = document.getElementById("stat-active-pairing");
+        if (el) el.textContent = "N/A";
+    });
+
+    // 8. App Check status hint
+    const appCheckEl = document.getElementById("stat-appcheck-status");
+    if (appCheckEl) {
+        appCheckEl.textContent = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("your-") ? "Config vorhanden" : "Nicht konfiguriert";
+    }
+
+    // 9. Indexes status hint
+    const indexEl = document.getElementById("stat-indexes-status");
+    if (indexEl) indexEl.textContent = "Prüfe via Full Validation";
+
+    // Load error summaries + performance + warnings
     loadErrorSummaries();
+    loadPerformanceMetrics();
+    loadSubscriptionWarnings();
 }
 
 async function loadErrorSummaries() {
@@ -740,18 +815,45 @@ async function viewUserDetails(masterId) {
 
         const masterData = masterDoc.data();
         let html = "<h3>Master Details</h3>";
-        html += `<p><strong>Master ID:</strong> ${masterId}</p>`;
-        html += `<p><strong>Email:</strong> ${masterData.email || "N/A"}</p>`;
+        html += `<div class="ticket-detail-grid">`;
+        html += `<p><strong>Master ID:</strong> ${escapeHtml(masterId)}</p>`;
+        html += `<p><strong>Email:</strong> ${escapeHtml(masterData.email || "N/A")}</p>`;
+        html += `<p><strong>IMEI:</strong> ${escapeHtml(masterData.imei || "N/A")}</p>`;
         html += `<p><strong>Created At:</strong> ${masterData.createdAt ? new Date(masterData.createdAt.seconds * 1000).toLocaleString() : "N/A"}</p>`;
+        html += `<p><strong>Last Token Refresh:</strong> ${masterData.lastTokenRefresh ? new Date(masterData.lastTokenRefresh.seconds * 1000).toLocaleString() : "N/A"}</p>`;
+        html += `</div>`;
 
-        // Subscription info
+        // Subscription info with Trial detail
         if (masterData.subscription) {
+            const sub = masterData.subscription;
+            const statusLabel = sub.status === "trial" ? "🟡 Trial (7 Tage)" : sub.status === "active" ? "🟢 Active" : "🔴 " + (sub.status || "none");
             html += `<h4>Subscription</h4>`;
-            html += `<p><strong>Status:</strong> ${masterData.subscription.status}</p>`;
-            html += `<p><strong>Type:</strong> ${masterData.subscription.type || "N/A"}</p>`;
-            if (masterData.subscription.expiresAt) {
-                html += `<p><strong>Expires:</strong> ${new Date(masterData.subscription.expiresAt.seconds * 1000).toLocaleString()}</p>`;
+            html += `<div class="ticket-detail-grid">`;
+            html += `<p><strong>Status:</strong> ${escapeHtml(statusLabel)}</p>`;
+            html += `<p><strong>Type:</strong> ${escapeHtml(sub.type || "N/A")}</p>`;
+            if (sub.trialStartedAt) {
+                html += `<p><strong>Trial Start:</strong> ${new Date(sub.trialStartedAt.seconds * 1000).toLocaleString()}</p>`;
             }
+            if (sub.trialEndsAt) {
+                const trialEnd = new Date(sub.trialEndsAt.seconds * 1000);
+                const isExpired = trialEnd < new Date();
+                html += `<p><strong>Trial Ende:</strong> <span style="color:${isExpired ? "red" : "green"}">${trialEnd.toLocaleString()}${isExpired ? " (ABGELAUFEN)" : ""}</span></p>`;
+            }
+            if (sub.startedAt) {
+                html += `<p><strong>Abo Start:</strong> ${new Date(sub.startedAt.seconds * 1000).toLocaleString()}</p>`;
+            }
+            if (sub.expiresAt) {
+                const expDate = new Date(sub.expiresAt.seconds * 1000);
+                const isExpired = expDate < new Date();
+                html += `<p><strong>Abo Ablauf:</strong> <span style="color:${isExpired ? "red" : "green"}">${expDate.toLocaleString()}${isExpired ? " (ABGELAUFEN)" : ""}</span></p>`;
+            }
+            if (sub.type) {
+                const childLimit = sub.type.startsWith("family") ? "Unbegrenzt (99)" : "1";
+                html += `<p><strong>Child-Limit:</strong> ${childLimit}</p>`;
+            }
+            html += `</div>`;
+        } else {
+            html += `<h4>Subscription</h4><p>Keine Subscription vorhanden.</p>`;
         }
 
         // Load children
@@ -760,14 +862,18 @@ async function viewUserDetails(masterId) {
         if (childrenSnapshot.empty) {
             html += "<p>No children linked.</p>";
         } else {
-            html += "<table><tr><th>Child ID</th><th>Locked</th><th>Last Seen</th></tr>";
+            html += "<table><tr><th>Child ID</th><th>Locked</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>";
             childrenSnapshot.forEach(childDoc => {
                 const childData = childDoc.data();
-                const lastSeen = childData.lastSeen ? new Date(childData.lastSeen.seconds * 1000).toLocaleString() : "N/A";
+                const lastSeen = childData.lastSeen ? new Date(childData.lastSeen.seconds * 1000) : null;
+                const lastSeenStr = lastSeen ? lastSeen.toLocaleString() : "N/A";
+                const onlineStatus = getOnlineStatus(lastSeen);
                 html += `<tr>
-                    <td>${childDoc.id}</td>
-                    <td>${childData.isLocked ? "Yes" : "No"}</td>
-                    <td>${lastSeen}</td>
+                    <td>${escapeHtml(childDoc.id)}</td>
+                    <td>${childData.isLocked ? "🔒 Yes" : "🔓 No"}</td>
+                    <td>${lastSeenStr}</td>
+                    <td>${onlineStatus}</td>
+                    <td><button onclick="viewDeviceDetails('${childDoc.id}')" class="btn btn-secondary btn-sm">Details</button></td>
                 </tr>`;
             });
             html += "</table>";
@@ -775,12 +881,35 @@ async function viewUserDetails(masterId) {
 
         // Actions
         html += `<h4>Actions</h4>`;
-        html += `<button onclick="triggerDsarExportForUser('${masterId}')" class="btn btn-primary" style="margin-inline-end: 10px;">Export User Data (DSAR)</button>`;
+        html += `<div class="ticket-actions">`;
+        html += `<button onclick="triggerDsarExportForUser('${masterId}')" class="btn btn-primary">Export User Data (DSAR)</button>`;
         html += `<button onclick="revokeUserSubscription('${masterId}')" class="btn btn-danger">Revoke Subscription</button>`;
+        html += `<button onclick="revokeUserTokens('${masterId}')" class="btn btn-danger">Revoke Tokens (Force Re-Auth)</button>`;
+        html += `</div>`;
 
         modalContent.innerHTML = html;
     } catch (error) {
-        modalContent.innerHTML = `<div class='error'>Error loading details: ${error.message}</div>`;
+        modalContent.innerHTML = `<div class='error'>Error loading details: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function getOnlineStatus(lastSeen) {
+    if (!lastSeen) return '<span class="status-expired">Unbekannt</span>';
+    const now = new Date();
+    const diffMin = (now - lastSeen) / 60000;
+    if (diffMin < 20) return '<span class="status-active">🟢 Online</span>';
+    if (diffMin < 60) return '<span class="status-open">🟡 Kürzlich</span>';
+    return '<span class="status-expired">🔴 Offline</span>';
+}
+
+async function revokeUserTokens(uid) {
+    if (!confirm(`Alle Tokens für User ${uid} widerrufen? Der User muss sich neu einloggen.`)) return;
+    try {
+        const revokeFunc = functions.httpsCallable("revokeUserTokens");
+        await revokeFunc({ uid: uid });
+        showNotification("Tokens erfolgreich widerrufen.", "success");
+    } catch (error) {
+        showNotification("Fehler beim Token-Widerruf: " + error.message, "error");
     }
 }
 
@@ -1122,24 +1251,32 @@ async function triggerDsarExportForUser(masterId) {
 
 async function triggerAccountDeletion() {
     const masterId = document.getElementById("delete-master-id").value.trim();
+    const resultEl = document.getElementById("delete-result");
     if (!masterId) {
         showNotification("Please enter a Master ID.", "info");
         return;
     }
 
-    if (!confirm(`WARNING: This will permanently delete ALL data for user ${masterId}. This action cannot be undone. Continue?`)) {
+    if (!confirm(`WARNUNG: Hiermit werden ALLE Daten für User ${masterId} unwiderruflich gelöscht (Master, Children, Tasks, Subscriptions). Fortfahren?`)) {
         return;
     }
 
-    if (!confirm(`FINAL CONFIRMATION: Are you absolutely sure you want to delete user ${masterId}?`)) {
+    if (!confirm(`LETZTE BESTÄTIGUNG: Sind Sie absolut sicher, dass Sie User ${masterId} löschen möchten?`)) {
         return;
     }
+
+    if (resultEl) resultEl.innerHTML = "<div class='loading'>Lösche Account...</div>";
 
     try {
-        // This would call a Cloud Function to handle deletion
-        showNotification("Account deletion request submitted. The backend will process this asynchronously.", "success");
+        const deleteFunc = functions.httpsCallable("deleteUserAccount");
+        await deleteFunc({ masterId: masterId });
+        if (resultEl) resultEl.innerHTML = "<div class='success-box'>Account erfolgreich gelöscht.</div>";
+        showNotification("Account deletion completed successfully.", "success");
+        loadUsers();
+        loadStats();
     } catch (error) {
-        showNotification("Error: " + error.message, "error");
+        if (resultEl) resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+        showNotification("Error deleting account: " + error.message, "error");
     }
 }
 
@@ -1186,6 +1323,559 @@ async function exportAuditLogs() {
     }
 }
 
+// ==================== DEVICES (CHILDREN) TAB ====================
+
+let deviceLastDoc = null;
+
+async function loadDevices(direction) {
+    const listEl = document.getElementById("device-list");
+    if (!listEl) return;
+    listEl.innerHTML = "<div class='loading'>Loading devices...</div>";
+
+    try {
+        let query = db.collection("children").orderBy("lastSeen", "desc").limit(PAGE_SIZE);
+        if (direction === "next" && deviceLastDoc) {
+            query = db.collection("children").orderBy("lastSeen", "desc").startAfter(deviceLastDoc).limit(PAGE_SIZE);
+        }
+
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+            listEl.innerHTML = "<div class='info'>Keine Geräte gefunden.</div>";
+            return;
+        }
+
+        deviceLastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+        let html = "<table><tr><th>Child ID</th><th>Master</th><th>Locked</th><th>Blacklist</th><th>Last Seen</th><th>Status</th><th>FCM</th><th>Actions</th></tr>";
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            const lastSeen = d.lastSeen ? new Date(d.lastSeen.seconds * 1000) : null;
+            const onlineStatus = getOnlineStatus(lastSeen);
+            const blacklistCount = Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0;
+            const hasFcm = d.fcmToken ? "✅" : "❌";
+
+            html += `<tr>
+                <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 16))}${doc.id.length > 16 ? "..." : ""}</td>
+                <td title="${escapeHtml(d.masterImei || "")}">${escapeHtml((d.masterImei || "").substring(0, 12))}...</td>
+                <td>${d.isLocked ? "🔒" : "🔓"}</td>
+                <td>${blacklistCount} Apps</td>
+                <td>${lastSeen ? lastSeen.toLocaleString() : "N/A"}</td>
+                <td>${onlineStatus}</td>
+                <td>${hasFcm}</td>
+                <td><button onclick="viewDeviceDetails('${doc.id}')" class="btn btn-secondary btn-sm">Details</button></td>
+            </tr>`;
+        });
+        html += "</table>";
+        listEl.innerHTML = html;
+
+        const paginationEl = document.getElementById("device-pagination");
+        if (paginationEl) {
+            paginationEl.innerHTML = snapshot.docs.length === PAGE_SIZE
+                ? `<button onclick="loadDevices('next')" class="btn btn-secondary">Next Page</button>`
+                : "";
+        }
+    } catch (error) {
+        listEl.innerHTML = `<div class='error'>Error loading devices: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function searchDevices() {
+    const query = (document.getElementById("device-search-input")?.value || "").trim().toLowerCase();
+    if (query.length < 3) {
+        showNotification("Bitte mindestens 3 Zeichen eingeben.", "info");
+        return;
+    }
+
+    const listEl = document.getElementById("device-list");
+    listEl.innerHTML = "<div class='loading'>Suche Geräte...</div>";
+
+    db.collection("children").get().then(snapshot => {
+        const results = [];
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            if (doc.id.toLowerCase().includes(query) || (d.masterImei || "").toLowerCase().includes(query)) {
+                results.push({ id: doc.id, data: d });
+            }
+        });
+
+        if (results.length === 0) {
+            listEl.innerHTML = "<div class='info'>Keine Geräte gefunden.</div>";
+            return;
+        }
+
+        let html = "<table><tr><th>Child ID</th><th>Master</th><th>Locked</th><th>Blacklist</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>";
+        results.forEach(r => {
+            const d = r.data;
+            const lastSeen = d.lastSeen ? new Date(d.lastSeen.seconds * 1000) : null;
+            const onlineStatus = getOnlineStatus(lastSeen);
+            const blacklistCount = Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0;
+            html += `<tr>
+                <td>${escapeHtml(r.id)}</td>
+                <td>${escapeHtml((d.masterImei || "").substring(0, 12))}...</td>
+                <td>${d.isLocked ? "🔒" : "🔓"}</td>
+                <td>${blacklistCount} Apps</td>
+                <td>${lastSeen ? lastSeen.toLocaleString() : "N/A"}</td>
+                <td>${onlineStatus}</td>
+                <td><button onclick="viewDeviceDetails('${r.id}')" class="btn btn-secondary btn-sm">Details</button></td>
+            </tr>`;
+        });
+        html += "</table>";
+        listEl.innerHTML = html;
+        showNotification(`${results.length} Gerät(e) gefunden.`, "success");
+    }).catch(error => {
+        listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    });
+}
+
+async function viewDeviceDetails(childId) {
+    const modal = document.getElementById("device-details-modal");
+    const content = document.getElementById("device-details-content");
+    if (!modal || !content) return;
+
+    content.innerHTML = "<div class='loading'>Loading device details...</div>";
+    modal.style.display = "block";
+
+    try {
+        const childDoc = await db.collection("children").doc(childId).get();
+        if (!childDoc.exists) {
+            content.innerHTML = "<div class='error'>Gerät nicht gefunden.</div>";
+            return;
+        }
+
+        const d = childDoc.data();
+        const lastSeen = d.lastSeen ? new Date(d.lastSeen.seconds * 1000) : null;
+        const onlineStatus = getOnlineStatus(lastSeen);
+
+        let html = `<h3>Gerätedetails: ${escapeHtml(childId)}</h3>`;
+        html += `<div class="ticket-detail-grid">`;
+        html += `<p><strong>Child ID:</strong> ${escapeHtml(childId)}</p>`;
+        html += `<p><strong>Master IMEI:</strong> ${escapeHtml(d.masterImei || "N/A")}</p>`;
+        html += `<p><strong>Lock Status:</strong> ${d.isLocked ? "🔒 Gesperrt" : "🔓 Entsperrt"}</p>`;
+        html += `<p><strong>Online Status:</strong> ${onlineStatus}</p>`;
+        html += `<p><strong>Last Seen:</strong> ${lastSeen ? lastSeen.toLocaleString() : "N/A"}</p>`;
+        html += `<p><strong>FCM Token:</strong> ${d.fcmToken ? "✅ Vorhanden" : "❌ Nicht registriert"}</p>`;
+        html += `</div>`;
+
+        // App Blacklist
+        html += `<h4>App Blacklist (${Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0} Apps)</h4>`;
+        if (Array.isArray(d.appBlacklist) && d.appBlacklist.length > 0) {
+            html += `<div class="ticket-description">${d.appBlacklist.map(a => escapeHtml(a)).join("<br>")}</div>`;
+        } else {
+            html += `<p>Keine Apps gesperrt.</p>`;
+        }
+
+        // Usage Rules
+        html += `<h4>Usage Rules</h4>`;
+        if (d.usageRules && typeof d.usageRules === "object") {
+            html += `<div class="ticket-description">${escapeHtml(JSON.stringify(d.usageRules, null, 2))}</div>`;
+        } else {
+            html += `<p>Keine Nutzungsregeln gesetzt.</p>`;
+        }
+
+        // Tasks
+        const tasksSnap = await db.collection("children").doc(childId).collection("tasks").orderBy("createdAt", "desc").limit(20).get();
+        html += `<h4>Tasks (${tasksSnap.size})</h4>`;
+        if (!tasksSnap.empty) {
+            html += "<table><tr><th>Title</th><th>Status</th><th>Proof</th><th>AI-Analyse</th><th>Erstellt</th></tr>";
+            tasksSnap.forEach(taskDoc => {
+                const t = taskDoc.data();
+                const created = t.createdAt ? new Date(t.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
+                const proofLink = t.proofUrl ? `<a href="${escapeHtml(t.proofUrl)}" target="_blank" rel="noopener">📷 Ansehen</a>` : "—";
+                const aiInfo = t.aiAnalysis ? `Labels: ${(t.aiAnalysis.labels || []).join(", ")}` : "—";
+                html += `<tr>
+                    <td>${escapeHtml(t.title || t.description || "N/A")}</td>
+                    <td><span class="${getTaskStatusClass(t.status)}">${escapeHtml(t.status || "N/A")}</span></td>
+                    <td>${proofLink}</td>
+                    <td>${escapeHtml(aiInfo)}</td>
+                    <td>${created}</td>
+                </tr>`;
+            });
+            html += "</table>";
+        } else {
+            html += "<p>Keine Tasks vorhanden.</p>";
+        }
+
+        // Usage History
+        const usageSnap = await db.collection("children").doc(childId).collection("usageHistory").orderBy("date", "desc").limit(14).get();
+        html += `<h4>Usage History (letzte ${usageSnap.size} Tage)</h4>`;
+        if (!usageSnap.empty) {
+            html += "<table><tr><th>Datum</th><th>Screen Time</th></tr>";
+            usageSnap.forEach(uDoc => {
+                const u = uDoc.data();
+                const minutes = u.totalUsageMillis ? Math.round(u.totalUsageMillis / 60000) : 0;
+                html += `<tr><td>${escapeHtml(u.date || uDoc.id)}</td><td>${minutes} Minuten</td></tr>`;
+            });
+            html += "</table>";
+        } else {
+            html += "<p>Keine Usage-Daten vorhanden.</p>";
+        }
+
+        // Link to Master
+        html += `<h4>Actions</h4>`;
+        html += `<div class="ticket-actions">`;
+        html += `<button onclick="viewUserDetails('${escapeHtml(d.masterImei || "")}')" class="btn btn-primary">Master anzeigen</button>`;
+        html += `</div>`;
+
+        content.innerHTML = html;
+    } catch (error) {
+        content.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function getTaskStatusClass(status) {
+    switch (status) {
+        case "ASSIGNED": case "pending": return "status-open";
+        case "SUBMITTED": case "pending_approval": return "status-awaiting";
+        case "APPROVED": case "approved": return "status-active";
+        case "REJECTED": return "status-expired";
+        default: return "";
+    }
+}
+
+function closeDeviceDetailsModal() {
+    const modal = document.getElementById("device-details-modal");
+    if (modal) modal.style.display = "none";
+}
+
+// ==================== PAIRING OVERVIEW ====================
+
+async function loadPairingOverview(type) {
+    const listEl = document.getElementById("pairing-list");
+    if (!listEl) return;
+    listEl.innerHTML = "<div class='loading'>Lade Pairing-Daten...</div>";
+
+    const now = firebase.firestore.Timestamp.now();
+    let allHtml = "";
+
+    try {
+        // Pairing Codes
+        if (type === "codes" || type === "all") {
+            const codesSnap = await db.collection("pairingCodes").get();
+            let activeCodes = 0, expiredCodes = 0;
+            let codesHtml = "<h4>Pairing Codes (6-stellig)</h4>";
+
+            if (codesSnap.empty) {
+                codesHtml += "<p>Keine Pairing Codes vorhanden.</p>";
+            } else {
+                codesHtml += "<table><tr><th>Code</th><th>Master ID</th><th>Erstellt</th><th>Ablauf</th><th>Status</th></tr>";
+                codesSnap.forEach(doc => {
+                    const d = doc.data();
+                    const created = d.createdAt ? new Date(d.createdAt.seconds * 1000).toLocaleString() : "N/A";
+                    const expires = d.expiresAt ? new Date(d.expiresAt.seconds * 1000).toLocaleString() : "N/A";
+                    const isExpired = d.expiresAt && d.expiresAt.seconds < now.seconds;
+                    if (isExpired) expiredCodes++; else activeCodes++;
+                    codesHtml += `<tr>
+                        <td><strong>${escapeHtml(doc.id)}</strong></td>
+                        <td>${escapeHtml((d.masterId || d.masterImei || "").substring(0, 12))}...</td>
+                        <td>${created}</td>
+                        <td>${expires}</td>
+                        <td>${isExpired ? '<span class="status-expired">Abgelaufen</span>' : '<span class="status-active">Aktiv</span>'}</td>
+                    </tr>`;
+                });
+                codesHtml += "</table>";
+            }
+            allHtml += codesHtml;
+            const acEl = document.getElementById("pairing-active-codes");
+            const ecEl = document.getElementById("pairing-expired-codes");
+            if (acEl) acEl.textContent = activeCodes;
+            if (ecEl) ecEl.textContent = expiredCodes;
+        }
+
+        // Pairing Tokens
+        if (type === "tokens" || type === "all") {
+            const tokensSnap = await db.collection("pairingTokens").get();
+            let activeTokens = 0, expiredTokens = 0;
+            let tokensHtml = "<h4>Pairing Tokens (UUID, 5 Min)</h4>";
+
+            if (tokensSnap.empty) {
+                tokensHtml += "<p>Keine Pairing Tokens vorhanden.</p>";
+            } else {
+                tokensHtml += "<table><tr><th>Token ID</th><th>Master ID</th><th>Erstellt</th><th>Ablauf</th><th>Status</th></tr>";
+                tokensSnap.forEach(doc => {
+                    const d = doc.data();
+                    const created = d.createdAt ? new Date(d.createdAt.seconds * 1000).toLocaleString() : "N/A";
+                    const expires = d.expiresAt ? new Date(d.expiresAt.seconds * 1000).toLocaleString() : "N/A";
+                    const isExpired = d.expiresAt && d.expiresAt.seconds < now.seconds;
+                    if (isExpired) expiredTokens++; else activeTokens++;
+                    tokensHtml += `<tr>
+                        <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
+                        <td>${escapeHtml((d.masterId || d.masterImei || "").substring(0, 12))}...</td>
+                        <td>${created}</td>
+                        <td>${expires}</td>
+                        <td>${isExpired ? '<span class="status-expired">Abgelaufen</span>' : '<span class="status-active">Aktiv</span>'}</td>
+                    </tr>`;
+                });
+                tokensHtml += "</table>";
+            }
+            allHtml += tokensHtml;
+            const atEl = document.getElementById("pairing-active-tokens");
+            const etEl = document.getElementById("pairing-expired-tokens");
+            if (atEl) atEl.textContent = activeTokens;
+            if (etEl) etEl.textContent = expiredTokens;
+        }
+
+        listEl.innerHTML = allHtml || "<div class='info'>Keine Daten geladen.</div>";
+    } catch (error) {
+        listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== ERROR LOGS (SEARCHABLE) ====================
+
+let errorLogLastDoc = null;
+
+async function loadErrorLogs(direction) {
+    const listEl = document.getElementById("errorlog-list");
+    if (!listEl) return;
+    listEl.innerHTML = "<div class='loading'>Lade Error Logs...</div>";
+
+    try {
+        let query = db.collection("error_logs").orderBy("timestamp", "desc").limit(PAGE_SIZE);
+        if (direction === "next" && errorLogLastDoc) {
+            query = db.collection("error_logs").orderBy("timestamp", "desc").startAfter(errorLogLastDoc).limit(PAGE_SIZE);
+        }
+
+        const dateFilter = document.getElementById("errorlog-date-filter")?.value;
+        if (dateFilter) {
+            const start = firebase.firestore.Timestamp.fromDate(new Date(dateFilter));
+            const end = firebase.firestore.Timestamp.fromDate(new Date(dateFilter + "T23:59:59"));
+            query = db.collection("error_logs")
+                .where("timestamp", ">=", start)
+                .where("timestamp", "<=", end)
+                .orderBy("timestamp", "desc")
+                .limit(PAGE_SIZE);
+        }
+
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+            listEl.innerHTML = "<div class='info'>Keine Error Logs gefunden.</div>";
+            return;
+        }
+
+        errorLogLastDoc = snapshot.docs[snapshot.docs.length - 1];
+        renderErrorLogTable(listEl, snapshot.docs);
+
+        const paginationEl = document.getElementById("errorlog-pagination");
+        if (paginationEl) {
+            paginationEl.innerHTML = snapshot.docs.length === PAGE_SIZE
+                ? `<button onclick="loadErrorLogs('next')" class="btn btn-secondary">Next Page</button>`
+                : "";
+        }
+    } catch (error) {
+        listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function searchErrorLogs() {
+    const searchQuery = (document.getElementById("errorlog-search-input")?.value || "").trim().toLowerCase();
+    const dateFilter = document.getElementById("errorlog-date-filter")?.value;
+    const listEl = document.getElementById("errorlog-list");
+    if (!listEl) return;
+
+    if (!searchQuery && !dateFilter) {
+        loadErrorLogs();
+        return;
+    }
+
+    listEl.innerHTML = "<div class='loading'>Suche Error Logs...</div>";
+
+    let query = db.collection("error_logs").orderBy("timestamp", "desc").limit(200);
+    if (dateFilter) {
+        const start = firebase.firestore.Timestamp.fromDate(new Date(dateFilter));
+        const end = firebase.firestore.Timestamp.fromDate(new Date(dateFilter + "T23:59:59"));
+        query = db.collection("error_logs")
+            .where("timestamp", ">=", start)
+            .where("timestamp", "<=", end)
+            .orderBy("timestamp", "desc")
+            .limit(200);
+    }
+
+    query.get().then(snapshot => {
+        const filtered = [];
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            const funcName = (d.functionName || "").toLowerCase();
+            const msg = (d.message || "").toLowerCase();
+            if (!searchQuery || funcName.includes(searchQuery) || msg.includes(searchQuery)) {
+                filtered.push(doc);
+            }
+        });
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = "<div class='info'>Keine passenden Error Logs gefunden.</div>";
+            return;
+        }
+
+        renderErrorLogTable(listEl, filtered);
+        showNotification(`${filtered.length} Error Log(s) gefunden.`, "success");
+    }).catch(error => {
+        listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    });
+}
+
+function renderErrorLogTable(container, docs) {
+    let html = "<table><tr><th>Zeitpunkt</th><th>Funktion</th><th>Fehlermeldung</th><th>User</th><th>Severity</th></tr>";
+    docs.forEach(doc => {
+        const d = typeof doc.data === "function" ? doc.data() : doc;
+        const ts = d.timestamp ? new Date(d.timestamp.seconds * 1000).toLocaleString() : "N/A";
+        const funcName = d.functionName || "N/A";
+        const msg = (d.message || "N/A").substring(0, 80);
+        const userId = d.userId || d.uid || "N/A";
+        const severity = d.severity || "error";
+        html += `<tr>
+            <td>${ts}</td>
+            <td>${escapeHtml(funcName)}</td>
+            <td title="${escapeHtml(d.message || "")}">${escapeHtml(msg)}${(d.message || "").length > 80 ? "..." : ""}</td>
+            <td>${escapeHtml(userId.substring(0, 12))}</td>
+            <td><span class="status-expired">${escapeHtml(severity)}</span></td>
+        </tr>`;
+    });
+    html += "</table>";
+    container.innerHTML = html;
+}
+
+// ==================== PERFORMANCE METRICS ====================
+
+async function loadPerformanceMetrics() {
+    const container = document.getElementById("performance-metrics");
+    if (!container) return;
+    container.innerHTML = "<div class='loading'>Lade Performance-Metriken...</div>";
+
+    try {
+        const snapshot = await db.collection("performance_metrics")
+            .orderBy("timestamp", "desc")
+            .limit(20)
+            .get();
+
+        if (snapshot.empty) {
+            container.innerHTML = "<div class='info'>Keine Performance-Metriken vorhanden.</div>";
+            return;
+        }
+
+        let html = "<table><tr><th>Funktion</th><th>Dauer (ms)</th><th>Status</th><th>Zeitpunkt</th></tr>";
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            const ts = d.timestamp ? new Date(d.timestamp.seconds * 1000).toLocaleString() : "N/A";
+            const duration = d.duration || d.executionTimeMs || "N/A";
+            const status = d.success === true ? '<span class="status-active">OK</span>' : d.success === false ? '<span class="status-expired">FAIL</span>' : "N/A";
+            html += `<tr>
+                <td>${escapeHtml(d.functionName || d.action || "N/A")}</td>
+                <td>${duration}</td>
+                <td>${status}</td>
+                <td>${ts}</td>
+            </tr>`;
+        });
+        html += "</table>";
+        container.innerHTML = html;
+    } catch (error) {
+        container.innerHTML = `<div class='info'>Performance-Metriken nicht verfügbar (${escapeHtml(error.message)}).</div>`;
+    }
+}
+
+// ==================== SUBSCRIPTION EXPIRY WARNINGS ====================
+
+async function loadSubscriptionWarnings() {
+    const container = document.getElementById("subscription-warnings");
+    if (!container) return;
+
+    try {
+        const now = new Date();
+        const warningThreshold = new Date();
+        warningThreshold.setDate(warningThreshold.getDate() + 7); // 7 days warning
+
+        const mastersSnap = await db.collection("masters").get();
+        const warnings = [];
+
+        mastersSnap.forEach(doc => {
+            const d = doc.data();
+            const sub = d.subscription;
+            if (!sub) return;
+
+            // Trial expiry warning
+            if (sub.status === "trial" && sub.trialEndsAt) {
+                const trialEnd = new Date(sub.trialEndsAt.seconds * 1000);
+                if (trialEnd < warningThreshold) {
+                    const isExpired = trialEnd < now;
+                    warnings.push({
+                        masterId: doc.id,
+                        email: d.email || "N/A",
+                        type: "Trial",
+                        expiresAt: trialEnd,
+                        expired: isExpired
+                    });
+                }
+            }
+
+            // Subscription expiry warning
+            if ((sub.status === "active") && sub.expiresAt) {
+                const expiresAt = new Date(sub.expiresAt.seconds * 1000);
+                if (expiresAt < warningThreshold) {
+                    const isExpired = expiresAt < now;
+                    warnings.push({
+                        masterId: doc.id,
+                        email: d.email || "N/A",
+                        type: sub.type || "Abo",
+                        expiresAt: expiresAt,
+                        expired: isExpired
+                    });
+                }
+            }
+        });
+
+        if (warnings.length === 0) {
+            container.innerHTML = "";
+            return;
+        }
+
+        warnings.sort((a, b) => a.expiresAt - b.expiresAt);
+
+        let html = `<div class="compliance-section" style="border-inline-start: 4px solid #ffc107; padding: 15px; margin-block-end: 15px">`;
+        html += `<h3 style="margin-block-start:0; color:#b45309">⚠️ Subscription-Ablauf-Warnungen (${warnings.length})</h3>`;
+        html += "<table><tr><th>User</th><th>Email</th><th>Typ</th><th>Ablauf</th><th>Status</th></tr>";
+        warnings.forEach(w => {
+            const statusBadge = w.expired
+                ? '<span class="status-expired">ABGELAUFEN</span>'
+                : '<span class="status-open">Läuft bald ab</span>';
+            html += `<tr>
+                <td><a href="#" onclick="viewUserDetails('${escapeHtml(w.masterId)}'); return false;">${escapeHtml(w.masterId.substring(0, 12))}...</a></td>
+                <td>${escapeHtml(w.email)}</td>
+                <td>${escapeHtml(w.type)}</td>
+                <td>${w.expiresAt.toLocaleDateString()}</td>
+                <td>${statusBadge}</td>
+            </tr>`;
+        });
+        html += "</table></div>";
+        container.innerHTML = html;
+    } catch (error) {
+        container.innerHTML = "";
+    }
+}
+
+// ==================== ADMIN CLAIM MANAGEMENT ====================
+
+async function grantAdminClaim() {
+    const uid = (document.getElementById("admin-target-uid")?.value || "").trim();
+    const resultEl = document.getElementById("admin-claim-result");
+    if (!uid) {
+        showNotification("Bitte eine User UID eingeben.", "info");
+        return;
+    }
+
+    if (!confirm(`Admin-Claim für UID "${uid}" setzen?`)) return;
+
+    if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Admin-Claim...</div>";
+
+    try {
+        const setAdminFunc = functions.httpsCallable("setAdminClaim");
+        await setAdminFunc({ uid: uid });
+        if (resultEl) resultEl.innerHTML = `<div class='success-box'>Admin-Claim erfolgreich für ${escapeHtml(uid)} gesetzt.</div>`;
+        showNotification("Admin-Claim gesetzt.", "success");
+    } catch (error) {
+        if (resultEl) resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+        showNotification("Fehler: " + error.message, "error");
+    }
+}
+
 // ==================== UTILITY ====================
 
 function showNotification(message, type) {
@@ -1209,6 +1899,8 @@ function escapeHtml(text) {
 window.onclick = function(event) {
     const userModal = document.getElementById("user-details-modal");
     const ticketModal = document.getElementById("ticket-details-modal");
+    const deviceModal = document.getElementById("device-details-modal");
     if (event.target === userModal) userModal.style.display = "none";
     if (event.target === ticketModal) ticketModal.style.display = "none";
+    if (event.target === deviceModal) deviceModal.style.display = "none";
 };
