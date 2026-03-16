@@ -527,6 +527,118 @@ input[type="text"] {
     background: #f0fdf4;
 }
 
+/* ==================== GO-LIVE AMPEL ==================== */
+
+.golive-ampel-card {
+    border-radius: 10px;
+    padding: 18px;
+    border: 2px solid #cbd5e1;
+    background: #f8fafc;
+}
+.golive-ampel-card.ampel-green { border-color: #22c55e; background: #f0fdf4; }
+.golive-ampel-card.ampel-yellow { border-color: #eab308; background: #fefce8; }
+.golive-ampel-card.ampel-red { border-color: #ef4444; background: #fef2f2; }
+
+.ampel-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-block-end: 14px;
+}
+.ampel-light {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px 2px rgba(0,0,0,0.08);
+}
+.ampel-light-green { background: #22c55e; box-shadow: 0 0 12px 3px rgba(34,197,94,0.35); }
+.ampel-light-yellow { background: #eab308; box-shadow: 0 0 12px 3px rgba(234,179,8,0.35); }
+.ampel-light-red { background: #ef4444; box-shadow: 0 0 12px 3px rgba(239,68,68,0.35); }
+
+.ampel-title h4 { margin: 0; font-size: 1.1rem; }
+.ampel-title p { margin: 2px 0 0; color: #475569; font-size: 0.92rem; }
+
+.ampel-summary {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-block-end: 14px;
+    padding: 10px 0;
+    border-block-start: 1px solid #e2e8f0;
+    border-block-end: 1px solid #e2e8f0;
+}
+.ampel-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+}
+.ampel-stat strong { font-size: 1.05rem; color: #0f172a; }
+.ampel-stat span { font-size: 0.78rem; color: #64748b; }
+
+.ampel-platforms h5 { margin: 0 0 8px; font-size: 0.95rem; }
+
+.ampel-platform-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-block-end: 6px;
+}
+.ampel-platform-label { min-width: 200px; font-size: 0.88rem; color: #334155; }
+.ampel-platform-pct { min-width: 38px; text-align: end; font-weight: 600; font-size: 0.88rem; }
+.ampel-platform-detail { font-size: 0.78rem; color: #64748b; }
+
+.ampel-progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.ampel-progress-bar-lg { height: 12px; border-radius: 6px; }
+.ampel-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.3s ease;
+}
+
+.ampel-total-bar {
+    margin-block-start: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.ampel-total-pct { font-weight: 600; font-size: 0.92rem; white-space: nowrap; }
+
+/* ==================== PLATFORM READINESS CHECKLISTS ==================== */
+
+.platform-checklist-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-block-end: 2px;
+}
+.platform-checklist-item:hover { background: #f1f5f9; }
+.platform-checklist-item input[type="checkbox"] { margin-block-start: 3px; flex-shrink: 0; }
+.platform-checklist-item label { cursor: pointer; font-size: 0.9rem; line-height: 1.4; }
+
+.severity-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-inline-end: 4px;
+}
+.severity-critical { background: #fecaca; color: #991b1b; }
+.severity-high { background: #fed7aa; color: #9a3412; }
+.severity-medium { background: #fef08a; color: #854d0e; }
+.severity-low { background: #d1fae5; color: #065f46; }
+
 .code-block {
     margin: 0;
     padding: 12px;
