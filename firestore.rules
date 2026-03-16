@@ -57,7 +57,7 @@ service cloud.firestore {
     // 3. Admins (for support purposes)
     match /children/{childId} {
       allow read: if isSignedIn() && (
-        resource.data.masterImei == request.auth.uid || 
+        resource.data.masterImei == request.auth.uid ||
         childId == request.auth.uid ||
         isAdmin()
       );
@@ -77,20 +77,20 @@ service cloud.firestore {
       function getChild() {
         return get(/databases/$(database)/documents/children/$(childId));
       }
-      
+
       function isMasterOfChild() {
         return isSignedIn() && getChild().data.masterImei == request.auth.uid;
       }
-      
+
       function isChildDevice() {
         return isSignedIn() && childId == request.auth.uid;
       }
-      
+
       allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
       allow create: if isMasterOfChild(); // Only master can create tasks
       allow update: if isMasterOfChild() || isChildDevice(); // Both can update (child submits proof, master reviews)
       allow delete: if isMasterOfChild(); // Only master can delete tasks
-      
+
       // Validate task data structure when writing
       allow create, update: if isSignedIn()
         && request.resource.data.keys().hasOnly(['title', 'description', 'status', 'proofUrl', 'createdAt', 'updatedAt', 'assignedAt', 'submittedAt', 'reviewedAt', 'unlockDuration', 'masterImei'])
@@ -137,10 +137,10 @@ service cloud.firestore {
       function getChildForHistory() {
         return get(/databases/$(database)/documents/children/$(childId));
       }
-      
+
       allow read: if isSignedIn() && (getChildForHistory().data.masterImei == request.auth.uid || childId == request.auth.uid || isAdmin());
       allow write: if isSignedIn() && childId == request.auth.uid; // Only child can report usage
-      
+
       // Validate usage history data structure
       allow create, update: if isSignedIn()
         && request.resource.data.keys().hasOnly(['date', 'totalUsageMillis', 'updatedAt'])
@@ -179,6 +179,12 @@ service cloud.firestore {
     match /error_logs/{errorId} {
       allow read: if isAdmin();
       allow write: if false; // Only Cloud Functions can write
+    }
+
+    // --- OPERATOR CONFIG COLLECTION ---
+    // Runtime configuration for operator dashboard (cloud + AI settings)
+    match /operatorConfig/{docId} {
+      allow read, write: if isAdmin();
     }
   }
 }
