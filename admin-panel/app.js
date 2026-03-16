@@ -33,6 +33,24 @@ const setupChecklistItems = [
     { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" }
 ];
 
+
+const defaultOperatorConfig = {
+    cloud: {
+        projectId: "",
+        region: "europe-west1",
+        appCheckMode: "enforced",
+        releaseChannel: "prod"
+    },
+    ai: {
+        provider: "openai",
+        model: "gpt-5-mini",
+        temperature: 0.3,
+        endpoint: "",
+        keyRef: "",
+        systemPrompt: "Du unterstützt Operatoren beim Bearbeiten von Support-Tickets präzise und datenschutzkonform."
+    }
+};
+
 document.addEventListener("DOMContentLoaded", function() {
     try {
         app = firebase.initializeApp(firebaseConfig);
@@ -124,6 +142,7 @@ function switchTab(tabName, evt) {
 
 function initializeSetupAssistant() {
     renderSetupChecklist();
+    loadOperatorConfig();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
@@ -160,6 +179,113 @@ function renderSetupChecklist() {
 
         checklistEl.appendChild(wrapper);
     });
+}
+
+function getOperatorConfigDocRef() {
+    return db.collection("operatorConfig").doc("global");
+}
+
+function getOperatorConfigFormValues() {
+    const tempValue = parseFloat(document.getElementById("cfg-ai-temperature")?.value || "0.3");
+
+    return {
+        cloud: {
+            projectId: (document.getElementById("cfg-cloud-project-id")?.value || "").trim(),
+            region: (document.getElementById("cfg-cloud-region")?.value || "").trim(),
+            appCheckMode: (document.getElementById("cfg-cloud-appcheck")?.value || "").trim(),
+            releaseChannel: (document.getElementById("cfg-cloud-release-channel")?.value || "").trim()
+        },
+        ai: {
+            provider: (document.getElementById("cfg-ai-provider")?.value || "").trim(),
+            model: (document.getElementById("cfg-ai-model")?.value || "").trim(),
+            temperature: Number.isFinite(tempValue) ? tempValue : 0.3,
+            endpoint: (document.getElementById("cfg-ai-endpoint")?.value || "").trim(),
+            keyRef: (document.getElementById("cfg-ai-key-ref")?.value || "").trim(),
+            systemPrompt: (document.getElementById("cfg-ai-system-prompt")?.value || "").trim()
+        }
+    };
+}
+
+function renderOperatorConfig(config, loadedAt) {
+    const merged = {
+        cloud: { ...defaultOperatorConfig.cloud, ...(config?.cloud || {}) },
+        ai: { ...defaultOperatorConfig.ai, ...(config?.ai || {}) }
+    };
+
+    document.getElementById("cfg-cloud-project-id").value = merged.cloud.projectId || "";
+    document.getElementById("cfg-cloud-region").value = merged.cloud.region || "";
+    document.getElementById("cfg-cloud-appcheck").value = merged.cloud.appCheckMode || "";
+    document.getElementById("cfg-cloud-release-channel").value = merged.cloud.releaseChannel || "";
+
+    document.getElementById("cfg-ai-provider").value = merged.ai.provider || "";
+    document.getElementById("cfg-ai-model").value = merged.ai.model || "";
+    document.getElementById("cfg-ai-temperature").value = String(merged.ai.temperature ?? 0.3);
+    document.getElementById("cfg-ai-endpoint").value = merged.ai.endpoint || "";
+    document.getElementById("cfg-ai-key-ref").value = merged.ai.keyRef || "";
+    document.getElementById("cfg-ai-system-prompt").value = merged.ai.systemPrompt || "";
+
+    const status = document.getElementById("operator-config-status");
+    if (status) {
+        status.innerHTML = `<div class='info'>Konfiguration geladen (${loadedAt ? new Date(loadedAt).toLocaleString() : "lokale Defaults"}).</div>`;
+    }
+}
+
+async function loadOperatorConfig() {
+    const status = document.getElementById("operator-config-status");
+    if (status) status.innerHTML = "<div class='loading'>Lade Konfiguration...</div>";
+
+    try {
+        const doc = await getOperatorConfigDocRef().get();
+        const data = doc.exists ? doc.data() : defaultOperatorConfig;
+        const loadedAt = doc.exists && data.updatedAt?.seconds ? data.updatedAt.seconds * 1000 : null;
+        renderOperatorConfig(data, loadedAt);
+        if (!doc.exists) {
+            showNotification("No persisted operator config found. Using defaults.", "success");
+        }
+    } catch (error) {
+        if (status) status.innerHTML = `<div class='error'>Fehler beim Laden: ${escapeHtml(error.message)}</div>`;
+        showNotification("Failed to load operator config: " + error.message, "error");
+    }
+}
+
+async function saveOperatorConfig() {
+    const status = document.getElementById("operator-config-status");
+    if (status) status.innerHTML = "<div class='loading'>Speichere Konfiguration...</div>";
+
+    try {
+        const values = getOperatorConfigFormValues();
+        await getOperatorConfigDocRef().set({
+            ...values,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: auth.currentUser ? auth.currentUser.uid : "unknown"
+        }, { merge: true });
+
+        if (status) {
+            status.innerHTML = "<div class='success-box'>Konfiguration erfolgreich gespeichert.</div>";
+        }
+        showNotification("Operator configuration saved.", "success");
+    } catch (error) {
+        if (status) status.innerHTML = `<div class='error'>Fehler beim Speichern: ${escapeHtml(error.message)}</div>`;
+        showNotification("Failed to save operator config: " + error.message, "error");
+    }
+}
+
+function testAiConfiguration() {
+    const status = document.getElementById("operator-config-status");
+    const values = getOperatorConfigFormValues();
+    const isValid = Boolean(values.ai.provider && values.ai.model && values.ai.systemPrompt && values.ai.keyRef);
+
+    if (!status) return;
+
+    if (!isValid) {
+        status.innerHTML = "<div class='error'>KI-Test fehlgeschlagen: provider, model, keyRef und systemPrompt sind erforderlich.</div>";
+        showNotification("AI configuration test failed.", "error");
+        return;
+    }
+
+    const preview = `${values.ai.provider}/${values.ai.model}, temp=${values.ai.temperature}`;
+    status.innerHTML = `<div class='success-box'>KI-Konfiguration valide. Test-Payload: ${escapeHtml(preview)}</div>`;
+    showNotification("AI configuration looks valid.", "success");
 }
 
 async function runFullSetupValidation() {
@@ -224,6 +350,22 @@ async function runFullSetupValidation() {
                 message: "Access failed: " + error.message
             });
         }
+    }
+
+    // Check 3b: Runtime configuration document
+    try {
+        await getOperatorConfigDocRef().get();
+        setupValidationResults.push({
+            check: "Runtime Configuration (operatorConfig/global)",
+            status: "ok",
+            message: "Configuration document readable."
+        });
+    } catch (error) {
+        setupValidationResults.push({
+            check: "Runtime Configuration (operatorConfig/global)",
+            status: "error",
+            message: "Could not read config document: " + error.message
+        });
     }
 
     // Check 4: Callable functions reachability
@@ -345,6 +487,10 @@ function generateOperatorAssistantAnswer(question) {
         return "Support-Workflow: 1) Ticketliste laden, 2) Ticketdetail öffnen, 3) Admin-Response speichern, 4) Statuswechsel testen (in_progress/closed). KI-Antworten im Ticketdetail samt Confidence prüfen und dokumentieren.";
     }
 
+    if (q.includes("konfiguration") || q.includes("configuration") || q.includes("runtime") || q.includes("cloud-dienst")) {
+        return "Runtime-Konfiguration: Im Tab 'Cloud Integration & Operator Assistant' den Block 'Runtime Configuration (Cloud + KI)' nutzen. Erst Konfiguration laden, dann Cloud- und KI-Felder pflegen, speichern und mit 'Test KI-Konfiguration' plausibilisieren.";
+    }
+
     if (q.includes("compliance") || q.includes("dsar") || q.includes("audit")) {
         return "Compliance-Flow: DSAR Export für Test-Master auslösen, Audit-Logs für Zeitraum exportieren, Ergebnisse archivieren. Danach Setup-Report exportieren und als Betriebsnachweis ablegen.";
     }
@@ -368,7 +514,7 @@ function refreshAllStats() {
 
 function loadStats() {
     // Show loading indicators
-    const statIds = ["stat-total-users", "stat-active-subs", "stat-total-tasks", "stat-open-tickets", "stat-total-children", "stat-errors-24h"];
+    const statIds = ["stat-total-users", "stat-current-revenue", "stat-active-subs", "stat-total-tasks", "stat-open-tickets", "stat-total-children", "stat-errors-24h"];
     statIds.forEach(id => {
         document.getElementById(id).innerHTML = "<span class='loading-spinner'></span>";
     });
@@ -383,8 +529,22 @@ function loadStats() {
     // 2. Active Subscriptions
     db.collection("masters").where("subscription.status", "==", "active").get().then(snapshot => {
         document.getElementById("stat-active-subs").textContent = snapshot.size;
+
+        // 2b. Current Revenue (monthly recurring approximation)
+        let monthlyRevenue = 0;
+        snapshot.forEach(doc => {
+            const subscriptionType = doc.data().subscription?.type || "";
+
+            if (subscriptionType === "single_child_monthly") monthlyRevenue += 1.99;
+            else if (subscriptionType === "family_monthly") monthlyRevenue += 4.99;
+            else if (subscriptionType === "single_child_yearly") monthlyRevenue += 19.99 / 12;
+            else if (subscriptionType === "family_yearly") monthlyRevenue += 49.99 / 12;
+        });
+
+        document.getElementById("stat-current-revenue").textContent = `€${monthlyRevenue.toFixed(2)}`;
     }).catch(() => {
         document.getElementById("stat-active-subs").textContent = "Error";
+        document.getElementById("stat-current-revenue").textContent = "Error";
     });
 
     // 3. Total Tasks
