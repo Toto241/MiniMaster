@@ -372,21 +372,12 @@ async function runFullSetupValidation() {
         });
     }
 
-    // Check 4: Callable functions reachability (ALL critical functions)
+    // Check 4: Callable functions reachability (safe, no destructive side effects)
     const functionChecks = [
-        { name: "revokeSubscription", payload: { masterId: "health-check" } },
-        { name: "exportUserData", payload: { masterId: "health-check" } },
-        { name: "deleteUserAccount", payload: {} },
-        { name: "setAdminClaim", payload: { uid: "health-check" } },
-        { name: "registerMasterDevice", payload: { imei: "health-check" } },
-        { name: "generateCustomToken", payload: {} },
-        { name: "revokeUserTokens", payload: { uid: "health-check" } },
-        { name: "createPairingCode", payload: {} },
+        { name: "adminHealthCheck", payload: {} },
+        { name: "getSubscriptionStatus", payload: {} },
         { name: "validatePairingCode", payload: { pairingCode: "000000" } },
-        { name: "setDeviceLocked", payload: { childId: "health-check", isLocked: false } },
-        { name: "updateAppBlacklist", payload: { childId: "health-check", appBlacklist: [] } },
-        { name: "verifyPurchase", payload: { purchaseToken: "health-check", sku: "test" } },
-        { name: "createSupportTicket", payload: { problemDescription: "health-check" } },
+        { name: "exportUserData", payload: { masterId: "health-check" } },
     ];
 
     for (const fn of functionChecks) {
@@ -405,7 +396,7 @@ async function runFullSetupValidation() {
                 check: `Function (${fn.name})`,
                 status: exists ? "warn" : "error",
                 message: exists
-                    ? "Function reachable but returned business/auth error (expected in health-check mode)."
+                    ? "Function reachable but returned business/auth error (expected in safe health-check mode)."
                     : "Function endpoint not found."
             });
         }
@@ -1480,7 +1471,8 @@ async function viewDeviceDetails(childId) {
             tasksSnap.forEach(taskDoc => {
                 const t = taskDoc.data();
                 const created = t.createdAt ? new Date(t.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
-                const proofLink = t.proofUrl ? `<a href="${escapeHtml(t.proofUrl)}" target="_blank" rel="noopener">📷 Ansehen</a>` : "—";
+                const proofUrl = t.photoUrl || t.proofUrl;
+                const proofLink = proofUrl ? `<a href="${escapeHtml(proofUrl)}" target="_blank" rel="noopener">📷 Ansehen</a>` : "—";
                 const aiInfo = t.aiAnalysis ? `Labels: ${(t.aiAnalysis.labels || []).join(", ")}` : "—";
                 html += `<tr>
                     <td>${escapeHtml(t.title || t.description || "N/A")}</td>

@@ -147,48 +147,66 @@ export const getSubscriptionStatus = functions.https.onCall(
  * Revokes a subscription (admin-only).
  */
 export const revokeSubscription = functions.https.onCall(
-  async (data: { subscriptionId: string }, context: CallableContext) => {
+  async (data: { subscriptionId?: string; masterId?: string }, context: CallableContext) => {
     const startTime = Date.now();
 
     try {
       requireAdmin(context);
       const adminUid = context.auth?.uid;
 
-      const subscriptionId = data.subscriptionId;
-      if (!subscriptionId) {
-        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a subscriptionId.");
+      let subscriptionId = data.subscriptionId;
+      const targetMasterId = data.masterId;
+
+      if (!subscriptionId && !targetMasterId) {
+        throw new functions.https.HttpsError("invalid-argument", "The function must be called with subscriptionId or masterId.");
       }
 
-      const subDoc = await db().collection("subscriptions").doc(subscriptionId).get();
-      if (!subDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "Subscription not found.");
+      if (!subscriptionId && targetMasterId) {
+        const candidate = await db().collection("subscriptions")
+          .where("masterId", "==", targetMasterId)
+          .limit(1)
+          .get();
+        if (!candidate.empty) {
+          subscriptionId = candidate.docs[0].id;
+        }
       }
-      const masterId = subDoc.data()?.masterId;
 
-      await db().collection("subscriptions").doc(subscriptionId).update({
-        status: "revoked",
-        revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-        revokedBy: adminUid ?? "unknown-admin",
-      });
+      let masterId = targetMasterId;
 
-      if (masterId) {
-        await db().collection("masters").doc(masterId).update({
-          isPremium: false,
-          "subscription.status": "revoked",
-          "subscription.revokedAt": admin.firestore.FieldValue.serverTimestamp(),
+      if (subscriptionId) {
+        const subDoc = await db().collection("subscriptions").doc(subscriptionId).get();
+        if (!subDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "Subscription not found.");
+        }
+        masterId = masterId || subDoc.data()?.masterId;
+
+        await db().collection("subscriptions").doc(subscriptionId).update({
+          status: "revoked",
+          revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+          revokedBy: adminUid ?? "unknown-admin",
         });
       }
 
+      if (!masterId) {
+        throw new functions.https.HttpsError("not-found", "Master account not found for subscription revocation.");
+      }
+
+      await db().collection("masters").doc(masterId).update({
+        isPremium: false,
+        "subscription.status": "revoked",
+        "subscription.revokedAt": admin.firestore.FieldValue.serverTimestamp(),
+      });
+
       await AuditLogger.logSuccess(
-        "admin.revoke_subscription", context, `subscriptions/${subscriptionId}`, "subscription",
+        "admin.revoke_subscription", context, subscriptionId ? `subscriptions/${subscriptionId}` : `masters/${masterId}`, "subscription",
         { subscriptionId, masterId, duration: Date.now() - startTime }
       );
 
-      return { message: `Subscription ${subscriptionId} successfully revoked.` };
+      return { message: subscriptionId ? `Subscription ${subscriptionId} successfully revoked.` : `Subscription status for master ${masterId} successfully revoked.` };
     } catch (error) {
       await AuditLogger.logFailure(
-        "admin.revoke_subscription", context, `subscriptions/${data.subscriptionId}`, "subscription",
-        error as Error, { subscriptionId: data.subscriptionId }
+        "admin.revoke_subscription", context, `subscriptions/${data.subscriptionId || "unknown"}`, "subscription",
+        error as Error, { subscriptionId: data.subscriptionId, masterId: data.masterId }
       );
       console.error("Error revoking subscription:", error);
       if (error instanceof functions.https.HttpsError) throw error;

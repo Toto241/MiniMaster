@@ -8,44 +8,56 @@ import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 
+async function deleteMasterAccountById(masterId: string, context: CallableContext, startTime: number) {
+  const masterDeviceRef = db().collection("masters").doc(masterId);
+  const masterDoc = await masterDeviceRef.get();
+  if (!masterDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "Master account not found.");
+  }
+
+  const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
+  const deleteChildrenPromises = childrenSnapshot.docs.map((doc) => doc.ref.delete());
+  await Promise.all(deleteChildrenPromises);
+
+  const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterId).get();
+  const deleteTasksPromises = tasksSnapshot.docs.map((doc) => doc.ref.delete());
+  await Promise.all(deleteTasksPromises);
+
+  const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
+  const deleteSubsPromises = subsSnapshot.docs.map((doc) => doc.ref.delete());
+  await Promise.all(deleteSubsPromises);
+
+  await masterDeviceRef.delete();
+  await admin.auth().deleteUser(masterId);
+
+  await AuditLogger.logSuccess(
+    "device.delete", context, `masters/${masterId}`, "device",
+    {
+      masterId, childrenDeleted: childrenSnapshot.size,
+      tasksDeleted: tasksSnapshot.size, subscriptionsDeleted: subsSnapshot.size,
+      duration: Date.now() - startTime,
+    }
+  );
+}
+
 /**
  * Deletes a user account and all associated data.
  */
 export const deleteUserAccount = functions.https.onCall(
-  async (_data: Record<string, never>, context: CallableContext) => {
+  async (data: { masterId?: string }, context: CallableContext) => {
     const startTime = Date.now();
-    const masterId = requireAuth(context);
-    const masterDeviceRef = db().collection("masters").doc(masterId);
+    const callerId = requireAuth(context);
+    const isAdmin = context.auth?.token?.role === "admin";
+
+    let masterId = callerId;
+    if (isAdmin && data?.masterId && typeof data.masterId === "string") {
+      masterId = data.masterId;
+    } else if (!isAdmin && data?.masterId && data.masterId !== callerId) {
+      throw new functions.https.HttpsError("permission-denied", "Users can only delete their own account.");
+    }
 
     try {
-      const masterDoc = await masterDeviceRef.get();
-      if (!masterDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "Master account not found.");
-      }
-
-      const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
-      const deleteChildrenPromises = childrenSnapshot.docs.map((doc) => doc.ref.delete());
-      await Promise.all(deleteChildrenPromises);
-
-      const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterId).get();
-      const deleteTasksPromises = tasksSnapshot.docs.map((doc) => doc.ref.delete());
-      await Promise.all(deleteTasksPromises);
-
-      const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
-      const deleteSubsPromises = subsSnapshot.docs.map((doc) => doc.ref.delete());
-      await Promise.all(deleteSubsPromises);
-
-      await masterDeviceRef.delete();
-      await admin.auth().deleteUser(masterId);
-
-      await AuditLogger.logSuccess(
-        "device.delete", context, `masters/${masterId}`, "device",
-        {
-          masterId, childrenDeleted: childrenSnapshot.size,
-          tasksDeleted: tasksSnapshot.size, subscriptionsDeleted: subsSnapshot.size,
-          duration: Date.now() - startTime,
-        }
-      );
+      await deleteMasterAccountById(masterId, context, startTime);
 
       functions.logger.info(`User account and all associated data deleted for master ${masterId}.`);
       return { success: true };
@@ -57,6 +69,38 @@ export const deleteUserAccount = functions.https.onCall(
       functions.logger.error(`Failed to delete user account for master ${masterId}:`, error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while deleting the user account.", error);
     }
+  }
+);
+
+/**
+ * Safe admin health check for the operator dashboard (read-only, no side effects).
+ */
+export const adminHealthCheck = functions.https.onCall(
+  async (_data: Record<string, never>, context: CallableContext) => {
+    requireAdmin(context);
+
+    const collections = ["masters", "children", "supportTickets", "audit_logs", "operatorConfig"];
+    const checks: Record<string, string> = {};
+
+    for (const collectionName of collections) {
+      try {
+        await db().collection(collectionName).limit(1).get();
+        checks[collectionName] = "ok";
+      } catch (error) {
+        checks[collectionName] = `error: ${(error as Error).message}`;
+      }
+    }
+
+    return {
+      ok: true,
+      timestamp: new Date().toISOString(),
+      checks,
+      functions: {
+        validatePairingCode: true,
+        getSubscriptionStatus: true,
+        exportUserData: true,
+      },
+    };
   }
 );
 

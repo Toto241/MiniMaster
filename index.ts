@@ -36,5 +36,5 @@ export {
 export { onChildDeviceUpdateV2, analyzeTaskPhoto, onTaskStatusChange } from "./src/triggers";
 
 // Admin (account deletion, error reports, DSAR export)
-export { deleteUserAccount, sendDailyErrorReport, exportUserData } from "./src/admin";
+export { deleteUserAccount, sendDailyErrorReport, exportUserData, adminHealthCheck } from "./src/admin";
 
