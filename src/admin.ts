@@ -5,7 +5,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { db } from "../firebase";
+import { db, storage } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 
 async function deleteMasterAccountById(masterId: string, context: CallableContext, startTime: number) {
@@ -91,10 +91,32 @@ export const adminHealthCheck = functions.https.onCall(
       }
     }
 
+    let storageStatus = "ok";
+    let storageBucketName: string | null = null;
+    try {
+      storageBucketName = storage().bucket().name || null;
+      await storage().bucket().getMetadata();
+    } catch (error) {
+      storageStatus = `error: ${(error as Error).message}`;
+    }
+
     return {
       ok: true,
       timestamp: new Date().toISOString(),
       checks,
+      prerequisites: {
+        storage: storageStatus,
+        storageBucket: storageBucketName,
+        ai: {
+          geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+          geminiModel: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+          openAiConfigured: Boolean(process.env.OPENAI_API_KEY),
+        },
+        environment: {
+          projectId: process.env.GCLOUD_PROJECT || process.env.FIREBASE_CONFIG || null,
+          functionsEmulator: process.env.FUNCTIONS_EMULATOR === "true",
+        },
+      },
       functions: {
         validatePairingCode: true,
         getSubscriptionStatus: true,

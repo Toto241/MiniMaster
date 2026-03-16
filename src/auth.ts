@@ -88,13 +88,33 @@ export const setUserRole = functions.https.onCall(
 );
 
 /**
- * Issues a fresh Firebase custom token for the currently authenticated user.
- * Supports token rotation and includes current custom claims.
+ * Issues a fresh Firebase custom token for either:
+ * 1. the currently authenticated user, or
+ * 2. a master authenticated via masterImei + secretKey (web-control login).
  */
 export const generateCustomToken = functions.https.onCall(
-  async (_data: Record<string, never>, context: CallableContext) => {
+  async (data: { masterImei?: string; secretKey?: string }, context: CallableContext) => {
     const startTime = Date.now();
-    const uid = requireAuth(context);
+    let uid: string;
+
+    if (context.auth) {
+      uid = context.auth.uid;
+    } else {
+      const { masterImei, secretKey } = data || {};
+      if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Either authenticated context or valid masterImei/secretKey is required."
+        );
+      }
+
+      const masterDoc = await db().collection("masters").doc(masterImei).get();
+      if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+        throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
+      }
+
+      uid = masterImei;
+    }
 
     try {
       const user = await admin.auth().getUser(uid);
@@ -107,16 +127,20 @@ export const generateCustomToken = functions.https.onCall(
         });
       } catch { /* doc may not exist yet or db unavailable */ }
 
-      await AuditLogger.logSuccess(
-        "auth.token_generated", context, `users/${uid}`, "user",
-        { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime }
-      );
+      if (context.auth) {
+        await AuditLogger.logSuccess(
+          "auth.token_generated", context, `users/${uid}`, "user",
+          { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime }
+        );
+      }
 
       return { customToken };
     } catch (error) {
-      await AuditLogger.logFailure(
-        "auth.token_generated", context, `users/${uid}`, "user", error as Error
-      );
+      if (context.auth) {
+        await AuditLogger.logFailure(
+          "auth.token_generated", context, `users/${uid}`, "user", error as Error
+        );
+      }
       functions.logger.error("Error generating custom token:", error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while generating the token.", error);
     }
