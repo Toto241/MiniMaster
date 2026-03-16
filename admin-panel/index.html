@@ -524,6 +524,8 @@
                             <div class="setup-actions" style="margin-block-start: 12px">
                                 <button onclick="refreshCommandBuilderCommands()" class="btn btn-primary">Befehle generieren</button>
                                 <button onclick="saveCommandBuilderConfig()" class="btn btn-secondary">Vorgaben speichern</button>
+                                <button onclick="copyRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-secondary">Rollout-PS kopieren</button>
+                                <button onclick="downloadRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-primary">Rollout-PS herunterladen</button>
                             </div>
 
                             <div id="command-builder-status" class="data-list" style="margin-block-start: 15px">
