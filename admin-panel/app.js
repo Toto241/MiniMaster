@@ -249,6 +249,53 @@ function renderCommandBlockHtml(entry) {
     `;
 }
 
+function buildRolloutBundleScript(projectId) {
+    const commands = buildCommandCatalog(projectId);
+    const values = getCommandBuilderFormValues();
+    const header = [
+        "$ErrorActionPreference = \"Stop\"",
+        `Set-Location -Path \"${escapePowerShellString(values.workspacePath)}\"`,
+        "",
+        "Write-Host \"MiniMaster Rollout Bundle gestartet\" -ForegroundColor Cyan",
+        "",
+    ];
+
+    const blocks = commands.map(entry => {
+        const comment = `# ${entry.label}`;
+        const body = String(entry.command || "").split("\n");
+        return [comment, ...body, ""].join("\n");
+    });
+
+    return [...header, ...blocks].join("\n");
+}
+
+async function copyRolloutBundleScript(projectId) {
+    try {
+        const script = buildRolloutBundleScript(projectId);
+        await copyTextToClipboard(script);
+        showNotification("PowerShell-Rollout-Skript kopiert.", "success");
+    } catch (error) {
+        showNotification("Rollout-Skript konnte nicht kopiert werden: " + error.message, "error");
+    }
+}
+
+function downloadRolloutBundleScript(projectId) {
+    try {
+        const activeProjectId = (projectId || getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId || "default").trim();
+        const script = buildRolloutBundleScript(projectId);
+        const blob = new Blob([script], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `minimaster-rollout-${activeProjectId || "default"}.ps1`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showNotification("PowerShell-Rollout-Skript heruntergeladen.", "success");
+    } catch (error) {
+        showNotification("Rollout-Skript konnte nicht erstellt werden: " + error.message, "error");
+    }
+}
+
 function buildCommandCatalog(projectId) {
     const values = getCommandBuilderFormValues();
     const activeProjectId = (projectId || firebaseConfig.projectId || "").trim();
@@ -304,6 +351,62 @@ function buildCommandCatalog(projectId) {
             command: `node scripts/setup-admin.js \"${firstAdminEmail}\" \"${firstAdminPassword}\"`,
             cwd: values.workspacePath,
             fileName: "minimaster-setup-admin",
+        },
+        {
+            id: "android-build-all",
+            label: "Android Debug-Builds",
+            description: "Baut beide Android-Apps als Debug-Version.",
+            command: ".\\gradlew.bat assembleDebug",
+            cwd: values.workspacePath,
+            fileName: "minimaster-android-build-all",
+        },
+        {
+            id: "android-tests-master",
+            label: "MasterApp Unit-Tests",
+            description: "Führt die JVM-Unit-Tests der Master-App aus.",
+            command: ".\\gradlew.bat :masterApp:testDebugUnitTest",
+            cwd: values.workspacePath,
+            fileName: "minimaster-android-tests-master",
+        },
+        {
+            id: "android-tests-child",
+            label: "ChildApp Unit-Tests",
+            description: "Führt die JVM-Unit-Tests der Child-App aus.",
+            command: ".\\gradlew.bat :childApp:testDebugUnitTest",
+            cwd: values.workspacePath,
+            fileName: "minimaster-android-tests-child",
+        },
+        {
+            id: "android-adb-devices",
+            label: "ADB Geräte prüfen",
+            description: "Listet verbundene Emulatoren und physische Geräte auf.",
+            command: "adb devices -l",
+            cwd: values.workspacePath,
+            fileName: "minimaster-adb-devices",
+        },
+        {
+            id: "android-adb-logical-check",
+            label: "ADB Shell-Prüfung",
+            description: "Prüft, ob ein Android-Gerät per adb erreichbar ist.",
+            command: "adb shell getprop ro.product.model",
+            cwd: values.workspacePath,
+            fileName: "minimaster-adb-check",
+        },
+        {
+            id: "desktop-launcher",
+            label: "Desktop Launcher starten",
+            description: "Startet den Electron-Launcher für Admin-Panel und Web-Control.",
+            command: "npm run desktop-start",
+            cwd: values.workspacePath,
+            fileName: "minimaster-desktop-launcher",
+        },
+        {
+            id: "desktop-direct-electron",
+            label: "Desktop Launcher direkt mit Electron",
+            description: "Alternative zum npm-Skript für den nativen Desktop-Start.",
+            command: "npx electron desktop/main.js",
+            cwd: values.workspacePath,
+            fileName: "minimaster-desktop-electron",
         },
     ];
 }
@@ -444,6 +547,10 @@ function renderCommissioningReport(report) {
                 cwd: getCommandBuilderFormValues().workspacePath,
                 fileName: "minimaster-report-deploy",
             })}
+            <div class="command-actions" style="margin-block-end: 12px;">
+                <button onclick="copyRolloutBundleScript('${escapeHtml(report.projectId || "")}')" class="btn btn-secondary btn-sm">Gesamtes Rollout-PS kopieren</button>
+                <button onclick="downloadRolloutBundleScript('${escapeHtml(report.projectId || "")}')" class="btn btn-primary btn-sm">Gesamtes Rollout-PS herunterladen</button>
+            </div>
             <h5>Zugewiesene Rollen</h5>
             ${roleHtml}
             <h5>Offene Punkte</h5>
