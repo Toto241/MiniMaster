@@ -574,3 +574,153 @@ input[type="text"] {
         grid-template-columns: 1fr;
     }
 }
+
+/* --- Online Status Indicators --- */
+.online-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.online-status.online {
+    color: #059669;
+}
+
+.online-status.recent {
+    color: #d97706;
+}
+
+.online-status.offline {
+    color: #dc2626;
+}
+
+/* --- Device Tab Styles --- */
+.device-search {
+    display: flex;
+    gap: 10px;
+    margin-block-end: 15px;
+}
+
+.device-search input {
+    flex: 1;
+}
+
+/* --- Pairing Tab Styles --- */
+.pairing-filters {
+    display: flex;
+    gap: 5px;
+    margin-block-end: 15px;
+    flex-wrap: wrap;
+}
+
+.pairing-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 15px;
+    margin-block-end: 20px;
+}
+
+.pairing-stat-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.pairing-stat-card h4 {
+    margin: 0 0 5px 0;
+    color: #6c757d;
+    font-size: 0.85em;
+}
+
+.pairing-stat-card p {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* --- Error Log Tab --- */
+.errorlog-search {
+    display: flex;
+    gap: 10px;
+    margin-block-end: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.errorlog-search input[type="text"] {
+    flex: 1;
+    min-inline-size: 200px;
+}
+
+.errorlog-search input[type="date"] {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* --- Security Status Grid --- */
+.security-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-block-end: 20px;
+}
+
+.security-status-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.security-status-card h4 {
+    margin: 0 0 5px 0;
+    color: #6c757d;
+    font-size: 0.85em;
+}
+
+.security-status-card p {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+/* --- Info Box --- */
+.info {
+    padding: 15px;
+    text-align: center;
+    color: #17a2b8;
+    font-style: italic;
+}
+
+/* --- Admin Claim Form --- */
+.admin-claim-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-block-end: 10px;
+}
+
+.admin-claim-form input {
+    flex: 1;
+    min-inline-size: 200px;
+}
+
+/* --- Tab Content Headers --- */
+.tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-block-end: 15px;
+}
+
+.tab-header h2 {
+    margin: 0;
+}
