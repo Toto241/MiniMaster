@@ -2,8 +2,10 @@
 /* global firebase, Chart */
 // Mini-Master Web Control Panel JavaScript
 
+const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
+
 // Firebase configuration (you'll need to replace this with your actual config)
-const firebaseConfig = {
+const fallbackFirebaseConfig = {
     // This should be replaced with actual Firebase config
     // You can get this from your Firebase console
     apiKey: "your-api-key",
@@ -13,6 +15,34 @@ const firebaseConfig = {
     messagingSenderId: "123456789",
     appId: "your-app-id"
 };
+
+function hasCompleteFirebaseConfig(config) {
+    if (!config || typeof config !== 'object') return false;
+    const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+    return requiredKeys.every(key => typeof config[key] === 'string' && config[key].trim().length > 0);
+}
+
+function isPlaceholderFirebaseConfig(config) {
+    if (!hasCompleteFirebaseConfig(config)) return true;
+    return Object.values(config).some(value =>
+        typeof value === 'string' && (value.includes('your-') || value.includes('your_project'))
+    );
+}
+
+function loadFirebaseConfig() {
+    try {
+        const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (hasCompleteFirebaseConfig(parsed) && !isPlaceholderFirebaseConfig(parsed)) {
+            return parsed;
+        }
+    } catch (error) {
+        console.warn('Failed to load Firebase config override:', error);
+    }
+    return fallbackFirebaseConfig;
+}
+
+const firebaseConfig = loadFirebaseConfig();
 
 // --- Global Variables ---
 let app, db, functions;
@@ -27,6 +57,10 @@ let usageChartInstance = null;
  */
 document.addEventListener('DOMContentLoaded', function() {
     try {
+        if (isPlaceholderFirebaseConfig(firebaseConfig)) {
+            throw new Error('Firebase-Webkonfiguration fehlt. Bitte zuerst die Bootstrap-Konfiguration im Operator-Dashboard speichern.');
+        }
+
         // Ensure firebase is available
         if (typeof firebase === 'undefined') {
             throw new Error('Firebase script not loaded. Please check your internet connection and script tags.');

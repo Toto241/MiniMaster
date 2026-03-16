@@ -4,6 +4,7 @@
 
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 const COMMAND_BUILDER_STORAGE_KEY = "operatorCommandBuilderConfig";
+const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations";
 
 // Firebase configuration (MUST be replaced with actual config)
 const fallbackFirebaseConfig = {
@@ -68,6 +69,23 @@ const setupChecklistItems = [
     { key: "support-workflow", label: "Support-Ticket-Workflow getestet" },
     { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" },
     { key: "deploy-verified", label: "Deploy erfolgreich und Functions live" }
+];
+
+const commissioningAttestationItems = [
+    { key: "firebase-auth-enabled", label: "Firebase Authentication aktiviert" },
+    { key: "firestore-enabled", label: "Firestore aktiviert" },
+    { key: "storage-enabled", label: "Firebase Storage aktiviert" },
+    { key: "functions-enabled", label: "Cloud Functions aktiviert" },
+    { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt" },
+    { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert" },
+    { key: "android-child-registered", label: "Android-App com.google.pairing registriert" },
+    { key: "firebase-project-bound", label: "firebase use --add lokal durchgeführt" },
+    { key: "service-account-ready", label: "serviceAccountKey.json lokal für setup-admin verfügbar" },
+    { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft" },
+    { key: "device-sync-verified", label: "Device-Sync zwischen Parent Panel und Child geprüft" },
+    { key: "support-flow-verified", label: "Support-Ticket-Flow geprüft" },
+    { key: "compliance-flow-verified", label: "DSAR- und Audit-Flow geprüft" },
+    { key: "storage-rules-verified", label: "Storage Rules aktiv und geprüft" }
 ];
 
 
@@ -321,6 +339,14 @@ function buildCommandCatalog(projectId) {
             fileName: "minimaster-firebase-login",
         },
         {
+            id: "firebase-use-add",
+            label: "Firebase Projekt lokal binden",
+            description: "Verknüpft das lokale Repo mit dem Zielprojekt via firebase use --add.",
+            command: activeProjectId ? `firebase use --add ${activeProjectId}` : "firebase use --add",
+            cwd: values.workspacePath,
+            fileName: "minimaster-firebase-use-add",
+        },
+        {
             id: "firebase-deploy-full",
             label: "Vollständiger Deploy",
             description: "Deployt Firestore-Regeln, Indexes, Functions und Hosting in das aktive Projekt.",
@@ -343,6 +369,30 @@ function buildCommandCatalog(projectId) {
             command: `firebase deploy --only hosting${projectSuffix}`,
             cwd: values.workspacePath,
             fileName: "minimaster-deploy-hosting",
+        },
+        {
+            id: "firebase-deploy-storage",
+            label: "Nur Storage Rules deployen",
+            description: "Aktualisiert Storage-Regeln separat.",
+            command: `firebase deploy --only storage${projectSuffix}`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-deploy-storage",
+        },
+        {
+            id: "repo-deploy-script",
+            label: "Repository Deploy-Skript",
+            description: "Führt das vorhandene Deploy-Skript über Bash/WSL aus.",
+            command: "bash ./deploy.sh",
+            cwd: values.workspacePath,
+            fileName: "minimaster-deploy-script",
+        },
+        {
+            id: "repo-config-sync-script",
+            label: "Firebase Config Sync-Skript",
+            description: "Synchronisiert Firebase-Konfiguration per Bash/WSL-Skript in die Panels.",
+            command: "bash ./scripts/update-firebase-config.sh",
+            cwd: values.workspacePath,
+            fileName: "minimaster-config-sync",
         },
         {
             id: "setup-admin",
@@ -437,6 +487,51 @@ function updateSetupChecklistState(partialState) {
     localStorage.setItem("operatorSetupChecklist", JSON.stringify({ ...savedState, ...partialState }));
 }
 
+function getCommissioningAttestations() {
+    try {
+        return JSON.parse(localStorage.getItem(COMMISSIONING_ATTESTATION_STORAGE_KEY) || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function updateCommissioningAttestations(partialState) {
+    const savedState = getCommissioningAttestations();
+    localStorage.setItem(COMMISSIONING_ATTESTATION_STORAGE_KEY, JSON.stringify({ ...savedState, ...partialState }));
+}
+
+function renderCommissioningAttestations() {
+    const container = document.getElementById("commissioning-attestations");
+    if (!container) return;
+
+    const savedState = getCommissioningAttestations();
+    container.innerHTML = "";
+
+    commissioningAttestationItems.forEach(item => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "setup-checklist-item";
+        wrapper.innerHTML = `
+            <input type="checkbox" id="attestation-${item.key}" ${savedState[item.key] ? "checked" : ""}>
+            <label for="attestation-${item.key}">${item.label}</label>
+        `;
+
+        const checkbox = wrapper.querySelector("input");
+        checkbox.addEventListener("change", (e) => {
+            updateCommissioningAttestations({ [item.key]: e.target.checked });
+            refreshCommissioningReport();
+        });
+
+        container.appendChild(wrapper);
+    });
+}
+
+function getMissingAttestations() {
+    const savedState = getCommissioningAttestations();
+    return commissioningAttestationItems
+        .filter(item => !savedState[item.key])
+        .map(item => item.label);
+}
+
 function getBootstrapFirebaseFormValues() {
     return {
         apiKey: (document.getElementById("bootstrap-api-key")?.value || "").trim(),
@@ -496,16 +591,20 @@ function persistBootstrapFirebaseConfig(showReloadHint = true) {
 
 function syncCommissioningChecklist(validationSummary) {
     const config = getOperatorConfigFormValues();
+    const attestations = getCommissioningAttestations();
     const updates = {
         "firebase-config": !isPlaceholderFirebaseConfig(firebaseConfig),
         "admin-auth": Boolean(validationSummary?.checks?.adminAuthOk),
         "firestore-access": Boolean(validationSummary?.checks?.firestoreAccessOk),
         "functions-access": Boolean(validationSummary?.checks?.functionsReachable),
         "appcheck-active": Boolean(config.cloud.appCheckMode),
-        "ai-config": Boolean(config.ai.provider && config.ai.model && config.ai.keyRef && config.ai.systemPrompt),
+        "android-apps": Boolean(attestations["android-master-registered"] && attestations["android-child-registered"]),
+        "ai-config": Boolean((config.ai.provider && config.ai.model && config.ai.keyRef && config.ai.systemPrompt) && validationSummary?.checks?.aiConfigured),
+        "support-workflow": Boolean(attestations["support-flow-verified"]),
+        "compliance-flow": Boolean(attestations["compliance-flow-verified"]),
     };
 
-    if (validationSummary?.errorCount === 0) {
+    if (validationSummary?.errorCount === 0 && attestations["firebase-project-bound"] && attestations["parent-panel-verified"] && attestations["device-sync-verified"] && attestations["storage-rules-verified"]) {
         updates["deploy-verified"] = true;
     }
 
@@ -515,7 +614,7 @@ function syncCommissioningChecklist(validationSummary) {
 
 function buildDeployCommand(projectId) {
     const trimmedProjectId = (projectId || "").trim();
-    const base = "firebase deploy --only firestore:rules,firestore:indexes,functions,hosting";
+    const base = "firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting";
     return trimmedProjectId ? `${base} --project ${trimmedProjectId}` : base;
 }
 
@@ -527,6 +626,12 @@ function renderCommissioningReport(report) {
         ? `<ul>${report.roleAssignments.map(item => `<li>${escapeHtml(item.uid)} → ${escapeHtml(item.role)}</li>`).join("")}</ul>`
         : "<p>Keine zusätzlichen Rollen zugewiesen.</p>";
 
+    const attestationLabels = Object.fromEntries(commissioningAttestationItems.map(item => [item.key, item.label]));
+    const attestationEntries = Object.entries(report.attestations || {}).filter(([, value]) => Boolean(value));
+    const attestationHtml = attestationEntries.length > 0
+        ? `<ul>${attestationEntries.map(([key]) => `<li>${escapeHtml(attestationLabels[key] || key)}</li>`).join("")}</ul>`
+        : "<p>Noch keine Freigaben bestätigt.</p>";
+
     const pendingHtml = report.pending.length > 0
         ? `<ul>${report.pending.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
         : "<p>Keine offenen Inbetriebnahme-Punkte erkannt.</p>";
@@ -536,6 +641,7 @@ function renderCommissioningReport(report) {
             <h4>Inbetriebnahmebericht</h4>
             <p><strong>Projekt:</strong> ${escapeHtml(report.projectId || "nicht gesetzt")}</p>
             <p><strong>Firebase-Webkonfiguration:</strong> ${report.firebaseConfigured ? "bereit" : "offen"}</p>
+            <p><strong>Parent Web-Control:</strong> ${report.webControlConfigured ? "shared config bereit" : "noch nicht freigegeben"}</p>
             <p><strong>Runtime-Konfiguration:</strong> ${report.runtimeConfigured ? "gespeichert" : "unvollständig"}</p>
             <p><strong>Validierung:</strong> ${report.validationSummary ? `${report.validationSummary.ok} OK, ${report.validationSummary.warn} WARN, ${report.validationSummary.errorCount} ERROR` : "noch nicht ausgeführt"}</p>
             <p><strong>Deploy-Befehl:</strong></p>
@@ -553,6 +659,8 @@ function renderCommissioningReport(report) {
             </div>
             <h5>Zugewiesene Rollen</h5>
             ${roleHtml}
+            <h5>Bestätigte Freigaben</h5>
+            ${attestationHtml}
             <h5>Offene Punkte</h5>
             ${pendingHtml}
         </div>
@@ -613,19 +721,31 @@ async function runCommissioningAssistant() {
         if (!validationSummary.checks.functionsReachable) {
             pending.push("Backend mit Firebase deployen oder Endpoints prüfen.");
         }
+        if (!validationSummary.checks.storageHealthOk) {
+            pending.push("Storage-Bucket und Admin-Zugriff prüfen.");
+        }
+        if (!validationSummary.checks.webControlConfigReady) {
+            pending.push("Gemeinsame Firebase-Konfiguration für das Parent Web Panel bereitstellen.");
+        }
+
+        getMissingAttestations().forEach(item => {
+            pending.push(`Manuelle Freigabe offen: ${item}`);
+        });
 
         commissioningSummary = {
             projectId: bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId,
             firebaseConfigured: !isPlaceholderFirebaseConfig(bootstrapConfig),
+            webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
             runtimeConfigured: Boolean(mergedRuntimeConfig.cloud.projectId && mergedRuntimeConfig.ai.provider && mergedRuntimeConfig.ai.model),
             validationSummary,
             deployCommand: buildDeployCommand(bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId),
             roleAssignments,
+            attestations: getCommissioningAttestations(),
             pending,
         };
 
         renderCommissioningReport(commissioningSummary);
-    renderCommandCatalog(commissioningSummary.projectId);
+        renderCommandCatalog(commissioningSummary.projectId);
         syncCommissioningChecklist(validationSummary);
         showNotification(pending.length === 0 ? "Inbetriebnahme-Assistent erfolgreich abgeschlossen." : "Inbetriebnahme-Assistent ausgeführt. Offene Punkte im Bericht prüfen.", pending.length === 0 ? "success" : "info");
     } catch (error) {
@@ -639,19 +759,29 @@ async function runCommissioningAssistant() {
 function refreshCommissioningReport() {
     const runtimeConfig = getOperatorConfigFormValues();
     const pending = [];
+    const missingAttestations = getMissingAttestations();
     if (isPlaceholderFirebaseConfig(firebaseConfig)) pending.push("Firebase-Webkonfiguration lokal speichern.");
     if (!runtimeConfig.cloud.projectId) pending.push("Cloud Project ID setzen.");
     if (!runtimeConfig.ai.provider || !runtimeConfig.ai.model || !runtimeConfig.ai.keyRef || !runtimeConfig.ai.systemPrompt) {
         pending.push("KI-Runtime-Konfiguration vervollständigen.");
     }
+    if (commissioningSummary?.validationSummary?.checks && !commissioningSummary.validationSummary.checks.storageHealthOk) {
+        pending.push("Storage Health im Backend prüfen.");
+    }
+    if (commissioningSummary?.validationSummary?.checks && !commissioningSummary.validationSummary.checks.webControlConfigReady) {
+        pending.push("Gemeinsame Konfiguration für web-control fehlt.");
+    }
+    missingAttestations.forEach(item => pending.push(`Manuelle Freigabe offen: ${item}`));
 
     commissioningSummary = {
         projectId: runtimeConfig.cloud.projectId || firebaseConfig.projectId,
         firebaseConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
+        webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
         runtimeConfigured: Boolean(runtimeConfig.cloud.projectId && runtimeConfig.ai.provider && runtimeConfig.ai.model),
         validationSummary: commissioningSummary?.validationSummary || null,
         deployCommand: buildDeployCommand(runtimeConfig.cloud.projectId || firebaseConfig.projectId),
         roleAssignments: commissioningSummary?.roleAssignments || [],
+        attestations: getCommissioningAttestations(),
         pending,
     };
 
@@ -793,6 +923,7 @@ function switchTab(tabName, evt) {
 
 function initializeSetupAssistant() {
     renderSetupChecklist();
+    renderCommissioningAttestations();
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     loadOperatorConfig();
@@ -958,8 +1089,8 @@ async function runFullSetupValidation() {
         check: "Firebase Configuration",
         status: placeholderConfig ? "error" : "ok",
         message: placeholderConfig
-            ? "Placeholder config detected. Update firebaseConfig in admin-panel/app.js."
-            : "Firebase config appears configured."
+            ? "Shared Firebase bootstrap config is still missing."
+            : "Firebase bootstrap config appears configured for both panels."
     });
 
     // Check 2: Auth + Admin claim
@@ -1023,9 +1154,47 @@ async function runFullSetupValidation() {
         });
     }
 
+    // Check 3c: Shared configuration for web-control
+    setupValidationResults.push({
+        check: "Shared Web-Control Firebase Config",
+        status: isPlaceholderFirebaseConfig(firebaseConfig) ? "error" : "ok",
+        message: isPlaceholderFirebaseConfig(firebaseConfig)
+            ? "Shared Firebase bootstrap config is still missing."
+            : "Admin panel and web-control can use the same bootstrap config."
+    });
+
+    // Check 3d: Backend health and prerequisites
+    try {
+        const healthResult = await functions.httpsCallable("adminHealthCheck")({});
+        const data = healthResult.data || {};
+        const storageStatus = data.prerequisites?.storage || "unknown";
+        const ai = data.prerequisites?.ai || {};
+
+        setupValidationResults.push({
+            check: "Backend Storage Health",
+            status: String(storageStatus).startsWith("ok") ? "ok" : "error",
+            message: String(storageStatus).startsWith("ok")
+                ? `Bucket erreichbar (${data.prerequisites?.storageBucket || "unbekannt"}).`
+                : String(storageStatus)
+        });
+
+        setupValidationResults.push({
+            check: "AI Secret Configuration",
+            status: (ai.geminiConfigured || ai.openAiConfigured) ? "ok" : "warn",
+            message: (ai.geminiConfigured || ai.openAiConfigured)
+                ? `Backend-KI konfiguriert (Gemini: ${Boolean(ai.geminiConfigured)}, OpenAI: ${Boolean(ai.openAiConfigured)}).`
+                : "Keine produktiven KI-Secrets im Backend erkannt."
+        });
+    } catch (error) {
+        setupValidationResults.push({
+            check: "Backend Storage Health",
+            status: "error",
+            message: "adminHealthCheck failed: " + error.message
+        });
+    }
+
     // Check 4: Callable functions reachability (safe, no destructive side effects)
     const functionChecks = [
-        { name: "adminHealthCheck", payload: {} },
         { name: "getSubscriptionStatus", payload: {} },
         { name: "validatePairingCode", payload: { pairingCode: "000000" } },
         { name: "exportUserData", payload: { masterId: "health-check" } },
@@ -1077,6 +1246,9 @@ async function runFullSetupValidation() {
             adminAuthOk: setupValidationResults.some(result => result.check === "Admin Authentication" && result.status === "ok"),
             firestoreAccessOk: setupValidationResults.filter(result => result.check.startsWith("Firestore Collection")).every(result => result.status === "ok"),
             functionsReachable: setupValidationResults.filter(result => result.check.startsWith("Function (")).every(result => result.status === "ok" || result.status === "warn"),
+            storageHealthOk: setupValidationResults.some(result => result.check === "Backend Storage Health" && result.status === "ok"),
+            aiConfigured: setupValidationResults.some(result => result.check === "AI Secret Configuration" && result.status === "ok"),
+            webControlConfigReady: setupValidationResults.some(result => result.check === "Shared Web-Control Firebase Config" && result.status === "ok"),
         },
     };
     syncCommissioningChecklist(summary);
@@ -1093,7 +1265,9 @@ function exportSetupReport() {
             projectId: firebaseConfig.projectId || null
         },
         checklist: checklistState,
-        validationResults: setupValidationResults
+        attestations: getCommissioningAttestations(),
+        validationResults: setupValidationResults,
+        commissioningSummary,
     };
 
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
