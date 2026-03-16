@@ -554,6 +554,49 @@
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Plausibilit&auml;tspr&uuml;fung</h3>
+                            <p>
+                                Pr&uuml;ft alle Angaben auf Widerspr&uuml;che und Inkonsistenzen zwischen Plattformen,
+                                Backend und Freigaben. Optional kann Gemini gefundene Probleme erkl&auml;ren.
+                            </p>
+                            <div class="setup-actions">
+                                <button onclick="runPlausibilityWithAiOption()" class="btn btn-primary">Plausibilit&auml;t pr&uuml;fen</button>
+                            </div>
+                            <div id="plausibility-results" class="data-list" style="margin-block-start: 12px"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Einrichtungsassistent: Eltern- &amp; Kind-App</h3>
+                            <p>
+                                Schritt-f&uuml;r-Schritt-Anleitung f&uuml;r die Ersteinrichtung der Apps auf den
+                                Mobiltelefonen. Jeder Schritt kann &uuml;ber Gemini erkl&auml;rt werden.
+                            </p>
+                            <div class="setup-actions">
+                                <button onclick="startSetupWizard('masterApp')" class="btn btn-primary">Eltern-App einrichten</button>
+                                <button onclick="startSetupWizard('childApp')" class="btn btn-primary">Kind-App einrichten</button>
+                                <button onclick="resetWizard(activeWizard || 'masterApp')" class="btn btn-secondary">Wizard zur&uuml;cksetzen</button>
+                            </div>
+                            <div id="setup-wizard-content" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">W&auml;hlen Sie einen Assistenten, um loszulegen.</div>
+                            </div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>🤖 Gemini KI-Assistent</h3>
+                            <p>
+                                Stellen Sie eine freie Frage zur Einrichtung, Konfiguration oder einem Problem.
+                                Gemini analysiert den Kontext und liefert eine Erkl&auml;rung mit L&ouml;sungsvorschlag.
+                                <strong>Vor jeder Anfrage ist eine Zustimmung erforderlich.</strong>
+                            </p>
+                            <div id="ai-consent-status" style="margin-block-end: 10px"></div>
+                            <div class="dsar-form">
+                                <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..."></textarea>
+                                <button onclick="askGeminiFreiform()" class="btn btn-primary">🤖 Gemini fragen</button>
+                            </div>
+                            <div id="ai-explain-response" class="data-list" style="margin-block-start: 12px"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
                             <p>
                                 Stellt alle relevanten Betriebsbefehle zentral zusammen und wandelt sie per Button

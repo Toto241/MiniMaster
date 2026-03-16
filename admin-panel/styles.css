@@ -639,6 +639,168 @@ input[type="text"] {
 .severity-medium { background: #fef08a; color: #854d0e; }
 .severity-low { background: #d1fae5; color: #065f46; }
 
+/* ==================== PLAUSIBILITÄTSPRÜFUNG ==================== */
+
+.plausibility-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-block-end: 4px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.plausibility-error { background: #fef2f2; border-inline-start: 3px solid #ef4444; }
+.plausibility-warn { background: #fefce8; border-inline-start: 3px solid #eab308; }
+.plausibility-info { background: #eff6ff; border-inline-start: 3px solid #3b82f6; }
+.plausibility-ok { background: #f0fdf4; border-inline-start: 3px solid #22c55e; }
+
+/* ==================== EINRICHTUNGS-WIZARD ==================== */
+
+.wizard-active-card {
+    background: #f8fafc;
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    padding: 18px;
+}
+.wizard-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-block-end: 8px;
+}
+.wizard-progress-header h4 { margin: 0; }
+.wizard-progress-header span { font-size: 0.85rem; color: #64748b; }
+
+.wizard-step-nav {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-block-end: 14px;
+}
+.wizard-step-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid #cbd5e1;
+    background: white;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #64748b;
+    transition: all 0.15s;
+}
+.wizard-step-dot.done { border-color: #22c55e; background: #dcfce7; color: #166534; }
+.wizard-step-dot.active { border-color: #3b82f6; background: #dbeafe; color: #1e40af; }
+
+.wizard-step-content h5 { margin: 0 0 8px; color: #0f172a; }
+.wizard-step-content p { margin: 0 0 10px; line-height: 1.5; }
+
+.wizard-detail {
+    margin-block-end: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.wizard-detail summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: #475569;
+    background: #f1f5f9;
+}
+.wizard-detail-content {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: #334155;
+}
+.wizard-detail-content code {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+}
+
+.wizard-step-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-block-end: 12px;
+}
+.wizard-check-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.wizard-nav-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* ==================== AI CONSENT DIALOG ==================== */
+
+.consent-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+.consent-dialog {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 520px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.consent-dialog h3 { margin-block-start: 0; }
+.consent-dialog p { line-height: 1.5; color: #334155; }
+
+.consent-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-block-start: 16px;
+}
+.consent-remember {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: #475569;
+}
+.consent-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* ==================== AI RESPONSE CARD ==================== */
+
+.ai-response-card {
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 14px;
+}
+.ai-response-card h5 { margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.ai-provider-badge {
+    font-size: 0.7rem;
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.ai-section { margin-block-end: 8px; }
+.ai-section strong { font-size: 0.88rem; color: #92400e; }
+.ai-section p { margin: 4px 0 0; line-height: 1.5; }
+
 .code-block {
     margin: 0;
     padding: 12px;
