@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -19,7 +19,13 @@
     <body>
         <div class="container">
             <header class="header">
-                <h1>MiniMaster Operator Dashboard</h1>
+                <div class="header-brand">
+                    <div class="header-logo">M</div>
+                    <div>
+                        <h1>MiniMaster</h1>
+                        <span class="header-subtitle">Operator Dashboard</span>
+                    </div>
+                </div>
                 <div id="auth-status" class="auth-status">
                     <span id="user-email"></span>
                     <button
@@ -27,7 +33,7 @@
                         onclick="logout()"
                         style="display: none"
                     >
-                        Logout
+                        Abmelden
                     </button>
                 </div>
             </header>
@@ -38,10 +44,10 @@
                     class="nav-tab active"
                     onclick="switchTab('overview', event)"
                 >
-                    Overview
+                    Übersicht
                 </button>
                 <button class="nav-tab" onclick="switchTab('users', event)">
-                    Users
+                    Benutzer
                 </button>
                 <button class="nav-tab" onclick="switchTab('devices', event)">
                     Geräte
@@ -50,16 +56,16 @@
                     class="nav-tab"
                     onclick="switchTab('subscriptions', event)"
                 >
-                    Subscriptions
+                    Abonnements
                 </button>
                 <button class="nav-tab" onclick="switchTab('pairing', event)">
-                    Pairing
+                    Kopplung
                 </button>
                 <button class="nav-tab" onclick="switchTab('support', event)">
-                    Support Tickets
+                    Support
                 </button>
                 <button class="nav-tab" onclick="switchTab('errorlogs', event)">
-                    Error Logs
+                    Fehlerprotokoll
                 </button>
                 <button
                     class="nav-tab"
@@ -68,58 +74,193 @@
                     Compliance
                 </button>
                 <button class="nav-tab" onclick="switchTab('setup', event)">
-                    Cloud Setup &amp; Assistant
+                    Einrichtung &amp; Assistent
                 </button>
             </nav>
 
             <main class="main-content">
-                <!-- Login Section -->
-                <section id="login-section" class="section">
-                    <h2>Operator Login</h2>
-                    <p>
-                        Dieses Admin-Tool ist ausschließlich für den Betreiber
-                        von MiniMaster vorgesehen (nicht für Eltern- oder
-                        Kinder-Accounts).
-                    </p>
-                    <form id="login-form">
-                        <input
-                            type="email"
-                            id="login-email"
-                            placeholder="Email"
-                            required
-                        />
-                        <input
-                            type="password"
-                            id="login-password"
-                            placeholder="Password"
-                            required
-                        />
-                        <button type="submit" class="btn btn-primary">
-                            Login
-                        </button>
-                    </form>
+                <!-- ==================== ONBOARDING SECTION ==================== -->
+                <section id="onboarding-section" class="section">
 
-                    <div class="setup-card" style="margin-block-start: 24px">
-                        <h3>Firebase Bootstrap-Konfiguration</h3>
+                    <!-- Welcome Banner -->
+                    <div class="onboarding-welcome">
+                        <h2>Willkommen beim MiniMaster Operator Dashboard</h2>
                         <p>
-                            Für die erste Inbetriebnahme oder beim Wechsel des Firebase-Projekts
-                            kann die Web-Konfiguration hier lokal hinterlegt werden. Danach lässt
-                            sich das Admin-Tool ohne Codeänderung neu initialisieren.
+                            Dieses Dashboard ist ausschließlich für den <strong>Betreiber</strong> von MiniMaster vorgesehen
+                            &ndash; nicht für Eltern oder Kinder. Folgen Sie den Schritten unten, um Ihr System
+                            einzurichten und Zugang zu erhalten.
                         </p>
-                        <div class="commissioning-grid">
-                            <input type="text" id="bootstrap-api-key" placeholder="Firebase apiKey" />
-                            <input type="text" id="bootstrap-auth-domain" placeholder="Firebase authDomain" />
-                            <input type="text" id="bootstrap-project-id" placeholder="Firebase projectId" />
-                            <input type="text" id="bootstrap-storage-bucket" placeholder="Firebase storageBucket" />
-                            <input type="text" id="bootstrap-messaging-sender-id" placeholder="Firebase messagingSenderId" />
-                            <input type="text" id="bootstrap-app-id" placeholder="Firebase appId" />
-                        </div>
-                        <div class="setup-actions" style="margin-block-start: 12px">
-                            <button onclick="saveBootstrapFirebaseConfig()" class="btn btn-secondary">Lokal speichern</button>
-                            <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary">Speichern und neu laden</button>
-                        </div>
-                        <div id="bootstrap-config-status" class="data-list" style="margin-block-start: 15px"></div>
                     </div>
+
+                    <!-- Stepper -->
+                    <div class="onboarding-stepper">
+                        <div class="stepper-step" id="stepper-step-1">
+                            <div class="stepper-indicator">1</div>
+                            <span>Firebase verbinden</span>
+                        </div>
+                        <div class="stepper-line" id="stepper-line-1"></div>
+                        <div class="stepper-step" id="stepper-step-2">
+                            <div class="stepper-indicator">2</div>
+                            <span>Konto erstellen</span>
+                        </div>
+                        <div class="stepper-line" id="stepper-line-2"></div>
+                        <div class="stepper-step" id="stepper-step-3">
+                            <div class="stepper-indicator">3</div>
+                            <span>Admin aktivieren</span>
+                        </div>
+                    </div>
+
+                    <!-- ===== Phase 1: Firebase verbinden ===== -->
+                    <div id="onboarding-phase-1" class="onboarding-phase">
+                        <div class="phase-card">
+                            <div class="phase-header">
+                                <div class="phase-icon">🔥</div>
+                                <div>
+                                    <h3>Schritt 1: Firebase-Projekt verbinden</h3>
+                                    <p class="phase-description">
+                                        Damit dieses Dashboard mit Ihrem MiniMaster-Backend kommunizieren kann,
+                                        benötigt es die Firebase-Webkonfiguration Ihres Projekts. Sie finden diese
+                                        Werte in der
+                                        <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a>
+                                        unter <em>Projekteinstellungen → Allgemein → Ihre Apps → Web-App</em>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="firebase-config-form">
+                                <div class="config-field">
+                                    <label for="bootstrap-api-key">API Key</label>
+                                    <input type="text" id="bootstrap-api-key" placeholder="AIzaSy..." />
+                                </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-auth-domain">Auth Domain</label>
+                                    <input type="text" id="bootstrap-auth-domain" placeholder="mein-projekt.firebaseapp.com" />
+                                </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-project-id">Project ID</label>
+                                    <input type="text" id="bootstrap-project-id" placeholder="mein-projekt-id" />
+                                </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-storage-bucket">Storage Bucket</label>
+                                    <input type="text" id="bootstrap-storage-bucket" placeholder="mein-projekt.appspot.com" />
+                                </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-messaging-sender-id">Messaging Sender ID</label>
+                                    <input type="text" id="bootstrap-messaging-sender-id" placeholder="123456789012" />
+                                </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-app-id">App ID</label>
+                                    <input type="text" id="bootstrap-app-id" placeholder="1:123456789:web:abc123" />
+                                </div>
+                            </div>
+
+                            <div id="bootstrap-config-status" class="phase-status"></div>
+
+                            <div class="phase-actions">
+                                <button onclick="saveBootstrapFirebaseConfig()" class="btn btn-secondary">Lokal speichern</button>
+                                <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary">Speichern &amp; verbinden</button>
+                            </div>
+
+                            <details class="phase-help">
+                                <summary>Wo finde ich diese Werte?</summary>
+                                <div class="phase-help-content">
+                                    <ol>
+                                        <li>Öffnen Sie die <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a></li>
+                                        <li>Wählen Sie Ihr MiniMaster-Projekt</li>
+                                        <li>Klicken Sie auf das Zahnrad-Symbol → <strong>Projekteinstellungen</strong></li>
+                                        <li>Scrollen Sie zu <strong>Ihre Apps</strong> → wählen Sie die Web-App (&lt;/&gt;)</li>
+                                        <li>Falls noch keine Web-App existiert: <strong>App hinzufügen → Web</strong></li>
+                                        <li>Kopieren Sie die Werte aus dem <code>firebaseConfig</code>-Objekt in die Felder oben</li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+
+                    <!-- ===== Phase 2: Konto erstellen oder Einloggen ===== -->
+                    <div id="onboarding-phase-2" class="onboarding-phase" style="display: none">
+                        <div class="phase-card">
+                            <div class="phase-header">
+                                <div class="phase-icon">👤</div>
+                                <div>
+                                    <h3>Schritt 2: Operator-Konto</h3>
+                                    <p class="phase-description">
+                                        Erstellen Sie ein neues Operator-Konto oder melden Sie sich mit einem bestehenden an.
+                                        Dieses Konto wird in Firebase Authentication verwaltet.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Tab Toggle: Registrieren / Einloggen -->
+                            <div class="auth-toggle">
+                                <button class="auth-toggle-btn active" id="toggle-register" onclick="showAuthMode('register')">
+                                    Neues Konto erstellen
+                                </button>
+                                <button class="auth-toggle-btn" id="toggle-login" onclick="showAuthMode('login')">
+                                    Bestehendes Konto nutzen
+                                </button>
+                            </div>
+
+                            <!-- Registrierungsformular -->
+                            <form id="register-form" class="auth-form" onsubmit="handleRegistration(event)">
+                                <div class="form-group">
+                                    <label for="register-email">E-Mail-Adresse</label>
+                                    <input type="email" id="register-email" placeholder="operator@example.com" required />
+                                </div>
+                                <div class="form-group">
+                                    <label for="register-password">Passwort</label>
+                                    <input type="password" id="register-password" placeholder="Mindestens 8 Zeichen" minlength="8" required />
+                                </div>
+                                <div class="form-group">
+                                    <label for="register-password-confirm">Passwort bestätigen</label>
+                                    <input type="password" id="register-password-confirm" placeholder="Passwort wiederholen" minlength="8" required />
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full" id="register-submit-btn">
+                                    Konto erstellen
+                                </button>
+                                <div id="register-status" class="phase-status"></div>
+                            </form>
+
+                            <!-- Login-Formular -->
+                            <form id="login-form" class="auth-form" style="display: none">
+                                <div class="form-group">
+                                    <label for="login-email">E-Mail-Adresse</label>
+                                    <input type="email" id="login-email" placeholder="operator@example.com" required />
+                                </div>
+                                <div class="form-group">
+                                    <label for="login-password">Passwort</label>
+                                    <input type="password" id="login-password" placeholder="Passwort" required />
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full">
+                                    Anmelden
+                                </button>
+                                <div id="login-status" class="phase-status"></div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- ===== Phase 3: Admin-Zugang aktivieren ===== -->
+                    <div id="onboarding-phase-3" class="onboarding-phase" style="display: none">
+                        <div class="phase-card">
+                            <div class="phase-header">
+                                <div class="phase-icon">🔑</div>
+                                <div>
+                                    <h3>Schritt 3: Admin-Berechtigung aktivieren</h3>
+                                    <p class="phase-description">
+                                        Ihr Konto wurde erstellt, aber Sie benötigen die <strong>Admin-Berechtigung</strong>,
+                                        um das Dashboard vollständig nutzen zu können.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div id="admin-activation-content">
+                                <!-- Content wird dynamisch durch JS befüllt -->
+                            </div>
+
+                            <div id="admin-activation-status" class="phase-status"></div>
+                        </div>
+                    </div>
+
                 </section>
 
                 <!-- Dashboard Section (Hidden until authorized) -->
@@ -133,31 +274,31 @@
                         <h2>KPI Dashboard</h2>
                         <div class="stats-grid">
                             <div class="stat-card">
-                                <h3>Total Users</h3>
+                                <h3>Benutzer gesamt</h3>
                                 <p id="stat-total-users">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Current Revenue (MRR)</h3>
+                                <h3>Umsatz (MRR)</h3>
                                 <p id="stat-current-revenue">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Active Subscriptions</h3>
+                                <h3>Aktive Abonnements</h3>
                                 <p id="stat-active-subs">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Total Tasks</h3>
+                                <h3>Aufgaben gesamt</h3>
                                 <p id="stat-total-tasks">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Open Tickets</h3>
+                                <h3>Offene Tickets</h3>
                                 <p id="stat-open-tickets">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Children Paired</h3>
+                                <h3>Gekoppelte Kinder</h3>
                                 <p id="stat-total-children">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Errors (24h)</h3>
+                                <h3>Fehler (24h)</h3>
                                 <p id="stat-errors-24h">--</p>
                             </div>
                         </div>
@@ -171,7 +312,7 @@
                                 border-radius: 8px;
                             "
                         >
-                            <h3 style="margin-block-start: 0">Quick Links</h3>
+                            <h3 style="margin-block-start: 0">Schnellzugriff</h3>
                             <a
                                 href="logs.html"
                                 class="btn btn-primary"
@@ -180,13 +321,13 @@
                                     text-decoration: none;
                                     margin-inline-end: 10px;
                                 "
-                                >View Audit Logs</a
+                                >Audit-Logs anzeigen</a
                             >
                             <button
                                 onclick="refreshAllStats()"
                                 class="btn btn-secondary"
                             >
-                                Refresh Stats
+                                Statistiken aktualisieren
                             </button>
                         </div>
 
@@ -194,37 +335,37 @@
                         <div id="subscription-warnings" class="data-list" style="margin-block-end: 20px"></div>
 
                         <!-- Performance Metrics -->
-                        <h3>Performance Metrics</h3>
+                        <h3>Leistungskennzahlen</h3>
                         <div id="performance-metrics" class="data-list">
-                            <div class="info">Click "Refresh Stats" to load performance metrics.</div>
+                            <div class="info">Klicken Sie auf „Statistiken aktualisieren", um Kennzahlen zu laden.</div>
                         </div>
 
                         <!-- Security Status -->
-                        <h3>Security &amp; System Status</h3>
+                        <h3>Sicherheit &amp; Systemstatus</h3>
                         <div class="stats-grid" style="margin-block-end: 20px">
                             <div class="stat-card">
                                 <h3>App Check</h3>
                                 <p id="stat-appcheck-status" style="font-size:1em">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Firestore Indexes</h3>
+                                <h3>Firestore-Indizes</h3>
                                 <p id="stat-indexes-status" style="font-size:1em">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Active Pairing Codes</h3>
+                                <h3>Aktive Kopplungscodes</h3>
                                 <p id="stat-active-pairing">--</p>
                             </div>
                             <div class="stat-card">
-                                <h3>Trial Users</h3>
+                                <h3>Testnutzer</h3>
                                 <p id="stat-trial-users">--</p>
                             </div>
                         </div>
 
                         <!-- Error Summary Section -->
-                        <h3>Recent Error Summary</h3>
+                        <h3>Aktuelle Fehlerzusammenfassung</h3>
                         <div id="error-summary" class="data-list">
                             <div class="info">
-                                Click "Refresh Stats" to load error summaries.
+                                Klicken Sie auf „Statistiken aktualisieren", um die Fehlerzusammenfassung zu laden.
                             </div>
                         </div>
                     </div>
@@ -235,24 +376,24 @@
                         class="tab-content"
                         style="display: none"
                     >
-                        <h2>User Management</h2>
+                        <h2>Benutzerverwaltung</h2>
                         <div class="user-search">
                             <input
                                 type="text"
                                 id="user-search-input"
-                                placeholder="Search by Email or Master ID"
+                                placeholder="Suche nach E-Mail oder Master-ID"
                             />
                             <button
                                 onclick="searchUsers()"
                                 class="btn btn-secondary"
                             >
-                                Search
+                                Suchen
                             </button>
                             <button
                                 onclick="loadUsers()"
                                 class="btn btn-secondary"
                             >
-                                Show All
+                                Alle anzeigen
                             </button>
                         </div>
                         <div id="user-list" class="data-list">
@@ -263,7 +404,7 @@
 
                     <!-- Tab: Devices (Children) -->
                     <div id="tab-devices" class="tab-content" style="display: none">
-                        <h2>Geräte (Children Devices)</h2>
+                        <h2>Geräte (Kinder-Geräte)</h2>
                         <div class="user-search">
                             <input type="text" id="device-search-input" placeholder="Suche nach Child-ID oder Master-ID" />
                             <button onclick="searchDevices()" class="btn btn-secondary">Suchen</button>
@@ -279,25 +420,25 @@
                         class="tab-content"
                         style="display: none"
                     >
-                        <h2>Subscription Monitoring</h2>
+                        <h2>Abonnement-Überwachung</h2>
                         <div class="sub-filters">
                             <button
                                 onclick="filterSubscriptions('all')"
                                 class="btn btn-secondary"
                             >
-                                All
+                                Alle
                             </button>
                             <button
                                 onclick="filterSubscriptions('active')"
                                 class="btn btn-secondary"
                             >
-                                Active
+                                Aktiv
                             </button>
                             <button
                                 onclick="filterSubscriptions('expired')"
                                 class="btn btn-secondary"
                             >
-                                Expired
+                                Abgelaufen
                             </button>
                         </div>
                         <div id="subscription-list" class="data-list">
@@ -329,19 +470,19 @@
                         class="tab-content"
                         style="display: none"
                     >
-                        <h2>Support Tickets</h2>
+                        <h2>Support-Tickets</h2>
                         <div class="support-filters">
                             <button
                                 onclick="filterTickets('all')"
                                 class="btn btn-secondary"
                             >
-                                All
+                                Alle
                             </button>
                             <button
                                 onclick="filterTickets('open')"
                                 class="btn btn-secondary"
                             >
-                                Open
+                                Offen
                             </button>
                             <button
                                 onclick="
@@ -349,25 +490,25 @@
                                 "
                                 class="btn btn-secondary"
                             >
-                                Awaiting Feedback
+                                Wartet auf Feedback
                             </button>
                             <button
                                 onclick="filterTickets('escalated')"
                                 class="btn btn-secondary"
                             >
-                                Escalated
+                                Eskaliert
                             </button>
                             <button
                                 onclick="filterTickets('in_progress')"
                                 class="btn btn-secondary"
                             >
-                                In Progress
+                                In Bearbeitung
                             </button>
                             <button
                                 onclick="filterTickets('closed')"
                                 class="btn btn-secondary"
                             >
-                                Closed
+                                Geschlossen
                             </button>
                         </div>
                         <div id="support-tickets-list" class="data-list">
@@ -378,7 +519,7 @@
 
                     <!-- Tab: Error Logs -->
                     <div id="tab-errorlogs" class="tab-content" style="display: none">
-                        <h2>Error Logs (durchsuchbar)</h2>
+                        <h2>Fehlerprotokoll (durchsuchbar)</h2>
                         <div class="user-search">
                             <input type="text" id="errorlog-search-input" placeholder="Suche nach Funktionsname oder Fehlermeldung" />
                             <input type="date" id="errorlog-date-filter" />
@@ -395,24 +536,24 @@
                         class="tab-content"
                         style="display: none"
                     >
-                        <h2>Compliance &amp; Data Management</h2>
+                        <h2>Compliance &amp; Datenverwaltung</h2>
                         <div class="compliance-section">
-                            <h3>DSAR (Data Subject Access Request)</h3>
+                            <h3>DSAR (Datenauskunftsantrag)</h3>
                             <p>
-                                Export all data associated with a specific user
-                                for GDPR compliance.
+                                Exportieren Sie alle Daten eines bestimmten Benutzers
+                                gemäß DSGVO-Anforderungen.
                             </p>
                             <div class="dsar-form">
                                 <input
                                     type="text"
                                     id="dsar-master-id"
-                                    placeholder="Enter Master ID"
+                                    placeholder="Master-ID eingeben"
                                 />
                                 <button
                                     onclick="triggerDsarExport()"
                                     class="btn btn-primary"
                                 >
-                                    Export User Data
+                                    Benutzerdaten exportieren
                                 </button>
                             </div>
                             <div
@@ -426,7 +567,7 @@
                             class="compliance-section admin-only"
                             style="margin-block-start: 30px"
                         >
-                            <h3>Data Deletion Request (GDPR Art. 17)</h3>
+                            <h3>Datenlöschung (DSGVO Art. 17)</h3>
                             <p>
                                 Permanent alle Daten eines Nutzers löschen – ruft direkt die Cloud Function
                                 <code>deleteUserAccount</code> auf. Löscht Master, Children, Tasks, Subscriptions.
@@ -435,13 +576,13 @@
                                 <input
                                     type="text"
                                     id="delete-master-id"
-                                    placeholder="Enter Master ID"
+                                    placeholder="Master-ID eingeben"
                                 />
                                 <button
                                     onclick="triggerAccountDeletion()"
                                     class="btn btn-danger"
                                 >
-                                    Delete User Account
+                                    Benutzerkonto löschen
                                 </button>
                             </div>
                             <div id="delete-result" class="data-list" style="margin-block-start: 10px"></div>
@@ -451,8 +592,8 @@
                             class="compliance-section"
                             style="margin-block-start: 30px"
                         >
-                            <h3>Audit Log Export</h3>
-                            <p>Export audit logs for a specific time period.</p>
+                            <h3>Audit-Log Export</h3>
+                            <p>Exportieren Sie Audit-Logs für einen bestimmten Zeitraum.</p>
                             <div class="dsar-form">
                                 <input type="date" id="audit-start-date" />
                                 <input type="date" id="audit-end-date" />
@@ -460,7 +601,7 @@
                                     onclick="exportAuditLogs()"
                                     class="btn btn-primary"
                                 >
-                                    Export Audit Logs
+                                    Audit-Logs exportieren
                                 </button>
                             </div>
                             <div
@@ -477,7 +618,7 @@
                         class="tab-content"
                         style="display: none"
                     >
-                        <h2>Cloud Integration &amp; Operator Assistant</h2>
+                        <h2>Cloud-Integration &amp; Operator-Assistent</h2>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Inbetriebnahme-Assistent</h3>
@@ -624,7 +765,7 @@
 
                         <div class="setup-grid">
                             <div class="setup-card">
-                                <h3>Integration Health Check (alle Cloud Functions)</h3>
+                                <h3>Integrationstest (alle Cloud Functions)</h3>
                                 <p>
                                     Validiert die Anbindung an zentrale
                                     Cloud-Dienste (Auth, Firestore, Functions)
@@ -635,13 +776,13 @@
                                         onclick="runFullSetupValidation()"
                                         class="btn btn-primary"
                                     >
-                                        Run Full Validation
+                                        Vollständige Validierung starten
                                     </button>
                                     <button
                                         onclick="exportSetupReport()"
                                         class="btn btn-secondary"
                                     >
-                                        Export Setup Report
+                                        Bericht exportieren
                                     </button>
                                 </div>
                                 <div
@@ -656,7 +797,7 @@
                             </div>
 
                             <div class="setup-card">
-                                <h3>Operator Onboarding Checklist</h3>
+                                <h3>Operator-Checkliste</h3>
                                 <p>
                                     Geführte Inbetriebnahme für Betreiber.
                                     Checkpoints werden lokal im Browser
@@ -701,7 +842,7 @@
                             class="setup-card"
                             style="margin-block-start: 20px"
                         >
-                            <h3>Runtime Configuration (Cloud + KI)</h3>
+                            <h3>Laufzeitkonfiguration (Cloud + KI)</h3>
                             <p>
                                 Zentrale Betreiber-Konfiguration für
                                 Cloud-Dienste und KI-Verhalten. Änderungen
@@ -733,8 +874,8 @@
                             </div>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="loadOperatorConfig()" class="btn btn-secondary">Load Configuration</button>
-                                <button onclick="saveOperatorConfig()" class="btn btn-primary">Save Configuration</button>
+                                <button onclick="loadOperatorConfig()" class="btn btn-secondary">Konfiguration laden</button>
+                                <button onclick="saveOperatorConfig()" class="btn btn-primary">Konfiguration speichern</button>
                                 <button onclick="testAiConfiguration()" class="btn btn-secondary">Test KI-Konfiguration</button>
                             </div>
                             <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
@@ -746,7 +887,7 @@
                             class="setup-card"
                             style="margin-block-start: 20px"
                         >
-                            <h3>Operator Assistant</h3>
+                            <h3>Operator-Assistent</h3>
                             <p>
                                 Fragen zur Integration, Deployment, Rollen und
                                 Troubleshooting direkt im Panel klären.
@@ -770,7 +911,7 @@
                                         onclick="askOperatorAssistant()"
                                         class="btn btn-primary"
                                     >
-                                        Ask
+                                        Fragen
                                     </button>
                                 </div>
                             </div>

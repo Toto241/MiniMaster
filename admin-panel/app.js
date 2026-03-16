@@ -1542,6 +1542,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     if (isPlaceholderFirebaseConfig(firebaseConfig)) {
         console.warn("Firebase config placeholders detected. Waiting for bootstrap configuration.");
+        updateOnboardingStepper(1);
         return;
     }
 
@@ -1553,6 +1554,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Setup login form submission
         document.getElementById("login-form").addEventListener("submit", handleLogin);
+
+        // Setup registration form submission
+        const registerForm = document.getElementById("register-form");
+        if (registerForm) {
+            registerForm.addEventListener("submit", handleRegistration);
+        }
 
         // Check authentication state
         auth.onAuthStateChanged(user => {
@@ -1566,22 +1573,222 @@ document.addEventListener("DOMContentLoaded", function() {
                         loadDashboardData();
                         if (role === "admin") initializeSetupAssistant();
                     } else {
-                        showNotification("Access Denied: Not an authorized operator.", "error");
-                        auth.signOut();
+                        // User is authenticated but has no operator role -> show phase 3
+                        showAdminActivationPhase(user);
                     }
                 });
             } else {
                 currentUserRole = null;
-                showLogin();
+                showOnboarding();
             }
         });
+
+        // Show phase 2 since Firebase is configured
+        updateOnboardingStepper(2);
+        showOnboardingPhase(2);
 
         console.log("Firebase initialized successfully.");
     } catch (error) {
         console.error("Firebase initialization error:", error);
-        showNotification("Firebase configuration error. Please check your setup.", "error");
+        showNotification("Firebase-Konfigurationsfehler. Bitte Einrichtung prüfen.", "error");
     }
 });
+
+// ==================== ONBOARDING FLOW ====================
+
+function updateOnboardingStepper(activeStep) {
+    for (let i = 1; i <= 3; i++) {
+        const stepEl = document.getElementById("stepper-step-" + i);
+        const lineEl = document.getElementById("stepper-line-" + (i - 1));
+        if (stepEl) {
+            stepEl.classList.remove("active", "done");
+            if (i < activeStep) stepEl.classList.add("done");
+            else if (i === activeStep) stepEl.classList.add("active");
+        }
+        if (lineEl) {
+            lineEl.classList.remove("done");
+            if (i <= activeStep - 1) lineEl.classList.add("done");
+        }
+    }
+}
+
+function showOnboardingPhase(phase) {
+    for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById("onboarding-phase-" + i);
+        if (el) el.style.display = i === phase ? "block" : "none";
+    }
+}
+
+function showAuthMode(mode) {
+    const registerForm = document.getElementById("register-form");
+    const loginForm = document.getElementById("login-form");
+    const toggleRegister = document.getElementById("toggle-register");
+    const toggleLogin = document.getElementById("toggle-login");
+
+    if (mode === "register") {
+        registerForm.style.display = "flex";
+        loginForm.style.display = "none";
+        toggleRegister.classList.add("active");
+        toggleLogin.classList.remove("active");
+    } else {
+        registerForm.style.display = "none";
+        loginForm.style.display = "flex";
+        toggleRegister.classList.remove("active");
+        toggleLogin.classList.add("active");
+    }
+}
+
+function showOnboarding() {
+    document.getElementById("onboarding-section").style.display = "block";
+    document.getElementById("dashboard-section").style.display = "none";
+    document.getElementById("dashboard-nav").style.display = "none";
+    document.getElementById("logout-btn").style.display = "none";
+    document.getElementById("user-email").textContent = "";
+
+    if (!isPlaceholderFirebaseConfig(firebaseConfig)) {
+        updateOnboardingStepper(2);
+        showOnboardingPhase(2);
+    } else {
+        updateOnboardingStepper(1);
+        showOnboardingPhase(1);
+    }
+}
+
+function showAdminActivationPhase(user) {
+    document.getElementById("onboarding-section").style.display = "block";
+    document.getElementById("dashboard-section").style.display = "none";
+    document.getElementById("dashboard-nav").style.display = "none";
+    document.getElementById("logout-btn").style.display = "inline-block";
+    document.getElementById("user-email").textContent = user.email || "";
+
+    updateOnboardingStepper(3);
+    showOnboardingPhase(3);
+    renderAdminActivationContent(user);
+}
+
+function renderAdminActivationContent(user) {
+    const container = document.getElementById("admin-activation-content");
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="admin-info-box">
+            <h4>Ihr Konto: ${escapeHtml(user.email || "")}</h4>
+            <p>
+                Sie sind angemeldet, besitzen aber noch keine Operator-Berechtigung.
+                Um das Dashboard nutzen zu können, muss Ihrem Konto die Rolle
+                <strong>admin</strong>, <strong>support</strong> oder <strong>auditor</strong> zugewiesen werden.
+            </p>
+        </div>
+
+        <div class="admin-info-box" style="background: #f8fafc; border-color: #e2e8f0;">
+            <h4>So erhalten Sie Admin-Zugang</h4>
+            <p><strong>Ersteinrichtung (noch kein Admin vorhanden):</strong></p>
+            <ol>
+                <li>Öffnen Sie ein Terminal im MiniMaster-Projektordner</li>
+                <li>Führen Sie folgenden Befehl aus:<br>
+                    <code style="background:#0f172a;color:#e2e8f0;padding:4px 8px;border-radius:4px;display:inline-block;margin-block-start:4px">node scripts/setup-admin.js ${escapeHtml(user.email || "ihre@email.de")} IhrPasswort</code>
+                </li>
+                <li>Kehren Sie zum Dashboard zurück und klicken Sie auf <strong>Zugang prüfen</strong></li>
+            </ol>
+            <p style="margin-block-start: 12px"><strong>Zusätzlicher Operator (Admin existiert bereits):</strong></p>
+            <ol>
+                <li>Bitten Sie den vorhandenen Admin, im Dashboard unter <em>Einrichtung → Rollenverwaltung</em> Ihre UID einzutragen</li>
+                <li>Ihre UID: <code style="background:#0f172a;color:#e2e8f0;padding:2px 6px;border-radius:4px">${escapeHtml(user.uid)}</code></li>
+            </ol>
+        </div>
+
+        <div class="admin-waiting-hint">
+            <span style="font-size:1.3rem">⏳</span>
+            <p>
+                Nachdem die Berechtigung gesetzt wurde, klicken Sie auf <strong>Zugang prüfen</strong>,
+                um Ihren Status neu zu laden. Es kann einige Sekunden dauern, bis die Änderung wirksam wird.
+            </p>
+        </div>
+
+        <div class="phase-actions" style="margin-block-start: 16px">
+            <button onclick="recheckAdminAccess()" class="btn btn-primary">Zugang prüfen</button>
+            <button onclick="logout()" class="btn btn-secondary">Abmelden</button>
+        </div>
+    `;
+}
+
+async function recheckAdminAccess() {
+    const statusEl = document.getElementById("admin-activation-status");
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Prüfe Berechtigung...</div>";
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            if (statusEl) statusEl.innerHTML = "<div class='error'>Nicht angemeldet.</div>";
+            return;
+        }
+
+        // Force token refresh
+        const idTokenResult = await user.getIdTokenResult(true);
+        const role = idTokenResult.claims.role;
+
+        if (role === "admin" || role === "support" || role === "auditor") {
+            if (statusEl) {
+                statusEl.innerHTML = `<div class="admin-success-box">
+                    <h4>✅ Berechtigung bestätigt!</h4>
+                    <p>Rolle: <strong>${escapeHtml(role.toUpperCase())}</strong></p>
+                    <button onclick="window.location.reload()" class="btn btn-primary">Dashboard öffnen</button>
+                </div>`;
+            }
+        } else {
+            if (statusEl) {
+                statusEl.innerHTML = "<div class='error'>Noch keine Operator-Rolle zugewiesen. Bitte führen Sie die oben beschriebenen Schritte aus.</div>";
+            }
+        }
+    } catch (error) {
+        if (statusEl) statusEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== REGISTRATION ====================
+
+async function handleRegistration(event) {
+    event.preventDefault();
+
+    const email = document.getElementById("register-email").value.trim();
+    const password = document.getElementById("register-password").value;
+    const passwordConfirm = document.getElementById("register-password-confirm").value;
+    const statusEl = document.getElementById("register-status");
+    const submitBtn = document.getElementById("register-submit-btn");
+
+    if (password !== passwordConfirm) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Die Passwörter stimmen nicht überein.</div>";
+        return;
+    }
+
+    if (password.length < 8) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Das Passwort muss mindestens 8 Zeichen lang sein.</div>";
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Wird erstellt...";
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Konto wird erstellt...</div>";
+
+    try {
+        await auth.createUserWithEmailAndPassword(email, password);
+        // onAuthStateChanged will handle the transition to phase 3
+        if (statusEl) statusEl.innerHTML = "<div class='success-box'>Konto erfolgreich erstellt!</div>";
+    } catch (error) {
+        let msg = error.message;
+        if (error.code === "auth/email-already-in-use") {
+            msg = "Diese E-Mail-Adresse wird bereits verwendet. Bitte melden Sie sich stattdessen an.";
+        } else if (error.code === "auth/weak-password") {
+            msg = "Das Passwort ist zu schwach. Verwenden Sie mindestens 8 Zeichen mit Buchstaben und Zahlen.";
+        } else if (error.code === "auth/invalid-email") {
+            msg = "Die E-Mail-Adresse ist ungültig.";
+        }
+        if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Konto erstellen";
+    }
+}
 
 // ==================== AUTHENTICATION ====================
 
@@ -1589,10 +1796,22 @@ function handleLogin(event) {
     event.preventDefault();
     const email = document.getElementById("login-email").value;
     const password = document.getElementById("login-password").value;
+    const statusEl = document.getElementById("login-status");
+
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Anmeldung...</div>";
 
     auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+            if (statusEl) statusEl.innerHTML = "";
+        })
         .catch(error => {
-            showNotification("Login failed: " + error.message, "error");
+            let msg = error.message;
+            if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+                msg = "E-Mail oder Passwort ungültig.";
+            } else if (error.code === "auth/too-many-requests") {
+                msg = "Zu viele Versuche. Bitte warten Sie einen Moment.";
+            }
+            if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
         });
 }
 
@@ -1601,15 +1820,11 @@ function logout() {
 }
 
 function showLogin() {
-    document.getElementById("login-section").style.display = "block";
-    document.getElementById("dashboard-section").style.display = "none";
-    document.getElementById("dashboard-nav").style.display = "none";
-    document.getElementById("logout-btn").style.display = "none";
-    document.getElementById("user-email").textContent = "";
+    showOnboarding();
 }
 
 function showDashboard(user) {
-    document.getElementById("login-section").style.display = "none";
+    document.getElementById("onboarding-section").style.display = "none";
     document.getElementById("dashboard-section").style.display = "block";
     document.getElementById("dashboard-nav").style.display = "flex";
     document.getElementById("logout-btn").style.display = "inline-block";
@@ -1775,11 +1990,11 @@ async function loadOperatorConfig() {
         const loadedAt = doc.exists && data.updatedAt?.seconds ? data.updatedAt.seconds * 1000 : null;
         renderOperatorConfig(data, loadedAt);
         if (!doc.exists) {
-            showNotification("No persisted operator config found. Using defaults.", "success");
+            showNotification("Keine gespeicherte Konfiguration gefunden. Standardwerte werden verwendet.", "success");
         }
     } catch (error) {
         if (status) status.innerHTML = `<div class='error'>Fehler beim Laden: ${escapeHtml(error.message)}</div>`;
-        showNotification("Failed to load operator config: " + error.message, "error");
+        showNotification("Konfiguration konnte nicht geladen werden: " + error.message, "error");
     }
 }
 
@@ -1800,10 +2015,10 @@ async function saveOperatorConfig() {
         }
         refreshCommissioningReport();
         renderCommandCatalog(values.cloud.projectId || firebaseConfig.projectId);
-        showNotification("Operator configuration saved.", "success");
+        showNotification("Operator-Konfiguration gespeichert.", "success");
     } catch (error) {
         if (status) status.innerHTML = `<div class='error'>Fehler beim Speichern: ${escapeHtml(error.message)}</div>`;
-        showNotification("Failed to save operator config: " + error.message, "error");
+        showNotification("Konfiguration konnte nicht gespeichert werden: " + error.message, "error");
     }
 }
 
@@ -1816,13 +2031,13 @@ function testAiConfiguration() {
 
     if (!isValid) {
         status.innerHTML = "<div class='error'>KI-Test fehlgeschlagen: provider, model, keyRef und systemPrompt sind erforderlich.</div>";
-        showNotification("AI configuration test failed.", "error");
+        showNotification("KI-Konfigurationstest fehlgeschlagen.", "error");
         return;
     }
 
     const preview = `${values.ai.provider}/${values.ai.model}, temp=${values.ai.temperature}`;
     status.innerHTML = `<div class='success-box'>KI-Konfiguration valide. Test-Payload: ${escapeHtml(preview)}</div>`;
-    showNotification("AI configuration looks valid.", "success");
+    showNotification("KI-Konfiguration sieht gültig aus.", "success");
 }
 
 async function runFullSetupValidation() {
@@ -2001,7 +2216,7 @@ async function runFullSetupValidation() {
         },
     };
     syncCommissioningChecklist(summary);
-    showNotification("Setup validation completed.", errorCount > 0 ? "error" : "success");
+    showNotification("Validierung abgeschlossen.", errorCount > 0 ? "error" : "success");
     return summary;
 }
 
@@ -2027,7 +2242,7 @@ function exportSetupReport() {
     a.click();
     URL.revokeObjectURL(url);
 
-    showNotification("Setup report exported.", "success");
+    showNotification("Einrichtungsbericht exportiert.", "success");
 }
 
 function saveBootstrapFirebaseConfig() {
@@ -2352,7 +2567,7 @@ async function loadUsers(direction) {
 function searchUsers() {
     const query = document.getElementById("user-search-input").value.trim().toLowerCase();
     if (query.length < 3) {
-        showNotification("Please enter at least 3 characters to search.", "info");
+        showNotification("Bitte mindestens 3 Zeichen eingeben.", "info");
         return;
     }
 
@@ -2592,10 +2807,10 @@ async function revokeUserSubscription(masterId) {
     try {
         const revokeFunc = functions.httpsCallable("revokeSubscription");
         await revokeFunc({ masterId: masterId });
-        showNotification("Subscription revoked successfully.", "success");
+        showNotification("Abonnement erfolgreich widerrufen.", "success");
         loadSubscriptions();
     } catch (error) {
-        showNotification("Error revoking subscription: " + error.message, "error");
+        showNotification("Fehler beim Widerrufen des Abonnements: " + error.message, "error");
     }
 }
 
@@ -2808,7 +3023,7 @@ async function viewTicketUserData(ticketId) {
 async function saveAdminResponse(ticketId) {
     const response = document.getElementById("admin-response-text").value.trim();
     if (!response) {
-        showNotification("Please enter a response.", "info");
+        showNotification("Bitte geben Sie eine Antwort ein.", "info");
         return;
     }
 
@@ -2818,10 +3033,10 @@ async function saveAdminResponse(ticketId) {
             respondedAt: firebase.firestore.FieldValue.serverTimestamp(),
             status: "awaiting_user_feedback"
         });
-        showNotification("Admin response saved successfully.", "success");
+        showNotification("Admin-Antwort erfolgreich gespeichert.", "success");
         loadSupportTickets();
     } catch (error) {
-        showNotification("Error saving response: " + error.message, "error");
+        showNotification("Fehler beim Speichern der Antwort: " + error.message, "error");
     }
 }
 
@@ -2834,7 +3049,7 @@ async function updateTicketStatus(ticketId, newStatus) {
         showNotification("Ticket status updated to " + newStatus + ".", "success");
         loadSupportTickets();
     } catch (error) {
-        showNotification("Error updating ticket status: " + error.message, "error");
+        showNotification("Fehler beim Aktualisieren des Ticket-Status: " + error.message, "error");
     }
 }
 
@@ -2843,7 +3058,7 @@ async function updateTicketStatus(ticketId, newStatus) {
 async function triggerDsarExport() {
     const masterId = document.getElementById("dsar-master-id").value.trim();
     if (!masterId) {
-        showNotification("Please enter a Master ID.", "info");
+        showNotification("Bitte geben Sie eine Master-ID ein.", "info");
         return;
     }
     await triggerDsarExportForUser(masterId);
@@ -2912,7 +3127,7 @@ async function triggerAccountDeletion() {
     const masterId = document.getElementById("delete-master-id").value.trim();
     const resultEl = document.getElementById("delete-result");
     if (!masterId) {
-        showNotification("Please enter a Master ID.", "info");
+        showNotification("Bitte geben Sie eine Master-ID ein.", "info");
         return;
     }
 
@@ -2935,7 +3150,7 @@ async function triggerAccountDeletion() {
         loadStats();
     } catch (error) {
         if (resultEl) resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
-        showNotification("Error deleting account: " + error.message, "error");
+        showNotification("Fehler beim Löschen des Kontos: " + error.message, "error");
     }
 }
 
@@ -2945,7 +3160,7 @@ async function exportAuditLogs() {
     const resultEl = document.getElementById("audit-export-result");
 
     if (!startDate || !endDate) {
-        showNotification("Please select both start and end dates.", "info");
+        showNotification("Bitte wählen Sie Start- und Enddatum.", "info");
         return;
     }
 
@@ -3559,7 +3774,7 @@ function escapeHtml(text) {
 
 async function assignUserRole() {
     if (currentUserRole !== "admin") {
-        showNotification("Only admins can assign roles.", "error");
+        showNotification("Nur Admins können Rollen zuweisen.", "error");
         return;
     }
 
@@ -3568,11 +3783,11 @@ async function assignUserRole() {
     const resultEl = document.getElementById("role-result");
 
     if (!uid) {
-        showNotification("Please enter a User UID.", "info");
+        showNotification("Bitte geben Sie eine User-UID ein.", "info");
         return;
     }
     if (!role || !["admin", "support", "auditor"].includes(role)) {
-        showNotification("Please select a valid role.", "info");
+        showNotification("Bitte wählen Sie eine gültige Rolle.", "info");
         return;
     }
 
@@ -3584,10 +3799,10 @@ async function assignUserRole() {
         await setUserRoleInternal(uid, role);
         if (resultEl) resultEl.innerHTML = `<div class='success-box'>Rolle '${role}' erfolgreich für User ${escapeHtml(uid)} gesetzt.</div>`;
         refreshCommissioningReport();
-        showNotification(`Role '${role}' assigned to ${uid}.`, "success");
+        showNotification(`Rolle '${role}' für ${uid} zugewiesen.`, "success");
     } catch (error) {
         if (resultEl) resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
-        showNotification("Error assigning role: " + error.message, "error");
+        showNotification("Fehler beim Zuweisen der Rolle: " + error.message, "error");
     }
 }
 
