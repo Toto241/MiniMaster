@@ -588,3 +588,93 @@ export const getTicketUserData = functions.https.onCall(
     };
   }
 );
+
+// ==================== AI EXPLAIN PROBLEM (OPERATOR ASSISTANT) ====================
+
+/**
+ * Callable function for the admin panel to get AI explanations for setup/config problems.
+ * Requires authenticated admin/support user and explicit consent flag.
+ *
+ * Input: { problemContext: string, consentGiven: boolean }
+ * Output: { explanation: string, suggestion: string, provider: string, model: string }
+ */
+export const aiExplainProblem = functions.https.onCall(
+  async (data: { problemContext: string; consentGiven: boolean }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const role = context.auth.token.role as string | undefined;
+    if (role !== "admin" && role !== "support") {
+      throw new functions.https.HttpsError("permission-denied", "Only admin or support users can use the AI assistant.");
+    }
+
+    const { problemContext, consentGiven } = data;
+
+    if (!consentGiven) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Zustimmung zur KI-Nutzung ist erforderlich. Bitte bestätigen Sie vor der Anfrage."
+      );
+    }
+
+    if (!problemContext || typeof problemContext !== "string" || problemContext.trim().length < 10) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Problembeschreibung muss mindestens 10 Zeichen lang sein."
+      );
+    }
+
+    if (problemContext.length > 3000) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Problembeschreibung darf maximal 3000 Zeichen lang sein."
+      );
+    }
+
+    const prompt = `Du bist ein technischer Setup-Assistent für die MiniMaster Parental-Control-Suite.
+Der Betreiber hat ein Problem während der Einrichtung oder Inbetriebnahme und bittet um Hilfe.
+
+KONTEXT:
+${problemContext.trim()}
+
+${knowledgeBase ? `WISSENSBASIS:\n${knowledgeBase.substring(0, 8000)}\n` : ""}
+Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück:
+{
+  "explanation": "Erklärung des Problems in 2-3 Sätzen",
+  "suggestion": "Konkrete Schritt-für-Schritt-Lösung"
+}`;
+
+    try {
+      const aiResult = await generateAiCompletion(prompt);
+      let parsed: { explanation: string; suggestion: string };
+      try {
+        parsed = JSON.parse(aiResult.rawResponse);
+      } catch {
+        parsed = {
+          explanation: aiResult.rawResponse.substring(0, 500),
+          suggestion: "Bitte prüfen Sie die Konfiguration manuell oder wenden Sie sich an den Support.",
+        };
+      }
+
+      await AuditLogger.log(
+        "ai.explain_problem", context.auth.uid, role || "unknown",
+        "system", "ai_query", "success",
+        { provider: aiResult.provider, contextLength: problemContext.length }
+      );
+
+      return {
+        explanation: parsed.explanation || "Keine Erklärung verfügbar.",
+        suggestion: parsed.suggestion || "Keine Lösung vorgeschlagen.",
+        provider: aiResult.provider,
+        model: aiResult.provider === "gemini" ? GEMINI_MODEL : "gpt-4o",
+      };
+    } catch (error) {
+      functions.logger.error("Error in aiExplainProblem:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "KI-Analyse fehlgeschlagen. Bitte prüfen Sie die KI-Konfiguration (GEMINI_API_KEY / OPENAI_API_KEY)."
+      );
+    }
+  }
+);

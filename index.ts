@@ -29,7 +29,7 @@ export {
 // Support & AI
 export {
   createSupportTicket, grantSupportAccess, revokeSupportAccess, cleanupExpiredGrants,
-  onTicketCreated, provideSolutionFeedback, getTicketUserData,
+  onTicketCreated, provideSolutionFeedback, getTicketUserData, aiExplainProblem,
 } from "./src/support";
 
 // Triggers (FCM sync, photo analysis, task notifications)

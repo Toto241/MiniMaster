@@ -778,6 +778,502 @@ function renderAllPlatformSections() {
     renderGoLiveAmpel();
 }
 
+// ==================== PLAUSIBILITÄTSPRÜFUNG ====================
+
+function runPlausibilityCheck() {
+    const container = document.getElementById("plausibility-results");
+    if (!container) return;
+
+    const findings = [];
+    const attestations = getCommissioningAttestations();
+    const platformState = getPlatformReadiness();
+    const config = typeof getOperatorConfigFormValues === "function" ? getOperatorConfigFormValues() : {};
+
+    // Cross-Platform-Plausibilität
+    if (attestations["android-master-registered"] && !platformState["ma-registration-flow"]) {
+        findings.push({ severity: "warn", text: "MasterApp als registriert markiert, aber Registrierungs-Flow nicht bestätigt." });
+    }
+    if (attestations["android-child-registered"] && !platformState["ca-pairing-flow"]) {
+        findings.push({ severity: "warn", text: "ChildApp als registriert markiert, aber Pairing-Flow nicht bestätigt." });
+    }
+    if (attestations["parent-panel-verified"] && !platformState["dt-parent-panel-login"]) {
+        findings.push({ severity: "warn", text: "Parent-Panel als geprüft markiert, aber Desktop-Login nicht bestätigt." });
+    }
+    if (attestations["device-sync-verified"] && !platformState["ca-fcm-sync"]) {
+        findings.push({ severity: "warn", text: "Device-Sync als geprüft markiert, aber FCM-Sync in ChildApp nicht bestätigt." });
+    }
+    if (attestations["storage-rules-verified"] && !platformState["ca-task-proof"]) {
+        findings.push({ severity: "info", text: "Storage-Rules geprüft, aber Foto-Beweis-Upload noch nicht bestätigt." });
+    }
+
+    // MasterApp-Plausibilität
+    if (platformState["ma-lock-unlock"] && !platformState["ca-accessibility-active"]) {
+        findings.push({ severity: "error", text: "MasterApp Lock/Unlock bestätigt, aber ChildApp AccessibilityService nicht aktiv – Sperren wirken nicht." });
+    }
+    if (platformState["ma-task-create"] && !platformState["ca-task-proof"]) {
+        findings.push({ severity: "warn", text: "Task-Erstellung bestätigt, aber Foto-Beweis-Upload im Kind-App nicht bestätigt." });
+    }
+    if (platformState["ma-task-review"] && !platformState["ma-task-reject-ui"]) {
+        findings.push({ severity: "warn", text: "Task-Review bestätigt, aber Reject-Button fehlt noch." });
+    }
+    if (platformState["ma-usage-rules-nav"] && !platformState["ca-usage-limits"]) {
+        findings.push({ severity: "warn", text: "UsageRules in MasterApp navigierbar, aber Limits in ChildApp nicht durchgesetzt." });
+    }
+    if (platformState["ma-fcm-working"] && !platformState["ca-fcm-sync"]) {
+        findings.push({ severity: "error", text: "FCM-Empfang in MasterApp bestätigt, aber FCM-Sync in ChildApp nicht – Push-Kette unterbrochen." });
+    }
+    if (platformState["ma-subscription-check"] && !platformState["ma-subscription-enforce"]) {
+        findings.push({ severity: "warn", text: "Abo-Check bestätigt, aber Free-Tier-Limit wird nicht erzwungen." });
+    }
+
+    // ChildApp-Plausibilität
+    if (platformState["ca-app-blocking-effective"] && !platformState["ca-overlay-secure"]) {
+        findings.push({ severity: "error", text: "App-Blocking als wirksam markiert, aber Overlay-Sicherheit fehlt – Kinder können Overlay wegwischen." });
+    }
+    if (platformState["ca-app-blocking-effective"] && !platformState["ca-uninstall-prevention"]) {
+        findings.push({ severity: "error", text: "App-Blocking bestätigt, aber Deinstallationsschutz fehlt – Kind kann App einfach deinstallieren." });
+    }
+    if (platformState["ca-accessibility-active"] && !platformState["ca-settings-protection"]) {
+        findings.push({ severity: "error", text: "AccessibilityService aktiv, aber Settings-Schutz fehlt – Kind kann Service abschalten." });
+    }
+    if (platformState["ca-heartbeat"] && !platformState["ca-boot-receiver"]) {
+        findings.push({ severity: "warn", text: "HeartbeatWorker bestätigt, aber BootReceiver fehlt – nach Neustart kein Heartbeat." });
+    }
+
+    // Desktop-Plausibilität
+    if (platformState["dt-auto-update"] && !platformState["dt-code-signing"]) {
+        findings.push({ severity: "error", text: "Auto-Update bestätigt, aber Code-Signing fehlt – unsignierte Updates sind ein Sicherheitsrisiko." });
+    }
+    if (platformState["dt-desktop-notifications"] && !platformState["dt-ipc-messaging"]) {
+        findings.push({ severity: "warn", text: "Desktop-Benachrichtigungen bestätigt, aber IPC-Kommunikation fehlt – Benachrichtigungen benötigen IPC." });
+    }
+    if (platformState["dt-parent-panel-login"] && !platformState["dt-credential-security"]) {
+        findings.push({ severity: "error", text: "Parent-Panel-Login bestätigt, aber Credentials unsicher gespeichert." });
+    }
+
+    // KI-Konfiguration
+    if (config?.ai?.provider && !config?.ai?.keyRef) {
+        findings.push({ severity: "warn", text: "KI-Provider konfiguriert, aber Secret-Referenz fehlt – KI-Aufrufe werden fehlschlagen." });
+    }
+
+    // Backend ↔ App-Konsistenz
+    const validationChecks = commissioningSummary?.validationSummary?.checks || {};
+    if (validationChecks.functionsReachable && !platformState["ma-pairing-works"]) {
+        findings.push({ severity: "info", text: "Backend-Functions erreichbar, aber MasterApp-Pairing noch nicht getestet." });
+    }
+    if (validationChecks.storageHealthOk && !platformState["ca-task-proof"]) {
+        findings.push({ severity: "info", text: "Storage-Bucket erreichbar, aber Foto-Upload aus ChildApp noch ungeprüft." });
+    }
+
+    if (findings.length === 0) {
+        findings.push({ severity: "ok", text: "Keine Plausibilitäts-Widersprüche erkannt. Alle Angaben sind konsistent." });
+    }
+
+    const html = findings.map(f => {
+        const icon = f.severity === "error" ? "🔴" : f.severity === "warn" ? "🟡" : f.severity === "info" ? "🔵" : "🟢";
+        return `<div class="plausibility-item plausibility-${f.severity}">${icon} ${escapeHtml(f.text)}</div>`;
+    }).join("");
+
+    container.innerHTML = html;
+    return findings;
+}
+
+// ==================== EINRICHTUNGSASSISTENTEN (WIZARD) ====================
+
+const WIZARD_STATE_KEY = "operatorSetupWizardState";
+
+function getWizardState(wizardId) {
+    try {
+        const all = JSON.parse(localStorage.getItem(WIZARD_STATE_KEY) || "{}");
+        return all[wizardId] || { currentStep: 0, completed: {} };
+    } catch (_) { return { currentStep: 0, completed: {} }; }
+}
+
+function saveWizardState(wizardId, state) {
+    try {
+        const all = JSON.parse(localStorage.getItem(WIZARD_STATE_KEY) || "{}");
+        all[wizardId] = state;
+        localStorage.setItem(WIZARD_STATE_KEY, JSON.stringify(all));
+    } catch (_) { /* ignore */ }
+}
+
+const setupWizards = {
+    masterApp: {
+        title: "Eltern-App (MasterApp) einrichten",
+        steps: [
+            {
+                title: "1. App installieren",
+                instruction: "Installieren Sie die MasterApp auf dem Eltern-Smartphone. Sie finden sie unter dem Paketnamen <strong>com.minimaster.masterapp</strong>.",
+                detail: "Für Testzwecke: <code>gradlew.bat :masterApp:assembleDebug</code> ausführen und die APK per USB/ADB installieren. Für Produktion: App über den Google Play Store herunterladen.",
+                checkKey: "ma-registration-flow",
+            },
+            {
+                title: "2. Geräteregistrierung",
+                instruction: "Öffnen Sie die App. Sie werden automatisch zur Registrierung geleitet. Die App fordert <strong>READ_PHONE_STATE</strong> an und registriert das Gerät über <code>registerMasterDevice</code>.",
+                detail: "Nach Registrierung erhalten Sie einen <strong>SecretKey</strong>, der im DataStore gespeichert wird. <em>Wichtig:</em> Auf Android 10+ kann die IMEI nicht direkt gelesen werden – hier wird eine alternative Geräte-ID benötigt.",
+                checkKey: "ma-registration-flow",
+            },
+            {
+                title: "3. Kind-Gerät koppeln",
+                instruction: "Im Dashboard auf <strong>Pairing-Link generieren</strong> oder einen <strong>6-stelligen Code</strong> erstellen. Den Link/Code an das Kind-Gerät weitergeben.",
+                detail: "Pairing-Links sind 5 Minuten gültig (UUID-Token). Codes sind 24 Stunden gültig. Nach erfolgreichem Pairing erscheint das Kind-Gerät im Dashboard.",
+                checkKey: "ma-pairing-works",
+            },
+            {
+                title: "4. Gerätesperre testen",
+                instruction: "Im Dashboard den <strong>Lock-Toggle</strong> für das gekoppelte Kind-Gerät aktivieren. Prüfen Sie, ob das Kind-Gerät gesperrt wird.",
+                detail: "Der Lock-Status wird in Echtzeit via Firestore synchronisiert. Das Kind-Gerät empfängt die Änderung über FCM und den AccessibilityService.",
+                checkKey: "ma-lock-unlock",
+            },
+            {
+                title: "5. Aufgabe erstellen und prüfen",
+                instruction: "Eine Testaufgabe über <strong>Aufgabe erstellen</strong> anlegen. Das Kind schließt die Aufgabe mit Fotobeweis ab. Danach im <strong>Task Review</strong> genehmigen.",
+                detail: "Aufgaben-Flow: pending → pending_approval (Kind schickt Foto) → approved (Eltern genehmigen). Der Reject-Button muss ebenfalls funktionieren.",
+                checkKey: "ma-task-review",
+            },
+            {
+                title: "6. Nutzungsregeln einrichten",
+                instruction: "Öffnen Sie <strong>Nutzungsregeln</strong> für ein Kind-Gerät. Setzen Sie ein Tageslimit (z.B. 120 Minuten), ein Zeitfenster (z.B. 08:00–20:00) und optional Pro-App-Limits.",
+                detail: "Die Regeln werden über <code>setUsageRules</code> Cloud Function gespeichert und per FCM an das Kind-Gerät übermittelt. Testen Sie, ob die Limits auf dem Kind-Gerät tatsächlich greifen.",
+                checkKey: "ma-usage-rules-nav",
+            },
+            {
+                title: "7. Push-Benachrichtigungen prüfen",
+                instruction: "Lösen Sie auf dem Kind-Gerät eine Aufgaben-Erledigung aus. Prüfen Sie, ob die Eltern-App eine <strong>Push-Benachrichtigung</strong> empfängt.",
+                detail: "Die MasterApp verwendet zwei Notification-Channels: IMPORTANCE_HIGH (Aufgaben) und IMPORTANCE_DEFAULT (Gerätestatus). FCM-Token wird beim App-Start registriert.",
+                checkKey: "ma-fcm-working",
+            },
+            {
+                title: "8. Abonnement prüfen",
+                instruction: "Öffnen Sie den <strong>Subscription-Screen</strong>. Prüfen Sie, ob Produkte angezeigt werden und ein Testkauf möglich ist.",
+                detail: "SKUs: single_child_monthly (€1,99), family_monthly (€4,99), single_child_yearly (€19,99), family_yearly (€49,99). Testmodus über Google Play Console aktivieren.",
+                checkKey: "ma-subscription-check",
+            },
+        ],
+    },
+    childApp: {
+        title: "Kind-App (ChildApp) einrichten",
+        steps: [
+            {
+                title: "1. App installieren",
+                instruction: "Installieren Sie die ChildApp auf dem Kind-Smartphone. Paketname: <strong>com.google.pairing</strong> (Legacy-Paketname).",
+                detail: "Für Tests: <code>gradlew.bat :childApp:assembleDebug</code>. Per ADB installieren: <code>adb install childApp/build/outputs/apk/debug/childApp-debug.apk</code>.",
+                checkKey: "ca-pairing-flow",
+            },
+            {
+                title: "2. Kopplung durchführen",
+                instruction: "Öffnen Sie die ChildApp und geben Sie den <strong>6-stelligen Code</strong> ein oder öffnen Sie den <strong>Pairing-Link</strong> auf dem Kind-Gerät.",
+                detail: "Die App ruft <code>validatePairingCode</code> oder <code>validatePairingToken</code> auf. Nach Erfolg wird ein Child-Dokument in Firestore erstellt und die App wechselt in den überwachten Modus.",
+                checkKey: "ca-pairing-flow",
+            },
+            {
+                title: "3. Berechtigungen erteilen",
+                instruction: "Erteilen Sie alle erforderlichen Berechtigungen: <strong>Eingabehilfe (Accessibility)</strong>, <strong>Overlay-Berechtigung</strong>, <strong>Nutzungsstatistik-Zugriff</strong>, <strong>Geräteadministrator</strong>.",
+                detail: "Die App leitet durch jeden Berechtigungsschritt. Ohne Accessibility-Berechtigung ist keine App-Überwachung möglich. Die Overlay-Berechtigung wird für die Sperrbildschirm-Anzeige benötigt.",
+                checkKey: "ca-permission-onboarding",
+            },
+            {
+                title: "4. Eingabehilfe aktivieren",
+                instruction: "Navigieren Sie zu <strong>Einstellungen → Eingabehilfe → MiniMaster</strong> und aktivieren Sie den Dienst. Bestätigen Sie die Warnung.",
+                detail: "Der MiniMasterAccessibilityService überwacht App-Wechsel und blockiert Apps auf der Blacklist. Ohne diesen Service ist die App-Sperrfunktion wirkungslos.",
+                checkKey: "ca-accessibility-active",
+            },
+            {
+                title: "5. Sperrbildschirm testen",
+                instruction: "Lösen Sie über die Eltern-App eine <strong>Gerätesperre</strong> aus. Das Kind-Gerät sollte sofort einen Sperrbildschirm anzeigen, der nicht umgangen werden kann.",
+                detail: "Die BlockingOverlayService zeigt ein Vollbild-Overlay. Prüfen Sie: Ist das Overlay wirklich nicht wegwischbar? Bedeckt es den gesamten Bildschirm? Überlebt es einen Home-Button-Druck?",
+                checkKey: "ca-overlay-secure",
+            },
+            {
+                title: "6. App-Blocking testen",
+                instruction: "Fügen Sie über die Eltern-App eine App zur <strong>Blacklist</strong> hinzu (z.B. YouTube). Öffnen Sie diese App auf dem Kind-Gerät.",
+                detail: "Das AccessibilityService erkennt den App-Wechsel und blockiert die App. Aktuell wird GLOBAL_ACTION_BACK verwendet – prüfen Sie, ob das Kind die App trotzdem sofort wieder öffnen kann.",
+                checkKey: "ca-app-blocking-effective",
+            },
+            {
+                title: "7. Heartbeat prüfen",
+                instruction: "Warten Sie 15 Minuten oder prüfen Sie in der Eltern-App den <strong>Online-Status</strong> (lastSeen-Timestamp). Das Kind-Gerät sollte als 'online' erscheinen.",
+                detail: "Der HeartbeatWorker sendet alle 15 Minuten per WorkManager. Im Dashboard: grüner Punkt = online (lastSeen < 20 Min), grauer Punkt = offline.",
+                checkKey: "ca-heartbeat",
+            },
+            {
+                title: "8. Aufgaben-Beweis testen",
+                instruction: "Erstellen Sie in der Eltern-App eine Aufgabe. Schließen Sie sie auf dem Kind-Gerät ab und machen Sie ein <strong>Foto als Beweis</strong>.",
+                detail: "Das Foto wird über Firebase Storage hochgeladen. Die Aufgabe wechselt in den Status <code>pending_approval</code>. Die Eltern können das Foto im Task-Review einsehen.",
+                checkKey: "ca-task-proof",
+            },
+            {
+                title: "9. Neustart-Verhalten prüfen",
+                instruction: "Starten Sie das Kind-Gerät neu. Prüfen Sie, ob alle Dienste (Accessibility, Heartbeat, FCM) <strong>automatisch</strong> wieder laufen.",
+                detail: "Der BootReceiver startet die Services nach dem Boot. Testen Sie: Ist die App-Sperre aktiv? Kommt ein Heartbeat nach dem Neustart?",
+                checkKey: "ca-boot-receiver",
+            },
+        ],
+    },
+};
+
+let activeWizard = null;
+
+function startSetupWizard(wizardId) {
+    const wizard = setupWizards[wizardId];
+    if (!wizard) return;
+    activeWizard = wizardId;
+    const state = getWizardState(wizardId);
+    renderWizardStep(wizardId, state.currentStep);
+}
+
+function renderWizardStep(wizardId, stepIndex) {
+    const container = document.getElementById("setup-wizard-content");
+    if (!container) return;
+    const wizard = setupWizards[wizardId];
+    if (!wizard) return;
+
+    const state = getWizardState(wizardId);
+    state.currentStep = stepIndex;
+    saveWizardState(wizardId, state);
+
+    const step = wizard.steps[stepIndex];
+    if (!step) return;
+
+    const totalSteps = wizard.steps.length;
+    const completedCount = Object.keys(state.completed).filter(k => state.completed[k]).length;
+
+    const progressPct = Math.round((completedCount / totalSteps) * 100);
+    const isStepDone = Boolean(state.completed[stepIndex]);
+
+    let stepsNav = "";
+    for (let i = 0; i < totalSteps; i++) {
+        const done = state.completed[i];
+        const active = i === stepIndex;
+        stepsNav += `<button class="wizard-step-dot ${done ? "done" : ""} ${active ? "active" : ""}" onclick="renderWizardStep('${wizardId}', ${i})" title="Schritt ${i + 1}">${i + 1}</button>`;
+    }
+
+    container.innerHTML = `
+        <div class="wizard-active-card">
+            <div class="wizard-progress-header">
+                <h4>${escapeHtml(wizard.title)}</h4>
+                <span>${completedCount}/${totalSteps} Schritte (${progressPct}%)</span>
+            </div>
+            <div class="ampel-progress-bar" style="margin-block-end:12px">
+                <div class="ampel-progress-fill" style="width:${progressPct}%;background:${progressPct === 100 ? '#22c55e' : '#3b82f6'}"></div>
+            </div>
+            <div class="wizard-step-nav">${stepsNav}</div>
+            <div class="wizard-step-content">
+                <h5>${step.title}</h5>
+                <p>${step.instruction}</p>
+                <details class="wizard-detail">
+                    <summary>Technische Details & Hinweise</summary>
+                    <div class="wizard-detail-content">${step.detail}</div>
+                </details>
+                <div class="wizard-step-actions">
+                    <label class="wizard-check-label">
+                        <input type="checkbox" ${isStepDone ? "checked" : ""} onchange="toggleWizardStepDone('${wizardId}', ${stepIndex}, this.checked)">
+                        Schritt erledigt
+                    </label>
+                    <button class="btn btn-secondary btn-sm" onclick="askGeminiAboutStep('${wizardId}', ${stepIndex})" title="KI-Hilfe anfordern">🤖 Gemini fragen</button>
+                </div>
+            </div>
+            <div class="wizard-nav-buttons">
+                ${stepIndex > 0 ? `<button class="btn btn-secondary btn-sm" onclick="renderWizardStep('${wizardId}', ${stepIndex - 1})">← Zurück</button>` : "<span></span>"}
+                ${stepIndex < totalSteps - 1 ? `<button class="btn btn-primary btn-sm" onclick="renderWizardStep('${wizardId}', ${stepIndex + 1})">Weiter →</button>` : `<button class="btn btn-primary btn-sm" onclick="finishWizard('${wizardId}')">Abschließen ✓</button>`}
+            </div>
+            <div id="wizard-gemini-response" style="margin-block-start:12px"></div>
+        </div>`;
+}
+
+function toggleWizardStepDone(wizardId, stepIndex, done) {
+    const state = getWizardState(wizardId);
+    state.completed[stepIndex] = done;
+    saveWizardState(wizardId, state);
+
+    // Sync with platform readiness
+    const wizard = setupWizards[wizardId];
+    if (wizard?.steps[stepIndex]?.checkKey) {
+        updatePlatformReadiness({ [wizard.steps[stepIndex].checkKey]: done });
+        renderPlatformReadinessSection(wizardId === "masterApp" ? "masterApp" : "childApp");
+        renderGoLiveAmpel();
+    }
+    renderWizardStep(wizardId, stepIndex);
+}
+
+function finishWizard(wizardId) {
+    const state = getWizardState(wizardId);
+    const wizard = setupWizards[wizardId];
+    const total = wizard.steps.length;
+    const done = Object.keys(state.completed).filter(k => state.completed[k]).length;
+
+    const container = document.getElementById("setup-wizard-content");
+    if (!container) return;
+
+    if (done === total) {
+        container.innerHTML = `<div class="success-box">✅ ${escapeHtml(wizard.title)} – alle ${total} Schritte abgeschlossen!</div>`;
+    } else {
+        container.innerHTML = `<div class="error">⚠️ ${done}/${total} Schritte erledigt. Bitte offene Schritte nachholen.</div>`;
+    }
+    activeWizard = null;
+    renderGoLiveAmpel();
+}
+
+function resetWizard(wizardId) {
+    saveWizardState(wizardId, { currentStep: 0, completed: {} });
+    startSetupWizard(wizardId);
+}
+
+// ==================== GEMINI KI-ERKLÄRUNGS-DIENST MIT CONSENT ====================
+
+const AI_CONSENT_KEY = "operatorAiConsentGiven";
+
+function hasAiConsent() {
+    return localStorage.getItem(AI_CONSENT_KEY) === "true";
+}
+
+function grantAiConsent() {
+    localStorage.setItem(AI_CONSENT_KEY, "true");
+}
+
+function revokeAiConsent() {
+    localStorage.removeItem(AI_CONSENT_KEY);
+    const statusEl = document.getElementById("ai-consent-status");
+    if (statusEl) statusEl.innerHTML = "<div class='info'>KI-Zustimmung wurde widerrufen.</div>";
+    showNotification("KI-Zustimmung widerrufen.", "info");
+}
+
+function showAiConsentDialog(onAccept) {
+    if (hasAiConsent()) {
+        onAccept();
+        return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "consent-overlay";
+    overlay.innerHTML = `
+        <div class="consent-dialog">
+            <h3>🤖 KI-Nutzung: Zustimmung erforderlich</h3>
+            <p>
+                Sie sind dabei, eine KI-gestützte Analyse über <strong>Google Gemini</strong> anzufordern.
+                Dabei werden technische Kontext-Informationen (Fehlerbeschreibung, Konfigurationsdetails)
+                an die Gemini-API übermittelt.
+            </p>
+            <p>
+                <strong>Es werden keine personenbezogenen Daten</strong> (Nutzernamen, IMEI, Secrets)
+                an die KI übermittelt. Die Anfrage enthält ausschließlich technische Beschreibungen.
+            </p>
+            <p>
+                Möchten Sie der KI-Nutzung für diese Sitzung zustimmen?
+            </p>
+            <div class="consent-actions">
+                <label class="consent-remember">
+                    <input type="checkbox" id="consent-remember-check"> Für künftige Anfragen merken
+                </label>
+                <div class="consent-buttons">
+                    <button class="btn btn-secondary" id="consent-decline">Ablehnen</button>
+                    <button class="btn btn-primary" id="consent-accept">Zustimmen & fortfahren</button>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector("#consent-decline").addEventListener("click", () => {
+        overlay.remove();
+        showNotification("KI-Anfrage abgebrochen. Keine Daten übermittelt.", "info");
+    });
+
+    overlay.querySelector("#consent-accept").addEventListener("click", () => {
+        const remember = overlay.querySelector("#consent-remember-check")?.checked;
+        if (remember) grantAiConsent();
+        overlay.remove();
+        onAccept();
+    });
+}
+
+function renderAiConsentStatus() {
+    const statusEl = document.getElementById("ai-consent-status");
+    if (!statusEl) return;
+    if (hasAiConsent()) {
+        statusEl.innerHTML = `<div class="success-box">KI-Zustimmung erteilt. <button class="btn btn-secondary btn-sm" onclick="revokeAiConsent()" style="margin-inline-start:8px">Widerrufen</button></div>`;
+    } else {
+        statusEl.innerHTML = `<div class="info">Noch keine KI-Zustimmung erteilt. Sie werden bei der ersten Anfrage gefragt.</div>`;
+    }
+}
+
+async function callAiExplain(problemContext) {
+    const responseEl = document.getElementById("ai-explain-response") || document.getElementById("wizard-gemini-response");
+    if (responseEl) responseEl.innerHTML = "<div class='loading'>KI analysiert das Problem...</div>";
+
+    try {
+        const result = await functions.httpsCallable("aiExplainProblem")({
+            problemContext: problemContext,
+            consentGiven: true,
+        });
+
+        const data = result.data || {};
+        const html = `
+            <div class="ai-response-card">
+                <h5>🤖 KI-Erklärung <span class="ai-provider-badge">${escapeHtml(data.provider || "?")} / ${escapeHtml(data.model || "?")}</span></h5>
+                <div class="ai-section">
+                    <strong>Erklärung:</strong>
+                    <p>${escapeHtml(data.explanation || "Keine Erklärung verfügbar.")}</p>
+                </div>
+                <div class="ai-section">
+                    <strong>Lösungsvorschlag:</strong>
+                    <p>${escapeHtml(data.suggestion || "Kein Vorschlag verfügbar.")}</p>
+                </div>
+            </div>`;
+        if (responseEl) responseEl.innerHTML = html;
+        return data;
+    } catch (error) {
+        const errorHtml = `<div class="error">KI-Anfrage fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        if (responseEl) responseEl.innerHTML = errorHtml;
+        return null;
+    }
+}
+
+function askGeminiAboutStep(wizardId, stepIndex) {
+    const wizard = setupWizards[wizardId];
+    if (!wizard) return;
+    const step = wizard.steps[stepIndex];
+    if (!step) return;
+
+    const problemContext = `Einrichtungsschritt: ${step.title}\n\nAnweisung: ${step.instruction.replace(/<[^>]+>/g, "")}\n\nDetails: ${step.detail.replace(/<[^>]+>/g, "")}\n\nDer Betreiber braucht Hilfe bei diesem Schritt der ${wizard.title}. Erkläre was zu tun ist und typische Fehlerquellen.`;
+
+    showAiConsentDialog(() => callAiExplain(problemContext));
+}
+
+function askGeminiAboutPlausibility(finding) {
+    const problemContext = `Plausibilitätsprüfung hat folgendes gefunden:\n\n${finding}\n\nErkläre das Problem und was konkret zu tun ist, um es zu lösen.`;
+    showAiConsentDialog(() => callAiExplain(problemContext));
+}
+
+function askGeminiFreiform() {
+    const input = document.getElementById("ai-freeform-input");
+    if (!input) return;
+    const question = input.value.trim();
+    if (question.length < 10) {
+        showNotification("Bitte mindestens 10 Zeichen eingeben.", "error");
+        return;
+    }
+
+    const problemContext = `Betreiber-Frage zur MiniMaster-Einrichtung:\n\n${question}`;
+    showAiConsentDialog(() => callAiExplain(problemContext));
+}
+
+function runPlausibilityWithAiOption() {
+    const findings = runPlausibilityCheck();
+    if (!findings) return;
+
+    const errors = findings.filter(f => f.severity === "error" || f.severity === "warn");
+    if (errors.length > 0) {
+        const container = document.getElementById("plausibility-results");
+        if (container) {
+            const btn = document.createElement("div");
+            btn.style.marginBlockStart = "12px";
+            btn.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="askGeminiAboutPlausibility('${escapeHtml(errors.map(e => e.text).join("; ").replace(/'/g, "\\'"))}')">🤖 Gemini: Alle Probleme erklären lassen</button>`;
+            container.appendChild(btn);
+        }
+    }
+}
+
 function getBootstrapFirebaseFormValues() {
     return {
         apiKey: (document.getElementById("bootstrap-api-key")?.value || "").trim(),
@@ -1175,6 +1671,7 @@ function initializeSetupAssistant() {
     renderSetupChecklist();
     renderCommissioningAttestations();
     renderAllPlatformSections();
+    renderAiConsentStatus();
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     loadOperatorConfig();
