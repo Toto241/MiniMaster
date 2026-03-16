@@ -401,7 +401,7 @@
                         </div>
 
                         <div
-                            class="compliance-section"
+                            class="compliance-section admin-only"
                             style="margin-block-start: 30px"
                         >
                             <h3>Data Deletion Request (GDPR Art. 17)</h3>
@@ -505,7 +505,7 @@
                         </div>
 
                         <!-- Admin-Konto-Erstellung -->
-                        <div class="setup-card" style="margin-block-start: 20px">
+                        <div class="setup-card admin-only" style="margin-block-start: 20px">
                             <h3>Admin-Konto erstellen / Admin-Claim vergeben</h3>
                             <p>Bestehenden Firebase-Auth-User zum Operator/Admin hochstufen (nur für bereits authentifizierte Admins).</p>
                             <div class="dsar-form">
@@ -513,6 +513,23 @@
                                 <button onclick="grantAdminClaim()" class="btn btn-primary">Admin-Claim setzen</button>
                             </div>
                             <div id="admin-claim-result" class="data-list" style="margin-block-start: 10px"></div>
+                        </div>
+
+                        <!-- Rollenverwaltung -->
+                        <div class="setup-card admin-only" style="margin-block-start: 20px">
+                            <h3>Rollenverwaltung (RBAC)</h3>
+                            <p>Operator-Rollen zuweisen: <strong>Admin</strong> (Vollzugriff), <strong>Support</strong> (Tickets + KI-Support, eingeschränkt auf freigegebene Fälle), <strong>Auditor</strong> (Einsicht Audit-Logs + Compliance).</p>
+                            <div class="dsar-form">
+                                <input type="text" id="role-uid" placeholder="User UID" />
+                                <select id="role-select">
+                                    <option value="">-- Rolle wählen --</option>
+                                    <option value="admin">Admin (Vollzugriff)</option>
+                                    <option value="support">Support Agent</option>
+                                    <option value="auditor">Read-Only Auditor</option>
+                                </select>
+                                <button onclick="assignUserRole()" class="btn btn-primary">Rolle zuweisen</button>
+                            </div>
+                            <div id="role-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
 
                         <div

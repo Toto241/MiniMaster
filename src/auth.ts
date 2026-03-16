@@ -8,6 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, AuditLogger } from "./shared";
+import type { OperatorRole } from "./shared";
 
 /**
  * Sets the custom claim 'role: admin' for a specified user UID.
@@ -42,6 +43,49 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
     throw new functions.https.HttpsError("internal", "Failed to set admin claim.");
   }
 });
+
+const VALID_OPERATOR_ROLES: OperatorRole[] = ["admin", "support", "auditor"];
+
+/**
+ * Sets an operator role (admin/support/auditor) for a specified user UID.
+ * Only callable by an existing admin.
+ */
+export const setUserRole = functions.https.onCall(
+  async (data: { uid: string; role: string }, context: CallableContext) => {
+    const startTime = Date.now();
+
+    try {
+      requireAdmin(context);
+
+      const { uid, role } = data;
+      if (!uid || typeof uid !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "A valid user UID is required.");
+      }
+      if (!role || !VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          `Role must be one of: ${VALID_OPERATOR_ROLES.join(", ")}`
+        );
+      }
+
+      await admin.auth().setCustomUserClaims(uid, { role });
+
+      await AuditLogger.logSuccess(
+        "admin.set_admin_claim", context, `users/${uid}`, "user",
+        { targetUserId: uid, assignedRole: role, duration: Date.now() - startTime }
+      );
+
+      return { message: `Role '${role}' set for user ${uid}` };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "admin.set_admin_claim", context, `users/${data?.uid || "unknown"}`, "user",
+        error as Error, { targetUserId: data?.uid, role: data?.role }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError("internal", "Failed to set user role.");
+    }
+  }
+);
 
 /**
  * Issues a fresh Firebase custom token for the currently authenticated user.

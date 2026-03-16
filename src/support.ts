@@ -10,7 +10,7 @@ import { OpenAI } from "openai";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
-import { AuditLogger } from "./shared";
+import { AuditLogger, requireSupportOrAdmin } from "./shared";
 
 // ==================== AI CLIENT ====================
 
@@ -516,5 +516,75 @@ export const provideSolutionFeedback = functions.https.onCall(
       functions.logger.error("Error in provideSolutionFeedback:", error);
       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
     }
+  }
+);
+
+/**
+ * GDPR-compliant function for support agents to view user data through a ticket.
+ * Requires an active, non-expired support access grant linked to the ticket.
+ */
+export const getTicketUserData = functions.https.onCall(
+  async (data: { ticketId: string }, context: CallableContext) => {
+    requireSupportOrAdmin(context);
+    const callerId = context.auth!.uid;
+
+    const { ticketId } = data;
+    if (!ticketId || typeof ticketId !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const ticketDoc = await db().collection("supportTickets").doc(ticketId).get();
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
+    }
+
+    const ticket = ticketDoc.data()!;
+    const masterImei = ticket.masterImei;
+
+    // Verify active support grant exists for this ticket
+    if (!ticket.accessGrantId) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "No support access grant for this ticket. User must grant access first."
+      );
+    }
+
+    const grantDoc = await db().collection("supportAccessGrants").doc(ticket.accessGrantId).get();
+    if (!grantDoc.exists) {
+      throw new functions.https.HttpsError("permission-denied", "Support access grant not found.");
+    }
+
+    const grant = grantDoc.data()!;
+    if (grant.status !== "active") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        `Support access grant is ${grant.status}. User must re-grant access.`
+      );
+    }
+
+    const now = admin.firestore.Timestamp.now();
+    if (grant.expiresAt && grant.expiresAt.seconds < now.seconds) {
+      await db().collection("supportAccessGrants").doc(ticket.accessGrantId).update({ status: "expired" });
+      throw new functions.https.HttpsError("deadline-exceeded", "Support access grant has expired.");
+    }
+
+    // Grant is valid — fetch user data
+    const masterDoc = await db().collection("masters").doc(masterImei).get();
+    const masterData = masterDoc.exists ? masterDoc.data() : null;
+
+    const childrenSnap = await db().collection("children").where("masterImei", "==", masterImei).get();
+    const children = childrenSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+    await AuditLogger.log(
+      "admin.user_impersonation", callerId, context.auth!.token.role as string || "support",
+      `masters/${masterImei}`, "user", "success",
+      { ticketId, grantId: ticket.accessGrantId, childCount: children.length }
+    );
+
+    return {
+      master: masterData ? { id: masterImei, ...masterData } : null,
+      children,
+      grantExpiresAt: grant.expiresAt?.toDate?.()?.toISOString() || null,
+    };
   }
 );
