@@ -98,6 +98,28 @@
                             Login
                         </button>
                     </form>
+
+                    <div class="setup-card" style="margin-block-start: 24px">
+                        <h3>Firebase Bootstrap-Konfiguration</h3>
+                        <p>
+                            Für die erste Inbetriebnahme oder beim Wechsel des Firebase-Projekts
+                            kann die Web-Konfiguration hier lokal hinterlegt werden. Danach lässt
+                            sich das Admin-Tool ohne Codeänderung neu initialisieren.
+                        </p>
+                        <div class="commissioning-grid">
+                            <input type="text" id="bootstrap-api-key" placeholder="Firebase apiKey" />
+                            <input type="text" id="bootstrap-auth-domain" placeholder="Firebase authDomain" />
+                            <input type="text" id="bootstrap-project-id" placeholder="Firebase projectId" />
+                            <input type="text" id="bootstrap-storage-bucket" placeholder="Firebase storageBucket" />
+                            <input type="text" id="bootstrap-messaging-sender-id" placeholder="Firebase messagingSenderId" />
+                            <input type="text" id="bootstrap-app-id" placeholder="Firebase appId" />
+                        </div>
+                        <div class="setup-actions" style="margin-block-start: 12px">
+                            <button onclick="saveBootstrapFirebaseConfig()" class="btn btn-secondary">Lokal speichern</button>
+                            <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary">Speichern und neu laden</button>
+                        </div>
+                        <div id="bootstrap-config-status" class="data-list" style="margin-block-start: 15px"></div>
+                    </div>
                 </section>
 
                 <!-- Dashboard Section (Hidden until authorized) -->
@@ -456,6 +478,59 @@
                         style="display: none"
                     >
                         <h2>Cloud Integration &amp; Operator Assistant</h2>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Inbetriebnahme-Assistent</h3>
+                            <p>
+                                Dieses Werkzeug bündelt die produktive Inbetriebnahme: Firebase-Bootstrap,
+                                Runtime-Konfiguration, optionale Rollenvergabe und Validierung mit Abschlussbericht.
+                            </p>
+
+                            <div class="wizard-step">
+                                <h4>1. Firebase-Projekt und Zusatzrollen</h4>
+                                <div class="commissioning-grid">
+                                    <input type="text" id="commissioning-support-uid" placeholder="Optional: Support Agent UID" />
+                                    <input type="text" id="commissioning-auditor-uid" placeholder="Optional: Auditor UID" />
+                                </div>
+                                <p class="muted-note">
+                                    Die eigentliche Firebase-Webkonfiguration erfolgt im Bootstrap-Block vor dem Login,
+                                    die Cloud-/KI-Runtime-Konfiguration im Block darunter.
+                                </p>
+                            </div>
+
+                            <div class="setup-actions" style="margin-block-start: 12px">
+                                <button onclick="runCommissioningAssistant()" class="btn btn-primary">Assistent ausführen</button>
+                                <button onclick="refreshCommissioningReport()" class="btn btn-secondary">Bericht aktualisieren</button>
+                            </div>
+
+                            <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
+                                <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
+                            </div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
+                            <p>
+                                Stellt alle relevanten Betriebsbefehle zentral zusammen und wandelt sie per Button
+                                in PowerShell um. Das gilt für Deploy, Vorbereitungsbefehle und die Erstadmin-Anlage.
+                            </p>
+
+                            <div class="commissioning-grid">
+                                <input type="text" id="cmd-workspace-path" placeholder="Arbeitsverzeichnis, z. B. D:/Tools/MiniMaster" />
+                                <input type="email" id="cmd-first-admin-email" placeholder="Optional: Erstadmin E-Mail" />
+                                <input type="text" id="cmd-first-admin-password" placeholder="Optional: Erstadmin Passwort" />
+                            </div>
+
+                            <div class="setup-actions" style="margin-block-start: 12px">
+                                <button onclick="refreshCommandBuilderCommands()" class="btn btn-primary">Befehle generieren</button>
+                                <button onclick="saveCommandBuilderConfig()" class="btn btn-secondary">Vorgaben speichern</button>
+                            </div>
+
+                            <div id="command-builder-status" class="data-list" style="margin-block-start: 15px">
+                                <div class="info">Noch keine Befehle generiert.</div>
+                            </div>
+                            <div id="command-builder-results" class="data-list" style="margin-block-start: 15px"></div>
+                        </div>
 
                         <div class="setup-grid">
                             <div class="setup-card">
