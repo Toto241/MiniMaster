@@ -532,6 +532,252 @@ function getMissingAttestations() {
         .map(item => item.label);
 }
 
+// ==================== GO-LIVE AMPEL & PLATTFORM-TRACKER ====================
+
+const PLATFORM_ATTESTATION_STORAGE_KEY = "operatorPlatformReadiness";
+
+function getPlatformReadiness() {
+    try {
+        return JSON.parse(localStorage.getItem(PLATFORM_ATTESTATION_STORAGE_KEY) || "{}");
+    } catch (_) { return {}; }
+}
+
+function updatePlatformReadiness(partial) {
+    const current = getPlatformReadiness();
+    Object.assign(current, partial);
+    localStorage.setItem(PLATFORM_ATTESTATION_STORAGE_KEY, JSON.stringify(current));
+}
+
+const platformReadinessItems = {
+    masterApp: {
+        label: "MasterApp (Eltern-Android)",
+        items: [
+            { key: "ma-registration-flow", label: "Geräteregistrierung & SecretKey-Persistierung funktionsfähig", severity: "critical" },
+            { key: "ma-credentials-encrypted", label: "IMEI/SecretKey verschlüsselt gespeichert (EncryptedSharedPreferences)", severity: "critical" },
+            { key: "ma-imei-fallback", label: "IMEI-Fallback für Android 10+ implementiert (kein READ_PHONE_STATE)", severity: "critical" },
+            { key: "ma-proguard-enabled", label: "ProGuard/R8 in Release-Build aktiviert (minifyEnabled=true)", severity: "critical" },
+            { key: "ma-pairing-works", label: "Pairing-Link-Generierung und Kopplung mit ChildApp getestet", severity: "critical" },
+            { key: "ma-lock-unlock", label: "Lock/Unlock Toggle für Kindergeräte funktionsfähig", severity: "critical" },
+            { key: "ma-task-create", label: "Task-Erstellung mit Deadline funktionsfähig", severity: "high" },
+            { key: "ma-task-review", label: "Task Review mit Fotoanzeige und Genehmigung funktionsfähig", severity: "high" },
+            { key: "ma-task-reject-ui", label: "Reject-Button in TaskReviewScreen vorhanden und funktional", severity: "high" },
+            { key: "ma-usage-rules-nav", label: "UsageRulesScreen über Navigation erreichbar und datengebunden", severity: "high" },
+            { key: "ma-date-picker", label: "DatePicker statt Freitext-Timestamp für Task-Deadline", severity: "medium" },
+            { key: "ma-subscription-check", label: "Abo-Status wird beim Start geprüft (queryPurchases)", severity: "high" },
+            { key: "ma-subscription-enforce", label: "Free-Tier-Limit (1 Kind) wird vor Aktionen erzwungen", severity: "high" },
+            { key: "ma-fcm-working", label: "FCM Push-Empfang (task_pending_approval, device_status) getestet", severity: "high" },
+            { key: "ma-debug-hidden", label: "Debug-Infos (IMEI/SecretKey) in Release-Builds ausgeblendet", severity: "critical" },
+            { key: "ma-firebase-appcheck", label: "Firebase App Check aktiviert", severity: "high" },
+            { key: "ma-offline-handling", label: "Offline-Hinweis oder -Caching implementiert", severity: "medium" },
+            { key: "ma-qr-pairing", label: "QR-Code-Anzeige für Pairing (nicht nur Link)", severity: "medium" },
+        ],
+    },
+    childApp: {
+        label: "ChildApp (Kind-Android)",
+        items: [
+            { key: "ca-pairing-flow", label: "Pairing per Deep-Link und 6-stelligem Code funktionsfähig", severity: "critical" },
+            { key: "ca-fcm-sync", label: "FCM-Regelempfang (isLocked, appBlacklist, usageRules) funktionsfähig", severity: "critical" },
+            { key: "ca-heartbeat", label: "HeartbeatWorker sendet lastSeen alle 15 Min (WorkManager)", severity: "critical" },
+            { key: "ca-accessibility-active", label: "AccessibilityService aktiviert und App-Überwachung läuft", severity: "critical" },
+            { key: "ca-app-blocking-effective", label: "App-Blocking tatsächlich wirksam (nicht nur GLOBAL_ACTION_BACK)", severity: "critical" },
+            { key: "ca-overlay-secure", label: "BlockingOverlay nicht wegwischbar, bedeckt kompletten Screen", severity: "critical" },
+            { key: "ca-uninstall-prevention", label: "App-Deinstallation verhindert (Device Admin / setUninstallBlocked)", severity: "critical" },
+            { key: "ca-settings-protection", label: "Zugriff auf Eingabehilfe-Einstellungen geschützt (nicht nur geloggt)", severity: "critical" },
+            { key: "ca-device-admin-enforced", label: "DevicePolicyManager tatsächlich aufgerufen (force-lock, watch-login)", severity: "high" },
+            { key: "ca-usage-limits", label: "Tages- und Pro-App-Nutzungslimits korrekt durchgesetzt", severity: "high" },
+            { key: "ca-time-windows", label: "Zeitfenster-Einschränkungen (inkl. Nachtsperre) aktiv", severity: "high" },
+            { key: "ca-tamper-detection", label: "Manipulationserkennung (Settings-Zugriff) getestet", severity: "high" },
+            { key: "ca-task-proof", label: "Foto-Beweis-Upload für Aufgaben funktionsfähig", severity: "high" },
+            { key: "ca-boot-receiver", label: "BootReceiver startet Services nach Geräte-Neustart", severity: "high" },
+            { key: "ca-factory-reset-protection", label: "Factory-Reset-Schutz implementiert", severity: "medium" },
+            { key: "ca-root-detection", label: "Root-/SafetyNet-Erkennung implementiert", severity: "medium" },
+            { key: "ca-permission-onboarding", label: "Permissions-Onboarding mit Verifikation implementiert", severity: "high" },
+        ],
+    },
+    desktop: {
+        label: "Desktop-App (Eltern Heim-PC)",
+        items: [
+            { key: "dt-csp-headers", label: "Content Security Policy (CSP) in beiden HTML-Dateien gesetzt", severity: "critical" },
+            { key: "dt-sri-hashes", label: "SRI-Hashes für alle externen CDN-Scripts vorhanden", severity: "critical" },
+            { key: "dt-credential-security", label: "Credentials nicht als Klartext in localStorage (keytar/keyring)", severity: "critical" },
+            { key: "dt-session-timeout", label: "Session-Timeout (Auto-Logout nach Inaktivität) implementiert", severity: "high" },
+            { key: "dt-electron-builder", label: "electron-builder konfiguriert für Installer-Erzeugung", severity: "critical" },
+            { key: "dt-code-signing", label: "Code-Signing-Zertifikate für Windows/macOS eingerichtet", severity: "high" },
+            { key: "dt-auto-update", label: "Auto-Update-Mechanismus (electron-updater) implementiert", severity: "high" },
+            { key: "dt-system-tray", label: "System-Tray-Integration (Minimize-to-Tray, Icon)", severity: "medium" },
+            { key: "dt-desktop-notifications", label: "Desktop-Benachrichtigungen bei Aufgaben/Sperren", severity: "high" },
+            { key: "dt-window-persistence", label: "Fenstergröße/-position wird gespeichert", severity: "low" },
+            { key: "dt-ipc-messaging", label: "IPC-Kommunikation zwischen Main-Process und Panels", severity: "medium" },
+            { key: "dt-parent-panel-login", label: "Parent-Panel-Login im Electron-Fenster geprüft", severity: "critical" },
+            { key: "dt-admin-panel-login", label: "Admin-Panel-Login im Electron-Fenster geprüft", severity: "high" },
+            { key: "dt-crash-reporting", label: "Crash-Reporter integriert (Sentry o. Ä.)", severity: "medium" },
+        ],
+    },
+};
+
+function computeGoLiveStatus() {
+    const attestations = getCommissioningAttestations();
+    const missingAttestations = getMissingAttestations();
+    const platformState = getPlatformReadiness();
+    const validation = commissioningSummary?.validationSummary || null;
+
+    const backendReady = validation
+        ? (validation.errorCount === 0 && validation.checks.adminAuthOk && validation.checks.functionsReachable && validation.checks.firestoreAccessOk)
+        : false;
+
+    const allAttestationsOk = missingAttestations.length === 0;
+
+    const platformStatus = {};
+    let totalCritical = 0;
+    let doneCritical = 0;
+    let totalHigh = 0;
+    let doneHigh = 0;
+    let totalAll = 0;
+    let doneAll = 0;
+
+    for (const [platformKey, platform] of Object.entries(platformReadinessItems)) {
+        let pCritical = 0, pCriticalDone = 0, pHigh = 0, pHighDone = 0, pTotal = 0, pDone = 0;
+        for (const item of platform.items) {
+            pTotal++;
+            totalAll++;
+            if (item.severity === "critical") { pCritical++; totalCritical++; }
+            if (item.severity === "high") { pHigh++; totalHigh++; }
+            if (platformState[item.key]) {
+                pDone++;
+                doneAll++;
+                if (item.severity === "critical") { pCriticalDone++; doneCritical++; }
+                if (item.severity === "high") { pHighDone++; doneHigh++; }
+            }
+        }
+        platformStatus[platformKey] = {
+            label: platform.label,
+            total: pTotal, done: pDone,
+            critical: pCritical, criticalDone: pCriticalDone,
+            high: pHigh, highDone: pHighDone,
+            percent: pTotal > 0 ? Math.round((pDone / pTotal) * 100) : 0,
+        };
+    }
+
+    const allCriticalDone = doneCritical === totalCritical;
+    const allHighDone = doneHigh === totalHigh;
+
+    let ampel, ampelLabel, ampelDescription;
+    if (backendReady && allAttestationsOk && allCriticalDone && allHighDone && doneAll === totalAll) {
+        ampel = "green";
+        ampelLabel = "Go-Live freigegeben";
+        ampelDescription = "Backend, manuelle Freigaben und alle Plattformen sind produktionsbereit.";
+    } else if (backendReady && allCriticalDone) {
+        ampel = "yellow";
+        ampelLabel = "Teilweise bereit";
+        ampelDescription = "Backend und kritische Punkte OK. Offene Freigaben oder HIGH-Punkte verhindern Vollfreigabe.";
+    } else {
+        ampel = "red";
+        ampelLabel = "Go-Live blockiert";
+        ampelDescription = backendReady
+            ? `${totalCritical - doneCritical} kritische Plattform-Punkte offen.`
+            : "Backend-Validierung fehlt oder fehlerhaft. Kritische Plattform-Punkte offen.";
+    }
+
+    return {
+        ampel, ampelLabel, ampelDescription,
+        backendReady, allAttestationsOk,
+        platformStatus,
+        totals: { totalAll, doneAll, totalCritical, doneCritical, totalHigh, doneHigh },
+    };
+}
+
+function renderGoLiveAmpel() {
+    const container = document.getElementById("golive-ampel");
+    if (!container) return;
+
+    const status = computeGoLiveStatus();
+    const pct = status.totals.totalAll > 0 ? Math.round((status.totals.doneAll / status.totals.totalAll) * 100) : 0;
+
+    let platformBars = "";
+    for (const [, ps] of Object.entries(status.platformStatus)) {
+        const barColor = ps.criticalDone === ps.critical
+            ? (ps.done === ps.total ? "#22c55e" : "#eab308")
+            : "#ef4444";
+        platformBars += `
+            <div class="ampel-platform-row">
+                <span class="ampel-platform-label">${escapeHtml(ps.label)}</span>
+                <div class="ampel-progress-bar">
+                    <div class="ampel-progress-fill" style="width:${ps.percent}%;background:${barColor}"></div>
+                </div>
+                <span class="ampel-platform-pct">${ps.percent}%</span>
+                <span class="ampel-platform-detail">${ps.done}/${ps.total}</span>
+            </div>`;
+    }
+
+    container.innerHTML = `
+        <div class="golive-ampel-card ampel-${status.ampel}">
+            <div class="ampel-header">
+                <div class="ampel-light ampel-light-${status.ampel}"></div>
+                <div class="ampel-title">
+                    <h4>${escapeHtml(status.ampelLabel)}</h4>
+                    <p>${escapeHtml(status.ampelDescription)}</p>
+                </div>
+            </div>
+            <div class="ampel-summary">
+                <div class="ampel-stat"><strong>${status.totals.doneCritical}/${status.totals.totalCritical}</strong><span>Kritisch</span></div>
+                <div class="ampel-stat"><strong>${status.totals.doneHigh}/${status.totals.totalHigh}</strong><span>Hoch</span></div>
+                <div class="ampel-stat"><strong>${status.totals.doneAll}/${status.totals.totalAll}</strong><span>Gesamt</span></div>
+                <div class="ampel-stat"><strong>${status.backendReady ? "OK" : "FEHLT"}</strong><span>Backend</span></div>
+                <div class="ampel-stat"><strong>${status.allAttestationsOk ? "OK" : "OFFEN"}</strong><span>Freigaben</span></div>
+            </div>
+            <div class="ampel-platforms">
+                <h5>Plattform-Fortschritt</h5>
+                ${platformBars}
+            </div>
+            <div class="ampel-total-bar">
+                <div class="ampel-progress-bar ampel-progress-bar-lg">
+                    <div class="ampel-progress-fill" style="width:${pct}%;background:${status.ampel === 'green' ? '#22c55e' : status.ampel === 'yellow' ? '#eab308' : '#ef4444'}"></div>
+                </div>
+                <span class="ampel-total-pct">${pct}% Gesamtfortschritt</span>
+            </div>
+        </div>`;
+}
+
+function renderPlatformReadinessSection(platformKey) {
+    const container = document.getElementById(`platform-${platformKey}`);
+    if (!container) return;
+    const platform = platformReadinessItems[platformKey];
+    if (!platform) return;
+
+    const savedState = getPlatformReadiness();
+    container.innerHTML = "";
+
+    const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    const sortedItems = [...platform.items].sort((a, b) => (severityOrder[a.severity] || 9) - (severityOrder[b.severity] || 9));
+
+    sortedItems.forEach(item => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "platform-checklist-item severity-" + item.severity;
+        wrapper.innerHTML = `
+            <input type="checkbox" id="platform-${item.key}" ${savedState[item.key] ? "checked" : ""}>
+            <label for="platform-${item.key}">
+                <span class="severity-badge severity-${item.severity}">${item.severity.toUpperCase()}</span>
+                ${escapeHtml(item.label)}
+            </label>
+        `;
+
+        const checkbox = wrapper.querySelector("input");
+        checkbox.addEventListener("change", (e) => {
+            updatePlatformReadiness({ [item.key]: e.target.checked });
+            renderGoLiveAmpel();
+        });
+
+        container.appendChild(wrapper);
+    });
+}
+
+function renderAllPlatformSections() {
+    renderPlatformReadinessSection("masterApp");
+    renderPlatformReadinessSection("childApp");
+    renderPlatformReadinessSection("desktop");
+    renderGoLiveAmpel();
+}
+
 function getBootstrapFirebaseFormValues() {
     return {
         apiKey: (document.getElementById("bootstrap-api-key")?.value || "").trim(),
@@ -747,6 +993,7 @@ async function runCommissioningAssistant() {
         renderCommissioningReport(commissioningSummary);
         renderCommandCatalog(commissioningSummary.projectId);
         syncCommissioningChecklist(validationSummary);
+        renderGoLiveAmpel();
         showNotification(pending.length === 0 ? "Inbetriebnahme-Assistent erfolgreich abgeschlossen." : "Inbetriebnahme-Assistent ausgeführt. Offene Punkte im Bericht prüfen.", pending.length === 0 ? "success" : "info");
     } catch (error) {
         if (reportEl) {
@@ -787,12 +1034,15 @@ function refreshCommissioningReport() {
 
     renderCommissioningReport(commissioningSummary);
     renderCommandCatalog(commissioningSummary.projectId);
+    renderGoLiveAmpel();
 }
 
 document.addEventListener("DOMContentLoaded", function() {
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     renderCommandCatalog(firebaseConfig.projectId);
+    renderAllPlatformSections();
+    renderGoLiveAmpel();
 
     if (isPlaceholderFirebaseConfig(firebaseConfig)) {
         console.warn("Firebase config placeholders detected. Waiting for bootstrap configuration.");
@@ -924,11 +1174,13 @@ function switchTab(tabName, evt) {
 function initializeSetupAssistant() {
     renderSetupChecklist();
     renderCommissioningAttestations();
+    renderAllPlatformSections();
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     loadOperatorConfig();
     refreshCommissioningReport();
     renderCommandCatalog(firebaseConfig.projectId);
+    renderGoLiveAmpel();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
