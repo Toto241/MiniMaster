@@ -2,8 +2,11 @@
 /* global firebase */
 // MiniMaster Operator Dashboard JavaScript
 
+const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
+const COMMAND_BUILDER_STORAGE_KEY = "operatorCommandBuilderConfig";
+
 // Firebase configuration (MUST be replaced with actual config)
-const firebaseConfig = {
+const fallbackFirebaseConfig = {
     apiKey: "your-api-key",
     authDomain: "your-project.firebaseapp.com",
     projectId: "your-project-id",
@@ -12,8 +15,37 @@ const firebaseConfig = {
     appId: "your-app-id"
 };
 
+function hasCompleteFirebaseConfig(config) {
+    if (!config || typeof config !== "object") return false;
+    const requiredKeys = ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"];
+    return requiredKeys.every(key => typeof config[key] === "string" && config[key].trim().length > 0);
+}
+
+function isPlaceholderFirebaseConfig(config) {
+    if (!hasCompleteFirebaseConfig(config)) return true;
+    return Object.values(config).some(value =>
+        typeof value === "string" && (value.includes("your-") || value.includes("your_project"))
+    );
+}
+
+function loadFirebaseConfig() {
+    try {
+        const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (hasCompleteFirebaseConfig(parsed) && !isPlaceholderFirebaseConfig(parsed)) {
+            return parsed;
+        }
+    } catch (error) {
+        console.warn("Failed to load Firebase config override:", error);
+    }
+    return fallbackFirebaseConfig;
+}
+
+let firebaseConfig = loadFirebaseConfig();
+
 let app, auth, db, functions;
 let currentUserRole = null; // "admin", "support", or "auditor"
+let commissioningSummary = null;
 
 // Pagination state
 const PAGE_SIZE = 25;
@@ -56,7 +88,480 @@ const defaultOperatorConfig = {
     }
 };
 
+const defaultCommandBuilderConfig = {
+    workspacePath: "D:\\Tools\\MiniMaster",
+    firstAdminEmail: "",
+    firstAdminPassword: "",
+};
+
+function loadCommandBuilderConfig() {
+    try {
+        const raw = localStorage.getItem(COMMAND_BUILDER_STORAGE_KEY);
+        return { ...defaultCommandBuilderConfig, ...(raw ? JSON.parse(raw) : {}) };
+    } catch (error) {
+        console.warn("Failed to load command builder config:", error);
+        return { ...defaultCommandBuilderConfig };
+    }
+}
+
+function getCommandBuilderFormValues() {
+    return {
+        workspacePath: (document.getElementById("cmd-workspace-path")?.value || defaultCommandBuilderConfig.workspacePath).trim(),
+        firstAdminEmail: (document.getElementById("cmd-first-admin-email")?.value || "").trim(),
+        firstAdminPassword: (document.getElementById("cmd-first-admin-password")?.value || "").trim(),
+    };
+}
+
+function renderCommandBuilderConfig(config) {
+    const values = { ...defaultCommandBuilderConfig, ...(config || {}) };
+    const mapping = {
+        "cmd-workspace-path": values.workspacePath,
+        "cmd-first-admin-email": values.firstAdminEmail,
+        "cmd-first-admin-password": values.firstAdminPassword,
+    };
+
+    Object.entries(mapping).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value || "";
+    });
+}
+
+function saveCommandBuilderConfig(showMessage = true) {
+    const values = getCommandBuilderFormValues();
+    localStorage.setItem(COMMAND_BUILDER_STORAGE_KEY, JSON.stringify(values));
+    if (showMessage) {
+        showNotification("Befehlszentrale gespeichert.", "success");
+    }
+    return values;
+}
+
+function escapePowerShellString(value) {
+    return String(value || "").replace(/`/g, "``").replace(/"/g, "`\"");
+}
+
+function buildPowerShellScript(command, cwd) {
+    const lines = [
+        '$ErrorActionPreference = "Stop"',
+    ];
+
+    if (cwd) {
+        lines.push(`Set-Location -Path "${escapePowerShellString(cwd)}"`);
+    }
+
+    lines.push(command);
+    return lines.join("\n");
+}
+
+function encodeCommandPayload(payload) {
+    return encodeURIComponent(JSON.stringify(payload));
+}
+
+function decodeCommandPayload(payload) {
+    return JSON.parse(decodeURIComponent(payload));
+}
+
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "readonly");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+}
+
+async function copyRenderedCommand(payload, mode) {
+    try {
+        const data = decodeCommandPayload(payload);
+        const text = mode === "powershell"
+            ? buildPowerShellScript(data.command, data.cwd)
+            : data.command;
+        await copyTextToClipboard(text);
+        showNotification(mode === "powershell" ? "PowerShell-Befehl kopiert." : "Befehl kopiert.", "success");
+    } catch (error) {
+        showNotification("Befehl konnte nicht kopiert werden: " + error.message, "error");
+    }
+}
+
+function togglePowerShellPreview(payload, targetId) {
+    try {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+
+        if (target.dataset.visible === "true") {
+            target.innerHTML = "";
+            target.dataset.visible = "false";
+            return;
+        }
+
+        const data = decodeCommandPayload(payload);
+        target.innerHTML = `<pre class="code-block">${escapeHtml(buildPowerShellScript(data.command, data.cwd))}</pre>`;
+        target.dataset.visible = "true";
+    } catch (error) {
+        showNotification("PowerShell-Vorschau konnte nicht erzeugt werden: " + error.message, "error");
+    }
+}
+
+function downloadPowerShellCommand(payload) {
+    try {
+        const data = decodeCommandPayload(payload);
+        const script = buildPowerShellScript(data.command, data.cwd);
+        const blob = new Blob([script], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${data.fileName || data.id || "command"}.ps1`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showNotification("PowerShell-Skript heruntergeladen.", "success");
+    } catch (error) {
+        showNotification("PowerShell-Skript konnte nicht erstellt werden: " + error.message, "error");
+    }
+}
+
+function renderCommandBlockHtml(entry) {
+    const previewId = `ps-preview-${entry.id}`;
+    const payload = encodeCommandPayload(entry);
+    return `
+        <div class="command-block">
+            <div class="command-block-header">
+                <div>
+                    <h5>${escapeHtml(entry.label)}</h5>
+                    <p>${escapeHtml(entry.description || "")}</p>
+                </div>
+            </div>
+            <pre class="code-block">${escapeHtml(entry.command)}</pre>
+            <div class="command-actions">
+                <button onclick="copyRenderedCommand('${payload}', 'raw')" class="btn btn-secondary btn-sm">CLI kopieren</button>
+                <button onclick="copyRenderedCommand('${payload}', 'powershell')" class="btn btn-primary btn-sm">PowerShell kopieren</button>
+                <button onclick="togglePowerShellPreview('${payload}', '${previewId}')" class="btn btn-secondary btn-sm">PowerShell anzeigen</button>
+                <button onclick="downloadPowerShellCommand('${payload}')" class="btn btn-secondary btn-sm">PS1 herunterladen</button>
+            </div>
+            <div id="${previewId}" class="command-preview" data-visible="false"></div>
+        </div>
+    `;
+}
+
+function buildCommandCatalog(projectId) {
+    const values = getCommandBuilderFormValues();
+    const activeProjectId = (projectId || firebaseConfig.projectId || "").trim();
+    const projectSuffix = activeProjectId ? ` --project ${activeProjectId}` : "";
+    const firstAdminEmail = values.firstAdminEmail || "admin@example.com";
+    const firstAdminPassword = values.firstAdminPassword || "<PASSWORT>";
+
+    return [
+        {
+            id: "preflight-install",
+            label: "Projekt vorbereiten",
+            description: "Installiert Abhängigkeiten und prüft Build, Lint und Tests.",
+            command: "npm install\nnpm run build\nnpm run lint\nnpm test",
+            cwd: values.workspacePath,
+            fileName: "minimaster-preflight",
+        },
+        {
+            id: "firebase-login",
+            label: "Firebase CLI Authentifizierung",
+            description: "Meldet die lokale CLI am Firebase-Konto an.",
+            command: "firebase login",
+            cwd: values.workspacePath,
+            fileName: "minimaster-firebase-login",
+        },
+        {
+            id: "firebase-deploy-full",
+            label: "Vollständiger Deploy",
+            description: "Deployt Firestore-Regeln, Indexes, Functions und Hosting in das aktive Projekt.",
+            command: buildDeployCommand(activeProjectId),
+            cwd: values.workspacePath,
+            fileName: "minimaster-deploy-full",
+        },
+        {
+            id: "firebase-deploy-functions",
+            label: "Nur Functions deployen",
+            description: "Nützlich nach Backend-Änderungen ohne Hosting-Rollout.",
+            command: `firebase deploy --only functions${projectSuffix}`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-deploy-functions",
+        },
+        {
+            id: "firebase-deploy-hosting",
+            label: "Nur Hosting deployen",
+            description: "Aktualisiert Admin-Panel und Web-Control ohne Backend-Rollout.",
+            command: `firebase deploy --only hosting${projectSuffix}`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-deploy-hosting",
+        },
+        {
+            id: "setup-admin",
+            label: "Erstadmin anlegen",
+            description: "Erstellt den initialen Operator-Admin per Service Account.",
+            command: `node scripts/setup-admin.js \"${firstAdminEmail}\" \"${firstAdminPassword}\"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-setup-admin",
+        },
+    ];
+}
+
+function renderCommandCatalog(projectId) {
+    const container = document.getElementById("command-builder-results");
+    if (!container) return;
+
+    const commands = buildCommandCatalog(projectId);
+    container.innerHTML = commands.map(renderCommandBlockHtml).join("");
+}
+
+function refreshCommandBuilderCommands() {
+    const values = saveCommandBuilderConfig(false);
+    const activeProjectId = getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId;
+    renderCommandCatalog(activeProjectId);
+
+    const status = document.getElementById("command-builder-status");
+    if (status) {
+        status.innerHTML = `<div class='success-box'>Befehle für ${escapeHtml(activeProjectId || "aktuelles Standardprojekt")} und Arbeitsverzeichnis ${escapeHtml(values.workspacePath)} bereitgestellt.</div>`;
+    }
+
+    showNotification("Befehlszentrale aktualisiert.", "success");
+}
+
+function updateSetupChecklistState(partialState) {
+    const savedState = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
+    localStorage.setItem("operatorSetupChecklist", JSON.stringify({ ...savedState, ...partialState }));
+}
+
+function getBootstrapFirebaseFormValues() {
+    return {
+        apiKey: (document.getElementById("bootstrap-api-key")?.value || "").trim(),
+        authDomain: (document.getElementById("bootstrap-auth-domain")?.value || "").trim(),
+        projectId: (document.getElementById("bootstrap-project-id")?.value || "").trim(),
+        storageBucket: (document.getElementById("bootstrap-storage-bucket")?.value || "").trim(),
+        messagingSenderId: (document.getElementById("bootstrap-messaging-sender-id")?.value || "").trim(),
+        appId: (document.getElementById("bootstrap-app-id")?.value || "").trim(),
+    };
+}
+
+function renderBootstrapFirebaseConfig(config) {
+    const values = config || firebaseConfig || fallbackFirebaseConfig;
+    const mapping = {
+        "bootstrap-api-key": values.apiKey || "",
+        "bootstrap-auth-domain": values.authDomain || "",
+        "bootstrap-project-id": values.projectId || "",
+        "bootstrap-storage-bucket": values.storageBucket || "",
+        "bootstrap-messaging-sender-id": values.messagingSenderId || "",
+        "bootstrap-app-id": values.appId || "",
+    };
+
+    Object.entries(mapping).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+    });
+
+    const statusEl = document.getElementById("bootstrap-config-status");
+    if (!statusEl) return;
+    if (isPlaceholderFirebaseConfig(values)) {
+        statusEl.innerHTML = "<div class='error'>Firebase-Webkonfiguration ist noch nicht final hinterlegt. Trage die echten Werte ein und speichere sie lokal.</div>";
+    } else {
+        statusEl.innerHTML = `<div class='success-box'>Aktive Firebase-Konfiguration: ${escapeHtml(values.projectId || "unbekannt")}</div>`;
+    }
+}
+
+function persistBootstrapFirebaseConfig(showReloadHint = true) {
+    const values = getBootstrapFirebaseFormValues();
+    const statusEl = document.getElementById("bootstrap-config-status");
+
+    if (!hasCompleteFirebaseConfig(values) || isPlaceholderFirebaseConfig(values)) {
+        if (statusEl) {
+            statusEl.innerHTML = "<div class='error'>Alle Firebase-Webwerte müssen gesetzt sein und dürfen keine Platzhalter enthalten.</div>";
+        }
+        throw new Error("Firebase-Webkonfiguration ist unvollständig oder enthält Platzhalter.");
+    }
+
+    localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(values));
+    firebaseConfig = values;
+    updateSetupChecklistState({ "firebase-config": true });
+
+    if (statusEl) {
+        statusEl.innerHTML = `<div class='success-box'>Firebase-Webkonfiguration lokal gespeichert für Projekt ${escapeHtml(values.projectId)}.${showReloadHint ? " Seite neu laden, falls du auf ein neues Projekt umstellst." : ""}</div>`;
+    }
+    return values;
+}
+
+function syncCommissioningChecklist(validationSummary) {
+    const config = getOperatorConfigFormValues();
+    const updates = {
+        "firebase-config": !isPlaceholderFirebaseConfig(firebaseConfig),
+        "admin-auth": Boolean(validationSummary?.checks?.adminAuthOk),
+        "firestore-access": Boolean(validationSummary?.checks?.firestoreAccessOk),
+        "functions-access": Boolean(validationSummary?.checks?.functionsReachable),
+        "appcheck-active": Boolean(config.cloud.appCheckMode),
+        "ai-config": Boolean(config.ai.provider && config.ai.model && config.ai.keyRef && config.ai.systemPrompt),
+    };
+
+    if (validationSummary?.errorCount === 0) {
+        updates["deploy-verified"] = true;
+    }
+
+    updateSetupChecklistState(updates);
+    renderSetupChecklist();
+}
+
+function buildDeployCommand(projectId) {
+    const trimmedProjectId = (projectId || "").trim();
+    const base = "firebase deploy --only firestore:rules,firestore:indexes,functions,hosting";
+    return trimmedProjectId ? `${base} --project ${trimmedProjectId}` : base;
+}
+
+function renderCommissioningReport(report) {
+    const container = document.getElementById("commissioning-report");
+    if (!container) return;
+
+    const roleHtml = (report.roleAssignments || []).length > 0
+        ? `<ul>${report.roleAssignments.map(item => `<li>${escapeHtml(item.uid)} → ${escapeHtml(item.role)}</li>`).join("")}</ul>`
+        : "<p>Keine zusätzlichen Rollen zugewiesen.</p>";
+
+    const pendingHtml = report.pending.length > 0
+        ? `<ul>${report.pending.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : "<p>Keine offenen Inbetriebnahme-Punkte erkannt.</p>";
+
+    container.innerHTML = `
+        <div class="commissioning-report ${report.pending.length === 0 ? "commissioning-complete" : ""}">
+            <h4>Inbetriebnahmebericht</h4>
+            <p><strong>Projekt:</strong> ${escapeHtml(report.projectId || "nicht gesetzt")}</p>
+            <p><strong>Firebase-Webkonfiguration:</strong> ${report.firebaseConfigured ? "bereit" : "offen"}</p>
+            <p><strong>Runtime-Konfiguration:</strong> ${report.runtimeConfigured ? "gespeichert" : "unvollständig"}</p>
+            <p><strong>Validierung:</strong> ${report.validationSummary ? `${report.validationSummary.ok} OK, ${report.validationSummary.warn} WARN, ${report.validationSummary.errorCount} ERROR` : "noch nicht ausgeführt"}</p>
+            <p><strong>Deploy-Befehl:</strong></p>
+            ${renderCommandBlockHtml({
+                id: "report-deploy-command",
+                label: "Deploy aus Bericht",
+                description: "Der aus der Inbetriebnahme ermittelte Voll-Deploy-Befehl.",
+                command: report.deployCommand,
+                cwd: getCommandBuilderFormValues().workspacePath,
+                fileName: "minimaster-report-deploy",
+            })}
+            <h5>Zugewiesene Rollen</h5>
+            ${roleHtml}
+            <h5>Offene Punkte</h5>
+            ${pendingHtml}
+        </div>
+    `;
+}
+
+async function setUserRoleInternal(uid, role) {
+    const setRoleFunc = functions.httpsCallable("setUserRole");
+    await setRoleFunc({ uid, role });
+}
+
+async function runCommissioningAssistant() {
+    const reportEl = document.getElementById("commissioning-report");
+    if (reportEl) reportEl.innerHTML = "<div class='loading'>Führe Inbetriebnahme-Assistent aus...</div>";
+
+    const roleAssignments = [];
+    const pending = [];
+
+    try {
+        const bootstrapConfig = persistBootstrapFirebaseConfig(false);
+
+        const runtimeConfig = getOperatorConfigFormValues();
+        if (!runtimeConfig.cloud.projectId) {
+            const projectInput = document.getElementById("cfg-cloud-project-id");
+            if (projectInput) projectInput.value = bootstrapConfig.projectId;
+        }
+        await saveOperatorConfig();
+
+        const supportUid = (document.getElementById("commissioning-support-uid")?.value || "").trim();
+        const auditorUid = (document.getElementById("commissioning-auditor-uid")?.value || "").trim();
+
+        if (currentUserRole === "admin") {
+            if (supportUid) {
+                await setUserRoleInternal(supportUid, "support");
+                roleAssignments.push({ uid: supportUid, role: "support" });
+            }
+            if (auditorUid) {
+                await setUserRoleInternal(auditorUid, "auditor");
+                roleAssignments.push({ uid: auditorUid, role: "auditor" });
+            }
+        }
+
+        const validationSummary = await runFullSetupValidation();
+        const mergedRuntimeConfig = getOperatorConfigFormValues();
+
+        if (!mergedRuntimeConfig.ai.provider || !mergedRuntimeConfig.ai.model || !mergedRuntimeConfig.ai.keyRef || !mergedRuntimeConfig.ai.systemPrompt) {
+            pending.push("KI-Konfiguration im Runtime-Block vollständig ausfüllen (provider, model, keyRef, systemPrompt).");
+        }
+        if (!mergedRuntimeConfig.cloud.appCheckMode) {
+            pending.push("App Check Modus im Runtime-Block setzen.");
+        }
+        if (validationSummary.errorCount > 0) {
+            pending.push("Full Validation ohne ERROR abschließen.");
+        }
+        if (!validationSummary.checks.adminAuthOk) {
+            pending.push("Operator mit Admin-Claim anmelden.");
+        }
+        if (!validationSummary.checks.functionsReachable) {
+            pending.push("Backend mit Firebase deployen oder Endpoints prüfen.");
+        }
+
+        commissioningSummary = {
+            projectId: bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId,
+            firebaseConfigured: !isPlaceholderFirebaseConfig(bootstrapConfig),
+            runtimeConfigured: Boolean(mergedRuntimeConfig.cloud.projectId && mergedRuntimeConfig.ai.provider && mergedRuntimeConfig.ai.model),
+            validationSummary,
+            deployCommand: buildDeployCommand(bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId),
+            roleAssignments,
+            pending,
+        };
+
+        renderCommissioningReport(commissioningSummary);
+    renderCommandCatalog(commissioningSummary.projectId);
+        syncCommissioningChecklist(validationSummary);
+        showNotification(pending.length === 0 ? "Inbetriebnahme-Assistent erfolgreich abgeschlossen." : "Inbetriebnahme-Assistent ausgeführt. Offene Punkte im Bericht prüfen.", pending.length === 0 ? "success" : "info");
+    } catch (error) {
+        if (reportEl) {
+            reportEl.innerHTML = `<div class='error'>Inbetriebnahme fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        }
+        showNotification("Inbetriebnahme-Assistent fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+function refreshCommissioningReport() {
+    const runtimeConfig = getOperatorConfigFormValues();
+    const pending = [];
+    if (isPlaceholderFirebaseConfig(firebaseConfig)) pending.push("Firebase-Webkonfiguration lokal speichern.");
+    if (!runtimeConfig.cloud.projectId) pending.push("Cloud Project ID setzen.");
+    if (!runtimeConfig.ai.provider || !runtimeConfig.ai.model || !runtimeConfig.ai.keyRef || !runtimeConfig.ai.systemPrompt) {
+        pending.push("KI-Runtime-Konfiguration vervollständigen.");
+    }
+
+    commissioningSummary = {
+        projectId: runtimeConfig.cloud.projectId || firebaseConfig.projectId,
+        firebaseConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
+        runtimeConfigured: Boolean(runtimeConfig.cloud.projectId && runtimeConfig.ai.provider && runtimeConfig.ai.model),
+        validationSummary: commissioningSummary?.validationSummary || null,
+        deployCommand: buildDeployCommand(runtimeConfig.cloud.projectId || firebaseConfig.projectId),
+        roleAssignments: commissioningSummary?.roleAssignments || [],
+        pending,
+    };
+
+    renderCommissioningReport(commissioningSummary);
+    renderCommandCatalog(commissioningSummary.projectId);
+}
+
 document.addEventListener("DOMContentLoaded", function() {
+    renderBootstrapFirebaseConfig(firebaseConfig);
+    renderCommandBuilderConfig(loadCommandBuilderConfig());
+    renderCommandCatalog(firebaseConfig.projectId);
+
+    if (isPlaceholderFirebaseConfig(firebaseConfig)) {
+        console.warn("Firebase config placeholders detected. Waiting for bootstrap configuration.");
+        return;
+    }
+
     try {
         app = firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
@@ -181,7 +686,11 @@ function switchTab(tabName, evt) {
 
 function initializeSetupAssistant() {
     renderSetupChecklist();
+    renderBootstrapFirebaseConfig(firebaseConfig);
+    renderCommandBuilderConfig(loadCommandBuilderConfig());
     loadOperatorConfig();
+    refreshCommissioningReport();
+    renderCommandCatalog(firebaseConfig.projectId);
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
@@ -302,6 +811,8 @@ async function saveOperatorConfig() {
         if (status) {
             status.innerHTML = "<div class='success-box'>Konfiguration erfolgreich gespeichert.</div>";
         }
+        refreshCommissioningReport();
+        renderCommandCatalog(values.cloud.projectId || firebaseConfig.projectId);
         showNotification("Operator configuration saved.", "success");
     } catch (error) {
         if (status) status.innerHTML = `<div class='error'>Fehler beim Speichern: ${escapeHtml(error.message)}</div>`;
@@ -335,9 +846,7 @@ async function runFullSetupValidation() {
     setupValidationResults = [];
 
     // Check 1: Firebase config placeholders
-    const placeholderConfig = Object.values(firebaseConfig).some(value =>
-        typeof value === "string" && (value.includes("your-") || value.includes("your_project"))
-    );
+    const placeholderConfig = isPlaceholderFirebaseConfig(firebaseConfig);
     setupValidationResults.push({
         check: "Firebase Configuration",
         status: placeholderConfig ? "error" : "ok",
@@ -453,7 +962,19 @@ async function runFullSetupValidation() {
     html += `<div style="margin-block-start: 10px;"><strong>Summary:</strong> ${ok} OK, ${warn} WARN, ${errorCount} ERROR</div>`;
 
     resultEl.innerHTML = html;
+    const summary = {
+        ok,
+        warn,
+        errorCount,
+        checks: {
+            adminAuthOk: setupValidationResults.some(result => result.check === "Admin Authentication" && result.status === "ok"),
+            firestoreAccessOk: setupValidationResults.filter(result => result.check.startsWith("Firestore Collection")).every(result => result.status === "ok"),
+            functionsReachable: setupValidationResults.filter(result => result.check.startsWith("Function (")).every(result => result.status === "ok" || result.status === "warn"),
+        },
+    };
+    syncCommissioningChecklist(summary);
     showNotification("Setup validation completed.", errorCount > 0 ? "error" : "success");
+    return summary;
 }
 
 function exportSetupReport() {
@@ -477,6 +998,26 @@ function exportSetupReport() {
     URL.revokeObjectURL(url);
 
     showNotification("Setup report exported.", "success");
+}
+
+function saveBootstrapFirebaseConfig() {
+    try {
+        persistBootstrapFirebaseConfig(true);
+        refreshCommissioningReport();
+        renderCommandCatalog(firebaseConfig.projectId);
+        showNotification("Firebase-Webkonfiguration lokal gespeichert.", "success");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+function reloadWithBootstrapConfig() {
+    try {
+        persistBootstrapFirebaseConfig(false);
+        window.location.reload();
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
 }
 
 function askOperatorAssistant() {
@@ -513,7 +1054,11 @@ function generateOperatorAssistantAnswer(question) {
     }
 
     if (q.includes("firebase") || q.includes("config") || q.includes("projekt")) {
-        return "Firebase-Integration: In admin-panel/app.js die firebaseConfig-Werte ersetzen (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId). Danach Panel neu laden und Full Validation ausführen.";
+        return "Firebase-Integration: Im Inbetriebnahme-Assistenten die Bootstrap-Felder ausfüllen, lokal speichern und bei Projektwechsel neu laden. Danach Runtime-Konfiguration sichern und Full Validation ausführen.";
+    }
+
+    if (q.includes("inbetriebnahme") || q.includes("go live") || q.includes("deploy") || q.includes("rollout")) {
+        return "Inbetriebnahme im Panel: 1) Firebase-Bootstrap eintragen, 2) Runtime-Konfiguration speichern, 3) optionale Support/Auditor-Rollen zuweisen, 4) Assistent ausführen, 5) Full Validation ohne ERROR abschließen, 6) Deploy-Befehl aus dem Bericht verwenden.";
     }
 
     if (q.includes("function") || q.includes("callable") || q.includes("cloud function")) {
@@ -2006,9 +2551,9 @@ async function assignUserRole() {
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Rolle...</div>";
 
     try {
-        const setRoleFunc = functions.httpsCallable("setUserRole");
-        await setRoleFunc({ uid, role });
+        await setUserRoleInternal(uid, role);
         if (resultEl) resultEl.innerHTML = `<div class='success-box'>Rolle '${role}' erfolgreich für User ${escapeHtml(uid)} gesetzt.</div>`;
+        refreshCommissioningReport();
         showNotification(`Role '${role}' assigned to ${uid}.`, "success");
     } catch (error) {
         if (resultEl) resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
