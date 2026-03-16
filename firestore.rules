@@ -13,31 +13,51 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.role == 'admin';
     }
 
-    // Helper function to check if an active support grant exists for a given master
+    // Helper function to check if the authenticated user is a support agent.
+    function isSupport() {
+      return isSignedIn() && request.auth.token.role == 'support';
+    }
+
+    // Helper function to check if the authenticated user is an auditor.
+    function isAuditor() {
+      return isSignedIn() && request.auth.token.role == 'auditor';
+    }
+
+    // Any operator role (admin, support, or auditor).
+    function isOperator() {
+      return isAdmin() || isSupport() || isAuditor();
+    }
+
+    // Support or admin role.
+    function isSupportOrAdmin() {
+      return isAdmin() || isSupport();
+    }
+
+    // Helper function to check if an active support grant exists for a given master.
+    // Since Firestore rules don't support collection queries, support agents access
+    // user data exclusively through the getTicketUserData Cloud Function which
+    // validates grants server-side. Direct Firestore reads for masters/children
+    // are restricted to admin role only.
     function hasActiveSupportGrant(masterImei) {
-      // This function checks if there's ANY active grant for the master
-      // In practice, you'd query the supportAccessGrants collection
-      // Since Firestore rules don't support queries, we rely on the admin
-      // to only access data when they have the grantId from the ticket
-      return isAdmin(); // Simplified: Admins can access if they have a valid ticket
+      return isAdmin();
     }
 
     // --- SUPPORT TICKETS COLLECTION ---
     // Users can create and read their own tickets
-    // Admins can read all tickets and update their status
+    // Admins and support agents can read all tickets and update their status
     match /supportTickets/{ticketId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isSupportOrAdmin());
       allow create: if isSignedIn() && request.resource.data.masterImei == request.auth.uid;
-      allow update: if isAdmin(); // Only admins can update ticket status
+      allow update: if isSupportOrAdmin();
     }
 
     // --- SUPPORT ACCESS GRANTS COLLECTION ---
     // Users can create and manage their own grants
-    // Admins can read all grants
+    // Admins and support agents can read all grants
     match /supportAccessGrants/{grantId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isSupportOrAdmin());
       allow create: if isSignedIn() && request.resource.data.masterImei == request.auth.uid;
-      allow update: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isSupportOrAdmin());
     }
 
     // --- MASTERS COLLECTION ---
@@ -159,32 +179,34 @@ service cloud.firestore {
 
     // --- AUDIT LOGS COLLECTION ---
     // Audit logs track all system operations for compliance and security
-    // Read-only for admins, write access only via Cloud Functions
+    // Read-only for admins and auditors, write access only via Cloud Functions
     match /audit_logs/{logId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isAuditor();
       allow write: if false; // Only Cloud Functions can write
     }
 
     // --- PERFORMANCE METRICS COLLECTION ---
     // Performance metrics track function execution times and success rates
-    // Read-only for admins, write access only via Cloud Functions
+    // Read-only for admins and auditors, write access only via Cloud Functions
     match /performance_metrics/{metricId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isAuditor();
       allow write: if false; // Only Cloud Functions can write
     }
 
     // --- ERROR LOGS COLLECTION ---
     // Error logs track all system errors for debugging and monitoring
-    // Read-only for admins, write access only via Cloud Functions
+    // Read-only for admins and auditors, write access only via Cloud Functions
     match /error_logs/{errorId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isAuditor();
       allow write: if false; // Only Cloud Functions can write
     }
 
     // --- OPERATOR CONFIG COLLECTION ---
     // Runtime configuration for operator dashboard (cloud + AI settings)
+    // All operators can read, only admins can write
     match /operatorConfig/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if isOperator();
+      allow write: if isAdmin();
     }
   }
 }

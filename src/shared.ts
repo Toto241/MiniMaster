@@ -16,9 +16,25 @@ export function requireAuth(context: CallableContext): string {
   return context.auth.uid;
 }
 
+export type OperatorRole = "admin" | "support" | "auditor";
+
 export function requireAdmin(context: CallableContext): void {
   if (!context.auth || context.auth.token.role !== "admin") {
     throw new functions.https.HttpsError("permission-denied", "Admin privileges required.");
+  }
+}
+
+export function requireSupportOrAdmin(context: CallableContext): void {
+  const role = context.auth?.token?.role;
+  if (!context.auth || (role !== "admin" && role !== "support")) {
+    throw new functions.https.HttpsError("permission-denied", "Support or admin privileges required.");
+  }
+}
+
+export function requireAuditorOrAbove(context: CallableContext): void {
+  const role = context.auth?.token?.role;
+  if (!context.auth || (role !== "admin" && role !== "support" && role !== "auditor")) {
+    throw new functions.https.HttpsError("permission-denied", "Operator privileges required.");
   }
 }
 

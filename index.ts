@@ -6,7 +6,7 @@
  */
 
 // Auth & Registration
-export { setAdminClaim, generateCustomToken, registerMasterDevice, revokeUserTokens } from "./src/auth";
+export { setAdminClaim, setUserRole, generateCustomToken, registerMasterDevice, revokeUserTokens } from "./src/auth";
 
 // Pairing
 export { createPairingCode, validatePairingCode, generatePairingLink, validatePairingToken } from "./src/pairing";
@@ -29,7 +29,7 @@ export {
 // Support & AI
 export {
   createSupportTicket, grantSupportAccess, revokeSupportAccess, cleanupExpiredGrants,
-  onTicketCreated, provideSolutionFeedback,
+  onTicketCreated, provideSolutionFeedback, getTicketUserData,
 } from "./src/support";
 
 // Triggers (FCM sync, photo analysis, task notifications)

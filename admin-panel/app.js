@@ -13,6 +13,7 @@ const firebaseConfig = {
 };
 
 let app, auth, db, functions;
+let currentUserRole = null; // "admin", "support", or "auditor"
 
 // Pagination state
 const PAGE_SIZE = 25;
@@ -69,16 +70,20 @@ document.addEventListener("DOMContentLoaded", function() {
         auth.onAuthStateChanged(user => {
             if (user) {
                 user.getIdTokenResult(true).then(idTokenResult => {
-                    if (idTokenResult.claims.role === "admin") {
+                    const role = idTokenResult.claims.role;
+                    if (role === "admin" || role === "support" || role === "auditor") {
+                        currentUserRole = role;
                         showDashboard(user);
+                        applyRoleRestrictions(role);
                         loadDashboardData();
-                        initializeSetupAssistant();
+                        if (role === "admin") initializeSetupAssistant();
                     } else {
                         showNotification("Access Denied: Not an authorized operator.", "error");
                         auth.signOut();
                     }
                 });
             } else {
+                currentUserRole = null;
                 showLogin();
             }
         });
@@ -120,7 +125,37 @@ function showDashboard(user) {
     document.getElementById("dashboard-section").style.display = "block";
     document.getElementById("dashboard-nav").style.display = "flex";
     document.getElementById("logout-btn").style.display = "inline-block";
-    document.getElementById("user-email").textContent = user.email;
+    const roleLabel = currentUserRole ? ` (${currentUserRole.toUpperCase()})` : "";
+    document.getElementById("user-email").textContent = (user.email || "") + roleLabel;
+}
+
+/**
+ * Controls tab visibility based on operator role.
+ * - admin: all tabs
+ * - support: Overview, Support Tickets
+ * - auditor: Overview, Compliance, Error Logs
+ */
+function applyRoleRestrictions(role) {
+    const tabAccess = {
+        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup"],
+        support: ["overview", "support"],
+        auditor: ["overview", "errorlogs", "compliance"]
+    };
+
+    const allowed = tabAccess[role] || [];
+    document.querySelectorAll(".nav-tab").forEach(btn => {
+        const onclickAttr = btn.getAttribute("onclick") || "";
+        const match = onclickAttr.match(/switchTab\('(\w+)'/);
+        if (match) {
+            const tabName = match[1];
+            btn.style.display = allowed.includes(tabName) ? "" : "none";
+        }
+    });
+
+    // Hide admin-only action buttons for non-admins
+    if (role !== "admin") {
+        document.querySelectorAll(".admin-only").forEach(el => { el.style.display = "none"; });
+    }
 }
 
 // ==================== TAB NAVIGATION ====================
@@ -1123,7 +1158,11 @@ async function viewTicketDetails(ticketId) {
         }
 
         if (ticket.accessGranted) {
-            html += `<button onclick="viewUserDetails('${ticket.masterImei}')" class="btn btn-primary">View User Data</button>`;
+            if (currentUserRole === "admin") {
+                html += `<button onclick="viewUserDetails('${ticket.masterImei}')" class="btn btn-primary">View User Data (Admin)</button>`;
+            } else {
+                html += `<button onclick="viewTicketUserData('${ticketId}')" class="btn btn-primary">View User Data (Grant)</button>`;
+            }
         }
         html += `</div>`;
 
@@ -1135,6 +1174,60 @@ async function viewTicketDetails(ticketId) {
 
 function closeTicketDetailsModal() {
     document.getElementById("ticket-details-modal").style.display = "none";
+}
+
+/**
+ * GDPR-compliant user data view for support agents via ticket grant.
+ * Calls getTicketUserData Cloud Function which verifies the grant.
+ */
+async function viewTicketUserData(ticketId) {
+    const modal = document.getElementById("user-details-modal");
+    const modalContent = document.getElementById("user-details-content");
+
+    modalContent.innerHTML = "<div class='loading'>Loading user data via support grant...</div>";
+    modal.style.display = "block";
+
+    try {
+        const getDataFunc = functions.httpsCallable("getTicketUserData");
+        const result = await getDataFunc({ ticketId });
+        const { master, children, grantExpiresAt } = result.data;
+
+        let html = "<h3>User Data (Support Grant)</h3>";
+        html += `<div class="info" style="margin-block-end:10px;">Access via Ticket ${escapeHtml(ticketId)}. Grant expires: ${grantExpiresAt ? new Date(grantExpiresAt).toLocaleString() : "N/A"}</div>`;
+
+        if (master) {
+            html += `<div class="ticket-detail-grid">`;
+            html += `<p><strong>Master ID:</strong> ${escapeHtml(master.id)}</p>`;
+            html += `<p><strong>Email:</strong> ${escapeHtml(master.email || "N/A")}</p>`;
+            html += `<p><strong>IMEI:</strong> ${escapeHtml(master.imei || "N/A")}</p>`;
+            if (master.subscription) {
+                html += `<p><strong>Subscription:</strong> ${escapeHtml(master.subscription.status || "none")}</p>`;
+            }
+            html += `</div>`;
+        } else {
+            html += "<div class='error'>Master data not available.</div>";
+        }
+
+        html += `<h4>Children (${children.length})</h4>`;
+        if (children.length > 0) {
+            html += "<table><tr><th>Child ID</th><th>Locked</th><th>Last Seen</th></tr>";
+            children.forEach(child => {
+                const lastSeen = child.lastSeen ? new Date(child.lastSeen._seconds * 1000).toLocaleString() : "N/A";
+                html += `<tr>
+                    <td>${escapeHtml(child.id)}</td>
+                    <td>${child.isLocked ? "🔒" : "🔓"}</td>
+                    <td>${lastSeen}</td>
+                </tr>`;
+            });
+            html += "</table>";
+        } else {
+            html += "<p>No children linked.</p>";
+        }
+
+        modalContent.innerHTML = html;
+    } catch (error) {
+        modalContent.innerHTML = `<div class='error'>Error: ${escapeHtml(error.message)}</div>`;
+    }
 }
 
 async function saveAdminResponse(ticketId) {
@@ -1885,6 +1978,42 @@ function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML.replace(/\n/g, "<br>");
+}
+
+// ==================== ROLE MANAGEMENT (Admin only) ====================
+
+async function assignUserRole() {
+    if (currentUserRole !== "admin") {
+        showNotification("Only admins can assign roles.", "error");
+        return;
+    }
+
+    const uid = (document.getElementById("role-uid")?.value || "").trim();
+    const role = (document.getElementById("role-select")?.value || "").trim();
+    const resultEl = document.getElementById("role-result");
+
+    if (!uid) {
+        showNotification("Please enter a User UID.", "info");
+        return;
+    }
+    if (!role || !["admin", "support", "auditor"].includes(role)) {
+        showNotification("Please select a valid role.", "info");
+        return;
+    }
+
+    if (!confirm(`Rolle '${role}' für User ${uid} setzen?`)) return;
+
+    if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Rolle...</div>";
+
+    try {
+        const setRoleFunc = functions.httpsCallable("setUserRole");
+        await setRoleFunc({ uid, role });
+        if (resultEl) resultEl.innerHTML = `<div class='success-box'>Rolle '${role}' erfolgreich für User ${escapeHtml(uid)} gesetzt.</div>`;
+        showNotification(`Role '${role}' assigned to ${uid}.`, "success");
+    } catch (error) {
+        if (resultEl) resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+        showNotification("Error assigning role: " + error.message, "error");
+    }
 }
 
 // Close modals when clicking outside
