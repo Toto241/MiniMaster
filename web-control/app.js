@@ -6,13 +6,11 @@ const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 
 // Firebase configuration (you'll need to replace this with your actual config)
 const fallbackFirebaseConfig = {
-    // This should be replaced with actual Firebase config
-    // You can get this from your Firebase console
     apiKey: "your-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
+    authDomain: "minimaster-app.firebaseapp.com",
+    projectId: "minimaster-app",
+    storageBucket: "minimaster-app.firebasestorage.app",
+    messagingSenderId: "your-messaging-sender-id",
     appId: "your-app-id"
 };
 

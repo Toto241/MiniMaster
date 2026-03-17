@@ -16,10 +16,10 @@ const isElectronOperator = Boolean(
 // Firebase configuration (MUST be replaced with actual config)
 const fallbackFirebaseConfig = {
     apiKey: "your-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
+    authDomain: "minimaster-app.firebaseapp.com",
+    projectId: "minimaster-app",
+    storageBucket: "minimaster-app.firebasestorage.app",
+    messagingSenderId: "your-messaging-sender-id",
     appId: "your-app-id"
 };
 
