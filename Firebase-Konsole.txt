@@ -1,0 +1,11 @@
+App 1: Web-App (liefert die fehlenden Werte)
+Wo: Projekteinstellungen → Allgemein → „Meine Apps" → </>-Symbol klicken
+
+Feld	Eingabe
+App-Spitzname	MiniMaster Web Panel
+☑ „Firebase Hosting einrichten"	Anhaken
+Hosting-Website auswählen	minimaster-28fbd (oder Default)
+→ „App registrieren" klicken → Firebase zeigt das firebaseConfig-Objekt → API Key und App ID notieren.
+
+API Key: AIzaSyBjINek6A4RVqha9_wOBTVQZ5PDyl9MBkE 
+App ID:  1:716142639488:web:9bef591e96e72db771a965
