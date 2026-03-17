@@ -56,8 +56,8 @@ describe("Firestore Security Rules - Structural Validation", () => {
   // ==================== Role-Based Access Tests ====================
 
   describe("Role-based access control", () => {
-    it("should define isMaster helper function", () => {
-      expect(rulesContent).toMatch(/function\s+isMaster/);
+    it("should define isSignedIn helper function", () => {
+      expect(rulesContent).toMatch(/function\s+isSignedIn/);
     });
 
     it("should define isAdmin helper function", () => {
@@ -92,6 +92,20 @@ describe("Firestore Security Rules - Structural Validation", () => {
     it("should have rules version 2", () => {
       expect(rulesContent).toContain("rules_version = '2'");
     });
+
+    it("should deny writes to pairing codes from clients", () => {
+      const pairingSection = rulesContent.substring(
+        rulesContent.indexOf("match /pairingCodes/{codeId}")
+      );
+      expect(pairingSection).toContain("allow read, write: if false");
+    });
+
+    it("should deny writes to subscriptions from clients", () => {
+      const subSection = rulesContent.substring(
+        rulesContent.indexOf("match /subscriptions/{subscriptionId}")
+      );
+      expect(subSection).toContain("allow write: if false");
+    });
   });
 
   // ==================== Data Validation Tests ====================
@@ -100,6 +114,14 @@ describe("Firestore Security Rules - Structural Validation", () => {
     it("should validate data fields on write operations", () => {
       // Check that rules contain field validation
       expect(rulesContent).toContain("request.resource.data");
+    });
+
+    it("should enforce lowercase task status values", () => {
+      expect(rulesContent).toContain("['pending', 'pending_approval', 'approved', 'rejected']");
+    });
+
+    it("should validate task proof field as photoUrl", () => {
+      expect(rulesContent).toContain("photoUrl");
     });
   });
 
