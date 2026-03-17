@@ -1562,3 +1562,78 @@ input:focus, select:focus, textarea:focus {
 .tab-header h2 {
     margin: 0;
 }
+
+/* --- Firebase Tab --- */
+.firebase-section {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 20px;
+    margin-block-end: 20px;
+}
+
+.firebase-section h3 {
+    margin-block-start: 0;
+    color: #1a56db;
+}
+
+.firebase-result {
+    margin-block-start: 12px;
+}
+
+.status-overview {
+    background: #f8fbff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-block-end: 12px;
+}
+
+.status-ok {
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.status-error {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.status-warn {
+    color: #d97706;
+    font-weight: 600;
+}
+
+.gemini-response {
+    white-space: pre-wrap;
+    background: #f3f4f6;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    max-block-size: 300px;
+    overflow-y: auto;
+}
+
+.inline-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.text-muted {
+    color: #6b7280;
+    font-size: 0.9em;
+}
+
+.job-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-block-end: 12px;
+}
+
+#knowledge-base-editor {
+    font-family: monospace;
+    font-size: 0.85em;
+    width: 100%;
+    resize: vertical;
+}

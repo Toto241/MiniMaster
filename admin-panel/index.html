@@ -76,6 +76,9 @@
                 <button class="nav-tab" onclick="switchTab('setup', event)">
                     Einrichtung &amp; Assistent
                 </button>
+                <button class="nav-tab" onclick="switchTab('firebase', event)">
+                    Firebase
+                </button>
             </nav>
 
             <main class="main-content">
@@ -923,6 +926,104 @@
                     </div>
                 </section>
             </main>
+            <!-- ==================== TAB: FIREBASE ==================== -->
+            <div id="tab-firebase" class="tab-content" style="display: none">
+                <h2>Firebase-Verwaltung</h2>
+
+                <!-- Section 1: Functions Status Dashboard -->
+                <div class="firebase-section">
+                    <h3>Cloud Functions Status</h3>
+                    <p>Systemstatus und Health-Check aller Cloud Functions.</p>
+                    <button onclick="loadFunctionsStatus()" class="btn btn-primary">Status laden</button>
+                    <div id="functions-status-result" class="firebase-result"></div>
+                </div>
+
+                <!-- Section 2: Gemini API Live-Test -->
+                <div class="firebase-section">
+                    <h3>Gemini API Live-Test</h3>
+                    <p>Teste die Verbindung zur Gemini AI API.</p>
+                    <div class="form-group">
+                        <label for="gemini-test-prompt">Test-Prompt (optional):</label>
+                        <input type="text" id="gemini-test-prompt" placeholder="Antworte kurz: Was ist MiniMaster?" class="form-input" />
+                    </div>
+                    <button onclick="testGeminiApi()" class="btn btn-primary">Gemini testen</button>
+                    <div id="gemini-test-result" class="firebase-result"></div>
+                </div>
+
+                <!-- Section 3: Knowledge Base Editor -->
+                <div class="firebase-section">
+                    <h3>Knowledge Base Editor</h3>
+                    <p>Bearbeite die Wissensbasis für den KI-Support-Agenten.</p>
+                    <button onclick="loadKnowledgeBase()" class="btn btn-secondary">Knowledge Base laden</button>
+                    <div class="form-group" style="margin-block-start: 10px">
+                        <textarea id="knowledge-base-editor" rows="15" class="form-input" placeholder="Knowledge Base wird geladen..."></textarea>
+                    </div>
+                    <div class="inline-actions">
+                        <button onclick="saveKnowledgeBase()" class="btn btn-primary">Speichern</button>
+                        <span id="kb-source-info" class="text-muted"></span>
+                    </div>
+                    <div id="kb-save-result" class="firebase-result"></div>
+                </div>
+
+                <!-- Section 4: Live Audit-Log Viewer -->
+                <div class="firebase-section">
+                    <h3>Live Audit-Log Viewer</h3>
+                    <p>Durchsuche die Audit-Logs in Echtzeit.</p>
+                    <div class="sub-filters">
+                        <select id="audit-action-filter" class="form-input" style="width: auto; display: inline-block">
+                            <option value="">Alle Aktionen</option>
+                            <option value="auth.login">auth.login</option>
+                            <option value="auth.register">auth.register</option>
+                            <option value="device.lock">device.lock</option>
+                            <option value="device.delete">device.delete</option>
+                            <option value="pairing.create">pairing.create</option>
+                            <option value="pairing.validate">pairing.validate</option>
+                            <option value="task.create">task.create</option>
+                            <option value="task.approve">task.approve</option>
+                            <option value="subscription.verify">subscription.verify</option>
+                            <option value="support.ticket">support.ticket</option>
+                            <option value="admin.role">admin.role</option>
+                        </select>
+                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="width: 80px; display: inline-block" />
+                        <button onclick="loadAuditLogs()" class="btn btn-primary">Laden</button>
+                    </div>
+                    <div id="audit-log-list" class="data-list"></div>
+                </div>
+
+                <!-- Section 5: FCM Test Push -->
+                <div class="firebase-section">
+                    <h3>FCM Test-Push</h3>
+                    <p>Sende eine Test-Nachricht an ein Gerät.</p>
+                    <div class="form-group">
+                        <label for="fcm-child-id">Kind-ID:</label>
+                        <input type="text" id="fcm-child-id" placeholder="z.B. 123456789012345" class="form-input" />
+                    </div>
+                    <div class="form-group">
+                        <label for="fcm-token-direct">Oder direkt FCM-Token:</label>
+                        <input type="text" id="fcm-token-direct" placeholder="FCM Token (optional, überschreibt Kind-ID)" class="form-input" />
+                    </div>
+                    <button onclick="sendTestFcm()" class="btn btn-primary">Test-Push senden</button>
+                    <div id="fcm-test-result" class="firebase-result"></div>
+                </div>
+
+                <!-- Section 6: Scheduled Jobs -->
+                <div class="firebase-section">
+                    <h3>Geplante Jobs manuell ausführen</h3>
+                    <p>Starte geplante Hintergrundjobs sofort.</p>
+                    <div class="job-buttons">
+                        <button onclick="triggerJob('checkExpiredSubscriptions')" class="btn btn-secondary">
+                            Abgelaufene Abos prüfen
+                        </button>
+                        <button onclick="triggerJob('cleanupExpiredGrants')" class="btn btn-secondary">
+                            Abgelaufene Zugänge aufräumen
+                        </button>
+                        <button onclick="triggerJob('sendDailyErrorReport')" class="btn btn-secondary">
+                            Fehlerreport erstellen
+                        </button>
+                    </div>
+                    <div id="job-trigger-result" class="firebase-result"></div>
+                </div>
+            </div>
 
             <div
                 id="notification"

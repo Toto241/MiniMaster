@@ -1,0 +1,186 @@
+MiniMaster – Wissensbasis für den KI-Support-Agenten
+=====================================================
+
+ÜBERBLICK
+---------
+MiniMaster ist eine Kindersicherungs-Suite bestehend aus:
+- Eltern-App (masterApp): Android-App für Eltern zur Verwaltung
+- Kind-App (childApp): Android-App auf dem Gerät des Kindes
+- Web-Eltern-Panel: Browser-basierte Steuerung unter minimaster-web-control.web.app
+- Admin-Panel: Betreiber-Dashboard unter minimaster-admin-panel.web.app
+- Cloud Functions: Firebase-Backend für alle Logik
+
+HÄUFIGE PROBLEME UND LÖSUNGEN
+------------------------------
+
+### Pairing / Kopplung
+
+Problem: Kind-App lässt sich nicht mit Eltern-App koppeln
+Lösung:
+1. Prüfen ob beide Geräte eine stabile Internetverbindung haben
+2. In der Eltern-App einen neuen Pairing-Code generieren (6-stelliger Code, gültig 24 Stunden)
+3. Alternativ einen Pairing-Link generieren (gültig 5 Minuten)
+4. Den Code/Link in der Kind-App eingeben
+5. Falls der Code abgelaufen ist: neuen Code generieren
+
+Problem: Pairing-Code wird als ungültig angezeigt
+Lösung:
+1. Prüfen ob der Code korrekt eingegeben wurde (6 Ziffern)
+2. Codes laufen nach 24 Stunden ab – neuen Code generieren
+3. Pairing-Links laufen nach 5 Minuten ab – neuen Link generieren
+4. Maximal 10 Code-Generierungen pro Stunde möglich (Spam-Schutz)
+
+Problem: "Maximale Anzahl an Kindern erreicht" bei der Kopplung
+Lösung:
+1. Im Free-Tarif ist nur 1 Kind möglich
+2. Upgrade auf Premium-Abo für mehr Kinder
+3. Oder bestehendes Kind-Gerät entkoppeln und neues koppeln
+
+### App-Sperre / Gerätesteuerung
+
+Problem: Kind-Gerät wird nicht gesperrt obwohl Sperre aktiviert
+Lösung:
+1. Prüfen ob die Kind-App noch aktiv ist (letzter Heartbeat in den letzten 15 Minuten)
+2. Accessibility Service muss auf dem Kind-Gerät aktiviert sein
+3. Einstellungen → Bedienungshilfen → MiniMaster → Aktivieren
+4. Akku-Optimierung für die Kind-App deaktivieren
+5. Gerät des Kindes neustarten
+
+Problem: App-Blacklist wird nicht übernommen
+Lösung:
+1. Änderungen werden per FCM Push an das Kind-Gerät gesendet
+2. Prüfen ob das Kind-Gerät online ist (Heartbeat)
+3. Kind-App neustarten falls nötig
+4. Push-Benachrichtigungen müssen für die Kind-App erlaubt sein
+
+Problem: Nutzungsregeln (Zeitlimits) greifen nicht
+Lösung:
+1. Regeln werden über setUsageRules gesetzt und per FCM synchronisiert
+2. Prüfen ob das Kind-Gerät die Regeln empfangen hat
+3. Kind-App benötigt Accessibility Service und Geräte-Admin-Rechte
+4. Akku-Optimierung für Kind-App muss deaktiviert sein
+
+### Aufgaben (Tasks)
+
+Problem: Kind kann Aufgabe nicht als erledigt markieren
+Lösung:
+1. Aufgabe muss im Status "pending" sein
+2. Kind muss ein Foto als Beweis hochladen (photoUrl)
+3. Prüfen ob Storage-Regeln korrekt deployt sind
+4. Prüfen ob das Kind Kamerazugriff erlaubt hat
+
+Problem: Foto wird beim Aufgaben-Abschluss nicht hochgeladen
+Lösung:
+1. Kameraberechtigung der Kind-App prüfen
+2. Speicherberechtigung der Kind-App prüfen
+3. Internetverbindung prüfen
+4. Firebase Storage muss aktiv sein
+
+Problem: Eltern können Aufgabe nicht genehmigen
+Lösung:
+1. Aufgabe muss im Status "pending_approval" sein (Kind hat bereits abgeschlossen)
+2. Nur der zugehörige Master (Elternteil) kann genehmigen
+3. Aufgaben-Workflow: pending → pending_approval → approved
+
+### Abonnement / Subscription
+
+Problem: Premium-Features nicht verfügbar nach Kauf
+Lösung:
+1. Prüfen ob der Kauf bei Google Play abgeschlossen wurde
+2. verifyPurchase-Function aufrufen zum Verifizieren
+3. App neustarten nach dem Kauf
+4. Google Play Cache leeren: Einstellungen → Apps → Google Play Store → Cache leeren
+
+Problem: Abo-Status wird als "abgelaufen" angezeigt
+Lösung:
+1. Prüfen ob das Abo bei Google Play noch aktiv ist
+2. checkExpiredSubscriptions läuft automatisch täglich
+3. Bei Zahlungsproblemen: Google Play → Zahlungsmethoden prüfen
+4. Abo manuell erneuern über Google Play
+
+### Authentifizierung / Login
+
+Problem: Login im Admin-Panel funktioniert nicht
+Lösung:
+1. E-Mail und Passwort korrekt eingeben
+2. Firebase Authentication muss aktiviert sein (E-Mail/Passwort)
+3. Benutzer muss in Firebase Authentication registriert sein
+4. Für Admin-Zugang: Admin-Claim muss gesetzt sein (setAdminClaim)
+
+Problem: "Unauthenticated" Fehler bei Cloud Function Aufrufen
+Lösung:
+1. masterImei und secretKey müssen korrekt sein
+2. secretKey wird bei registerMasterDevice generiert und muss sicher gespeichert werden
+3. Prüfen ob das Master-Dokument in Firestore existiert
+4. secretKey darf nicht verloren gehen – bei Verlust: neues Gerät registrieren
+
+### Einrichtung / Setup
+
+Problem: Firebase-Verbindung schlägt fehl
+Lösung:
+1. Firebase Config prüfen (apiKey, projectId, etc.)
+2. Im Operator Dashboard: Einrichtung → Firebase verbinden
+3. Prüfen ob alle 6 Config-Werte korrekt sind
+4. Browser-Konsole auf Fehler prüfen (F12)
+
+Problem: Cloud Functions antworten nicht
+Lösung:
+1. Prüfen ob Functions deployt sind: firebase functions:list
+2. Blaze-Plan muss aktiv sein (Pay-as-you-go)
+3. Firebase Console → Functions → Logs prüfen
+4. Region beachten: Functions laufen auf us-central1
+
+Problem: Hosting-Seite zeigt 404
+Lösung:
+1. firebase deploy --only hosting ausführen
+2. Hosting-Sites müssen erstellt sein (minimaster-web-control, minimaster-admin-panel)
+3. DNS/Domains prüfen falls Custom Domain konfiguriert
+4. Browser-Cache leeren (Strg+Shift+R)
+
+### FCM / Push-Benachrichtigungen
+
+Problem: Kind-Gerät empfängt keine Push-Nachrichten
+Lösung:
+1. FCM-Token muss registriert sein (registerFcmToken)
+2. Google Play Services müssen auf dem Kind-Gerät installiert sein
+3. Push-Benachrichtigungen für die Kind-App erlauben
+4. Akku-Optimierung deaktivieren
+5. Datenverbindung prüfen
+
+Problem: FCM-Token ist ungültig
+Lösung:
+1. Token kann sich nach App-Update ändern
+2. updateFCMToken aufrufen um neuen Token zu registrieren
+3. Kind-App neustarten
+
+### Heartbeat / Gerätestatus
+
+Problem: Kind-Gerät zeigt "Offline" obwohl es eingeschaltet ist
+Lösung:
+1. Heartbeat wird alle 15 Minuten gesendet (WorkManager)
+2. Akku-Optimierung für Kind-App deaktivieren
+3. Hintergrund-Datennutzung für Kind-App erlauben
+4. Prüfen ob recordHeartbeat-Function erreichbar ist
+5. Kind-App neustarten
+
+FEHLER-CODES
+-------------
+- invalid-argument: Fehlende oder falsche Parameter
+- unauthenticated: Ungültige IMEI oder secretKey
+- permission-denied: Kein Zugriff (nicht der zugehörige Master)
+- not-found: Dokument existiert nicht
+- deadline-exceeded: Pairing-Code/Token abgelaufen
+- failed-precondition: Ungültiger Aufgaben-Statuswechsel
+- already-exists: IMEI bereits registriert
+- resource-exhausted: Code-Limit (10) oder Free-Tier-Limit (1 Kind)
+
+TECHNISCHE HINWEISE
+-------------------
+- Aufgaben-Status-Workflow: pending → pending_approval → approved
+- Pairing-Codes: 6-stellig, 24h gültig, max. 10 Versuche
+- Pairing-Links: UUID-basiert, 5 Minuten gültig
+- Heartbeat-Intervall: 15 Minuten (WorkManager)
+- Support-Zugang: 48 Stunden gültig nach Erteilung
+- FCM: Nur geänderte Felder werden gesendet (Diff-Strategie)
+- Firestore: Flache Struktur (keine families/ Collection)
+- Storage: Fotos unter children/{childId}/photos/{fileName}
