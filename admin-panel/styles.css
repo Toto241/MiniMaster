@@ -1266,6 +1266,64 @@ input:focus, select:focus, textarea:focus {
     margin-block-start: 12px;
 }
 
+/* CLI-Ausführung im Operator-Desktop-Modus */
+.btn-execute {
+    background: #059669;
+    color: #fff;
+    border: 0;
+    font-weight: 700;
+}
+
+.btn-execute:hover {
+    background: #047857;
+}
+
+.cli-output-area {
+    margin-block-start: 10px;
+    padding: 12px;
+    background: #0f172a;
+    color: #a3e635;
+    border-radius: 8px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.85rem;
+    max-block-size: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.cli-status {
+    margin-block-start: 8px;
+    font-size: 0.9rem;
+}
+
+.cli-running {
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.cli-success {
+    color: #059669;
+    font-weight: 600;
+}
+
+.cli-error {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.operator-badge {
+    display: inline-block;
+    background: #059669;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-inline-start: 8px;
+    vertical-align: middle;
+}
+
 .check-ok {
     color: #0f766e;
     font-weight: bold;
