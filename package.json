@@ -16,6 +16,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": "22"
+  },
   "dependencies": {
     "@types/node": "^22.15.29",
     "firebase-admin": "^13.4.0",
