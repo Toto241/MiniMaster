@@ -25,7 +25,7 @@ Reviewed repository areas:
 | Backend test suite | `npm test` | ✅ 13/13 suites, 129/129 tests passed |
 | Android manifest validation | `./validate_manifests.sh` | ✅ Passed |
 | Android unit tests (Gradle) | `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest` | ⚠️ Blocked by local Java/Gradle compatibility (`Unsupported class file major version 69`) |
-| GUI smoke check | Playwright-based page load + screenshot for `web-control` and `admin-panel` | ✅ Both entry UIs load and render |
+| GUI smoke check | Manual browser smoke check – pages served via local HTTP and verified in browser for `web-control` and `admin-panel` | ✅ Both entry UIs load and render |
 
 ## Code Analysis & Review Notes
 
@@ -52,7 +52,7 @@ Both pages and their dependent static assets load successfully over local HTTP s
 
 ## Recommended Follow-up
 
-1. Pin a project-supported Java version in setup docs (or enforce via toolchain) to remove the current Gradle test blocker.
+1. Ensure **Java 17** (the version already targeted by both Android apps via `compileOptions` and Kotlin `jvmTarget`) is used as the local JDK to remove the current Gradle test blocker (`Unsupported class file major version 69` indicates a mismatch – install a Java 17 JDK and set `JAVA_HOME` accordingly).
 2. Optionally add a CI job for screenshot-based UI smoke tests to preserve baseline UI availability checks over time.
 
 ## Conclusion
