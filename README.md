@@ -129,7 +129,7 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[API Documentation](API_DOCUMENTATION.md):** Detailed reference for all Cloud Functions.
 - **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project.
 - **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
-- **[Quality Review 2026-03-17](docs/QUALITY_REVIEW_2026-03-17.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
+- **[Quality Review YYYY-MM-DD](docs/QUALITY_REVIEW_YYYY-MM-DD.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
 - **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
 
 Each source file is also thoroughly documented.
