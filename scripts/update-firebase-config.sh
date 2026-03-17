@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Bekannte Standardwerte (abgeleitet von Project ID) ─────────────────
-DEFAULT_PROJECT_ID="minimaster-app"
+DEFAULT_PROJECT_ID="minimaster-28fbd"
 DEFAULT_AUTH_DOMAIN="${DEFAULT_PROJECT_ID}.firebaseapp.com"
 DEFAULT_STORAGE_BUCKET="${DEFAULT_PROJECT_ID}.firebasestorage.app"
 

@@ -1,9 +1,9 @@
 {
   "projects": {
-    "default": "minimaster-app"
+    "default": "minimaster-28fbd"
   },
   "targets": {
-    "minimaster-app": {
+    "minimaster-28fbd": {
       "hosting": {
         "web-control": [
           "minimaster-web-control"

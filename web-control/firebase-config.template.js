@@ -2,12 +2,12 @@
 // Copy this file to firebase-config.js and fill in your actual Firebase project details
 
 const firebaseConfig = {
-    apiKey: "your-api-key",
-    authDomain: "minimaster-app.firebaseapp.com",
-    projectId: "minimaster-app",
-    storageBucket: "minimaster-app.firebasestorage.app",
-    messagingSenderId: "your-messaging-sender-id",
-    appId: "your-app-id"
+    apiKey: "AIzaSyBjINek6A4RVqha9_wOBTVQZ5PDyl9MBkE",
+    authDomain: "minimaster-28fbd.firebaseapp.com",
+    projectId: "minimaster-28fbd",
+    storageBucket: "minimaster-28fbd.firebasestorage.app",
+    messagingSenderId: "716142639488",
+    appId: "1:716142639488:web:9bef591e96e72db771a965"
 };
 
 // How to get these values:
