@@ -6,6 +6,13 @@ const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 const COMMAND_BUILDER_STORAGE_KEY = "operatorCommandBuilderConfig";
 const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations";
 
+// Electron Operator-Bridge-Erkennung
+const isElectronOperator = Boolean(
+    typeof window !== "undefined" &&
+    window.miniMasterDesktop &&
+    window.miniMasterDesktop.isOperatorContext
+);
+
 // Firebase configuration (MUST be replaced with actual config)
 const fallbackFirebaseConfig = {
     apiKey: "your-api-key",
@@ -244,9 +251,75 @@ function downloadPowerShellCommand(payload) {
     }
 }
 
+// ── CLI-Ausführung via Electron Bridge ──────────────────────────────────
+let activeCLICommandId = null;
+let cliOutputCleanup = null;
+
+async function executeCommandDirect(payload) {
+    if (!isElectronOperator) {
+        showNotification("CLI-Ausführung nur im Operator-Desktop-Modus verfügbar.", "error");
+        return;
+    }
+
+    const data = decodeCommandPayload(payload);
+    const outputId = `cli-output-${data.id}`;
+    const outputEl = document.getElementById(outputId);
+    const statusId = `cli-status-${data.id}`;
+    const statusEl = document.getElementById(statusId);
+
+    if (!outputEl) return;
+
+    // Bestätigungsdialog
+    const confirmed = confirm(`Befehl ausführen?\n\n${data.command}\n\nArbeitsverzeichnis: ${data.cwd || "(aktuell)"}`);
+    if (!confirmed) return;
+
+    outputEl.textContent = "";
+    outputEl.style.display = "block";
+    if (statusEl) statusEl.innerHTML = '<span class="cli-running">⏳ Wird ausgeführt…</span>';
+
+    // Live-Output Listener
+    if (cliOutputCleanup) cliOutputCleanup();
+    cliOutputCleanup = window.miniMasterDesktop.onCLIOutput((msg) => {
+        if (outputEl) {
+            outputEl.textContent += msg.data;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+    });
+
+    try {
+        const result = await window.miniMasterDesktop.runCLI(data.command, data.cwd);
+        activeCLICommandId = null;
+        if (cliOutputCleanup) { cliOutputCleanup(); cliOutputCleanup = null; }
+
+        if (result.code === 0) {
+            if (statusEl) statusEl.innerHTML = '<span class="cli-success">✅ Erfolgreich abgeschlossen</span>';
+            showNotification(`"${data.label}" erfolgreich ausgeführt.`, "success");
+        } else {
+            if (statusEl) statusEl.innerHTML = `<span class="cli-error">❌ Beendet mit Code ${result.code}</span>`;
+            showNotification(`"${data.label}" fehlgeschlagen (Code ${result.code}).`, "error");
+        }
+    } catch (error) {
+        activeCLICommandId = null;
+        if (cliOutputCleanup) { cliOutputCleanup(); cliOutputCleanup = null; }
+        if (statusEl) statusEl.innerHTML = `<span class="cli-error">❌ ${escapeHtml(error.message)}</span>`;
+        showNotification("Fehler: " + error.message, "error");
+    }
+}
+
 function renderCommandBlockHtml(entry) {
     const previewId = `ps-preview-${entry.id}`;
+    const outputId = `cli-output-${entry.id}`;
+    const statusId = `cli-status-${entry.id}`;
     const payload = encodeCommandPayload(entry);
+
+    const executeBtn = isElectronOperator
+        ? `<button onclick="executeCommandDirect('${payload}')" class="btn btn-execute btn-sm">▶ Ausführen</button>`
+        : "";
+
+    const outputArea = isElectronOperator
+        ? `<div id="${statusId}" class="cli-status"></div><pre id="${outputId}" class="cli-output-area" style="display:none"></pre>`
+        : "";
+
     return `
         <div class="command-block">
             <div class="command-block-header">
@@ -257,12 +330,14 @@ function renderCommandBlockHtml(entry) {
             </div>
             <pre class="code-block">${escapeHtml(entry.command)}</pre>
             <div class="command-actions">
+                ${executeBtn}
                 <button onclick="copyRenderedCommand('${payload}', 'raw')" class="btn btn-secondary btn-sm">CLI kopieren</button>
                 <button onclick="copyRenderedCommand('${payload}', 'powershell')" class="btn btn-primary btn-sm">PowerShell kopieren</button>
                 <button onclick="togglePowerShellPreview('${payload}', '${previewId}')" class="btn btn-secondary btn-sm">PowerShell anzeigen</button>
                 <button onclick="downloadPowerShellCommand('${payload}')" class="btn btn-secondary btn-sm">PS1 herunterladen</button>
             </div>
             <div id="${previewId}" class="command-preview" data-visible="false"></div>
+            ${outputArea}
         </div>
     `;
 }
@@ -1539,6 +1614,12 @@ document.addEventListener("DOMContentLoaded", function() {
     renderCommandCatalog(firebaseConfig.projectId);
     renderAllPlatformSections();
     renderGoLiveAmpel();
+
+    // Operator-Desktop-Modus Badge anzeigen
+    if (isElectronOperator) {
+        const badge = document.getElementById("electron-operator-badge");
+        if (badge) badge.style.display = "block";
+    }
 
     if (isPlaceholderFirebaseConfig(firebaseConfig)) {
         console.warn("Firebase config placeholders detected. Waiting for bootstrap configuration.");
