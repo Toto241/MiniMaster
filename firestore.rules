@@ -107,12 +107,8 @@ service cloud.firestore {
       }
 
       allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
-      allow create: if isMasterOfChild(); // Only master can create tasks
-      allow update: if isMasterOfChild() || isChildDevice(); // Both can update (child submits proof, master reviews)
-      allow delete: if isMasterOfChild(); // Only master can delete tasks
-
-      // Validate task data structure when writing (matches Cloud Functions task lifecycle)
-      allow create, update: if isSignedIn()
+      // Only master can create tasks, and the task document must satisfy the schema.
+      allow create: if isMasterOfChild()
         && request.resource.data.keys().hasOnly([
           'description', 'deadline', 'status', 'photoUrl', 'createdAt',
           'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
@@ -125,6 +121,23 @@ service cloud.firestore {
         && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
         && (!('rejectionReason' in request.resource.data) || request.resource.data.rejectionReason is string)
         && request.resource.data.masterImei is string;
+
+      // Both master and child device can update, but updates must satisfy the same schema.
+      allow update: if (isMasterOfChild() || isChildDevice())
+        && request.resource.data.keys().hasOnly([
+          'description', 'deadline', 'status', 'photoUrl', 'createdAt',
+          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
+        ])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() < 1000
+        && request.resource.data.status is string
+        && request.resource.data.status in ['pending', 'pending_approval', 'approved', 'rejected']
+        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
+        && (!('rejectionReason' in request.resource.data) || request.resource.data.rejectionReason is string)
+        && request.resource.data.masterImei is string;
+
+      allow delete: if isMasterOfChild(); // Only master can delete tasks
     }
 
     // --- PAIRING CODES COLLECTION ---
