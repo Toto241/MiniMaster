@@ -83,9 +83,9 @@ describe("Firestore Security Rules - Structural Validation", () => {
 
     it("should restrict admin-only collections", () => {
       // audit_logs and error_logs should only be accessible by admins
-      const auditSection = rulesContent.substring(
-        rulesContent.indexOf("audit_logs")
-      );
+      const auditIdx = rulesContent.indexOf("audit_logs");
+      expect(auditIdx).toBeGreaterThanOrEqual(0);
+      const auditSection = rulesContent.substring(auditIdx);
       expect(auditSection).toContain("isAdmin");
     });
 
@@ -94,16 +94,16 @@ describe("Firestore Security Rules - Structural Validation", () => {
     });
 
     it("should deny writes to pairing codes from clients", () => {
-      const pairingSection = rulesContent.substring(
-        rulesContent.indexOf("match /pairingCodes/{codeId}")
-      );
+      const pairingIdx = rulesContent.indexOf("match /pairingCodes/{codeId}");
+      expect(pairingIdx).toBeGreaterThanOrEqual(0);
+      const pairingSection = rulesContent.substring(pairingIdx);
       expect(pairingSection).toContain("allow read, write: if false");
     });
 
     it("should deny writes to subscriptions from clients", () => {
-      const subSection = rulesContent.substring(
-        rulesContent.indexOf("match /subscriptions/{subscriptionId}")
-      );
+      const subIdx = rulesContent.indexOf("match /subscriptions/{subscriptionId}");
+      expect(subIdx).toBeGreaterThanOrEqual(0);
+      const subSection = rulesContent.substring(subIdx);
       expect(subSection).toContain("allow write: if false");
     });
   });
@@ -129,16 +129,16 @@ describe("Firestore Security Rules - Structural Validation", () => {
 
   describe("Support ticket access", () => {
     it("should allow masters to create support tickets", () => {
-      const ticketSection = rulesContent.substring(
-        rulesContent.indexOf("supportTickets")
-      );
+      const ticketIdx = rulesContent.indexOf("supportTickets");
+      expect(ticketIdx).toBeGreaterThanOrEqual(0);
+      const ticketSection = rulesContent.substring(ticketIdx);
       expect(ticketSection).toContain("create");
     });
 
     it("should allow admins to read support tickets", () => {
-      const ticketSection = rulesContent.substring(
-        rulesContent.indexOf("supportTickets")
-      );
+      const ticketIdx = rulesContent.indexOf("supportTickets");
+      expect(ticketIdx).toBeGreaterThanOrEqual(0);
+      const ticketSection = rulesContent.substring(ticketIdx);
       expect(ticketSection).toContain("isAdmin");
     });
   });
