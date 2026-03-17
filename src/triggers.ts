@@ -106,6 +106,7 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
 
 /**
  * Sends push notification to master when a task is submitted for review.
+ * Also notifies the child device when a task was approved or rejected.
  */
 export const onTaskStatusChange = functions.firestore
   .document("/children/{childId}/tasks/{taskId}")
@@ -150,6 +151,45 @@ export const onTaskStatusChange = functions.firestore
         functions.logger.info(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
       } catch (error) {
         functions.logger.error("Error sending notification:", error);
+      }
+
+      return;
+    }
+
+    // Notify child when parent has reviewed the task.
+    if ((newValue.status === "approved" || newValue.status === "rejected") && newValue.status !== previousValue.status) {
+      const childId = context.params.childId;
+      const childDoc = await db().collection("children").doc(childId).get();
+      const childFcmToken = childDoc.data()?.fcmToken;
+
+      if (!childFcmToken) {
+        functions.logger.warn(`Child ${childId} does not have an FCM token. Cannot send review notification.`);
+        return;
+      }
+
+      const reviewTitle = newValue.status === "approved" ? "Task Approved" : "Task Rejected";
+      const reviewBody = newValue.status === "approved"
+        ? `Great job! Your task "${newValue.description || ""}" was approved.`
+        : `Your task "${newValue.description || ""}" was rejected. Please review and try again.`;
+
+      const reviewMessage = {
+        token: childFcmToken,
+        notification: {
+          title: reviewTitle,
+          body: reviewBody,
+        },
+        data: {
+          taskId: context.params.taskId,
+          childId,
+          status: newValue.status,
+        },
+      };
+
+      try {
+        await getMessaging().send(reviewMessage);
+        functions.logger.info(`Review notification sent to child ${childId} for task ${context.params.taskId}`);
+      } catch (error) {
+        functions.logger.error("Error sending review notification:", error);
       }
     }
   });

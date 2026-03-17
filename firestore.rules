@@ -111,19 +111,20 @@ service cloud.firestore {
       allow update: if isMasterOfChild() || isChildDevice(); // Both can update (child submits proof, master reviews)
       allow delete: if isMasterOfChild(); // Only master can delete tasks
 
-      // Validate task data structure when writing
+      // Validate task data structure when writing (matches Cloud Functions task lifecycle)
       allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['title', 'description', 'status', 'proofUrl', 'createdAt', 'updatedAt', 'assignedAt', 'submittedAt', 'reviewedAt', 'unlockDuration', 'masterImei'])
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() < 200
+        && request.resource.data.keys().hasOnly([
+          'description', 'deadline', 'status', 'photoUrl', 'createdAt',
+          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
+        ])
         && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
         && request.resource.data.description.size() < 1000
         && request.resource.data.status is string
-        && request.resource.data.status in ['ASSIGNED', 'SUBMITTED', 'APPROVED', 'REJECTED']
-        && (!('proofUrl' in request.resource.data) || request.resource.data.proofUrl is string || request.resource.data.proofUrl == null)
-        && request.resource.data.unlockDuration is int
-        && request.resource.data.unlockDuration >= 0;
+        && request.resource.data.status in ['pending', 'pending_approval', 'approved', 'rejected']
+        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
+        && (!('rejectionReason' in request.resource.data) || request.resource.data.rejectionReason is string)
+        && request.resource.data.masterImei is string;
     }
 
     // --- PAIRING CODES COLLECTION ---
