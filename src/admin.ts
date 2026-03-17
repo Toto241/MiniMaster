@@ -1,10 +1,13 @@
 /**
  * Admin & System Cloud Functions.
- * Handles account deletion, DSAR data export, daily error reports.
+ * Handles account deletion, DSAR data export, daily error reports,
+ * Gemini API testing, knowledge base management, FCM test push, and scheduled job triggers.
  */
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import * as fs from "fs";
+import * as path from "path";
 import { db, storage } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 
@@ -270,6 +273,195 @@ export const exportUserData = functions.https.onCall(
       if (error instanceof functions.https.HttpsError) throw error;
       functions.logger.error(`Failed to export data for master ${masterId}:`, error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while exporting user data.", error);
+    }
+  }
+);
+
+// ==================== GEMINI API TEST ====================
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+
+export const testGeminiConnection = functions.https.onCall(
+  async (data: { prompt?: string }, context: CallableContext) => {
+    requireAdmin(context);
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: "GEMINI_API_KEY ist nicht konfiguriert." };
+    }
+
+    const testPrompt = data?.prompt || "Antworte kurz: Was ist MiniMaster?";
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: testPrompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { success: false, error: `Gemini API Fehler (${response.status}): ${errorText}` };
+      }
+
+      const result = await response.json() as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = result.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+
+      return { success: true, model: GEMINI_MODEL, response: text };
+    } catch (error) {
+      return { success: false, error: `Verbindungsfehler: ${(error as Error).message}` };
+    }
+  }
+);
+
+// ==================== KNOWLEDGE BASE MANAGEMENT ====================
+
+export const getKnowledgeBase = functions.https.onCall(
+  async (_data: Record<string, never>, context: CallableContext) => {
+    requireAdmin(context);
+
+    // Try Firestore first (runtime edits), fall back to deployed file
+    const doc = await db().collection("operatorConfig").doc("knowledgeBase").get();
+    if (doc.exists && doc.data()?.content) {
+      return { success: true, content: doc.data()!.content, source: "firestore" };
+    }
+
+    try {
+      const filePath = path.join(__dirname, "..", "knowledge_base.txt");
+      const content = fs.readFileSync(filePath, "utf-8");
+      return { success: true, content, source: "file" };
+    } catch {
+      return { success: true, content: "", source: "empty" };
+    }
+  }
+);
+
+export const updateKnowledgeBase = functions.https.onCall(
+  async (data: { content?: string }, context: CallableContext) => {
+    requireAdmin(context);
+
+    if (typeof data?.content !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "content (string) is required.");
+    }
+
+    await db().collection("operatorConfig").doc("knowledgeBase").set({
+      content: data.content,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth!.uid,
+    });
+
+    functions.logger.info(`Knowledge base updated by admin ${context.auth!.uid} (${data.content.length} chars).`);
+    return { success: true, length: data.content.length };
+  }
+);
+
+// ==================== FCM TEST PUSH ====================
+
+export const sendTestFcmMessage = functions.https.onCall(
+  async (data: { token?: string; childId?: string }, context: CallableContext) => {
+    requireAdmin(context);
+
+    let fcmToken = data?.token;
+
+    // If childId provided, look up the FCM token
+    if (!fcmToken && data?.childId) {
+      const childDoc = await db().collection("children").doc(data.childId).get();
+      fcmToken = childDoc.data()?.fcmToken;
+      if (!fcmToken) {
+        return { success: false, error: `Kein FCM-Token für Kind ${data.childId} gefunden.` };
+      }
+    }
+
+    if (!fcmToken || typeof fcmToken !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "token oder childId ist erforderlich.");
+    }
+
+    try {
+      const messageId = await admin.messaging().send({
+        token: fcmToken,
+        notification: {
+          title: "MiniMaster Test",
+          body: "Dies ist eine Test-Nachricht vom Admin-Panel.",
+        },
+        data: {
+          type: "admin_test",
+          timestamp: Date.now().toString(),
+        },
+      });
+
+      functions.logger.info(`Test FCM sent by admin ${context.auth!.uid} to token ${fcmToken.substring(0, 20)}...`);
+      return { success: true, messageId };
+    } catch (error) {
+      return { success: false, error: `FCM Fehler: ${(error as Error).message}` };
+    }
+  }
+);
+
+// ==================== SCHEDULED JOB TRIGGERS ====================
+
+export const triggerScheduledJob = functions.https.onCall(
+  async (data: { jobName?: string }, context: CallableContext) => {
+    requireAdmin(context);
+
+    const jobName = data?.jobName;
+    if (!jobName || typeof jobName !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "jobName ist erforderlich.");
+    }
+
+    const startTime = Date.now();
+
+    try {
+      switch (jobName) {
+        case "checkExpiredSubscriptions": {
+          const subsSnapshot = await db().collection("subscriptions")
+            .where("status", "==", "active").get();
+          let expired = 0;
+          const now = admin.firestore.Timestamp.now();
+          for (const doc of subsSnapshot.docs) {
+            const expiresAt = doc.data().expiresAt;
+            if (expiresAt && expiresAt.toMillis() < now.toMillis()) {
+              await doc.ref.update({ status: "expired", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+              expired++;
+            }
+          }
+          return { success: true, jobName, duration: Date.now() - startTime, result: { checked: subsSnapshot.size, expired } };
+        }
+
+        case "cleanupExpiredGrants": {
+          const grantsSnapshot = await db().collection("supportTickets")
+            .where("accessGranted", "==", true).get();
+          let revoked = 0;
+          const now = admin.firestore.Timestamp.now();
+          for (const doc of grantsSnapshot.docs) {
+            const expiresAt = doc.data().accessExpiresAt;
+            if (expiresAt && expiresAt.toMillis() < now.toMillis()) {
+              await doc.ref.update({ accessGranted: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+              revoked++;
+            }
+          }
+          return { success: true, jobName, duration: Date.now() - startTime, result: { checked: grantsSnapshot.size, revoked } };
+        }
+
+        case "sendDailyErrorReport": {
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const errorsSnapshot = await db().collection("error_logs")
+            .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(since)).get();
+          return { success: true, jobName, duration: Date.now() - startTime, result: { errorsLast24h: errorsSnapshot.size } };
+        }
+
+        default:
+          throw new functions.https.HttpsError("invalid-argument", `Unbekannter Job: ${jobName}`);
+      }
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error(`Failed to trigger job ${jobName}:`, error);
+      throw new functions.https.HttpsError("internal", `Job-Ausführung fehlgeschlagen: ${(error as Error).message}`);
     }
   }
 );

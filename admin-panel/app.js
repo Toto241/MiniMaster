@@ -3887,6 +3887,217 @@ async function assignUserRole() {
     }
 }
 
+// ==================== FIREBASE TAB: FUNCTIONS STATUS ====================
+
+async function loadFunctionsStatus() {
+    const resultEl = document.getElementById("functions-status-result");
+    resultEl.innerHTML = "<div class='loading'>Lade Status...</div>";
+
+    try {
+        const healthResult = await functions.httpsCallable("adminHealthCheck")({});
+        const data = healthResult.data || {};
+        const checks = data.checks || {};
+        const prereqs = data.prerequisites || {};
+        const ai = prereqs.ai || {};
+        const env = prereqs.environment || {};
+
+        let html = `<div class="status-overview">`;
+        html += `<p><strong>Zeitstempel:</strong> ${escapeHtml(data.timestamp || "-")}</p>`;
+        html += `<p><strong>Projekt-ID:</strong> ${escapeHtml(env.projectId || "-")}</p>`;
+        html += `<p><strong>Storage:</strong> <span class="${String(prereqs.storage).startsWith("ok") ? "status-ok" : "status-error"}">${escapeHtml(String(prereqs.storage))}</span> (Bucket: ${escapeHtml(prereqs.storageBucket || "-")})</p>`;
+        html += `<p><strong>Gemini API:</strong> <span class="${ai.geminiConfigured ? "status-ok" : "status-error"}">${ai.geminiConfigured ? "Konfiguriert" : "Nicht konfiguriert"}</span> (Modell: ${escapeHtml(ai.geminiModel || "-")})</p>`;
+        html += `<p><strong>OpenAI API:</strong> <span class="${ai.openAiConfigured ? "status-ok" : "status-warn"}">${ai.openAiConfigured ? "Konfiguriert" : "Nicht konfiguriert"}</span></p>`;
+        html += `</div>`;
+
+        html += `<h4>Firestore Collections</h4><table class="data-table"><thead><tr><th>Collection</th><th>Status</th></tr></thead><tbody>`;
+        for (const [name, status] of Object.entries(checks)) {
+            const isOk = status === "ok";
+            html += `<tr><td>${escapeHtml(name)}</td><td><span class="${isOk ? "status-ok" : "status-error"}">${escapeHtml(String(status))}</span></td></tr>`;
+        }
+        html += `</tbody></table>`;
+
+        resultEl.innerHTML = html;
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== FIREBASE TAB: GEMINI API TEST ====================
+
+async function testGeminiApi() {
+    const resultEl = document.getElementById("gemini-test-result");
+    const prompt = (document.getElementById("gemini-test-prompt")?.value || "").trim();
+    resultEl.innerHTML = "<div class='loading'>Teste Gemini API...</div>";
+
+    try {
+        const payload = prompt ? { prompt } : {};
+        const result = await functions.httpsCallable("testGeminiConnection")(payload);
+        const data = result.data || {};
+
+        if (data.success) {
+            resultEl.innerHTML = `<div class='success-box'>
+                <p><strong>Modell:</strong> ${escapeHtml(data.model)}</p>
+                <p><strong>Antwort:</strong></p>
+                <pre class="gemini-response">${escapeHtml(data.response)}</pre>
+            </div>`;
+        } else {
+            resultEl.innerHTML = `<div class='error'>${escapeHtml(data.error)}</div>`;
+        }
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== FIREBASE TAB: KNOWLEDGE BASE ====================
+
+async function loadKnowledgeBase() {
+    const editor = document.getElementById("knowledge-base-editor");
+    const sourceInfo = document.getElementById("kb-source-info");
+    editor.value = "Lade...";
+
+    try {
+        const result = await functions.httpsCallable("getKnowledgeBase")({});
+        const data = result.data || {};
+        editor.value = data.content || "";
+        const sourceLabel = data.source === "firestore" ? "Firestore (bearbeitet)" : data.source === "file" ? "Deployed-Datei" : "Leer";
+        sourceInfo.textContent = `Quelle: ${sourceLabel}`;
+    } catch (error) {
+        editor.value = "";
+        sourceInfo.textContent = "";
+        showNotification("Fehler beim Laden: " + error.message, "error");
+    }
+}
+
+async function saveKnowledgeBase() {
+    const editor = document.getElementById("knowledge-base-editor");
+    const resultEl = document.getElementById("kb-save-result");
+    const content = editor.value;
+
+    if (!content.trim()) {
+        showNotification("Knowledge Base darf nicht leer sein.", "info");
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Speichere...</div>";
+
+    try {
+        const result = await functions.httpsCallable("updateKnowledgeBase")({ content });
+        const data = result.data || {};
+        resultEl.innerHTML = `<div class='success-box'>Gespeichert (${data.length} Zeichen). Quelle ist jetzt Firestore.</div>`;
+        document.getElementById("kb-source-info").textContent = "Quelle: Firestore (bearbeitet)";
+        showNotification("Knowledge Base gespeichert.", "success");
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== FIREBASE TAB: AUDIT LOG VIEWER ====================
+
+async function loadAuditLogs() {
+    const listEl = document.getElementById("audit-log-list");
+    const actionFilter = document.getElementById("audit-action-filter")?.value || "";
+    const limit = parseInt(document.getElementById("audit-limit")?.value) || 50;
+    listEl.innerHTML = "<div class='loading'>Lade Audit-Logs...</div>";
+
+    try {
+        let query = db.collection("audit_logs").orderBy("timestamp", "desc");
+        if (actionFilter) {
+            query = query.where("action", "==", actionFilter);
+        }
+        query = query.limit(Math.min(limit, 500));
+
+        const snapshot = await query.get();
+
+        if (snapshot.empty) {
+            listEl.innerHTML = "<p class='text-muted'>Keine Audit-Logs gefunden.</p>";
+            return;
+        }
+
+        let html = `<table class="data-table"><thead><tr>
+            <th>Zeit</th><th>Aktion</th><th>User</th><th>Ziel</th><th>Status</th><th>Details</th>
+        </tr></thead><tbody>`;
+
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            const time = d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString("de-DE") : "-";
+            const action = d.action || "-";
+            const userId = d.userId || "-";
+            const target = d.targetResource || "-";
+            const status = d.status || "-";
+            const details = d.metadata ? JSON.stringify(d.metadata).substring(0, 100) : "-";
+
+            html += `<tr>
+                <td>${escapeHtml(time)}</td>
+                <td><code>${escapeHtml(action)}</code></td>
+                <td title="${escapeHtml(userId)}">${escapeHtml(userId.substring(0, 15))}${userId.length > 15 ? "\u2026" : ""}</td>
+                <td title="${escapeHtml(target)}">${escapeHtml(target.substring(0, 25))}${target.length > 25 ? "\u2026" : ""}</td>
+                <td><span class="${status === "success" ? "status-ok" : "status-error"}">${escapeHtml(status)}</span></td>
+                <td title="${escapeHtml(details)}">${escapeHtml(details.substring(0, 50))}${details.length > 50 ? "\u2026" : ""}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        html += `<p class="text-muted">${snapshot.size} Eintr\u00e4ge geladen.</p>`;
+        listEl.innerHTML = html;
+    } catch (error) {
+        listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== FIREBASE TAB: FCM TEST PUSH ====================
+
+async function sendTestFcm() {
+    const resultEl = document.getElementById("fcm-test-result");
+    const childId = (document.getElementById("fcm-child-id")?.value || "").trim();
+    const token = (document.getElementById("fcm-token-direct")?.value || "").trim();
+
+    if (!childId && !token) {
+        showNotification("Bitte Kind-ID oder FCM-Token eingeben.", "info");
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Sende Test-Push...</div>";
+
+    try {
+        const payload = token ? { token } : { childId };
+        const result = await functions.httpsCallable("sendTestFcmMessage")(payload);
+        const data = result.data || {};
+
+        if (data.success) {
+            resultEl.innerHTML = `<div class='success-box'>Test-Push erfolgreich gesendet!<br>Message-ID: <code>${escapeHtml(data.messageId)}</code></div>`;
+        } else {
+            resultEl.innerHTML = `<div class='error'>${escapeHtml(data.error)}</div>`;
+        }
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// ==================== FIREBASE TAB: SCHEDULED JOBS ====================
+
+async function triggerJob(jobName) {
+    const resultEl = document.getElementById("job-trigger-result");
+    resultEl.innerHTML = `<div class='loading'>F\u00fchre "${escapeHtml(jobName)}" aus...</div>`;
+
+    try {
+        const result = await functions.httpsCallable("triggerScheduledJob")({ jobName });
+        const data = result.data || {};
+
+        if (data.success) {
+            const details = data.result ? JSON.stringify(data.result, null, 2) : "";
+            resultEl.innerHTML = `<div class='success-box'>
+                <p><strong>Job:</strong> ${escapeHtml(data.jobName)}</p>
+                <p><strong>Dauer:</strong> ${data.duration}ms</p>
+                ${details ? `<pre>${escapeHtml(details)}</pre>` : ""}
+            </div>`;
+        } else {
+            resultEl.innerHTML = `<div class='error'>Job fehlgeschlagen.</div>`;
+        }
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
 // Close modals when clicking outside
 window.onclick = function(event) {
     const userModal = document.getElementById("user-details-modal");

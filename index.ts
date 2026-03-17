@@ -35,6 +35,10 @@ export {
 // Triggers (FCM sync, photo analysis, task notifications)
 export { onChildDeviceUpdateV2, analyzeTaskPhoto, onTaskStatusChange } from "./src/triggers";
 
-// Admin (account deletion, error reports, DSAR export)
-export { deleteUserAccount, sendDailyErrorReport, exportUserData, adminHealthCheck } from "./src/admin";
+// Admin (account deletion, error reports, DSAR export, Firebase management)
+export {
+  deleteUserAccount, sendDailyErrorReport, exportUserData, adminHealthCheck,
+  testGeminiConnection, getKnowledgeBase, updateKnowledgeBase,
+  sendTestFcmMessage, triggerScheduledJob,
+} from "./src/admin";
 
