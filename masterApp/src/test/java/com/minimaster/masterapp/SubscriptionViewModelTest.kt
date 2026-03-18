@@ -16,10 +16,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -79,6 +82,25 @@ class SubscriptionViewModelTest {
         viewModel.verifyPurchase(purchase)
         advanceUntilIdle()
 
-        verify(callable).call(any())
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("token-1", payload["purchaseToken"])
+        assertEquals("single_child_monthly", payload["sku"])
+    }
+
+    @Test
+    fun verifyPurchase_without_products_does_not_call_backend() = runTest {
+        val viewModel = SubscriptionViewModel(billingClientWrapper, functions)
+        val purchase: Purchase = mock()
+
+        whenever(purchase.purchaseToken).thenReturn("token-2")
+        whenever(purchase.products).thenReturn(emptyList())
+
+        viewModel.verifyPurchase(purchase)
+        advanceUntilIdle()
+
+        verify(callable, never()).call(any())
     }
 }

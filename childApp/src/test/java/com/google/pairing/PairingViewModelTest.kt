@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
@@ -56,6 +57,12 @@ class PairingViewModelTest {
         viewModel.validateToken("token-1", "imei-1")
         advanceUntilIdle()
 
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("token-1", payload["pairingToken"])
+        assertEquals("imei-1", payload["childImei"])
         verify(childIdRepository).saveChildId("child-123")
         assertTrue(viewModel.pairingState.value is PairingState.Success)
         assertEquals("imei-1", viewModel.childImeiForDebug.value)

@@ -19,6 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
@@ -90,6 +91,37 @@ class DashboardViewModelTest {
         viewModel.createTask("child-1", "Zimmer aufraeumen", 1704067200000L)
         advanceUntilIdle()
 
-        verify(callable).call(any())
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("imei-1", payload["masterImei"])
+        assertEquals("secret-1", payload["secretKey"])
+        assertEquals("child-1", payload["childImei"])
+        assertEquals("Zimmer aufraeumen", payload["description"])
+        assertEquals("2024-01-01T00:00:00Z", payload["deadlineISO"])
+    }
+
+    @Test
+    fun setDeviceLocked_with_credentials_calls_backend_with_expected_payload() = runTest {
+        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
+        advanceUntilIdle()
+
+        whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-9" to "secret-9"))
+        whenever(functions.getHttpsCallable(eq("setDeviceLocked"))).thenReturn(callable)
+        whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
+
+        viewModel.setDeviceLocked("child-9", true)
+        advanceUntilIdle()
+
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("imei-9", payload["masterImei"])
+        assertEquals("secret-9", payload["secretKey"])
+        assertEquals("child-9", payload["childImei"])
+        assertEquals(true, payload["isLocked"])
     }
 }
