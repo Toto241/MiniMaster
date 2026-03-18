@@ -260,6 +260,7 @@ export const grantSupportAccess = functions.https.onCall(
         error as Error, { ticketId }
       );
       functions.logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
+      if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to grant support access.", error);
     }
   }
@@ -309,6 +310,7 @@ export const revokeSupportAccess = functions.https.onCall(
         error as Error, { grantId }
       );
       functions.logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
+      if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to revoke support access.", error);
     }
   }
@@ -514,6 +516,7 @@ export const provideSolutionFeedback = functions.https.onCall(
       return { success: true, message: `Ticket ${newStatus}.` };
     } catch (error) {
       functions.logger.error("Error in provideSolutionFeedback:", error);
+      if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
     }
   }

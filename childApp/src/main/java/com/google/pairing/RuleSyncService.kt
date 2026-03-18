@@ -177,7 +177,7 @@ class RuleSyncService : FirebaseMessagingService() {
         try {
             val data = hashMapOf("childId" to childId)
             val result = functions.getHttpsCallable("getRulesForChild").call(data).await()
-            val rules = result.data as? Map<String, Any>
+            val rules = result.getData() as? Map<String, Any>
 
             if (rules != null) {
                 Log.d(TAG, "Retrieved rules from backend: $rules")

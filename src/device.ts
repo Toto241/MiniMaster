@@ -163,7 +163,8 @@ export const setUsageRules = functions.https.onCall(
 );
 
 export const getRulesForChild = functions.https.onCall(
-  async (data: { childId: string }, _context: CallableContext) => {
+  async (data: { childId: string }, context: CallableContext) => {
+    const requesterId = requireAuth(context);
     const { childId } = data;
 
     if (!childId || typeof childId !== "string") {
@@ -179,6 +180,12 @@ export const getRulesForChild = functions.https.onCall(
       }
 
       const childData = doc.data();
+      const isOwnerMaster = childData?.masterImei === requesterId;
+      const isSelfChild = childId === requesterId;
+      if (!isOwnerMaster && !isSelfChild) {
+        throw new functions.https.HttpsError("permission-denied", "Not authorized to read rules for this child device.");
+      }
+
       return {
         isLocked: childData?.isLocked || false,
         appBlacklist: childData?.appBlacklist || [],
@@ -326,14 +333,14 @@ export const reportDailyUsage = functions.https.onCall(
       }, { merge: true });
 
       await AuditLogger.logSuccess(
-        "system.heartbeat", context, `children/${childId}/usageHistory/${date}`, "system",
+        "rules.update_screen_time", context, `children/${childId}/usageHistory/${date}`, "system",
         { childId, date, usageMillis, duration: Date.now() - startTime }
       );
 
       return { success: true };
     } catch (error) {
       await AuditLogger.logFailure(
-        "system.heartbeat", context, `children/${childId}/usageHistory/${date}`, "system",
+        "rules.update_screen_time", context, `children/${childId}/usageHistory/${date}`, "system",
         error as Error, { childId, date }
       );
       functions.logger.error(`Failed to report usage for child ${childId}:`, error);
@@ -347,11 +354,16 @@ export const reportDailyUsage = functions.https.onCall(
  * device admin removal attempt). Stores the event and notifies the parent via FCM.
  */
 export const reportTamperEvent = functions.https.onCall(
-  async (data: { childId: string; eventType: string; timestamp: number }, _context: CallableContext) => {
+  async (data: { childId: string; eventType: string; timestamp: number }, context: CallableContext) => {
+    const callerId = requireAuth(context);
     const { childId, eventType, timestamp } = data;
 
     if (!childId || !eventType) {
       throw new functions.https.HttpsError("invalid-argument", "Missing childId or eventType.");
+    }
+
+    if (callerId !== childId) {
+      throw new functions.https.HttpsError("permission-denied", "Child device is not authorized to report tamper events for another device.");
     }
 
     // Look up the child to find the parent (masterImei)

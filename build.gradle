@@ -34,7 +34,6 @@ allprojects {
             // PROTOCOL BUFFERS - CVE-2024-7254 (Potential DoS)
             // ============================================================
             force 'com.google.protobuf:protobuf-java:4.29.2'
-            force 'com.google.protobuf:protobuf-javalite:4.29.2'
             force 'com.google.protobuf:protobuf-kotlin:4.29.2'
 
             // ============================================================

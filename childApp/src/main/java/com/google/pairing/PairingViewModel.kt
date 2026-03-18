@@ -82,7 +82,7 @@ class PairingViewModel @Inject constructor(
 
             try {
                 val result = functions.getHttpsCallable("validatePairingToken").call(data).await()
-                val childId = (result.data as? Map<String, Any>)?.get("childId") as? String
+                val childId = (result.getData() as? Map<String, Any>)?.get("childId") as? String
 
                 if (childId != null) {
                     childIdRepository.saveChildId(childId)
@@ -92,8 +92,7 @@ class PairingViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 val errorMessage = if (e is FirebaseFunctionsException) {
-                    "Error (
-                    ${e.code}): ${e.message}"
+                    "Error (${e.code}): ${e.message}"
                 } else {
                     e.message ?: "An unknown error occurred."
                 }
