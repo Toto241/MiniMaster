@@ -1,64 +1,54 @@
 <resources>
-    <!-- App name for the master (parent) application -->
-    <string name="app_name">MiniMaster (Master)</string>
+    <string name="app_name">MiniMaster (Pais)</string>
 
-    <!-- Main UI strings -->
-    <string name="parent_device_setup">Parent Device Setup</string>
-    <string name="setup_description">First, we need to register this device as the primary parent controller. The app will use a stable app-scoped device ID.</string>
-    <string name="register_device">Register This Device</string>
-    <string name="registering_device">Registering device...</string>
+    <string name="parent_device_setup">Configuração do dispositivo dos pais</string>
+    <string name="setup_description">Primeiro, precisamos registrar este dispositivo como controlador parental principal. O app usará um identificador de dispositivo estável no escopo do app.</string>
+    <string name="register_device">Registrar este dispositivo</string>
+    <string name="registering_device">Registrando dispositivo...</string>
 
-    <!-- Dashboard strings -->
-    <string name="paired_devices">Paired Devices</string>
-    <string name="child_id_label">Child ID: %1$s</string>
-    <string name="device_locked">Locked</string>
+    <string name="paired_devices">Dispositivos pareados</string>
+    <string name="child_id_label">ID da criança: %1$s</string>
+    <string name="device_locked">Bloqueado</string>
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>
-    <string name="create_task">Create Task</string>
-    <string name="review_tasks">Review Tasks</string>
-    <string name="go_premium">Go Premium</string>
+    <string name="create_task">Criar tarefa</string>
+    <string name="review_tasks">Revisar tarefas</string>
+    <string name="go_premium">Ir para Premium</string>
 
-    <!-- Pairing and link generation -->
-    <string name="generate_pairing_link">Generate Pairing Link</string>
-    <string name="generating_link">Generating link...</string>
-    <string name="retry_link_generation">Retry Link Generation</string>
-    <string name="link_generated_success">Link generated successfully!</string>
-    <string name="link_status">Link Status: %1$s</string>
+    <string name="generate_pairing_link">Gerar link de pareamento</string>
+    <string name="generating_link">Gerando link...</string>
+    <string name="retry_link_generation">Tentar gerar o link novamente</string>
+    <string name="link_generated_success">Link gerado com sucesso!</string>
+    <string name="link_status">Status do link: %1$s</string>
 
-    <!-- Task creation -->
-    <string name="create_new_task">Create New Task</string>
-    <string name="task_description">Task Description</string>
-    <string name="deadline_unix">Deadline (Unix Timestamp)</string>
-    <string name="cancel">Cancel</string>
+    <string name="create_new_task">Criar nova tarefa</string>
+    <string name="task_description">Descrição da tarefa</string>
+    <string name="deadline_unix">Prazo (timestamp Unix)</string>
+    <string name="cancel">Cancelar</string>
 
-    <!-- Task review -->
-    <string name="review_completed_tasks">Review Completed Tasks</string>
-    <string name="no_tasks_to_review">No tasks to review.</string>
-    <string name="child_label">Child: %1$s</string>
-    <string name="proof_for_task">Proof for task: %1$s</string>
-    <string name="approve_task">Approve Task</string>
-    <string name="back_to_dashboard">Back to Dashboard</string>
+    <string name="review_completed_tasks">Revisar tarefas concluídas</string>
+    <string name="no_tasks_to_review">Não há tarefas para revisar.</string>
+    <string name="child_label">Criança: %1$s</string>
+    <string name="proof_for_task">Prova da tarefa: %1$s</string>
+    <string name="approve_task">Aprovar tarefa</string>
+    <string name="back_to_dashboard">Voltar ao painel</string>
 
-    <!-- Subscription -->
-    <string name="get_premium">Get Premium</string>
-    <string name="loading_subscription">Loading subscription options...</string>
-    <string name="subscribe_for_price">Subscribe for %1$s</string>
+    <string name="get_premium">Obter Premium</string>
+    <string name="loading_subscription">Carregando opções de assinatura...</string>
+    <string name="subscribe_for_price">Assinar por %1$s</string>
 
-    <!-- Error messages -->
-    <string name="failed_update_lock_state">Failed to update lock state. Please try again.</string>
-    <string name="failed_create_task">Failed to create task. Please try again.</string>
-    <string name="failed_approve_task">Failed to approve task. Please try again.</string>
-    <string name="unknown_error">An unknown error occurred.</string>
-    <string name="error_format">Error (%1$s): %2$s</string>
+    <string name="failed_update_lock_state">Falha ao atualizar o estado de bloqueio. Tente novamente.</string>
+    <string name="failed_create_task">Falha ao criar a tarefa. Tente novamente.</string>
+    <string name="failed_approve_task">Falha ao aprovar a tarefa. Tente novamente.</string>
+    <string name="unknown_error">Ocorreu um erro desconhecido.</string>
+    <string name="error_format">Erro (%1$s): %2$s</string>
 
-    <!-- Debug info -->
-    <string name="debug_info">---- DEBUG INFO ----</string>
-    <string name="debug_imei">Device ID: %1$s</string>
-    <string name="debug_secret_key">Secret Key: %1$s</string>
-    <string name="debug_not_set">Not set</string>
+    <string name="debug_info">---- INFORMAÇÕES DE DEPURAÇÃO ----</string>
+    <string name="debug_imei">ID do dispositivo: %1$s</string>
+    <string name="debug_secret_key">Chave secreta: %1$s</string>
+    <string name="debug_not_set">Não definido</string>
 
-    <!-- First start language setup -->
-    <string name="language_setup_title">Choose your app language</string>
-    <string name="language_setup_description">Select your preferred language for MiniMaster. You can change it later in a future settings screen.</string>
-    <string name="language_continue">Continue</string>
+    <string name="language_setup_title">Escolha o idioma do app</string>
+    <string name="language_setup_description">Selecione seu idioma preferido para o MiniMaster. Você poderá alterá-lo depois em uma futura tela de configurações.</string>
+    <string name="language_continue">Continuar</string>
 </resources>

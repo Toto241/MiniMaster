@@ -1,49 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The official name of the application, displayed in the app launcher and system settings. -->
-    <string name="app_name">Mini-Master Child App</string>
+    <string name="app_name">Mini-Master चाइल्ड ऐप</string>
 
-    <!-- Title text displayed at the top of the pairing screen. -->
-    <string name="pairing_screen_title">Pairing Screen</string>
+    <string name="pairing_screen_title">पेयरिंग स्क्रीन</string>
+    <string name="pairing_code_input_label">पेयरिंग कोड दर्ज करें</string>
+    <string name="pairing_button_text">डिवाइस पेयर करें</string>
+    <string name="pairing_status_idle">कृपया पेयरिंग कोड दर्ज करें या डीप लिंक खोलें।</string>
+    <string name="pairing_status_loading">पेयरिंग प्रोसेस हो रही है...</string>
+    <string name="pairing_status_success">डिवाइस सफलतापूर्वक पेयर हो गया।</string>
 
-    <!-- Label for the text input field where the user enters the pairing code received from the parent app. -->
-    <string name="pairing_code_input_label">Enter Pairing Code</string>
+    <string name="lock_screen_title">डिवाइस लॉक है</string>
+    <string name="lock_screen_message">ऐप लॉक है। बच्चे की आईडी: %1$s</string>
+    <string name="view_tasks_button">कार्य देखें</string>
 
-    <!-- Text for the button that the user clicks to initiate the pairing process after entering the code. -->
-    <string name="pairing_button_text">Pair Device</string>
-    <string name="pairing_status_idle">Bitte Pairing-Code eingeben oder Deep Link öffnen.</string>
-    <string name="pairing_status_loading">Pairing wird verarbeitet...</string>
-    <string name="pairing_status_success">Geraet erfolgreich gekoppelt.</string>
+    <string name="error_code_expired">पेयरिंग कोड की समय-सीमा समाप्त हो गई है।</string>
+    <string name="error_invalid_code">अमान्य पेयरिंग कोड।</string>
+    <string name="error_saving_child_id">डिवाइस आईडी सहेजने में त्रुटि।</string>
 
-    <!-- Message displayed on the lock screen. The %1$s placeholder will be replaced by the unique Child ID. -->
-    <!-- Example: "App is locked. Child ID: child12345" -->
-    <string name="lock_screen_title">Device Locked</string>
-    <string name="lock_screen_message">App is locked. Child ID: %1$s</string>
-    <string name="view_tasks_button">View Tasks</string>
+    <string name="accessibility_service_description">Mini-Master अभिभावक नियंत्रण सेवा, जो ऐप उपयोग की निगरानी करती है और बच्चों के सुरक्षित डिवाइस उपयोग के लिए ब्लॉकिंग नियम लागू करती है।</string>
 
-    <!-- Error message displayed when the entered pairing code has passed its expiration time. -->
-    <string name="error_code_expired">Pairing code has expired.</string>
+    <string name="permission_title">महत्वपूर्ण अनुमति आवश्यक है</string>
+    <string name="permission_disclosure_body">Mini-Master को अभिभावक नियम लागू करने के लिए Accessibility अनुमति चाहिए, जैसे ऐप ब्लॉकिंग और कार्य-आधारित लॉक। सेवा रीयल टाइम में नियम लागू करने के लिए अग्रभूमि ऐप उपयोग को देखती है। यह अनुमति केवल अभिभावक नियंत्रण सुविधाओं के लिए उपयोग की जाती है।</string>
+    <string name="permission_disclosure_consent">मैं समझता/समझती हूँ कि यह अनुमति अभिभावक नियंत्रण के लिए कैसे उपयोग होती है।</string>
+    <string name="permission_open_settings">Accessibility सेटिंग खोलें</string>
+    <string name="permission_confirm_enabled">मैंने Accessibility सेवा सक्षम कर दी है</string>
+    <string name="permission_status_opened_settings">सेटिंग खुल गई है। Mini-Master Accessibility सेवा सक्षम करें, फिर वापस आकर पुष्टि करें।</string>
+    <string name="permission_status_not_enabled">Accessibility सेवा अभी सक्षम नहीं है। कृपया पहले सिस्टम सेटिंग में इसे सक्षम करें।</string>
 
-    <!-- Error message displayed when the entered pairing code is not found, syntactically incorrect, or otherwise invalid. -->
-    <string name="error_invalid_code">Invalid pairing code.</string>
-
-    <!-- Error message displayed if saving the device/child ID to local storage fails after successful pairing. -->
-    <string name="error_saving_child_id">Error saving device ID.</string>
-
-    <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Mini-Master parental control service that monitors app usage and enforces blocking rules to ensure safe device usage for children.</string>
-
-    <!-- Permission onboarding disclosure -->
-    <string name="permission_title">Important Permission Needed</string>
-    <string name="permission_disclosure_body">Mini-Master needs Accessibility access to enforce parental rules such as app blocking and task-based locks. The service observes foreground app usage to apply rules in real time. This access is used only for parental-control features.</string>
-    <string name="permission_disclosure_consent">I understand how this permission is used for parental control.</string>
-    <string name="permission_open_settings">Open Accessibility Settings</string>
-    <string name="permission_confirm_enabled">I enabled accessibility service</string>
-    <string name="permission_status_opened_settings">Settings opened. Enable Mini-Master accessibility service, then return and confirm.</string>
-    <string name="permission_status_not_enabled">Accessibility service is not enabled yet. Please enable it in system settings first.</string>
-
-    <!-- First start language setup -->
-    <string name="language_setup_title">Choose your app language</string>
-    <string name="language_setup_description">Select your preferred language for Mini-Master Child App. You can change it later in a future settings screen.</string>
-    <string name="language_continue">Continue</string>
+    <string name="language_setup_title">ऐप की भाषा चुनें</string>
+    <string name="language_setup_description">Mini-Master चाइल्ड ऐप के लिए अपनी पसंदीदा भाषा चुनें। आप इसे बाद में सेटिंग स्क्रीन में बदल सकते हैं।</string>
+    <string name="language_continue">जारी रखें</string>
 </resources>

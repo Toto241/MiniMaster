@@ -141,6 +141,9 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[Language Global Roadmap](docs/LANGUAGE_GLOBAL_ROADMAP.md):** Global language prioritization, rollout waves, and locale strategy.
 - **[First-Start Language Implementation](docs/LANGUAGE_FIRST_START_IMPLEMENTATION.md):** Technical details for mandatory language selection on first launch.
 - **[Language Validation Report 2026-03-18](docs/LANGUAGE_VALIDATION_REPORT_2026-03-18.md):** Deep integration analysis and current validation outcomes.
+- **[Legal Country Compliance Matrix](docs/LEGAL_COUNTRY_COMPLIANCE_MATRIX.md):** Country-by-country legal topics and mandatory go-live gates.
+- **[AGB Template DE](docs/AGB_TEMPLATE_DE.md):** Terms template with essential consumer and liability rights clauses.
+- **[Legal Rollout Checklist](docs/LEGAL_ROLLOUT_CHECKLIST.md):** Operational legal integration and validation checklist per market.
 - **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
 
 Each source file is also thoroughly documented.
