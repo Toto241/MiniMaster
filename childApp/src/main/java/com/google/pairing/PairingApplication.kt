@@ -29,7 +29,8 @@ class PairingApplication : Application(), Configuration.Provider {
      * This allows Hilt to inject dependencies into [androidx.work.ListenableWorker]s.
      * @return The WorkManager [Configuration].
      */
-    override fun getWorkManagerConfiguration() =
+    override val workManagerConfiguration: Configuration
+        get() =
         Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()

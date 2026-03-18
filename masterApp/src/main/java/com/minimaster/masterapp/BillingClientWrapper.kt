@@ -3,9 +3,14 @@ package com.minimaster.masterapp
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.android.billingclient.api.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,8 +24,11 @@ import javax.inject.Singleton
  */
 @Singleton
 class BillingClientWrapper @Inject constructor(
+    @ApplicationContext
     context: Context
 ) {
+    private val billingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val _productDetails = MutableStateFlow<List<ProductDetails>>(emptyList())
     /** A [StateFlow] that emits the list of available product details (subscriptions). */
     val productDetails = _productDetails.asStateFlow()
@@ -93,11 +101,12 @@ class BillingClientWrapper @Inject constructor(
         }
         val params = QueryProductDetailsParams.newBuilder().setProductList(productList)
 
-        billingClient.queryProductDetails(params.build()) { billingResult, productDetailsList ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                _productDetails.value = productDetailsList
+        billingScope.launch {
+            val result = billingClient.queryProductDetails(params.build())
+            if (result.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                _productDetails.value = result.productDetailsList.orEmpty()
             } else {
-                Log.e("BillingClient", "Error querying products: ${billingResult.debugMessage}")
+                Log.e("BillingClient", "Error querying products: ${result.billingResult.debugMessage}")
             }
         }
     }

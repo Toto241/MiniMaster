@@ -11,6 +11,9 @@
 
     <!-- Text for the button that the user clicks to initiate the pairing process after entering the code. -->
     <string name="pairing_button_text">Pair Device</string>
+    <string name="pairing_status_idle">Bitte Pairing-Code eingeben oder Deep Link öffnen.</string>
+    <string name="pairing_status_loading">Pairing wird verarbeitet...</string>
+    <string name="pairing_status_success">Geraet erfolgreich gekoppelt.</string>
 
     <!-- Message displayed on the lock screen. The %1$s placeholder will be replaced by the unique Child ID. -->
     <!-- Example: "App is locked. Child ID: child12345" -->
@@ -26,7 +29,7 @@
 
     <!-- Error message displayed if saving the device/child ID to local storage fails after successful pairing. -->
     <string name="error_saving_child_id">Error saving device ID.</string>
-    
+
     <!-- Accessibility Service -->
     <string name="accessibility_service_description">Mini-Master parental control service that monitors app usage and enforces blocking rules to ensure safe device usage for children.</string>
 </resources>

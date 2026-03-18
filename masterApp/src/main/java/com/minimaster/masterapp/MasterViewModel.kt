@@ -103,7 +103,7 @@ class MasterViewModel @Inject constructor(
             val data = hashMapOf("imei" to imei)
             try {
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
-                val key = (result.data as? Map<String, Any>)?.get("secretKey") as? String
+                val key = (result.getData() as? Map<String, Any>)?.get("secretKey") as? String
                 if (key != null) {
                     credentialsRepository.saveCredentials(imei, key)
                     _debugState.value = DebugState(imei = imei, secretKey = key)
@@ -138,7 +138,7 @@ class MasterViewModel @Inject constructor(
 
             try {
                 val result = functions.getHttpsCallable("generatePairingLink").call(data).await()
-                val token = (result.data as? Map<String, Any>)?.get("pairingToken") as? String
+                val token = (result.getData() as? Map<String, Any>)?.get("pairingToken") as? String
                 if (token != null) {
                     _linkGenerationState.value = LinkGenerationState.Success(token)
                 } else {

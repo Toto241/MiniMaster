@@ -10,6 +10,7 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
@@ -88,10 +89,10 @@ fun MasterAppNavigation(viewModel: MasterViewModel = hiltViewModel()) {
         }
         composable("createTask/{childId}") { backStackEntry ->
             val childId = backStackEntry.arguments?.getString("childId") ?: ""
+            val dashboardEntry = remember(backStackEntry) { navController.getBackStackEntry("dashboard") }
+            val dashboardViewModel: DashboardViewModel = hiltViewModel(dashboardEntry)
             CreateTaskScreen(
                 onTaskCreate = { description, deadline ->
-                    // Retrieve the ViewModel scoped to the dashboard to call its method.
-                    val dashboardViewModel: DashboardViewModel = hiltViewModel(navController.getBackStackEntry("dashboard"))
                     dashboardViewModel.createTask(childId, description, deadline)
                     navController.popBackStack()
                 },

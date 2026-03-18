@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import coil.compose.rememberImagePainter
+import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
@@ -57,9 +57,9 @@ fun ProofSubmissionScreen(
         }
     )
     // Temporäre Datei für die Kamera-Aufnahme
-        val tempImageFile = remember { 
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        File(context.cacheDir, "proof_temp.jpg") 
+    val tempImageFile = remember {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        File(context.cacheDir, "proof_temp_$timeStamp.jpg")
     }
     Column(
         modifier = Modifier
@@ -72,8 +72,8 @@ fun ProofSubmissionScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         if (imageUri != null) {
-            Image(
-                painter = rememberImagePainter(imageUri),
+            AsyncImage(
+                model = imageUri,
                 contentDescription = "Proof Preview",
                 modifier = Modifier
                     .size(200.dp)
@@ -91,7 +91,7 @@ fun ProofSubmissionScreen(
                     "${context.packageName}.provider",
                     tempImageFile
                 )
-                cameraLauncher.launch(imageUri)
+                imageUri?.let { cameraLauncher.launch(it) }
             },
             enabled = !isUploading
         ) {
@@ -145,15 +145,22 @@ suspend fun uploadProofAndSubmit(taskId: String, uri: Uri, context: android.cont
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
         // Use the actual ChildIdProvider implementation
         val childIdProvider = ChildIdProviderImpl(context)
-        val childImei = childIdProvider.childIdFlow.value ?: return false
-        val taskRepository = TaskRepository(
-            FirebaseFirestore.getInstance(),
-            FirebaseFunctions.getInstance(),
-            childIdProvider
-        )
+        val childImei = childIdProvider.getChildId()
+        if (childImei.isBlank()) {
+            return false
+        }
 
         // Call the Cloud Function
-        taskRepository.submitTaskProof(childImei, taskId, downloadUrl)
+        val data = hashMapOf(
+            "childImei" to childImei,
+            "taskId" to taskId,
+            "photoUrl" to downloadUrl
+        )
+        FirebaseFunctions.getInstance()
+            .getHttpsCallable("completeTask")
+            .call(data)
+            .await()
+        true
     } catch (e: Exception) {
         e.printStackTrace()
         false
