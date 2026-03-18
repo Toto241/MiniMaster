@@ -40,6 +40,7 @@ class PairingApplication : Application(), Configuration.Provider {
      * application-level components, such as the [HeartbeatWorker].
      */
     override fun onCreate() {
+        applySavedChildLocale(this)
         super.onCreate()
         setupHeartbeatWorker()
     }

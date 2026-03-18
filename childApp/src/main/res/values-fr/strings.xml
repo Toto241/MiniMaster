@@ -24,4 +24,9 @@
     <string name="permission_confirm_enabled">J\'ai activé le service d\'accessibilité</string>
     <string name="permission_status_opened_settings">Paramètres ouverts. Activez le service Mini-Master, puis revenez pour confirmer.</string>
     <string name="permission_status_not_enabled">Le service d\'accessibilité n\'est pas encore activé. Activez-le d\'abord dans les paramètres système.</string>
+
+    <!-- Configuration initiale de la langue -->
+    <string name="language_setup_title">Choisissez la langue de l\'application</string>
+    <string name="language_setup_description">Sélectionnez votre langue préférée pour l\'application enfant Mini-Master. Vous pourrez la modifier plus tard dans un futur écran de paramètres.</string>
+    <string name="language_continue">Continuer</string>
 </resources>

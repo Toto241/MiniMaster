@@ -24,4 +24,9 @@
     <string name="permission_confirm_enabled">Ich habe den Bedienungshilfen-Dienst aktiviert</string>
     <string name="permission_status_opened_settings">Einstellungen geöffnet. Aktivieren Sie den Mini-Master-Dienst und bestätigen Sie danach hier.</string>
     <string name="permission_status_not_enabled">Der Bedienungshilfen-Dienst ist noch nicht aktiviert. Bitte zuerst in den Systemeinstellungen aktivieren.</string>
+
+    <!-- Ersteinrichtung Sprache -->
+    <string name="language_setup_title">App-Sprache auswählen</string>
+    <string name="language_setup_description">Wählen Sie Ihre bevorzugte Sprache für die Mini-Master Kinder-App. Sie können die Sprache später in einer künftigen Einstellungsansicht ändern.</string>
+    <string name="language_continue">Weiter</string>
 </resources>

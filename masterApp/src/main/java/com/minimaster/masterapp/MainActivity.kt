@@ -6,10 +6,14 @@ import android.util.Log
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.RadioButton
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
@@ -34,9 +38,22 @@ import java.util.UUID
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySavedMasterLocale(this)
         super.onCreate(savedInstanceState)
         setContent {
-            MasterAppNavigation()
+            var languageSelected by remember { mutableStateOf(hasMasterLanguageSelection(this)) }
+
+            if (!languageSelected) {
+                LanguageSelectionScreen(
+                    onLanguageSelected = { languageTag ->
+                        saveMasterLanguageSelection(this, languageTag)
+                        languageSelected = true
+                        recreate()
+                    }
+                )
+            } else {
+                MasterAppNavigation()
+            }
         }
     }
 }
@@ -246,4 +263,94 @@ private fun getStableMasterId(context: Context): String {
     prefs.edit().putString("stable_master_id", stableId).apply()
     Log.d("MasterApp", "Generated and persisted stable master device ID.")
     return stableId
+}
+
+private data class LanguageOption(val tag: String, val label: String)
+
+@Composable
+private fun LanguageSelectionScreen(onLanguageSelected: (String) -> Unit) {
+    val options = remember {
+        listOf(
+            LanguageOption("en", "English"),
+            LanguageOption("de", "Deutsch"),
+            LanguageOption("fr", "Francais"),
+            LanguageOption("zh-CN", "Chinese (Simplified)"),
+            LanguageOption("es", "Espanol"),
+            LanguageOption("pt-BR", "Portugues (Brasil)"),
+            LanguageOption("hi", "Hindi"),
+            LanguageOption("ar", "Arabic"),
+            LanguageOption("id", "Indonesian"),
+            LanguageOption("ja", "Japanese"),
+            LanguageOption("ru", "Russian"),
+            LanguageOption("tr", "Turkish"),
+            LanguageOption("it", "Italian"),
+            LanguageOption("ko", "Korean"),
+            LanguageOption("vi", "Vietnamese"),
+            LanguageOption("pl", "Polish"),
+            LanguageOption("nl", "Dutch"),
+            LanguageOption("th", "Thai"),
+            LanguageOption("uk", "Ukrainian"),
+            LanguageOption("fa", "Persian"),
+            LanguageOption("bn", "Bengali"),
+            LanguageOption("ur", "Urdu"),
+            LanguageOption("sw", "Swahili"),
+            LanguageOption("he", "Hebrew"),
+            LanguageOption("ro", "Romanian"),
+            LanguageOption("cs", "Czech"),
+            LanguageOption("sv", "Swedish"),
+            LanguageOption("no", "Norwegian"),
+            LanguageOption("da", "Danish"),
+            LanguageOption("fi", "Finnish"),
+            LanguageOption("el", "Greek"),
+            LanguageOption("hu", "Hungarian")
+        )
+    }
+    var selectedTag by remember { mutableStateOf("en") }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = stringResource(R.string.language_setup_title),
+                style = MaterialTheme.typography.h5,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            Text(
+                text = stringResource(R.string.language_setup_description),
+                style = MaterialTheme.typography.body1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(options) { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedTag = option.tag }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedTag == option.tag,
+                            onClick = { selectedTag = option.tag }
+                        )
+                        Text(text = option.label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+
+            Button(
+                onClick = { onLanguageSelected(selectedTag) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.language_continue))
+            }
+        }
+    }
 }

@@ -10,4 +10,9 @@ import dagger.hilt.android.HiltAndroidApp
  * field injection in Android components and to set up the Hilt dependency graph.
  */
 @HiltAndroidApp
-class MasterApplication : Application()
+class MasterApplication : Application() {
+	override fun onCreate() {
+		applySavedMasterLocale(this)
+		super.onCreate()
+	}
+}
