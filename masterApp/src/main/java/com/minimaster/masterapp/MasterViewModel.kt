@@ -2,6 +2,7 @@ package com.minimaster.masterapp
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -78,6 +79,8 @@ class MasterViewModel @Inject constructor(
     private val credentialsRepository: MasterCredentialsRepository
 ) : ViewModel() {
 
+    private var firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+
     private val _registrationState = MutableStateFlow<RegistrationState>(RegistrationState.Idle)
     /** A [StateFlow] representing the current state of the device registration process. */
     val registrationState: StateFlow<RegistrationState> = _registrationState.asStateFlow()
@@ -106,7 +109,7 @@ class MasterViewModel @Inject constructor(
         viewModelScope.launch {
             credentialsRepository.getCredentials.collect { (imei, secret) ->
                 _debugState.value = DebugState(imei = imei, secretKey = secret)
-                if (!imei.isNullOrEmpty() && !secret.isNullOrEmpty()) {
+                if (!imei.isNullOrEmpty()) {
                     _registrationState.value = RegistrationState.Success("Device already registered.")
                 }
             }
@@ -115,7 +118,8 @@ class MasterViewModel @Inject constructor(
 
     /**
      * Registers the device with the backend using its IMEI.
-     * On success, it saves the returned secret key to the [credentialsRepository].
+     * On success, it signs in using the returned Firebase custom token and stores the
+     * canonical master id for follow-up authenticated calls.
      * @param imei The unique identifier of the device to register.
      */
     fun registerDevice(imei: String) {
@@ -124,13 +128,16 @@ class MasterViewModel @Inject constructor(
             val data = hashMapOf("imei" to imei)
             try {
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
-                val key = (result.getData() as? Map<String, Any>)?.get("secretKey") as? String
-                if (key != null) {
-                    credentialsRepository.saveCredentials(imei, key)
-                    _debugState.value = DebugState(imei = imei, secretKey = key)
+                val payload = result.data as? Map<*, *>
+                val masterId = payload?.get("masterId") as? String
+                val customToken = payload?.get("customToken") as? String
+                if (masterId != null && customToken != null) {
+                    firebaseAuth.signInWithCustomToken(customToken).await()
+                    credentialsRepository.saveCredentials(masterId, "")
+                    _debugState.value = DebugState(imei = masterId, secretKey = null)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
-                     _registrationState.value = RegistrationState.Error("Backend returned no secret key.")
+                     _registrationState.value = RegistrationState.Error("Backend returned no registration token.")
                 }
             } catch (e: Exception) {
                 val errorMessage = if (e is FirebaseFunctionsException) "Error (${e.code}): ${e.message}" else e.message ?: "An unknown error occurred."
@@ -146,16 +153,15 @@ class MasterViewModel @Inject constructor(
     fun generateLink() {
         val currentState = debugState.value
         val currentImei = currentState.imei
-        val currentSecret = currentState.secretKey
 
-        if (currentImei == null || currentSecret == null) {
+        if (currentImei == null) {
             _linkGenerationState.value = LinkGenerationState.Error("Device not registered yet.")
             return
         }
 
         viewModelScope.launch {
             _linkGenerationState.value = LinkGenerationState.Loading
-            val data = hashMapOf("imei" to currentImei, "secretKey" to currentSecret)
+            val data = hashMapOf<String, Any>()
 
             try {
                 val result = functions.getHttpsCallable("generatePairingLink").call(data).await()
@@ -257,5 +263,9 @@ class MasterViewModel @Inject constructor(
                 _legalConsentState.value = LegalConsentState.Error(errorMessage)
             }
         }
+    }
+
+    internal fun setFirebaseAuthForTesting(firebaseAuth: FirebaseAuth) {
+        this.firebaseAuth = firebaseAuth
     }
 }

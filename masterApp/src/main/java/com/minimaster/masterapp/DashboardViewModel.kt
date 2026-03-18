@@ -169,13 +169,13 @@ class DashboardViewModel @Inject constructor(
      */
     fun setDeviceLocked(childImei: String, isLocked: Boolean) {
         viewModelScope.launch {
-            val (imei, secret) = credentialsRepository.getCredentials.first()
-            if (imei == null || secret == null) {
+            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
             }
             val data = hashMapOf(
-                "masterImei" to imei, "secretKey" to secret, "childImei" to childImei, "isLocked" to isLocked
+                "childId" to childImei, "isLocked" to isLocked
             )
             try {
                 functions.getHttpsCallable("setDeviceLocked").call(data).await()
@@ -194,8 +194,8 @@ class DashboardViewModel @Inject constructor(
      */
     fun createTask(childImei: String, description: String, deadline: Long) {
         viewModelScope.launch {
-            val (imei, secret) = credentialsRepository.getCredentials.first()
-            if (imei == null || secret == null) {
+            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
             }
@@ -203,8 +203,9 @@ class DashboardViewModel @Inject constructor(
             sdf.timeZone = TimeZone.getTimeZone("UTC")
             val deadlineISO = sdf.format(java.util.Date(deadline))
             val data = hashMapOf(
-                "masterImei" to imei, "secretKey" to secret, "childImei" to childImei,
-                "description" to description, "deadlineISO" to deadlineISO
+                "childId" to childImei,
+                "description" to description,
+                "deadlineISO" to deadlineISO
             )
             try {
                 functions.getHttpsCallable("createTask").call(data).await()
@@ -222,13 +223,14 @@ class DashboardViewModel @Inject constructor(
      */
     fun approveTask(childImei: String, taskId: String) {
         viewModelScope.launch {
-            val (imei, secret) = credentialsRepository.getCredentials.first()
-            if (imei == null || secret == null) {
+            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
             }
             val data = hashMapOf(
-                "masterImei" to imei, "secretKey" to secret, "childImei" to childImei, "taskId" to taskId
+                "childId" to childImei,
+                "taskId" to taskId
             )
             try {
                 functions.getHttpsCallable("approveTask").call(data).await()
@@ -247,8 +249,8 @@ class DashboardViewModel @Inject constructor(
      */
     fun rejectTask(childImei: String, taskId: String, reason: String? = null) {
         viewModelScope.launch {
-            val (imei, secret) = credentialsRepository.getCredentials.first()
-            if (imei == null || secret == null) {
+            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
             }

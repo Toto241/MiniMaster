@@ -95,9 +95,7 @@ class DashboardViewModelTest {
         verify(callable).call(payloadCaptor.capture())
         val payload = payloadCaptor.firstValue as Map<*, *>
 
-        assertEquals("imei-1", payload["masterImei"])
-        assertEquals("secret-1", payload["secretKey"])
-        assertEquals("child-1", payload["childImei"])
+        assertEquals("child-1", payload["childId"])
         assertEquals("Zimmer aufraeumen", payload["description"])
         assertEquals("2024-01-01T00:00:00Z", payload["deadlineISO"])
     }
@@ -119,9 +117,7 @@ class DashboardViewModelTest {
         verify(callable).call(payloadCaptor.capture())
         val payload = payloadCaptor.firstValue as Map<*, *>
 
-        assertEquals("imei-9", payload["masterImei"])
-        assertEquals("secret-9", payload["secretKey"])
-        assertEquals("child-9", payload["childImei"])
+        assertEquals("child-9", payload["childId"])
         assertEquals(true, payload["isLocked"])
     }
 }
