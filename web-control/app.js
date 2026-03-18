@@ -45,7 +45,6 @@ const firebaseConfig = loadFirebaseConfig();
 // --- Global Variables ---
 let app, db, functions;
 let currentMasterImei = null;
-let currentSecretKey = null;
 let devicesListener = null; // Firestore listener for real-time updates
 let usageChartInstance = null;
 
@@ -68,15 +67,18 @@ document.addEventListener('DOMContentLoaded', function() {
         db = firebase.firestore();
         functions = firebase.functions();
 
-        // Restore session if credentials are saved in localStorage
-        const savedCredentials = localStorage.getItem('minimaster-credentials');
-        if (savedCredentials) {
-            const credentials = JSON.parse(savedCredentials);
-            currentMasterImei = credentials.masterImei;
-            currentSecretKey = credentials.secretKey;
+        firebase.auth().onAuthStateChanged(user => {
+            if (!user) {
+                return;
+            }
+
+            currentMasterImei = user.uid;
+            localStorage.setItem('minimaster-credentials', JSON.stringify({
+                masterImei: currentMasterImei
+            }));
             showMainContent();
             loadDevices();
-        }
+        });
 
         console.log('Firebase initialized successfully.');
     } catch (error) {
@@ -111,13 +113,11 @@ function login() {
             return firebase.auth().signInWithCustomToken(customToken);
         })
         .then(() => {
-            currentMasterImei = masterImei;
-            currentSecretKey = secretKey;
+            currentMasterImei = firebase.auth().currentUser ? firebase.auth().currentUser.uid : masterImei;
 
-            // Save credentials for next session
+            // Save canonical master id for next session
             localStorage.setItem('minimaster-credentials', JSON.stringify({
-                masterImei: masterImei,
-                secretKey: secretKey
+                masterImei: currentMasterImei
             }));
 
             showMainContent();
@@ -136,8 +136,8 @@ function login() {
  */
 function logout() {
     currentMasterImei = null;
-    currentSecretKey = null;
     localStorage.removeItem('minimaster-credentials');
+    firebase.auth().signOut().catch(error => console.warn('Sign-out warning:', error));
 
     // Detach the real-time listener to prevent memory leaks and unnecessary reads.
     if (devicesListener) {
@@ -261,9 +261,7 @@ function toggleDeviceLock(childImei, isLocked) {
     const setDeviceLocked = functions.httpsCallable('setDeviceLocked');
 
     setDeviceLocked({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childImei,
         isLocked: isLocked
     }).then(result => {
         showNotification(`Device ${isLocked ? 'locked' : 'unlocked'} successfully`, 'success');
@@ -284,9 +282,8 @@ function toggleDeviceLock(childImei, isLocked) {
  */
 function openTaskModal(childId) {
     document.getElementById('task-child-id').value = childId;
-    document.getElementById('task-title').value = '';
     document.getElementById('task-description').value = '';
-    document.getElementById('unlock-duration').value = 30; // Default value
+    document.getElementById('task-deadline').value = '';
 
     document.getElementById('task-creation-modal').style.display = 'flex';
 }
@@ -296,37 +293,33 @@ function openTaskModal(childId) {
  */
 function closeTaskModal() {
     document.getElementById('task-creation-modal').style.display = 'none';
-    document.getElementById('task-form').reset();
+    const descriptionField = document.getElementById('task-description');
+    const deadlineField = document.getElementById('task-deadline');
+    if (descriptionField) descriptionField.value = '';
+    if (deadlineField) deadlineField.value = '';
 }
 
 /**
  * Calls the 'createTask' Firebase Cloud Function to assign a new task.
  * @param {Event} event - The form submission event.
  */
-function assignTask(event) {
+function createTask(event) {
     event.preventDefault();
     const childId = document.getElementById('task-child-id').value;
-    const title = document.getElementById('task-title').value.trim();
     const description = document.getElementById('task-description').value.trim();
-    const unlockDuration = parseInt(document.getElementById('unlock-duration').value, 10);
+    const deadlineValue = document.getElementById('task-deadline').value;
 
-    if (!childId || !title || !description || isNaN(unlockDuration) || unlockDuration <= 0) {
+    if (!childId || !description || !deadlineValue) {
         showNotification('Please fill all fields correctly.', 'error');
         return;
     }
 
     const createTask = functions.httpsCallable('createTask');
-
-    // Calculate deadline: current time + unlockDuration minutes (as a simple deadline)
-    const deadlineDate = new Date();
-    deadlineDate.setDate(deadlineDate.getDate() + 1); // Default: 1 day from now
-    const deadlineISO = deadlineDate.toISOString();
+    const deadlineISO = new Date(deadlineValue).toISOString();
 
     createTask({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childId,
-        description: title + ' - ' + description,
+        childId: childId,
+        description: description,
         deadlineISO: deadlineISO
     }).then(result => {
         showNotification('Task assigned successfully! Task ID: ' + result.data.taskId, 'success');
@@ -449,18 +442,14 @@ function saveRules(event) {
     // Update Usage Rules
     const setUsageRules = functions.httpsCallable('setUsageRules');
     promises.push(setUsageRules({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childImei,
         usageRules: usageRules
     }));
 
     // Update App Blacklist
     const updateAppBlacklist = functions.httpsCallable('updateAppBlacklist');
     promises.push(updateAppBlacklist({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childImei,
         appBlacklist: blockedApps
     }));
 
@@ -566,9 +555,7 @@ function approveTaskReview(taskId, childImei) {
     const approveTask = functions.httpsCallable('approveTask');
 
     approveTask({
-        masterImei: currentMasterImei,
-        secretKey: currentSecretKey,
-        childImei: childImei,
+        childId: childImei,
         taskId: taskId
     }).then(result => {
         showNotification('Task approved successfully!', 'success');
