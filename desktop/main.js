@@ -93,10 +93,10 @@ ipcMain.handle("abort-cli", (_event, commandId) => {
 // ── Fenster: Eltern-Panel ──────────────────────────────────────────────
 function createParentWindow() {
   const win = new BrowserWindow({
-    inline-size: 1200,
-    block-size: 820,
-    mininline-size: 980,
-    minblock-size: 700,
+    width: 1200,
+    height: 820,
+    minWidth: 980,
+    minHeight: 700,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -118,10 +118,10 @@ function createParentWindow() {
 // ── Fenster: Operator Dashboard (mit CLI-Bridge) ───────────────────────
 function createOperatorWindow() {
   const win = new BrowserWindow({
-    inline-size: 1400,
-    block-size: 900,
-    mininline-size: 1080,
-    minblock-size: 700,
+    width: 1400,
+    height: 900,
+    minWidth: 1080,
+    minHeight: 700,
     autoHideMenuBar: true,
     title: "MiniMaster Operator Dashboard",
     webPreferences: {
