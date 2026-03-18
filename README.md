@@ -142,6 +142,8 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[First-Start Language Implementation](docs/LANGUAGE_FIRST_START_IMPLEMENTATION.md):** Technical details for mandatory language selection on first launch.
 - **[Language Validation Report 2026-03-18](docs/LANGUAGE_VALIDATION_REPORT_2026-03-18.md):** Deep integration analysis and current validation outcomes.
 - **[Legal Country Compliance Matrix](docs/LEGAL_COUNTRY_COMPLIANCE_MATRIX.md):** Country-by-country legal topics and mandatory go-live gates.
+- **[Google Baseline plus Country Review 2026-03-18](docs/GOOGLE_BASELINE_AND_COUNTRY_REVIEW_2026-03-18.md):** Operational research baseline using Google rules as minimum plus legal review package per target market.
+- **[Legal Versioning and Re-Consent Spec](docs/LEGAL_VERSIONING_RECONSENT_SPEC.md):** Technical specification for policy versioning, country/locale rollout, and forced re-consent on major changes.
 - **[AGB Template DE](docs/AGB_TEMPLATE_DE.md):** Terms template with essential consumer and liability rights clauses.
 - **[Legal Rollout Checklist](docs/LEGAL_ROLLOUT_CHECKLIST.md):** Operational legal integration and validation checklist per market.
 - **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.

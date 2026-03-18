@@ -45,6 +45,8 @@ Diese Allgemeinen Geschaeftsbedingungen (AGB) regeln die Nutzung der MiniMaster-
 
 1. Geplante Wartungsfenster duerfen den Dienst temporaer einschraenken.
 2. Der Anbieter kann Dienste bei Sicherheitsrisiken kurzfristig einschränken.
+3. Eine bestimmte Verfuegbarkeit, ununterbrochene Erreichbarkeit oder Fehlerfreiheit wird nur uebernommen, soweit dies ausdruecklich zugesagt ist.
+4. Soweit rechtlich zulaessig, werden keine Garantien fuer eine bestimmte Eignung, Kompatibilitaet mit allen Endgeraeten oder jederzeitige Verfuegbarkeit uebernommen.
 
 ## 9. Datenschutz und Datensicherheit
 
@@ -68,6 +70,7 @@ Diese Allgemeinen Geschaeftsbedingungen (AGB) regeln die Nutzung der MiniMaster-
 2. Haftung fuer Vorsatz und grobe Fahrlaessigkeit bleibt unbeschraenkt.
 3. Bei leichter Fahrlaessigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten und typischen, vorhersehbaren Schaeden.
 4. Haftungsbeschraenkungen gelten nicht bei Verletzung von Leben, Koerper, Gesundheit oder nach zwingendem Produkthaftungsrecht.
+5. Soweit rechtlich zulaessig und soweit keine zwingenden Verbraucherrechte entgegenstehen, erfolgen Leistungen ohne weitergehende Garantien oder Zusicherungen.
 
 ## 13. Freistellung
 
@@ -93,3 +96,9 @@ Nutzer stellen den Anbieter von Anspruechen Dritter frei, die aus rechtswidriger
 5. Datenschutzbezug und Betroffenenrechte-Verweis.
 6. Aenderungsvorbehalt nur mit sachlichem Grund und Transparenz.
 7. Kontakt- und Beschwerdewege.
+
+## Formulierungshinweis zum Garantieausschluss (juristische Feinabstimmung)
+
+Empfohlene Kurzformel fuer marktspezifische Fassungen:
+
+"Soweit gesetzlich zulaessig, werden die Dienste ohne zusaetzliche Garantien bereitgestellt. Unberuehrt bleiben zwingende gesetzliche Rechte, insbesondere Verbraucherrechte sowie die Haftung in gesetzlich nicht abdingbaren Faellen."
