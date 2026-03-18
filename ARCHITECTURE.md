@@ -82,6 +82,12 @@ Blocked until: migration design (dual-write + backfill), updated rules, updated 
 
 Phased approach recommended: (1) Introduce families collection w/ deny rules lifted only for read via Cloud Functions. (2) Dual-write. (3) Backfill. (4) Switch reads. (5) Remove flat collections.
 
+## Compliance and retention status
+
+- Legal policy publishing and re-consent enforcement run on dedicated Cloud Functions with Firestore-backed `legalPolicies` and `masterLegalConsents` collections.
+- DSAR export and account deletion must cover compliance side-data in addition to the core profile domain, especially `masterLegalConsents`, `supportTickets`, `supportAccessGrants`, and user-scoped observability collections.
+- Audit and error logs are prepared for Firestore TTL rollout via per-document `ttl` timestamps; `performance_metrics` remains the next observability collection to align.
+
 ## 6. Gaps & Future Work
 
 - Hardening of enforcement engine (OEM-specific behavior, bypass resistance, battery optimization handling)

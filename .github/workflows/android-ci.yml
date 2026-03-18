@@ -24,15 +24,15 @@ jobs:
       - name: Gradle cache
         uses: gradle/gradle-build-action@v3
       - name: Show Gradle version
-        run: ./gradlew --version
+        run: ./scripts/run-android-checks.sh --version
       - name: Build & Unit tests
-        run: ./gradlew clean testDebugUnitTest :masterApp:assembleDebug :childApp:assembleDebug
+        run: ./scripts/run-android-checks.sh clean testDebugUnitTest :masterApp:assembleDebug :childApp:assembleDebug
       - name: Lint
-        run: ./gradlew lint
+        run: ./scripts/run-android-checks.sh lint
       - name: Android test (instrumentation)
         run: echo "Instrumentation tests are typically run on emulator; configure matrix if needed."
       - name: Jacoco report
-        run: ./gradlew jacocoTestReport || echo "Jacoco not configured, skipping coverage"
+        run: ./scripts/run-android-checks.sh jacocoTestReport || echo "Jacoco not configured, skipping coverage"
       - name: Upload reports
         uses: actions/upload-artifact@v4
         with:

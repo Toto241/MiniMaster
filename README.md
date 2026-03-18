@@ -156,22 +156,22 @@ Each source file is also thoroughly documented.
 The project has a comprehensive test suite to ensure code quality and stability.
 
 - **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
-- **Android Lint (blocking for errors):** `./gradlew lint`
-- **Android Unit Tests:** `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
-- **Android Instrumentation Build:** `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
-- **Selected Connected Tests (requires running emulator/device, master):** `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
-- **Selected Connected Tests (requires running emulator/device, child):** `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
+- **Android Lint (blocking for errors):** `./scripts/run-android-checks.sh lint`
+- **Android Unit Tests:** `./scripts/run-android-checks.sh :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
+- **Android Instrumentation Build:** `./scripts/run-android-checks.sh :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
+- **Selected Connected Tests (requires running emulator/device, master):** `./scripts/run-android-checks.sh :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
+- **Selected Connected Tests (requires running emulator/device, child):** `./scripts/run-android-checks.sh :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
 - **Language Regression Checks:** Verify first-start language picker is shown once, locale is persisted after restart, and localized strings load for selected language.
 
 ### Validation Gate
 
 For repository validation after changes, run this sequence:
 
-1. `./gradlew lint`
-2. `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
-3. `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
-4. Optional full device validation (master): `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
-5. Optional full device validation (child): `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
+1. `./scripts/run-android-checks.sh lint`
+2. `./scripts/run-android-checks.sh :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
+3. `./scripts/run-android-checks.sh :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
+4. Optional full device validation (master): `./scripts/run-android-checks.sh :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
+5. Optional full device validation (child): `./scripts/run-android-checks.sh :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
 
 ## License
 
