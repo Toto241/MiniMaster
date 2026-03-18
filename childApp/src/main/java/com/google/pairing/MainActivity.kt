@@ -1,21 +1,17 @@
 package com.google.pairing
 
-import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.telephony.TelephonyManager
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,6 +19,7 @@ import androidx.core.content.FileProvider
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -34,7 +31,7 @@ import javax.inject.Inject
  * screens of the application using Jetpack Compose Navigation. It is responsible for:
  * - Observing the pairing and onboarding status to display the correct screen.
  * - Handling deep links for device pairing.
- * - Managing runtime permissions for device identifiers.
+ * - Managing a stable app-scoped device identifier for pairing.
  * - Coordinating camera actions for task photo proofs.
  */
 @AndroidEntryPoint
@@ -61,22 +58,6 @@ class MainActivity : ComponentActivity() {
                     tasksViewModel.completeTaskWithPhoto(taskId, uri)
                 }
             }
-        }
-    }
-
-    /**
-     * Activity result launcher for requesting the `READ_PHONE_STATE` permission.
-     * If the permission is granted, it proceeds with handling the pairing intent.
-     * If denied, it logs a warning.
-     */
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // Permission granted, re-process the intent to continue pairing.
-            handleIntent(intent)
-        } else {
-            Log.w("MainActivity", "READ_PHONE_STATE permission was denied by the user.")
         }
     }
 
@@ -195,62 +176,37 @@ class MainActivity : ComponentActivity() {
             val token = intent.data?.lastPathSegment
             if (token != null) {
                 Log.d("MainActivity", "Deep link received with token: $token")
-                // Check for phone state permission before trying to get the IMEI.
-                when (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)) {
-                    PackageManager.PERMISSION_GRANTED -> {
-                        val imei = getImei(this)
-                        if (imei != null) {
-                            viewModel.validateToken(token, imei)
-                        } else {
-                            Log.e("MainActivity", "IMEI is null even with permission.")
-                        }
-                    }
-                    else -> {
-                        // Request the permission. The result is handled by the requestPermissionLauncher.
-                        requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
-                    }
-                }
+                viewModel.validateToken(token, getStableChildId(this))
             }
         }
     }
 
     /**
-     * Retrieves the device's IMEI. This is a sensitive operation that requires
-     * the `READ_PHONE_STATE` permission.
+     * Returns a stable app-scoped child identifier that does not depend on Telephony APIs.
      *
-     * Note: Accessing IMEI is restricted in modern Android versions and is used here
-     * as a stable, unique device identifier for this specific proof-of-concept.
-     * In a production app, a non-resettable hardware ID should be avoided in favor of
-     * alternatives like `ANDROID_ID` or Firebase Installation ID.
+     * Preference order:
+     * 1. Cached identifier from SharedPreferences
+     * 2. ANDROID_ID if available
+     * 3. Random UUID fallback persisted for future runs
      *
      * @param context The application context.
-     * @return The device's IMEI as a [String], or null if permission is denied or an error occurs.
+     * @return A non-empty stable identifier for this app install.
      */
-    @SuppressLint("HardwareIds")
-    private fun getImei(context: Context): String? {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("MainActivity", "Attempted to get IMEI without permission.")
-            return null
+    private fun getStableChildId(context: Context): String {
+        val prefs = context.getSharedPreferences("child_identity", Context.MODE_PRIVATE)
+        val cachedId = prefs.getString("stable_child_id", null)
+        if (!cachedId.isNullOrBlank()) {
+            return cachedId
         }
-        return try {
-            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            // Use the appropriate method based on the Android API level.
-            val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                telephonyManager.imei
-            } else {
-                @Suppress("DEPRECATION")
-                telephonyManager.deviceId
-            }
-            if (imei == null) {
-                Log.w("MainActivity", "IMEI is null, even with permission.")
-            }
-            imei
-        } catch (e: SecurityException) {
-            Log.e("MainActivity", "Failed to get IMEI due to SecurityException.", e)
-            null
-        } catch (e: Exception) {
-            Log.e("MainActivity", "An unexpected error occurred while getting IMEI.", e)
-            null
+
+        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        val stableId = if (androidId.isNullOrBlank() || androidId == "9774d56d682e549c") {
+            "child-${UUID.randomUUID()}"
+        } else {
+            "android-$androidId"
         }
+
+        prefs.edit().putString("stable_child_id", stableId).apply()
+        return stableId
     }
 }

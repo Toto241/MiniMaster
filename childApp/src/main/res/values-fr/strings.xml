@@ -6,6 +6,9 @@
     <string name="pairing_screen_title">Écran de couplage</string>
     <string name="pairing_code_input_label">Entrez le code de couplage</string>
     <string name="pairing_button_text">Coupler l\'appareil</string>
+    <string name="pairing_status_idle">Veuillez saisir le code de couplage ou ouvrir le lien profond.</string>
+    <string name="pairing_status_loading">Couplage en cours...</string>
+    <string name="pairing_status_success">Appareil couplé avec succès.</string>
     <string name="error_code_expired">Le code de couplage a expiré.</string>
     <string name="error_invalid_code">Code de couplage invalide.</string>
     <string name="error_saving_child_id">Erreur lors de l\'enregistrement de l\'ID de l\'appareil.</string>
