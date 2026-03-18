@@ -4,7 +4,11 @@ This document provides comprehensive documentation for all Cloud Functions in th
 
 ## Authentication
 
-All Cloud Functions require Firebase Authentication. Users must be signed in with a valid Firebase token.
+Most Cloud Functions require an authenticated Firebase user context.
+
+- Device ownership and authorization are enforced via server-side checks (`masterId`/`childId`, `secretKey`, ownership relations).
+- `generateCustomToken` additionally supports web-control login via `masterImei + secretKey`.
+- Field names like `imei`, `masterImei`, `childImei` are legacy API names and currently carry app-scoped stable device IDs (not Telephony IMEI reads in Android apps).
 
 ## Cloud Functions
 
@@ -56,16 +60,15 @@ Validates a pairing token and creates the master-child relationship.
 ```typescript
 {
   pairingToken: string,  // Required: Token from QR code or manual entry
-  masterImei: string,    // Required: Master device IMEI
-  childImei: string      // Required: Child device IMEI
+  // Child is resolved from authenticated caller (uid)
 }
 ```
 
 **Response**:
 ```typescript
 {
-  success: boolean,
-  message: string
+  childId: string,
+  masterId: string
 }
 ```
 
@@ -82,11 +85,9 @@ const validatePairingToken = httpsCallable(functions, 'validatePairingToken');
 
 try {
   const result = await validatePairingToken({
-    pairingToken: 'abc123def456',
-    masterImei: 'master-device-789',
-    childImei: 'child-device-123'
+    pairingToken: 'abc123def456'
   });
-  console.log('Pairing result:', result.data.message);
+  console.log('Pairing result:', result.data.childId, result.data.masterId);
 } catch (error) {
   console.error('Pairing failed:', error.code, error.message);
 }

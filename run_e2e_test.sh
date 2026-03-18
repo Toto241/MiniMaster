@@ -30,7 +30,7 @@ adb logcat -c
 # --- Step 2: Run masterApp test to generate a token ---
 echo "[2/5] Running masterApp test to generate token..."
 # We target the specific test class and method to avoid running other tests.
-./gradlew :masterApp:connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest#generateTokenAndLogIt
+./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest#generateTokenAndLogIt
 
 echo "masterApp test finished. Searching for token in logs..."
 
@@ -51,7 +51,7 @@ echo "Token successfully retrieved: $TOKEN"
 # --- Step 4: Launch childApp with the deep link ---
 echo "[4/5] Launching childApp with deep link..."
 DEEP_LINK="minimaster://pair/$TOKEN"
-PACKAGE_NAME="com.google.pairing.child"
+PACKAGE_NAME="com.google.pairing"
 
 # Stop the app first to ensure a clean launch
 adb shell am force-stop "$PACKAGE_NAME"
@@ -65,6 +65,6 @@ sleep 5 # Give the app time to process the link and make the network call.
 # --- Step 5: Run childApp test to verify the result ---
 echo "[5/5] Running childApp test to verify pairing success..."
 # We target the specific verification test.
-./gradlew :childApp:connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.DeepLinkE2ETest#verifySuccessfulPairingFromDeepLink_showsLockScreen
+./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.DeepLinkE2ETest#verifySuccessfulPairingFromDeepLink_showsLockScreen
 
 echo "--- E2E Test Finished Successfully! ---"
