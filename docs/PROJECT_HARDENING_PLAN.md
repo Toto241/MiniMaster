@@ -71,7 +71,28 @@ This PR completes the following changes. Reviewers should pay attention to the a
 - Add screenshot-based web smoke tests to CI for UI regression detection.
 - Continue migration away from any legacy client-passed secrets towards strict token-based auth only.
 
-## 3. Next Milestone Checklist
+## 3. Priorisierte Umsetzungsreihenfolge
+
+### Phase A — Go-Live-Blocker zuerst
+
+1. Backend-Full-Validation ohne Fehler herstellen (Admin-Claim, Functions, Firestore, Runtime-Konfiguration).
+2. Child-App-Enforcement-Härtung abschließen: wirksames App-Blocking, Overlay-Sicherheit, Schutz gegen Abschalten/Deinstallation.
+3. Pflicht-Freigaben und Compliance-Nachweise dokumentiert abhaken.
+
+### Phase B — Hochpriorisierte Produktreife
+
+1. Storage/Foto-Upload und Task-Proof-Ende-zu-Ende absichern.
+2. Zeitfenster/Usage-Limits auf dem Child-Gerät belastbar testen und vervollständigen.
+3. Desktop-Sicherheitsbasis schließen (CSP, SRI, Credential-Speicherung, Session-Timeout).
+
+### Phase C — Skalierung und Betriebsreife
+
+1. JDK/Gradle-Toolchain in CI und lokalen Setup-Dokumenten pinnen.
+2. Firebase-Emulator-Regeltests für Deny/Allow-Szenarien ergänzen.
+3. Screenshot-basierte UI-Smoke-Tests und zusätzliche Device-Level-Checks in CI integrieren.
+4. Dokumentation und Release-Notes synchron halten, damit die Priorisierung nicht veraltet.
+
+## 4. Next Milestone Checklist
 
 1. Pin and verify JDK/Gradle toolchain in CI and local docs.
 2. Add Firebase Emulator rules integration tests for deny/allow scenarios.
