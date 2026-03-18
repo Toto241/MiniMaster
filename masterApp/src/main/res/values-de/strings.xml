@@ -56,4 +56,9 @@
     <string name="debug_imei">Geräte-ID: %1$s</string>
     <string name="debug_secret_key">Geheimer Schlüssel: %1$s</string>
     <string name="debug_not_set">Nicht gesetzt</string>
+
+    <!-- Ersteinrichtung Sprache -->
+    <string name="language_setup_title">App-Sprache auswählen</string>
+    <string name="language_setup_description">Wählen Sie Ihre bevorzugte Sprache für MiniMaster. Sie können die Sprache später in einer künftigen Einstellungsansicht ändern.</string>
+    <string name="language_continue">Weiter</string>
 </resources>

@@ -11,7 +11,30 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.Button
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.RadioButton
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -67,6 +90,7 @@ class MainActivity : ComponentActivity() {
      * @param savedInstanceState The previously saved instance state, if any.
      */
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySavedChildLocale(this)
         super.onCreate(savedInstanceState)
         // Starte den TaskMonitoringService
         val serviceIntent = Intent(this, TaskMonitoringService::class.java)
@@ -82,7 +106,15 @@ class MainActivity : ComponentActivity() {
                 childId to onboardingComplete
             }.collect { (childId, onboardingComplete) ->
                 setContent {
-                    AppNavigation(childId, onboardingComplete)
+                    AppNavigation(
+                        childId = childId,
+                        onboardingComplete = onboardingComplete,
+                        languageSelected = hasChildLanguageSelection(this@MainActivity),
+                        onLanguageSelected = { languageTag ->
+                            saveChildLanguageSelection(this@MainActivity, languageTag)
+                            recreate()
+                        }
+                    )
                 }
             }
         }
@@ -98,16 +130,25 @@ class MainActivity : ComponentActivity() {
      * @param onboardingComplete True if the user has completed the initial permission setup.
      */
     @Composable
-    fun AppNavigation(childId: String?, onboardingComplete: Boolean) {
+    fun AppNavigation(
+        childId: String?,
+        onboardingComplete: Boolean,
+        languageSelected: Boolean,
+        onLanguageSelected: (String) -> Unit
+    ) {
         val navController = rememberNavController()
         // Determine the appropriate start destination based on application state.
         val startDestination = when {
+            !languageSelected -> "language"     // App language must be selected first
             childId.isNullOrEmpty() -> "pairing" // Not paired yet
             !onboardingComplete -> "permission"  // Paired but needs permissions
             else -> "lock"                       // Paired and onboarded
         }
 
         NavHost(navController = navController, startDestination = startDestination) {
+            composable("language") {
+                LanguageSelectionScreen(onLanguageSelected = onLanguageSelected)
+            }
             composable("pairing") {
                 PairingScreen(viewModel = viewModel)
             }
@@ -208,5 +249,95 @@ class MainActivity : ComponentActivity() {
 
         prefs.edit().putString("stable_child_id", stableId).apply()
         return stableId
+    }
+}
+
+private data class LanguageOption(val tag: String, val label: String)
+
+@Composable
+private fun LanguageSelectionScreen(onLanguageSelected: (String) -> Unit) {
+    val options = remember {
+        listOf(
+            LanguageOption("en", "English"),
+            LanguageOption("de", "Deutsch"),
+            LanguageOption("fr", "Francais"),
+            LanguageOption("zh-CN", "Chinese (Simplified)"),
+            LanguageOption("es", "Espanol"),
+            LanguageOption("pt-BR", "Portugues (Brasil)"),
+            LanguageOption("hi", "Hindi"),
+            LanguageOption("ar", "Arabic"),
+            LanguageOption("id", "Indonesian"),
+            LanguageOption("ja", "Japanese"),
+            LanguageOption("ru", "Russian"),
+            LanguageOption("tr", "Turkish"),
+            LanguageOption("it", "Italian"),
+            LanguageOption("ko", "Korean"),
+            LanguageOption("vi", "Vietnamese"),
+            LanguageOption("pl", "Polish"),
+            LanguageOption("nl", "Dutch"),
+            LanguageOption("th", "Thai"),
+            LanguageOption("uk", "Ukrainian"),
+            LanguageOption("fa", "Persian"),
+            LanguageOption("bn", "Bengali"),
+            LanguageOption("ur", "Urdu"),
+            LanguageOption("sw", "Swahili"),
+            LanguageOption("he", "Hebrew"),
+            LanguageOption("ro", "Romanian"),
+            LanguageOption("cs", "Czech"),
+            LanguageOption("sv", "Swedish"),
+            LanguageOption("no", "Norwegian"),
+            LanguageOption("da", "Danish"),
+            LanguageOption("fi", "Finnish"),
+            LanguageOption("el", "Greek"),
+            LanguageOption("hu", "Hungarian")
+        )
+    }
+    var selectedTag by remember { mutableStateOf("en") }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = stringResource(R.string.language_setup_title),
+                style = MaterialTheme.typography.h5,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            Text(
+                text = stringResource(R.string.language_setup_description),
+                style = MaterialTheme.typography.body1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(options) { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedTag = option.tag }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedTag == option.tag,
+                            onClick = { selectedTag = option.tag }
+                        )
+                        Text(text = option.label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+
+            Button(
+                onClick = { onLanguageSelected(selectedTag) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.language_continue))
+            }
+        }
     }
 }

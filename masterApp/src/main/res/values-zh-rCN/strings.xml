@@ -56,4 +56,9 @@
     <string name="debug_imei">设备ID：%1$s</string>
     <string name="debug_secret_key">密钥：%1$s</string>
     <string name="debug_not_set">未设置</string>
+
+    <!-- 首次语言设置 -->
+    <string name="language_setup_title">选择应用语言</string>
+    <string name="language_setup_description">请选择 MiniMaster 的首选语言。后续可在设置页面中更改。</string>
+    <string name="language_continue">继续</string>
 </resources>

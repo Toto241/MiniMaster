@@ -37,6 +37,7 @@ The Mini-Master suite is designed to give parents control over their children's 
 - **Task-Based Unlocking:** Assign tasks to children (e.g., "Clean your room"). The child device remains locked until the child submits photo proof of task completion, which the parent can then approve or reject.
 - **Push Notifications:** Parents receive real-time notifications when a child submits a task for review.
 - **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
+- **First-Start Language Selection:** Both Android apps require language selection on first launch and persist the selected locale.
 - **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
 - **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
 - **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
@@ -120,7 +121,14 @@ Set environment variables for ticket automation:
 
 1.  **Registration & Pairing:** Register the parent device, then generate a pairing code to link the child device.
 2.  **Setup Child Device:** Follow the onboarding flow on the child device and grant the crucial **Accessibility Service** permission for app blocking to work.
-3.  **Management:** Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
+3.  **Select App Language:** On first launch of each Android app, select the preferred app language before continuing.
+4.  **Management:** Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
+
+### Supported Android App Languages
+
+Current integrated locales:
+
+- `en`, `de`, `fr`, `zh-CN`, `es`, `pt-BR`, `hi`, `ar`, `id`, `ja`, `ru`, `tr`, `it`, `ko`, `vi`, `pl`, `nl`, `th`, `uk`, `fa`, `bn`, `ur`, `sw`, `he`, `ro`, `cs`, `sv`, `no`, `da`, `fi`, `el`, `hu`
 
 ## Documentation
 
@@ -130,6 +138,9 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project.
 - **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
 - **[Quality Review YYYY-MM-DD](docs/QUALITY_REVIEW_YYYY-MM-DD.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
+- **[Language Global Roadmap](docs/LANGUAGE_GLOBAL_ROADMAP.md):** Global language prioritization, rollout waves, and locale strategy.
+- **[First-Start Language Implementation](docs/LANGUAGE_FIRST_START_IMPLEMENTATION.md):** Technical details for mandatory language selection on first launch.
+- **[Language Validation Report 2026-03-18](docs/LANGUAGE_VALIDATION_REPORT_2026-03-18.md):** Deep integration analysis and current validation outcomes.
 - **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
 
 Each source file is also thoroughly documented.
@@ -142,9 +153,9 @@ The project has a comprehensive test suite to ensure code quality and stability.
 - **Android Lint (blocking for errors):** `./gradlew lint`
 - **Android Unit Tests:** `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
 - **Android Instrumentation Build:** `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
-- **Selected Connected Tests (requires running emulator/device):**
-    - `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
-    - `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
+- **Selected Connected Tests (requires running emulator/device, master):** `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
+- **Selected Connected Tests (requires running emulator/device, child):** `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
+- **Language Regression Checks:** Verify first-start language picker is shown once, locale is persisted after restart, and localized strings load for selected language.
 
 ### Validation Gate
 
@@ -153,9 +164,8 @@ For repository validation after changes, run this sequence:
 1. `./gradlew lint`
 2. `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
 3. `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
-4. Optional full device validation:
-     - `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
-     - `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
+4. Optional full device validation (master): `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
+5. Optional full device validation (child): `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
 
 ## License
 

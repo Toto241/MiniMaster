@@ -20,4 +20,7 @@
     <string name="permission_confirm_enabled">我已启用无障碍服务</string>
     <string name="permission_status_opened_settings">已打开设置。请启用 Mini-Master 无障碍服务，然后返回确认。</string>
     <string name="permission_status_not_enabled">无障碍服务尚未启用。请先在系统设置中启用。</string>
+    <string name="language_setup_title">选择应用语言</string>
+    <string name="language_setup_description">请选择 Mini-Master 儿童应用的首选语言。后续可在设置页面中更改。</string>
+    <string name="language_continue">继续</string>
 </resources>

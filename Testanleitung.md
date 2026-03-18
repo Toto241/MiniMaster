@@ -134,6 +134,27 @@ Nachdem die Geräte erfolgreich gekoppelt wurden, können die folgenden Kernfunk
 2.  Führen Sie die Apps aus.
 3.  **Erwartetes Ergebnis:** Alle Texte in der Benutzeroberfläche (Titel, Buttons, Fehlermeldungen) werden in der eingestellten Sprache korrekt angezeigt. Bei einer nicht unterstützten Sprache fallen die Texte auf Englisch zurück.
 
+**Testfall F-06: Sprachwahl beim Erststart (beide Apps)**
+
+1.  Deinstallieren Sie `masterApp` und `childApp` oder löschen Sie jeweils die App-Daten.
+2.  Starten Sie die `masterApp` auf Gerät A.
+3.  **Erwartetes Ergebnis:** Vor Registrierung/Dashboard erscheint die Sprachwahl.
+4.  Wählen Sie eine Sprache und bestätigen Sie mit **Continue/Weiter/Continuer**.
+5.  **Erwartetes Ergebnis:** Die App navigiert in den regulären Flow (Registrierung oder Dashboard).
+6.  Wiederholen Sie die Schritte 2-5 für die `childApp` auf Gerät B.
+
+**Testfall F-07: Persistenz der Sprachwahl nach Neustart**
+
+1.  Wählen Sie beim Erststart in beiden Apps eine nicht-default Sprache (z.B. Deutsch oder Französisch).
+2.  Beenden Sie beide Apps vollständig (Swipe aus Recents) und starten Sie sie erneut.
+3.  **Erwartetes Ergebnis:** Die Sprachwahl wird nicht erneut angezeigt, und die gewählte Sprache bleibt aktiv.
+
+**Testfall F-08: RTL-Schnelltest (Arabisch/Hebräisch)**
+
+1.  Wählen Sie in der Sprachwahl Arabisch oder Hebräisch.
+2.  Starten Sie den Erstflow in beiden Apps.
+3.  **Erwartetes Ergebnis:** Texte und Layout sind lesbar, keine abgeschnittenen Buttons, keine überlappenden Elemente.
+
 ## 4. Automatisierte Tests
 
 Das Projekt enthält bereits eine Reihe von automatisierten Tests und kann um einen End-to-End-Test erweitert werden.
