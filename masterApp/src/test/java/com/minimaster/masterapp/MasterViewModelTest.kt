@@ -1,6 +1,8 @@
 package com.minimaster.masterapp
 
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
@@ -32,6 +34,7 @@ class MasterViewModelTest {
     private lateinit var functions: FirebaseFunctions
     private lateinit var callable: HttpsCallableReference
     private lateinit var credentialsRepository: MasterCredentialsRepository
+    private lateinit var firebaseAuth: FirebaseAuth
 
     @Before
     fun setUp() {
@@ -39,6 +42,7 @@ class MasterViewModelTest {
         functions = mock()
         callable = mock()
         credentialsRepository = mock()
+        firebaseAuth = mock()
     }
 
     @After
@@ -51,6 +55,7 @@ class MasterViewModelTest {
         whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-1" to "secret-1"))
 
         val viewModel = MasterViewModel(functions, credentialsRepository)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
         advanceUntilIdle()
 
         assertTrue(viewModel.registrationState.value is RegistrationState.Success)
@@ -64,10 +69,12 @@ class MasterViewModelTest {
         whenever(functions.getHttpsCallable(eq("registerMasterDevice"))).thenReturn(callable)
 
         val callableResult: HttpsCallableResult = mock()
-        whenever(callableResult.getData()).thenReturn(mapOf("secretKey" to "generated-secret"))
+        whenever(callableResult.getData()).thenReturn(mapOf("masterId" to "imei-123", "customToken" to "token-123"))
         whenever(callable.call(any())).thenReturn(Tasks.forResult(callableResult))
+        whenever(firebaseAuth.signInWithCustomToken("token-123")).thenReturn(Tasks.forResult(mock<AuthResult>()))
 
         val viewModel = MasterViewModel(functions, credentialsRepository)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
         advanceUntilIdle()
 
         viewModel.registerDevice("imei-123")
@@ -78,10 +85,10 @@ class MasterViewModelTest {
         val payload = payloadCaptor.firstValue as Map<*, *>
 
         assertEquals("imei-123", payload["imei"])
-        verify(credentialsRepository).saveCredentials("imei-123", "generated-secret")
+        verify(credentialsRepository).saveCredentials("imei-123", "")
         assertTrue(viewModel.registrationState.value is RegistrationState.Success)
         assertEquals("imei-123", viewModel.debugState.value.imei)
-        assertEquals("generated-secret", viewModel.debugState.value.secretKey)
+        assertEquals(null, viewModel.debugState.value.secretKey)
     }
 
     @Test
@@ -89,6 +96,7 @@ class MasterViewModelTest {
         whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
 
         val viewModel = MasterViewModel(functions, credentialsRepository)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
         advanceUntilIdle()
 
         viewModel.generateLink()
@@ -109,6 +117,7 @@ class MasterViewModelTest {
         whenever(callable.call(any())).thenReturn(Tasks.forResult(callableResult))
 
         val viewModel = MasterViewModel(functions, credentialsRepository)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
         advanceUntilIdle()
 
         viewModel.generateLink()
@@ -118,8 +127,7 @@ class MasterViewModelTest {
         verify(callable).call(payloadCaptor.capture())
         val payload = payloadCaptor.firstValue as Map<*, *>
 
-        assertEquals("imei-1", payload["imei"])
-        assertEquals("secret-1", payload["secretKey"])
+        assertTrue(payload.isEmpty())
         assertTrue(viewModel.linkGenerationState.value is LinkGenerationState.Success)
     }
 }
