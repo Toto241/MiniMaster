@@ -32,6 +32,12 @@ export {
   onTicketCreated, provideSolutionFeedback, getTicketUserData, aiExplainProblem,
 } from "./src/support";
 
+// Legal Policies & Consent
+export {
+  getActiveLegalPolicies, needsLegalReconsent, recordLegalConsent,
+  publishLegalPolicy, markLegalReconsentRequired,
+} from "./src/legal";
+
 // Triggers (FCM sync, photo analysis, task notifications)
 export { onChildDeviceUpdateV2, analyzeTaskPhoto, onTaskStatusChange } from "./src/triggers";
 

@@ -1,17 +1,22 @@
 package com.minimaster.masterapp
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
+import androidx.compose.material.Checkbox
 import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.OutlinedButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.RadioButton
 import androidx.compose.material.Surface
@@ -19,6 +24,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -30,6 +36,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.UUID
+import java.util.Locale
 
 /**
  * The main and only activity for the Master App.
@@ -41,18 +48,82 @@ class MainActivity : ComponentActivity() {
         applySavedMasterLocale(this)
         super.onCreate(savedInstanceState)
         setContent {
-            var languageSelected by remember { mutableStateOf(hasMasterLanguageSelection(this)) }
+            val viewModel: MasterViewModel = hiltViewModel()
+            val registrationState by viewModel.registrationState.collectAsState()
+            val legalConsentState by viewModel.legalConsentState.collectAsState()
 
-            if (!languageSelected) {
-                LanguageSelectionScreen(
-                    onLanguageSelected = { languageTag ->
-                        saveMasterLanguageSelection(this, languageTag)
-                        languageSelected = true
-                        recreate()
-                    }
-                )
-            } else {
-                MasterAppNavigation()
+            var languageSelected by remember { mutableStateOf(hasMasterLanguageSelection(this)) }
+            val context = LocalContext.current
+            val appLocale = remember {
+                val configured = context.resources.configuration.locales
+                if (configured.isEmpty) Locale.getDefault() else configured[0]
+            }
+            val legalCountry = remember(appLocale) { appLocale.country.ifBlank { "US" }.uppercase(Locale.ROOT) }
+            val legalLocale = remember(appLocale) { appLocale.toLanguageTag().ifBlank { "en-US" } }
+
+            LaunchedEffect(languageSelected, registrationState, legalCountry, legalLocale) {
+                if (languageSelected && registrationState is RegistrationState.Success) {
+                    viewModel.refreshLegalConsentStatus(legalCountry, legalLocale)
+                }
+            }
+
+            when {
+                !languageSelected -> {
+                    LanguageSelectionScreen(
+                        onLanguageSelected = { languageTag ->
+                            saveMasterLanguageSelection(this, languageTag)
+                            languageSelected = true
+                            recreate()
+                        }
+                    )
+                }
+
+                registrationState !is RegistrationState.Success -> {
+                    RegistrationScreen(
+                        viewModel = viewModel,
+                        onRegistrationSuccess = {}
+                    )
+                }
+
+                legalConsentState is LegalConsentState.Unknown ||
+                    legalConsentState is LegalConsentState.Checking -> {
+                    LegalConsentLoadingScreen()
+                }
+
+                legalConsentState is LegalConsentState.Required -> {
+                    val state = legalConsentState as LegalConsentState.Required
+                    LegalConsentScreen(
+                        policies = state.policies,
+                        onAccept = {
+                            viewModel.acceptLegalPolicies(
+                                country = legalCountry,
+                                locale = legalLocale,
+                                policies = state.policies,
+                                appVersion = BuildConfig.VERSION_NAME
+                            )
+                        },
+                        onOpenUrl = { url ->
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Log.w("MainActivity", "Failed to open legal URL: $url", e)
+                            }
+                        }
+                    )
+                }
+
+                legalConsentState is LegalConsentState.Error -> {
+                    val state = legalConsentState as LegalConsentState.Error
+                    LegalConsentErrorScreen(
+                        message = state.message,
+                        onRetry = { viewModel.refreshLegalConsentStatus(legalCountry, legalLocale) }
+                    )
+                }
+
+                else -> {
+                    MasterAppNavigation(viewModel = viewModel)
+                }
             }
         }
     }
@@ -266,6 +337,149 @@ private fun getStableMasterId(context: Context): String {
 }
 
 private data class LanguageOption(val tag: String, val label: String)
+
+@Composable
+private fun LegalConsentLoadingScreen() {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Checking legal policy requirements...",
+                style = MaterialTheme.typography.body1,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun LegalConsentErrorScreen(message: String, onRetry: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Legal check failed",
+                style = MaterialTheme.typography.h6,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colors.error
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.body2,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(onClick = onRetry) {
+                Text("Retry")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LegalConsentScreen(
+    policies: ActiveLegalPolicies,
+    onAccept: () -> Unit,
+    onOpenUrl: (String) -> Unit
+) {
+    var termsAccepted by remember { mutableStateOf(false) }
+    var privacyAccepted by remember { mutableStateOf(false) }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Legal update required",
+                style = MaterialTheme.typography.h5,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Please review and accept the current Terms and Privacy Policy before continuing.",
+                style = MaterialTheme.typography.body1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = { onOpenUrl(policies.termsUrl) },
+                border = BorderStroke(1.dp, MaterialTheme.colors.primary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Open Terms (v${policies.termsVersion})")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onOpenUrl(policies.privacyUrl) },
+                border = BorderStroke(1.dp, MaterialTheme.colors.primary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Open Privacy Policy (v${policies.privacyVersion})")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(checked = termsAccepted, onCheckedChange = { termsAccepted = it })
+                Text(
+                    text = "I accept the Terms of Service.",
+                    style = MaterialTheme.typography.body2,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(checked = privacyAccepted, onCheckedChange = { privacyAccepted = it })
+                Text(
+                    text = "I acknowledge the Privacy Policy.",
+                    style = MaterialTheme.typography.body2,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = onAccept,
+                enabled = termsAccepted && privacyAccepted,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Accept and continue")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Country: ${policies.country}, Locale: ${policies.locale}",
+                style = MaterialTheme.typography.caption,
+                color = Color.Gray
+            )
+        }
+    }
+}
 
 @Composable
 private fun LanguageSelectionScreen(onLanguageSelected: (String) -> Unit) {

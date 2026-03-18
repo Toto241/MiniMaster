@@ -48,6 +48,23 @@ data class DebugState(
     val secretKey: String? = null
 )
 
+data class ActiveLegalPolicies(
+    val country: String,
+    val locale: String,
+    val termsVersion: String,
+    val privacyVersion: String,
+    val termsUrl: String,
+    val privacyUrl: String
+)
+
+sealed class LegalConsentState {
+    object Unknown : LegalConsentState()
+    object Checking : LegalConsentState()
+    object Ready : LegalConsentState()
+    data class Required(val policies: ActiveLegalPolicies) : LegalConsentState()
+    data class Error(val message: String) : LegalConsentState()
+}
+
 /**
  * A [ViewModel] that manages the initial registration of the master device and the
  * generation of pairing links for child devices.
@@ -72,6 +89,10 @@ class MasterViewModel @Inject constructor(
     private val _debugState = MutableStateFlow(DebugState())
     /** A [StateFlow] holding the current credentials for debugging display. */
     val debugState: StateFlow<DebugState> = _debugState.asStateFlow()
+
+    private val _legalConsentState = MutableStateFlow<LegalConsentState>(LegalConsentState.Unknown)
+    /** A [StateFlow] representing whether legal re-consent must be collected before app usage. */
+    val legalConsentState: StateFlow<LegalConsentState> = _legalConsentState.asStateFlow()
 
     init {
         checkRegistrationStatus()
@@ -147,6 +168,93 @@ class MasterViewModel @Inject constructor(
             } catch (e: Exception) {
                  val errorMessage = if (e is FirebaseFunctionsException) "Error (${e.code}): ${e.message}" else e.message ?: "An unknown error occurred."
                 _linkGenerationState.value = LinkGenerationState.Error(errorMessage)
+            }
+        }
+    }
+
+    /**
+     * Checks backend legal policy state for the current country/locale and determines
+     * whether explicit consent is required before allowing app usage.
+     */
+    fun refreshLegalConsentStatus(country: String, locale: String) {
+        viewModelScope.launch {
+            _legalConsentState.value = LegalConsentState.Checking
+            val data = hashMapOf(
+                "country" to country,
+                "locale" to locale
+            )
+
+            try {
+                val result = functions.getHttpsCallable("needsLegalReconsent").call(data).await()
+                val payload = result.data as? Map<*, *> ?: run {
+                    _legalConsentState.value = LegalConsentState.Error("Invalid legal status response.")
+                    return@launch
+                }
+
+                val requires = payload["requiresReconsent"] as? Boolean ?: false
+                val terms = payload["terms"] as? Map<*, *>
+                val privacy = payload["privacy"] as? Map<*, *>
+
+                val termsVersion = terms?.get("version") as? String ?: ""
+                val privacyVersion = privacy?.get("version") as? String ?: ""
+                val termsUrl = terms?.get("contentUrl") as? String ?: ""
+                val privacyUrl = privacy?.get("contentUrl") as? String ?: ""
+
+                if (requires) {
+                    _legalConsentState.value = LegalConsentState.Required(
+                        ActiveLegalPolicies(
+                            country = country,
+                            locale = locale,
+                            termsVersion = termsVersion,
+                            privacyVersion = privacyVersion,
+                            termsUrl = termsUrl,
+                            privacyUrl = privacyUrl
+                        )
+                    )
+                } else {
+                    _legalConsentState.value = LegalConsentState.Ready
+                }
+            } catch (e: Exception) {
+                val errorMessage = if (e is FirebaseFunctionsException) {
+                    "Error (${e.code}): ${e.message}"
+                } else {
+                    e.message ?: "An unknown error occurred while checking legal consent."
+                }
+                _legalConsentState.value = LegalConsentState.Error(errorMessage)
+            }
+        }
+    }
+
+    /**
+     * Records explicit legal consent for the currently active terms/privacy versions.
+     */
+    fun acceptLegalPolicies(
+        country: String,
+        locale: String,
+        policies: ActiveLegalPolicies,
+        appVersion: String
+    ) {
+        viewModelScope.launch {
+            _legalConsentState.value = LegalConsentState.Checking
+            val data = hashMapOf(
+                "country" to country,
+                "locale" to locale,
+                "termsVersion" to policies.termsVersion,
+                "privacyVersion" to policies.privacyVersion,
+                "consentSource" to "master_app",
+                "appVersion" to appVersion
+            )
+
+            try {
+                functions.getHttpsCallable("recordLegalConsent").call(data).await()
+                _legalConsentState.value = LegalConsentState.Ready
+            } catch (e: Exception) {
+                val errorMessage = if (e is FirebaseFunctionsException) {
+                    "Error (${e.code}): ${e.message}"
+                } else {
+                    e.message ?: "An unknown error occurred while saving legal consent."
+                }
+                _legalConsentState.value = LegalConsentState.Error(errorMessage)
             }
         }
     }
