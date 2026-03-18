@@ -18,6 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
@@ -72,6 +73,11 @@ class MasterViewModelTest {
         viewModel.registerDevice("imei-123")
         advanceUntilIdle()
 
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("imei-123", payload["imei"])
         verify(credentialsRepository).saveCredentials("imei-123", "generated-secret")
         assertTrue(viewModel.registrationState.value is RegistrationState.Success)
         assertEquals("imei-123", viewModel.debugState.value.imei)
@@ -91,5 +97,29 @@ class MasterViewModelTest {
         val state = viewModel.linkGenerationState.value
         assertTrue(state is LinkGenerationState.Error)
         assertEquals("Device not registered yet.", (state as LinkGenerationState.Error).message)
+    }
+
+    @Test
+    fun generateLink_with_credentials_calls_backend_with_payload_and_sets_success() = runTest {
+        whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-1" to "secret-1"))
+        whenever(functions.getHttpsCallable(eq("generatePairingLink"))).thenReturn(callable)
+
+        val callableResult: HttpsCallableResult = mock()
+        whenever(callableResult.getData()).thenReturn(mapOf("pairingToken" to "token-xyz"))
+        whenever(callable.call(any())).thenReturn(Tasks.forResult(callableResult))
+
+        val viewModel = MasterViewModel(functions, credentialsRepository)
+        advanceUntilIdle()
+
+        viewModel.generateLink()
+        advanceUntilIdle()
+
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("imei-1", payload["imei"])
+        assertEquals("secret-1", payload["secretKey"])
+        assertTrue(viewModel.linkGenerationState.value is LinkGenerationState.Success)
     }
 }
