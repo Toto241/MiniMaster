@@ -82,6 +82,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-crashlytics-ktx:19.3.0'
     implementation 'com.google.firebase:firebase-messaging-ktx:24.1.0'
     implementation 'com.google.firebase:firebase-auth-ktx:23.1.0'
+    implementation 'com.google.firebase:firebase-appcheck-playintegrity:18.0.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0'
 
     // Hilt - Updated for security

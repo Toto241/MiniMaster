@@ -14,5 +14,6 @@ class MasterApplication : Application() {
 	override fun onCreate() {
 		applySavedMasterLocale(this)
 		super.onCreate()
+		MasterAppCheckInitializer.initialize(this)
 	}
 }

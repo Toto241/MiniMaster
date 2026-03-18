@@ -148,29 +148,52 @@ export const generateCustomToken = functions.https.onCall(
 );
 
 /**
- * Registers a master account for the authenticated user.
- * Creates a Firestore master document, assigns the "master" role claim,
- * and starts a 7-day free trial period.
+ * Registers a master account and returns a Firebase custom token for the
+ * canonical master identity. Existing master records are reused.
  */
 export const registerMasterDevice = functions.https.onCall(
   async (data: { imei: string }, context: CallableContext) => {
     const startTime = Date.now();
-    const masterId = requireAuth(context);
     const { imei } = data;
     if (!imei || typeof imei !== "string") {
       throw new functions.https.HttpsError("invalid-argument", "The function must be called with a valid 'imei' string.");
     }
 
+    const masterId = context.auth?.uid || imei;
+    if (context.auth && context.auth.uid !== imei) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Authenticated user does not match requested master device id."
+      );
+    }
+
     const masterDeviceRef = db().collection("masters").doc(masterId);
 
     try {
+      const authUser = await admin.auth().getUser(masterId).catch(async (error: { code?: string }) => {
+        if (error?.code === "auth/user-not-found") {
+          return admin.auth().createUser({ uid: masterId });
+        }
+        throw error;
+      });
+
       const doc = await masterDeviceRef.get();
       if (doc.exists) {
+        await admin.auth().setCustomUserClaims(masterId, {
+          ...(authUser.customClaims || {}),
+          role: "master",
+          masterImei: masterId,
+        });
+        const customToken = await admin.auth().createCustomToken(masterId, {
+          ...(authUser.customClaims || {}),
+          role: "master",
+          masterImei: masterId,
+        });
         await AuditLogger.logSuccess(
           "device.register", context, `masters/${masterId}`, "device",
           { imei, alreadyExists: true, duration: Date.now() - startTime }
         );
-        return { masterId: masterId };
+        return { masterId, customToken };
       }
 
       const now = admin.firestore.Timestamp.now();
@@ -188,7 +211,13 @@ export const registerMasterDevice = functions.https.onCall(
         },
       });
 
-      await admin.auth().setCustomUserClaims(masterId, { role: "master" });
+      const customClaims = {
+        ...(authUser.customClaims || {}),
+        role: "master",
+        masterImei: masterId,
+      };
+      await admin.auth().setCustomUserClaims(masterId, customClaims);
+      const customToken = await admin.auth().createCustomToken(masterId, customClaims);
 
       await AuditLogger.logSuccess(
         "device.register", context, `masters/${masterId}`, "device",
@@ -196,7 +225,7 @@ export const registerMasterDevice = functions.https.onCall(
       );
 
       functions.logger.info(`Master account registered for uid: ${masterId}`);
-      return { masterId: masterId };
+      return { masterId, customToken };
 
     } catch (error) {
       await AuditLogger.logFailure(
