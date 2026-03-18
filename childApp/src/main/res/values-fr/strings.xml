@@ -15,4 +15,13 @@
     
     <!-- Accessibility Service -->
     <string name="accessibility_service_description">Service de contrôle parental Mini-Master qui surveille l\'utilisation des applications et applique les règles de blocage pour assurer une utilisation sûre de l\'appareil pour les enfants.</string>
+
+    <!-- Permission onboarding disclosure -->
+    <string name="permission_title">Autorisation importante requise</string>
+    <string name="permission_disclosure_body">Mini-Master a besoin de l\'accès Accessibilité pour appliquer les règles parentales, comme le blocage d\'applications et le verrouillage basé sur les tâches. Le service observe l\'application active pour appliquer les règles en temps réel. Cet accès est utilisé uniquement pour les fonctions de contrôle parental.</string>
+    <string name="permission_disclosure_consent">Je comprends comment cette autorisation est utilisée pour le contrôle parental.</string>
+    <string name="permission_open_settings">Ouvrir les paramètres d\'accessibilité</string>
+    <string name="permission_confirm_enabled">J\'ai activé le service d\'accessibilité</string>
+    <string name="permission_status_opened_settings">Paramètres ouverts. Activez le service Mini-Master, puis revenez pour confirmer.</string>
+    <string name="permission_status_not_enabled">Le service d\'accessibilité n\'est pas encore activé. Activez-le d\'abord dans les paramètres système.</string>
 </resources>

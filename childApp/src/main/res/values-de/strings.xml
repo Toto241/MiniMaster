@@ -15,4 +15,13 @@
     
     <!-- Accessibility Service -->
     <string name="accessibility_service_description">Mini-Master Kindersicherungsdienst, der App-Nutzung überwacht und Sperrregeln durchsetzt, um sichere Gerätenutzung für Kinder zu gewährleisten.</string>
+
+    <!-- Permission onboarding disclosure -->
+    <string name="permission_title">Wichtige Berechtigung erforderlich</string>
+    <string name="permission_disclosure_body">Mini-Master benötigt Zugriff auf Bedienungshilfen, um Elternregeln wie App-Sperrung und aufgabenbasierte Sperren durchzusetzen. Der Dienst beobachtet die aktuell genutzte App, um Regeln in Echtzeit anzuwenden. Dieser Zugriff wird nur für Kinderschutz-Funktionen verwendet.</string>
+    <string name="permission_disclosure_consent">Ich verstehe, wie diese Berechtigung für die Kindersicherung verwendet wird.</string>
+    <string name="permission_open_settings">Bedienungshilfen öffnen</string>
+    <string name="permission_confirm_enabled">Ich habe den Bedienungshilfen-Dienst aktiviert</string>
+    <string name="permission_status_opened_settings">Einstellungen geöffnet. Aktivieren Sie den Mini-Master-Dienst und bestätigen Sie danach hier.</string>
+    <string name="permission_status_not_enabled">Der Bedienungshilfen-Dienst ist noch nicht aktiviert. Bitte zuerst in den Systemeinstellungen aktivieren.</string>
 </resources>

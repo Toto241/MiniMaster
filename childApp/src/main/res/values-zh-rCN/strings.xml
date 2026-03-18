@@ -13,4 +13,11 @@
     <string name="error_invalid_code">无效的配对码。</string>
     <string name="error_saving_child_id">保存设备ID时出错。</string>
     <string name="accessibility_service_description">Mini-Master 家长控制服务会监控应用使用情况并执行拦截规则，以确保儿童安全使用设备。</string>
+    <string name="permission_title">需要重要权限</string>
+    <string name="permission_disclosure_body">Mini-Master 需要无障碍权限来执行家长规则，例如应用拦截和基于任务的锁定。该服务会检测前台应用，以便实时应用规则。此权限仅用于家长控制功能。</string>
+    <string name="permission_disclosure_consent">我已了解该权限在家长控制中的用途。</string>
+    <string name="permission_open_settings">打开无障碍设置</string>
+    <string name="permission_confirm_enabled">我已启用无障碍服务</string>
+    <string name="permission_status_opened_settings">已打开设置。请启用 Mini-Master 无障碍服务，然后返回确认。</string>
+    <string name="permission_status_not_enabled">无障碍服务尚未启用。请先在系统设置中启用。</string>
 </resources>
