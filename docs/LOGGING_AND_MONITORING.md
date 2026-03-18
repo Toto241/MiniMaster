@@ -206,6 +206,11 @@ To implement TTL (Time-To-Live) policies:
 2. Add a `ttl` field to documents with expiration timestamp
 3. The extension automatically deletes expired documents
 
+Current backend status:
+- `audit_logs` entries now include a `ttl` timestamp at write time with a 90-day retention target.
+- `error_logs` entries now include a `ttl` timestamp at write time with a 60-day retention target.
+- `performance_metrics` still needs the same TTL field wiring before retention is fully consistent across all observability collections.
+
 ### Cloud Logging
 
 - Default retention: 30 days

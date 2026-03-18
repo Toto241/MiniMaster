@@ -11,6 +11,14 @@ import * as path from "path";
 import { db, storage } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 
+const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
+
+async function deleteQuerySnapshot(snapshot: FirebaseFirestore.QuerySnapshot): Promise<number> {
+  if (snapshot.empty) return 0;
+  await Promise.all(snapshot.docs.map((doc) => doc.ref.delete()));
+  return snapshot.size;
+}
+
 async function deleteMasterAccountById(masterId: string, context: CallableContext, startTime: number) {
   const masterDeviceRef = db().collection("masters").doc(masterId);
   const masterDoc = await masterDeviceRef.get();
@@ -18,17 +26,32 @@ async function deleteMasterAccountById(masterId: string, context: CallableContex
     throw new functions.https.HttpsError("not-found", "Master account not found.");
   }
 
-  const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
-  const deleteChildrenPromises = childrenSnapshot.docs.map((doc) => doc.ref.delete());
-  await Promise.all(deleteChildrenPromises);
-
   const tasksSnapshot = await db().collectionGroup("tasks").where("masterImei", "==", masterId).get();
-  const deleteTasksPromises = tasksSnapshot.docs.map((doc) => doc.ref.delete());
-  await Promise.all(deleteTasksPromises);
+  const tasksDeleted = await deleteQuerySnapshot(tasksSnapshot);
+
+  const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
+  const childrenDeleted = await deleteQuerySnapshot(childrenSnapshot);
 
   const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
-  const deleteSubsPromises = subsSnapshot.docs.map((doc) => doc.ref.delete());
-  await Promise.all(deleteSubsPromises);
+  const subscriptionsDeleted = await deleteQuerySnapshot(subsSnapshot);
+
+  const ticketsSnapshot = await db().collection("supportTickets").where("masterImei", "==", masterId).get();
+  const supportTicketsDeleted = await deleteQuerySnapshot(ticketsSnapshot);
+
+  const supportGrantsSnapshot = await db().collection("supportAccessGrants").where("masterImei", "==", masterId).get();
+  const supportGrantsDeleted = await deleteQuerySnapshot(supportGrantsSnapshot);
+
+  const legalConsentsSnapshot = await db().collection(LEGAL_CONSENTS_COLLECTION).where("masterImei", "==", masterId).get();
+  const legalConsentsDeleted = await deleteQuerySnapshot(legalConsentsSnapshot);
+
+  const auditLogsSnapshot = await db().collection("audit_logs").where("userId", "==", masterId).get();
+  const auditLogsDeleted = await deleteQuerySnapshot(auditLogsSnapshot);
+
+  const errorLogsSnapshot = await db().collection("error_logs").where("userId", "==", masterId).get();
+  const errorLogsDeleted = await deleteQuerySnapshot(errorLogsSnapshot);
+
+  const performanceMetricsSnapshot = await db().collection("performance_metrics").where("userId", "==", masterId).get();
+  const performanceMetricsDeleted = await deleteQuerySnapshot(performanceMetricsSnapshot);
 
   await masterDeviceRef.delete();
   await admin.auth().deleteUser(masterId);
@@ -36,8 +59,16 @@ async function deleteMasterAccountById(masterId: string, context: CallableContex
   await AuditLogger.logSuccess(
     "device.delete", context, `masters/${masterId}`, "device",
     {
-      masterId, childrenDeleted: childrenSnapshot.size,
-      tasksDeleted: tasksSnapshot.size, subscriptionsDeleted: subsSnapshot.size,
+      masterId,
+      childrenDeleted,
+      tasksDeleted,
+      subscriptionsDeleted,
+      supportTicketsDeleted,
+      supportGrantsDeleted,
+      legalConsentsDeleted,
+      auditLogsDeleted,
+      errorLogsDeleted,
+      performanceMetricsDeleted,
       duration: Date.now() - startTime,
     }
   );
@@ -245,6 +276,12 @@ export const exportUserData = functions.https.onCall(
       const ticketsSnapshot = await db().collection("supportTickets").where("masterImei", "==", masterId).get();
       const supportTickets = ticketsSnapshot.docs.map((t) => ({ id: t.id, ...t.data() }));
 
+      const supportGrantsSnapshot = await db().collection("supportAccessGrants").where("masterImei", "==", masterId).get();
+      const supportAccessGrants = supportGrantsSnapshot.docs.map((g) => ({ id: g.id, ...g.data() }));
+
+      const legalConsentsSnapshot = await db().collection(LEGAL_CONSENTS_COLLECTION).where("masterImei", "==", masterId).get();
+      const legalConsents = legalConsentsSnapshot.docs.map((c) => ({ id: c.id, ...c.data() }));
+
       const auditSnapshot = await db().collection("audit_logs")
         .where("userId", "==", masterId)
         .orderBy("timestamp", "desc")
@@ -259,6 +296,8 @@ export const exportUserData = functions.https.onCall(
         children: childrenData,
         subscriptions,
         supportTickets,
+        supportAccessGrants,
+        legalConsents,
         auditLogs,
       };
 

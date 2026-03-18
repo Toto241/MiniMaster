@@ -222,5 +222,18 @@ service cloud.firestore {
       allow read: if isOperator();
       allow write: if isAdmin();
     }
+
+    // --- LEGAL POLICY COLLECTIONS ---
+    // Policies are published through admin-only Cloud Functions and may be read by
+    // authenticated users for support/audit purposes.
+    match /legalPolicies/{policyId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can publish or retire policies
+    }
+
+    match /masterLegalConsents/{consentId} {
+      allow read: if isSignedIn() && (resource.data.masterImei == request.auth.uid || isAdmin() || isAuditor());
+      allow write: if false; // Only Cloud Functions can record or flag re-consent
+    }
   }
 }

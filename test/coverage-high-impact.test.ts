@@ -12,6 +12,10 @@ const state: {
   subscriptions: Record<string, DocData>;
   supportTickets: Record<string, DocData>;
   supportAccessGrants: Record<string, DocData>;
+  masterLegalConsents: Record<string, DocData>;
+  audit_logs: Record<string, DocData>;
+  error_logs: Record<string, DocData>;
+  performance_metrics: Record<string, DocData>;
 } = {
   masters: {},
   children: {},
@@ -20,6 +24,10 @@ const state: {
   subscriptions: {},
   supportTickets: {},
   supportAccessGrants: {},
+  masterLegalConsents: {},
+  audit_logs: {},
+  error_logs: {},
+  performance_metrics: {},
 };
 
 let autoId = 0;
@@ -42,6 +50,10 @@ function getCollectionMap(collection: string) {
   if (collection === "subscriptions") return state.subscriptions;
   if (collection === "supportTickets") return state.supportTickets;
   if (collection === "supportAccessGrants") return state.supportAccessGrants;
+  if (collection === "masterLegalConsents") return state.masterLegalConsents;
+  if (collection === "audit_logs") return state.audit_logs;
+  if (collection === "error_logs") return state.error_logs;
+  if (collection === "performance_metrics") return state.performance_metrics;
   return {} as Record<string, DocData>;
 }
 
@@ -118,18 +130,27 @@ const mockFirestore: any = {
   collection: (name: string) => ({
     doc: (id: string) => docRef(name, id),
     add: async (data: DocData) => {
-      const id = nextId(name === "supportTickets" ? "ticket" : "grant");
+      const id = nextId(name);
       getCollectionMap(name)[id] = { ...data };
       return { id, get: async () => snapshotOf(id, getCollectionMap(name)[id], docRef(name, id)) };
     },
-    where: (field: string, _op: string, value: any) => ({
-      get: async () => {
+    where: (field: string, _op: string, value: any) => {
+      const getMatchingDocs = () => {
         const docs = Object.entries(getCollectionMap(name))
           .filter(([, data]) => data && data[field] === value)
           .map(([id, data]) => snapshotOf(id, data, docRef(name, id)));
-        return querySnapshot(docs);
-      },
-    }),
+        return docs;
+      };
+
+      return {
+        get: async () => querySnapshot(getMatchingDocs()),
+        orderBy: (_orderField: string, _direction?: string) => ({
+          limit: (_limit: number) => ({
+            get: async () => querySnapshot(getMatchingDocs()),
+          }),
+        }),
+      };
+    },
   }),
   collectionGroup: (name: string) => ({
     where: (field: string, _op: string, value: any) => ({
@@ -273,6 +294,18 @@ beforeEach(() => {
   state.supportAccessGrants = {
     "grant-1": { masterImei: "m1", ticketId: "ticket-1", status: "active" },
   };
+  state.masterLegalConsents = {
+    "m1_DE_de-DE": { masterImei: "m1", country: "DE", locale: "de-DE" },
+  };
+  state.audit_logs = {
+    "audit-1": { userId: "m1", action: "auth.login" },
+  };
+  state.error_logs = {
+    "error-1": { userId: "m1", functionName: "deleteUserAccount" },
+  };
+  state.performance_metrics = {
+    "metric-1": { userId: "m1", functionName: "deleteUserAccount" },
+  };
 
   const expiresMs = Date.now() + 24 * 60 * 60 * 1000;
   const validUntil = admin.firestore.Timestamp.fromMillis(expiresMs);
@@ -320,8 +353,8 @@ describe("coverage high impact callable suite", () => {
     state.masters = {};
     state.children = {};
 
-    const regRes = await registerMasterDevice({ imei: "new-imei" }, asMaster);
-    expect(regRes).toEqual({ masterId: "m1" });
+    const regRes = await registerMasterDevice({ imei: "m1" }, asMaster);
+    expect(regRes).toEqual(expect.objectContaining({ masterId: "m1", customToken: "custom-token" }));
 
     const tokenRes = await generatePairingLink({}, asMaster);
     expect(typeof tokenRes.pairingToken).toBe("string");
@@ -358,6 +391,11 @@ describe("coverage high impact callable suite", () => {
     const res = await deleteUserAccount({}, asMaster);
     expect(res).toEqual({ success: true });
     expect(state.masters.m1).toBeUndefined();
+    expect(state.masterLegalConsents["m1_DE_de-DE"]).toBeUndefined();
+    expect(state.supportAccessGrants["grant-1"]).toBeUndefined();
+    expect(state.audit_logs["audit-1"]).toBeUndefined();
+    expect(state.error_logs["error-1"]).toBeUndefined();
+    expect(state.performance_metrics["metric-1"]).toBeUndefined();
     expect(authMock.deleteUser).toHaveBeenCalledWith("m1");
   });
 

@@ -133,3 +133,15 @@ Major Change (Re-Consent zwingend) wenn mindestens eines gilt:
 3. Web-Control Consent-Gate.
 4. ChildApp nur Hinweis (vertragliche Zustimmung bleibt beim Parent/Master).
 5. Monitoring und SLA fuer Consent-Fehler.
+
+## 10) DSAR / Loeschung
+
+Bei Account-Loeschung oder DSAR-Export muessen die nachfolgenden Collections einbezogen werden:
+
+1. `masterLegalConsents`
+2. `supportTickets`
+3. `supportAccessGrants`
+4. `audit_logs` (sofern rechtlich zulaessig bzw. nach definierter Ausnahmebehandlung)
+5. `error_logs` und `performance_metrics`, wenn sie nutzerbezogene Kennungen enthalten
+
+Damit ist sichergestellt, dass Compliance-Daten nicht ausserhalb des eigentlichen Master-Profils zurueckbleiben.

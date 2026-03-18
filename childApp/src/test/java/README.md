@@ -2,4 +2,15 @@
 
 This directory is intended to hold the unit tests for the `childApp` module.
 
-**Note:** As of the last review, this module has no unit tests. It is highly recommended to add tests to cover the application's ViewModels, Repositories, and other business logic to ensure code quality and prevent regressions.
+Current repository coverage in this module includes:
+
+- `PairingViewModelTest`
+- `AccessibilityServiceTest`
+- `ChildIdProviderImplTest`
+- `TaskStatusTest`
+
+Additional coverage is still recommended for:
+
+- repositories (`TaskRepository`, `OnboardingRepository`)
+- background/runtime behavior (`HeartbeatWorker`, `RuleSyncService`)
+- permission-loss and tamper-handling flows

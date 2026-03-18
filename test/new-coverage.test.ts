@@ -80,6 +80,8 @@ function resetState() {
     subscriptions: {},
     audit_logs: {},
     supportTickets: {},
+    supportAccessGrants: {},
+    masterLegalConsents: {},
   };
 }
 
@@ -266,12 +268,20 @@ describe("sendDailyErrorReport", () => {
 
 describe("exportUserData", () => {
   it("exportiert Benutzerdaten für gültigen Master (Admin)", async () => {
+    state.supportAccessGrants = {
+      grant1: { masterImei: "m1", ticketId: "ticket-1", status: "active" },
+    };
+    state.masterLegalConsents = {
+      consent1: { masterImei: "m1", country: "DE", locale: "de-DE", acceptedTermsVersion: "2026.03.18-1" },
+    };
     const wrapped = testEnv.wrap(fns.exportUserData);
     const result = await wrapped({ masterId: "m1" }, asAdmin);
 
     expect(result.success).toBe(true);
     expect(result.data.masterId).toBe("m1");
     expect(result.data.masterProfile).toBeDefined();
+    expect(result.data.supportAccessGrants).toHaveLength(1);
+    expect(result.data.legalConsents).toHaveLength(1);
   });
 
   it("wirft invalid-argument ohne masterId", async () => {

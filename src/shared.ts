@@ -7,6 +7,14 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const AUDIT_LOG_RETENTION_DAYS = 90;
+const ERROR_LOG_RETENTION_DAYS = 60;
+
+export function buildTtlTimestamp(retentionDays: number): admin.firestore.Timestamp {
+  return admin.firestore.Timestamp.fromMillis(Date.now() + (retentionDays * DAY_IN_MS));
+}
+
 // ==================== AUTH HELPERS ====================
 
 export function requireAuth(context: CallableContext): string {
@@ -142,6 +150,7 @@ export type AuditAction =
 
 export interface AuditLog {
   timestamp: admin.firestore.Timestamp;
+  ttl?: admin.firestore.Timestamp;
   userId: string;
   userRole: "master" | "child" | "admin" | "support" | "unknown";
   action: AuditAction;
@@ -179,6 +188,7 @@ export class AuditLogger {
         status,
         metadata,
         errorMessage: error?.message,
+        ttl: buildTtlTimestamp(AUDIT_LOG_RETENTION_DAYS),
       };
 
       await this.collection().add(logEntry);
@@ -263,6 +273,7 @@ export async function handleError(
     stack: error.stack,
     userId: context?.auth?.uid,
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    ttl: buildTtlTimestamp(ERROR_LOG_RETENTION_DAYS),
   };
 
   try {

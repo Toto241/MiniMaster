@@ -75,7 +75,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Show Gradle version
-        run: ./gradlew --version
+        run: ./scripts/run-android-checks.sh --version
 
       - name: Validate Android manifests
         run: |
@@ -98,7 +98,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Show Gradle version
-        run: ./gradlew --version
+        run: ./scripts/run-android-checks.sh --version
 
       - name: Test network access to Google Maven
         id: network-test
@@ -113,27 +113,27 @@ jobs:
 
       - name: Build (fail on deprecations in CI)
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew clean build -Dorg.gradle.warning.mode=all --continue --no-daemon
+        run: ./scripts/run-android-checks.sh clean build -Dorg.gradle.warning.mode=all --continue --no-daemon
 
       - name: Run Android unit tests
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew testDebugUnitTest --continue --no-daemon
+        run: ./scripts/run-android-checks.sh testDebugUnitTest --continue --no-daemon
 
       - name: Detekt
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew detektAll --continue --no-daemon
+        run: ./scripts/run-android-checks.sh detektAll --continue --no-daemon
 
       - name: Check Kotlin code style
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew ktlintCheck --continue --no-daemon
+        run: ./scripts/run-android-checks.sh ktlintCheck --continue --no-daemon
 
       - name: Build debug APKs
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew assembleDebug --continue --no-daemon
+        run: ./scripts/run-android-checks.sh assembleDebug --continue --no-daemon
 
       - name: Generate Jacoco report
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./gradlew jacocoTestReport --continue --no-daemon || echo "Jacoco not configured, skipping coverage"
+        run: ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon || echo "Jacoco not configured, skipping coverage"
 
       - name: Skip Android tests (Network Restricted)
         if: steps.network-test.outputs.google-maven-accessible == 'false'
@@ -189,7 +189,7 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_6
-          script: ./gradlew connectedDebugAndroidTest --continue --no-daemon
+          script: ./scripts/run-android-checks.sh connectedDebugAndroidTest --continue --no-daemon
       - name: Upload androidTest reports
         if: steps.network-test.outputs.google-maven-accessible == 'true'
         uses: actions/upload-artifact@v4
