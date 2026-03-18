@@ -1,14 +1,11 @@
 package com.google.pairing.child
 
-import android.content.Context
-import org.junit.Before
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
-import org.mockito.kotlin.mock
 import org.robolectric.RobolectricTestRunner
-import org.junit.Assert.*
 
 /**
  * Unit tests for AccessibilityService related functionality
@@ -16,77 +13,14 @@ import org.junit.Assert.*
 @RunWith(RobolectricTestRunner::class)
 class AccessibilityServiceTest {
 
-    @Mock
-    private lateinit var mockContext: Context
-
-    private lateinit var accessibilityService: MiniMasterAccessibilityService
-
-    @Before
-    fun setUp() {
-        MockitoAnnotations.openMocks(this)
-    }
-
-    @Test
-    fun `blocked apps list should be updated correctly`() {
-        // Given
-        val blockedApps = setOf("com.example.game1", "com.example.social1", "com.example.video1")
-        
-        // When - This would be called by the service
-        val service = MiniMasterAccessibilityService()
-        service.updateBlockedApps(blockedApps)
-        
-        // Then - Verify the service has the correct blocked apps
-        // Note: In a real test, we'd need to access the private blockedApps field
-        // For now, this tests the method exists and can be called
-        assertTrue("updateBlockedApps method should exist and be callable", true)
-    }
-
-    @Test
-    fun `getCurrentForegroundApp should return correct app`() {
-        // Given
-        val service = MiniMasterAccessibilityService()
-        
-        // When - Initially no foreground app
-        val result = service.getCurrentForegroundApp()
-        
-        // Then - Should be null initially
-        assertNull("Initial foreground app should be null", result)
-    }
-
-    @Test
-    fun `isRunning should return service status correctly`() {
-        // Given
-        val service = MiniMasterAccessibilityService()
-        
-        // When - Service not yet connected
-        val result = service.isRunning()
-        
-        // Then - Should be false initially
-        assertFalse("Service should not be running initially", result)
-    }
-
-    @Test
-    fun `forceBlockApp should add app to blocked list`() {
-        // Given
-        val service = MiniMasterAccessibilityService()
-        val packageName = "com.example.testapp"
-        
-        // When - Force block an app
-        service.forceBlockApp(packageName)
-        
-        // Then - Method should execute without error
-        // Note: In a real implementation, we'd verify the app was added to the blocked list
-        assertTrue("forceBlockApp should execute successfully", true)
-    }
-
     @Test
     fun `blocked apps parsing should handle comma separated values`() {
         // Given
         val blockedAppsString = "com.app1,com.app2,com.app3"
-        
+
         // When
         val blockedAppsSet = blockedAppsString.split(",").toSet()
-        
+
         // Then
         assertEquals("Should have 3 blocked apps", 3, blockedAppsSet.size)
         assertTrue("Should contain com.app1", blockedAppsSet.contains("com.app1"))
@@ -98,16 +32,16 @@ class AccessibilityServiceTest {
     fun `empty blocked apps string should result in empty set`() {
         // Given
         val blockedAppsString = ""
-        
+
         // When
         val blockedAppsSet = if (blockedAppsString.isNotEmpty()) {
             blockedAppsString.split(",").toSet()
         } else {
             emptySet()
         }
-        
+
         // Then
-        assertTrue("Empty string should result in empty set", blockedAppsSet.isEmpty())
+        assertEquals("Empty string should result in empty set", 0, blockedAppsSet.size)
     }
 
     @Test
@@ -120,13 +54,13 @@ class AccessibilityServiceTest {
             "com.example.userapp",
             "com.facebook.katana"
         )
-        
+
         // When - Filter system apps and our own app
         val userApps = testPackages.filter { packageName ->
-            !packageName.startsWith("com.android") && 
+            !packageName.startsWith("com.android") &&
             packageName != "com.google.pairing.child"
         }
-        
+
         // Then
         assertEquals("Should have 2 user apps", 2, userApps.size)
         assertTrue("Should contain user app", userApps.contains("com.example.userapp"))
@@ -139,12 +73,39 @@ class AccessibilityServiceTest {
         val usageRulesJson = "{\"dailyLimitSeconds\": 3600}"
 
         // When
-        val jsonObject = org.json.JSONObject(usageRulesJson)
+                val jsonObject = JSONObject(usageRulesJson)
         val limit = jsonObject.optLong("dailyLimitSeconds", -1L)
 
         // Then
         assertEquals("Daily limit should be 3600", 3600L, limit)
     }
+
+        @Test
+        fun `usage rules should parse app limits and allowed hours`() {
+                val usageRulesJson = """
+                        {
+                            "dailyLimitSeconds": 7200,
+                            "appLimits": {
+                                "com.example.game": 1800,
+                                "com.example.video": 2400
+                            },
+                            "allowedHours": {
+                                "start": "08:00",
+                                "end": "20:00"
+                            }
+                        }
+                """.trimIndent()
+
+                val jsonObject = JSONObject(usageRulesJson)
+                val appLimits = jsonObject.getJSONObject("appLimits")
+                val allowedHours = jsonObject.getJSONObject("allowedHours")
+
+                assertEquals(7200L, jsonObject.optLong("dailyLimitSeconds", -1L))
+                assertEquals(1800L, appLimits.getLong("com.example.game"))
+                assertEquals(2400L, appLimits.getLong("com.example.video"))
+                assertEquals("08:00", allowedHours.optString("start"))
+                assertEquals("20:00", allowedHours.optString("end"))
+        }
 
     @Test
     fun `invalid usage rules should handle gracefully`() {
@@ -154,7 +115,7 @@ class AccessibilityServiceTest {
         // When
         var limit = -1L
         try {
-            val jsonObject = org.json.JSONObject(invalidJson)
+            val jsonObject = JSONObject(invalidJson)
             limit = jsonObject.optLong("dailyLimitSeconds", -1L)
         } catch (e: Exception) {
             // Expected

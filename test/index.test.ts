@@ -100,7 +100,7 @@ describe("callable contracts", () => {
     getStub.mockResolvedValue({ exists: true, data: () => ({}) });
 
     const wrapped = testEnv.wrap(fns.getRulesForChild);
-    const result = await wrapped({ childId: "c1" });
+    const result = await wrapped({ childId: "c1" }, asChild);
 
     expect(result).toEqual({ isLocked: false, appBlacklist: [], usageRules: {} });
   });

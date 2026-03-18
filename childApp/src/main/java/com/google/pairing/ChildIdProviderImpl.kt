@@ -10,7 +10,7 @@ import android.content.SharedPreferences
  * This class should be initialized once when the app starts and the child
  * device is paired with a master.
  */
-class ChildIdProviderImpl(context: Context) : ChildIdProvider {
+class ChildIdProviderImpl(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(
         "MiniMasterPrefs",
         Context.MODE_PRIVATE
@@ -32,7 +32,7 @@ class ChildIdProviderImpl(context: Context) : ChildIdProvider {
      * Retrieves the stored child ID.
      * @return The child ID, or an empty string if not set.
      */
-    override fun getChildId(): String {
+    fun getChildId(): String {
         return prefs.getString(KEY_CHILD_ID, "") ?: ""
     }
 

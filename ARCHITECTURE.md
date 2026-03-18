@@ -27,9 +27,11 @@ A context diagram should be placed here, showing the main components and their i
 - **Purpose:** Receives rule state (lock flag, app blacklist structure, usage rules object), displays tasks, uploads photo proof, heartbeat ping.
 - **Tech:** Kotlin / Jetpack Compose / Hilt.
 - **Key Components (implemented):**
-  - `RuleSyncService` (FCM-triggered sync stub)
+  - `RuleSyncService` (FCM-triggered sync)
   - `HeartbeatWorker` (lastSeen updates)
-- **Missing / NOT implemented:** Accessibility / foreground monitoring service, app usage / screen-time enforcement, local policy cache & circuit-breaker logic.
+  - `MiniMasterAccessibilityService` (foreground monitoring, app blocking, usage limits)
+  - `BlockingOverlayService` (overlay-based app blocking)
+- **Remaining gaps:** Robust offline policy cache with conflict resolution, stronger anti-tamper hardening, and broader device-level E2E validation.
 
 ### 2.3. Firebase Backend
 
@@ -82,7 +84,7 @@ Phased approach recommended: (1) Introduce families collection w/ deny rules lif
 
 ## 6. Gaps & Future Work
 
-- Enforcement engine (Accessibility / usage metrics)
+- Hardening of enforcement engine (OEM-specific behavior, bypass resistance, battery optimization handling)
 - Subscription renewal / entitlement revocation scheduler
 - Photo proof validation (size/content)
 - Structured auth (token claims replacing raw secret keys)

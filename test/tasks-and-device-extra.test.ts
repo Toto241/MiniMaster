@@ -189,6 +189,27 @@ describe("setUsageRules", () => {
   });
 });
 
+describe("getRulesForChild", () => {
+  it("throws permission-denied when requester is neither owner nor child", async () => {
+    getMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ masterImei: "other-master", isLocked: true, appBlacklist: ["com.example"], usageRules: { dailyLimitSeconds: 10 } }),
+    });
+
+    const wrapped = testEnv.wrap(fns.getRulesForChild);
+    await expect(wrapped({ childId: "c1" }, asMaster)).rejects.toThrow(/Not authorized/);
+  });
+});
+
+describe("reportTamperEvent", () => {
+  it("throws permission-denied when childId does not match caller", async () => {
+    const wrapped = testEnv.wrap(fns.reportTamperEvent);
+    await expect(
+      wrapped({ childId: "c2", eventType: "accessibility_service_disabled", timestamp: Date.now() }, asChild)
+    ).rejects.toThrow(/not authorized/i);
+  });
+});
+
 describe("createTask", () => {
   it("creates task for authorized master", async () => {
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec" }) });

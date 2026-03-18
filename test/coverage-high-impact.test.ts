@@ -447,6 +447,6 @@ describe("coverage high impact callable suite", () => {
 
     await expect(
       provideSolutionFeedback({ ticketId: "ticket-foreign", feedback: "accepted" }, asMaster)
-    ).rejects.toThrow(/Failed to update ticket feedback/);
+    ).rejects.toThrow(/do not have permission/i);
   });
 });
