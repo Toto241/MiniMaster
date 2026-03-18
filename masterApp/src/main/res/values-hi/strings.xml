@@ -1,64 +1,54 @@
 <resources>
-    <!-- App name for the master (parent) application -->
-    <string name="app_name">MiniMaster (Master)</string>
+    <string name="app_name">MiniMaster (अभिभावक)</string>
 
-    <!-- Main UI strings -->
-    <string name="parent_device_setup">Parent Device Setup</string>
-    <string name="setup_description">First, we need to register this device as the primary parent controller. The app will use a stable app-scoped device ID.</string>
-    <string name="register_device">Register This Device</string>
-    <string name="registering_device">Registering device...</string>
+    <string name="parent_device_setup">अभिभावक डिवाइस सेटअप</string>
+    <string name="setup_description">पहले हमें इस डिवाइस को प्राथमिक अभिभावक नियंत्रक के रूप में पंजीकृत करना होगा। ऐप एक स्थिर, ऐप-स्कोप्ड डिवाइस आईडी का उपयोग करेगा।</string>
+    <string name="register_device">इस डिवाइस को पंजीकृत करें</string>
+    <string name="registering_device">डिवाइस पंजीकृत किया जा रहा है...</string>
 
-    <!-- Dashboard strings -->
-    <string name="paired_devices">Paired Devices</string>
-    <string name="child_id_label">Child ID: %1$s</string>
-    <string name="device_locked">Locked</string>
-    <string name="device_online">Online</string>
-    <string name="device_offline">Offline</string>
-    <string name="create_task">Create Task</string>
-    <string name="review_tasks">Review Tasks</string>
-    <string name="go_premium">Go Premium</string>
+    <string name="paired_devices">युग्मित डिवाइस</string>
+    <string name="child_id_label">बच्चे की आईडी: %1$s</string>
+    <string name="device_locked">लॉक्ड</string>
+    <string name="device_online">ऑनलाइन</string>
+    <string name="device_offline">ऑफलाइन</string>
+    <string name="create_task">कार्य बनाएं</string>
+    <string name="review_tasks">कार्यों की समीक्षा करें</string>
+    <string name="go_premium">प्रीमियम लें</string>
 
-    <!-- Pairing and link generation -->
-    <string name="generate_pairing_link">Generate Pairing Link</string>
-    <string name="generating_link">Generating link...</string>
-    <string name="retry_link_generation">Retry Link Generation</string>
-    <string name="link_generated_success">Link generated successfully!</string>
-    <string name="link_status">Link Status: %1$s</string>
+    <string name="generate_pairing_link">पेयरिंग लिंक जनरेट करें</string>
+    <string name="generating_link">लिंक जनरेट किया जा रहा है...</string>
+    <string name="retry_link_generation">लिंक जनरेशन फिर से करें</string>
+    <string name="link_generated_success">लिंक सफलतापूर्वक जनरेट हुआ!</string>
+    <string name="link_status">लिंक स्थिति: %1$s</string>
 
-    <!-- Task creation -->
-    <string name="create_new_task">Create New Task</string>
-    <string name="task_description">Task Description</string>
-    <string name="deadline_unix">Deadline (Unix Timestamp)</string>
-    <string name="cancel">Cancel</string>
+    <string name="create_new_task">नया कार्य बनाएं</string>
+    <string name="task_description">कार्य का विवरण</string>
+    <string name="deadline_unix">समय-सीमा (Unix टाइमस्टैम्प)</string>
+    <string name="cancel">रद्द करें</string>
 
-    <!-- Task review -->
-    <string name="review_completed_tasks">Review Completed Tasks</string>
-    <string name="no_tasks_to_review">No tasks to review.</string>
-    <string name="child_label">Child: %1$s</string>
-    <string name="proof_for_task">Proof for task: %1$s</string>
-    <string name="approve_task">Approve Task</string>
-    <string name="back_to_dashboard">Back to Dashboard</string>
+    <string name="review_completed_tasks">पूर्ण किए गए कार्यों की समीक्षा करें</string>
+    <string name="no_tasks_to_review">समीक्षा के लिए कोई कार्य नहीं है।</string>
+    <string name="child_label">बच्चा: %1$s</string>
+    <string name="proof_for_task">कार्य का प्रमाण: %1$s</string>
+    <string name="approve_task">कार्य स्वीकृत करें</string>
+    <string name="back_to_dashboard">डैशबोर्ड पर वापस जाएं</string>
 
-    <!-- Subscription -->
-    <string name="get_premium">Get Premium</string>
-    <string name="loading_subscription">Loading subscription options...</string>
-    <string name="subscribe_for_price">Subscribe for %1$s</string>
+    <string name="get_premium">प्रीमियम प्राप्त करें</string>
+    <string name="loading_subscription">सदस्यता विकल्प लोड किए जा रहे हैं...</string>
+    <string name="subscribe_for_price">%1$s में सदस्यता लें</string>
 
-    <!-- Error messages -->
-    <string name="failed_update_lock_state">Failed to update lock state. Please try again.</string>
-    <string name="failed_create_task">Failed to create task. Please try again.</string>
-    <string name="failed_approve_task">Failed to approve task. Please try again.</string>
-    <string name="unknown_error">An unknown error occurred.</string>
-    <string name="error_format">Error (%1$s): %2$s</string>
+    <string name="failed_update_lock_state">लॉक स्थिति अपडेट नहीं हो सकी। कृपया फिर से प्रयास करें।</string>
+    <string name="failed_create_task">कार्य नहीं बन सका। कृपया फिर से प्रयास करें।</string>
+    <string name="failed_approve_task">कार्य स्वीकृत नहीं हो सका। कृपया फिर से प्रयास करें।</string>
+    <string name="unknown_error">एक अज्ञात त्रुटि हुई।</string>
+    <string name="error_format">त्रुटि (%1$s): %2$s</string>
 
-    <!-- Debug info -->
-    <string name="debug_info">---- DEBUG INFO ----</string>
-    <string name="debug_imei">Device ID: %1$s</string>
-    <string name="debug_secret_key">Secret Key: %1$s</string>
-    <string name="debug_not_set">Not set</string>
+    <string name="debug_info">---- डीबग जानकारी ----</string>
+    <string name="debug_imei">डिवाइस आईडी: %1$s</string>
+    <string name="debug_secret_key">सीक्रेट की: %1$s</string>
+    <string name="debug_not_set">सेट नहीं है</string>
 
-    <!-- First start language setup -->
-    <string name="language_setup_title">Choose your app language</string>
-    <string name="language_setup_description">Select your preferred language for MiniMaster. You can change it later in a future settings screen.</string>
-    <string name="language_continue">Continue</string>
+    <string name="language_setup_title">ऐप की भाषा चुनें</string>
+    <string name="language_setup_description">MiniMaster के लिए अपनी पसंदीदा भाषा चुनें। आप इसे बाद में सेटिंग स्क्रीन में बदल सकते हैं।</string>
+    <string name="language_continue">जारी रखें</string>
 </resources>
