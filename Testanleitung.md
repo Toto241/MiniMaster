@@ -48,15 +48,14 @@ Hinweis: Neben dem im Dokument beschriebenen Token-Flow (einmaliger `pairingToke
 **Testfall M-01: Erfolgreiche Kopplung (Happy Path)**
 
 1.  Starten Sie die `masterApp` auf Gerät A.
-2.  Erteilen Sie die angeforderte `READ_PHONE_STATE`-Berechtigung.
-3.  Klicken Sie auf **"Register Device"**. In der Debug-Ansicht sollten die IMEI und ein `secretKey` erscheinen.
+3.  Klicken Sie auf **"Register Device"**. In der Debug-Ansicht sollten die Geräte-ID und ein `secretKey` erscheinen.
 4.  Klicken Sie auf **"Generate Pairing Link"**. Ein `pairingToken` wird in der Debug-Ansicht angezeigt.
 5.  Öffnen Sie auf Gerät B ein Terminal und führen Sie den folgenden `adb`-Befehl aus, um die `childApp` über den Deep Link zu starten. Ersetzen Sie `{TOKEN}` durch den eben generierten `pairingToken`.
     ```bash
-    adb shell am start -a android.intent.action.VIEW -d "minimaster://pair/{TOKEN}" com.google.pairing.child
+    adb shell am start -a android.intent.action.VIEW -d "minimaster://pair/{TOKEN}" com.google.pairing
     ```
-6.  Die `childApp` startet auf Gerät B. Erteilen Sie hier ebenfalls die `READ_PHONE_STATE`-Berechtigung.
-7.  **Erwartetes Ergebnis:** Die `childApp` zeigt kurz eine Ladeanzeige, navigiert dann zum Sperrbildschirm (`LockScreen`) und zeigt dort die IMEI von Gerät A als `childId` an. Die Kopplung war erfolgreich.
+6.  Die `childApp` startet auf Gerät B.
+7.  **Erwartetes Ergebnis:** Die `childApp` zeigt kurz eine Ladeanzeige und navigiert anschließend zum Sperrbildschirm (`LockScreen`). Die Kopplung war erfolgreich.
 
 ---
 
@@ -88,9 +87,9 @@ Hinweis: Neben dem im Dokument beschriebenen Token-Flow (einmaliger `pairingToke
 
 **Testfall M-05: Verweigerte Berechtigungen**
 
-1.  Starten Sie die `masterApp` oder `childApp`.
-2.  Wenn die Berechtigungsanfrage für `READ_PHONE_STATE` erscheint, verweigern Sie diese.
-3.  **Erwartetes Ergebnis:** Die jeweilige App zeigt eine Benachrichtigung an, dass die Berechtigung für die Kernfunktionalität notwendig ist. Der Kopplungsprozess kann nicht fortgesetzt werden.
+1.  Starten Sie die `childApp` und öffnen Sie den Onboarding-/Permission-Flow.
+2.  Verweigern Sie die für Enforcement relevanten Berechtigungen (z. B. Accessibility/Overlay je nach Gerät).
+3.  **Erwartetes Ergebnis:** Die App bleibt in einem eingeschränkten Zustand und zeigt an, dass ohne Freigabe keine vollständige Schutzfunktion aktiv ist.
 
 ---
 
@@ -154,8 +153,8 @@ Diese Tests laufen schnell auf der lokalen JVM und prüfen einzelne Komponenten 
 
 ### 3.3. Automatisierte UI-Tests (Instrumentiert)
 Diese Tests laufen auf einem Emulator/Gerät und prüfen UI-Flows innerhalb einer einzelnen App.
-*   **Befehl (Child-App):** `./gradlew :childApp:connectedAndroidTest`
-*   **Befehl (Master-App):** `./gradlew :masterApp:connectedAndroidTest`
+*   **Befehl (Child-App):** `./gradlew :childApp:connectedDebugAndroidTest`
+*   **Befehl (Master-App):** `./gradlew :masterApp:connectedDebugAndroidTest`
 
 ### 3.4. Automatisierter End-to-End-Test (Kit)
 Für das Projekt wurde ein vollautomatischer End-to-End-Test implementiert, der den gesamten Kopplungs-Flow über beide Apps hinweg überprüft. Dieser Test wird durch das Skript `run_e2e_test.sh` im Hauptverzeichnis des Projekts gesteuert.
@@ -165,7 +164,7 @@ Das Skript automatisiert die folgenden Schritte:
 1.  Es führt einen instrumentierten Test auf der `masterApp` aus, der einen echten Kopplungs-Token vom Backend generiert.
 2.  Der Token wird aus den Geräte-Logs (`logcat`) ausgelesen.
 3.  Die `childApp` wird per `adb`-Befehl über einen Deep-Link mit dem erhaltenen Token gestartet.
-4.  Zuletzt wird ein weiterer instrumentierter Test auf der `childApp` ausgeführt, der verifiziert, dass die App erfolgreich gekoppelt wurde und den Sperrbildschirm anzeigt.
+4.  Zuletzt wird ein weiterer instrumentierter Test auf der `childApp` ausgeführt, der verifiziert, dass die App erfolgreich gekoppelt wurde und den Sperrbildschirm anzeigt (`DeepLinkE2ETest`).
 
 **Voraussetzungen:**
 *   Ein Android-Gerät oder Emulator ist via `adb` verbunden.

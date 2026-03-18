@@ -139,7 +139,23 @@ Each source file is also thoroughly documented.
 The project has a comprehensive test suite to ensure code quality and stability.
 
 - **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
-- **Android:** The project is configured for unit tests (`/src/test`) and end-to-end instrumentation tests (`/src/androidTest`) which can be run via Android Studio.
+- **Android Lint (blocking for errors):** `./gradlew lint`
+- **Android Unit Tests:** `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
+- **Android Instrumentation Build:** `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
+- **Selected Connected Tests (requires running emulator/device):**
+    - `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
+    - `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
+
+### Validation Gate
+
+For repository validation after changes, run this sequence:
+
+1. `./gradlew lint`
+2. `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
+3. `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
+4. Optional full device validation:
+     - `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
+     - `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
 
 ## License
 
