@@ -607,6 +607,177 @@ function getMissingAttestations() {
         .map(item => item.label);
 }
 
+
+function getPriorityWeight(severity) {
+    if (severity === "critical") return 300;
+    if (severity === "high") return 200;
+    if (severity === "medium") return 100;
+    return 50;
+}
+
+function buildPrioritizedActionPlan() {
+    const validation = commissioningSummary?.validationSummary || null;
+    const validationChecks = validation?.checks || {};
+    const platformState = getPlatformReadiness();
+    const missingAttestations = commissioningAttestationItems.filter(item => !getCommissioningAttestations()[item.key]);
+    const steps = [];
+
+    if (!validation) {
+        steps.push({
+            id: "backend-validation-missing",
+            category: "Backend",
+            platform: "Operator Setup",
+            severity: "critical",
+            title: "Full Validation im Operator-Panel ausführen",
+            why: "Ohne Backend-Validierung bleibt unklar, ob Admin-Claims, Functions, Firestore und Runtime-Konfiguration produktionsbereit sind.",
+            action: "Im Setup-Tab zuerst 'Full Validation' starten und alle ERRORs vor weiteren Plattformarbeiten beseitigen.",
+        });
+    } else {
+        if (!validationChecks.adminAuthOk) {
+            steps.push({
+                id: "backend-admin-auth",
+                category: "Backend",
+                platform: "Operator Setup",
+                severity: "critical",
+                title: "Admin-Authentifizierung und Claims reparieren",
+                why: "Ohne gültigen Admin-Claim sind produktive Betreiberfunktionen blockiert.",
+                action: "Admin-Login prüfen, Role-Assignment erneut ausführen und Token/Claim-Refresh verifizieren.",
+            });
+        }
+        if (!validationChecks.functionsReachable) {
+            steps.push({
+                id: "backend-functions-reachable",
+                category: "Backend",
+                platform: "Operator Setup",
+                severity: "critical",
+                title: "Cloud Functions erreichbar machen",
+                why: "Wenn Functions nicht erreichbar sind, funktionieren Pairing, Geräteverwaltung und Support-Workflows nicht zuverlässig.",
+                action: "Firebase-Projekt, Region, Deploy-Status und callable Endpunkte prüfen; danach Validation erneut starten.",
+            });
+        }
+        if (!validationChecks.firestoreAccessOk) {
+            steps.push({
+                id: "backend-firestore-access",
+                category: "Backend",
+                platform: "Operator Setup",
+                severity: "critical",
+                title: "Firestore-Zugriff und Rollenrechte beheben",
+                why: "Fehlender Firestore-Zugriff blockiert Kernfunktionen wie Geräte-, Task- und Audit-Daten.",
+                action: "Rules, Admin-Session und Projektkonfiguration prüfen, bis die Collections lesbar sind.",
+            });
+        }
+        if (!validationChecks.storageHealthOk) {
+            steps.push({
+                id: "backend-storage-health",
+                category: "Backend",
+                platform: "Operator Setup",
+                severity: "high",
+                title: "Storage-Bucket für Foto-Uploads stabilisieren",
+                why: "Task-Beweisfotos und Support-Dateien hängen von funktionierendem Storage ab.",
+                action: "Bucket, Regeln und Service-Anbindung prüfen; danach Upload-Flows erneut testen.",
+            });
+        }
+        if (!validationChecks.webControlConfigReady) {
+            steps.push({
+                id: "backend-web-config",
+                category: "Backend",
+                platform: "Web / Setup",
+                severity: "high",
+                title: "Gemeinsame Firebase-Webkonfiguration vervollständigen",
+                why: "Solange die Bootstrap-Konfiguration fehlt, bleiben Admin-Panel und Web-Control nur eingeschränkt einsetzbar.",
+                action: "Shared Firebase Config lokal speichern und anschließend beide Panels erneut validieren.",
+            });
+        }
+    }
+
+    missingAttestations.forEach(item => {
+        steps.push({
+            id: `attestation-${item.key}`,
+            category: "Compliance",
+            platform: "Operator Setup",
+            severity: "high",
+            title: item.label,
+            why: "Diese manuelle Freigabe ist Teil des Go-Live-Gates und kann browserseitig nicht verlässlich automatisiert geprüft werden.",
+            action: "Nachweis prüfen, dokumentieren und anschließend im Setup-Tab als erledigt markieren.",
+        });
+    });
+
+    for (const platform of Object.values(platformReadinessItems)) {
+        for (const item of platform.items) {
+            if (platformState[item.key]) continue;
+            steps.push({
+                id: item.key,
+                category: platform.label,
+                platform: platform.label,
+                severity: item.severity,
+                title: item.label,
+                why: item.severity === "critical"
+                    ? "Dieser Punkt blockiert die Kernfunktion oder den sicheren Rollout der Plattform."
+                    : item.severity === "high"
+                        ? "Dieser Punkt ist für einen belastbaren Rollout sehr wichtig, aber nicht das allererste Go-Live-Gate."
+                        : "Dieser Punkt erhöht Qualität und Robustheit, kann aber nach den kritischen Themen folgen.",
+                action: `Nächster Umsetzungsschritt für ${platform.label}: diese Funktion implementieren/testen und danach in der Checkliste bestätigen.`,
+            });
+        }
+    }
+
+    const deduped = [];
+    const seen = new Set();
+    for (const step of steps) {
+        if (seen.has(step.id)) continue;
+        seen.add(step.id);
+        deduped.push(step);
+    }
+
+    deduped.sort((a, b) => {
+        const weightDiff = getPriorityWeight(b.severity) - getPriorityWeight(a.severity);
+        if (weightDiff !== 0) return weightDiff;
+        return a.title.localeCompare(b.title, "de");
+    });
+
+    return deduped.map((step, index) => ({
+        ...step,
+        order: index + 1,
+    }));
+}
+
+function renderPrioritizedActionPlan() {
+    const container = document.getElementById("prioritized-action-plan");
+    if (!container) return;
+
+    const steps = buildPrioritizedActionPlan();
+    if (steps.length === 0) {
+        container.innerHTML = "<div class='success-box'>Alle aktuell erfassten kritischen, hohen und mittleren Punkte sind abgearbeitet. Nächster Schritt: Final-Validation und Rollout.</div>";
+        return;
+    }
+
+    const topSteps = steps.slice(0, 12);
+    const html = topSteps.map(step => `
+        <div class="priority-plan-item priority-${escapeHtml(step.severity)}">
+            <div class="priority-plan-header">
+                <span class="priority-rank">#${step.order}</span>
+                <span class="priority-badge severity-${escapeHtml(step.severity)}">${escapeHtml(step.severity.toUpperCase())}</span>
+                <strong>${escapeHtml(step.title)}</strong>
+            </div>
+            <div class="priority-meta">${escapeHtml(step.platform)} · ${escapeHtml(step.category)}</div>
+            <p><strong>Warum jetzt:</strong> ${escapeHtml(step.why)}</p>
+            <p><strong>Nächster Schritt:</strong> ${escapeHtml(step.action)}</p>
+        </div>
+    `).join("");
+
+    const hiddenCount = steps.length - topSteps.length;
+    const summary = hiddenCount > 0
+        ? `<p class="muted-note">Es werden die wichtigsten ${topSteps.length} von ${steps.length} offenen Punkten angezeigt. Nach Abarbeitung bitte Bericht aktualisieren.</p>`
+        : `<p class="muted-note">Alle ${steps.length} offenen Punkte sind in Reihenfolge dargestellt.</p>`;
+
+    container.innerHTML = `
+        <div class="priority-plan-list">
+            ${summary}
+            ${html}
+        </div>
+    `;
+}
+
 // ==================== GO-LIVE AMPEL & PLATTFORM-TRACKER ====================
 
 const PLATFORM_ATTESTATION_STORAGE_KEY = "operatorPlatformReadiness";
@@ -710,7 +881,7 @@ function computeGoLiveStatus() {
     let totalAll = 0;
     let doneAll = 0;
 
-    for (const [platformKey, platform] of Object.entries(platformReadinessItems)) {
+    for (const platform of Object.values(platformReadinessItems)) {
         let pCritical = 0, pCriticalDone = 0, pHigh = 0, pHighDone = 0, pTotal = 0, pDone = 0;
         for (const item of platform.items) {
             pTotal++;
@@ -840,6 +1011,7 @@ function renderPlatformReadinessSection(platformKey) {
         checkbox.addEventListener("change", (e) => {
             updatePlatformReadiness({ [item.key]: e.target.checked });
             renderGoLiveAmpel();
+            renderPrioritizedActionPlan();
         });
 
         container.appendChild(wrapper);
@@ -851,6 +1023,7 @@ function renderAllPlatformSections() {
     renderPlatformReadinessSection("childApp");
     renderPlatformReadinessSection("desktop");
     renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
 }
 
 // ==================== PLAUSIBILITÄTSPRÜFUNG ====================
@@ -1167,6 +1340,7 @@ function toggleWizardStepDone(wizardId, stepIndex, done) {
         updatePlatformReadiness({ [wizard.steps[stepIndex].checkKey]: done });
         renderPlatformReadinessSection(wizardId === "masterApp" ? "masterApp" : "childApp");
         renderGoLiveAmpel();
+        renderPrioritizedActionPlan();
     }
     renderWizardStep(wizardId, stepIndex);
 }
@@ -1187,6 +1361,7 @@ function finishWizard(wizardId) {
     }
     activeWizard = null;
     renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
 }
 
 function resetWizard(wizardId) {
@@ -1565,6 +1740,7 @@ async function runCommissioningAssistant() {
         renderCommandCatalog(commissioningSummary.projectId);
         syncCommissioningChecklist(validationSummary);
         renderGoLiveAmpel();
+        renderPrioritizedActionPlan();
         showNotification(pending.length === 0 ? "Inbetriebnahme-Assistent erfolgreich abgeschlossen." : "Inbetriebnahme-Assistent ausgeführt. Offene Punkte im Bericht prüfen.", pending.length === 0 ? "success" : "info");
     } catch (error) {
         if (reportEl) {
@@ -1606,6 +1782,7 @@ function refreshCommissioningReport() {
     renderCommissioningReport(commissioningSummary);
     renderCommandCatalog(commissioningSummary.projectId);
     renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
 }
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -1614,6 +1791,7 @@ document.addEventListener("DOMContentLoaded", function() {
     renderCommandCatalog(firebaseConfig.projectId);
     renderAllPlatformSections();
     renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
 
     // Operator-Desktop-Modus Badge anzeigen
     if (isElectronOperator) {
@@ -1974,6 +2152,7 @@ function initializeSetupAssistant() {
     refreshCommissioningReport();
     renderCommandCatalog(firebaseConfig.projectId);
     renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {

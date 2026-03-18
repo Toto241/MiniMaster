@@ -952,6 +952,102 @@ input:focus, select:focus, textarea:focus {
     background: #f0fdf4;
 }
 
+
+.priority-plan-list {
+    display: grid;
+    gap: 12px;
+}
+
+.priority-plan-item {
+    border: 1px solid #cbd5e1;
+    border-left-width: 5px;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 14px;
+}
+
+.priority-plan-item.priority-critical {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+}
+
+.priority-plan-item.priority-high {
+    border-left-color: #d97706;
+    background: #fff7ed;
+}
+
+.priority-plan-item.priority-medium {
+    border-left-color: #2563eb;
+    background: #eff6ff;
+}
+
+.priority-plan-item.priority-low {
+    border-left-color: #475569;
+}
+
+.priority-plan-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-block-end: 6px;
+}
+
+.priority-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 28px;
+    padding-inline: 10px;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.priority-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.priority-badge.severity-critical {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.priority-badge.severity-high {
+    background: #fed7aa;
+    color: #9a3412;
+}
+
+.priority-badge.severity-medium {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.priority-badge.severity-low {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.priority-meta {
+    color: #475569;
+    font-size: 0.84rem;
+    margin-block-end: 8px;
+}
+
+.priority-plan-item p {
+    margin: 6px 0 0;
+}
+
 /* ==================== GO-LIVE AMPEL ==================== */
 
 .golive-ampel-card {
