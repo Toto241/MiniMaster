@@ -32,4 +32,13 @@
 
     <!-- Accessibility Service -->
     <string name="accessibility_service_description">Mini-Master parental control service that monitors app usage and enforces blocking rules to ensure safe device usage for children.</string>
+
+    <!-- Permission onboarding disclosure -->
+    <string name="permission_title">Important Permission Needed</string>
+    <string name="permission_disclosure_body">Mini-Master needs Accessibility access to enforce parental rules such as app blocking and task-based locks. The service observes foreground app usage to apply rules in real time. This access is used only for parental-control features.</string>
+    <string name="permission_disclosure_consent">I understand how this permission is used for parental control.</string>
+    <string name="permission_open_settings">Open Accessibility Settings</string>
+    <string name="permission_confirm_enabled">I enabled accessibility service</string>
+    <string name="permission_status_opened_settings">Settings opened. Enable Mini-Master accessibility service, then return and confirm.</string>
+    <string name="permission_status_not_enabled">Accessibility service is not enabled yet. Please enable it in system settings first.</string>
 </resources>
