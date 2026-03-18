@@ -14,12 +14,14 @@ This PR completes the following changes. Reviewers should pay attention to the a
 - If no FCM token is present for the child, a warning is logged and no notification is sent (no crash).
 
 **2. Firestore rules — task schema enforcement (`firestore.rules`)**
-- The previous implementation had a separate `allow create, update: if isSignedIn()` clause that allowed any authenticated user to write tasks. This has been replaced.
-- Task `create` is now gated by `isMasterOfChild()` **and** inline schema validation.
-- Task `update` is now gated by `isMasterOfChild() || isChildDevice()` **and** inline schema validation.
+- The previous implementation had a separate `allow create, update: if isSignedIn()` clause that allowed any authenticated user to write tasks. This has been **removed**.
+- Schema validation has been extracted into a shared `isValidTaskSchema()` helper function and is now enforced alongside ownership checks in the `allow create` and `allow update` clauses. This ensures a write is only permitted when the caller is the owner **and** the payload satisfies the schema — `isValidTaskSchema()` is deliberately not a standalone allow gate.
+- Task `create` is gated by `isMasterOfChild()` **and** inline schema validation.
+- Task `update` is gated by `isMasterOfChild() || isChildDevice()` **and** inline schema validation.
 - Accepted field set updated to match the actual data model: `description`, `deadline`, `status`, `photoUrl`, `createdAt`, `completedAt`, `updatedAt`, `masterImei`, `rejectionReason`.
 - Status values corrected to lowercase: `pending`, `pending_approval`, `approved`, `rejected`.
-- Optional fields (`photoUrl`, `rejectionReason`, `deadline`, timestamps) validated as the correct type when present.
+- Optional timestamp fields (`deadline`, `createdAt`, `completedAt`, `updatedAt`) are validated as `timestamp` type when present.
+- Optional string fields (`photoUrl`, `rejectionReason`) validated as the correct type when present.
 
 **3. New tests (`test/task-status-notifications.test.ts`, `test/firestore-rules.test.ts`)**
 - `test/task-status-notifications.test.ts` — new suite covering:

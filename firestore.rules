@@ -106,25 +106,39 @@ service cloud.firestore {
         return isSignedIn() && childId == request.auth.uid;
       }
 
-      allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
-      allow create: if isMasterOfChild(); // Only master can create tasks
-      allow update: if isMasterOfChild() || isChildDevice(); // Both can update (child submits proof, master reviews)
-      allow delete: if isMasterOfChild(); // Only master can delete tasks
+      // isValidTaskSchema() must always be used in conjunction with an ownership check
+      // (isMasterOfChild() or isChildDevice()). It is intentionally not a standalone gate —
+      // the standalone `isSignedIn()` clause was removed precisely to prevent unauthenticated
+      // or foreign-owner writes that would otherwise bypass ownership gating.
+      function isValidTaskSchema() {
+        let d = request.resource.data;
+        return d.keys().hasOnly([
+            'description', 'deadline', 'status', 'photoUrl', 'createdAt',
+            'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
+          ])
+          && d.description is string
+          && d.description.size() > 0
+          && d.description.size() < 1000
+          && d.status is string
+          && d.status in ['pending', 'pending_approval', 'approved', 'rejected']
+          && (!('photoUrl' in d) || d.photoUrl is string || d.photoUrl == null)
+          && (!('rejectionReason' in d) || d.rejectionReason is string)
+          && d.masterImei is string
+          && (!('deadline' in d) || d.deadline is timestamp)
+          && (!('createdAt' in d) || d.createdAt is timestamp)
+          && (!('completedAt' in d) || d.completedAt is timestamp)
+          && (!('updatedAt' in d) || d.updatedAt is timestamp);
+      }
 
-      // Validate task data structure when writing (matches Cloud Functions task lifecycle)
-      allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
-          'description', 'deadline', 'status', 'photoUrl', 'createdAt',
-          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
-        ])
-        && request.resource.data.description is string
-        && request.resource.data.description.size() > 0
-        && request.resource.data.description.size() < 1000
-        && request.resource.data.status is string
-        && request.resource.data.status in ['pending', 'pending_approval', 'approved', 'rejected']
-        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
-        && (!('rejectionReason' in request.resource.data) || request.resource.data.rejectionReason is string)
-        && request.resource.data.masterImei is string;
+      allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
+
+      // Only master can create tasks; schema validation is combined with the ownership check.
+      allow create: if isMasterOfChild() && isValidTaskSchema();
+
+      // Both master and child device can update; schema validation is combined with the ownership check.
+      allow update: if (isMasterOfChild() || isChildDevice()) && isValidTaskSchema();
+
+      allow delete: if isMasterOfChild(); // Only master can delete tasks
     }
 
     // --- PAIRING CODES COLLECTION ---

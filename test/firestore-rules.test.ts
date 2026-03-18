@@ -94,16 +94,16 @@ describe("Firestore Security Rules - Structural Validation", () => {
     });
 
     it("should deny writes to pairing codes from clients", () => {
-      const pairingSection = rulesContent.substring(
-        rulesContent.indexOf("match /pairingCodes/{codeId}")
-      );
+      const idx = rulesContent.indexOf("match /pairingCodes/{codeId}");
+      expect(idx).toBeGreaterThanOrEqual(0);
+      const pairingSection = rulesContent.substring(idx);
       expect(pairingSection).toContain("allow read, write: if false");
     });
 
     it("should deny writes to subscriptions from clients", () => {
-      const subSection = rulesContent.substring(
-        rulesContent.indexOf("match /subscriptions/{subscriptionId}")
-      );
+      const idx = rulesContent.indexOf("match /subscriptions/{subscriptionId}");
+      expect(idx).toBeGreaterThanOrEqual(0);
+      const subSection = rulesContent.substring(idx);
       expect(subSection).toContain("allow write: if false");
     });
   });
@@ -122,6 +122,31 @@ describe("Firestore Security Rules - Structural Validation", () => {
 
     it("should validate task proof field as photoUrl", () => {
       expect(rulesContent).toContain("photoUrl");
+    });
+
+    it("should type-check optional timestamp fields", () => {
+      // Verify that each of the four optional timestamp fields has an explicit `is timestamp` check.
+      expect(rulesContent).toContain("d.deadline is timestamp");
+      expect(rulesContent).toContain("d.createdAt is timestamp");
+      expect(rulesContent).toContain("d.completedAt is timestamp");
+      expect(rulesContent).toContain("d.updatedAt is timestamp");
+    });
+
+    it("should accept optional timestamp fields when absent", () => {
+      // Each timestamp check is guarded by a presence test so documents without the
+      // optional field still pass validation.
+      expect(rulesContent).toContain("!('deadline' in d)");
+      expect(rulesContent).toContain("!('createdAt' in d)");
+      expect(rulesContent).toContain("!('completedAt' in d)");
+      expect(rulesContent).toContain("!('updatedAt' in d)");
+    });
+
+    it("should validate task schema via a dedicated helper function", () => {
+      // The schema validation must be in a named helper so it cannot be used as a
+      // standalone allow gate (i.e., it must always be combined with an ownership check).
+      expect(rulesContent).toContain("function isValidTaskSchema()");
+      expect(rulesContent).toContain("isMasterOfChild() && isValidTaskSchema()");
+      expect(rulesContent).toContain("isChildDevice()) && isValidTaskSchema()");
     });
   });
 
