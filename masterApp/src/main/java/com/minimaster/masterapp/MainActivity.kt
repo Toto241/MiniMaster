@@ -1,17 +1,11 @@
 package com.minimaster.masterapp
 
-import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.telephony.TelephonyManager
 import android.util.Log
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
 import androidx.compose.material.CircularProgressIndicator
@@ -26,12 +20,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import java.util.UUID
 
 /**
  * The main and only activity for the Master App.
@@ -105,8 +99,7 @@ fun MasterAppNavigation(viewModel: MasterViewModel = hiltViewModel()) {
 /**
  * A screen that handles the initial registration of the master device.
  *
- * It prompts the user for necessary permissions (`READ_PHONE_STATE`) to get a unique
- * device ID, then calls the [MasterViewModel] to register the device with the backend.
+ * It derives a stable app-scoped device identifier and registers the master device.
  *
  * @param viewModel The [MasterViewModel] to handle the registration logic.
  * @param onRegistrationSuccess A callback invoked upon successful registration to trigger navigation.
@@ -115,23 +108,7 @@ fun MasterAppNavigation(viewModel: MasterViewModel = hiltViewModel()) {
 fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> Unit) {
     val context = LocalContext.current
     val registrationState by viewModel.registrationState.collectAsState()
-    var permissionStatus by remember { mutableStateOf("App needs permission to read device state.") }
-
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            val imei = getImei(context)
-            if (imei != null) {
-                permissionStatus = "Permission granted. Ready to register."
-                viewModel.registerDevice(imei)
-            } else {
-                permissionStatus = "Permission granted, but failed to retrieve IMEI."
-            }
-        } else {
-            permissionStatus = "Permission denied. Cannot retrieve IMEI."
-        }
-    }
+    var registrationHint by remember { mutableStateOf("Ready to register this device.") }
 
     // A side effect that triggers navigation once the registration state becomes Success.
     LaunchedEffect(registrationState) {
@@ -157,15 +134,12 @@ fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> 
             // Display UI based on the current registration state
             when (val state = registrationState) {
                 is RegistrationState.Idle, is RegistrationState.Error -> {
-                    val message = if (state is RegistrationState.Error) state.message else permissionStatus
+                    val message = if (state is RegistrationState.Error) state.message else registrationHint
                     Text(text = message, style = MaterialTheme.typography.body2, textAlign = TextAlign.Center, modifier = Modifier.padding(bottom = 24.dp))
                     Button(onClick = {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-                            val imei = getImei(context)
-                            if (imei != null) viewModel.registerDevice(imei) else permissionStatus = "Failed to retrieve IMEI."
-                        } else {
-                            requestPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
-                        }
+                        val deviceId = getStableMasterId(context)
+                        registrationHint = "Registering with app-scoped device ID."
+                        viewModel.registerDevice(deviceId)
                     }) {
                         Text(stringResource(R.string.register_device))
                     }
@@ -245,34 +219,31 @@ fun LinkGenerationSection(linkState: LinkGenerationState, onGenerateClick: () ->
 }
 
 /**
- * Retrieves the device's IMEI. This is a sensitive operation that requires the `READ_PHONE_STATE` permission.
+ * Returns a stable app-scoped identifier for master registration.
  *
- * Note: Accessing IMEI is restricted on modern Android versions and is used here for simplicity
- * as a unique identifier. Production apps should prefer less invasive, privacy-friendly identifiers.
+ * Preference order:
+ * 1. Cached identifier from SharedPreferences
+ * 2. ANDROID_ID if available
+ * 3. Random UUID fallback persisted for future runs
  *
  * @param context The application context.
- * @return The device's IMEI as a [String], or null if permission is not granted or an error occurs.
+ * @return A non-empty stable identifier for this app install.
  */
-@SuppressLint("HardwareIds")
-private fun getImei(context: Context): String? {
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-        Log.w("MasterApp", "READ_PHONE_STATE permission not granted.")
-        return null
+private fun getStableMasterId(context: Context): String {
+    val prefs = context.getSharedPreferences("master_identity", Context.MODE_PRIVATE)
+    val cachedId = prefs.getString("stable_master_id", null)
+    if (!cachedId.isNullOrBlank()) {
+        return cachedId
     }
-    return try {
-        val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // This will likely fail for non-system apps on Android 10+ and throw a SecurityException.
-            telephonyManager.imei
-        } else {
-            @Suppress("DEPRECATION")
-            telephonyManager.deviceId
-        }
-    } catch (e: SecurityException) {
-        Log.e("MasterApp", "Failed to get IMEI due to security exception.", e)
-        null
-    } catch (e: Exception) {
-        Log.e("MasterApp", "An unexpected error occurred while getting IMEI.", e)
-        null
+
+    val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+    val stableId = if (androidId.isNullOrBlank() || androidId == "9774d56d682e549c") {
+        "master-${UUID.randomUUID()}"
+    } else {
+        "android-$androidId"
     }
+
+    prefs.edit().putString("stable_master_id", stableId).apply()
+    Log.d("MasterApp", "Generated and persisted stable master device ID.")
+    return stableId
 }

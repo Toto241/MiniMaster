@@ -52,6 +52,7 @@ class TaskMonitoringService : Service() {
                 // Broadcast the task status so the AccessibilityService can enforce locks
                 // or unlock the device.
                 val broadcastIntent = Intent("com.google.pairing.TASK_STATUS_UPDATE")
+                broadcastIntent.setPackage(packageName)
                 broadcastIntent.putExtra("task_status", task?.status)
                 sendBroadcast(broadcastIntent)
             }
@@ -64,17 +65,12 @@ class TaskMonitoringService : Service() {
      * This is required for the service to keep running in the background on modern Android versions.
      */
     private fun startForegroundService() {
-        val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
                 "Task Monitoring",
                 NotificationManager.IMPORTANCE_LOW
             )
-        } else {
-            null
-        }
-
-        if (channel != null) {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }
 

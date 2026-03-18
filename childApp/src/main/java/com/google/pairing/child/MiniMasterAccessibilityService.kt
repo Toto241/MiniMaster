@@ -13,6 +13,7 @@ import android.provider.Settings
 import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import androidx.core.content.ContextCompat
 import com.google.pairing.LockScreen
 import com.google.pairing.MainActivity
 import com.google.pairing.R
@@ -128,9 +129,14 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        // Register the receiver
+        // Register as not exported since only in-app broadcasts are expected.
         val filter = IntentFilter("com.google.pairing.TASK_STATUS_UPDATE")
-        registerReceiver(taskStatusReceiver, filter)
+        ContextCompat.registerReceiver(
+            this,
+            taskStatusReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     /**

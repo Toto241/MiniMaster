@@ -6,6 +6,9 @@
     <string name="pairing_screen_title">Kopplungsbildschirm</string>
     <string name="pairing_code_input_label">Kopplungscode eingeben</string>
     <string name="pairing_button_text">Gerät koppeln</string>
+    <string name="pairing_status_idle">Bitte Kopplungscode eingeben oder Deep Link öffnen.</string>
+    <string name="pairing_status_loading">Kopplung wird verarbeitet...</string>
+    <string name="pairing_status_success">Gerät erfolgreich gekoppelt.</string>
     <string name="error_code_expired">Kopplungscode ist abgelaufen.</string>
     <string name="error_invalid_code">Ungültiger Kopplungscode.</string>
     <string name="error_saving_child_id">Fehler beim Speichern der Geräte-ID.</string>

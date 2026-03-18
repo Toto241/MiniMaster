@@ -4,7 +4,7 @@
     
     <!-- Main UI strings -->
     <string name="parent_device_setup">Elterngerät einrichten</string>
-    <string name="setup_description">Zuerst müssen wir dieses Gerät als primäre Elternkontrolle registrieren. Dies erfordert die Berechtigung, eine eindeutige Geräte-ID zu lesen.</string>
+    <string name="setup_description">Zuerst müssen wir dieses Gerät als primäre Elternkontrolle registrieren. Die App verwendet dafür eine stabile app-interne Geräte-ID.</string>
     <string name="register_device">Dieses Gerät registrieren</string>
     <string name="registering_device">Gerät wird registriert...</string>
     
@@ -35,6 +35,7 @@
     <string name="review_completed_tasks">Erledigte Aufgaben überprüfen</string>
     <string name="no_tasks_to_review">Keine Aufgaben zu überprüfen.</string>
     <string name="child_label">Kind: %1$s</string>
+    <string name="proof_for_task">Nachweis für Aufgabe: %1$s</string>
     <string name="approve_task">Aufgabe genehmigen</string>
     <string name="back_to_dashboard">Zurück zum Dashboard</string>
     
@@ -52,7 +53,7 @@
     
     <!-- Debug info -->
     <string name="debug_info">---- DEBUG-INFO ----</string>
-    <string name="debug_imei">IMEI: %1$s</string>
+    <string name="debug_imei">Geräte-ID: %1$s</string>
     <string name="debug_secret_key">Geheimer Schlüssel: %1$s</string>
     <string name="debug_not_set">Nicht gesetzt</string>
 </resources>

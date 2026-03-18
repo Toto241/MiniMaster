@@ -6,7 +6,11 @@
     <string name="pairing_screen_title">配对屏幕</string>
     <string name="pairing_code_input_label">输入配对码</string>
     <string name="pairing_button_text">配对设备</string>
+    <string name="pairing_status_idle">请输入配对码或打开深度链接。</string>
+    <string name="pairing_status_loading">正在处理配对...</string>
+    <string name="pairing_status_success">设备配对成功。</string>
     <string name="error_code_expired">配对码已过期。</string>
     <string name="error_invalid_code">无效的配对码。</string>
     <string name="error_saving_child_id">保存设备ID时出错。</string>
+    <string name="accessibility_service_description">Mini-Master 家长控制服务会监控应用使用情况并执行拦截规则，以确保儿童安全使用设备。</string>
 </resources>

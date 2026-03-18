@@ -4,7 +4,7 @@
     
     <!-- Main UI strings -->
     <string name="parent_device_setup">Configuration de l\'appareil parent</string>
-    <string name="setup_description">Tout d\'abord, nous devons enregistrer cet appareil en tant que contrôleur parent principal. Cela nécessite une autorisation pour lire un identifiant d\'appareil unique.</string>
+    <string name="setup_description">Tout d\'abord, nous devons enregistrer cet appareil en tant que contrôleur parent principal. L\'application utilise un identifiant d\'appareil stable propre à l\'application.</string>
     <string name="register_device">Enregistrer cet appareil</string>
     <string name="registering_device">Enregistrement de l\'appareil...</string>
     
@@ -35,6 +35,7 @@
     <string name="review_completed_tasks">Examiner les tâches terminées</string>
     <string name="no_tasks_to_review">Aucune tâche à examiner.</string>
     <string name="child_label">Enfant : %1$s</string>
+    <string name="proof_for_task">Preuve pour la tâche : %1$s</string>
     <string name="approve_task">Approuver la tâche</string>
     <string name="back_to_dashboard">Retour au tableau de bord</string>
     
@@ -52,7 +53,7 @@
     
     <!-- Debug info -->
     <string name="debug_info">---- INFO DE DÉBOGAGE ----</string>
-    <string name="debug_imei">IMEI : %1$s</string>
+    <string name="debug_imei">ID appareil : %1$s</string>
     <string name="debug_secret_key">Clé secrète : %1$s</string>
     <string name="debug_not_set">Non défini</string>
 </resources>
