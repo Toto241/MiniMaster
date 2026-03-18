@@ -53,7 +53,6 @@ class TaskMonitoringService : Service() {
                 // or unlock the device.
                 val broadcastIntent = Intent("com.google.pairing.TASK_STATUS_UPDATE")
                 broadcastIntent.putExtra("task_status", task?.status)
-                broadcastIntent.putExtra("unlock_duration", task?.unlockDuration)
                 sendBroadcast(broadcastIntent)
             }
         }
@@ -67,8 +66,8 @@ class TaskMonitoringService : Service() {
     private fun startForegroundService() {
         val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel(
-                NOTIFICATION_CHANNEL_ID, 
-                "Task Monitoring", 
+                NOTIFICATION_CHANNEL_ID,
+                "Task Monitoring",
                 NotificationManager.IMPORTANCE_LOW
             )
         } else {
