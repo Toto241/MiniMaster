@@ -158,6 +158,8 @@ After every production deploy, complete this sequence:
 6. Task proof upload and review work end-to-end.
 7. Support ticket creation and operator processing work.
 
+For final release approval, execute and archive the commissioning checklist in [docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md).
+
 ## 7. Evidence & Audit Trail
 
 For every SEV-1 / SEV-2 incident record:
