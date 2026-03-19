@@ -1,8 +1,8 @@
 # Readiness Scorecard (2026-03-19)
 
-Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared, subscription and legal coverage waves.
+Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared, subscription, legal and subscription branch-hardening waves.
 
-## Scoring Date: 2026-03-19 (Update #6)
+## Scoring Date: 2026-03-19 (Update #7)
 
 ---
 
@@ -12,8 +12,8 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 |-----------|-------|-----|----------|
 | Build gate green | 5 | 5 | `npm run build` passes (0 errors) |
 | Lint gate green | 5 | 5 | `npm run lint` passes (0 errors) |
-| Test gate green | 5 | 5 | 411/411 tests pass (20 suites) |
-| Coverage > 75% | 5 | 5 | Stmts 93.09%, Branch 79.25%, Funcs 92.74%, Lines 93.78% |
+| Test gate green | 5 | 5 | 415/415 tests pass (20 suites) |
+| Coverage > 75% | 5 | 5 | Stmts 94.08%, Branch 79.56%, Funcs 94.30%, Lines 94.83% |
 | CI artifact archiving | 4 | 5 | CI Runbook + CI Gate Stabilization Proof (5 konsekutive Runs) |
 
 ---
@@ -87,7 +87,7 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 
 | Maßnahme | Punkte | Nachweis |
 |----------|--------|----------|
-| Coverage-Boost: 78.5%→93.09% Stmts, 61%→79.25% Branch | +1 | zusätzliche Abdeckungswellen in branch-coverage-boost.test.ts, deep-coverage-gaps.test.ts, legal-admin-support-coverage.test.ts, new-coverage.test.ts, task-status-notifications.test.ts, triggers-v2-coverage.test.ts und tasks-and-device-extra.test.ts |
+| Coverage-Boost: 78.5%→94.08% Stmts, 61%→79.56% Branch | +1 | zusätzliche Abdeckungswellen in branch-coverage-boost.test.ts, deep-coverage-gaps.test.ts, legal-admin-support-coverage.test.ts, new-coverage.test.ts, task-status-notifications.test.ts, triggers-v2-coverage.test.ts und tasks-and-device-extra.test.ts |
 | Enforcement-Testautomation: 39 Backend-Tests | +4 | enforcement-automation.test.ts (Kategorien A-G) |
 | Compliance-Evidence-Bundle komplett | +2 | COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md |
 | CI-Gate-Stabilisierung dokumentiert | +2 | CI_GATE_STABILIZATION_PROOF_2026-03-19.md |
@@ -110,4 +110,4 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 
 ## Empfehlung
 
-**GO** — Score 94/100 übertrifft das 90%-Ziel deutlich. Alle automatisierten Gates sind grün und stabil; der aktuelle Nachweisstand liegt bei 411/411 Tests und 93.09% / 79.25% / 92.74% / 93.78% Coverage. Verbleibende 6 Punkte sind operative Aufgaben, die parallel zum Soft-Launch bearbeitet werden können.
+**GO** — Score 94/100 übertrifft das 90%-Ziel deutlich. Alle automatisierten Gates sind grün und stabil; der aktuelle Nachweisstand liegt bei 415/415 Tests und 94.08% / 79.56% / 94.30% / 94.83% Coverage. Verbleibende 6 Punkte sind operative Aufgaben, die parallel zum Soft-Launch bearbeitet werden können.

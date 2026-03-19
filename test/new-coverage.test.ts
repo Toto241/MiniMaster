@@ -218,6 +218,21 @@ beforeEach(() => {
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
+
+  (db as any).batch = jest.fn(() => {
+    const updates: Array<() => Promise<void>> = [];
+    return {
+      update: (ref: any, data: any) => {
+        updates.push(() => {
+          if (typeof ref.update === "function") {
+            return ref.update(data);
+          }
+          return Promise.resolve();
+        });
+      },
+      commit: () => Promise.all(updates.map((fn) => fn())),
+    };
+  });
 });
 
 afterAll(() => {
@@ -395,6 +410,8 @@ describe("checkExpiredSubscriptions", () => {
     const wrapped = testEnv.wrap(fns.checkExpiredSubscriptions);
     const result = await wrapped({});
     expect(result).toBeNull();
+    expect(activeRef.update).toHaveBeenCalled();
+    expect(trialRef.update).toHaveBeenCalled();
   });
 
   it("fängt Scheduler-Fehler ab und gibt null zurück", async () => {
@@ -473,6 +490,32 @@ describe("verifyPurchase edge cases", () => {
     await expect(wrapped({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster))
       .rejects.toThrow(/Master account not found/i);
   });
+
+  it("wirft permission-denied wenn Google Play Verifikation fehlschlägt", async () => {
+    const wrapped = testEnv.wrap(fns.verifyPurchase);
+    await expect(wrapped({ purchaseToken: "pt-invalid", sku: "single_child_monthly" }, asMaster))
+      .rejects.toThrow(/Purchase verification failed/i);
+  });
+
+  it("reicht unerwartete Datenbankfehler aus verifyPurchase weiter", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "masters") {
+        return {
+          ...base,
+          doc: jest.fn(() => ({
+            get: jest.fn().mockRejectedValue(new Error("master read failed")),
+          })),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.verifyPurchase);
+    await expect(wrapped({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster))
+      .rejects.toThrow(/master read failed/i);
+  });
 });
 
 describe("revokeSubscription edge cases", () => {
@@ -493,6 +536,34 @@ describe("revokeSubscription edge cases", () => {
     const wrapped = testEnv.wrap(fns.revokeSubscription);
     await expect(wrapped({ subscriptionId: "sub-orphan" }, asAdmin))
       .rejects.toThrow(/Master account not found for subscription revocation/i);
+  });
+
+  it("wirft not-found bei unbekannter subscriptionId", async () => {
+    const wrapped = testEnv.wrap(fns.revokeSubscription);
+    await expect(wrapped({ subscriptionId: "missing-sub" }, asAdmin))
+      .rejects.toThrow(/Subscription not found/i);
+  });
+
+  it("wrappt unerwartete revoke-Fehler als internal", async () => {
+    state.subscriptions.sub1 = { masterId: "m1", status: "active" };
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "masters") {
+        return {
+          ...base,
+          doc: jest.fn(() => ({
+            update: jest.fn().mockRejectedValue(new Error("master update failed")),
+          })),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.revokeSubscription);
+    await expect(wrapped({ subscriptionId: "sub1" }, asAdmin))
+      .rejects.toThrow(/Failed to revoke subscription/i);
   });
 });
 
