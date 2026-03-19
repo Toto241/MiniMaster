@@ -171,6 +171,41 @@
     .btn-copy:hover { background: var(--primary); }
     .btn-copy.copied { background: var(--green); }
 
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+    .modal {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: min(480px, 92vw);
+      box-shadow: 0 20px 60px rgba(15,23,42,0.25);
+    }
+    .modal h3 { margin: 0 0 6px; font-size: 1.15rem; color: var(--ink); }
+    .modal .modal-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 18px; }
+    .modal label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--ink); margin: 10px 0 3px; }
+    .modal input {
+      width: 100%; box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1.5px solid rgba(15,23,42,0.12);
+      border-radius: 8px;
+      font-family: "Cascadia Code","Consolas",monospace;
+      font-size: 0.84rem;
+      transition: border-color .15s;
+    }
+    .modal input:focus { outline: none; border-color: var(--primary); }
+    .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-status { margin-top: 12px; font-size: 0.84rem; padding: 8px 12px; border-radius: 8px; display: none; }
+    .modal-status.success { display: block; background: #ecfdf5; color: #065f46; }
+    .modal-status.error { display: block; background: #fef2f2; color: #991b1b; }
+
     /* Info Bar */
     .info-bar {
       width: min(980px, 100%);
@@ -214,6 +249,7 @@
       <div class="actions">
         <a class="btn btn-purple" href="admin-panel/index.html">Admin öffnen</a>
         <a class="btn btn-outline" href="admin-panel/logs.html">Audit-Logs</a>
+        <button class="btn btn-outline" onclick="openFirebaseModal()">🔥 Firebase-Config laden</button>
       </div>
     </article>
 
@@ -261,7 +297,84 @@
   <div class="footer">
     MiniMaster v1.0 · <a href="README.md">Dokumentation</a> · <a href="API_DOCUMENTATION.md">API-Referenz</a> · <a href="ARCHITECTURE.md">Architektur</a>
   </div>
+  <!-- Firebase Config Modal -->
+  <div class="modal-overlay" id="fb-modal">
+    <div class="modal">
+      <h3>🔥 Firebase-Konfiguration</h3>
+      <p class="modal-sub">Werte werden direkt ins Operator Dashboard (localStorage) übernommen.</p>
+      <label for="fb-apiKey">API Key</label>
+      <input id="fb-apiKey" value="AIzaSyCDeDL5QEyuwiwBFnkaAv07BnmRtmvD6q0">
+      <label for="fb-authDomain">Auth Domain</label>
+      <input id="fb-authDomain" value="minimaster-28fbd.firebaseapp.com">
+      <label for="fb-projectId">Project ID</label>
+      <input id="fb-projectId" value="minimaster-28fbd">
+      <label for="fb-storageBucket">Storage Bucket</label>
+      <input id="fb-storageBucket" value="minimaster-28fbd.firebasestorage.app">
+      <label for="fb-messagingSenderId">Messaging Sender ID</label>
+      <input id="fb-messagingSenderId" value="716142639488">
+      <label for="fb-appId">App ID <span style="font-weight:400;color:var(--muted)">(Web-App aus Firebase Console)</span></label>
+      <input id="fb-appId" placeholder="1:716142639488:web:xxxxxxxxxx">
+      <div class="modal-status" id="fb-status"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeFirebaseModal()">Abbrechen</button>
+        <button class="btn btn-purple" onclick="saveFirebaseConfig()">💾 Ins Dashboard speichern</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // --- Firebase Config Modal ---
+    function openFirebaseModal() {
+      // Try to load existing config from localStorage
+      try {
+        var existing = localStorage.getItem('operatorFirebaseConfigOverride');
+        if (existing) {
+          var cfg = JSON.parse(existing);
+          if (cfg.apiKey) document.getElementById('fb-apiKey').value = cfg.apiKey;
+          if (cfg.authDomain) document.getElementById('fb-authDomain').value = cfg.authDomain;
+          if (cfg.projectId) document.getElementById('fb-projectId').value = cfg.projectId;
+          if (cfg.storageBucket) document.getElementById('fb-storageBucket').value = cfg.storageBucket;
+          if (cfg.messagingSenderId) document.getElementById('fb-messagingSenderId').value = cfg.messagingSenderId;
+          if (cfg.appId) document.getElementById('fb-appId').value = cfg.appId;
+        }
+      } catch(e) { /* ignore */ }
+      document.getElementById('fb-status').className = 'modal-status';
+      document.getElementById('fb-modal').classList.add('open');
+    }
+    function closeFirebaseModal() {
+      document.getElementById('fb-modal').classList.remove('open');
+    }
+    function saveFirebaseConfig() {
+      var fields = ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'];
+      var ids = ['fb-apiKey','fb-authDomain','fb-projectId','fb-storageBucket','fb-messagingSenderId','fb-appId'];
+      var config = {};
+      var statusEl = document.getElementById('fb-status');
+      for (var i = 0; i < fields.length; i++) {
+        var val = document.getElementById(ids[i]).value.trim();
+        if (!val || val.includes('your-')) {
+          statusEl.textContent = 'Bitte alle Felder ausfüllen (keine Platzhalter).';
+          statusEl.className = 'modal-status error';
+          document.getElementById(ids[i]).focus();
+          return;
+        }
+        config[fields[i]] = val;
+      }
+      try {
+        localStorage.setItem('operatorFirebaseConfigOverride', JSON.stringify(config));
+        statusEl.textContent = '✅ Firebase-Konfiguration gespeichert! Das Operator Dashboard verwendet diese Werte beim nächsten Laden.';
+        statusEl.className = 'modal-status success';
+        setTimeout(closeFirebaseModal, 2500);
+      } catch(e) {
+        statusEl.textContent = 'Fehler beim Speichern: ' + e.message;
+        statusEl.className = 'modal-status error';
+      }
+    }
+    // Close modal on overlay click
+    document.getElementById('fb-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeFirebaseModal();
+    });
+
+    // --- APK Path Copy ---
     function copyPath(elementId) {
       const codeEl = document.getElementById(elementId);
       const relativePath = codeEl.textContent;
