@@ -1825,6 +1825,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (user) {
                 user.getIdTokenResult(true).then(idTokenResult => {
                     const role = idTokenResult.claims.role;
+                    console.log("Auth state: user=" + user.email + ", role=" + (role || "none"));
                     if (role === "admin" || role === "support" || role === "auditor") {
                         currentUserRole = role;
                         showDashboard(user);
@@ -1833,8 +1834,12 @@ document.addEventListener("DOMContentLoaded", function() {
                         if (role === "admin") initializeSetupAssistant();
                     } else {
                         // User is authenticated but has no operator role -> show phase 3
+                        console.warn("User has no operator role. Showing admin activation phase.");
                         showAdminActivationPhase(user);
                     }
+                }).catch(err => {
+                    console.error("Token refresh failed:", err);
+                    showNotification("Token-Prüfung fehlgeschlagen: " + err.message, "error");
                 });
             } else {
                 currentUserRole = null;
@@ -1939,28 +1944,28 @@ function renderAdminActivationContent(user) {
             </p>
         </div>
 
-        <div class="admin-info-box" style="background: #f8fafc; border-color: #e2e8f0;">
-            <h4>So erhalten Sie Admin-Zugang</h4>
-            <p><strong>Ersteinrichtung (noch kein Admin vorhanden):</strong></p>
-            <ol>
-                <li>Öffnen Sie ein Terminal im MiniMaster-Projektordner</li>
-                <li>Führen Sie folgenden Befehl aus:<br>
-                    <code style="background:#0f172a;color:#e2e8f0;padding:4px 8px;border-radius:4px;display:inline-block;margin-block-start:4px">node scripts/setup-admin.js ${escapeHtml(user.email || "ihre@email.de")} IhrPasswort</code>
-                </li>
-                <li>Kehren Sie zum Dashboard zurück und klicken Sie auf <strong>Zugang prüfen</strong></li>
-            </ol>
-            <p style="margin-block-start: 12px"><strong>Zusätzlicher Operator (Admin existiert bereits):</strong></p>
-            <ol>
-                <li>Bitten Sie den vorhandenen Admin, im Dashboard unter <em>Einrichtung → Rollenverwaltung</em> Ihre UID einzutragen</li>
-                <li>Ihre UID: <code style="background:#0f172a;color:#e2e8f0;padding:2px 6px;border-radius:4px">${escapeHtml(user.uid)}</code></li>
-            </ol>
+        <div class="admin-info-box" style="background: #f0fdf4; border-color: #bbf7d0;">
+            <h4>🚀 Ersteinrichtung — Admin-Zugang direkt aktivieren</h4>
+            <p>
+                Falls dies die <strong>erste Einrichtung</strong> ist und noch kein Admin existiert,
+                können Sie sich direkt als Admin aktivieren:
+            </p>
+            <div class="phase-actions" style="margin-block-start: 12px">
+                <button onclick="bootstrapFirstAdminAction()" class="btn btn-primary" id="btn-bootstrap-admin">
+                    🔑 Als ersten Admin aktivieren
+                </button>
+            </div>
+            <div id="bootstrap-admin-status" class="phase-status" style="margin-block-start: 8px"></div>
         </div>
 
-        <div class="admin-waiting-hint">
-            <span style="font-size:1.3rem">⏳</span>
+        <div class="admin-info-box" style="background: #f8fafc; border-color: #e2e8f0;">
+            <h4>Zusätzlicher Operator (Admin existiert bereits)</h4>
             <p>
-                Nachdem die Berechtigung gesetzt wurde, klicken Sie auf <strong>Zugang prüfen</strong>,
-                um Ihren Status neu zu laden. Es kann einige Sekunden dauern, bis die Änderung wirksam wird.
+                Bitten Sie den vorhandenen Admin, im Dashboard unter <em>Einrichtung → Rollenverwaltung</em>
+                Ihre UID einzutragen:
+            </p>
+            <p style="margin-block-start: 8px">
+                Ihre UID: <code style="background:#0f172a;color:#e2e8f0;padding:2px 6px;border-radius:4px">${escapeHtml(user.uid)}</code>
             </p>
         </div>
 
@@ -2004,6 +2009,41 @@ async function recheckAdminAccess() {
     }
 }
 
+async function bootstrapFirstAdminAction() {
+    const btn = document.getElementById("btn-bootstrap-admin");
+    const statusEl = document.getElementById("bootstrap-admin-status");
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ Wird aktiviert...";
+    }
+
+    try {
+        const bootstrapFunc = functions.httpsCallable("bootstrapFirstAdmin");
+        const result = await bootstrapFunc({});
+
+        if (statusEl) {
+            statusEl.innerHTML = `<div class="admin-success-box">
+                <h4>✅ ${escapeHtml(result.data.message)}</h4>
+                <button onclick="window.location.reload()" class="btn btn-primary" style="margin-top:8px">Dashboard öffnen</button>
+            </div>`;
+        }
+        showNotification("Admin-Zugang aktiviert!", "success");
+    } catch (err) {
+        let msg = err.message || "Unbekannter Fehler";
+        if (err.code === "permission-denied") {
+            msg = "Es existiert bereits ein Admin. Bitten Sie den bestehenden Admin, Ihnen eine Rolle zuzuweisen.";
+        } else if (err.code === "unauthenticated") {
+            msg = "Sie müssen angemeldet sein. Bitte registrieren oder einloggen.";
+        }
+        if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "🔑 Als ersten Admin aktivieren";
+        }
+    }
+}
+
 // ==================== REGISTRATION ====================
 
 async function handleRegistration(event) {
@@ -2032,16 +2072,20 @@ async function handleRegistration(event) {
     try {
         await auth.createUserWithEmailAndPassword(email, password);
         // onAuthStateChanged will handle the transition to phase 3
-        if (statusEl) statusEl.innerHTML = "<div class='success-box'>Konto erfolgreich erstellt!</div>";
+        if (statusEl) statusEl.innerHTML = "<div class='success-box'>✅ Konto erstellt! Sie werden weitergeleitet...</div>";
+        showNotification("Konto erstellt! Jetzt wird die Admin-Berechtigung benötigt (Schritt 3).", "success");
     } catch (error) {
         let msg = error.message;
         if (error.code === "auth/email-already-in-use") {
-            msg = "Diese E-Mail-Adresse wird bereits verwendet. Bitte melden Sie sich stattdessen an.";
+            msg = "Diese E-Mail-Adresse wird bereits verwendet. Wechseln Sie zu 'Bestehendes Konto nutzen'.";
         } else if (error.code === "auth/weak-password") {
             msg = "Das Passwort ist zu schwach. Verwenden Sie mindestens 8 Zeichen mit Buchstaben und Zahlen.";
         } else if (error.code === "auth/invalid-email") {
             msg = "Die E-Mail-Adresse ist ungültig.";
+        } else if (error.code === "auth/network-request-failed") {
+            msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
         }
+        console.error("Registration error:", error.code, error.message);
         if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
     } finally {
         submitBtn.disabled = false;
@@ -2061,7 +2105,7 @@ function handleLogin(event) {
 
     auth.signInWithEmailAndPassword(email, password)
         .then(() => {
-            if (statusEl) statusEl.innerHTML = "";
+            if (statusEl) statusEl.innerHTML = "<div class='success-box'>✅ Anmeldung erfolgreich...</div>";
         })
         .catch(error => {
             let msg = error.message;
@@ -2069,7 +2113,10 @@ function handleLogin(event) {
                 msg = "E-Mail oder Passwort ungültig.";
             } else if (error.code === "auth/too-many-requests") {
                 msg = "Zu viele Versuche. Bitte warten Sie einen Moment.";
+            } else if (error.code === "auth/network-request-failed") {
+                msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
             }
+            console.error("Login error:", error.code, error.message);
             if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
         });
 }
@@ -2507,10 +2554,12 @@ function exportSetupReport() {
 
 function saveBootstrapFirebaseConfig() {
     try {
-        persistBootstrapFirebaseConfig(true);
+        persistBootstrapFirebaseConfig(false);
         refreshCommissioningReport();
         renderCommandCatalog(firebaseConfig.projectId);
-        showNotification("Firebase-Webkonfiguration lokal gespeichert.", "success");
+        showNotification("Firebase-Konfiguration gespeichert. Verbindung wird hergestellt...", "success");
+        // Auto-initialize Firebase in-place to avoid confusing reload requirement
+        initializeFirebaseAfterConfigSave();
     } catch (error) {
         showNotification(error.message, "error");
     }
@@ -2522,6 +2571,55 @@ function reloadWithBootstrapConfig() {
         window.location.reload();
     } catch (error) {
         showNotification(error.message, "error");
+    }
+}
+
+function initializeFirebaseAfterConfigSave() {
+    // If Firebase already initialized, just reload
+    if (app) {
+        window.location.reload();
+        return;
+    }
+
+    try {
+        app = firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.firestore();
+        functions = firebase.functions();
+
+        document.getElementById("login-form").addEventListener("submit", handleLogin);
+        const registerForm = document.getElementById("register-form");
+        if (registerForm) {
+            registerForm.addEventListener("submit", handleRegistration);
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                user.getIdTokenResult(true).then(idTokenResult => {
+                    const role = idTokenResult.claims.role;
+                    if (role === "admin" || role === "support" || role === "auditor") {
+                        currentUserRole = role;
+                        showDashboard(user);
+                        applyRoleRestrictions(role);
+                        loadDashboardData();
+                        if (role === "admin") initializeSetupAssistant();
+                    } else {
+                        showAdminActivationPhase(user);
+                    }
+                });
+            } else {
+                currentUserRole = null;
+                showOnboarding();
+            }
+        });
+
+        updateOnboardingStepper(2);
+        showOnboardingPhase(2);
+        console.log("Firebase initialized after config save.");
+        showNotification("Firebase verbunden! Bitte melden Sie sich an oder erstellen Sie ein Konto.", "success");
+    } catch (error) {
+        console.error("Firebase initialization after config save failed:", error);
+        showNotification("Firebase-Initialisierung fehlgeschlagen: " + error.message + ". Versuche Seite neu zu laden.", "error");
     }
 }
 
