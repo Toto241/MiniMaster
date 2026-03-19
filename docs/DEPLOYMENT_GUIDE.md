@@ -8,7 +8,7 @@ Diese Anleitung beschreibt den aktuellen Deploy- und Inbetriebnahmepfad fuer Bac
 
 1. Firebase-Projekt mit Blaze-Tarif
 2. Firebase CLI installiert (`npm install -g firebase-tools`)
-3. Node.js 18+
+3. Node.js 22
 4. Lokaler Checkout von `main`
 
 ## 2. Lokale Vorbereitung

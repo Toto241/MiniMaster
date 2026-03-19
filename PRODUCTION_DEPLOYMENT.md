@@ -7,7 +7,7 @@ Diese Anleitung beschreibt den aktuellen, produktionsnahen Rollout fuer MiniMast
 ## 1. Voraussetzungen
 
 - Firebase Projekt (Blaze Plan)
-- Node.js 18+
+- Node.js 22
 - Firebase CLI (`npm install -g firebase-tools`)
 - Zugriff auf GitHub Repo und Secrets
 
