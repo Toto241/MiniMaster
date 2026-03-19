@@ -67,7 +67,7 @@ describe("integration: task lifecycle", () => {
     const approveTask = testEnv.wrap(fns.approveTask);
 
     const completeRes = await completeTask(
-      { taskId: "task1", photoUrl: "https://example.com/proof.jpg" },
+      { taskId: "task1", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/proof.jpg" },
       { auth: { uid: "c1", token: {} } }
     );
 

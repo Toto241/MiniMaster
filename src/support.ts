@@ -25,6 +25,7 @@ type AiGenerationResult = {
 };
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const OPENAI_FALLBACK_ENABLED = process.env.OPENAI_FALLBACK_ENABLED === "true";
 
 let openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI {
@@ -133,6 +134,9 @@ async function generateAiCompletion(prompt: string): Promise<AiGenerationResult>
   }
 
   if (process.env.OPENAI_API_KEY) {
+    if (!OPENAI_FALLBACK_ENABLED) {
+      throw new Error("OPENAI_API_KEY is set but OpenAI fallback is disabled. Set OPENAI_FALLBACK_ENABLED=true to allow fallback.");
+    }
     functions.logger.warn("GEMINI_API_KEY missing. Falling back to OpenAI.");
     return generateWithOpenAI(prompt);
   }
@@ -156,13 +160,27 @@ function parseAiTicketResponse(rawResponse: string): AiTicketResponse {
 }
 
 let knowledgeBase = "";
-try {
-  // knowledge_base.txt lives at project root; when compiled, __dirname is lib/src/
-  // so we need to go up two levels to reach the project root
-  const knowledgeBasePath = path.join(__dirname, "..", "..", "knowledge_base.txt");
-  knowledgeBase = fs.readFileSync(knowledgeBasePath, "utf-8");
-} catch (error) {
-  functions.logger.error("Failed to load knowledge base:", error);
+const knowledgeBaseCandidates = [
+  process.env.KNOWLEDGE_BASE_PATH,
+  path.join(__dirname, "..", "..", "knowledge_base.txt"),
+  path.join(process.cwd(), "knowledge_base.txt"),
+].filter((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
+
+for (const candidate of knowledgeBaseCandidates) {
+  try {
+    if (!fs.existsSync(candidate)) {
+      continue;
+    }
+    knowledgeBase = fs.readFileSync(candidate, "utf-8");
+    functions.logger.info(`Knowledge base loaded from ${candidate}`);
+    break;
+  } catch (error) {
+    functions.logger.warn(`Failed to read knowledge base candidate ${candidate}:`, error);
+  }
+}
+
+if (!knowledgeBase) {
+  functions.logger.warn("Knowledge base file not found. AI support answers will run without local KB context.");
 }
 
 // ==================== SUPPORT TICKETS ====================

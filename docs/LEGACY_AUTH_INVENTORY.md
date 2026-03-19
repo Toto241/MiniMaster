@@ -17,9 +17,16 @@ Alle neuen Cloud Functions nutzen ausschließlich Firebase Auth (`context.auth`)
 - **Migration:** Phase 2 — Eltern-Panel auf Firebase Auth UI umstellen
 
 ### `registerMasterDevice` (src/auth.ts)
-- **Pattern:** Erzeugt `secretKey` bei Registrierung → speichert in `masters/{masterImei}`
+- **Pattern:** Legacy-Fallback erlaubt Registrierung ohne `context.auth` nur über `imei`; bevorzugt ist authentifizierte Registrierung (`context.auth.uid`).
 - **Zweck:** Erstregistrierung eines Eltern-Geräts
 - **Migration:** Phase 2 — IMEI durch Firebase Installation ID / Android ID ersetzen
+
+## 1.1 Legacy-Freeze Steuerung (neu)
+
+- `DISABLE_LEGACY_SECRETKEY_AUTH=true`
+	- Deaktiviert in `generateCustomToken` den Legacy-Login via `masterImei + secretKey`.
+	- Deaktiviert in `registerMasterDevice` den IMEI-only Fallback ohne `context.auth`.
+- Legacy-Nutzungstelemetrie wird best-effort in `legacyAuthUsage` geschrieben (`endpoint`, `mode`, `identifier`, `timestamp`).
 
 ## 2. Funktionen mit context.auth (Modern) — bereits migriert
 
@@ -54,7 +61,7 @@ Alle neuen Cloud Functions nutzen ausschließlich Firebase Auth (`context.auth`)
 
 | Collection | Feld | Verwendung |
 |------------|------|-----------|
-| `masters` | `secretKey` | Legacy-Auth Vergleichswert |
+| `masters` | `secretKey` | Legacy-Auth Vergleichswert (nur für verbleibenden Fallback in `generateCustomToken`) |
 | `masters` | (doc ID = masterImei) | Legacy-Geräte-ID |
 | `children` | `masterImei` | Owner-Zuordnung zum Master |
 | `children/{id}/tasks` | `masterImei` | Task-Ersteller-Referenz |
@@ -66,7 +73,7 @@ Alle neuen Cloud Functions nutzen ausschließlich Firebase Auth (`context.auth`)
 ## 4. Client-Nutzung
 
 ### MasterApp (Android)
-- `MasterCredentialsRepository`: speichert `masterImei` + `secretKey` lokal
+- `MasterCredentialsRepository`: speichert aktuell `masterImei` (und historisch `secretKey`) lokal
 - `registerMasterDevice` wird bei Erststart aufgerufen
 - Alle API-Aufrufe nutzen Firebase Auth nach `generateCustomToken`-Login
 
@@ -84,6 +91,6 @@ Alle neuen Cloud Functions nutzen ausschließlich Firebase Auth (`context.auth`)
 Siehe [AUTH_MIGRATION_PLAN.md](AUTH_MIGRATION_PLAN.md) für die detaillierte Phasenplanung.
 
 **Kurzfassung:**
-1. ~~Phase 1: Backend auf `context.auth` umstellen~~ → **Größtenteils erledigt** (nur `generateCustomToken` + `registerMasterDevice` noch Legacy)
+1. ~~Phase 1: Backend auf `context.auth` umstellen~~ → **Größtenteils erledigt** (Legacy-Fallback in `generateCustomToken` und optional in `registerMasterDevice` nur noch kontrolliert via Feature-Flag)
 2. Phase 2: Clients auf Firebase Auth UI umstellen, IMEI durch Firebase Installation ID ersetzen
 3. Phase 3: Legacy-Felder entfernen, Daten migrieren
