@@ -1,0 +1,740 @@
+  console.info
+    {"severity":"INFO","message":"Knowledge base loaded from D:\\Tools\\MiniMaster\\knowledge_base.txt"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.delete","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"User account and all associated data deleted for master m1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.delete","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"User account and all associated data deleted for master m1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.auto_fix","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Auto-fix \"cleanup_expired_subscriptions\" executed by admin admin1: 1 abgelaufene Abonnements bereinigt."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.auto_fix","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Auto-fix \"cleanup_expired_grants\" executed by admin admin1: 1 abgelaufene Zugriffsrechte entfernt."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.auto_fix","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Auto-fix \"regenerate_error_report\" executed by admin admin1: Fehlerreport f├╝r 0 Fehler erstellt."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.auto_fix","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Auto-fix \"clear_error_logs\" executed by admin admin1: 0 alte Fehlerlog-Eintr├ñge (>30 Tage) gel├Âscht."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.error_analysis","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"admin.user_impersonation","userId":"s1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.explain_problem","userId":"s1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Ticket t1 feedback: accepted, new status: closed_by_ai"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"severity":"ERROR","message":"Error in provideSolutionFeedback: HttpsError: Ticket not found.\n    at D:\\Tools\\MiniMaster\\src\\support.ts:525:15 {\n  code: 'not-found',\n  details: undefined,\n  httpErrorCode: { canonicalName: 'NOT_FOUND', status: 404 }\n}"}
+
+    [0m [90m 545 |[39m       [36mreturn[39m { success[33m:[39m [36mtrue[39m[33m,[39m message[33m:[39m [32m`Ticket ${newStatus}.`[39m }[33m;[39m
+     [90m 546 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 547 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in provideSolutionFeedback:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 548 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 549 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update ticket feedback."[39m)[33m;[39m
+     [90m 550 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:547:24
+
+  console.error
+    {"severity":"ERROR","message":"Error in provideSolutionFeedback: HttpsError: You do not have permission to update this ticket.\n    at D:\\Tools\\MiniMaster\\src\\support.ts:530:15 {\n  code: 'permission-denied',\n  details: undefined,\n  httpErrorCode: { canonicalName: 'PERMISSION_DENIED', status: 403 }\n}"}
+
+    [0m [90m 545 |[39m       [36mreturn[39m { success[33m:[39m [36mtrue[39m[33m,[39m message[33m:[39m [32m`Ticket ${newStatus}.`[39m }[33m;[39m
+     [90m 546 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 547 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in provideSolutionFeedback:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 548 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 549 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update ticket feedback."[39m)[33m;[39m
+     [90m 550 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:547:24
+
+  console.info
+    {"action":"admin.revoke_subscription","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"admin.revoke_subscription","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"admin.revoke_subscription","userId":"admin1","status":"failure","error":"The function must be called with subscriptionId or masterId.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\subscription.ts:207:7"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/subscription.ts:207:7
+
+  console.error
+    Error revoking subscription: HttpsError: The function must be called with subscriptionId or masterId.
+        at D:\Tools\MiniMaster\src\subscription.ts:161:15
+        at D:\Tools\MiniMaster\node_modules\firebase-functions\lib\common\onInit.js:33:16
+        at Function.fixedLen [as run] (D:\Tools\MiniMaster\node_modules\firebase-functions\lib\v1\providers\https.js:76:47)
+        at wrapped (D:\Tools\MiniMaster\node_modules\firebase-functions-test\lib\v1.js:71:30)
+        at Object.<anonymous> (D:\Tools\MiniMaster\test\branch-coverage-wave8.test.ts:846:18)
+        at Promise.then.completed (D:\Tools\MiniMaster\node_modules\jest-circus\build\utils.js:298:28)
+        at new Promise (<anonymous>)
+        at callAsyncCircusFn (D:\Tools\MiniMaster\node_modules\jest-circus\build\utils.js:231:10)
+        at _callCircusTest (D:\Tools\MiniMaster\node_modules\jest-circus\build\run.js:316:40)
+        at _runTest (D:\Tools\MiniMaster\node_modules\jest-circus\build\run.js:252:3)
+        at _runTestsForDescribeBlock (D:\Tools\MiniMaster\node_modules\jest-circus\build\run.js:126:9)
+        at _runTestsForDescribeBlock (D:\Tools\MiniMaster\node_modules\jest-circus\build\run.js:121:9)
+        at run (D:\Tools\MiniMaster\node_modules\jest-circus\build\run.js:71:3)
+        at runAndTransformResultsToJestFormat (D:\Tools\MiniMaster\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+        at jestAdapter (D:\Tools\MiniMaster\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+        at runTestInternal (D:\Tools\MiniMaster\node_modules\jest-runner\build\runTest.js:367:16)
+        at runTest (D:\Tools\MiniMaster\node_modules\jest-runner\build\runTest.js:444:34) {
+      code: 'invalid-argument',
+      details: undefined,
+      httpErrorCode: { canonicalName: 'INVALID_ARGUMENT', status: 400 }
+    }
+
+    [0m [90m 209 |[39m         error [36mas[39m [33mError[39m[33m,[39m { subscriptionId[33m:[39m data[33m.[39msubscriptionId[33m,[39m masterId[33m:[39m data[33m.[39mmasterId }
+     [90m 210 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 211 |[39m       console[33m.[39merror([32m"Error revoking subscription:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 212 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 213 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to revoke subscription."[39m)[33m;[39m
+     [90m 214 |[39m     }[0m
+
+      at src/subscription.ts:211:15
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:846:5)
+
+  console.error
+    {"action":"admin.revoke_subscription","userId":"admin1","status":"failure","error":"Subscription not found.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\subscription.ts:207:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:852:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/subscription.ts:207:7
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:852:5)
+
+  console.error
+    Error revoking subscription: HttpsError: Subscription not found.
+        at D:\Tools\MiniMaster\src\subscription.ts:179:17 {
+      code: 'not-found',
+      details: undefined,
+      httpErrorCode: { canonicalName: 'NOT_FOUND', status: 404 }
+    }
+
+    [0m [90m 209 |[39m         error [36mas[39m [33mError[39m[33m,[39m { subscriptionId[33m:[39m data[33m.[39msubscriptionId[33m,[39m masterId[33m:[39m data[33m.[39mmasterId }
+     [90m 210 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 211 |[39m       console[33m.[39merror([32m"Error revoking subscription:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 212 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 213 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to revoke subscription."[39m)[33m;[39m
+     [90m 214 |[39m     }[0m
+
+      at src/subscription.ts:211:15
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:852:5)
+
+  console.info
+    {"action":"admin.revoke_subscription","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.register","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Master account registered for uid: m1"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.register","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Knowledge base updated by admin admin1 (26 chars)."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Test FCM sent by admin admin1 to token child-fcm-123..."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Cleaned up 1 expired support grants."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Support ticket created: auto_1773961039909_33rk for master m1"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"admin.revoke_support_access","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Support access revoked: g1"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:320:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1132:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/support.ts:320:9
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1132:5)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"failure","error":"Grant not found or access denied.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:342:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1132:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/support.ts:342:7
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1132:5)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to revoke support access for grant nonexistent: HttpsError: Grant not found or access denied.\n    at D:\\Tools\\MiniMaster\\src\\support.ts:324:15\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1132:5) {\n  code: 'permission-denied',\n  details: undefined,\n  httpErrorCode: { canonicalName: 'PERMISSION_DENIED', status: 403 }\n}"}
+
+    [0m [90m 344 |[39m         error [36mas[39m [33mError[39m[33m,[39m { grantId }
+     [90m 345 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 346 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to revoke support access for grant ${grantId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 347 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 348 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to revoke support access."[39m[33m,[39m error)[33m;[39m
+     [90m 349 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:346:24
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1132:5)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:320:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1139:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/support.ts:320:9
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1139:5)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"failure","error":"Grant not found or access denied.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:342:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1139:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/support.ts:342:7
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1139:5)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to revoke support access for grant g2: HttpsError: Grant not found or access denied.\n    at D:\\Tools\\MiniMaster\\src\\support.ts:324:15\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1139:5) {\n  code: 'permission-denied',\n  details: undefined,\n  httpErrorCode: { canonicalName: 'PERMISSION_DENIED', status: 403 }\n}"}
+
+    [0m [90m 344 |[39m         error [36mas[39m [33mError[39m[33m,[39m { grantId }
+     [90m 345 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 346 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to revoke support access for grant ${grantId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 347 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 348 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to revoke support access."[39m[33m,[39m error)[33m;[39m
+     [90m 349 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:346:24
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1139:5)
+
+  console.info
+    {"uid":"m1","severity":"INFO","message":"App Check bypassed in test mode."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"device.pair","userId":"m1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:221:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1258:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/pairing.ts:221:9
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1258:5)
+
+  console.error
+    {"action":"device.pair","userId":"m1","status":"failure","error":"Your trial has expired. Please subscribe to continue using Mini-Master.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:253:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1258:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/pairing.ts:253:7
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1258:5)
+
+  console.error
+    {"action":"device.pair","userId":"m1","status":"failure","error":"Master account not found.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:253:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave8.test.ts:1265:5)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/pairing.ts:253:7
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1265:5)
+
+  console.info
+    {"action":"device.pair","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Pairing token created for masterId: m1"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Daily Error Report: No errors in the last 24 hours Ô£à"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"severity":"WARNING","message":"\nÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ\nÔòæ Daily Error Report - Thu Mar 19 2026\nÔòáÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ\nÔòæ Total Errors: 2\nÔòæ\nÔòæ Top Errors by Function:\nÔòæ   - testFn: 2\nÔòæ\nÔòæ Top Error Messages:\nÔòæ   - Test error...: 1\nÔòæ   - Another error...: 1\nÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ\n      "}
+
+    [0m [90m 220 |[39m [32m      `[39m[33m;[39m
+     [90m 221 |[39m
+    [31m[1m>[22m[39m[90m 222 |[39m       functions[33m.[39mlogger[33m.[39mwarn(report)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 223 |[39m
+     [90m 224 |[39m       [36mawait[39m db()[33m.[39mcollection([32m"error_summaries"[39m)[33m.[39madd({
+     [90m 225 |[39m         date[33m:[39m today[33m,[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/admin.ts:222:24
+
+FAIL test/branch-coverage-wave8.test.ts (142 MB heap size)
+  recordLegalConsent
+    ÔêÜ missing termsVersion ÔåÆ throws invalid-argument (43 ms)
+    ÔêÜ missing privacyVersion ÔåÆ throws invalid-argument (2 ms)
+    ÔêÜ non-string termsVersion ÔåÆ treated as empty (2 ms)
+    ÔêÜ non-string privacyVersion ÔåÆ treated as empty (1 ms)
+    ÔêÜ consentSource defaults to master_app when empty (4 ms)
+    ÔêÜ custom consentSource and appVersion are accepted (2 ms)
+    ÔêÜ version mismatch ÔåÆ throws failed-precondition (1 ms)
+  publishLegalPolicy
+    ÔêÜ invalid policyType ÔåÆ throws invalid-argument (2 ms)
+    ÔêÜ empty version ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ empty contentUrl ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ non-string version ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ non-string contentUrl ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ successful publish with isMajorChange true (1 ms)
+    ÔêÜ successful publish defaults to active status (1 ms)
+  markLegalReconsentRequired
+    ÔêÜ targets specific master if masterImei provided (1 ms)
+    ÔêÜ targets all consents for country/locale when no masterImei (1 ms)
+    ÔêÜ empty masterImei string is treated as no masterImei (1 ms)
+  legal normalizeLocale edge cases
+    ÔêÜ invalid locale format ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ non-string locale ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ normalizes underscore to hyphen (1 ms)
+  deleteUserAccount edge cases
+    ÔêÜ non-admin trying to delete another user ÔåÆ throws permission-denied (8 ms)
+    ÔêÜ non-admin deletes own account (masterId matches caller) (9 ms)
+    ÔêÜ non-admin deletes own account without specifying masterId (2 ms)
+  adminHealthCheck storage error
+    ÔêÜ returns error status when storage metadata fails (3 ms)
+  triggerScheduledJob
+    ÔêÜ checkExpiredSubscriptions job (1 ms)
+    ÔêÜ cleanupExpiredGrants job (1 ms)
+    ÔêÜ sendDailyErrorReport job
+    ÔêÜ unknown job ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ missing jobName ÔåÆ throws invalid-argument (1 ms)
+  executeAutoFix
+    ÔêÜ cleanup_expired_subscriptions action (2 ms)
+    ÔêÜ cleanup_expired_grants action (2 ms)
+    ÔêÜ regenerate_error_report action (2 ms)
+    ÔêÜ clear_error_logs action (2 ms)
+    ÔêÜ unknown action ÔåÆ throws invalid-argument (2 ms)
+    ÔêÜ missing analysisId ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ negative errorIndex ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ missing action ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ nonexistent analysis document ÔåÆ throws not-found (1 ms)
+  analyzeSystemErrors edge cases
+    ÔêÜ no errors in time range ÔåÆ returns empty (1 ms)
+    ÔêÜ single errorId analysis (3 ms)
+    ÔêÜ nonexistent errorId ÔåÆ throws not-found (1 ms)
+  getTicketUserData edge cases
+    ÔêÜ ticket without accessGrantId ÔåÆ throws permission-denied (7 ms)
+    ÔêÜ grant not active (revoked) ÔåÆ throws permission-denied (2 ms)
+    ÔêÜ grant expired ÔåÆ throws deadline-exceeded (1 ms)
+    ÔêÜ grant not found ÔåÆ throws permission-denied (1 ms)
+    ÔêÜ valid grant returns master and children data (2 ms)
+    ÔêÜ nonexistent ticket ÔåÆ throws not-found (1 ms)
+  aiExplainProblem edge cases
+    ÔêÜ non-admin/support ÔåÆ throws permission-denied (2 ms)
+    ÔêÜ consentGiven false ÔåÆ throws failed-precondition (1 ms)
+    ÔêÜ problemContext too short ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ problemContext too long ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ support user can call aiExplainProblem (2 ms)
+  provideSolutionFeedback edge cases
+    ÔêÜ missing ticketId ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ missing feedback ÔåÆ throws invalid-argument (2 ms)
+    ÔêÜ invalid feedback value ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ rejected without comment ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ rejected with empty comment ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ accepted feedback ÔåÆ closes ticket (2 ms)
+    ÔêÜ not-found ticket ÔåÆ throws not-found (8 ms)
+    ÔêÜ not own ticket ÔåÆ throws permission-denied (7 ms)
+  revokeSubscription edge cases
+    ÔêÜ by masterId only (no subscriptionId) (3 ms)
+    ÔêÜ by subscriptionId (2 ms)
+    ÔêÜ missing both subscriptionId and masterId ÔåÆ throws invalid-argument (12 ms)
+    ÔêÜ nonexistent subscription ÔåÆ throws not-found (13 ms)
+    ÔêÜ by masterId with matching subscription doc (2 ms)
+  getSubscriptionStatus trial branches
+    ├ù trial with Timestamp-like trialEndsAt (3 ms)
+    ÔêÜ trial with non-Timestamp trialEndsAt (raw number) (1 ms)
+    ├ù expired trial ÔåÆ isTrialActive false (1 ms)
+  registerMasterDevice edge cases
+    ÔêÜ authenticated user with mismatched uid ÔåÆ throws failed-precondition (5 ms)
+    ÔêÜ authenticated user registers new device (doc does not exist) (4 ms)
+    ÔêÜ authenticated user re-registers existing device (2 ms)
+  updateChildDevice edge cases
+    ├ù appBlacklist update by owner master (1 ms)
+    ├ù non-owner master ÔåÆ throws permission-denied (1 ms)
+  getKnowledgeBase
+    ÔêÜ returns from firestore when present (1 ms)
+    ÔêÜ falls back to file when not in firestore (1 ms)
+  updateKnowledgeBase
+    ÔêÜ updates KB content (2 ms)
+    ÔêÜ non-string content ÔåÆ throws invalid-argument (1 ms)
+  testGeminiConnection
+    ÔêÜ successful Gemini response (1 ms)
+    ÔêÜ Gemini API error response
+    ÔêÜ fetch network error (1 ms)
+    ÔêÜ custom prompt passed to Gemini
+  sendTestFcmMessage edge cases
+    ÔêÜ childId provided, no token found ÔåÆ returns error (1 ms)
+    ÔêÜ neither token nor childId ÔåÆ throws invalid-argument (1 ms)
+    ÔêÜ childId provided with token ÔåÆ sends message (2 ms)
+  cleanupExpiredGrants scheduled
+    ÔêÜ revokes expired grants and updates tickets (2 ms)
+  createSupportTicket branches
+    ÔêÜ allowSupportAccess false ÔåÆ no grant created (1 ms)
+    ÔêÜ missing problemDescription ÔåÆ throws invalid-argument (2 ms)
+    ÔêÜ non-boolean allowSupportAccess ÔåÆ throws invalid-argument (1 ms)
+  revokeSupportAccess
+    ÔêÜ revokes own grant with associated ticket (2 ms)
+    ÔêÜ nonexistent grant ÔåÆ throws permission-denied (9 ms)
+    ÔêÜ grant owned by other user ÔåÆ throws permission-denied (9 ms)
+  onTaskStatusChange edge cases
+    ├ù status approved ÔåÆ sends notification to child (1 ms)
+    ├ù status rejected ÔåÆ sends rejection notification to child (1 ms)
+    ├ù no child FCM token ÔåÆ logs warning, does not throw (1 ms)
+    ├ù no masterImei ÔåÆ logs warning for pending_approval (1 ms)
+    ├ù no master FCM token ÔåÆ logs warning for pending_approval
+  createTask subscription edge cases
+    ÔêÜ expired trial ÔåÆ throws resource-exhausted (5 ms)
+  generatePairingLink edge cases
+    ÔêÜ expired trial ÔåÆ throws resource-exhausted (22 ms)
+    ÔêÜ master not found ÔåÆ throws not-found (3 ms)
+    ÔêÜ successful token generation (2 ms)
+  needsLegalReconsent edge cases
+    ÔêÜ no consent doc ÔåÆ returns missing_consent (2 ms)
+    ÔêÜ consent exists but versions outdated ÔåÆ requires reconsent (2 ms)
+    ÔêÜ consent exists with matching versions ÔåÆ up_to_date (2 ms)
+    ÔêÜ requiresReconsent flag forced ÔåÆ requires reconsent (1 ms)
+    ÔêÜ non-string acceptedTermsVersion treated as empty (3 ms)
+  sendDailyErrorReport
+    ÔêÜ runs scheduled report (no errors) (2 ms)
+    ÔêÜ runs with error logs present (5 ms)
+
+  ÔùÅ getSubscriptionStatus trial branches ÔÇ║ trial with Timestamp-like trialEndsAt
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      876 |     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+      877 |     const res = await wrapped({}, asMaster);
+    > 878 |     expect(res.isTrialActive).toBe(true);
+          |                               ^
+      879 |     expect(res.trialDaysRemaining).toBeGreaterThan(0);
+      880 |   });
+      881 |
+
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:878:31)
+
+  ÔùÅ getSubscriptionStatus trial branches ÔÇ║ expired trial ÔåÆ isTrialActive false
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: NaN
+
+      899 |     const res = await wrapped({}, asMaster);
+      900 |     expect(res.isTrialActive).toBe(false);
+    > 901 |     expect(res.trialDaysRemaining).toBe(0);
+          |                                    ^
+      902 |   });
+      903 | });
+      904 |
+
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:901:36)
+
+  ÔùÅ updateChildDevice edge cases ÔÇ║ appBlacklist update by owner master
+
+    TypeError: Cannot read properties of undefined (reading 'length')
+
+      936 | describe("updateChildDevice edge cases", () => {
+      937 |   it("appBlacklist update by owner master", async () => {
+    > 938 |     const wrapped = testEnv.wrap(fns.setAppBlacklist);
+          |                             ^
+      939 |     const res = await wrapped({ childId: "c1", appBlacklist: ["com.new.app"] }, asMaster);
+      940 |     expect(res.success).toBe(true);
+      941 |   });
+
+      at isV2CloudFunction (node_modules/firebase-functions-test/lib/main.js:49:26)
+      at Object.wrap (node_modules/firebase-functions-test/lib/main.js:32:9)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:938:29)
+
+  ÔùÅ updateChildDevice edge cases ÔÇ║ non-owner master ÔåÆ throws permission-denied
+
+    TypeError: Cannot read properties of undefined (reading 'length')
+
+      943 |   it("non-owner master ÔåÆ throws permission-denied", async () => {
+      944 |     state.children["c2"] = { masterImei: "other-master", childImei: "c2" };
+    > 945 |     const wrapped = testEnv.wrap(fns.setAppBlacklist);
+          |                             ^
+      946 |     await expect(wrapped({ childId: "c2", appBlacklist: [] }, asMaster))
+      947 |       .rejects.toThrow(/not authorized/i);
+      948 |   });
+
+      at isV2CloudFunction (node_modules/firebase-functions-test/lib/main.js:49:26)
+      at Object.wrap (node_modules/firebase-functions-test/lib/main.js:32:9)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:945:29)
+
+  ÔùÅ onTaskStatusChange edge cases ÔÇ║ status approved ÔåÆ sends notification to child
+
+    TypeError: firestoreService.snapshot_ is not a function
+
+      1150 |     state.children["c1"].fcmToken = "child-fcm-token";
+      1151 |     const func = fns.onTaskStatusChange;
+    > 1152 |     const beforeSnap = testEnv.firestore.makeDocumentSnapshot(
+           |                                          ^
+      1153 |       { status: "pending_approval", description: "Clean room", masterImei: "m1" },
+      1154 |       "children/c1/tasks/t1"
+      1155 |     );
+
+      at Object.makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:72:29)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1152:42)
+
+  ÔùÅ onTaskStatusChange edge cases ÔÇ║ status rejected ÔåÆ sends rejection notification to child
+
+    TypeError: firestoreService.snapshot_ is not a function
+
+      1167 |     state.children["c1"].fcmToken = "child-fcm-token";
+      1168 |     const func = fns.onTaskStatusChange;
+    > 1169 |     const beforeSnap = testEnv.firestore.makeDocumentSnapshot(
+           |                                          ^
+      1170 |       { status: "pending_approval", description: "Do homework", masterImei: "m1" },
+      1171 |       "children/c1/tasks/t1"
+      1172 |     );
+
+      at Object.makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:72:29)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1169:42)
+
+  ÔùÅ onTaskStatusChange edge cases ÔÇ║ no child FCM token ÔåÆ logs warning, does not throw
+
+    TypeError: firestoreService.snapshot_ is not a function
+
+      1184 |     delete state.children["c1"].fcmToken;
+      1185 |     const func = fns.onTaskStatusChange;
+    > 1186 |     const beforeSnap = testEnv.firestore.makeDocumentSnapshot(
+           |                                          ^
+      1187 |       { status: "pending_approval", description: "Task", masterImei: "m1" },
+      1188 |       "children/c1/tasks/t1"
+      1189 |     );
+
+      at Object.makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:72:29)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1186:42)
+
+  ÔùÅ onTaskStatusChange edge cases ÔÇ║ no masterImei ÔåÆ logs warning for pending_approval
+
+    TypeError: firestoreService.snapshot_ is not a function
+
+      1200 |   it("no masterImei ÔåÆ logs warning for pending_approval", async () => {
+      1201 |     const func = fns.onTaskStatusChange;
+    > 1202 |     const beforeSnap = testEnv.firestore.makeDocumentSnapshot(
+           |                                          ^
+      1203 |       { status: "pending", description: "Task" },
+      1204 |       "children/c1/tasks/t1"
+      1205 |     );
+
+      at Object.makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:72:29)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1202:42)
+
+  ÔùÅ onTaskStatusChange edge cases ÔÇ║ no master FCM token ÔåÆ logs warning for pending_approval
+
+    TypeError: firestoreService.snapshot_ is not a function
+
+      1217 |     delete state.masters["m1"].fcmToken;
+      1218 |     const func = fns.onTaskStatusChange;
+    > 1219 |     const beforeSnap = testEnv.firestore.makeDocumentSnapshot(
+           |                                          ^
+      1220 |       { status: "pending", description: "Task", masterImei: "m1" },
+      1221 |       "children/c1/tasks/t1"
+      1222 |     );
+
+      at Object.makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:72:29)
+      at Object.<anonymous> (test/branch-coverage-wave8.test.ts:1219:42)
+
+Test Suites: 1 failed, 1 total
+Tests:       9 failed, 98 passed, 107 total
+Snapshots:   0 total
+Time:        1.826 s, estimated 2 s
+Ran all test suites matching /test\\branch-coverage-wave8.test.ts/i.
