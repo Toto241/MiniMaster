@@ -1,0 +1,1350 @@
+  console.info
+    {"severity":"INFO","message":"Knowledge base loaded from D:\\Tools\\MiniMaster\\knowledge_base.txt"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.lock","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Lock state for child c1 set to true by master m1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"rules.update_blacklist","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"App blacklist for child c1 updated by master m1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"device.lock","userId":"m_other","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:32:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:744:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/device.ts:32:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:744:7)
+
+  console.info
+    {"action":"rules.update_usage","userId":"m1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Usage rules for child c1 updated by master m1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"device.lock","userId":"m1","status":"failure","error":"Firestore internal error","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:55:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:857:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/device.ts:55:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:857:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to set lock state for child c1: Error: Firestore internal error\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:848:66)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as doc] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:103:19)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:29:56"}
+
+    [0m [90m 57 |[39m         [32m`children/${childId}`[39m[33m,[39m [32m"device"[39m[33m,[39m error [36mas[39m [33mError[39m[33m,[39m { childId[33m,[39m isLocked }
+     [90m 58 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 59 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to set lock state for child ${childId}:`[39m[33m,[39m error)[33m;[39m
+     [90m    |[39m                        [31m[1m^[22m[39m
+     [90m 60 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"An unexpected error occurred while updating the device lock state."[39m[33m,[39m error)[33m;[39m
+     [90m 61 |[39m     }
+     [90m 62 |[39m   }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/device.ts:59:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:857:7)
+
+  console.error
+    {"action":"rules.update_blacklist","userId":"m1","status":"failure","error":"Firestore write error","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:105:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:883:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/device.ts:105:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:883:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to update blacklist for child c1: Error: Firestore write error\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:874:66)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as doc] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:103:19)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:81:56"}
+
+    [0m [90m 107 |[39m         error [36mas[39m [33mError[39m[33m,[39m { childId[33m,[39m appCount[33m:[39m appBlacklist[33m.[39mlength }
+     [90m 108 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 109 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to update blacklist for child ${childId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 110 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update app blacklist."[39m[33m,[39m error)[33m;[39m
+     [90m 111 |[39m     }
+     [90m 112 |[39m   }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/device.ts:109:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:883:7)
+
+  console.error
+    {"action":"rules.update_usage","userId":"m1","status":"failure","error":"Firestore write error","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:173:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:909:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/device.ts:173:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:909:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to set usage rules for child c1: Error: Firestore write error\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:900:66)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as doc] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:103:19)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:149:56"}
+
+    [0m [90m 175 |[39m         error [36mas[39m [33mError[39m[33m,[39m { childId }
+     [90m 176 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 177 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to set usage rules for child ${childId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 178 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to set usage rules."[39m[33m,[39m error)[33m;[39m
+     [90m 179 |[39m     }
+     [90m 180 |[39m   }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/device.ts:177:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:909:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to get rules for child c1: Error: Firestore read error\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:926:63)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as doc] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:103:19)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:192:56\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:935:20)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 212 |[39m     } [36mcatch[39m (error) {
+     [90m 213 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+    [31m[1m>[22m[39m[90m 214 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to get rules for child ${childId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 215 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"An unexpected error occurred while retrieving rules."[39m[33m,[39m error)[33m;[39m
+     [90m 216 |[39m     }
+     [90m 217 |[39m   }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/device.ts:214:24
+
+  console.error
+    {"action":"system.heartbeat","userId":"c1","status":"failure","error":"Firestore write error","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:243:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:963:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/device.ts:243:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:963:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to record heartbeat for child c1: Error: Firestore write error\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:954:66)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as doc] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:103:19)\n    at D:\\Tools\\MiniMaster\\src\\device.ts:224:56\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:963:20)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 246 |[39m       )[33m;[39m
+     [90m 247 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+    [31m[1m>[22m[39m[90m 248 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to record heartbeat for child ${childId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 249 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"An unexpected error occurred while recording heartbeat."[39m[33m,[39m error)[33m;[39m
+     [90m 250 |[39m     }
+     [90m 251 |[39m   }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/device.ts:248:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:963:7)
+
+  console.info
+    {"severity":"INFO","message":"New support ticket created: t_empty"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Empty problem description, skipping AI analysis."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"New support ticket created: t_ws"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Empty problem description, skipping AI analysis."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"New support ticket created: t_low"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"AI Response: {\"solution\":\"Test solution generated in stub mode.\",\"confidence\":0.85}"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"severity":"ERROR","message":"Error in onTicketCreated: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:447:59"}
+
+    [0m [90m 486 |[39m       [36mreturn[39m[33m;[39m
+     [90m 487 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 488 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in onTicketCreated:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 489 |[39m
+     [90m 490 |[39m       [36mawait[39m admin[33m.[39mfirestore()[33m.[39mcollection([32m"supportTickets"[39m)[33m.[39mdoc(ticketId)[33m.[39mupdate({
+     [90m 491 |[39m         aiGeneratedSolution[33m:[39m [32m"An error occurred while analyzing your ticket. A human support agent will assist you shortly."[39m[33m,[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:488:24
+
+  console.info
+    {"severity":"INFO","message":"New support ticket created: t_nofcm"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"AI Response: {\"solution\":\"Test solution generated in stub mode.\",\"confidence\":0.85}"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"severity":"ERROR","message":"Error in onTicketCreated: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:447:59"}
+
+    [0m [90m 486 |[39m       [36mreturn[39m[33m;[39m
+     [90m 487 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 488 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in onTicketCreated:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 489 |[39m
+     [90m 490 |[39m       [36mawait[39m admin[33m.[39mfirestore()[33m.[39mcollection([32m"supportTickets"[39m)[33m.[39mdoc(ticketId)[33m.[39mupdate({
+     [90m 491 |[39m         aiGeneratedSolution[33m:[39m [32m"An error occurred while analyzing your ticket. A human support agent will assist you shortly."[39m[33m,[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:488:24
+
+  console.info
+    {"severity":"INFO","message":"New support ticket created: t_nofcm2"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"AI Response: {\"solution\":\"Test solution generated in stub mode.\",\"confidence\":0.85}"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"severity":"ERROR","message":"Error in onTicketCreated: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:447:59"}
+
+    [0m [90m 486 |[39m       [36mreturn[39m[33m;[39m
+     [90m 487 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 488 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in onTicketCreated:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 489 |[39m
+     [90m 490 |[39m       [36mawait[39m admin[33m.[39mfirestore()[33m.[39mcollection([32m"supportTickets"[39m)[33m.[39mdoc(ticketId)[33m.[39mupdate({
+     [90m 491 |[39m         aiGeneratedSolution[33m:[39m [32m"An error occurred while analyzing your ticket. A human support agent will assist you shortly."[39m[33m,[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:488:24
+
+  console.error
+    {"severity":"ERROR","message":"Error in provideSolutionFeedback: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:521:71\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1059:25)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 545 |[39m       [36mreturn[39m { success[33m:[39m [36mtrue[39m[33m,[39m message[33m:[39m [32m`Ticket ${newStatus}.`[39m }[33m;[39m
+     [90m 546 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 547 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in provideSolutionFeedback:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 548 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 549 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update ticket feedback."[39m)[33m;[39m
+     [90m 550 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:547:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1059:25)
+
+  console.error
+    {"severity":"ERROR","message":"Error in provideSolutionFeedback: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:521:71\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1086:20)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 545 |[39m       [36mreturn[39m { success[33m:[39m [36mtrue[39m[33m,[39m message[33m:[39m [32m`Ticket ${newStatus}.`[39m }[33m;[39m
+     [90m 546 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 547 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in provideSolutionFeedback:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 548 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 549 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update ticket feedback."[39m)[33m;[39m
+     [90m 550 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:547:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1086:20)
+
+  console.error
+    {"severity":"ERROR","message":"Error in provideSolutionFeedback: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:521:71\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1093:20)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 545 |[39m       [36mreturn[39m { success[33m:[39m [36mtrue[39m[33m,[39m message[33m:[39m [32m`Ticket ${newStatus}.`[39m }[33m;[39m
+     [90m 546 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 547 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in provideSolutionFeedback:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 548 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 549 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update ticket feedback."[39m)[33m;[39m
+     [90m 550 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:547:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1093:20)
+
+  console.error
+    {"severity":"ERROR","message":"Error in provideSolutionFeedback: TypeError: Cannot read properties of undefined (reading 'doc')\n    at D:\\Tools\\MiniMaster\\src\\support.ts:521:71\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1105:25)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 545 |[39m       [36mreturn[39m { success[33m:[39m [36mtrue[39m[33m,[39m message[33m:[39m [32m`Ticket ${newStatus}.`[39m }[33m;[39m
+     [90m 546 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 547 |[39m       functions[33m.[39mlogger[33m.[39merror([32m"Error in provideSolutionFeedback:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 548 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 549 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to update ticket feedback."[39m)[33m;[39m
+     [90m 550 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:547:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1105:25)
+
+  console.error
+    {"action":"admin.grant_support_access","userId":"m1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:261:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1125:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/support.ts:261:9
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1125:7)
+
+  console.error
+    {"action":"admin.grant_support_access","userId":"m1","status":"failure","error":"Ticket not found or access denied.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:292:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1125:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/support.ts:292:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1125:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to grant support access for ticket t_other: HttpsError: Ticket not found or access denied.\n    at D:\\Tools\\MiniMaster\\src\\support.ts:265:15\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1125:7) {\n  code: 'permission-denied',\n  details: undefined,\n  httpErrorCode: { canonicalName: 'PERMISSION_DENIED', status: 403 }\n}"}
+
+    [0m [90m 294 |[39m         error [36mas[39m [33mError[39m[33m,[39m { ticketId }
+     [90m 295 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 296 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to grant support access for ticket ${ticketId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 297 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 298 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to grant support access."[39m[33m,[39m error)[33m;[39m
+     [90m 299 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:296:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1125:7)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:320:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1137:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/support.ts:320:9
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1137:7)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"failure","error":"Grant not found or access denied.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:342:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1137:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/support.ts:342:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1137:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to revoke support access for grant g_other: HttpsError: Grant not found or access denied.\n    at D:\\Tools\\MiniMaster\\src\\support.ts:324:15\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1137:7) {\n  code: 'permission-denied',\n  details: undefined,\n  httpErrorCode: { canonicalName: 'PERMISSION_DENIED', status: 403 }\n}"}
+
+    [0m [90m 344 |[39m         error [36mas[39m [33mError[39m[33m,[39m { grantId }
+     [90m 345 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 346 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to revoke support access for grant ${grantId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 347 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 348 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to revoke support access."[39m[33m,[39m error)[33m;[39m
+     [90m 349 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:346:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1137:7)
+
+  console.error
+    {"action":"admin.grant_support_access","userId":"m1","status":"failure","error":"Write failed","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:292:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1158:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/support.ts:292:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1158:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to grant support access for ticket t_err: Error: Write failed\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1152:56)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as collection] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:148:19)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:271:35"}
+
+    [0m [90m 294 |[39m         error [36mas[39m [33mError[39m[33m,[39m { ticketId }
+     [90m 295 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 296 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to grant support access for ticket ${ticketId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 297 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 298 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to grant support access."[39m[33m,[39m error)[33m;[39m
+     [90m 299 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:296:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1158:7)
+
+  console.error
+    {"action":"admin.revoke_support_access","userId":"m1","status":"failure","error":"Update failed","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:342:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1186:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/support.ts:342:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1186:7)
+
+  console.error
+    {"severity":"ERROR","message":"Failed to revoke support access for grant g_err: Error: Update failed\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1177:66)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as doc] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:103:19)\n    at D:\\Tools\\MiniMaster\\src\\support.ts:327:52"}
+
+    [0m [90m 344 |[39m         error [36mas[39m [33mError[39m[33m,[39m { grantId }
+     [90m 345 |[39m       )[33m;[39m
+    [31m[1m>[22m[39m[90m 346 |[39m       functions[33m.[39mlogger[33m.[39merror([32m`Failed to revoke support access for grant ${grantId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 347 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[39m error[33m;[39m
+     [90m 348 |[39m       [36mthrow[39m [36mnew[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m([32m"internal"[39m[33m,[39m [32m"Failed to revoke support access."[39m[33m,[39m error)[33m;[39m
+     [90m 349 |[39m     }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/support.ts:346:24
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1186:7)
+
+  console.info
+    {"action":"ai.explain_problem","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"ai.explain_problem","userId":"s1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"severity":"WARNING","message":"No masterImei found for this task. Cannot send notification."}
+
+    [0m [90m 241 |[39m       [36mconst[39m masterImei [33m=[39m newValue[33m.[39mmasterImei[33m;[39m
+     [90m 242 |[39m       [36mif[39m ([33m![39mmasterImei) {
+    [31m[1m>[22m[39m[90m 243 |[39m         functions[33m.[39mlogger[33m.[39mwarn([32m"No masterImei found for this task. Cannot send notification."[39m)[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 244 |[39m         [36mreturn[39m[33m;[39m
+     [90m 245 |[39m       }
+     [90m 246 |[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/triggers.ts:243:26
+      at cloudFunction.run (node_modules/firebase-functions/lib/common/onInit.js:33:16)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1440:13)
+
+  console.warn
+    {"severity":"WARNING","message":"Master m_nofcm does not have an FCM token. Cannot send notification."}
+
+    [0m [90m 249 |[39m
+     [90m 250 |[39m       [36mif[39m ([33m![39mfcmToken) {
+    [31m[1m>[22m[39m[90m 251 |[39m         functions[33m.[39mlogger[33m.[39mwarn([32m`Master ${masterImei} does not have an FCM token. Cannot send notification.`[39m)[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 252 |[39m         [36mreturn[39m[33m;[39m
+     [90m 253 |[39m       }
+     [90m 254 |[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/triggers.ts:251:26
+
+  console.info
+    {"severity":"INFO","message":"Notification sent to master m1 for task task3"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"code":"messaging/unavailable","severity":"ERROR","message":"Error: Error sending review notification:\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\triggers.ts:310:26\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1471:7)"}
+
+    [0m [90m 308 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m`Review notification sent to child ${childId} for task ${context.params.taskId}`[39m)[33m;[39m
+     [90m 309 |[39m       } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 310 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Error sending review notification:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 311 |[39m       }
+     [90m 312 |[39m     }
+     [90m 313 |[39m   })[33m;[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/triggers.ts:310:26
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1471:7)
+
+  console.error
+    {"code":"messaging/invalid-recipient","severity":"ERROR","message":"Error: Error sending review notification:\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\triggers.ts:310:26\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1481:7)"}
+
+    [0m [90m 308 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m`Review notification sent to child ${childId} for task ${context.params.taskId}`[39m)[33m;[39m
+     [90m 309 |[39m       } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 310 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Error sending review notification:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 311 |[39m       }
+     [90m 312 |[39m     }
+     [90m 313 |[39m   })[33m;[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/triggers.ts:310:26
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1481:7)
+
+  console.warn
+    {"severity":"WARNING","message":"Child c_nofcm does not have an FCM token. Cannot send review notification."}
+
+    [0m [90m 282 |[39m
+     [90m 283 |[39m       [36mif[39m ([33m![39mchildFcmToken) {
+    [31m[1m>[22m[39m[90m 284 |[39m         functions[33m.[39mlogger[33m.[39mwarn([32m`Child ${childId} does not have an FCM token. Cannot send review notification.`[39m)[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 285 |[39m         [36mreturn[39m[33m;[39m
+     [90m 286 |[39m       }
+     [90m 287 |[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/triggers.ts:284:26
+
+  console.error
+    {"severity":"ERROR","message":"Error sending review notification: Error: FCM send error\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1496:38)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+    [0m [90m 308 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m`Review notification sent to child ${childId} for task ${context.params.taskId}`[39m)[33m;[39m
+     [90m 309 |[39m       } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 310 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Error sending review notification:"[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 311 |[39m       }
+     [90m 312 |[39m     }
+     [90m 313 |[39m   })[33m;[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/triggers.ts:310:26
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1503:7)
+
+  console.warn
+    {"severity":"WARNING","message":"Task update task9 has missing before/after data. Skipping notification."}
+
+    [0m [90m 234 |[39m
+     [90m 235 |[39m     [36mif[39m ([33m![39mnewValue [33m||[39m [33m![39mpreviousValue) {
+    [31m[1m>[22m[39m[90m 236 |[39m       functions[33m.[39mlogger[33m.[39mwarn([32m`Task update ${context.params.taskId} has missing before/after data. Skipping notification.`[39m)[33m;[39m
+     [90m     |[39m                        [31m[1m^[22m[39m
+     [90m 237 |[39m       [36mreturn[39m[33m;[39m
+     [90m 238 |[39m     }
+     [90m 239 |[39m[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/triggers.ts:236:24
+      at cloudFunction.run (node_modules/firebase-functions/lib/common/onInit.js:33:16)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1522:13)
+
+  console.error
+    {"action":"device.pair","userId":"c1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:144:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1546:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/pairing.ts:144:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1546:7)
+
+  console.error
+    {"action":"device.pair","userId":"c1","status":"failure","error":"Active subscription or trial required for pairing.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:351:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1576:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/pairing.ts:351:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1576:7)
+
+  console.error
+    {"action":"device.pair","userId":"c1","status":"failure","error":"Child limit reached (1). Upgrade your subscription for more devices.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:351:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1588:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/pairing.ts:351:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1588:7)
+
+  console.error
+    {"action":"device.pair","userId":"m1","status":"denied","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at AuditLogger.logDenied (D:\\Tools\\MiniMaster\\src\\shared.ts:245:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:221:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1596:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logDenied (src/shared.ts:245:5)
+      at src/pairing.ts:221:9
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1596:7)
+
+  console.error
+    {"action":"device.pair","userId":"m1","status":"failure","error":"Your trial has expired. Please subscribe to continue using Mini-Master.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:199:26)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/timers:538:9)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:230:5)\n    at D:\\Tools\\MiniMaster\\src\\pairing.ts:253:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-wave2.test.ts:1596:7)"}
+
+    [0m [90m 197 |[39m
+     [90m 198 |[39m       [36mif[39m (status [33m===[39m [32m"failure"[39m [33m||[39m status [33m===[39m [32m"denied"[39m) {
+    [31m[1m>[22m[39m[90m 199 |[39m         functions[33m.[39mlogger[33m.[39merror([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status[33m,[39m error[33m:[39m error[33m?[39m[33m.[39mmessage })[33m;[39m
+     [90m     |[39m                          [31m[1m^[22m[39m
+     [90m 200 |[39m       } [36melse[39m {
+     [90m 201 |[39m         functions[33m.[39mlogger[33m.[39minfo([32m"Audit Event"[39m[33m,[39m { action[33m,[39m userId[33m,[39m status })[33m;[39m
+     [90m 202 |[39m       }[0m
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:199:26)
+      at AuditLogger.logFailure (src/shared.ts:230:5)
+      at src/pairing.ts:253:7
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1596:7)
+
+  console.info
+    {"severity":"INFO","message":"Child device c1 successfully paired with master m1 via pairing code."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Valid pairing code code789 used and deleted for childId c1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.pair","userId":"c1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"device.pair","userId":"c1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Child device c1 successfully paired with master m1."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+FAIL test/branch-coverage-wave2.test.ts (5.68 s, 151 MB heap size)
+  legal.ts branch coverage
+    getActiveLegalPolicies ÔÇô empty collection (buildDefaultPolicy fallback)
+      ÔêÜ returns default policy when no policies exist in collection (7 ms)
+    getActiveLegalPolicies ÔÇô mapPolicyDoc returns null (invalid policyType)
+      ÔêÜ skips policy with invalid policyType and falls back (3 ms)
+    getActiveLegalPolicies ÔÇô mapPolicyDoc returns null (non-string fields)
+      ÔêÜ skips policy with non-string country and falls back (2 ms)
+    getActiveLegalPolicies ÔÇô effectiveAt is not a Timestamp
+      ÔêÜ uses Timestamp.now() when effectiveAt is a plain object (3 ms)
+    getActiveLegalPolicies ÔÇô locale cascade: language-country fallback
+      ÔêÜ falls back to language-country locale when exact locale not found (2 ms)
+    getActiveLegalPolicies ÔÇô locale cascade: language-only fallback
+      ÔêÜ falls back to language-only locale (3 ms)
+    getActiveLegalPolicies ÔÇô locale cascade: en-US fallback
+      ÔêÜ falls back to en-US locale when no language match (3 ms)
+    getActiveLegalPolicies ÔÇô GLOBAL fallback
+      ÔêÜ falls back to GLOBAL en-US when no country-specific policy exists (2 ms)
+    needsLegalReconsent ÔÇô version mismatch branches
+      ÔêÜ returns requiresReconsent when terms version doesn't match (2 ms)
+      ÔêÜ returns requiresReconsent when privacy version doesn't match (2 ms)
+      ÔêÜ returns requiresReconsent when flag is set in consent doc (2 ms)
+      ├ù returns up_to_date when consent versions match (4 ms)
+      ÔêÜ returns requiresReconsent when accepted versions are non-string (2 ms)
+    publishLegalPolicy ÔÇô effectiveAt branch
+      ÔêÜ uses Timestamp.now() when effectiveAt is not a Timestamp (1 ms)
+      ÔêÜ uses Timestamp.now() when effectiveAt is undefined (1 ms)
+      ÔêÜ defaults status to active when not provided (1 ms)
+      ÔêÜ throws when version is empty (7 ms)
+      ÔêÜ throws when contentUrl is empty (2 ms)
+    markLegalReconsentRequired ÔÇô bulk path
+      ├ù marks all consents in country/locale when no targetMaster (3 ms)
+      ÔêÜ marks single master when targetMaster is provided (1 ms)
+    normalizeCountry / normalizeLocale / normalizePolicyType validation
+      ÔêÜ throws when country is invalid (too long) (1 ms)
+      ÔêÜ throws when locale has invalid format (1 ms)
+      ÔêÜ throws when locale is not a string (1 ms)
+      ÔêÜ throws when policyType is invalid in publishLegalPolicy (1 ms)
+  shared.ts branch coverage
+    requireSupportOrAdmin ÔÇô denied for non-support/non-admin
+      ÔêÜ throws permission-denied for auditor role when support-or-admin required (8 ms)
+      ÔêÜ throws permission-denied for master role when support-or-admin required (1 ms)
+    checkRateLimit ÔÇô window expiry and reset
+      ÔêÜ resets window after expiry and allows requests again (7 ms)
+    validateAppCheck ÔÇô log-only mode (no enforce)
+      ÔêÜ logs but does not throw when app check token missing and enforce=false (2 ms)
+    AuditLogger.logSuccess ÔÇô without context.auth returns early
+      ÔêÜ does not throw when context has no auth (grantSupportAccess catch) (1 ms)
+    AuditLogger.logDenied ÔÇô without context.auth returns early
+      ÔêÜ handles logDenied call gracefully when context.auth is null (10 ms)
+  device.ts branch coverage
+    setUsageRules ÔÇô bedtime format validation
+      ÔêÜ throws when bedtimeStart is not HH:MM format (1 ms)
+      ÔêÜ throws when bedtimeEnd is not HH:MM format (1 ms)
+      ÔêÜ throws when bedtimeStart is not a string (1 ms)
+      ÔêÜ throws when bedtimeEnd is not a string (1 ms)
+      ÔêÜ accepts valid bedtime format (2 ms)
+      ÔêÜ throws when unknown keys are provided (2 ms)
+      ÔêÜ throws when dailyLimit is negative (1 ms)
+      ÔêÜ throws when dailyLimit is not a number (1 ms)
+    getRulesForChild ÔÇô self-child access
+      ÔêÜ allows child to read its own rules (isSelfChild path) (1 ms)
+      ÔêÜ denies access for non-owner non-self requests (1 ms)
+    setDeviceLocked ÔÇô internal error catch
+      ÔêÜ throws internal error when Firestore update fails with non-HttpsError (10 ms)
+    updateAppBlacklist ÔÇô internal error catch
+      ÔêÜ throws internal error when Firestore update fails (7 ms)
+    setUsageRules ÔÇô internal error catch
+      ÔêÜ throws internal error when Firestore update fails (6 ms)
+    getRulesForChild ÔÇô internal error catch
+      ÔêÜ throws internal error when Firestore read fails with non-HttpsError (13 ms)
+    recordHeartbeat ÔÇô internal error catch
+      ÔêÜ throws internal when Firestore update fails with non-HttpsError (7 ms)
+  support.ts branch coverage
+    onTicketCreated ÔÇô empty problem description ÔåÆ skip AI
+      ÔêÜ skips AI analysis when problemDescription is empty (5 ms)
+      ÔêÜ skips AI analysis when problemDescription is whitespace only (3 ms)
+    onTicketCreated ÔÇô low confidence ÔåÆ escalated
+      ├ù escalates ticket when AI confidence is below 0.7 (6 ms)
+    onTicketCreated ÔÇô master not found / no fcmToken
+      ├ù completes without FCM when master doc does not exist (7 ms)
+      ├ù completes without FCM when master has no fcmToken (6 ms)
+    provideSolutionFeedback ÔÇô rejected with comment
+      ├ù escalates ticket when feedback is rejected with comment (6 ms)
+      ÔêÜ throws when rejected without comment (1 ms)
+      ÔêÜ throws when rejected with empty comment (1 ms)
+    provideSolutionFeedback ÔÇô permission denied
+      ├ù throws permission-denied when non-owner tries to update ticket (12 ms)
+    provideSolutionFeedback ÔÇô ticket not found
+      ├ù throws not-found when ticket does not exist (10 ms)
+    provideSolutionFeedback ÔÇô accepted
+      ├ù closes ticket when feedback is accepted (13 ms)
+    provideSolutionFeedback ÔÇô invalid feedback value
+      ÔêÜ throws when feedback is neither accepted nor rejected (2 ms)
+    grantSupportAccess ÔÇô permission denied (wrong owner)
+      ÔêÜ throws permission-denied when ticket belongs to different master (8 ms)
+    revokeSupportAccess ÔÇô permission denied (wrong owner)
+      ÔêÜ throws permission-denied when grant belongs to different master (8 ms)
+    grantSupportAccess ÔÇô internal error catch
+      ÔêÜ throws internal on unexpected Firestore error (6 ms)
+    revokeSupportAccess ÔÇô internal error catch
+      ÔêÜ throws internal on unexpected Firestore error (7 ms)
+    getTicketUserData ÔÇô grant status and expiry branches
+      ÔêÜ throws permission-denied when grant status is revoked (1 ms)
+      ÔêÜ throws deadline-exceeded when grant has expired (1 ms)
+      ÔêÜ throws permission-denied when no accessGrantId on ticket (1 ms)
+      ÔêÜ throws permission-denied when grant doc does not exist (1 ms)
+    aiExplainProblem ÔÇô permission and validation branches
+      ÔêÜ throws when role is neither admin nor support (1 ms)
+      ÔêÜ throws when consent is not given (1 ms)
+      ÔêÜ throws when problemContext is too short (1 ms)
+      ÔêÜ throws when problemContext exceeds 3000 chars (1 ms)
+      ÔêÜ returns explanation for valid admin request (1 ms)
+      ÔêÜ returns explanation for valid support request (1 ms)
+  triggers.ts branch coverage
+    onChildDeviceUpdateV2 ÔÇô deleted and new child guards
+      ├ù does nothing when newData is missing (child deleted) (2 ms)
+      ├ù does nothing when oldData is missing (new child) (1 ms)
+      ├ù does nothing when no relevant changes detected (1 ms)
+      ├ù skips when no valid FCM token (1 ms)
+    onChildDeviceUpdateV2 ÔÇô appBlacklist and usageRules diff
+      ├ù sends FCM when appBlacklist changes (1 ms)
+      ├ù sends FCM when usageRules change (1 ms)
+    sendFcmWithRetry ÔÇô retry on transient error
+      ├ù retries and succeeds on second attempt after transient error
+      ├ù gives up after maxAttempts on persistent transient error
+      ├ù does not retry on non-transient error
+    onTaskStatusChange ÔÇô missing masterImei, missing fcmToken
+      ÔêÜ returns early when masterImei is missing on pending_approval (5 ms)
+      ÔêÜ returns early when master has no fcmToken on pending_approval (3 ms)
+      ÔêÜ sends FCM notification when task becomes pending_approval (1012 ms)
+      ÔêÜ sends review notification to child when task is approved (3034 ms)
+      ÔêÜ sends review notification to child when task is rejected (3 ms)
+      ÔêÜ skips review notification when child has no fcmToken (3 ms)
+      ÔêÜ handles FCM error in review notification gracefully (3 ms)
+      ÔêÜ does nothing when status didn't actually change (1 ms)
+      ÔêÜ does nothing when before/after data is missing (3 ms)
+  pairing.ts branch coverage
+    validatePairingCode ÔÇô subscription check branches
+      ÔêÜ throws resource-exhausted when master has expired trial (8 ms)
+      ÔêÜ throws resource-exhausted when child limit is reached (1 ms)
+    validatePairingToken ÔÇô subscription and child limit
+      ÔêÜ throws resource-exhausted when master has no active access (3 ms)
+      ÔêÜ throws resource-exhausted when child limit reached via token (4 ms)
+    generatePairingLink ÔÇô subscription check
+      ÔêÜ throws resource-exhausted when master has no active access (5 ms)
+    createPairingCode ÔÇô subscription check
+      ÔêÜ throws resource-exhausted when master has no active access (1 ms)
+    validatePairingCode ÔÇô masterId from masterImei fallback
+      ÔêÜ uses masterImei field when masterId is absent (2 ms)
+    validatePairingToken ÔÇô masterId from masterImei fallback
+      ÔêÜ uses masterImei field when masterId is absent (2 ms)
+
+  ÔùÅ legal.ts branch coverage ÔÇ║ needsLegalReconsent ÔÇô version mismatch branches ÔÇ║ returns up_to_date when consent versions match
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      555 |       const wrapped = testEnv.wrap(fns.needsLegalReconsent);
+      556 |       const res = await wrapped({ country: "DE", locale: "de-DE" }, asMaster);
+    > 557 |       expect(res.requiresReconsent).toBe(false);
+          |                                     ^
+      558 |       expect(res.reason).toBe("up_to_date");
+      559 |     });
+      560 |
+
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:557:37)
+
+  ÔùÅ legal.ts branch coverage ÔÇ║ markLegalReconsentRequired ÔÇô bulk path ÔÇ║ marks all consents in country/locale when no targetMaster
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "all_in_locale"
+    Received: "country_locale"
+
+      643 |       const res = await wrapped({ country: "DE", locale: "de-DE" }, asAdmin);
+      644 |       expect(res.success).toBe(true);
+    > 645 |       expect(res.scope).toBe("all_in_locale");
+          |                         ^
+      646 |     });
+      647 |
+      648 |     it("marks single master when targetMaster is provided", async () => {
+
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:645:25)
+
+  ÔùÅ support.ts branch coverage ÔÇ║ onTicketCreated ÔÇô low confidence ÔåÆ escalated ÔÇ║ escalates ticket when AI confidence is below 0.7
+
+    TypeError: Cannot read properties of undefined (reading 'doc')
+
+      488 |       functions.logger.error("Error in onTicketCreated:", error);
+      489 |
+    > 490 |       await admin.firestore().collection("supportTickets").doc(ticketId).update({
+          |                                                           ^
+      491 |         aiGeneratedSolution: "An error occurred while analyzing your ticket. A human support agent will assist you shortly.",
+      492 |         aiConfidenceScore: 0.0,
+      493 |         aiSolutionStatus: "error",
+
+      at src/support.ts:490:59
+
+  ÔùÅ support.ts branch coverage ÔÇ║ onTicketCreated ÔÇô master not found / no fcmToken ÔÇ║ completes without FCM when master doc does not exist
+
+    TypeError: Cannot read properties of undefined (reading 'doc')
+
+      488 |       functions.logger.error("Error in onTicketCreated:", error);
+      489 |
+    > 490 |       await admin.firestore().collection("supportTickets").doc(ticketId).update({
+          |                                                           ^
+      491 |         aiGeneratedSolution: "An error occurred while analyzing your ticket. A human support agent will assist you shortly.",
+      492 |         aiConfidenceScore: 0.0,
+      493 |         aiSolutionStatus: "error",
+
+      at src/support.ts:490:59
+
+  ÔùÅ support.ts branch coverage ÔÇ║ onTicketCreated ÔÇô master not found / no fcmToken ÔÇ║ completes without FCM when master has no fcmToken
+
+    TypeError: Cannot read properties of undefined (reading 'doc')
+
+      488 |       functions.logger.error("Error in onTicketCreated:", error);
+      489 |
+    > 490 |       await admin.firestore().collection("supportTickets").doc(ticketId).update({
+          |                                                           ^
+      491 |         aiGeneratedSolution: "An error occurred while analyzing your ticket. A human support agent will assist you shortly.",
+      492 |         aiConfidenceScore: 0.0,
+      493 |         aiSolutionStatus: "error",
+
+      at src/support.ts:490:59
+
+  ÔùÅ support.ts branch coverage ÔÇ║ provideSolutionFeedback ÔÇô rejected with comment ÔÇ║ escalates ticket when feedback is rejected with comment
+
+    Failed to update ticket feedback.
+
+      547 |       functions.logger.error("Error in provideSolutionFeedback:", error);
+      548 |       if (error instanceof functions.https.HttpsError) throw error;
+    > 549 |       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
+          |             ^
+      550 |     }
+      551 |   }
+      552 | );
+
+      at src/support.ts:549:13
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1059:25)
+
+  ÔùÅ support.ts branch coverage ÔÇ║ provideSolutionFeedback ÔÇô permission denied ÔÇ║ throws permission-denied when non-owner tries to update ticket
+
+    expect(received).rejects.toThrow(expected)
+
+    Expected pattern: /permission/i
+    Received message: "Failed to update ticket feedback."
+
+          547 |       functions.logger.error("Error in provideSolutionFeedback:", error);
+          548 |       if (error instanceof functions.https.HttpsError) throw error;
+        > 549 |       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
+              |             ^
+          550 |     }
+          551 |   }
+          552 | );
+
+      at src/support.ts:549:13
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1086:20)
+      at Object.toThrow (node_modules/expect/build/index.js:218:22)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1086:93)
+
+  ÔùÅ support.ts branch coverage ÔÇ║ provideSolutionFeedback ÔÇô ticket not found ÔÇ║ throws not-found when ticket does not exist
+
+    expect(received).rejects.toThrow(expected)
+
+    Expected pattern: /not found/i
+    Received message: "Failed to update ticket feedback."
+
+          547 |       functions.logger.error("Error in provideSolutionFeedback:", error);
+          548 |       if (error instanceof functions.https.HttpsError) throw error;
+        > 549 |       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
+              |             ^
+          550 |     }
+          551 |   }
+          552 | );
+
+      at src/support.ts:549:13
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1093:20)
+      at Object.toThrow (node_modules/expect/build/index.js:218:22)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1093:98)
+
+  ÔùÅ support.ts branch coverage ÔÇ║ provideSolutionFeedback ÔÇô accepted ÔÇ║ closes ticket when feedback is accepted
+
+    Failed to update ticket feedback.
+
+      547 |       functions.logger.error("Error in provideSolutionFeedback:", error);
+      548 |       if (error instanceof functions.https.HttpsError) throw error;
+    > 549 |       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
+          |             ^
+      550 |     }
+      551 |   }
+      552 | );
+
+      at src/support.ts:549:13
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1105:25)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ onChildDeviceUpdateV2 ÔÇô deleted and new child guards ÔÇ║ does nothing when newData is missing (child deleted)
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1306 |         },
+      1307 |       };
+    > 1308 |       await wrapped(event);
+           |             ^
+      1309 |     });
+      1310 |
+      1311 |     it("does nothing when oldData is missing (new child)", async () => {
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1308:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ onChildDeviceUpdateV2 ÔÇô deleted and new child guards ÔÇ║ does nothing when oldData is missing (new child)
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1318 |         },
+      1319 |       };
+    > 1320 |       await wrapped(event);
+           |             ^
+      1321 |     });
+      1322 |
+      1323 |     it("does nothing when no relevant changes detected", async () => {
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1320:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ onChildDeviceUpdateV2 ÔÇô deleted and new child guards ÔÇ║ does nothing when no relevant changes detected
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1331 |         },
+      1332 |       };
+    > 1333 |       await wrapped(event);
+           |             ^
+      1334 |       expect(mockSend).not.toHaveBeenCalled();
+      1335 |     });
+      1336 |
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1333:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ onChildDeviceUpdateV2 ÔÇô deleted and new child guards ÔÇ║ skips when no valid FCM token
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1344 |         },
+      1345 |       };
+    > 1346 |       await wrapped(event);
+           |             ^
+      1347 |       expect(mockSend).not.toHaveBeenCalled();
+      1348 |     });
+      1349 |   });
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1346:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ onChildDeviceUpdateV2 ÔÇô appBlacklist and usageRules diff ÔÇ║ sends FCM when appBlacklist changes
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1359 |         },
+      1360 |       };
+    > 1361 |       await wrapped(event);
+           |             ^
+      1362 |       expect(mockSend).toHaveBeenCalled();
+      1363 |     });
+      1364 |
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1361:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ onChildDeviceUpdateV2 ÔÇô appBlacklist and usageRules diff ÔÇ║ sends FCM when usageRules change
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1372 |         },
+      1373 |       };
+    > 1374 |       await wrapped(event);
+           |             ^
+      1375 |       expect(mockSend).toHaveBeenCalled();
+      1376 |     });
+      1377 |   });
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1374:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ sendFcmWithRetry ÔÇô retry on transient error ÔÇ║ retries and succeeds on second attempt after transient error
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1392 |         },
+      1393 |       };
+    > 1394 |       await wrapped(event);
+           |             ^
+      1395 |       expect(mockSend).toHaveBeenCalledTimes(2);
+      1396 |     });
+      1397 |
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1394:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ sendFcmWithRetry ÔÇô retry on transient error ÔÇ║ gives up after maxAttempts on persistent transient error
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1411 |       };
+      1412 |       // The outer try/catch in onChildDeviceUpdateV2 catches the error
+    > 1413 |       await wrapped(event);
+           |             ^
+      1414 |       expect(mockSend).toHaveBeenCalledTimes(3);
+      1415 |     });
+      1416 |
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1413:13)
+
+  ÔùÅ triggers.ts branch coverage ÔÇ║ sendFcmWithRetry ÔÇô retry on transient error ÔÇ║ does not retry on non-transient error
+
+    TypeError: Right-hand side of 'instanceof' is not an object
+
+      1426 |         },
+      1427 |       };
+    > 1428 |       await wrapped(event);
+           |             ^
+      1429 |       expect(mockSend).toHaveBeenCalledTimes(1);
+      1430 |     });
+      1431 |   });
+
+      at encodeHelper (node_modules/firebase-functions-test/lib/providers/firestore.js:165:17)
+      at node_modules/lodash/lodash.js:13508:38
+      at node_modules/lodash/lodash.js:5006:15
+      at baseForOwn (node_modules/lodash/lodash.js:3032:24)
+      at mapValues (node_modules/lodash/lodash.js:13507:7)
+      at objectToValueProto (node_modules/firebase-functions-test/lib/providers/firestore.js:202:35)
+      at makeDocumentSnapshot (node_modules/firebase-functions-test/lib/providers/firestore.js:66:21)
+      at getOrCreateDocumentSnapshot (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:97:53)
+      at getOrCreateDocumentSnapshotChange (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:111:32)
+      at Object.getDocumentSnapshotChangeCloudEvent [as generateMock] (node_modules/firebase-functions-test/lib/cloudevent/mocks/firestore/helpers.js:38:18)
+      at generateMockCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:20:42)
+      at generateCombinedCloudEvent (node_modules/firebase-functions-test/lib/cloudevent/generate.js:13:33)
+      at node_modules/firebase-functions-test/lib/v2.js:47:70
+      at Object.<anonymous> (test/branch-coverage-wave2.test.ts:1428:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       18 failed, 79 passed, 97 total
+Snapshots:   0 total
+Time:        5.918 s, estimated 6 s
+Ran all test suites matching /test\\branch-coverage-wave2.test.ts/i.
