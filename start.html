@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniMaster – Start</title>
+  <style>
+    :root {
+      --bg: linear-gradient(135deg, #e8f0fe 0%, #f8fbff 40%, #e8f8ee 100%);
+      --ink: #10243f;
+      --card: #ffffff;
+      --primary: #1f6feb;
+      --secondary: #0f172a;
+      --muted: #5b6b80;
+      --green: #16a34a;
+      --orange: #ea580c;
+      --purple: #7c3aed;
+      --red: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .logo-circle {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--primary), var(--purple));
+      border-radius: 20px;
+      display: inline-grid;
+      place-items: center;
+      color: #fff;
+      font-size: 2.2rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(31,111,235,0.25);
+    }
+    .header h1 { font-size: 2.4rem; margin-bottom: 4px; }
+    .header p { color: var(--muted); font-size: 1.05rem; }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      width: min(980px, 100%);
+      margin-bottom: 28px;
+    }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(15,23,42,0.07);
+      border-radius: 18px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(15,23,42,0.06);
+      transition: transform .18s ease, box-shadow .18s ease;
+      cursor: default;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(15,23,42,0.12);
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .card-icon {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .icon-admin { background: var(--purple); }
+    .icon-parent { background: var(--primary); }
+    .icon-child { background: var(--green); }
+    .card-top h2 { font-size: 1.15rem; font-weight: 700; }
+    .card p.desc {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      flex: 1;
+    }
+    .card .actions { margin-top: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* Buttons */
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform .12s, box-shadow .12s, filter .12s;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(31,111,235,0.18);
+      filter: brightness(1.05);
+    }
+    .btn:active { transform: translateY(0); }
+    .btn-purple { background: var(--purple); color: #fff; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid rgba(15,23,42,0.12);
+      color: var(--ink);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* APK Path */
+    .apk-path {
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .apk-path code {
+      flex: 1;
+      word-break: break-all;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 0.8rem;
+      color: var(--ink);
+    }
+    .apk-path .apk-label {
+      font-weight: 700;
+      color: var(--ink);
+      white-space: nowrap;
+      font-size: 0.78rem;
+    }
+    .btn-copy {
+      background: var(--secondary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .btn-copy:hover { background: var(--primary); }
+    .btn-copy.copied { background: var(--green); }
+
+    /* Info Bar */
+    .info-bar {
+      width: min(980px, 100%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid rgba(15,23,42,0.06);
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+    .footer {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .footer a { color: var(--primary); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-circle">M</div>
+    <h1>MiniMaster</h1>
+    <p>Elternkontroll-Suite – Alle Anwendungen auf einen Blick</p>
+  </div>
+
+  <section class="grid">
+    <!-- Admin Dashboard -->
+    <article class="card">
+      <div class="card-top">
+        <div class="card-icon icon-admin">🛡️</div>
+        <h2>Admin Dashboard</h2>
+      </div>
+      <p class="desc">Benutzerverwaltung, Abonnements, Audit-Logs, Support-Tickets und Systemübersicht für Administratoren.</p>
+      <div class="actions">
+        <a class="btn btn-purple" href="admin-panel/index.html">Admin öffnen</a>
+        <a class="btn btn-outline" href="admin-panel/logs.html">Audit-Logs</a>
+      </div>
+    </article>
+
+    <!-- Eltern Control Panel -->
+    <article class="card">
+      <div class="card-top">
+        <div class="card-icon icon-parent">👨‍👩‍👧</div>
+        <h2>Eltern Control Panel</h2>
+      </div>
+      <p class="desc">Geräte sperren &amp; entsperren, Aufgaben erstellen, Nutzungsregeln setzen und Support-Fälle verwalten.</p>
+      <div class="apk-path">
+        <span class="apk-label">APK:</span>
+        <code id="master-apk-path">masterApp\build\outputs\apk\debug\masterApp-debug.apk</code>
+        <button class="btn-copy" onclick="copyPath('master-apk-path')">📋 Kopieren</button>
+      </div>
+      <div class="actions">
+        <a class="btn btn-primary" href="web-control/index.html">Eltern-Panel öffnen</a>
+      </div>
+    </article>
+
+    <!-- Kinder-App -->
+    <article class="card">
+      <div class="card-top">
+        <div class="card-icon icon-child">📱</div>
+        <h2>Kinder-App</h2>
+      </div>
+      <p class="desc">Die Kinder-App wird auf dem Gerät des Kindes installiert. Kopplung via QR-Code oder 6-stelligem Pairing-Code.</p>
+      <div class="apk-path">
+        <span class="apk-label">APK:</span>
+        <code id="child-apk-path">childApp\build\outputs\apk\debug\childApp-debug.apk</code>
+        <button class="btn-copy" onclick="copyPath('child-apk-path')">📋 Kopieren</button>
+      </div>
+      <div class="actions">
+        <a class="btn btn-green" href="QUICK_START_GUIDE.md">Schnellstart-Anleitung</a>
+        <a class="btn btn-outline" href="FIREBASE_EINRICHTUNG.md">Firebase-Setup</a>
+      </div>
+    </article>
+  </section>
+
+  <div class="info-bar">
+    <span class="dot"></span>
+    <span>Firebase-Projekt konfiguriert · Admin-Panel &amp; Eltern-Panel bereit · Kinder-App via APK oder Android Studio installierbar</span>
+  </div>
+
+  <div class="footer">
+    MiniMaster v1.0 · <a href="README.md">Dokumentation</a> · <a href="API_DOCUMENTATION.md">API-Referenz</a> · <a href="ARCHITECTURE.md">Architektur</a>
+  </div>
+  <script>
+    function copyPath(elementId) {
+      const codeEl = document.getElementById(elementId);
+      const relativePath = codeEl.textContent;
+      // Build absolute path from current page location
+      const basePath = decodeURIComponent(location.pathname.replace(/\/[^\/]*$/, '').replace(/^\//, ''));
+      const fullPath = basePath + '\\' + relativePath;
+      const btn = codeEl.nextElementSibling;
+      navigator.clipboard.writeText(fullPath).then(function() {
+        btn.textContent = '✅ Kopiert!';
+        btn.classList.add('copied');
+        setTimeout(function() { btn.textContent = '📋 Kopieren'; btn.classList.remove('copied'); }, 1500);
+      }).catch(function() {
+        // Fallback for file:// protocol
+        var ta = document.createElement('textarea');
+        ta.value = fullPath;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✅ Kopiert!';
+        btn.classList.add('copied');
+        setTimeout(function() { btn.textContent = '📋 Kopieren'; btn.classList.remove('copied'); }, 1500);
+      });
+    }
+  </script>
+</body>
+</html>

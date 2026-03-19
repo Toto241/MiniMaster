@@ -122,6 +122,24 @@ export const setUsageRules = functions.https.onCall(
       throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'usageRules' object.");
     }
 
+    // Schema validation: only allow known keys with correct types
+    const rules = usageRules as Record<string, unknown>;
+    const allowedKeys = new Set(["dailyLimit", "bedtimeStart", "bedtimeEnd", "scheduledDowntime"]);
+    const invalidKeys = Object.keys(rules).filter((k) => !allowedKeys.has(k));
+    if (invalidKeys.length > 0) {
+      throw new functions.https.HttpsError("invalid-argument", `Unknown usageRules keys: ${invalidKeys.join(", ")}`);
+    }
+    if (rules.dailyLimit !== undefined && (typeof rules.dailyLimit !== "number" || rules.dailyLimit < 0)) {
+      throw new functions.https.HttpsError("invalid-argument", "dailyLimit must be a non-negative number.");
+    }
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (rules.bedtimeStart !== undefined && (typeof rules.bedtimeStart !== "string" || !timeRegex.test(rules.bedtimeStart))) {
+      throw new functions.https.HttpsError("invalid-argument", "bedtimeStart must be in HH:MM format.");
+    }
+    if (rules.bedtimeEnd !== undefined && (typeof rules.bedtimeEnd !== "string" || !timeRegex.test(rules.bedtimeEnd))) {
+      throw new functions.https.HttpsError("invalid-argument", "bedtimeEnd must be in HH:MM format.");
+    }
+
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {

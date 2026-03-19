@@ -172,7 +172,7 @@ describe("setUsageRules", () => {
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
     updateMock.mockResolvedValue(undefined);
     const wrapped = testEnv.wrap(fns.setUsageRules);
-    const usageRules = { dailyLimitSeconds: 3600 };
+    const usageRules = { dailyLimit: 3600000, bedtimeStart: "21:00", bedtimeEnd: "07:00" };
     const res = await wrapped({ childId: "c1", usageRules }, asMaster);
     expect(res).toEqual({ success: true });
     expect(updateMock).toHaveBeenCalledWith({ usageRules, updatedAt: "mock-server-timestamp" });
