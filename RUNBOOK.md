@@ -159,6 +159,8 @@ After every production deploy, complete this sequence:
 7. Support ticket creation and operator processing work.
 
 For final release approval, execute and archive the commissioning checklist in [docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md).
+Apply the full release acceptance orchestration in [docs/COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md](docs/COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md).
+Track progress to >90% finalization using [docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md](docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md).
 
 ## 7. Evidence & Audit Trail
 
