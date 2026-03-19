@@ -1,0 +1,70 @@
+deleteUserAccount non-admin trying to delete another user throws permission-denied
+triggerScheduledJob unknown job throws invalid-argument
+triggerScheduledJob missing jobName throws invalid-argument
+executeAutoFix unknown action throws invalid-argument
+executeAutoFix missing analysisId throws invalid-argument
+executeAutoFix analysis not found throws not-found
+executeAutoFix missing errorIndex throws invalid-argument
+executeAutoFix negative errorIndex throws invalid-argument
+executeAutoFix missing action throws invalid-argument
+updateKnowledgeBase missing content throws invalid-argument
+sendTestFcmMessage throws when neither token nor childId provided
+generateCustomToken invalid secretKey throws unauthenticated
+generateCustomToken missing masterImei without auth throws unauthenticated
+bootstrapFirstAdmin throws permission-denied when admin already exists
+bootstrapFirstAdmin internal error on auth failure
+bootstrapFirstAdmin unauthenticated user rejected
+registerMasterDevice mismatched auth uid and imei throws failed-precondition
+registerMasterDevice invalid imei throws invalid-argument
+setUserRole invalid role throws invalid-argument
+setUserRole missing uid throws invalid-argument
+setUserRole non-admin rejected
+setUserRole internal error on auth SDK failure
+setAdminClaim internal error on auth SDK failure
+revokeUserTokens revokes tokens for valid uid
+getActiveLegalPolicies invalid country throws
+getActiveLegalPolicies invalid locale throws
+recordLegalConsent version mismatch throws failed-precondition
+recordLegalConsent missing termsVersion throws invalid-argument
+publishLegalPolicy missing version throws invalid-argument
+publishLegalPolicy missing contentUrl throws invalid-argument
+publishLegalPolicy invalid policyType throws invalid-argument
+markLegalReconsentRequired marks all users for reconsent (bulk)
+revokeSubscription subscription not found throws not-found
+revokeSubscription neither subscriptionId nor masterId throws invalid-argument
+getSubscriptionStatus master not found throws not-found
+verifyPurchase missing purchaseToken throws invalid-argument
+verifyPurchase invalid sku throws invalid-argument
+verifyPurchase family_monthly sku is accepted
+verifyPurchase yearly sku is accepted
+verifyPurchase family_yearly sku is accepted
+validatePairingCode edge cases data undefined on existing code throws internal
+validatePairingCode edge cases code without expiresAt (data corruption) deletes and throws
+validatePairingCode edge cases code without masterId (data corruption) deletes and throws
+validatePairingCode edge cases expired pairing code throws deadline-exceeded
+validatePairingCode edge cases master with no active access throws resource-exhausted
+validatePairingCode edge cases child limit reached throws resource-exhausted
+shared utilities (via createTask) createTask with expired trial throws resource-exhausted
+shared utilities (via createTask) createTask with no subscription at all throws resource-exhausted
+completeTask edge cases task not in pending state throws failed-precondition
+completeTask edge cases photoUrl exceeding max length throws
+approveTask edge cases task not in pending_approval throws failed-precondition
+rejectTask edge cases task not in pending_approval throws failed-precondition
+reportTamperEvent FCM branches child with no masterImei throws not-found
+device catch branches updateAppBlacklist ÔÇô child not owned by master throws permission-denied
+device catch branches setUsageRules ÔÇô child not owned by master throws permission-denied
+device catch branches getRulesForChild ÔÇô unauthorized user throws permission-denied
+provideSolutionFeedback edge branches rejects feedback requires comment
+provideSolutionFeedback edge branches wrong user cannot update ticket
+getTicketUserData grant status grant status revoked throws permission-denied
+getTicketUserData grant status grant expired auto-updates and throws deadline-exceeded
+aiExplainProblem edge cases problemContext too long (>3000 chars) throws
+recordHeartbeat child not found throws not-found
+registerFcmToken missing token throws invalid-argument
+registerFcmToken child not found throws not-found
+reportDailyUsage missing date throws invalid-argument
+analyzeSystemErrors no errors returns empty analyses
+analyzeSystemErrors no GEMINI_API_KEY throws failed-precondition
+analyzeSystemErrors errorId not found throws not-found
+exportUserData master not found throws not-found
+exportUserData missing masterId throws invalid-argument

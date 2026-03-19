@@ -1,0 +1,623 @@
+=== deleteUserAccount non-admin trying to delete another user throws permission-denied ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Users can only delete their own account."
+
+    [0m [90m 88 |[39m       masterId [33m=[39m data[33m.[39mmasterId[33m;[39m
+     [90m 89 |[39m     } [36melse[39m [36mif[39m ([
+
+=== triggerScheduledJob unknown job throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Unbekannter Job: unknown_job"
+
+    [0m [90m 497 |[39m
+     [90m 498 |[39m         [36mdefault[39m[33m:[39m
+    [31m[1m>[22m[39m[90m 499 |[39m           [36mthrow[39m [36mn
+
+=== triggerScheduledJob missing jobName throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "jobName ist erforderlich."
+
+    [0m [90m 452 |[39m     [36mconst[39m jobName [33m=[39m data[33m?[39m[33m.[39mjobName[33m;[39m
+     [90m 453 |[39m     [36mif[39m ([33m![39
+
+=== executeAutoFix unknown action throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Unbekannte Auto-Fix-Aktion: malicious_action. Erlaubt: cleanup_expired_subscriptions, cleanup_expired_grants, regenerate_error_report, clear_error_logs"
+
+    [0m [90m 801 |[39m
+     [90
+
+=== executeAutoFix missing analysisId throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "analysisId ist erforderlich."
+
+    [0m [90m 724 |[39m     [36mconst[39m { analysisId[33m,[39m errorIndex[33m,[39m action } [33m=[39m data [33m||[39m {}[33m;[39m
+     [90m 72
+
+=== executeAutoFix analysis not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Analyse nicht gefunden."
+
+    [0m [90m 737 |[39m     [36mconst[39m analysisDoc [33m=[39m [36mawait[39m analysisRef[33m.[39m[36mget[39m()[33m;[39m
+     [90m 738 |[39m     [36mif[
+
+=== executeAutoFix missing errorIndex throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "errorIndex ist erforderlich."
+
+    [0m [90m 727 |[39m     }
+     [90m 728 |[39m     [36mif[39m ([36mtypeof[39m errorIndex [33m!==[39m [32m"number"[39m [33m||[39m errorIndex 
+
+=== executeAutoFix negative errorIndex throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "errorIndex ist erforderlich."
+
+    [0m [90m 727 |[39m     }
+     [90m 728 |[39m     [36mif[39m ([36mtypeof[39m errorIndex [33m!==[39m [32m"number"[39m [33m||[39m errorIndex 
+
+=== executeAutoFix missing action throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "action ist erforderlich."
+
+    [0m [90m 730 |[39m     }
+     [90m 731 |[39m     [36mif[39m ([33m![39maction [33m||[39m [36mtypeof[39m action [33m!==[39m [32m"string"[39m) {
+
+=== updateKnowledgeBase missing content throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "content (string) is required."
+
+    [0m [90m 388 |[39m
+     [90m 389 |[39m     [36mif[39m ([36mtypeof[39m data[33m?[39m[33m.[39mcontent [33m!==[39m [32m"string"[39m) {
+    
+
+=== sendTestFcmMessage throws when neither token nor childId provided ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "token oder childId ist erforderlich."
+
+    [0m [90m 420 |[39m
+     [90m 421 |[39m     [36mif[39m ([33m![39mfcmToken [33m||[39m [36mtypeof[39m fcmToken [33m!==[39m [32m"strin
+
+=== generateCustomToken invalid secretKey throws unauthenticated ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "unauthenticated"
+Received message:   "Invalid master IMEI or secret key."
+
+    [0m [90m 194 |[39m       [36mconst[39m masterDoc [33m=[39m [36mawait[39m db()[33m.[39mcollection([32m"masters"[39m)[33m.[39mdoc(master
+
+=== generateCustomToken missing masterImei without auth throws unauthenticated ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "unauthenticated"
+Received message:   "Either authenticated context or valid masterImei/secretKey is required."
+
+    [0m [90m 186 |[39m       [36mconst[39m { masterImei[33m,[39m secretKey } [33m=[39m data [33m||[39m {}
+
+=== bootstrapFirstAdmin throws permission-denied when admin already exists ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Es existiert bereits ein Admin. Bitten Sie den bestehenden Admin, Ihnen eine Rolle zuzuweisen."
+
+    [0m [90m 134 |[39m
+     [90m 135 |[39m       [36mif[39m (adminExists) {
+    [31
+
+=== bootstrapFirstAdmin internal error on auth failure ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "internal"
+Received message:   "Admin-Aktivierung fehlgeschlagen: auth service down"
+
+    [0m [90m 153 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m) [36mthrow[
+
+=== bootstrapFirstAdmin unauthenticated user rejected ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "unauthenticated"
+Received message:   "Sie m├╝ssen angemeldet sein."
+
+    [0m [90m 113 |[39m   [36masync[39m (_data[33m:[39m unknown[33m,[39m context[33m:[39m [33mCallableContext[39m) [33m=>[39m {
+     [90m 114 |
+
+=== registerMasterDevice mismatched auth uid and imei throws failed-precondition ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "failed-precondition"
+Received message:   "Authenticated user does not match requested master device id."
+
+    [0m [90m 263 |[39m
+     [90m 264 |[39m     [36mif[39m (context[33m.[39mauth [33m&&[39m context[33m.[39mau
+
+=== registerMasterDevice invalid imei throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "The function must be called with a valid 'imei' string."
+
+    [0m [90m 246 |[39m     [36mconst[39m { imei } [33m=[39m data[33m;[39m
+     [90m 247 |[39m     [36mif[39m ([33m![
+
+=== setUserRole invalid role throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Role must be one of: admin, support, auditor"
+
+    [0m [90m 79 |[39m       }
+     [90m 80 |[39m       [36mif[39m ([33m![39mrole [33m||[39m [33m![39m[33mVALID_OPERATOR_ROLES[3
+
+=== setUserRole missing uid throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "A valid user UID is required."
+
+    [0m [90m 76 |[39m       [36mconst[39m { uid[33m,[39m role } [33m=[39m data[33m;[39m
+     [90m 77 |[39m       [36mif[39m ([33m![39muid [
+
+=== setUserRole non-admin rejected ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Admin privileges required."
+
+    [0m [90m 29 |[39m [36mexport[39m [36mfunction[39m requireAdmin(context[33m:[39m [33mCallableContext[39m)[33m:[39m [36mvoid[39m {
+     [90m 
+
+=== setUserRole internal error on auth SDK failure ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "internal"
+Received message:   "Failed to set user role."
+
+    [0m [90m  99 |[39m       )[33m;[39m
+     [90m 100 |[39m       [36mif[39m (error [36minstanceof[39m functions[33m.[39mhttps[33m.[39m[33mHttpsError[39m
+
+=== setAdminClaim internal error on auth SDK failure ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "internal"
+Received message:   "Failed to set admin claim."
+
+    [0m [90m 57 |[39m     console[33m.[39merror([32m"Error setting custom claim:"[39m[33m,[39m error)[33m;[39m
+     [90m 58 |[39m     [36mif[39m (error 
+
+=== revokeUserTokens revokes tokens for valid uid ===
+Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: undefined
+    at Object.<anonymous> (D:\Tools\MiniMaster\test\branch-coverage-wave5.test.ts:733:25)
+
+=== getActiveLegalPolicies invalid country throws ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "country must be a valid 2-letter ISO code."
+
+    [0m [90m 29 |[39m [36mfunction[39m normalizeCountry(raw[33m:[39m unknown)[33m:[39m string {
+     [90m 30 |[39m   [36mif[39m ([
+
+=== getActiveLegalPolicies invalid locale throws ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "locale must be a valid BCP-47 language tag."
+
+    [0m [90m 40 |[39m   [36mconst[39m value [33m=[39m raw[33m.[39mtrim()[33m;[39m
+     [90m 41 |[39m   [36mif[39m ([33m![39m[
+
+=== recordLegalConsent version mismatch throws failed-precondition ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "failed-precondition"
+Received message:   "Consent versions do not match currently active legal policy versions."
+
+    [0m [90m 261 |[39m     [36mconst[39m policies [33m=[39m [36mawait[39m getEffectivePolicies(country[3
+
+=== recordLegalConsent missing termsVersion throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "termsVersion and privacyVersion are required."
+
+    [0m [90m 249 |[39m     [36mconst[39m privacyVersion [33m=[39m [36mtypeof[39m data[33m?[39m[33m.[39mprivacyVersion [33m===[
+
+=== publishLegalPolicy missing version throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "version is required."
+
+    [0m [90m 331 |[39m
+     [90m 332 |[39m     [36mif[39m ([33m![39mversion) {
+    [31m[1m>[22m[39m[90m 333 |[39m       [36mthrow[39m [36mnew[39m f
+
+=== publishLegalPolicy missing contentUrl throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "contentUrl is required."
+
+    [0m [90m 334 |[39m     }
+     [90m 335 |[39m     [36mif[39m ([33m![39mcontentUrl) {
+    [31m[1m>[22m[39m[90m 336 |[39m       [36mthrow[39m [3
+
+=== publishLegalPolicy invalid policyType throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "policyType must be either 'terms' or 'privacy'."
+
+    [0m [90m 47 |[39m [36mfunction[39m normalizePolicyType(raw[33m:[39m unknown)[33m:[39m [33mPolicyType[39m {
+     [90m 48 |[
+
+=== markLegalReconsentRequired marks all users for reconsent (bulk) ===
+Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: "all_matching"
+Received: "country_locale"
+    at Object.<anonymous> (D:\Tools\MiniMaster\test\branch-coverage-wave5.test.ts:990:23)
+
+=== revokeSubscription subscription not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Subscription not found."
+
+    [0m [90m 177 |[39m         [36mconst[39m subDoc [33m=[39m [36mawait[39m db()[33m.[39mcollection([32m"subscriptions"[39m)[33m.[39mdoc(subscriptionId)[3
+
+=== revokeSubscription neither subscriptionId nor masterId throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "The function must be called with subscriptionId or masterId."
+
+    [0m [90m 159 |[39m
+     [90m 160 |[39m       [36mif[39m ([33m![39msubscriptionId [33m&&[39m [33m![39mtargetMa
+
+=== getSubscriptionStatus master not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Master account not found."
+
+    [0m [90m 122 |[39m     [36mconst[39m masterDoc [33m=[39m [36mawait[39m masterDeviceRef[33m.[39m[36mget[39m()[33m;[39m
+     [90m 123 |[39m     [36m
+
+=== verifyPurchase missing purchaseToken throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Missing required fields."
+
+    [0m [90m 48 |[39m
+     [90m 49 |[39m     [36mif[39m ([33m![39mpurchaseToken [33m||[39m [33m![39msku) {
+    [31m[1m>[22m[39m[90m 50 |[39m   
+
+=== verifyPurchase invalid sku throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Unknown product ID: invalid_sku"
+
+    [0m [90m 52 |[39m
+     [90m 53 |[39m     [36mif[39m ([33m![39m[33mVALID_PRODUCT_IDS[39m[33m.[39mincludes(sku)) {
+    [31m[1m>[22m[39m
+
+=== verifyPurchase family_monthly sku is accepted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Purchase verification failed."
+
+    [0m [90m  99 |[39m
+     [90m 100 |[39m         functions[33m.[39mlogger[33m.[39mwarn([32m`Invalid purchase token received for master ${masterI
+
+=== verifyPurchase yearly sku is accepted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Purchase verification failed."
+
+    [0m [90m  99 |[39m
+     [90m 100 |[39m         functions[33m.[39mlogger[33m.[39mwarn([32m`Invalid purchase token received for master ${masterI
+
+=== verifyPurchase family_yearly sku is accepted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Purchase verification failed."
+
+    [0m [90m  99 |[39m
+     [90m 100 |[39m         functions[33m.[39mlogger[33m.[39mwarn([32m`Invalid purchase token received for master ${masterI
+
+=== validatePairingCode edge cases data undefined on existing code throws internal ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Invalid pairing code."
+
+    [0m [90m 100 |[39m     [36mif[39m ([33m![39mdoc[33m.[39mexists) {
+     [90m 101 |[39m       functions[33m.[39mlogger[33m.[39mwarn([32m`Pairing code ${pa
+
+=== validatePairingCode edge cases code without expiresAt (data corruption) deletes and throws ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "internal"
+Received message:   "Invalid pairing code data structure."
+
+    [0m [90m 116 |[39m       [36mawait[39m pairingCodeRef[33m.[39m[36mdelete[39m()[33m;[39m
+     [90m 117 |[39m       functions[33m.[39mlogger
+
+=== validatePairingCode edge cases code without masterId (data corruption) deletes and throws ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "internal"
+Received message:   "Invalid pairing code data structure (masterId)."
+
+    [0m [90m 123 |[39m       [36mawait[39m pairingCodeRef[33m.[39m[36mdelete[39m()[33m;[39m
+     [90m 124 |[39m       functions[33m.
+
+=== validatePairingCode edge cases expired pairing code throws deadline-exceeded ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "deadline-exceeded"
+Received message:   "Pairing code has expired."
+
+    [0m [90m 132 |[39m       [36mawait[39m pairingCodeRef[33m.[39m[36mdelete[39m()[33m;[39m
+     [90m 133 |[39m       functions[33m.[39mlogger[3
+
+=== validatePairingCode edge cases master with no active access throws resource-exhausted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "resource-exhausted"
+Received message:   "Your trial has expired. Please subscribe to continue using Mini-Master."
+
+    [0m [90m 147 |[39m         { masterId[33m,[39m subscriptionStatus[33m:[39m masterData[33m?[39m[33m.
+
+=== validatePairingCode edge cases child limit reached throws resource-exhausted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "resource-exhausted"
+Received message:   "Child limit reached (1). Upgrade your subscription for more devices."
+
+    [0m [90m 157 |[39m       [33m.[39mwhere([32m"masterImei"[39m[33m,[39m [32m"=="[39m[33m,[39m masterI
+
+=== shared utilities (via createTask) createTask with expired trial throws resource-exhausted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "resource-exhausted"
+Received message:   "Active subscription or trial required to create tasks."
+
+    [0m [90m 28 |[39m
+     [90m 29 |[39m     [36mif[39m ([33m![39mhasActiveAccess(masterDoc[33m.[39mdata())) {
+    [31
+
+=== shared utilities (via createTask) createTask with no subscription at all throws resource-exhausted ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "resource-exhausted"
+Received message:   "Active subscription or trial required to create tasks."
+
+    [0m [90m 28 |[39m
+     [90m 29 |[39m     [36mif[39m ([33m![39mhasActiveAccess(masterDoc[33m.[39mdata())) {
+    [31
+
+=== completeTask edge cases task not in pending state throws failed-precondition ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "failed-precondition"
+Received message:   "Task cannot transition to pending_approval from current state."
+
+    [0m [90m 100 |[39m       [36mconst[39m current [33m=[39m taskDoc[33m.[39mdata() [36mas[39m any[33m;[39m
+
+
+=== completeTask edge cases photoUrl exceeding max length throws ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "photoUrl exceeds maximum allowed length."
+
+    [0m [90m 87 |[39m     [90m// Enforce max URL length to prevent abuse[39m
+     [90m 88 |[39m     [36mif[39m (photoUrl[33m.[39mlength
+
+=== approveTask edge cases task not in pending_approval throws failed-precondition ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "failed-precondition"
+Received message:   "Task not in pending_approval state."
+
+    [0m [90m 163 |[39m       [36mconst[39m taskData [33m=[39m taskSnap[33m.[39mdata() [36mas[39m any[33m;[39m
+     [90m 164 |[39m    
+
+=== rejectTask edge cases task not in pending_approval throws failed-precondition ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "failed-precondition"
+Received message:   "Task not in pending_approval state."
+
+    [0m [90m 221 |[39m       [36mconst[39m taskData [33m=[39m taskSnap[33m.[39mdata() [36mas[39m any[33m;[39m
+     [90m 222 |[39m    
+
+=== reportTamperEvent FCM branches child with no masterImei throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "No parent linked to this child."
+
+    [0m [90m 393 |[39m     [36mconst[39m masterImei [33m=[39m childDoc[33m.[39mdata()[33m?[39m[33m.[39mmasterImei[33m;[39m
+     [90m 394 |[39m   
+
+=== device catch branches updateAppBlacklist ÔÇô child not owned by master throws permission-denied ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Master device not authorized for this child."
+
+    [0m [90m 86 |[39m         [32m"Master not authorized for this child"[39m[33m,[39m { childId[33m,[39m appCount[33m:[39m appBlac
+
+=== device catch branches setUsageRules ÔÇô child not owned by master throws permission-denied ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Master device not authorized for this child."
+
+    [0m [90m 154 |[39m         [32m"Master not authorized for this child"[39m[33m,[39m { childId }
+     [90m 155 |[39m       )[33m;
+
+=== device catch branches getRulesForChild ÔÇô unauthorized user throws permission-denied ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Not authorized to read rules for this child device."
+
+    [0m [90m 202 |[39m       [36mconst[39m isSelfChild [33m=[39m childId [33m===[39m requesterId[33m;[39m
+     [90m 203 |
+
+=== provideSolutionFeedback edge branches rejects feedback requires comment ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Comment is required when feedback is rejected."
+
+    [0m [90m 515 |[39m     }
+     [90m 516 |[39m     [36mif[39m (feedback [33m===[39m [32m"rejected"[39m [33m&&[39m ([33m![39
+
+=== provideSolutionFeedback edge branches wrong user cannot update ticket ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "You do not have permission to update this ticket."
+
+    [0m [90m 528 |[39m       [36mconst[39m ticketData [33m=[39m ticketDoc[33m.[39mdata()[33m;[39m
+     [90m 529 |[39m      
+
+=== getTicketUserData grant status grant status revoked throws permission-denied ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "permission-denied"
+Received message:   "Support access grant is revoked. User must re-grant access."
+
+    [0m [90m 589 |[39m     [36mconst[39m grant [33m=[39m grantDoc[33m.[39mdata()[33m![39m[33m;[39m
+     [90m 590
+
+=== getTicketUserData grant status grant expired auto-updates and throws deadline-exceeded ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "deadline-exceeded"
+Received message:   "Support access grant has expired."
+
+    [0m [90m 598 |[39m     [36mif[39m (grant[33m.[39mexpiresAt [33m&&[39m grant[33m.[39mexpiresAt[33m.[39mseconds [33m<[39m now[33m.[39
+
+=== aiExplainProblem edge cases problemContext too long (>3000 chars) throws ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Problembeschreibung darf maximal 3000 Zeichen lang sein."
+
+    [0m [90m 659 |[39m
+     [90m 660 |[39m     [36mif[39m (problemContext[33m.[39mlength [33m>[39m [35m3000[39m) {
+  
+
+=== recordHeartbeat child not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "The specified child device does not exist."
+
+    [0m [90m 227 |[39m       [36mconst[39m childDoc [33m=[39m [36mawait[39m childDeviceRef[33m.[39m[36mget[39m()[33m;[39m
+     [90m 228
+
+=== registerFcmToken missing token throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Request must include a valid 'token'."
+
+    [0m [90m 259 |[39m
+     [90m 260 |[39m     [36mif[39m ([33m![39mtoken [33m||[39m [36mtypeof[39m token [33m!==[39m [32m"string"[3
+
+=== registerFcmToken child not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Child device not found."
+
+    [0m [90m 267 |[39m       [36mconst[39m doc [33m=[39m [36mawait[39m childDeviceRef[33m.[39m[36mget[39m()[33m;[39m
+     [90m 268 |[39m       [36mif[3
+
+=== reportDailyUsage missing date throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "Missing required fields."
+
+    [0m [90m 339 |[39m
+     [90m 340 |[39m     [36mif[39m ([33m![39mdate [33m||[39m [36mtypeof[39m usageMillis [33m!==[39m [32m"number"[39m) {
+  
+
+=== analyzeSystemErrors no errors returns empty analyses ===
+Error: GEMINI_API_KEY ist nicht konfiguriert.
+    at D:\Tools\MiniMaster\src\admin.ts:529:13
+    at D:\Tools\MiniMaster\node_modules\firebase-functions\lib\common\onInit.js:33:16
+    at Function.fixedLen [as run] (D:\Tools\MiniMaster\node_modules\firebase-functions\lib\v1\providers\https.js:76:47)
+ 
+
+=== analyzeSystemErrors no GEMINI_API_KEY throws failed-precondition ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "failed-precondition"
+Received message:   "GEMINI_API_KEY ist nicht konfiguriert."
+
+    [0m [90m 527 |[39m     [36mconst[39m apiKey [33m=[39m process[33m.[39menv[33m.[39m[33mGEMINI_API_KEY[39m[33m;[39m
+     [90m 5
+
+=== analyzeSystemErrors errorId not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Fehler-Eintrag nicht gefunden."
+
+    [0m [90m 542 |[39m       [36mconst[39m errDoc [33m=[39m [36mawait[39m db()[33m.[39mcollection([32m"error_logs"[39m)[33m.[39mdoc(data[33m.[39me
+
+=== exportUserData master not found throws not-found ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "not-found"
+Received message:   "Master account not found."
+
+    [0m [90m 257 |[39m       [36mconst[39m masterDoc [33m=[39m [36mawait[39m db()[33m.[39mcollection([32m"masters"[39m)[33m.[39mdoc(masterId)[33m.[39m
+
+=== exportUserData missing masterId throws invalid-argument ===
+Error: expect(received).rejects.toThrow(expected)
+
+Expected substring: "invalid-argument"
+Received message:   "masterId is required."
+
+    [0m [90m 249 |[39m     [36mconst[39m { masterId } [33m=[39m data [33m||[39m {}[33m;[39m
+     [90m 250 |[39m     [36mif[39m ([33m![39mmasterId [
+
