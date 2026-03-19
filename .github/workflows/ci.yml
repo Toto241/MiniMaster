@@ -53,6 +53,16 @@ jobs:
 
       - name: Run backend tests
         run: npm test --silent
+
+      - name: Upload backend test and coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-quality-gate
+          path: |
+            coverage/
+          retention-days: 30
+
   android:
     runs-on: ubuntu-latest
     defaults:

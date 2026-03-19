@@ -10,11 +10,11 @@
         <link rel="manifest" href="manifest.webmanifest" />
         <link rel="apple-touch-icon" href="icon.svg" />
         <link rel="stylesheet" href="styles.css?v=20260319" />
-        <!-- Firebase SDKs -->
-        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+        <!-- Firebase SDKs (SRI integrity enforced) -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
     </head>
     <body>
         <div class="container">
@@ -679,6 +679,30 @@
                             </div>
                             <div
                                 id="audit-export-result"
+                                class="data-list"
+                                style="margin-block-start: 15px"
+                            ></div>
+                        </div>
+
+                        <div
+                            class="compliance-section admin-only"
+                            style="margin-block-start: 30px"
+                        >
+                            <h3>Legacy-Auth Nutzungsmonitor</h3>
+                            <p>
+                                Zeigt die verbleibende Nutzung der veralteten secretKey/IMEI-Authentifizierung.
+                                Ziel: 0 Nutzungen für 14 aufeinanderfolgende Tage vor Dekommissionierung.
+                            </p>
+                            <div class="dsar-form">
+                                <button
+                                    onclick="loadLegacyAuthUsage()"
+                                    class="btn btn-primary"
+                                >
+                                    Legacy-Auth Nutzung laden
+                                </button>
+                            </div>
+                            <div
+                                id="legacy-auth-result"
                                 class="data-list"
                                 style="margin-block-start: 15px"
                             ></div>

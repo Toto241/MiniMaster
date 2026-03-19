@@ -3613,6 +3613,66 @@ async function exportAuditLogs() {
     }
 }
 
+// ==================== LEGACY AUTH USAGE MONITOR ====================
+
+async function loadLegacyAuthUsage() {
+    const resultEl = document.getElementById("legacy-auth-result");
+    if (!resultEl) return;
+    resultEl.innerHTML = "<div class='loading'>Legacy-Auth Nutzung wird geladen...</div>";
+
+    try {
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        const cutoff = firebase.firestore.Timestamp.fromDate(fourteenDaysAgo);
+
+        const snapshot = await db.collection("legacyAuthUsage")
+            .where("timestamp", ">=", cutoff)
+            .orderBy("timestamp", "desc")
+            .limit(500)
+            .get();
+
+        const total = snapshot.size;
+        const byEndpoint = {};
+        const byDay = {};
+
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            const endpoint = d.endpoint || "unknown";
+            byEndpoint[endpoint] = (byEndpoint[endpoint] || 0) + 1;
+
+            if (d.timestamp && d.timestamp.toDate) {
+                const day = d.timestamp.toDate().toISOString().split("T")[0];
+                byDay[day] = (byDay[day] || 0) + 1;
+            }
+        });
+
+        const zeroForFourteen = total === 0;
+        const statusClass = zeroForFourteen ? "success-box" : "warning-box";
+        const statusText = zeroForFourteen
+            ? "✅ Keine Legacy-Auth Nutzung in den letzten 14 Tagen — Dekommissionierung möglich."
+            : `⚠️ ${total} Legacy-Auth Aufrufe in den letzten 14 Tagen — Migration noch nicht abgeschlossen.`;
+
+        let endpointRows = Object.entries(byEndpoint)
+            .map(([ep, count]) => `<tr><td>${ep}</td><td>${count}</td></tr>`)
+            .join("");
+
+        let dayRows = Object.entries(byDay)
+            .sort(([a], [b]) => b.localeCompare(a))
+            .map(([day, count]) => `<tr><td>${day}</td><td>${count}</td></tr>`)
+            .join("");
+
+        resultEl.innerHTML = `
+            <div class="${statusClass}">${statusText}</div>
+            <h4 style="margin-block-start:15px">Nach Endpoint</h4>
+            <table><tr><th>Endpoint</th><th>Aufrufe</th></tr>${endpointRows || "<tr><td colspan='2'>Keine Daten</td></tr>"}</table>
+            <h4 style="margin-block-start:15px">Nach Tag (letzte 14 Tage)</h4>
+            <table><tr><th>Datum</th><th>Aufrufe</th></tr>${dayRows || "<tr><td colspan='2'>Keine Daten</td></tr>"}</table>
+        `;
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Fehler beim Laden: ${error.message}</div>`;
+    }
+}
+
 // ==================== DEVICES (CHILDREN) TAB ====================
 
 let deviceLastDoc = null;
