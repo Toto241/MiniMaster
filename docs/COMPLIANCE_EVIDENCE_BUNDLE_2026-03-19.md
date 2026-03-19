@@ -66,11 +66,11 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 
 | Metrik | Wert | Ziel | Status |
 |--------|------|------|--------|
-| Statements | 92.00% | >75% | ✅ |
-| Branches | 78.09% | >60% | ✅ |
-| Functions | 92.22% | >75% | ✅ |
-| Lines | 92.74% | >75% | ✅ |
-| Gesamttests | 407 | >240 | ✅ |
+| Statements | 93.09% | >75% | ✅ |
+| Branches | 79.25% | >60% | ✅ |
+| Functions | 92.74% | >75% | ✅ |
+| Lines | 93.78% | >75% | ✅ |
+| Gesamttests | 411 | >240 | ✅ |
 | Test-Suites | 20 | >15 | ✅ |
 
 ### 4.1 Coverage pro Modul

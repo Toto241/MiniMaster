@@ -228,6 +228,111 @@ describe("getActiveLegalPolicies", () => {
     await expect(wrapped({ country: "DE", locale: "!!!" }, asMaster))
       .rejects.toThrow(/BCP-47/);
   });
+
+  it("wirft invalid-argument bei nicht-string locale", async () => {
+    const wrapped = testEnv.wrap(fns.getActiveLegalPolicies);
+    await expect(wrapped({ country: "DE", locale: 123 as unknown as string }, asMaster))
+      .rejects.toThrow(/BCP-47/);
+  });
+
+  it("fällt auf globale Policies zurück wenn lokale Dokumente unbrauchbar sind", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    const legalDocs: Record<string, any> = {
+      invalidLocalTerms: { exists: true, data: () => ({ policyType: "terms", country: "DE", locale: "de-DE", version: "2026.04.01-1", contentUrl: 42, status: "active" }) },
+      globalTerms: { exists: true, data: () => ({ policyType: "terms", country: "GLOBAL", locale: "en-US", version: "2026.05.01-1", contentUrl: "https://example.com/global-terms", status: "active" }) },
+      globalPrivacy: { exists: true, data: () => ({ policyType: "privacy", country: "GLOBAL", locale: "en-US", version: "2026.05.01-1", contentUrl: "https://example.com/global-privacy", status: "active" }) },
+    };
+
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      if (name !== "legalPolicies") {
+        return originalCollection(name);
+      }
+
+      const filters: Array<{ field: string; value: unknown }> = [];
+      const query: any = {
+        where: jest.fn((field: string, _op: string, value: unknown) => {
+          filters.push({ field, value });
+          return query;
+        }),
+        limit: jest.fn(() => query),
+        get: jest.fn(() => {
+          const docs = Object.entries(legalDocs)
+            .filter(([, entry]) => {
+              const data = entry.data?.();
+              return filters.every((filter) => data?.[filter.field] === filter.value);
+            })
+            .map(([id, entry]) => ({ id, exists: entry.exists, data: entry.data }));
+          return Promise.resolve({ empty: docs.length === 0, size: docs.length, docs });
+        }),
+      };
+      return query;
+    });
+
+    const wrapped = testEnv.wrap(fns.getActiveLegalPolicies);
+    const res = await wrapped({ country: "DE", locale: "de-DE" }, asMaster);
+
+    expect(res.terms.version).toBe("2026.05.01-1");
+    expect(res.terms.contentUrl).toBe("https://example.com/global-terms");
+    expect(res.privacy.version).toBe("2026.05.01-1");
+    expect(res.privacy.contentUrl).toBe("https://example.com/global-privacy");
+  });
+
+  it("überspringt Policies ohne Daten und nutzt danach gültige Firestore-Policies", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      if (name !== "legalPolicies") {
+        return originalCollection(name);
+      }
+
+      const filters: Array<{ field: string; value: unknown }> = [];
+      const query: any = {
+        where: jest.fn((field: string, _op: string, value: unknown) => {
+          filters.push({ field, value });
+          return query;
+        }),
+        limit: jest.fn(() => query),
+        get: jest.fn(() => {
+          const policyType = filters.find((f) => f.field === "policyType")?.value;
+          const country = filters.find((f) => f.field === "country")?.value;
+          const locale = filters.find((f) => f.field === "locale")?.value;
+
+          if (policyType === "terms" && country === "DE" && locale === "de-DE") {
+            return Promise.resolve({
+              empty: false,
+              size: 1,
+              docs: [{ id: "broken-terms", exists: true, data: () => undefined }],
+            });
+          }
+
+          if (policyType === "terms" && country === "GLOBAL" && locale === "en-US") {
+            return Promise.resolve({
+              empty: false,
+              size: 1,
+              docs: [{ id: "global-terms", exists: true, data: () => ({ policyType: "terms", country: "GLOBAL", locale: "en-US", version: "2026.06.01-1", contentUrl: "https://example.com/fallback-terms", status: "active" }) }],
+            });
+          }
+
+          if (policyType === "privacy" && country === "GLOBAL" && locale === "en-US") {
+            return Promise.resolve({
+              empty: false,
+              size: 1,
+              docs: [{ id: "global-privacy", exists: true, data: () => ({ policyType: "privacy", country: "GLOBAL", locale: "en-US", version: "2026.06.01-1", contentUrl: "https://example.com/fallback-privacy", status: "active" }) }],
+            });
+          }
+
+          return Promise.resolve({ empty: true, size: 0, docs: [] });
+        }),
+      };
+      return query;
+    });
+
+    const wrapped = testEnv.wrap(fns.getActiveLegalPolicies);
+    const res = await wrapped({ country: "DE", locale: "de-DE" }, asMaster);
+
+    expect(res.terms.version).toBe("2026.06.01-1");
+    expect(res.privacy.version).toBe("2026.06.01-1");
+  });
 });
 
 describe("needsLegalReconsent", () => {
@@ -317,6 +422,14 @@ describe("publishLegalPolicy", () => {
       policyType: "terms", country: "DE", locale: "de-DE",
       version: "", contentUrl: "https://example.com",
     }, asAdmin)).rejects.toThrow(/version is required/);
+  });
+
+  it("wirft invalid-argument bei fehlender contentUrl", async () => {
+    const wrapped = testEnv.wrap(fns.publishLegalPolicy);
+    await expect(wrapped({
+      policyType: "terms", country: "DE", locale: "de-DE",
+      version: "2026.04.01-1", contentUrl: "",
+    }, asAdmin)).rejects.toThrow(/contentUrl is required/);
   });
 });
 
