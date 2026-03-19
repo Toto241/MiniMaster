@@ -680,6 +680,65 @@ describe("validatePairingCode – Branch-Coverage", () => {
     await expect(wrapped({ pairingCode: "111111" }, asChild)).rejects.toThrow(/expired/i);
   });
 
+  it("löscht korrupten Code mit ungültigem expiresAt", async () => {
+    state.pairingCodes["333333"] = {
+      masterId: "m1",
+      createdAt: { seconds: 1, nanoseconds: 0 },
+      expiresAt: "not-a-timestamp",
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "333333" }, asChild)).rejects.toThrow(/data structure/i);
+    expect(state.pairingCodes["333333"]).toBeUndefined();
+  });
+
+  it("löscht korrupten Code mit fehlendem masterId", async () => {
+    const admin = require("firebase-admin");
+    state.pairingCodes["444444"] = {
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "444444" }, asChild)).rejects.toThrow(/masterId/i);
+    expect(state.pairingCodes["444444"]).toBeUndefined();
+  });
+
+  it("wirft not-found wenn referenzierter Master fehlt", async () => {
+    const admin = require("firebase-admin");
+    state.pairingCodes["555555"] = {
+      masterId: "ghost-master",
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "555555" }, asChild)).rejects.toThrow(/Master account not found/);
+  });
+
+  it("wirft resource-exhausted ohne aktiven Zugang", async () => {
+    const admin = require("firebase-admin");
+    state.pairingCodes["666666"] = {
+      masterId: "m1",
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    state.masters.m1.subscription = { status: "expired", childLimit: 1 };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "666666" }, asChild)).rejects.toThrow(/trial has expired/i);
+  });
+
+  it("pairt Kind erfolgreich mit gültigem Code", async () => {
+    const admin = require("firebase-admin");
+    state.pairingCodes["777777"] = {
+      masterId: "m1",
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    state.masters.m1.subscription.childLimit = 99;
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    const res = await wrapped({ pairingCode: "777777" }, asChild);
+    expect(res.childId).toBe("c1");
+    expect(state.children.c1.masterImei).toBe("m1");
+  });
+
   it("wirft resource-exhausted bei erreichtem Child-Limit", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 86400, 0);
@@ -719,6 +778,51 @@ describe("validatePairingToken – Branch-Coverage", () => {
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
     await expect(wrapped({ pairingToken: "expired-uuid" }, asChild)).rejects.toThrow(/expired/i);
+  });
+
+  it("löscht korruptes Token mit ungültigem expiresAt", async () => {
+    state.pairingTokens["bad-exp-token"] = {
+      masterId: "m1",
+      createdAt: { seconds: 1, nanoseconds: 0 },
+      expiresAt: "not-a-timestamp",
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingToken);
+    await expect(wrapped({ pairingToken: "bad-exp-token" }, asChild)).rejects.toThrow(/data structure/i);
+    expect(state.pairingTokens["bad-exp-token"]).toBeUndefined();
+  });
+
+  it("löscht korruptes Token ohne masterId", async () => {
+    const admin = require("firebase-admin");
+    state.pairingTokens["missing-master-token"] = {
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingToken);
+    await expect(wrapped({ pairingToken: "missing-master-token" }, asChild)).rejects.toThrow(/missing masterId/i);
+    expect(state.pairingTokens["missing-master-token"]).toBeUndefined();
+  });
+
+  it("wirft not-found wenn referenzierter Master fehlt", async () => {
+    const admin = require("firebase-admin");
+    state.pairingTokens["ghost-master-token"] = {
+      masterId: "ghost-master",
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingToken);
+    await expect(wrapped({ pairingToken: "ghost-master-token" }, asChild)).rejects.toThrow(/Master account not found/);
+  });
+
+  it("wirft resource-exhausted ohne aktiven Zugang", async () => {
+    const admin = require("firebase-admin");
+    state.pairingTokens["expired-sub-token"] = {
+      masterId: "m1",
+      createdAt: admin.firestore.Timestamp.now(),
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
+    };
+    state.masters.m1.subscription = { status: "expired", childLimit: 1 };
+    const wrapped = testEnv.wrap(fns.validatePairingToken);
+    await expect(wrapped({ pairingToken: "expired-sub-token" }, asChild)).rejects.toThrow(/Active subscription or trial required/i);
   });
 
   it("wirft resource-exhausted bei erreichtem Kinderlimit", async () => {
@@ -766,6 +870,7 @@ describe("createPairingCode – Branch-Coverage", () => {
     const wrapped = testEnv.wrap(fns.createPairingCode);
     await expect(wrapped({}, asMaster)).rejects.toThrow(/subscription or trial/i);
   });
+
 });
 
 describe("generatePairingLink – Branch-Coverage", () => {
@@ -816,6 +921,12 @@ describe("generateCustomToken – Branch-Coverage", () => {
     const res = await wrapped({ masterImei: "m1", secretKey: "secret123" }, noAuth);
     expect(res.customToken).toBe("mock-custom-token");
   });
+
+  it("wirft internal wenn getUser fehlschlägt", async () => {
+    mockAuth.getUser.mockRejectedValueOnce(new Error("auth backend down"));
+    const wrapped = testEnv.wrap(fns.generateCustomToken);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/unexpected error.*token/i);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -840,6 +951,63 @@ describe("registerMasterDevice – Branch-Coverage", () => {
     const res = await wrapped({ imei: "m1" }, asMaster);
     expect(res.masterId).toBe("m1");
     expect(res.customToken).toBe("mock-custom-token");
+  });
+
+  it("erstellt neuen Master wenn Auth-User noch nicht existiert", async () => {
+    delete state.masters.m2;
+    mockAuth.getUser.mockRejectedValueOnce({ code: "auth/user-not-found" });
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    const res = await wrapped({ imei: "m2" }, { auth: { uid: "m2", token: { role: "master" } } });
+    expect(res.masterId).toBe("m2");
+    expect(mockAuth.createUser).toHaveBeenCalledWith({ uid: "m2" });
+    expect(state.masters.m2).toBeDefined();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// AUTH.TS – bootstrapFirstAdmin / revokeUserTokens
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("bootstrapFirstAdmin – Branch-Coverage", () => {
+  it("wirft unauthenticated ohne Auth-Kontext", async () => {
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    await expect(wrapped({}, noAuth)).rejects.toThrow(/angemeldet/i);
+  });
+
+  it("verweigert wenn bereits ein Admin existiert", async () => {
+    mockAuth.listUsers.mockResolvedValueOnce({
+      users: [{ uid: "admin-existing", customClaims: { role: "admin" } }],
+      pageToken: undefined,
+    });
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    await expect(wrapped({}, { auth: { uid: "u-bootstrap", token: {} } })).rejects.toThrow(/bereits ein Admin/i);
+  });
+
+  it("promotet den ersten Benutzer erfolgreich zum Admin", async () => {
+    mockAuth.listUsers.mockResolvedValueOnce({ users: [], pageToken: undefined });
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    const res = await wrapped({}, { auth: { uid: "u-first-admin", token: {} } });
+    expect(res.success).toBe(true);
+    expect(mockAuth.setCustomUserClaims).toHaveBeenCalledWith("u-first-admin", { role: "admin" });
+  });
+});
+
+describe("revokeUserTokens – Branch-Coverage", () => {
+  it("widerruft Tokens erfolgreich", async () => {
+    const wrapped = testEnv.wrap(fns.revokeUserTokens);
+    const res = await wrapped({ uid: "m1" }, asAdmin);
+    expect(res.message).toContain("revoked");
+    expect(mockAuth.revokeRefreshTokens).toHaveBeenCalledWith("m1");
+  });
+
+  it("wirft invalid-argument ohne uid", async () => {
+    const wrapped = testEnv.wrap(fns.revokeUserTokens);
+    await expect(wrapped({}, asAdmin)).rejects.toThrow(/UID/);
+  });
+
+  it("benötigt Admin-Berechtigung", async () => {
+    const wrapped = testEnv.wrap(fns.revokeUserTokens);
+    await expect(wrapped({ uid: "m1" }, asMaster)).rejects.toThrow(/Admin/);
   });
 });
 

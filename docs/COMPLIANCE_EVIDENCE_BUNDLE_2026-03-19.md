@@ -66,11 +66,11 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 
 | Metrik | Wert | Ziel | Status |
 |--------|------|------|--------|
-| Statements | 84.83% | >75% | ✅ |
-| Branches | 71.20% | >60% | ✅ |
-| Functions | 86.01% | >75% | ✅ |
-| Lines | 85.30% | >75% | ✅ |
-| Gesamttests | 349 | >240 | ✅ |
+| Statements | 86.74% | >75% | ✅ |
+| Branches | 72.98% | >60% | ✅ |
+| Functions | 87.04% | >75% | ✅ |
+| Lines | 87.28% | >75% | ✅ |
+| Gesamttests | 366 | >240 | ✅ |
 | Test-Suites | 20 | >15 | ✅ |
 
 ### 4.1 Coverage pro Modul
@@ -80,8 +80,8 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 | device.ts | ~87% | ~82% | ~90% | ~87% |
 | admin.ts | ~93% | ~72% | ~96% | ~93% |
 | triggers.ts | ~91% | ~82% | ~100% | ~91% |
-| auth.ts | ~87% | ~71% | ~85% | ~87% |
-| pairing.ts | ~90% | ~66% | ~88% | ~90% |
+| auth.ts | ~89% | ~78% | ~89% | ~89% |
+| pairing.ts | ~91% | ~84% | ~100% | ~91% |
 | tasks.ts | ~95% | ~85% | ~100% | ~95% |
 
 ## 5. Rechtliche Dokumentation
