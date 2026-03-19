@@ -340,6 +340,105 @@ describe("analyzeSystemErrors", () => {
     expect(res.analyses[0].diagnosis).toContain("This is not valid JSON");
   });
 
+  it("nutzt unknown-Fallback wenn functionFilter keine Fehlergruppe übrig lässt", async () => {
+    state.error_logs["err-empty-filter"] = {
+      functionName: "verifyPurchase",
+      message: "unexpected state",
+      timestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify([{
+          errorIndex: 0,
+          severity: "low",
+          category: "code",
+          diagnosis: "No grouped error",
+          solution: "Review manually",
+          autoFixable: false,
+          autoFixAction: null,
+          autoFixDescription: null,
+        }]) }] } }],
+      }),
+    });
+
+    const wrapped = testEnv.wrap(fns.analyzeSystemErrors);
+    const asAdminFilter = { auth: { uid: "admin-filter", token: { role: "admin" } } };
+    const res = await wrapped({ functionFilter: "does-not-exist" }, asAdminFilter);
+
+    expect(res.analyses.length).toBe(1);
+    expect(res.analyses[0].errorId).toBe("unknown");
+    expect(res.analyses[0].functionName).toBe("unknown");
+    expect(res.analyses[0].errorMessage).toBe("");
+    expect(res.totalErrors).toBe(0);
+  });
+
+  it("verwendet errors[0]-Fallback wenn mehr Analysen als Fehler vorhanden sind", async () => {
+    state.error_logs["err-base"] = {
+      functionName: "createTask",
+      message: "single source error",
+      timestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify([
+          {
+            errorIndex: 0,
+            severity: "medium",
+            category: "network",
+            diagnosis: "first",
+            solution: "first-fix",
+            autoFixable: false,
+            autoFixAction: null,
+            autoFixDescription: null,
+          },
+          {
+            errorIndex: 1,
+            severity: "low",
+            category: "data",
+            diagnosis: "second",
+            solution: "second-fix",
+            autoFixable: false,
+            autoFixAction: null,
+            autoFixDescription: null,
+          },
+        ]) }] } }],
+      }),
+    });
+
+    const wrapped = testEnv.wrap(fns.analyzeSystemErrors);
+    const asAdminOverflow = { auth: { uid: "admin-overflow", token: { role: "admin" } } };
+    const res = await wrapped({}, asAdminOverflow);
+
+    expect(res.analyses.length).toBe(2);
+    expect(res.analyses[1].errorId).toBe("err-base");
+    expect(res.analyses[1].functionName).toBe("createTask");
+    expect(res.analyses[1].errorMessage).toBe("single source error");
+  });
+
+  it("behandelt fehlende Gemini candidates robust", async () => {
+    state.error_logs["err-no-candidates"] = {
+      functionName: "test",
+      message: "missing candidates",
+      timestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    const wrapped = testEnv.wrap(fns.analyzeSystemErrors);
+    const asAdminNoCandidates = { auth: { uid: "admin-nocandidates", token: { role: "admin" } } };
+    const res = await wrapped({}, asAdminNoCandidates);
+
+    expect(res.analyses).toEqual([]);
+    expect(res.totalErrors).toBeGreaterThanOrEqual(1);
+  });
+
   it("clamps hours parameter to 1-168 range", async () => {
     const wrapped = testEnv.wrap(fns.analyzeSystemErrors);
     // 0 hours should be clamped to 1, 999 to 168 — no errors, returns empty
@@ -408,6 +507,25 @@ describe("executeAutoFix", () => {
     const res = await wrapped({
       analysisId: "analysis-3", errorIndex: 0, action: "regenerate_error_report",
     }, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.result).toContain("Fehlerreport");
+  });
+
+  it("regenerate_error_report nutzt unknown für fehlenden functionName", async () => {
+    state.ai_error_analyses["analysis-3b"] = {
+      analyses: [{ errorIndex: 0, autoFixable: true }],
+      status: "pending",
+    };
+    state.error_logs["err-report-unknown"] = {
+      message: "no functionName present",
+      timestamp: { seconds: Math.floor(Date.now() / 1000) - 60, nanoseconds: 0, toMillis() { return this.seconds * 1000; } },
+    };
+
+    const wrapped = testEnv.wrap(fns.executeAutoFix);
+    const res = await wrapped({
+      analysisId: "analysis-3b", errorIndex: 0, action: "regenerate_error_report",
+    }, asAdmin);
+
     expect(res.success).toBe(true);
     expect(res.result).toContain("Fehlerreport");
   });
@@ -962,6 +1080,44 @@ describe("generateCustomToken – Branch-Coverage", () => {
     expect(res.customToken).toBe("mock-custom-token");
   });
 
+  it("fällt bei fehlgeschlagener Legacy-Telemetrie nicht aus", async () => {
+    const baseCollectionImpl = (db.collection as jest.Mock).getMockImplementation();
+    jest.spyOn(db, "collection").mockImplementation((name: string) => {
+      if (name === "legacyAuthUsage") {
+        return {
+          add: jest.fn().mockRejectedValueOnce(new Error("telemetry down")),
+        } as any;
+      }
+      return baseCollectionImpl ? baseCollectionImpl(name) : { add: jest.fn() };
+    });
+
+    const wrapped = testEnv.wrap(fns.generateCustomToken);
+    const res = await wrapped({ masterImei: "m1", secretKey: "secret123" }, noAuth);
+    expect(res.customToken).toBe("mock-custom-token");
+  });
+
+  it("liefert weiter Token wenn lastTokenRefresh-Update fehlschlägt", async () => {
+    const originalCollection = db.collection;
+    jest.spyOn(db, "collection").mockImplementation((name: string) => {
+      const coll = originalCollection.call(db, name);
+      if (name !== "masters") return coll;
+      return {
+        ...coll,
+        doc: jest.fn((id: string) => {
+          const ref = coll.doc(id);
+          return {
+            ...ref,
+            update: jest.fn().mockRejectedValueOnce(new Error("db unavailable")),
+          };
+        }),
+      } as any;
+    });
+
+    const wrapped = testEnv.wrap(fns.generateCustomToken);
+    const res = await wrapped({}, asMaster);
+    expect(res.customToken).toBe("mock-custom-token");
+  });
+
   it("wirft internal wenn getUser fehlschlägt", async () => {
     mockAuth.getUser.mockRejectedValueOnce(new Error("auth backend down"));
     const wrapped = testEnv.wrap(fns.generateCustomToken);
@@ -1002,6 +1158,36 @@ describe("registerMasterDevice – Branch-Coverage", () => {
     expect(mockAuth.createUser).toHaveBeenCalledWith({ uid: "m2" });
     expect(state.masters.m2).toBeDefined();
   });
+
+  it("registriert ohne Auth (Legacy) und protokolliert Telemetrie", async () => {
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    const res = await wrapped({ imei: "m1" }, noAuth);
+    expect(res.masterId).toBe("m1");
+    expect(res.customToken).toBe("mock-custom-token");
+  });
+
+  it("fällt bei fehlgeschlagener Legacy-Telemetrie in Registrierung nicht aus", async () => {
+    const baseCollectionImpl = (db.collection as jest.Mock).getMockImplementation();
+    jest.spyOn(db, "collection").mockImplementation((name: string) => {
+      if (name === "legacyAuthUsage") {
+        return {
+          add: jest.fn().mockRejectedValueOnce(new Error("telemetry write failed")),
+        } as any;
+      }
+      return baseCollectionImpl ? baseCollectionImpl(name) : { add: jest.fn() };
+    });
+
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    const res = await wrapped({ imei: "m1" }, noAuth);
+    expect(res.masterId).toBe("m1");
+  });
+
+  it("wirft internal wenn getUser mit unbekanntem Fehler fehlschlägt", async () => {
+    mockAuth.getUser.mockRejectedValueOnce({ code: "auth/internal-error" });
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    await expect(wrapped({ imei: "m1" }, asMaster))
+      .rejects.toThrow(/unexpected error occurred while registering the device/i);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1030,6 +1216,13 @@ describe("bootstrapFirstAdmin – Branch-Coverage", () => {
     expect(res.success).toBe(true);
     expect(mockAuth.setCustomUserClaims).toHaveBeenCalledWith("u-first-admin", { role: "admin" });
   });
+
+  it("wirft internal bei unerwartetem listUsers-Fehler", async () => {
+    mockAuth.listUsers.mockRejectedValueOnce(new Error("auth listing unavailable"));
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    await expect(wrapped({}, { auth: { uid: "u-bootstrap-2", token: {} } }))
+      .rejects.toThrow(/admin-aktivierung fehlgeschlagen/i);
+  });
 });
 
 describe("revokeUserTokens – Branch-Coverage", () => {
@@ -1048,6 +1241,12 @@ describe("revokeUserTokens – Branch-Coverage", () => {
   it("benötigt Admin-Berechtigung", async () => {
     const wrapped = testEnv.wrap(fns.revokeUserTokens);
     await expect(wrapped({ uid: "m1" }, asMaster)).rejects.toThrow(/Admin/);
+  });
+
+  it("wirft internal bei unerwartetem Revoke-Fehler", async () => {
+    mockAuth.revokeRefreshTokens.mockRejectedValueOnce(new Error("revoke failed"));
+    const wrapped = testEnv.wrap(fns.revokeUserTokens);
+    await expect(wrapped({ uid: "m1" }, asAdmin)).rejects.toThrow(/failed to revoke tokens/i);
   });
 });
 
@@ -1072,6 +1271,12 @@ describe("setAdminClaim – Branch-Coverage", () => {
     const wrapped = testEnv.wrap(fns.setAdminClaim);
     await expect(wrapped({ uid: "user1" }, asMaster)).rejects.toThrow(/Admin/);
   });
+
+  it("wirft internal bei unerwartetem Fehler", async () => {
+    mockAuth.setCustomUserClaims.mockRejectedValueOnce(new Error("claims write failed"));
+    const wrapped = testEnv.wrap(fns.setAdminClaim);
+    await expect(wrapped({ uid: "user1" }, asAdmin)).rejects.toThrow(/failed to set admin claim/i);
+  });
 });
 
 describe("setUserRole – Branch-Coverage", () => {
@@ -1089,5 +1294,11 @@ describe("setUserRole – Branch-Coverage", () => {
   it("wirft invalid-argument ohne uid", async () => {
     const wrapped = testEnv.wrap(fns.setUserRole);
     await expect(wrapped({ role: "admin" }, asAdmin)).rejects.toThrow(/UID/);
+  });
+
+  it("wirft internal bei technischem Claims-Fehler", async () => {
+    mockAuth.setCustomUserClaims.mockRejectedValueOnce(new Error("claims backend unavailable"));
+    const wrapped = testEnv.wrap(fns.setUserRole);
+    await expect(wrapped({ uid: "user3", role: "auditor" }, asAdmin)).rejects.toThrow(/failed to set user role/i);
   });
 });

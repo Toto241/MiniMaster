@@ -66,11 +66,11 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 
 | Metrik | Wert | Ziel | Status |
 |--------|------|------|--------|
-| Statements | 94.08% | >75% | ✅ |
-| Branches | 79.56% | >60% | ✅ |
+| Statements | 94.85% | >75% | ✅ |
+| Branches | 82.12% | >60% | ✅ |
 | Functions | 94.30% | >75% | ✅ |
-| Lines | 94.83% | >75% | ✅ |
-| Gesamttests | 415 | >240 | ✅ |
+| Lines | 95.58% | >75% | ✅ |
+| Gesamttests | 428 | >240 | ✅ |
 | Test-Suites | 20 | >15 | ✅ |
 
 ### 4.1 Coverage pro Modul
@@ -78,14 +78,14 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 | Modul | Stmts | Branch | Funcs | Lines |
 |-------|-------|--------|-------|-------|
 | device.ts | 87.93% | 85.47% | 100.00% | 87.69% |
-| admin.ts | 97.02% | 73.03% | 83.33% | 99.71% |
+| admin.ts | 97.02% | 83.52% | 83.33% | 99.71% |
 | triggers.ts | 94.57% | 82.72% | 100.00% | 95.20% |
-| auth.ts | 88.88% | 78.49% | 88.88% | 89.20% |
+| auth.ts | 97.91% | 82.79% | 88.88% | 98.56% |
 | pairing.ts | 90.64% | 83.72% | 100.00% | 90.47% |
 | tasks.ts | 95.04% | 84.21% | 100.00% | 95.04% |
 | support.ts | 92.70% | 79.67% | 83.33% | 92.93% |
-| subscription.ts | 76.27% | 66.12% | 70.00% | 77.19% |
-| shared.ts | 86.02% | 63.63% | 87.50% | 87.35% |
+| subscription.ts | 97.45% | 83.87% | 100.00% | 99.12% |
+| shared.ts | 98.92% | 81.81% | 100.00% | 100.00% |
 
 ## 5. Rechtliche Dokumentation
 

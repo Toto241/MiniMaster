@@ -23,8 +23,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 |---------------|---------------|--------|-------------|------|
 | Build artifact (`npm run build`) | Local build: 0 errors | ✅ | Automated | 2026-03-19 |
 | Lint result (`npm run lint`) | Local lint: 0 warnings | ✅ | Automated | 2026-03-19 |
-| Test result (`npm test` — 415 tests) | 20 suites, 415/415 passed | ✅ | Automated | 2026-03-19 |
-| Coverage report (>75% statements) | Stmts 94.08%, Branch 79.56%, Funcs 94.30%, Lines 94.83% | ✅ | Automated | 2026-03-19 |
+| Test result (`npm test` — 428 tests) | 20 suites, 428/428 passed | ✅ | Automated | 2026-03-19 |
+| Coverage report (>75% statements) | Stmts 94.85%, Branch 82.12%, Funcs 94.30%, Lines 95.58% | ✅ | Automated | 2026-03-19 |
 | Firestore rules structural test | Rules validated in test suite | ✅ | Automated | 2026-03-19 |
 | CodeQL security scan (0 high/critical) | codeql-analysis.yml workflow | ⬜ | | |
 | Android build (if applicable) | _(pending)_ | ⬜ | | |
