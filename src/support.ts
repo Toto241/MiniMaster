@@ -157,8 +157,9 @@ function parseAiTicketResponse(rawResponse: string): AiTicketResponse {
 
 let knowledgeBase = "";
 try {
-  // knowledge_base.txt lives at project root (parent of src/)
-  const knowledgeBasePath = path.join(__dirname, "..", "knowledge_base.txt");
+  // knowledge_base.txt lives at project root; when compiled, __dirname is lib/src/
+  // so we need to go up two levels to reach the project root
+  const knowledgeBasePath = path.join(__dirname, "..", "..", "knowledge_base.txt");
   knowledgeBase = fs.readFileSync(knowledgeBasePath, "utf-8");
 } catch (error) {
   functions.logger.error("Failed to load knowledge base:", error);

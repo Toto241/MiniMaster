@@ -531,7 +531,7 @@ export const analyzeSystemErrors = functions.https.onCall(
     const hours = Math.min(Math.max(data?.hours || 24, 1), 168); // 1h–7d
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    let query: FirebaseFirestore.Query = db().collection("error_logs")
+    const query: FirebaseFirestore.Query = db().collection("error_logs")
       .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(since))
       .orderBy("timestamp", "desc")
       .limit(50);
