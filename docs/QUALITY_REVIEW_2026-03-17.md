@@ -22,7 +22,7 @@ Reviewed repository areas:
 |---|---|---|
 | TypeScript compile | `npm run build` | ✅ Passed |
 | Linting | `npm run lint` | ✅ Passed |
-| Backend test suite | `npm test` | ✅ 13/13 suites, 129/129 tests passed |
+| Backend test suite | `npm test -- --runInBand` | ✅ 17/17 suites, 240/240 tests passed |
 | Android manifest validation | `./validate_manifests.sh` | ✅ Passed |
 | Android lint (blocking on error) | `./gradlew lint` | ✅ Passed |
 | Android unit tests (Gradle) | `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest` | ✅ Passed |

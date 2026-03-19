@@ -10,6 +10,22 @@ import { db, auth } from "../firebase";
 import { requireAdmin, AuditLogger } from "./shared";
 import type { OperatorRole } from "./shared";
 
+const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
+
+async function logLegacyAuthUsage(endpoint: string, mode: "secretKey" | "imei_registration", identifier: string): Promise<void> {
+  try {
+    await db().collection("legacyAuthUsage").add({
+      endpoint,
+      mode,
+      identifier,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      projectId: process.env.GCLOUD_PROJECT || null,
+    });
+  } catch (error) {
+    functions.logger.warn("Failed to write legacy auth usage telemetry.", error);
+  }
+}
+
 /**
  * Sets the custom claim 'role: admin' for a specified user UID.
  * Only callable by an existing admin.
@@ -160,6 +176,13 @@ export const generateCustomToken = functions.https.onCall(
     if (context.auth) {
       uid = context.auth.uid;
     } else {
+      if (LEGACY_AUTH_DISABLED) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Legacy secretKey login is disabled. Please sign in via Firebase Auth."
+        );
+      }
+
       const { masterImei, secretKey } = data || {};
       if (!masterImei || typeof masterImei !== "string" || !secretKey || typeof secretKey !== "string") {
         throw new functions.https.HttpsError(
@@ -172,6 +195,9 @@ export const generateCustomToken = functions.https.onCall(
       if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
         throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
       }
+
+      functions.logger.warn("LEGACY_AUTH_USED generateCustomToken via masterImei/secretKey.", { masterImei });
+      await logLegacyAuthUsage("generateCustomToken", "secretKey", masterImei);
 
       uid = masterImei;
     }
@@ -223,6 +249,18 @@ export const registerMasterDevice = functions.https.onCall(
     }
 
     const masterId = context.auth?.uid || imei;
+    if (!context.auth && LEGACY_AUTH_DISABLED) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Legacy IMEI-only registration is disabled. Please register while authenticated."
+      );
+    }
+
+    if (!context.auth) {
+      functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
+      await logLegacyAuthUsage("registerMasterDevice", "imei_registration", imei);
+    }
+
     if (context.auth && context.auth.uid !== imei) {
       throw new functions.https.HttpsError(
         "failed-precondition",

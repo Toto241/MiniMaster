@@ -569,7 +569,7 @@ describe("onTicketCreated trigger", () => {
       id: "ticket-new",
     };
     const wrapped = testEnv.wrap(fns.onTicketCreated);
-    await wrapped(snapshot, { params: { ticketId: "ticket-new" } });
+    await wrapped(snapshot as any, { params: { ticketId: "ticket-new" } } as any);
 
     const ticket = state.supportTickets["ticket-new"];
     expect(ticket.aiGeneratedSolution).toBeDefined();
@@ -583,7 +583,7 @@ describe("onTicketCreated trigger", () => {
     };
     const wrapped = testEnv.wrap(fns.onTicketCreated);
     // Should not throw, just skip AI analysis
-    await wrapped(snapshot, { params: { ticketId: "ticket-empty" } });
+    await wrapped(snapshot as any, { params: { ticketId: "ticket-empty" } } as any);
   });
 
   it("eskaliert bei niedriger AI-Confidence", async () => {
@@ -595,7 +595,7 @@ describe("onTicketCreated trigger", () => {
       id: "ticket-low-conf",
     };
     const wrapped = testEnv.wrap(fns.onTicketCreated);
-    await wrapped(snapshot, { params: { ticketId: "ticket-low-conf" } });
+    await wrapped(snapshot as any, { params: { ticketId: "ticket-low-conf" } } as any);
     // Test stub returns confidence 0.85 > 0.7, so status should be awaiting_user_feedback
     const ticket = state.supportTickets["ticket-low-conf"];
     expect(ticket.status).toBe("awaiting_user_feedback");
@@ -613,7 +613,7 @@ describe("onTaskStatusChange", () => {
       after: { data: () => ({ status: "pending_approval", description: "Zimmer aufräumen", masterImei: "m1" }) },
     };
     const wrapped = testEnv.wrap(fns.onTaskStatusChange);
-    await wrapped(change, { params: { childId: "c1", taskId: "t1" } });
+    await wrapped(change as any, { params: { childId: "c1", taskId: "t1" } } as any);
     expect(mockSend).toHaveBeenCalled();
   });
 
@@ -623,7 +623,7 @@ describe("onTaskStatusChange", () => {
       after: { data: () => ({ status: "approved", description: "Hausaufgaben machen", masterImei: "m1" }) },
     };
     const wrapped = testEnv.wrap(fns.onTaskStatusChange);
-    await wrapped(change, { params: { childId: "c1", taskId: "t2" } });
+    await wrapped(change as any, { params: { childId: "c1", taskId: "t2" } } as any);
     expect(mockSend).toHaveBeenCalled();
   });
 
@@ -633,7 +633,7 @@ describe("onTaskStatusChange", () => {
       after: { data: () => ({ status: "rejected", description: "Müll rausbringen", masterImei: "m1" }) },
     };
     const wrapped = testEnv.wrap(fns.onTaskStatusChange);
-    await wrapped(change, { params: { childId: "c1", taskId: "t3" } });
+    await wrapped(change as any, { params: { childId: "c1", taskId: "t3" } } as any);
     expect(mockSend).toHaveBeenCalled();
   });
 
@@ -644,7 +644,7 @@ describe("onTaskStatusChange", () => {
       after: { data: () => ({ status: "pending_approval", description: "Test", masterImei: "m1" }) },
     };
     const wrapped = testEnv.wrap(fns.onTaskStatusChange);
-    await wrapped(change, { params: { childId: "c1", taskId: "t4" } });
+    await wrapped(change as any, { params: { childId: "c1", taskId: "t4" } } as any);
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -654,7 +654,7 @@ describe("onTaskStatusChange", () => {
       after: { data: () => ({ status: "pending_approval", description: "Test" }) },
     };
     const wrapped = testEnv.wrap(fns.onTaskStatusChange);
-    await wrapped(change, { params: { childId: "c1", taskId: "t5" } });
+    await wrapped(change as any, { params: { childId: "c1", taskId: "t5" } } as any);
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -665,7 +665,7 @@ describe("onTaskStatusChange", () => {
       after: { data: () => ({ status: "approved", description: "Test", masterImei: "m1" }) },
     };
     const wrapped = testEnv.wrap(fns.onTaskStatusChange);
-    await wrapped(change, { params: { childId: "c1", taskId: "t6" } });
+    await wrapped(change as any, { params: { childId: "c1", taskId: "t6" } } as any);
   });
 });
 
