@@ -1564,11 +1564,24 @@ function persistBootstrapFirebaseConfig(showReloadHint = true) {
     const values = getBootstrapFirebaseFormValues();
     const statusEl = document.getElementById("bootstrap-config-status");
 
-    if (!hasCompleteFirebaseConfig(values) || isPlaceholderFirebaseConfig(values)) {
+    console.log("[Firebase Config] Gelesene Formularwerte:", JSON.stringify(values, null, 2));
+
+    const requiredKeys = ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"];
+    const emptyFields = requiredKeys.filter(key => typeof values[key] !== "string" || values[key].trim().length === 0);
+    const placeholderFields = requiredKeys.filter(key =>
+        typeof values[key] === "string" && (values[key].includes("your-") || values[key].includes("your_project"))
+    );
+
+    if (emptyFields.length > 0 || placeholderFields.length > 0) {
+        const problems = [];
+        if (emptyFields.length > 0) problems.push("Leere Felder: " + emptyFields.join(", "));
+        if (placeholderFields.length > 0) problems.push("Platzhalter-Werte: " + placeholderFields.join(", "));
+        const detail = problems.join(" | ");
+        console.error("[Firebase Config] Validierung fehlgeschlagen:", detail);
         if (statusEl) {
-            statusEl.innerHTML = "<div class='error'>Alle Firebase-Webwerte müssen gesetzt sein und dürfen keine Platzhalter enthalten.</div>";
+            statusEl.innerHTML = "<div class='error'>Firebase-Konfiguration ungültig: " + escapeHtml(detail) + "</div>";
         }
-        throw new Error("Firebase-Webkonfiguration ist unvollständig oder enthält Platzhalter.");
+        throw new Error("Firebase-Konfiguration ungültig: " + detail);
     }
 
     localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(values));
@@ -2561,7 +2574,9 @@ function saveBootstrapFirebaseConfig() {
         // Auto-initialize Firebase in-place to avoid confusing reload requirement
         initializeFirebaseAfterConfigSave();
     } catch (error) {
+        console.error("[saveBootstrapFirebaseConfig] Fehler:", error);
         showNotification(error.message, "error");
+        alert("Firebase-Konfiguration Fehler:\n\n" + error.message);
     }
 }
 
@@ -2570,7 +2585,9 @@ function reloadWithBootstrapConfig() {
         persistBootstrapFirebaseConfig(false);
         window.location.reload();
     } catch (error) {
+        console.error("[reloadWithBootstrapConfig] Fehler:", error);
         showNotification(error.message, "error");
+        alert("Firebase-Konfiguration Fehler:\n\n" + error.message);
     }
 }
 
@@ -4119,9 +4136,10 @@ function showNotification(message, type) {
     notification.className = `notification ${type || "info"}`;
     notification.style.display = "block";
 
+    const duration = type === "error" ? 10000 : 5000;
     setTimeout(() => {
         notification.style.display = "none";
-    }, 5000);
+    }, duration);
 }
 
 function escapeHtml(text) {
