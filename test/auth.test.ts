@@ -8,6 +8,23 @@ const mockAuthInstance = {
   createCustomToken: jest.fn(),
 };
 
+const mockDbObj = {
+  collection: jest.fn(() => ({
+    doc: jest.fn(() => ({
+      get: jest.fn(() => Promise.resolve({ exists: false, data: () => undefined })),
+      update: jest.fn(() => Promise.resolve()),
+      set: jest.fn(() => Promise.resolve()),
+    })),
+    add: jest.fn(() => Promise.resolve()),
+  })),
+};
+
+jest.mock("../firebase", () => ({
+  db: jest.fn(() => mockDbObj),
+  auth: jest.fn(() => mockAuthInstance),
+  storage: jest.fn(() => ({ bucket: jest.fn() })),
+}));
+
 jest.mock("firebase-admin", () => ({
   auth: () => mockAuthInstance,
   firestore: {

@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as fs from "fs";
 import * as path from "path";
-import { db, storage } from "../firebase";
+import { db, auth, storage } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 
 const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
@@ -54,7 +54,7 @@ async function deleteMasterAccountById(masterId: string, context: CallableContex
   const performanceMetricsDeleted = await deleteQuerySnapshot(performanceMetricsSnapshot);
 
   await masterDeviceRef.delete();
-  await admin.auth().deleteUser(masterId);
+  await auth().deleteUser(masterId);
 
   await AuditLogger.logSuccess(
     "device.delete", context, `masters/${masterId}`, "device",

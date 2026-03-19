@@ -217,6 +217,8 @@ jest.mock("googleapis", () => ({
 
 jest.mock("../firebase", () => ({
   db: jest.fn(() => mockFirestore),
+  auth: jest.fn(() => authMock),
+  storage: jest.fn(() => ({ bucket: jest.fn() })),
 }));
 
 jest.mock("firebase-admin/messaging", () => ({

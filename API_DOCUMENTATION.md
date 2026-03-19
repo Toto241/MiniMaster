@@ -326,6 +326,8 @@ Trial: 7-day trial on `registerMasterDevice`, `trialEndsAt` checked by `hasActiv
 
 ## AI Task Photo Analysis
 
+`completeTask` validates that `photoUrl` is a valid Firebase Storage URL (`https://firebasestorage.googleapis.com/...`) and enforces a max length of 2048 characters to prevent SSRF and injection attacks.
+
 `analyzeTaskPhoto` (Firestore trigger on task status change to `pending_approval`):
 
 - **With `GEMINI_API_KEY`**: Calls Gemini Vision API to analyze the submitted photo against the task description. Returns structured JSON with `labels`, `safeSearch`, `taskCompletion` (completed/unclear/not_completed), `confidence`, and `summary`.
@@ -420,6 +422,11 @@ All Cloud Functions use Firebase's standard error codes:
 - Master-child relationships are verified before operations
 - Sensitive operations (lock/unlock) require master device authorization
 - Firestore security rules provide additional data access control
+- CSP, HSTS, X-Frame-Options (DENY), X-Content-Type-Options headers on all web hosting
+- Session timeout (30 Min Inaktivität) in Admin-Panel und Web-Control
+- photoUrl-Validierung verhindert SSRF über manipulierte URLs
+- Legacy secretKey/IMEI-Auth eingefroren — keine neuen Endpunkte (siehe `docs/LEGACY_AUTH_INVENTORY.md`)
+- Storage Rules: Max 5MB, nur `image/*` Content-Type, mit Owner-Prüfung
 
 ## Testing
 

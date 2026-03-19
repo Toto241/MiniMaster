@@ -25,6 +25,13 @@ const mockAuth = {
   deleteUser: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockDbObj = { collection: jest.fn() };
+jest.mock("../firebase", () => ({
+  db: jest.fn(() => mockDbObj),
+  auth: jest.fn(() => mockAuth),
+  storage: jest.fn(() => ({ bucket: jest.fn(() => ({ name: "test-bucket", getMetadata: jest.fn().mockResolvedValue([{ name: "test-bucket" }]) })) })),
+}));
+
 jest.mock("firebase-admin", () => {
   const original = jest.requireActual("firebase-admin");
   class MockTimestamp {

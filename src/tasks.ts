@@ -78,6 +78,17 @@ export const completeTask = functions.https.onCall(
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
     }
 
+    // Validate photoUrl: must be a Firebase Storage URL (prevent SSRF/injection)
+    const validStorageUrl = /^https:\/\/firebasestorage\.googleapis\.com\//;
+    if (typeof photoUrl !== "string" || !validStorageUrl.test(photoUrl)) {
+      throw new functions.https.HttpsError("invalid-argument", "photoUrl must be a valid Firebase Storage URL.");
+    }
+
+    // Enforce max URL length to prevent abuse
+    if (photoUrl.length > 2048) {
+      throw new functions.https.HttpsError("invalid-argument", "photoUrl exceeds maximum allowed length.");
+    }
+
     const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
 
     try {
