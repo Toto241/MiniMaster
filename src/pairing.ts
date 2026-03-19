@@ -6,6 +6,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
+import * as crypto from "crypto";
 import { db } from "../firebase";
 import { requireAuth, AuditLogger, hasActiveAccess } from "./shared";
 
@@ -28,11 +29,11 @@ export const createPairingCode = functions.https.onCall(async (_data: Record<str
   }
 
   const pairingCodesRef = db().collection("pairingCodes");
-  const maxAttempts = 10;
+  const maxAttempts = 50;
 
   try {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const pairingCode = crypto.randomInt(100000, 999999).toString();
       const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
 
       const doc = await pairingCodeDocRef.get();

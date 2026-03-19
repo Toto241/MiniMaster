@@ -42,27 +42,42 @@ async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
     throw new Error("GEMINI_API_KEY is not set.");
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 1000,
-        responseMimeType: "application/json",
+  const controller = new AbortController();
+  const timerId = setTimeout(() => controller.abort(), 30_000);
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
-    }),
-  });
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1000,
+          responseMimeType: "application/json",
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Gemini API timeout (30s)");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timerId);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -331,21 +346,16 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
     }
 
     const batch = db().batch();
-    const ticketUpdates: { [ticketId: string]: boolean } = {};
 
     expiredGrantsSnapshot.docs.forEach((doc) => {
       batch.update(doc.ref, { status: "expired" });
       const ticketId = doc.data().ticketId;
       if (ticketId) {
-        ticketUpdates[ticketId] = true;
+        batch.update(db().collection("supportTickets").doc(ticketId), { accessGranted: false });
       }
     });
 
     await batch.commit();
-
-    for (const ticketId of Object.keys(ticketUpdates)) {
-      await db().collection("supportTickets").doc(ticketId).update({ accessGranted: false });
-    }
 
     functions.logger.info(`Cleaned up ${expiredGrantsSnapshot.size} expired support grants.`);
     return null;

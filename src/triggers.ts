@@ -104,7 +104,14 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
     const taskId = event.params.taskId;
     const childId = event.params.childId;
 
-    functions.logger.info(`Starting AI analysis for task ${taskId} (child: ${childId}) photo: ${newData.photoUrl}`);
+    functions.logger.info(`Starting AI analysis for task ${taskId} (child: ${childId})`);
+
+    // Validate photoUrl is a Firebase Storage URL to prevent SSRF/injection
+    const validStorageUrl = /^https:\/\/firebasestorage\.googleapis\.com\//;
+    if (!validStorageUrl.test(newData.photoUrl)) {
+      functions.logger.error(`Invalid photoUrl for task ${taskId}: not a Firebase Storage URL`);
+      return;
+    }
 
     let analysis: Record<string, unknown>;
 
@@ -138,6 +145,7 @@ function buildFallbackAnalysis(): Record<string, unknown> {
     safeSearch: { adult: "UNKNOWN", violence: "UNKNOWN" },
     taskCompletion: "not_analyzed",
     source: "fallback",
+    warning: "AI analysis unavailable; using template detection",
   };
 }
 
@@ -145,7 +153,7 @@ async function analyzeWithGemini(
   apiKey: string, photoUrl: string, taskDescription: string
 ): Promise<Record<string, unknown>> {
   const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
   const prompt = `You are a parental control assistant. Analyze this photo submitted as proof for a child's task.
 Task description: "${taskDescription}"
@@ -172,11 +180,28 @@ Respond ONLY with valid JSON (no markdown, no code fences):
     ],
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timerId = setTimeout(() => controller.abort(), 30_000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Gemini API timeout (30s)");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timerId);
+  }
 
   if (!response.ok) {
     throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiniMaster Eltern-Panel</title>
+  <title>MiniMaster – Start</title>
   <style>
     :root {
       --bg: linear-gradient(120deg, #eaf2ff 0%, #f8fbff 45%, #eefaf2 100%);
@@ -12,6 +12,9 @@
       --primary: #1f6feb;
       --secondary: #0f172a;
       --muted: #5b6b80;
+      --green: #16a34a;
+      --orange: #ea580c;
+      --purple: #7c3aed;
     }
 
     * { box-sizing: border-box; }
@@ -28,28 +31,48 @@
     }
 
     .shell {
-      inline-size: min(920px, 100%);
+      inline-size: min(960px, 100%);
       background: var(--card);
       border-radius: 20px;
       box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
-      padding: 28px;
+      padding: 32px;
       border: 1px solid rgba(15, 23, 42, 0.08);
     }
 
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-block-end: 6px;
+    }
+
+    .logo {
+      width: 52px;
+      height: 52px;
+      background: var(--primary);
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 1.6rem;
+      font-weight: 800;
+    }
+
     h1 {
-      margin: 0 0 8px;
+      margin: 0;
       font-size: 2rem;
       letter-spacing: 0.2px;
     }
 
-    p {
-      margin: 0;
+    .subtitle {
+      margin: 0 0 0 0;
       color: var(--muted);
       line-height: 1.45;
+      font-size: 1rem;
     }
 
     .grid {
-      margin-block-start: 24px;
+      margin-block-start: 28px;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 16px;
@@ -58,12 +81,32 @@
     .card {
       border: 1px solid rgba(15, 23, 42, 0.08);
       border-radius: 14px;
-      padding: 18px;
+      padding: 22px;
       background: #fff;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      transition: transform .15s ease, box-shadow .15s ease;
     }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 1.4rem;
+      color: #fff;
+    }
+
+    .icon-admin { background: var(--purple); }
+    .icon-parent { background: var(--primary); }
+    .icon-child { background: var(--green); }
 
     .title {
       font-size: 1.1rem;
@@ -73,8 +116,10 @@
 
     .desc {
       color: var(--muted);
+      font-size: 0.92rem;
       min-block-size: 44px;
       margin: 0;
+      line-height: 1.5;
     }
 
     .row {
@@ -87,10 +132,14 @@
     .btn {
       border: 0;
       border-radius: 10px;
-      padding: 10px 14px;
+      padding: 10px 18px;
       font-weight: 700;
+      font-size: 0.92rem;
       cursor: pointer;
       text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       transition: transform .12s ease, box-shadow .12s ease;
     }
 
@@ -99,39 +148,87 @@
       box-shadow: 0 6px 14px rgba(31, 111, 235, 0.2);
     }
 
-    .btn-primary {
-      background: var(--primary);
-      color: #fff;
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-purple { background: var(--purple); color: #fff; }
+    .btn-dark { background: var(--secondary); color: #fff; }
+
+    .status-bar {
+      margin-block-start: 24px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.88rem;
+      color: var(--muted);
     }
 
-    .btn-dark {
-      background: var(--secondary);
-      color: #fff;
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
     }
 
     .hint {
-      margin-block-start: 18px;
-      font-size: .9rem;
+      margin-block-start: 16px;
+      font-size: .85rem;
       color: var(--muted);
+      text-align: center;
     }
   </style>
 </head>
 <body>
   <main class="shell">
-    <h1>MiniMaster Eltern-Panel</h1>
-    <p>Verwaltungsoberfläche für Eltern: Geräte, Aufgaben und Regeln im Überblick.</p>
+    <div class="header">
+      <div class="logo">M</div>
+      <div>
+        <h1>MiniMaster</h1>
+        <p class="subtitle">Elternkontroll-Suite – Alle Anwendungen auf einen Blick</p>
+      </div>
+    </div>
 
     <section class="grid">
+      <!-- Admin Panel -->
       <article class="card">
+        <div class="card-icon icon-admin">🛡️</div>
+        <h2 class="title">Admin Dashboard</h2>
+        <p class="desc">Benutzerverwaltung, Abonnements, Audit-Logs, Support-Tickets und Systemübersicht.</p>
+        <div class="row">
+          <a class="btn btn-purple" href="../admin-panel/index.html">Admin öffnen</a>
+        </div>
+      </article>
+
+      <!-- Eltern Control Panel -->
+      <article class="card">
+        <div class="card-icon icon-parent">👨‍👩‍👧</div>
         <h2 class="title">Eltern Control Panel</h2>
         <p class="desc">Geräte sperren/entsperren, Aufgaben erstellen, Regeln setzen, Support-Fälle verwalten.</p>
         <div class="row">
-          <a class="btn btn-primary" href="../web-control/index.html">Panel öffnen</a>
+          <a class="btn btn-primary" href="../web-control/index.html">Eltern-Panel öffnen</a>
+        </div>
+      </article>
+
+      <!-- Kinder-App Info -->
+      <article class="card">
+        <div class="card-icon icon-child">📱</div>
+        <h2 class="title">Kinder-App</h2>
+        <p class="desc">Die Kinder-App wird auf dem Gerät des Kindes installiert. Kopplung via QR-Code oder 6-stelligem Pairing-Code.</p>
+        <div class="row">
+          <a class="btn btn-green" href="../childApp/README.md">Installationsanleitung</a>
         </div>
       </article>
     </section>
 
-    <p class="hint">Hinweis: Für volle Funktionalität muss die Firebase-Konfiguration im Panel hinterlegt sein.</p>
+    <div class="status-bar">
+      <span class="status-dot"></span>
+      <span>Firebase-Projekt verbunden · Eltern- und Admin-Panel bereit · Kinder-App via APK installierbar</span>
+    </div>
+
+    <p class="hint">Hinweis: Für volle Funktionalität muss die Firebase-Konfiguration in den Panels hinterlegt sein.</p>
   </main>
 </body>
 </html>
