@@ -2,6 +2,17 @@
 /* global firebase, Chart */
 // Mini-Master Web Control Panel JavaScript
 
+/**
+ * Escapes HTML special characters to prevent XSS.
+ * @param {string} text - The raw text to escape.
+ * @returns {string} The HTML-safe string.
+ */
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = String(text || "");
+    return div.innerHTML;
+}
+
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 
 // Firebase configuration — configure via Operator-Dashboard (localStorage) or replace placeholders
@@ -195,7 +206,7 @@ function loadDevices() {
             renderDevices(devices);
         }, error => {
             console.error('Error loading devices:', error);
-            devicesListElement.innerHTML = '<div class="loading">Error loading devices: ' + error.message + '</div>';
+            devicesListElement.innerHTML = '<div class="loading">Error loading devices: ' + escapeHtml(error.message) + '</div>';
         });
 }
 
@@ -215,12 +226,13 @@ function renderDevices(devices) {
         const lastSeenSeconds = device.lastSeen ? (device.lastSeen.seconds || 0) : 0;
         const isOnline = lastSeenSeconds > 0 ?
             (Date.now() / 1000 - lastSeenSeconds) < (20 * 60) : false; // 20 minutes
+        const safeId = escapeHtml(device.id);
 
         return `
             <div class="device-card">
                 <div class="device-header">
                     <div class="device-info">
-                        <h3>Device: ${device.id}</h3>
+                        <h3>Device: ${safeId}</h3>
                         <div class="device-status">
                             <span class="status-indicator ${isOnline ? 'status-online' : 'status-offline'}"></span>
                             <span>${isOnline ? 'Online' : 'Offline'}</span>
@@ -231,17 +243,17 @@ function renderDevices(devices) {
                             <span>Locked</span>
                             <label class="switch">
                                 <input type="checkbox" ${device.isLocked ? 'checked' : ''}
-                                       onchange="toggleDeviceLock('${device.id}', this.checked)">
+                                       onchange="toggleDeviceLock('${safeId}', this.checked)">
                                 <span class="slider"></span>
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="device-actions">
-                    <button class="btn btn-primary" onclick="openTaskModal('${device.id}')">
+                    <button class="btn btn-primary" onclick="openTaskModal('${safeId}')">
                         Create Task
                     </button>
-                    <button class="btn btn-secondary" onclick='openRulesModal(${JSON.stringify(device)})'>
+                    <button class="btn btn-secondary" onclick='openRulesModal(${escapeHtml(JSON.stringify(device))})'>
                         Configure Rules
                     </button>
                 </div>
@@ -504,7 +516,7 @@ function loadTasksToReview() {
         })
         .catch(error => {
             console.error('Error loading tasks:', error);
-            tasksListElement.innerHTML = '<div class="loading">Error loading tasks: ' + error.message + '</div>';
+            tasksListElement.innerHTML = '<div class="loading">Error loading tasks: ' + escapeHtml(error.message) + '</div>';
         });
 }
 
@@ -524,18 +536,22 @@ function renderTasksToReview(tasks) {
         const createdTime = task.createdAt ? new Date(task.createdAt.seconds * 1000).toLocaleString() : 'N/A';
         // Derive childId from the Firestore document path (parent collection's parent doc ID)
         const childId = task.childId || '';
+        const safeChildId = escapeHtml(childId);
+        const safeDesc = escapeHtml(task.description || '');
+        const safeTaskId = escapeHtml(task.taskId || '');
+        const safePhotoUrl = task.photoUrl ? encodeURI(task.photoUrl) : '';
         return `
             <div class="task-card">
                 <div class="task-header">
                     <div class="task-info">
-                        <h4>Child ID: ${childId}</h4>
-                        <p><strong>Description:</strong> ${task.description || ''}</p>
+                        <h4>Child ID: ${safeChildId}</h4>
+                        <p><strong>Description:</strong> ${safeDesc}</p>
                         <p><strong>Created:</strong> ${createdTime}</p>
                     </div>
                 </div>
-                ${task.photoUrl ? `<a href="${task.photoUrl}" target="_blank" rel="noopener noreferrer"><img src="${task.photoUrl}" alt="Task proof" class="task-photo"></a>` : '<p>No photo proof submitted.</p>'}
+                ${safePhotoUrl ? `<a href="${safePhotoUrl}" target="_blank" rel="noopener noreferrer"><img src="${safePhotoUrl}" alt="Task proof" class="task-photo"></a>` : '<p>No photo proof submitted.</p>'}
                 <div class="task-actions">
-                    <button class="btn btn-success" onclick="approveTaskReview('${task.taskId}', '${childId}')">
+                    <button class="btn btn-success" onclick="approveTaskReview('${safeTaskId}', '${safeChildId}')">
                         Approve (Unlock)
                     </button>
                 </div>
@@ -681,32 +697,36 @@ async function loadSupportTickets() {
             const ticket = doc.data();
             const createdAt = ticket.createdAt ? ticket.createdAt.toDate().toLocaleString() : 'N/A';
             const statusClass = ticket.status === 'open' ? 'status-open' : ticket.status === 'in_progress' ? 'status-progress' : 'status-closed';
+            const safeDocId = escapeHtml(doc.id);
+            const safeProblem = escapeHtml(ticket.problemDescription);
+            const safeStatus = escapeHtml(ticket.status);
+            const safeGrantId = escapeHtml(ticket.accessGrantId || '');
 
             html += `
                 <div class="ticket-card">
                     <div class="ticket-header">
-                        <span class="ticket-id">Ticket #${doc.id.substring(0, 8)}</span>
-                        <span class="ticket-status ${statusClass}">${ticket.status}</span>
+                        <span class="ticket-id">Ticket #${escapeHtml(doc.id.substring(0, 8))}</span>
+                        <span class="ticket-status ${statusClass}">${safeStatus}</span>
                     </div>
                     <div class="ticket-body">
                         <p><strong>Created:</strong> ${createdAt}</p>
-                        <p><strong>Problem:</strong> ${ticket.problemDescription}</p>
+                        <p><strong>Problem:</strong> ${safeProblem}</p>
 
                         ${ticket.aiGeneratedSolution ?
                             `<div class="ai-solution">
                                 <h4>🤖 AI-Generated Solution (Confidence: ${(ticket.aiConfidenceScore * 100).toFixed(0)}%)</h4>
-                                <p>${ticket.aiGeneratedSolution.replace(/\n/g, '<br>')}</p>
+                                <p>${escapeHtml(ticket.aiGeneratedSolution).replace(/\n/g, '<br>')}</p>
                                 ${ticket.status === 'awaiting_user_feedback' ?
                                     `<div class="feedback-buttons">
-                                        <button onclick="provideFeedback('${doc.id}', 'accepted')" class="btn btn-success">✓ This solved my problem</button>
-                                        <button onclick="showRejectFeedbackForm('${doc.id}')" class="btn btn-warning">✗ I still need help</button>
+                                        <button onclick="provideFeedback('${safeDocId}', 'accepted')" class="btn btn-success">✓ This solved my problem</button>
+                                        <button onclick="showRejectFeedbackForm('${safeDocId}')" class="btn btn-warning">✗ I still need help</button>
                                     </div>` :
                                     ''
                                 }
-                                <div id="reject-feedback-form-${doc.id}" class="reject-feedback-form" style="display:none;">
-                                    <label for="reject-comment-${doc.id}"><strong>Please tell us what is still not working:</strong></label>
-                                    <textarea id="reject-comment-${doc.id}" rows="3" placeholder="Required comment..."></textarea>
-                                    <button onclick="submitRejectedFeedback('${doc.id}')" class="btn btn-warning">Submit No + Comment</button>
+                                <div id="reject-feedback-form-${safeDocId}" class="reject-feedback-form" style="display:none;">
+                                    <label for="reject-comment-${safeDocId}"><strong>Please tell us what is still not working:</strong></label>
+                                    <textarea id="reject-comment-${safeDocId}" rows="3" placeholder="Required comment..."></textarea>
+                                    <button onclick="submitRejectedFeedback('${safeDocId}')" class="btn btn-warning">Submit No + Comment</button>
                                 </div>
                             </div>` :
                             ''
@@ -714,9 +734,9 @@ async function loadSupportTickets() {
 
                         ${ticket.accessGranted ?
                             `<p class="access-granted">✓ Support access granted (expires in 48h)</p>
-                             <button onclick="revokeAccess('${ticket.accessGrantId}')" class="btn btn-danger">Revoke Access</button>` :
+                             <button onclick="revokeAccess('${safeGrantId}')" class="btn btn-danger">Revoke Access</button>` :
                             (ticket.status === 'escalated' || ticket.status === 'in_progress') ?
-                            `<button onclick="grantAccess('${doc.id}')" class="btn btn-primary">Grant Support Access</button>` :
+                            `<button onclick="grantAccess('${safeDocId}')" class="btn btn-primary">Grant Support Access</button>` :
                             ''
                         }
                     </div>
