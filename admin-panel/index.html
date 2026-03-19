@@ -79,6 +79,9 @@
                 <button class="nav-tab" onclick="switchTab('firebase', event)">
                     Firebase
                 </button>
+                <button class="nav-tab" onclick="switchTab('aimonitor', event)">
+                    🤖 KI-Monitor
+                </button>
             </nav>
 
             <main class="main-content">
@@ -1096,6 +1099,51 @@
                         </button>
                     </div>
                     <div id="job-trigger-result" class="firebase-result"></div>
+                </div>
+            </div>
+
+            <!-- ==================== AI MONITOR TAB ==================== -->
+            <div id="tab-aimonitor" class="tab-content" style="display: none">
+                <h2>🤖 KI-Fehlerüberwachung</h2>
+                <p class="section-description">
+                    Systemfehler werden mit Google Gemini analysiert. Die KI erstellt Diagnosen, schlägt Lösungen vor
+                    und kann bestimmte Probleme automatisch beheben.
+                </p>
+
+                <!-- Scan Controls -->
+                <div class="ai-scan-controls">
+                    <div class="scan-row">
+                        <label for="ai-scan-hours">Zeitraum:</label>
+                        <select id="ai-scan-hours">
+                            <option value="1">Letzte Stunde</option>
+                            <option value="6">Letzte 6 Stunden</option>
+                            <option value="24" selected>Letzte 24 Stunden</option>
+                            <option value="72">Letzte 3 Tage</option>
+                            <option value="168">Letzte 7 Tage</option>
+                        </select>
+                        <button id="btn-ai-scan" class="btn btn-primary" onclick="startAiErrorScan()">
+                            🔍 Fehleranalyse starten
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadAiFixHistory()">
+                            📋 Fix-Historie laden
+                        </button>
+                    </div>
+                    <div id="ai-scan-status" class="ai-scan-status" style="display: none">
+                        <div class="spinner-small"></div>
+                        <span>Gemini analysiert Systemfehler...</span>
+                    </div>
+                </div>
+
+                <!-- Analysis Results -->
+                <div id="ai-analysis-results" class="ai-analysis-results" style="display: none">
+                    <div class="ai-summary-bar" id="ai-summary-bar"></div>
+                    <div id="ai-error-cards"></div>
+                </div>
+
+                <!-- Fix History -->
+                <div id="ai-fix-history" class="ai-fix-history" style="display: none">
+                    <h3>Protokoll: KI-Analysen &amp; Auto-Fixes</h3>
+                    <div id="ai-fix-history-list"></div>
                 </div>
             </div>
 

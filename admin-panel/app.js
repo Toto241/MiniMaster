@@ -4587,3 +4587,185 @@ function loadDashboardCharts() {
     loadFunnelChart();
     updateSystemHealth();
 }
+
+// ==================== AI MONITOR (GEMINI) ====================
+
+let currentAnalysisId = null;
+let currentAnalyses = [];
+
+async function startAiErrorScan() {
+    const hours = parseInt(document.getElementById("ai-scan-hours").value, 10);
+    const statusEl = document.getElementById("ai-scan-status");
+    const resultsEl = document.getElementById("ai-analysis-results");
+    const btn = document.getElementById("btn-ai-scan");
+
+    btn.disabled = true;
+    statusEl.style.display = "flex";
+    resultsEl.style.display = "none";
+
+    try {
+        const analyzeSystemErrors = firebase.functions().httpsCallable("analyzeSystemErrors");
+        const response = await analyzeSystemErrors({ hours });
+        const data = response.data;
+
+        currentAnalysisId = data.analysisId;
+        currentAnalyses = data.analyses || [];
+
+        renderAiSummary(data);
+        renderAiErrorCards(data.analyses || []);
+        resultsEl.style.display = "block";
+
+        showNotification("KI-Analyse abgeschlossen: " + data.summary, "success");
+    } catch (err) {
+        showNotification("KI-Analyse fehlgeschlagen: " + err.message, "error");
+    } finally {
+        btn.disabled = false;
+        statusEl.style.display = "none";
+    }
+}
+
+function renderAiSummary(data) {
+    const bar = document.getElementById("ai-summary-bar");
+    const total = data.totalErrors || 0;
+    const analyzed = (data.analyses || []).length;
+    const fixable = (data.analyses || []).filter(a => a.autoFixable).length;
+    const critical = (data.analyses || []).filter(a => a.severity === "critical").length;
+
+    bar.innerHTML = [
+        '<span class="summary-stat">📊 <strong>' + escapeHtml(String(total)) + '</strong> Fehler gefunden</span>',
+        '<span class="summary-stat">🔬 <strong>' + escapeHtml(String(analyzed)) + '</strong> analysiert</span>',
+        '<span class="summary-stat">🔧 <strong>' + escapeHtml(String(fixable)) + '</strong> Auto-Fix möglich</span>',
+        critical > 0 ? '<span class="summary-stat">🔴 <strong>' + escapeHtml(String(critical)) + '</strong> kritisch</span>' : '',
+        '<span class="summary-stat" style="opacity:0.7">Modell: ' + escapeHtml(data.model || "gemini-2.0-flash") + '</span>',
+    ].join("");
+}
+
+function renderAiErrorCards(analyses) {
+    const container = document.getElementById("ai-error-cards");
+    if (!analyses.length) {
+        container.innerHTML = '<p style="color:#64748b;text-align:center;padding:2rem">Keine Fehler im gewählten Zeitraum.</p>';
+        return;
+    }
+
+    container.innerHTML = analyses.map((a, idx) => {
+        const severity = escapeHtml(a.severity || "medium");
+        const category = escapeHtml(a.category || "code");
+        const fnName = escapeHtml(a.functionName || "?");
+        const occurrences = a.occurrences || 1;
+        const errMsg = escapeHtml((a.errorMessage || "").substring(0, 300));
+        const diagnosis = escapeHtml(a.diagnosis || "Keine Diagnose verfügbar.");
+        const solution = escapeHtml(a.solution || "Keine Lösung vorgeschlagen.");
+
+        let fixSection = "";
+        if (a.autoFixable && a.autoFixAction) {
+            const fixDesc = escapeHtml(a.autoFixDescription || a.autoFixAction);
+            const appliedAlready = a.fixApplied;
+            fixSection = '<div class="ai-fix-section">' +
+                '<div class="ai-field"><span class="ai-field-label">Auto-Fix verfügbar</span>' +
+                '<span class="ai-field-value">' + fixDesc + '</span></div>' +
+                '<div class="ai-fix-actions">' +
+                (appliedAlready
+                    ? '<span class="fix-applied-badge">✅ Fix angewendet</span>'
+                    : '<button class="btn-autofix" onclick="executeAiFix(' + idx + ', \'' + escapeHtml(a.autoFixAction) + '\')" id="btn-fix-' + idx + '">⚡ Auto-Fix ausführen</button>'
+                ) +
+                '</div></div>';
+        } else {
+            fixSection = '<div class="ai-fix-section no-fix">' +
+                '<div class="ai-field"><span class="ai-field-label">Auto-Fix</span>' +
+                '<span class="ai-field-value">Nicht verfügbar – manuelle Behebung erforderlich</span></div></div>';
+        }
+
+        return '<div class="ai-error-card severity-' + severity + '">' +
+            '<div class="ai-error-header">' +
+            '<h4>' + fnName + ' <span style="font-weight:400;color:#94a3b8">(×' + escapeHtml(String(occurrences)) + ')</span></h4>' +
+            '<div><span class="severity-badge ' + severity + '">' + severity + '</span> ' +
+            '<span class="category-badge">' + category + '</span></div></div>' +
+            '<div class="ai-error-body">' +
+            '<div class="ai-field"><span class="ai-field-label">Fehlermeldung</span><span class="ai-field-value error-msg">' + errMsg + '</span></div>' +
+            '<div class="ai-field"><span class="ai-field-label">KI-Diagnose</span><span class="ai-field-value">' + diagnosis + '</span></div>' +
+            '<div class="ai-field"><span class="ai-field-label">Lösungsvorschlag</span><span class="ai-field-value">' + solution + '</span></div>' +
+            fixSection +
+            '</div></div>';
+    }).join("");
+}
+
+async function executeAiFix(errorIndex, action) {
+    if (!currentAnalysisId) {
+        showNotification("Keine aktive Analyse vorhanden.", "error");
+        return;
+    }
+
+    const confirmed = confirm(
+        "Auto-Fix ausführen?\n\nAktion: " + action +
+        "\n\nDiese Aktion wird sofort ausgeführt und protokolliert."
+    );
+    if (!confirmed) return;
+
+    const btn = document.getElementById("btn-fix-" + errorIndex);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ Wird ausgeführt...";
+    }
+
+    try {
+        const executeAutoFix = firebase.functions().httpsCallable("executeAutoFix");
+        const response = await executeAutoFix({
+            analysisId: currentAnalysisId,
+            errorIndex: errorIndex,
+            action: action,
+        });
+
+        if (btn) {
+            btn.outerHTML = '<span class="fix-applied-badge">✅ ' + escapeHtml(response.data.result) + '</span>';
+        }
+
+        showNotification("Auto-Fix erfolgreich: " + response.data.result, "success");
+    } catch (err) {
+        showNotification("Auto-Fix fehlgeschlagen: " + err.message, "error");
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "⚡ Auto-Fix ausführen";
+        }
+    }
+}
+
+async function loadAiFixHistory() {
+    const historyEl = document.getElementById("ai-fix-history");
+    const listEl = document.getElementById("ai-fix-history-list");
+    historyEl.style.display = "block";
+    listEl.innerHTML = '<div style="text-align:center;padding:1rem;color:#64748b">Lade Historie...</div>';
+
+    try {
+        const snapshot = await firebase.firestore().collection("ai_error_analyses")
+            .orderBy("analyzedAt", "desc")
+            .limit(20)
+            .get();
+
+        if (snapshot.empty) {
+            listEl.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem">Noch keine KI-Analysen durchgeführt.</p>';
+            return;
+        }
+
+        listEl.innerHTML = snapshot.docs.map(doc => {
+            const d = doc.data();
+            const date = d.analyzedAt ? new Date(d.analyzedAt.seconds * 1000).toLocaleString("de-DE") : "?";
+            const status = d.status || "pending";
+            const statusClass = status === "applied" ? "applied" : status === "dismissed" ? "dismissed" : "pending";
+            const statusLabel = status === "applied" ? "✅ Fix angewendet" : status === "dismissed" ? "❌ Verworfen" : "⏳ Ausstehend";
+            const errorCount = d.errorCount || 0;
+            const analysisCount = (d.analyses || []).length;
+            const fixableCount = (d.analyses || []).filter(a => a.autoFixable).length;
+            const model = d.model || "?";
+
+            return '<div class="fix-history-entry">' +
+                '<div>' +
+                '<strong>' + escapeHtml(String(analysisCount)) + ' Fehler analysiert</strong>' +
+                '<div class="fix-meta">' + escapeHtml(date) + ' · Modell: ' + escapeHtml(model) + ' · ' + escapeHtml(String(fixableCount)) + ' Auto-Fix möglich</div>' +
+                '</div>' +
+                '<span class="fix-status ' + statusClass + '">' + statusLabel + '</span>' +
+                '</div>';
+        }).join("");
+    } catch (err) {
+        listEl.innerHTML = '<p style="color:#ef4444">Fehler beim Laden: ' + escapeHtml(err.message) + '</p>';
+    }
+}

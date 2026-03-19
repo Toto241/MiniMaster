@@ -141,6 +141,8 @@ export type AuditAction =
   | "admin.user_impersonation"
   | "admin.revoke_subscription"
   | "ai.explain_problem"
+  | "ai.error_analysis"
+  | "ai.auto_fix"
   | "subscription.verify_purchase"
   | "subscription.activated"
   | "subscription.trial_started"
