@@ -1,8 +1,8 @@
 # Readiness Scorecard (2026-03-19)
 
-Status: **UPDATED** — scoring snapshot after enforcement automation + compliance evidence collection.
+Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and auth/pairing coverage wave.
 
-## Scoring Date: 2026-03-19 (Update #2)
+## Scoring Date: 2026-03-19 (Update #3)
 
 ---
 
@@ -12,8 +12,8 @@ Status: **UPDATED** — scoring snapshot after enforcement automation + complian
 |-----------|-------|-----|----------|
 | Build gate green | 5 | 5 | `npm run build` passes (0 errors) |
 | Lint gate green | 5 | 5 | `npm run lint` passes (0 errors) |
-| Test gate green | 5 | 5 | 349/349 tests pass (20 suites) |
-| Coverage > 75% | 5 | 5 | Stmts 84.83%, Branch 71.2%, Funcs 86.01%, Lines 85.3% |
+| Test gate green | 5 | 5 | 366/366 tests pass (20 suites) |
+| Coverage > 75% | 5 | 5 | Stmts 86.74%, Branch 72.98%, Funcs 87.04%, Lines 87.28% |
 | CI artifact archiving | 4 | 5 | CI Runbook + CI Gate Stabilization Proof (5 konsekutive Runs) |
 
 ---
@@ -87,7 +87,7 @@ Status: **UPDATED** — scoring snapshot after enforcement automation + complian
 
 | Maßnahme | Punkte | Nachweis |
 |----------|--------|----------|
-| Coverage-Boost: 78.5%→84.83% Stmts, 61%→71.2% Branch | +1 | branch-coverage-boost.test.ts (61 Tests), triggers-v2-coverage.test.ts (9 Tests) |
+| Coverage-Boost: 78.5%→86.74% Stmts, 61%→72.98% Branch | +1 | branch-coverage-boost.test.ts (jetzt 78 Tests), triggers-v2-coverage.test.ts (9 Tests) |
 | Enforcement-Testautomation: 39 Backend-Tests | +4 | enforcement-automation.test.ts (Kategorien A-G) |
 | Compliance-Evidence-Bundle komplett | +2 | COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md |
 | CI-Gate-Stabilisierung dokumentiert | +2 | CI_GATE_STABILIZATION_PROOF_2026-03-19.md |
