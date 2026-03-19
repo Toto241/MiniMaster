@@ -88,6 +88,54 @@ export const setUserRole = functions.https.onCall(
 );
 
 /**
+ * Bootstrap the very first admin user.
+ * Only works when NO admin user exists yet in Firebase Auth.
+ * The caller must be authenticated (registered via the panel).
+ * Security: iterates all users to verify no admin claim exists.
+ */
+export const bootstrapFirstAdmin = functions.https.onCall(
+  async (_data: unknown, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
+
+    const callerUid = context.auth.uid;
+
+    // Check if ANY admin already exists — iterate all users
+    let pageToken: string | undefined;
+    let adminExists = false;
+    do {
+      const listResult = await admin.auth().listUsers(1000, pageToken);
+      for (const user of listResult.users) {
+        if (user.customClaims && (user.customClaims as Record<string, unknown>).role === "admin") {
+          adminExists = true;
+          break;
+        }
+      }
+      pageToken = listResult.pageToken;
+    } while (pageToken && !adminExists);
+
+    if (adminExists) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Es existiert bereits ein Admin. Bitten Sie den bestehenden Admin, Ihnen eine Rolle zuzuweisen."
+      );
+    }
+
+    // No admin exists → promote caller to admin
+    await admin.auth().setCustomUserClaims(callerUid, { role: "admin" });
+
+    await AuditLogger.logSuccess(
+      "admin.set_admin_claim", context, `users/${callerUid}`, "user",
+      { targetUserId: callerUid, bootstrapFirstAdmin: true }
+    );
+
+    functions.logger.info(`Bootstrap: First admin set for UID ${callerUid}`);
+    return { success: true, message: "Sie sind jetzt Admin! Die Seite wird neu geladen." };
+  }
+);
+
+/**
  * Issues a fresh Firebase custom token for either:
  * 1. the currently authenticated user, or
  * 2. a master authenticated via masterImei + secretKey (web-control login).
