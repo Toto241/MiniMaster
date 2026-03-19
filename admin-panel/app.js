@@ -881,7 +881,7 @@ function computeGoLiveStatus() {
     let totalAll = 0;
     let doneAll = 0;
 
-    for (const platform of Object.values(platformReadinessItems)) {
+    for (const [platformKey, platform] of Object.entries(platformReadinessItems)) {
         let pCritical = 0, pCriticalDone = 0, pHigh = 0, pHighDone = 0, pTotal = 0, pDone = 0;
         for (const item of platform.items) {
             pTotal++;
