@@ -6,7 +6,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { requireAdmin, AuditLogger } from "./shared";
 import type { OperatorRole } from "./shared";
 
@@ -25,7 +25,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
       throw new functions.https.HttpsError("invalid-argument", "The function must be called with a user UID.");
     }
 
-    await admin.auth().setCustomUserClaims(uid, { role: "admin" });
+    await auth().setCustomUserClaims(uid, { role: "admin" });
 
     await AuditLogger.logSuccess(
       "admin.set_admin_claim", context, `users/${uid}`, "user",
@@ -68,7 +68,7 @@ export const setUserRole = functions.https.onCall(
         );
       }
 
-      await admin.auth().setCustomUserClaims(uid, { role });
+      await auth().setCustomUserClaims(uid, { role });
 
       await AuditLogger.logSuccess(
         "admin.set_admin_claim", context, `users/${uid}`, "user",
@@ -101,37 +101,46 @@ export const bootstrapFirstAdmin = functions.https.onCall(
 
     const callerUid = context.auth.uid;
 
-    // Check if ANY admin already exists — iterate all users
-    let pageToken: string | undefined;
-    let adminExists = false;
-    do {
-      const listResult = await admin.auth().listUsers(1000, pageToken);
-      for (const user of listResult.users) {
-        if (user.customClaims && (user.customClaims as Record<string, unknown>).role === "admin") {
-          adminExists = true;
-          break;
+    try {
+      // Check if ANY admin already exists — iterate all users
+      let pageToken: string | undefined;
+      let adminExists = false;
+      do {
+        const listResult = await auth().listUsers(1000, pageToken);
+        for (const user of listResult.users) {
+          if (user.customClaims && (user.customClaims as Record<string, unknown>).role === "admin") {
+            adminExists = true;
+            break;
+          }
         }
-      }
-      pageToken = listResult.pageToken;
-    } while (pageToken && !adminExists);
+        pageToken = listResult.pageToken;
+      } while (pageToken && !adminExists);
 
-    if (adminExists) {
+      if (adminExists) {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "Es existiert bereits ein Admin. Bitten Sie den bestehenden Admin, Ihnen eine Rolle zuzuweisen."
+        );
+      }
+
+      // No admin exists → promote caller to admin
+      await auth().setCustomUserClaims(callerUid, { role: "admin" });
+
+      await AuditLogger.logSuccess(
+        "admin.set_admin_claim", context, `users/${callerUid}`, "user",
+        { targetUserId: callerUid, bootstrapFirstAdmin: true }
+      );
+
+      functions.logger.info(`Bootstrap: First admin set for UID ${callerUid}`);
+      return { success: true, message: "Sie sind jetzt Admin! Die Seite wird neu geladen." };
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error("Bootstrap admin error:", error);
       throw new functions.https.HttpsError(
-        "permission-denied",
-        "Es existiert bereits ein Admin. Bitten Sie den bestehenden Admin, Ihnen eine Rolle zuzuweisen."
+        "internal",
+        `Admin-Aktivierung fehlgeschlagen: ${(error as Error).message}`
       );
     }
-
-    // No admin exists → promote caller to admin
-    await admin.auth().setCustomUserClaims(callerUid, { role: "admin" });
-
-    await AuditLogger.logSuccess(
-      "admin.set_admin_claim", context, `users/${callerUid}`, "user",
-      { targetUserId: callerUid, bootstrapFirstAdmin: true }
-    );
-
-    functions.logger.info(`Bootstrap: First admin set for UID ${callerUid}`);
-    return { success: true, message: "Sie sind jetzt Admin! Die Seite wird neu geladen." };
   }
 );
 
@@ -139,6 +148,9 @@ export const bootstrapFirstAdmin = functions.https.onCall(
  * Issues a fresh Firebase custom token for either:
  * 1. the currently authenticated user, or
  * 2. a master authenticated via masterImei + secretKey (web-control login).
+ *
+ * ⚠️ LEGACY AUTH — EINGEFROREN: secretKey/IMEI-Auth wird nicht erweitert.
+ * Migration zu Firebase Auth UI geplant (siehe docs/AUTH_MIGRATION_PLAN.md Phase 2).
  */
 export const generateCustomToken = functions.https.onCall(
   async (data: { masterImei?: string; secretKey?: string }, context: CallableContext) => {
@@ -165,8 +177,8 @@ export const generateCustomToken = functions.https.onCall(
     }
 
     try {
-      const user = await admin.auth().getUser(uid);
-      const customToken = await admin.auth().createCustomToken(uid, user.customClaims || {});
+      const user = await auth().getUser(uid);
+      const customToken = await auth().createCustomToken(uid, user.customClaims || {});
 
       // Track token refresh for security monitoring (best-effort)
       try {
@@ -198,6 +210,9 @@ export const generateCustomToken = functions.https.onCall(
 /**
  * Registers a master account and returns a Firebase custom token for the
  * canonical master identity. Existing master records are reused.
+ *
+ * ⚠️ LEGACY AUTH — EINGEFROREN: IMEI-basierte Registrierung wird nicht erweitert.
+ * Migration zu Firebase Installation ID geplant (siehe docs/AUTH_MIGRATION_PLAN.md Phase 2).
  */
 export const registerMasterDevice = functions.https.onCall(
   async (data: { imei: string }, context: CallableContext) => {
@@ -218,21 +233,21 @@ export const registerMasterDevice = functions.https.onCall(
     const masterDeviceRef = db().collection("masters").doc(masterId);
 
     try {
-      const authUser = await admin.auth().getUser(masterId).catch(async (error: { code?: string }) => {
+      const authUser = await auth().getUser(masterId).catch(async (error: { code?: string }) => {
         if (error?.code === "auth/user-not-found") {
-          return admin.auth().createUser({ uid: masterId });
+          return auth().createUser({ uid: masterId });
         }
         throw error;
       });
 
       const doc = await masterDeviceRef.get();
       if (doc.exists) {
-        await admin.auth().setCustomUserClaims(masterId, {
+        await auth().setCustomUserClaims(masterId, {
           ...(authUser.customClaims || {}),
           role: "master",
           masterImei: masterId,
         });
-        const customToken = await admin.auth().createCustomToken(masterId, {
+        const customToken = await auth().createCustomToken(masterId, {
           ...(authUser.customClaims || {}),
           role: "master",
           masterImei: masterId,
@@ -264,8 +279,8 @@ export const registerMasterDevice = functions.https.onCall(
         role: "master",
         masterImei: masterId,
       };
-      await admin.auth().setCustomUserClaims(masterId, customClaims);
-      const customToken = await admin.auth().createCustomToken(masterId, customClaims);
+      await auth().setCustomUserClaims(masterId, customClaims);
+      const customToken = await auth().createCustomToken(masterId, customClaims);
 
       await AuditLogger.logSuccess(
         "device.register", context, `masters/${masterId}`, "device",
@@ -301,7 +316,7 @@ export const revokeUserTokens = functions.https.onCall(
         throw new functions.https.HttpsError("invalid-argument", "A valid user UID is required.");
       }
 
-      await admin.auth().revokeRefreshTokens(targetUid);
+      await auth().revokeRefreshTokens(targetUid);
 
       await db().collection("masters").doc(targetUid).update({
         tokensRevokedAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -36,6 +36,18 @@ const mockAuth = {
   deleteUser: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockDbObj = { collection: jest.fn() };
+jest.mock("../firebase", () => ({
+  db: jest.fn(() => mockDbObj),
+  auth: jest.fn(() => mockAuth),
+  storage: jest.fn(() => ({
+    bucket: jest.fn(() => ({
+      name: "test-bucket",
+      getMetadata: jest.fn().mockResolvedValue([{ name: "test-bucket" }]),
+    })),
+  })),
+}));
+
 // Shared firestore instance so admin.firestore() and db() return the same mock
 const sharedFirestore: any = { collection: jest.fn() };
 

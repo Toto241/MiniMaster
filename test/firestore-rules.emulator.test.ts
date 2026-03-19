@@ -82,4 +82,69 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
 
     await assertSucceeds(getDoc(doc(db, "children", "child-1")));
   });
+
+  it("denies access to families/* collection (migration guard)", async () => {
+    const db = testEnv.authenticatedContext("master-1", { role: "admin" }).firestore();
+
+    await assertFails(
+      setDoc(doc(db, "families", "family-1"), { name: "TestFamily" })
+    );
+
+    await assertFails(
+      getDoc(doc(db, "families", "family-1"))
+    );
+  });
+
+  it("denies unauthenticated access to children", async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(getDoc(doc(db, "children", "child-1")));
+  });
+
+  it("denies unauthenticated access to masters", async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(getDoc(doc(db, "masters", "master-1")));
+  });
+
+  it("denies child task creation with invalid fields", async () => {
+    const db = testEnv.authenticatedContext("master-1", { role: "master" }).firestore();
+
+    // Missing required 'description' field
+    await assertFails(
+      setDoc(doc(db, "children", "child-1", "tasks", "task-bad"), {
+        status: "pending",
+        masterImei: "master-1",
+      })
+    );
+  });
+
+  it("allows the owning child to read its own tasks", async () => {
+    // Seed a task first
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, "children", "child-1", "tasks", "task-read"), {
+        description: "Test",
+        status: "pending",
+        masterImei: "master-1",
+      });
+    });
+
+    const db = testEnv.authenticatedContext("child-1").firestore();
+    await assertSucceeds(getDoc(doc(db, "children", "child-1", "tasks", "task-read")));
+  });
+
+  it("denies cross-tenant task read", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, "children", "child-1", "tasks", "task-cross"), {
+        description: "Test",
+        status: "pending",
+        masterImei: "master-1",
+      });
+    });
+
+    const db = testEnv.authenticatedContext("master-other").firestore();
+    await assertFails(getDoc(doc(db, "children", "child-1", "tasks", "task-cross")));
+  });
 });

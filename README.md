@@ -137,6 +137,8 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[API Documentation](API_DOCUMENTATION.md):** Detailed reference for all Cloud Functions.
 - **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md):** Step-by-step instructions for deploying the project.
 - **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
+- **[Legacy Auth Inventory](docs/LEGACY_AUTH_INVENTORY.md):** Vollständiges Inventar aller secretKey/IMEI-Endpunkte mit Freeze-Richtlinie.
+- **[Auth Migration Plan](docs/AUTH_MIGRATION_PLAN.md):** Phasenplan zur Migration von secretKey/IMEI auf Firebase Auth.
 - **[Quality Review YYYY-MM-DD](docs/QUALITY_REVIEW_YYYY-MM-DD.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
 - **[Language Global Roadmap](docs/LANGUAGE_GLOBAL_ROADMAP.md):** Global language prioritization, rollout waves, and locale strategy.
 - **[First-Start Language Implementation](docs/LANGUAGE_FIRST_START_IMPLEMENTATION.md):** Technical details for mandatory language selection on first launch.

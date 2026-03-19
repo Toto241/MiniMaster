@@ -119,11 +119,10 @@ class BlockingOverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 WindowManager.LayoutParams.TYPE_PHONE,
-            // FLAG_NOT_TOUCH_MODAL: allow button to receive touches
+            // Overlay captures all touch events (no pass-through to blocked app)
             // FLAG_LAYOUT_IN_SCREEN: cover status bar
             // FLAG_SHOW_WHEN_LOCKED: show over lock screen
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
             PixelFormat.TRANSLUCENT
         )

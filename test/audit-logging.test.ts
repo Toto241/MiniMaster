@@ -2,6 +2,20 @@
 import fft from "firebase-functions-test";
 import { db as getDb } from "../firebase";
 
+const mockAuthInline = {
+  setCustomUserClaims: jest.fn().mockResolvedValue(undefined),
+  getUser: jest.fn().mockResolvedValue({ customClaims: { role: "master" } }),
+  createCustomToken: jest.fn().mockResolvedValue("mock-token"),
+  listUsers: jest.fn().mockResolvedValue({ users: [], pageToken: undefined }),
+};
+
+const mockDbObj = { collection: jest.fn() };
+jest.mock("../firebase", () => ({
+  db: jest.fn(() => mockDbObj),
+  auth: jest.fn(() => mockAuthInline),
+  storage: jest.fn(() => ({ bucket: jest.fn() })),
+}));
+
 jest.mock("firebase-admin", () => {
   const original = jest.requireActual("firebase-admin");
   class MockTimestamp {

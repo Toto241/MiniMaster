@@ -6,6 +6,43 @@ const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 const COMMAND_BUILDER_STORAGE_KEY = "operatorCommandBuilderConfig";
 const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations";
 
+// ==================== SESSION TIMEOUT ====================
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
+let sessionTimeoutTimer = null;
+let sessionWarningTimer = null;
+
+function resetSessionTimeout() {
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    if (!auth || !auth.currentUser) return;
+
+    // Warnung 5 Minuten vor Ablauf
+    sessionWarningTimer = setTimeout(() => {
+        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "warning");
+    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
+
+    // Auto-Logout nach Timeout
+    sessionTimeoutTimer = setTimeout(() => {
+        if (auth && auth.currentUser) {
+            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
+            auth.signOut();
+        }
+    }, SESSION_TIMEOUT_MS);
+}
+
+function startSessionMonitoring() {
+    const events = ["mousedown", "keydown", "scroll", "touchstart"];
+    events.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
+    resetSessionTimeout();
+}
+
+function stopSessionMonitoring() {
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    sessionTimeoutTimer = null;
+    sessionWarningTimer = null;
+}
+
 // Electron Operator-Bridge-Erkennung
 const isElectronOperator = Boolean(
     typeof window !== "undefined" &&
@@ -2135,6 +2172,7 @@ function handleLogin(event) {
 }
 
 function logout() {
+    stopSessionMonitoring();
     auth.signOut();
 }
 
@@ -2149,6 +2187,7 @@ function showDashboard(user) {
     document.getElementById("logout-btn").style.display = "inline-block";
     const roleLabel = currentUserRole ? ` (${currentUserRole.toUpperCase()})` : "";
     document.getElementById("user-email").textContent = (user.email || "") + roleLabel;
+    startSessionMonitoring();
 }
 
 /**

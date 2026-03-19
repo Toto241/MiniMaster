@@ -15,6 +15,41 @@ function escapeHtml(text) {
 
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 
+// ==================== SESSION TIMEOUT ====================
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
+let sessionTimeoutTimer = null;
+let sessionWarningTimer = null;
+
+function resetSessionTimeout() {
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    if (!currentMasterImei) return;
+
+    sessionWarningTimer = setTimeout(() => {
+        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "error");
+    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
+
+    sessionTimeoutTimer = setTimeout(() => {
+        if (currentMasterImei) {
+            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
+            logout();
+        }
+    }, SESSION_TIMEOUT_MS);
+}
+
+function startSessionMonitoring() {
+    const events = ["mousedown", "keydown", "scroll", "touchstart"];
+    events.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
+    resetSessionTimeout();
+}
+
+function stopSessionMonitoring() {
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    sessionTimeoutTimer = null;
+    sessionWarningTimer = null;
+}
+
 // Firebase configuration — configure via Operator-Dashboard (localStorage) or replace placeholders
 const fallbackFirebaseConfig = {
     apiKey: "your-api-key",
@@ -133,6 +168,7 @@ function login() {
 
             showMainContent();
             loadDevices();
+            startSessionMonitoring();
             showNotification('Login successful!', 'success');
         })
         .catch(error => {
@@ -146,6 +182,7 @@ function login() {
  * and resetting the UI to the login screen.
  */
 function logout() {
+    stopSessionMonitoring();
     currentMasterImei = null;
     localStorage.removeItem('minimaster-credentials');
     firebase.auth().signOut().catch(error => console.warn('Sign-out warning:', error));

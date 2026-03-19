@@ -1,7 +1,7 @@
 <!-- High-signal instructions for AI coding agents working on MiniMaster -->
 # MiniMaster Agent Guide
 
-Parental control suite: Firebase Cloud Functions (TypeScript) + two Android apps (Kotlin/Compose) + static web panel. **Prototype status** – actual device blocking not implemented.
+Parental control suite: Firebase Cloud Functions (TypeScript) + two Android apps (Kotlin/Compose) + static web panel. **Prototype status** – device blocking implemented via AccessibilityService + system overlay.
 
 ## Architecture Overview
 
@@ -10,9 +10,9 @@ index.ts          → All callable Cloud Functions (auth, pairing, tasks, subscr
 firebase.ts       → Singleton Firebase Admin init (lazy getters: db(), auth(), storage())
 firestore.rules   → Flat schema validation (families/* explicitly denied!)
 masterApp/        → Parent Android app (Kotlin/Compose/Hilt/Play Billing)
-childApp/         → Child Android app (FCM sync, AccessibilityService stub)
-web-control/      → Static JS panel for parent actions
-admin-panel/      → Admin dashboard for subscription management
+childApp/         → Child Android app (FCM sync, AccessibilityService enforcement, tamper detection)
+web-control/      → Static JS panel for parent actions (session timeout: 30 min)
+admin-panel/      → Admin dashboard for subscription management (session timeout: 30 min)
 test/             → Jest tests with firebase-functions-test
 ```
 
@@ -150,6 +150,10 @@ firebase deploy --only functions,firestore,storage
 - Firestore rules validate schema (prevent `families/*` access)
 - Auth checks in **every** Cloud Function (no rule-only access)
 - Photo uploads to Storage with security rules (authenticated + masterImei ownership check)
+- **Legacy Auth Freeze**: No new `secretKey`/IMEI-based endpoints. All new functions must use `context.auth`. See `docs/LEGACY_AUTH_INVENTORY.md`.
+- Session timeout (30 min) in both web panels (admin-panel, web-control)
+- CSP headers configured in `firebase.json` for both hosting targets
+- `photoUrl` validation in `completeTask`: must be Firebase Storage URL, max 2048 chars
 
 ## Commit Checklist
 
