@@ -338,6 +338,69 @@
                             </button>
                         </div>
 
+                        <!-- ===== SYSTEM-GESUNDHEIT ===== -->
+                        <h3>Systemgesundheit</h3>
+                        <div class="health-banner" id="system-health-banner">
+                            <div class="health-indicator" id="health-indicator">
+                                <span class="health-dot"></span>
+                                <span class="health-label">System wird geprüft…</span>
+                            </div>
+                            <div class="health-details" id="health-details"></div>
+                        </div>
+
+                        <!-- ===== GRAFISCHE ÜBERSICHT ===== -->
+                        <h3>Grafische Übersicht</h3>
+                        <div class="charts-grid">
+                            <!-- Subscription-Verteilung -->
+                            <div class="chart-card">
+                                <h4>Abonnement-Verteilung</h4>
+                                <div class="donut-chart-wrap">
+                                    <svg class="donut-chart" viewBox="0 0 42 42" id="chart-subs">
+                                        <circle class="donut-bg" cx="21" cy="21" r="15.915"></circle>
+                                        <circle class="donut-seg seg-active" cx="21" cy="21" r="15.915" id="seg-active"></circle>
+                                        <circle class="donut-seg seg-trial" cx="21" cy="21" r="15.915" id="seg-trial"></circle>
+                                        <circle class="donut-seg seg-expired" cx="21" cy="21" r="15.915" id="seg-expired"></circle>
+                                        <text x="21" y="21" class="donut-center-text" id="donut-center-subs">--</text>
+                                        <text x="21" y="24.5" class="donut-sub-text">gesamt</text>
+                                    </svg>
+                                    <div class="chart-legend" id="legend-subs"></div>
+                                </div>
+                            </div>
+
+                            <!-- Aufgaben-Status -->
+                            <div class="chart-card">
+                                <h4>Aufgaben nach Status</h4>
+                                <div class="bar-chart-wrap" id="chart-tasks-bars"></div>
+                                <div class="chart-legend" id="legend-tasks"></div>
+                            </div>
+
+                            <!-- Geräte-Online-Status -->
+                            <div class="chart-card">
+                                <h4>Geräte-Online-Status</h4>
+                                <div class="donut-chart-wrap">
+                                    <svg class="donut-chart" viewBox="0 0 42 42" id="chart-devices">
+                                        <circle class="donut-bg" cx="21" cy="21" r="15.915"></circle>
+                                        <circle class="donut-seg seg-online" cx="21" cy="21" r="15.915" id="seg-online"></circle>
+                                        <text x="21" y="21" class="donut-center-text" id="donut-center-devices">--</text>
+                                        <text x="21" y="24.5" class="donut-sub-text">online</text>
+                                    </svg>
+                                    <div class="chart-legend" id="legend-devices"></div>
+                                </div>
+                            </div>
+
+                            <!-- 7-Tage Fehler-Trend -->
+                            <div class="chart-card">
+                                <h4>Fehler-Trend (7 Tage)</h4>
+                                <div class="sparkline-wrap" id="chart-error-trend"></div>
+                            </div>
+
+                            <!-- Conversion Funnel -->
+                            <div class="chart-card chart-card-wide">
+                                <h4>Nutzungs-Funnel</h4>
+                                <div class="funnel-wrap" id="chart-funnel"></div>
+                            </div>
+                        </div>
+
                         <!-- Subscription Expiry Warnings -->
                         <div id="subscription-warnings" class="data-list" style="margin-block-end: 20px"></div>
 

@@ -2617,12 +2617,14 @@ function loadDashboardData() {
     loadSubscriptions();
     loadSupportTickets();
     loadDevices();
+    loadDashboardCharts();
 }
 
 function refreshAllStats() {
     loadStats();
     loadPerformanceMetrics();
     loadSubscriptionWarnings();
+    loadDashboardCharts();
     showNotification("Statistics refreshed.", "success");
 }
 
@@ -4286,3 +4288,302 @@ window.onclick = function(event) {
     if (event.target === ticketModal) ticketModal.style.display = "none";
     if (event.target === deviceModal) deviceModal.style.display = "none";
 };
+
+// ==================== GRAPHICAL DASHBOARD CHARTS ====================
+
+const DONUT_CIRCUMFERENCE = 100; // percentage-based
+
+function setDonutSegment(id, pct, offset) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute("stroke-dasharray", pct + " " + (DONUT_CIRCUMFERENCE - pct));
+    el.setAttribute("stroke-dashoffset", String(offset));
+}
+
+// --- Subscription Donut ---
+async function loadSubscriptionChart() {
+    try {
+        const snap = await db.collection("masters").get();
+        let active = 0, trial = 0, expired = 0, none = 0;
+        snap.forEach(function(doc) {
+            const sub = doc.data().subscription;
+            if (!sub || !sub.status) { none++; return; }
+            if (sub.status === "active") active++;
+            else if (sub.status === "trial") trial++;
+            else expired++;
+        });
+        const total = active + trial + expired + none;
+        const pActive  = total ? (active / total) * DONUT_CIRCUMFERENCE : 0;
+        const pTrial   = total ? (trial / total) * DONUT_CIRCUMFERENCE : 0;
+        const pExpired = total ? ((expired + none) / total) * DONUT_CIRCUMFERENCE : 0;
+
+        // 25 = default offset so segments start at 12 o'clock
+        setDonutSegment("seg-active",  pActive, 25);
+        setDonutSegment("seg-trial",   pTrial,  25 - pActive);
+        setDonutSegment("seg-expired", pExpired, 25 - pActive - pTrial);
+
+        const centerEl = document.getElementById("donut-center-subs");
+        if (centerEl) centerEl.textContent = total;
+
+        const legend = document.getElementById("legend-subs");
+        if (legend) legend.innerHTML =
+            '<div class="legend-row"><span class="legend-dot" style="background:#3b82f6"></span>Aktiv<span class="legend-value">' + active + '</span></div>' +
+            '<div class="legend-row"><span class="legend-dot" style="background:#eab308"></span>Trial<span class="legend-value">' + trial + '</span></div>' +
+            '<div class="legend-row"><span class="legend-dot" style="background:#94a3b8"></span>Abgelaufen/Keine<span class="legend-value">' + (expired + none) + '</span></div>';
+    } catch (e) {
+        console.warn("Subscription chart error:", e);
+    }
+}
+
+// --- Task Status Bars ---
+async function loadTaskChart() {
+    const container = document.getElementById("chart-tasks-bars");
+    const legend = document.getElementById("legend-tasks");
+    if (!container) return;
+    try {
+        const snap = await db.collectionGroup("tasks").get();
+        var counts = { pending: 0, pending_approval: 0, approved: 0, rejected: 0 };
+        snap.forEach(function(doc) {
+            var s = doc.data().status || "pending";
+            if (counts.hasOwnProperty(s)) counts[s]++;
+            else counts.pending++;
+        });
+        var max = Math.max(1, counts.pending, counts.pending_approval, counts.approved, counts.rejected);
+        var labels = { pending: "Offen", pending_approval: "Prüfung", approved: "Genehmigt", rejected: "Abgelehnt" };
+        var html = "";
+        var legendHtml = "";
+        Object.keys(counts).forEach(function(key) {
+            var pct = Math.round((counts[key] / max) * 100);
+            html += '<div class="bar-row">' +
+                '<span class="bar-label">' + labels[key] + '</span>' +
+                '<div class="bar-track"><div class="bar-fill bar-' + key + '" style="width:' + pct + '%"></div></div>' +
+                '<span class="bar-count">' + counts[key] + '</span>' +
+                '</div>';
+        });
+        container.innerHTML = html;
+        if (legend) {
+            var total = counts.pending + counts.pending_approval + counts.approved + counts.rejected;
+            legend.innerHTML = '<div class="legend-row" style="color:#64748b">Gesamt: <span class="legend-value">' + total + '</span></div>';
+        }
+    } catch (e) {
+        container.innerHTML = '<div class="info">Aufgaben nicht verfügbar.</div>';
+    }
+}
+
+// --- Device Online Status ---
+async function loadDeviceOnlineChart() {
+    try {
+        const snap = await db.collection("children").get();
+        const now = Date.now();
+        const ONLINE_THRESHOLD = 15 * 60 * 1000; // 15 min
+        let online = 0, offline = 0;
+        snap.forEach(function(doc) {
+            const d = doc.data();
+            if (d.lastSeen) {
+                const lastMs = d.lastSeen.seconds ? d.lastSeen.seconds * 1000 : 0;
+                if (now - lastMs < ONLINE_THRESHOLD) online++;
+                else offline++;
+            } else {
+                offline++;
+            }
+        });
+        const total = online + offline;
+        const pOnline = total ? (online / total) * DONUT_CIRCUMFERENCE : 0;
+        setDonutSegment("seg-online", pOnline, 25);
+
+        const centerEl = document.getElementById("donut-center-devices");
+        if (centerEl) centerEl.textContent = total ? Math.round((online / total) * 100) + "%" : "0%";
+
+        const legend = document.getElementById("legend-devices");
+        if (legend) legend.innerHTML =
+            '<div class="legend-row"><span class="legend-dot" style="background:#22c55e"></span>Online<span class="legend-value">' + online + '</span></div>' +
+            '<div class="legend-row"><span class="legend-dot" style="background:#e2e8f0"></span>Offline<span class="legend-value">' + offline + '</span></div>';
+    } catch (e) {
+        console.warn("Device chart error:", e);
+    }
+}
+
+// --- 7-Day Error Trend ---
+async function loadErrorTrendChart() {
+    const container = document.getElementById("chart-error-trend");
+    if (!container) return;
+    try {
+        const now = new Date();
+        const days = [];
+        for (var i = 6; i >= 0; i--) {
+            var d = new Date(now);
+            d.setDate(d.getDate() - i);
+            d.setHours(0,0,0,0);
+            days.push({ date: d, label: d.toLocaleDateString("de-DE", { weekday: "short" }), count: 0 });
+        }
+        var weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        weekAgo.setHours(0,0,0,0);
+
+        const snap = await db.collection("error_logs")
+            .where("timestamp", ">=", firebase.firestore.Timestamp.fromDate(weekAgo))
+            .get();
+
+        snap.forEach(function(doc) {
+            var ts = doc.data().timestamp;
+            if (!ts) return;
+            var eDate = new Date(ts.seconds * 1000);
+            eDate.setHours(0,0,0,0);
+            for (var j = 0; j < days.length; j++) {
+                if (days[j].date.getTime() === eDate.getTime()) {
+                    days[j].count++;
+                    break;
+                }
+            }
+        });
+
+        var maxCount = Math.max(1, Math.max.apply(null, days.map(function(d) { return d.count; })));
+        var html = "";
+        days.forEach(function(day) {
+            var h = Math.max(2, Math.round((day.count / maxCount) * 80));
+            var cls = day.count > maxCount * 0.75 ? "spark-high" : day.count > maxCount * 0.4 ? "spark-med" : "";
+            html += '<div class="spark-col">' +
+                '<span class="spark-count">' + day.count + '</span>' +
+                '<div class="spark-bar ' + cls + '" style="height:' + h + 'px"></div>' +
+                '<span class="spark-label">' + day.label + '</span>' +
+                '</div>';
+        });
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<div class="info">Fehler-Trend nicht verfügbar.</div>';
+    }
+}
+
+// --- Conversion Funnel ---
+async function loadFunnelChart() {
+    const container = document.getElementById("chart-funnel");
+    if (!container) return;
+    try {
+        // Step 1: Registered masters
+        const mastersSnap = await db.collection("masters").get();
+        const registered = mastersSnap.size;
+
+        // Step 2: Masters that have at least one paired child
+        const childrenSnap = await db.collection("children").get();
+        const masterWithChild = new Set();
+        childrenSnap.forEach(function(doc) {
+            var mi = doc.data().masterImei;
+            if (mi) masterWithChild.add(mi);
+        });
+        const paired = masterWithChild.size;
+
+        // Step 3: Masters that have tasks
+        const tasksSnap = await db.collectionGroup("tasks").get();
+        const masterWithTask = new Set();
+        tasksSnap.forEach(function(doc) {
+            var mi = doc.data().masterImei;
+            if (mi) masterWithTask.add(mi);
+        });
+        const withTasks = masterWithTask.size;
+
+        // Step 4: Active subscriptions
+        var activeSubs = 0;
+        mastersSnap.forEach(function(doc) {
+            var sub = doc.data().subscription;
+            if (sub && sub.status === "active") activeSubs++;
+        });
+
+        var steps = [
+            { label: "Registriert", count: registered, color: "#3b82f6" },
+            { label: "Kind gepairt", count: paired, color: "#6366f1" },
+            { label: "Aufgabe erstellt", count: withTasks, color: "#8b5cf6" },
+            { label: "Abo aktiv", count: activeSubs, color: "#a855f7" }
+        ];
+        var maxH = 120;
+        var maxVal = Math.max(1, registered);
+
+        var html = "";
+        steps.forEach(function(step, idx) {
+            var h = Math.max(8, Math.round((step.count / maxVal) * maxH));
+            var pct = registered ? Math.round((step.count / registered) * 100) : 0;
+            if (idx > 0) html += '<span class="funnel-arrow">›</span>';
+            html += '<div class="funnel-step">' +
+                '<div class="funnel-bar" style="height:' + h + 'px;background:' + step.color + '"></div>' +
+                '<span class="funnel-count">' + step.count + '</span>' +
+                '<span class="funnel-label">' + step.label + ' (' + pct + '%)</span>' +
+                '</div>';
+        });
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<div class="info">Funnel-Daten nicht verfügbar.</div>';
+    }
+}
+
+// --- System Health Banner ---
+async function updateSystemHealth() {
+    const banner = document.getElementById("system-health-banner");
+    const indicator = document.getElementById("health-indicator");
+    const details = document.getElementById("health-details");
+    if (!banner) return;
+
+    var checks = [];
+    try {
+        // 1. Error rate (24h)
+        var yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        var errSnap = await db.collection("error_logs")
+            .where("timestamp", ">=", firebase.firestore.Timestamp.fromDate(yesterday))
+            .get();
+        var errCount = errSnap.size;
+        if (errCount === 0) checks.push({ label: "Fehler (24h): " + errCount, status: "green" });
+        else if (errCount <= 10) checks.push({ label: "Fehler (24h): " + errCount, status: "yellow" });
+        else checks.push({ label: "Fehler (24h): " + errCount, status: "red" });
+
+        // 2. Open tickets
+        var ticketSnap = await db.collection("supportTickets")
+            .where("status", "in", ["open", "escalated"])
+            .get();
+        var ticketCount = ticketSnap.size;
+        if (ticketCount === 0) checks.push({ label: "Offene Tickets: " + ticketCount, status: "green" });
+        else if (ticketCount <= 5) checks.push({ label: "Offene Tickets: " + ticketCount, status: "yellow" });
+        else checks.push({ label: "Offene Tickets: " + ticketCount, status: "red" });
+
+        // 3. Firebase config
+        var configOk = firebaseConfig && firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("your-");
+        checks.push({ label: "Firebase-Config", status: configOk ? "green" : "red" });
+
+        // 4. Active pairing codes (too many = suspicious)
+        var now = firebase.firestore.Timestamp.now();
+        var pairSnap = await db.collection("pairingCodes").get();
+        var activePairing = 0;
+        pairSnap.forEach(function(doc) {
+            if (doc.data().expiresAt && doc.data().expiresAt.seconds > now.seconds) activePairing++;
+        });
+        if (activePairing <= 20) checks.push({ label: "Kopplungscodes: " + activePairing, status: "green" });
+        else checks.push({ label: "Kopplungscodes: " + activePairing + " (ungewöhnlich hoch)", status: "yellow" });
+
+        // Determine overall status
+        var hasRed = checks.some(function(c) { return c.status === "red"; });
+        var hasYellow = checks.some(function(c) { return c.status === "yellow"; });
+        var overall = hasRed ? "red" : hasYellow ? "yellow" : "green";
+
+        banner.className = "health-banner health-" + overall;
+        var statusLabels = { green: "Alle Systeme betriebsbereit", yellow: "Einige Hinweise vorhanden", red: "Achtung: Probleme erkannt" };
+        indicator.innerHTML = '<span class="health-dot"></span><span class="health-label">' + statusLabels[overall] + '</span>';
+
+        var detailsHtml = "";
+        checks.forEach(function(c) {
+            detailsHtml += '<span class="health-item"><span class="h-dot h-dot-' + c.status + '"></span>' + escapeHtml(c.label) + '</span>';
+        });
+        details.innerHTML = detailsHtml;
+    } catch (e) {
+        banner.className = "health-banner health-yellow";
+        indicator.innerHTML = '<span class="health-dot"></span><span class="health-label">Systemstatus konnte nicht vollständig geprüft werden</span>';
+        details.innerHTML = '<span class="health-item"><span class="h-dot h-dot-yellow"></span>' + escapeHtml(e.message) + '</span>';
+    }
+}
+
+// --- Load all charts ---
+function loadDashboardCharts() {
+    loadSubscriptionChart();
+    loadTaskChart();
+    loadDeviceOnlineChart();
+    loadErrorTrendChart();
+    loadFunnelChart();
+    updateSystemHealth();
+}
