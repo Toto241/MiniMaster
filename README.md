@@ -66,7 +66,7 @@ The repository is organized as follows:
 
 ### Prerequisites
 
-- **Node.js:** v18 or higher.
+- **Node.js:** v22 (matching `package.json` engines; older versions are not a supported release target).
 - **Firebase Account:** A Google account to create a Firebase project.
 - **Firebase CLI:** Install globally via `npm install -g firebase-tools`.
 - **Android Studio:** Latest version with Android SDK and JDK 17.
@@ -147,6 +147,7 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[Country Review Folder](docs/country-reviews/README.md):** Dedicated per-market legal review artifacts and sign-off templates.
 - **[AGB Template DE](docs/AGB_TEMPLATE_DE.md):** Terms template with essential consumer and liability rights clauses.
 - **[Legal Rollout Checklist](docs/LEGAL_ROLLOUT_CHECKLIST.md):** Operational legal integration and validation checklist per market.
+- **[Next Implementation Workpackages 2026-03-18](docs/NEXT_IMPLEMENTATION_WORKPACKAGES_2026-03-18.md):** Detailed follow-up execution plan for the next implementation waves after the initial readiness pass.
 - **[Architecture Decision Records](docs/adr/):** Key architectural decisions and their rationale.
 
 Each source file is also thoroughly documented.
