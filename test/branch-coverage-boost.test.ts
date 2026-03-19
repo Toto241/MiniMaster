@@ -398,6 +398,11 @@ describe("executeAutoFix", () => {
       analyses: [{ errorIndex: 0, autoFixable: true }],
       status: "pending",
     };
+    state.error_logs["err-report-1"] = {
+      functionName: "validatePairingCode",
+      message: "expired code",
+      timestamp: { seconds: Math.floor(Date.now() / 1000) - 60, nanoseconds: 0, toMillis() { return this.seconds * 1000; } },
+    };
 
     const wrapped = testEnv.wrap(fns.executeAutoFix);
     const res = await wrapped({
@@ -412,6 +417,11 @@ describe("executeAutoFix", () => {
       analyses: [{ errorIndex: 0, autoFixable: true }],
       status: "pending",
     };
+    state.error_logs["err-old-1"] = {
+      functionName: "cleanupJob",
+      message: "stale entry",
+      timestamp: { seconds: Math.floor(Date.now() / 1000) - 35 * 24 * 60 * 60, nanoseconds: 0, toMillis() { return this.seconds * 1000; } },
+    };
 
     const wrapped = testEnv.wrap(fns.executeAutoFix);
     const res = await wrapped({
@@ -419,6 +429,36 @@ describe("executeAutoFix", () => {
     }, asAdmin);
     expect(res.success).toBe(true);
     expect(res.result).toContain("gelöscht");
+  });
+
+  it("wrappt unerwartete Auto-Fix-Fehler als internal", async () => {
+    state.ai_error_analyses["analysis-fail"] = {
+      analyses: [{ errorIndex: 0, autoFixable: true }],
+      status: "pending",
+    };
+
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "ai_error_analyses") {
+        return {
+          ...base,
+          doc: jest.fn((docId: string) => {
+            const ref = base.doc(docId);
+            return {
+              ...ref,
+              update: jest.fn().mockRejectedValue(new Error("analysis update failed")),
+            };
+          }),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.executeAutoFix);
+    await expect(wrapped({
+      analysisId: "analysis-fail", errorIndex: 0, action: "clear_error_logs",
+    }, asAdmin)).rejects.toThrow(/Auto-Fix fehlgeschlagen: analysis update failed/);
   });
 
   it("wirft invalid-argument bei unbekannter Aktion", async () => {

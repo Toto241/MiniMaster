@@ -1,8 +1,8 @@
 # Readiness Scorecard (2026-03-19)
 
-Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and auth/pairing coverage wave.
+Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared and subscription coverage waves.
 
-## Scoring Date: 2026-03-19 (Update #3)
+## Scoring Date: 2026-03-19 (Update #5)
 
 ---
 
@@ -12,8 +12,8 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 |-----------|-------|-----|----------|
 | Build gate green | 5 | 5 | `npm run build` passes (0 errors) |
 | Lint gate green | 5 | 5 | `npm run lint` passes (0 errors) |
-| Test gate green | 5 | 5 | 366/366 tests pass (20 suites) |
-| Coverage > 75% | 5 | 5 | Stmts 86.74%, Branch 72.98%, Funcs 87.04%, Lines 87.28% |
+| Test gate green | 5 | 5 | 407/407 tests pass (20 suites) |
+| Coverage > 75% | 5 | 5 | Stmts 92.00%, Branch 78.09%, Funcs 92.22%, Lines 92.74% |
 | CI artifact archiving | 4 | 5 | CI Runbook + CI Gate Stabilization Proof (5 konsekutive Runs) |
 
 ---
@@ -87,7 +87,7 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 
 | Maßnahme | Punkte | Nachweis |
 |----------|--------|----------|
-| Coverage-Boost: 78.5%→86.74% Stmts, 61%→72.98% Branch | +1 | branch-coverage-boost.test.ts (jetzt 78 Tests), triggers-v2-coverage.test.ts (9 Tests) |
+| Coverage-Boost: 78.5%→92.00% Stmts, 61%→78.09% Branch | +1 | zusätzliche Abdeckungswellen in branch-coverage-boost.test.ts, deep-coverage-gaps.test.ts, legal-admin-support-coverage.test.ts, new-coverage.test.ts, task-status-notifications.test.ts, triggers-v2-coverage.test.ts und tasks-and-device-extra.test.ts |
 | Enforcement-Testautomation: 39 Backend-Tests | +4 | enforcement-automation.test.ts (Kategorien A-G) |
 | Compliance-Evidence-Bundle komplett | +2 | COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md |
 | CI-Gate-Stabilisierung dokumentiert | +2 | CI_GATE_STABILIZATION_PROOF_2026-03-19.md |
@@ -110,4 +110,4 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 
 ## Empfehlung
 
-**GO** — Score 94/100 übertrifft das 90%-Ziel deutlich. Alle automatisierten Gates sind grün und stabil. Verbleibende 6 Punkte sind operative Aufgaben, die parallel zum Soft-Launch bearbeitet werden können.
+**GO** — Score 94/100 übertrifft das 90%-Ziel deutlich. Alle automatisierten Gates sind grün und stabil; der aktuelle Nachweisstand liegt bei 407/407 Tests und 92.00% / 78.09% / 92.22% / 92.74% Coverage. Verbleibende 6 Punkte sind operative Aufgaben, die parallel zum Soft-Launch bearbeitet werden können.

@@ -362,6 +362,39 @@ describe("adminHealthCheck", () => {
     const wrapped = testEnv.wrap(fns.adminHealthCheck);
     await expect(wrapped({}, asMaster)).rejects.toThrow(/Admin/);
   });
+
+  it("meldet Firestore- und Storage-Prüffehler im Ergebnis", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "children") {
+        return {
+          ...base,
+          limit: jest.fn(() => ({
+            get: jest.fn().mockRejectedValue(new Error("children probe failed")),
+          })),
+        };
+      }
+      return base;
+    });
+
+    const firebaseModule = require("../firebase");
+    const originalStorage = firebaseModule.storage.getMockImplementation();
+    firebaseModule.storage.mockImplementation(() => ({
+      bucket: jest.fn(() => ({
+        name: "broken-bucket",
+        getMetadata: jest.fn().mockRejectedValue(new Error("storage probe failed")),
+      })),
+    }));
+
+    const wrapped = testEnv.wrap(fns.adminHealthCheck);
+    const res = await wrapped({}, asAdmin);
+
+    expect(res.checks.children).toContain("children probe failed");
+    expect(res.prerequisites.storage).toContain("storage probe failed");
+
+    firebaseModule.storage.mockImplementation(originalStorage);
+  });
 });
 
 describe("getKnowledgeBase", () => {
@@ -438,6 +471,14 @@ describe("sendTestFcmMessage", () => {
     const wrapped = testEnv.wrap(fns.sendTestFcmMessage);
     await expect(wrapped({}, asAdmin)).rejects.toThrow(/token oder childId/);
   });
+
+  it("liefert FCM-Fehler zurück wenn Senden fehlschlägt", async () => {
+    mockSend.mockRejectedValueOnce(new Error("push failed"));
+    const wrapped = testEnv.wrap(fns.sendTestFcmMessage);
+    const res = await wrapped({ token: "broken-token" }, asAdmin);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("push failed");
+  });
 });
 
 describe("triggerScheduledJob", () => {
@@ -478,6 +519,26 @@ describe("triggerScheduledJob", () => {
   it("wirft invalid-argument ohne jobName", async () => {
     const wrapped = testEnv.wrap(fns.triggerScheduledJob);
     await expect(wrapped({}, asAdmin)).rejects.toThrow(/jobName/);
+  });
+
+  it("wrappt unerwartete Job-Fehler als internal", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "subscriptions") {
+        return {
+          ...base,
+          where: jest.fn(() => ({
+            get: jest.fn().mockRejectedValue(new Error("subscriptions query failed")),
+          })),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.triggerScheduledJob);
+    await expect(wrapped({ jobName: "checkExpiredSubscriptions" }, asAdmin))
+      .rejects.toThrow(/Job-Ausführung fehlgeschlagen: subscriptions query failed/);
   });
 });
 

@@ -45,6 +45,7 @@ describe("analyzeTaskPhoto", () => {
     jest.clearAllMocks();
     mockFetch.mockReset();
     delete process.env.GEMINI_API_KEY;
+    jest.useRealTimers();
   });
 
   it("verwendet Fallback-Analyse ohne GEMINI_API_KEY", async () => {
@@ -229,6 +230,40 @@ describe("analyzeTaskPhoto", () => {
     });
 
     // AbortError path was exercised → falls back to buildFallbackAnalysis
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it("löst echten Abort-Timer nach 30s aus", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    jest.useFakeTimers();
+
+    mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      return new Promise((_, reject) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        signal?.addEventListener("abort", () => {
+          const abortErr = new Error("The operation was aborted");
+          abortErr.name = "AbortError";
+          reject(abortErr);
+        });
+      });
+    });
+
+    const wrapped = wrapV2(myFunctions.analyzeTaskPhoto);
+    const pending = wrapped({
+      data: {
+        before: { status: "pending", description: "Timer Test" },
+        after: {
+          status: "pending_approval", description: "Timer Test",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/timer.jpg",
+        },
+      },
+      params: { childId: "c1", taskId: "t9" },
+    });
+
+    await jest.advanceTimersByTimeAsync(30000);
+    await pending;
+
     expect(mockFetch).toHaveBeenCalledTimes(1);
     delete process.env.GEMINI_API_KEY;
   });

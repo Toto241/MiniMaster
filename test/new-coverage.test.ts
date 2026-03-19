@@ -269,6 +269,28 @@ describe("sendDailyErrorReport", () => {
     const result = await wrapped({});
     expect(result).toBeNull();
   });
+
+  it("fängt unerwartete Fehler ab und gibt null zurück", async () => {
+    state.error_logs = {
+      e1: { functionName: "verifyPurchase", message: "timeout", timestamp: { seconds: Math.floor(Date.now() / 1000) - 3600 } },
+    };
+
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "error_summaries") {
+        return {
+          ...base,
+          add: jest.fn().mockRejectedValue(new Error("summary write failed")),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.sendDailyErrorReport);
+    const result = await wrapped({});
+    expect(result).toBeNull();
+  });
 });
 
 // ── ADMIN: exportUserData ──────────────────────────────────────────────────
@@ -305,6 +327,26 @@ describe("exportUserData", () => {
     const wrapped = testEnv.wrap(fns.exportUserData);
     await expect(wrapped({ masterId: "m1" }, asMaster)).rejects.toThrow(/Admin privileges/);
   });
+
+  it("wrappt unerwartete Exportfehler als internal", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "subscriptions") {
+        return {
+          ...base,
+          where: jest.fn(() => ({
+            get: jest.fn().mockRejectedValue(new Error("subscription export failed")),
+          })),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.exportUserData);
+    await expect(wrapped({ masterId: "m1" }, asAdmin))
+      .rejects.toThrow(/unexpected error occurred while exporting user data/i);
+  });
 });
 
 // ── SUBSCRIPTION: checkExpiredSubscriptions ────────────────────────────────
@@ -313,6 +355,62 @@ describe("checkExpiredSubscriptions", () => {
   it("l\u00e4uft ohne Fehler (scheduled task)", async () => {
     // checkExpiredSubscriptions uses batch writes which need deep Firestore mocks
     // Test verifies the function can be called without throwing
+    const wrapped = testEnv.wrap(fns.checkExpiredSubscriptions);
+    const result = await wrapped({});
+    expect(result).toBeNull();
+  });
+
+  it("markiert aktive Abos und Trials als abgelaufen", async () => {
+    const activeRef = { update: jest.fn(() => Promise.resolve()) };
+    const trialRef = { update: jest.fn(() => Promise.resolve()) };
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    let mastersCall = 0;
+
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "masters") {
+        mastersCall += 1;
+        if (mastersCall === 1) {
+          return {
+            ...base,
+            where: jest.fn().mockReturnThis(),
+            get: jest.fn().mockResolvedValue({
+              empty: false,
+              docs: [{ ref: activeRef, data: () => ({}) }],
+            }),
+          };
+        }
+        return {
+          ...base,
+          where: jest.fn().mockReturnThis(),
+          get: jest.fn().mockResolvedValue({
+            empty: false,
+            docs: [{ ref: trialRef, data: () => ({}) }],
+          }),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.checkExpiredSubscriptions);
+    const result = await wrapped({});
+    expect(result).toBeNull();
+  });
+
+  it("fängt Scheduler-Fehler ab und gibt null zurück", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "masters") {
+        return {
+          ...base,
+          where: jest.fn().mockReturnThis(),
+          get: jest.fn().mockRejectedValue(new Error("expiry query failed")),
+        };
+      }
+      return base;
+    });
+
     const wrapped = testEnv.wrap(fns.checkExpiredSubscriptions);
     const result = await wrapped({});
     expect(result).toBeNull();
@@ -347,6 +445,54 @@ describe("getSubscriptionStatus edge cases", () => {
 
     expect(result.subscriptionStatus.status).toBe("none");
     expect(result.hasAccess).toBe(false);
+  });
+
+  it("wirft not-found für unbekannten Master", async () => {
+    state.masters = {};
+
+    const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/Master account not found/i);
+  });
+});
+
+describe("verifyPurchase edge cases", () => {
+  it("wirft invalid-argument bei fehlenden Pflichtfeldern", async () => {
+    const wrapped = testEnv.wrap(fns.verifyPurchase);
+    await expect(wrapped({ purchaseToken: "pt" }, asMaster)).rejects.toThrow(/Missing required fields/i);
+  });
+
+  it("wirft invalid-argument bei unbekannter SKU", async () => {
+    const wrapped = testEnv.wrap(fns.verifyPurchase);
+    await expect(wrapped({ purchaseToken: "pt", sku: "unknown_sku" }, asMaster)).rejects.toThrow(/Unknown product ID/i);
+  });
+
+  it("wirft not-found wenn Master nicht existiert", async () => {
+    state.masters = {};
+
+    const wrapped = testEnv.wrap(fns.verifyPurchase);
+    await expect(wrapped({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster))
+      .rejects.toThrow(/Master account not found/i);
+  });
+});
+
+describe("revokeSubscription edge cases", () => {
+  it("widerruft Abo über masterId-Lookup", async () => {
+    state.subscriptions.sub1 = { masterId: "m1", status: "active" };
+
+    const wrapped = testEnv.wrap(fns.revokeSubscription);
+    const result = await wrapped({ masterId: "m1" }, asAdmin);
+
+    expect(result.message).toContain("successfully revoked");
+    expect(state.subscriptions.sub1.status).toBe("revoked");
+    expect(state.masters.m1.isPremium).toBe(false);
+  });
+
+  it("wirft not-found wenn Subscription keinen Master referenziert", async () => {
+    state.subscriptions["sub-orphan"] = { status: "active" };
+
+    const wrapped = testEnv.wrap(fns.revokeSubscription);
+    await expect(wrapped({ subscriptionId: "sub-orphan" }, asAdmin))
+      .rejects.toThrow(/Master account not found for subscription revocation/i);
   });
 });
 
