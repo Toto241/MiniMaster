@@ -167,7 +167,7 @@ try {
 
 // ==================== SUPPORT TICKETS ====================
 
-export const createSupportTicket = functions.https.onCall(
+export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { problemDescription: string; allowSupportAccess: boolean; consentSource?: string }, context: CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
@@ -612,7 +612,7 @@ export const getTicketUserData = functions.https.onCall(
  * Input: { problemContext: string, consentGiven: boolean }
  * Output: { explanation: string, suggestion: string, provider: string, model: string }
  */
-export const aiExplainProblem = functions.https.onCall(
+export const aiExplainProblem = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { problemContext: string; consentGiven: boolean }, context: CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");

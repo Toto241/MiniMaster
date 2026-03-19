@@ -94,7 +94,9 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
  * AI image analysis trigger when a task is completed.
  * Uses Gemini Vision API when GEMINI_API_KEY is configured, falls back to mock.
  */
-export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{taskId}", async (event) => {
+export const analyzeTaskPhoto = onDocumentUpdated(
+  { document: "children/{childId}/tasks/{taskId}", secrets: ["GEMINI_API_KEY"] },
+  async (event) => {
   const newData = event.data?.after.data();
   const oldData = event.data?.before.data();
 
