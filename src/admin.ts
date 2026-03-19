@@ -109,7 +109,7 @@ export const deleteUserAccount = functions.https.onCall(
 /**
  * Safe admin health check for the operator dashboard (read-only, no side effects).
  */
-export const adminHealthCheck = functions.https.onCall(
+export const adminHealthCheck = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     requireAdmin(context);
 
@@ -320,7 +320,7 @@ export const exportUserData = functions.https.onCall(
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
-export const testGeminiConnection = functions.https.onCall(
+export const testGeminiConnection = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { prompt?: string }, context: CallableContext) => {
     requireAdmin(context);
 
@@ -517,7 +517,7 @@ try {
  * Analyzes recent error_logs with Gemini AI and returns structured diagnosis + fix proposals.
  * Only accessible to admins. All analyses are logged to `ai_error_analyses`.
  */
-export const analyzeSystemErrors = functions.https.onCall(
+export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { hours?: number; functionFilter?: string; errorId?: string }, context: CallableContext) => {
     requireAdmin(context);
     const adminId = requireAuth(context);
