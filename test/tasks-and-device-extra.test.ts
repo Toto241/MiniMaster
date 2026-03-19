@@ -117,6 +117,23 @@ describe("task state machine", () => {
     await expect(wrapped({ taskId: "t1", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/proof.jpg" }, asChild)).rejects.toThrow(/cannot transition/);
   });
 
+  it("completeTask rejects non-Firebase photo URLs", async () => {
+    const wrapped = testEnv.wrap(fns.completeTask);
+    await expect(wrapped({ taskId: "t1", photoUrl: "https://example.com/proof.jpg" }, asChild)).rejects.toThrow(/Firebase Storage URL/);
+  });
+
+  it("completeTask rejects oversized photo URLs", async () => {
+    const longUrl = `https://firebasestorage.googleapis.com/${"a".repeat(2050)}`;
+    const wrapped = testEnv.wrap(fns.completeTask);
+    await expect(wrapped({ taskId: "t1", photoUrl: longUrl }, asChild)).rejects.toThrow(/maximum allowed length/);
+  });
+
+  it("completeTask throws not-found when task does not exist", async () => {
+    getMock.mockResolvedValue({ exists: false });
+    const wrapped = testEnv.wrap(fns.completeTask);
+    await expect(wrapped({ taskId: "missing", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/proof.jpg" }, asChild)).rejects.toThrow(/does not exist/);
+  });
+
   it("approveTask enforces pending_approval", async () => {
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec" }) });
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
@@ -245,6 +262,16 @@ describe("createTask", () => {
       description: "test",
       deadlineISO: "2025-12-31T23:59:59Z"
     }, asMaster)).rejects.toThrow(/not authorized/);
+  });
+
+  it("throws resource-exhausted without active subscription", async () => {
+    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ subscription: { status: "expired" } }) });
+    const wrapped = testEnv.wrap(fns.createTask);
+    await expect(wrapped({
+      childId: "c1",
+      description: "test",
+      deadlineISO: "2025-12-31T23:59:59Z"
+    }, asMaster)).rejects.toThrow(/Active subscription or trial required/);
   });
 
   it("throws invalid-argument for missing fields", async () => {

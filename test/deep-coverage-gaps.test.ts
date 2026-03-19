@@ -82,6 +82,9 @@ jest.mock("googleapis", () => ({
 const testEnv = fft();
 let fns: any;
 let db: any;
+const mockFetch = jest.fn();
+
+(global as any).fetch = mockFetch;
 
 let state: Record<string, any> = {};
 
@@ -144,6 +147,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockFetch.mockReset();
   resetState();
 
   const collectionImpl = (...args: unknown[]) => {
@@ -330,6 +334,36 @@ describe("provideSolutionFeedback – deep coverage", () => {
     await expect(wrapped({ ticketId: "ticket-awaiting", feedback: "accepted" }, {}))
       .rejects.toThrow(/authenticated/i);
   });
+
+  it("wirft invalid-argument ohne ticketId", async () => {
+    const wrapped = testEnv.wrap(fns.provideSolutionFeedback);
+    await expect(wrapped({ feedback: "accepted" }, asMaster))
+      .rejects.toThrow(/Missing ticketId or feedback/i);
+  });
+
+  it("wrappt unerwartete Update-Fehler als internal", async () => {
+    const originalCollection = sharedFirestore.collection.getMockImplementation();
+    sharedFirestore.collection = jest.fn((name: string) => {
+      const base = originalCollection(name);
+      if (name === "supportTickets") {
+        return {
+          ...base,
+          doc: jest.fn((docId: string) => {
+            const ref = base.doc(docId);
+            return {
+              ...ref,
+              update: jest.fn().mockRejectedValue(new Error("feedback update failed")),
+            };
+          }),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.provideSolutionFeedback);
+    await expect(wrapped({ ticketId: "ticket-awaiting", feedback: "accepted" }, asMaster))
+      .rejects.toThrow(/Failed to update ticket feedback/i);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -380,6 +414,49 @@ describe("aiExplainProblem – deep coverage", () => {
       problemContext: "Ein Problem beim Einrichten des Systems",
       consentGiven: true,
     }, {})).rejects.toThrow(/authenticated/i);
+  });
+
+  it("fällt bei ungültigem Gemini-JSON auf Rohtext zurück", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalGemini = process.env.GEMINI_API_KEY;
+    process.env.NODE_ENV = "production";
+    process.env.GEMINI_API_KEY = "gemini-key";
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: "Nur Freitext ohne JSON" }] } }],
+      }),
+    });
+
+    const wrapped = testEnv.wrap(fns.aiExplainProblem);
+    const res = await wrapped({
+      problemContext: "Die Eltern-App verbindet sich nicht zuverlässig mit dem Kindgerät.",
+      consentGiven: true,
+    }, asAdmin);
+
+    expect(res.provider).toBe("gemini");
+    expect(res.explanation).toContain("Nur Freitext ohne JSON");
+    expect(res.suggestion).toContain("manuell");
+
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.GEMINI_API_KEY = originalGemini;
+  });
+
+  it("wrappt Provider-Fehler als internal", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalGemini = process.env.GEMINI_API_KEY;
+    process.env.NODE_ENV = "production";
+    delete process.env.GEMINI_API_KEY;
+
+    const wrapped = testEnv.wrap(fns.aiExplainProblem);
+    await expect(wrapped({
+      problemContext: "Die Inbetriebnahme schlägt trotz korrekter Firebase-Konfiguration fehl.",
+      consentGiven: true,
+    }, asAdmin)).rejects.toThrow(/KI-Analyse fehlgeschlagen/i);
+
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.GEMINI_API_KEY = originalGemini;
   });
 });
 
@@ -553,6 +630,48 @@ describe("shared.ts utilities", () => {
     const ctx = { auth: { uid: "u1" } } as any;
     expect(() => shared.validateAppCheck(ctx, true)).not.toThrow();
   });
+
+  it("validateAppCheck erlaubt log-only Modus ohne App Token", () => {
+    const ctx = { auth: { uid: "u1" } } as any;
+    expect(() => shared.validateAppCheck(ctx, false)).not.toThrow();
+  });
+
+  it("requireSupportOrAdmin verweigert Master-Rolle", () => {
+    expect(() => shared.requireSupportOrAdmin(asMaster as any)).toThrow(/Support or admin/i);
+  });
+
+  it("requireAuditorOrAbove erlaubt Auditor und verweigert Master", () => {
+    expect(() => shared.requireAuditorOrAbove(asAuditor as any)).not.toThrow();
+    expect(() => shared.requireAuditorOrAbove(asMaster as any)).toThrow(/Operator privileges/i);
+  });
+
+  it("requireMasterOwnership gibt masterId zurück wenn Kind zugeordnet ist", async () => {
+    const masterId = await shared.requireMasterOwnership(asMaster as any, "c1");
+    expect(masterId).toBe("m1");
+  });
+
+  it("requireMasterOwnership verweigert fremdes Kind", async () => {
+    state.children["c-foreign"] = { masterImei: "other-master" };
+    await expect(shared.requireMasterOwnership(asMaster as any, "c-foreign"))
+      .rejects.toThrow(/Not the owner/i);
+  });
+
+  it("handleError fängt Logging-Fehler intern ab", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "error_logs") {
+        return {
+          ...base,
+          add: jest.fn().mockRejectedValue(new Error("error log write failed")),
+        };
+      }
+      return base;
+    });
+
+    await expect(shared.handleError(new Error("Test error"), null, "faultyLogger"))
+      .resolves.toBeUndefined();
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -599,6 +718,66 @@ describe("onTicketCreated trigger", () => {
     // Test stub returns confidence 0.85 > 0.7, so status should be awaiting_user_feedback
     const ticket = state.supportTickets["ticket-low-conf"];
     expect(ticket.status).toBe("awaiting_user_feedback");
+  });
+
+  it("nutzt Gemini im Produktionsmodus und eskaliert bei niedriger Confidence", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalGemini = process.env.GEMINI_API_KEY;
+    process.env.NODE_ENV = "production";
+    process.env.GEMINI_API_KEY = "gemini-key";
+
+    state.supportTickets["ticket-prod-low"] = {
+      masterImei: "m1", problemDescription: "Das Regelwerk greift nicht auf Samsung-Geräten.", status: "open",
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({ solution: "Bitte manuell prüfen", confidence: 0.2 }) }] } }],
+      }),
+    });
+
+    const snapshot = {
+      data: () => ({ masterImei: "m1", problemDescription: "Das Regelwerk greift nicht auf Samsung-Geräten.", status: "open" }),
+      id: "ticket-prod-low",
+    };
+
+    const wrapped = testEnv.wrap(fns.onTicketCreated);
+    await wrapped(snapshot as any, { params: { ticketId: "ticket-prod-low" } } as any);
+
+    expect(state.supportTickets["ticket-prod-low"].status).toBe("escalated");
+    expect(state.supportTickets["ticket-prod-low"].aiProvider).toBe("gemini");
+
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.GEMINI_API_KEY = originalGemini;
+  });
+
+  it("schreibt Fehlerstatus wenn die KI-Analyse fehlschlägt", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalGemini = process.env.GEMINI_API_KEY;
+    process.env.NODE_ENV = "production";
+    process.env.GEMINI_API_KEY = "gemini-key";
+
+    state.supportTickets["ticket-prod-error"] = {
+      masterImei: "m1", problemDescription: "Die Kind-App startet gar nicht mehr.", status: "open",
+    };
+
+    mockFetch.mockRejectedValueOnce(new Error("gemini unavailable"));
+
+    const snapshot = {
+      data: () => ({ masterImei: "m1", problemDescription: "Die Kind-App startet gar nicht mehr.", status: "open" }),
+      id: "ticket-prod-error",
+    };
+
+    const wrapped = testEnv.wrap(fns.onTicketCreated);
+    await expect(wrapped(snapshot as any, { params: { ticketId: "ticket-prod-error" } } as any))
+      .rejects.toThrow(/gemini unavailable/i);
+
+    expect(state.supportTickets["ticket-prod-error"].status).toBe("escalated");
+    expect(state.supportTickets["ticket-prod-error"].aiSolutionStatus).toBe("error");
+
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.GEMINI_API_KEY = originalGemini;
   });
 });
 
@@ -706,6 +885,26 @@ describe("createSupportTicket – deep coverage", () => {
     await expect(wrapped({ problemDescription: "Test problem" }, asMaster))
       .rejects.toThrow(/allowSupportAccess/i);
   });
+
+  it("wrappt Datenbankfehler als internal", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "supportTickets") {
+        return {
+          ...base,
+          add: jest.fn().mockRejectedValue(new Error("ticket write failed")),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.createSupportTicket);
+    await expect(wrapped({
+      problemDescription: "App lässt sich nicht pairen",
+      allowSupportAccess: false,
+    }, asMaster)).rejects.toThrow(/Failed to create support ticket/i);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -727,6 +926,29 @@ describe("grantSupportAccess", () => {
     await expect(wrapped({ ticketId: "ticket-1" }, otherMaster))
       .rejects.toThrow(/denied|not found/i);
   });
+
+  it("wirft invalid-argument ohne ticketId", async () => {
+    const wrapped = testEnv.wrap(fns.grantSupportAccess);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/Ticket ID is required/i);
+  });
+
+  it("wrappt unerwartete Grant-Fehler als internal", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "supportAccessGrants") {
+        return {
+          ...base,
+          add: jest.fn().mockRejectedValue(new Error("grant write failed")),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.grantSupportAccess);
+    await expect(wrapped({ ticketId: "ticket-1" }, asMaster))
+      .rejects.toThrow(/Failed to grant support access/i);
+  });
 });
 
 describe("revokeSupportAccess", () => {
@@ -742,5 +964,79 @@ describe("revokeSupportAccess", () => {
     const wrapped = testEnv.wrap(fns.revokeSupportAccess);
     await expect(wrapped({ grantId: "grant-active" }, otherMaster))
       .rejects.toThrow(/denied|not found/i);
+  });
+
+  it("wirft invalid-argument ohne grantId", async () => {
+    const wrapped = testEnv.wrap(fns.revokeSupportAccess);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/Grant ID is required/i);
+  });
+
+  it("wrappt unerwartete Revoke-Fehler als internal", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "supportAccessGrants") {
+        return {
+          ...base,
+          doc: jest.fn((docId: string) => {
+            const ref = base.doc(docId);
+            return {
+              ...ref,
+              update: jest.fn().mockRejectedValue(new Error("grant revoke failed")),
+            };
+          }),
+        };
+      }
+      return base;
+    });
+
+    const wrapped = testEnv.wrap(fns.revokeSupportAccess);
+    await expect(wrapped({ grantId: "grant-active" }, asMaster))
+      .rejects.toThrow(/Failed to revoke support access/i);
+  });
+});
+
+describe("cleanupExpiredGrants", () => {
+  it("gibt null zurück wenn keine Grants abgelaufen sind", async () => {
+    state.supportAccessGrants = {};
+    const wrapped = testEnv.wrap(fns.cleanupExpiredGrants);
+    const res = await wrapped({});
+    expect(res).toBeNull();
+  });
+
+  it("markiert Grants als expired und entzieht Ticket-Zugriff", async () => {
+    state.supportAccessGrants["grant-active"] = {
+      masterImei: "m1",
+      ticketId: "ticket-with-grant",
+      status: "active",
+      expiresAt: { seconds: Math.floor(Date.now() / 1000) - 60, nanoseconds: 0 },
+    };
+    state.supportTickets["ticket-with-grant"].accessGranted = true;
+
+    const wrapped = testEnv.wrap(fns.cleanupExpiredGrants);
+    const res = await wrapped({});
+
+    expect(res).toBeNull();
+    expect(state.supportAccessGrants["grant-active"].status).toBe("expired");
+    expect(state.supportTickets["ticket-with-grant"].accessGranted).toBe(false);
+  });
+
+  it("fängt Cleanup-Fehler ab und gibt null zurück", async () => {
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name === "supportAccessGrants") {
+        return {
+          ...base,
+          get: jest.fn().mockRejectedValue(new Error("cleanup failed")),
+        };
+      }
+      return base;
+    });
+    sharedFirestore.collection = jest.fn((name: string) => (db.collection as jest.Mock)(name));
+
+    const wrapped = testEnv.wrap(fns.cleanupExpiredGrants);
+    const res = await wrapped({});
+    expect(res).toBeNull();
   });
 });

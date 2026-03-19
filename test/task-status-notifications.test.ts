@@ -33,6 +33,7 @@ describe("onTaskStatusChange", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
   it("sends master notification when task moves to pending_approval", async () => {
@@ -129,5 +130,51 @@ describe("onTaskStatusChange", () => {
     );
 
     expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("retries transient FCM errors before succeeding", async () => {
+    jest.useFakeTimers();
+    mockGet.mockResolvedValueOnce({
+      data: () => ({ fcmToken: "master-token" }),
+    });
+    mockSend
+      .mockRejectedValueOnce({ code: "messaging/server-unavailable" })
+      .mockResolvedValueOnce("ok-after-retry");
+
+    const wrapped = testEnv.wrap(fns.onTaskStatusChange);
+    const pending = wrapped(
+      {
+        before: { data: () => ({ status: "pending", masterImei: "m1", description: "Retry Test" }) },
+        after: { data: () => ({ status: "pending_approval", masterImei: "m1", description: "Retry Test" }) },
+      },
+      { params: { childId: "c1", taskId: "retry-1" } }
+    );
+
+    await jest.advanceTimersByTimeAsync(1000);
+    await pending;
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after max retry attempts on transient FCM errors", async () => {
+    jest.useFakeTimers();
+    mockGet.mockResolvedValueOnce({
+      data: () => ({ fcmToken: "master-token" }),
+    });
+    mockSend.mockRejectedValue({ code: "messaging/server-unavailable" });
+
+    const wrapped = testEnv.wrap(fns.onTaskStatusChange);
+    const pending = wrapped(
+      {
+        before: { data: () => ({ status: "pending", masterImei: "m1", description: "Retry Exhaust" }) },
+        after: { data: () => ({ status: "pending_approval", masterImei: "m1", description: "Retry Exhaust" }) },
+      },
+      { params: { childId: "c1", taskId: "retry-2" } }
+    );
+
+    await jest.advanceTimersByTimeAsync(3000);
+    await pending;
+
+    expect(mockSend).toHaveBeenCalledTimes(3);
   });
 });
