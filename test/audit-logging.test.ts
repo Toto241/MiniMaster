@@ -220,7 +220,7 @@ describe("Audit Logging Infrastructure", () => {
 
   describe("createTask with audit logging", () => {
     it("logs denied access when master doesn't own child", async () => {
-      getStub.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+      getStub.mockResolvedValueOnce({ exists: true, data: () => ({ subscription: { status: "active" } }) });
       getStub.mockResolvedValueOnce({
         exists: true,
         data: () => ({ masterImei: "differentMaster" })

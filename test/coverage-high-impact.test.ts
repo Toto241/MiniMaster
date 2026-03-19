@@ -274,7 +274,7 @@ afterAll(() => {
 beforeEach(() => {
   jest.clearAllMocks();
   autoId = 0;
-  state.masters = { m1: { secretKey: "sec", subscription: { status: "active", type: "premium" } } };
+  state.masters = { m1: { secretKey: "sec", subscription: { status: "active", type: "family_monthly", childLimit: 99 } } };
   state.children = {
     c1: {
       childImei: "c1",

@@ -59,7 +59,7 @@ beforeEach(() => {
     collection: subCollectionMock
   });
   jest.spyOn(db, "collection").mockImplementation((..._args: unknown[]) => {
-    return { doc: docMock } as any;
+    return { doc: docMock, add: jest.fn().mockResolvedValue({ id: "mock-audit-id" }) } as any;
   });
 });
 
@@ -213,7 +213,7 @@ describe("reportTamperEvent", () => {
 
 describe("createTask", () => {
   it("creates task for authorized master", async () => {
-    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec" }) });
+    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec", subscription: { status: "active" } }) });
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
     setMock.mockResolvedValue(undefined);
     const wrapped = testEnv.wrap(fns.createTask);
@@ -237,7 +237,7 @@ describe("createTask", () => {
   });
 
   it("throws permission-denied if master not owner", async () => {
-    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec" }) });
+    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec", subscription: { status: "active" } }) });
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "other" }) });
     const wrapped = testEnv.wrap(fns.createTask);
     await expect(wrapped({
