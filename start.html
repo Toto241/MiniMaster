@@ -22,7 +22,7 @@
       font-family: "Segoe UI", system-ui, sans-serif;
       background: var(--bg);
       color: var(--ink);
-      min-height: 100vh;
+      min-block-size: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -32,10 +32,10 @@
     /* Header */
     .header {
       text-align: center;
-      margin-bottom: 36px;
+      margin-block-end: 36px;
     }
     .logo-circle {
-      width: 72px; height: 72px;
+      inline-size: 72px; block-size: 72px;
       background: linear-gradient(135deg, var(--primary), var(--purple));
       border-radius: 20px;
       display: inline-grid;
@@ -43,10 +43,10 @@
       color: #fff;
       font-size: 2.2rem;
       font-weight: 800;
-      margin-bottom: 12px;
+      margin-block-end: 12px;
       box-shadow: 0 8px 24px rgba(31,111,235,0.25);
     }
-    .header h1 { font-size: 2.4rem; margin-bottom: 4px; }
+    .header h1 { font-size: 2.4rem; margin-block-end: 4px; }
     .header p { color: var(--muted); font-size: 1.05rem; }
 
     /* Grid */
@@ -54,8 +54,8 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 20px;
-      width: min(980px, 100%);
-      margin-bottom: 28px;
+      inline-size: min(980px, 100%);
+      margin-block-end: 28px;
     }
 
     /* Card */
@@ -81,7 +81,7 @@
       gap: 14px;
     }
     .card-icon {
-      width: 48px; height: 48px;
+      inline-size: 48px; block-size: 48px;
       border-radius: 14px;
       display: grid;
       place-items: center;
@@ -99,7 +99,7 @@
       line-height: 1.55;
       flex: 1;
     }
-    .card .actions { margin-top: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+    .card .actions { margin-block-start: auto; display: flex; gap: 10px; flex-wrap: wrap; }
 
     /* Buttons */
     .btn {
@@ -141,7 +141,7 @@
       gap: 8px;
       font-size: 0.82rem;
       color: var(--muted);
-      margin-top: 4px;
+      margin-block-start: 4px;
     }
     .apk-path code {
       flex: 1;
@@ -185,14 +185,14 @@
       background: var(--card);
       border-radius: 16px;
       padding: 28px 32px;
-      width: min(480px, 92vw);
+      inline-size: min(480px, 92vw);
       box-shadow: 0 20px 60px rgba(15,23,42,0.25);
     }
     .modal h3 { margin: 0 0 6px; font-size: 1.15rem; color: var(--ink); }
-    .modal .modal-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 18px; }
+    .modal .modal-sub { font-size: 0.85rem; color: var(--muted); margin-block-end: 18px; }
     .modal label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--ink); margin: 10px 0 3px; }
     .modal input {
-      width: 100%; box-sizing: border-box;
+      inline-size: 100%; box-sizing: border-box;
       padding: 8px 10px;
       border: 1.5px solid rgba(15,23,42,0.12);
       border-radius: 8px;
@@ -201,14 +201,14 @@
       transition: border-color .15s;
     }
     .modal input:focus { outline: none; border-color: var(--primary); }
-    .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
-    .modal-status { margin-top: 12px; font-size: 0.84rem; padding: 8px 12px; border-radius: 8px; display: none; }
+    .modal-actions { margin-block-start: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-status { margin-block-start: 12px; font-size: 0.84rem; padding: 8px 12px; border-radius: 8px; display: none; }
     .modal-status.success { display: block; background: #ecfdf5; color: #065f46; }
     .modal-status.error { display: block; background: #fef2f2; color: #991b1b; }
 
     /* Info Bar */
     .info-bar {
-      width: min(980px, 100%);
+      inline-size: min(980px, 100%);
       display: flex;
       align-items: center;
       gap: 12px;
@@ -218,9 +218,9 @@
       border: 1px solid rgba(15,23,42,0.06);
       font-size: 0.88rem;
       color: var(--muted);
-      margin-bottom: 16px;
+      margin-block-end: 16px;
     }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .dot { inline-size: 10px; block-size: 10px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
 
     .footer {
       font-size: 0.82rem;

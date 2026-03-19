@@ -9,7 +9,7 @@
         <title>MiniMaster Operator Dashboard</title>
         <link rel="manifest" href="manifest.webmanifest" />
         <link rel="apple-touch-icon" href="icon.svg" />
-        <link rel="stylesheet" href="styles.css" />
+        <link rel="stylesheet" href="styles.css?v=20260319" />
         <!-- Firebase SDKs -->
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -1147,12 +1147,14 @@
                 </div>
             </div>
 
-            <div
-                id="notification"
-                class="notification"
-                style="display: none"
-            ></div>
         </div>
+
+        <!-- Global Notification (outside dashboard-section so it's visible during onboarding) -->
+        <div
+            id="notification"
+            class="notification"
+            style="display: none"
+        ></div>
 
         <!-- User Details Modal -->
         <div id="user-details-modal" class="modal" style="display: none">
@@ -1186,7 +1188,7 @@
             </div>
         </div>
 
-        <script src="app.js"></script>
+        <script src="app.js?v=20260319"></script>
         <script src="pwa-register.js"></script>
     </body>
 </html>
