@@ -256,6 +256,107 @@ interface MasterDevice {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+---
+
+## Legal Consent Functions
+
+### getActiveLegalPolicies
+
+Returns active legal policies (terms & privacy) for a country/locale, with automatic locale fallback chain.
+
+**Parameters**: `{ country: string (2-letter ISO), locale: string (BCP-47) }`
+**Response**: `{ country, locale, terms: { version, contentUrl }, privacy: { version, contentUrl } }`
+**Errors**: `invalid-argument` (invalid country/locale format)
+
+### needsLegalReconsent
+
+Checks if a master user needs to re-accept legal terms.
+
+**Parameters**: `{ country: string, locale: string }`
+**Response**: `{ requiresReconsent: boolean, reason: "missing_consent" | "version_or_policy_change" | "up_to_date" }`
+
+### recordLegalConsent
+
+Records a master's acceptance of specific policy versions.
+
+**Parameters**: `{ country: string, locale: string, termsVersion: string, privacyVersion: string }`
+**Response**: `{ success: true, termsVersion, privacyVersion }`
+**Errors**: `invalid-argument` (missing version), `failed-precondition` (version mismatch with current policies)
+
+### publishLegalPolicy (Admin)
+
+Publishes a new version of a legal policy.
+
+**Parameters**: `{ policyType: "terms" | "privacy", country: string, locale: string, version: string, contentUrl: string }`
+**Errors**: `invalid-argument` (invalid policyType or missing version)
+
+### markLegalReconsentRequired (Admin)
+
+Marks users as requiring re-consent. Scope: single master (with `masterImei`) or all in a country/locale.
+
+**Parameters**: `{ country: string, locale: string, masterImei?: string }`
+**Response**: `{ success: true, scope: "single_master" | "country_locale", updatedCount: number }`
+
+---
+
+## Subscription Enforcement
+
+The following functions enforce active subscription/trial:
+
+| Function | Check |
+|----------|-------|
+| `createTask` | `hasActiveAccess()` — blocks task creation without subscription |
+| `createPairingCode` | `hasActiveAccess()` — blocks code generation without subscription |
+| `validatePairingCode` | Child-limit check (`childLimit` from subscription plan) |
+| `validatePairingToken` | `hasActiveAccess()` + child-limit check |
+
+**Subscription Plans**:
+
+| Plan | `childLimit` | Price |
+|------|-------------|-------|
+| `single_child_monthly` | 1 | €1.99/mo |
+| `single_child_yearly` | 1 | €19.99/yr |
+| `family_monthly` | 99 (unlimited) | €4.99/mo |
+| `family_yearly` | 99 (unlimited) | €49.99/yr |
+
+Trial: 7-day trial on `registerMasterDevice`, `trialEndsAt` checked by `hasActiveAccess()`.
+
+---
+
+## AI Task Photo Analysis
+
+`analyzeTaskPhoto` (Firestore trigger on task status change to `pending_approval`):
+
+- **With `GEMINI_API_KEY`**: Calls Gemini Vision API to analyze the submitted photo against the task description. Returns structured JSON with `labels`, `safeSearch`, `taskCompletion` (completed/unclear/not_completed), `confidence`, and `summary`.
+- **Without API key**: Falls back to a neutral stub analysis (`source: "fallback"`).
+- Result is written to the task document as `aiAnalysis` field.
+
+---
+
+## Admin Functions
+
+### adminHealthCheck
+
+Pings 5 Firestore collections + Cloud Storage, returns status + AI/environment prerequisites.
+
+### getKnowledgeBase / updateKnowledgeBase
+
+Read/write the AI support knowledge base. Firestore-first, file fallback.
+
+### sendTestFcmMessage
+
+Send test FCM push to a token or child device. **Parameters**: `{ token?: string, childId?: string }`
+
+### triggerScheduledJob
+
+Manually trigger scheduled jobs: `checkExpiredSubscriptions`, `cleanupExpiredGrants`, `sendDailyErrorReport`.
+
+---
+
+## FCM Retry Strategy
+
+All FCM sends use exponential backoff (max 3 attempts, 1s/2s/4s delays). Only transient errors (UNAVAILABLE, INTERNAL, deadline-exceeded) trigger retry.
 ```
 
 ### Child Device

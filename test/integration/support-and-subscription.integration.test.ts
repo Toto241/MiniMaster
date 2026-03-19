@@ -148,7 +148,7 @@ describe("Support Ticket Lifecycle", () => {
 describe("Task Lifecycle - Complete Flow", () => {
   it("task can be created, completed, and then rejected", async () => {
     // Step 1: Create task
-    getStub.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+    getStub.mockResolvedValueOnce({ exists: true, data: () => ({ subscription: { status: "active" } }) });
     getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
     setStub.mockResolvedValue(undefined);
 

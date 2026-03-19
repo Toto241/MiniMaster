@@ -4,9 +4,31 @@
  */
 import * as functions from "firebase-functions/v1";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { getMessaging } from "firebase-admin/messaging";
+import { getMessaging, Message } from "firebase-admin/messaging";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
+
+/**
+ * Sends an FCM message with exponential backoff retry (max 3 attempts).
+ * Only retries on transient/server errors (5xx, UNAVAILABLE, INTERNAL).
+ */
+async function sendFcmWithRetry(message: Message, maxAttempts = 3): Promise<string> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await getMessaging().send(message);
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code || "";
+      const isTransient = code.includes("unavailable") || code.includes("internal") ||
+        code.includes("deadline-exceeded") || code === "messaging/server-unavailable";
+      if (!isTransient || attempt === maxAttempts) {
+        throw error;
+      }
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("FCM retry exhausted");
+}
 
 /**
  * Sends FCM diff-push when child device settings change (isLocked, appBlacklist, usageRules).
@@ -61,7 +83,7 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   };
 
   try {
-    await getMessaging().send(message);
+    await sendFcmWithRetry(message);
     functions.logger.info(`Successfully sent FCM message to child ${childId} for data update.`);
   } catch (error) {
     functions.logger.error(`Failed to send FCM message to child ${childId}:`, error);
@@ -69,7 +91,8 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
 });
 
 /**
- * AI image analysis trigger when a task is completed (mock implementation).
+ * AI image analysis trigger when a task is completed.
+ * Uses Gemini Vision API when GEMINI_API_KEY is configured, falls back to mock.
  */
 export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{taskId}", async (event) => {
   const newData = event.data?.after.data();
@@ -83,19 +106,24 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
 
     functions.logger.info(`Starting AI analysis for task ${taskId} (child: ${childId}) photo: ${newData.photoUrl}`);
 
-    // MOCK AI ANALYSIS — In production: use Google Cloud Vision API
-    const mockAnalysis = {
-      labels: ["Room", "Furniture", "Clean"],
-      safeSearch: {
-        adult: "VERY_UNLIKELY",
-        violence: "VERY_UNLIKELY",
-      },
-      analyzedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    let analysis: Record<string, unknown>;
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        analysis = await analyzeWithGemini(geminiKey, newData.photoUrl, newData.description || "");
+      } catch (error) {
+        functions.logger.warn(`Gemini analysis failed for task ${taskId}, using fallback:`, error);
+        analysis = buildFallbackAnalysis();
+      }
+    } else {
+      functions.logger.info("GEMINI_API_KEY not set – using fallback analysis.");
+      analysis = buildFallbackAnalysis();
+    }
 
     try {
       await event.data?.after.ref.update({
-        aiAnalysis: mockAnalysis,
+        aiAnalysis: { ...analysis, analyzedAt: admin.firestore.FieldValue.serverTimestamp() },
       });
       functions.logger.info(`AI analysis completed for task ${taskId}`);
     } catch (error) {
@@ -103,6 +131,69 @@ export const analyzeTaskPhoto = onDocumentUpdated("children/{childId}/tasks/{tas
     }
   }
 });
+
+function buildFallbackAnalysis(): Record<string, unknown> {
+  return {
+    labels: [],
+    safeSearch: { adult: "UNKNOWN", violence: "UNKNOWN" },
+    taskCompletion: "not_analyzed",
+    source: "fallback",
+  };
+}
+
+async function analyzeWithGemini(
+  apiKey: string, photoUrl: string, taskDescription: string
+): Promise<Record<string, unknown>> {
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const prompt = `You are a parental control assistant. Analyze this photo submitted as proof for a child's task.
+Task description: "${taskDescription}"
+
+Respond ONLY with valid JSON (no markdown, no code fences):
+{
+  "labels": ["string array of objects/concepts visible"],
+  "safeSearch": { "adult": "VERY_UNLIKELY|UNLIKELY|POSSIBLE|LIKELY|VERY_LIKELY", "violence": "same scale" },
+  "taskCompletion": "completed|unclear|not_completed",
+  "confidence": 0.0-1.0,
+  "summary": "one sentence"
+}`;
+
+  const body = {
+    contents: [{
+      parts: [
+        { text: prompt },
+        { inlineData: { mimeType: "image/jpeg", fileUri: photoUrl } },
+      ],
+    }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+    safetySettings: [
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+    ],
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+  }
+
+  const result = await response.json() as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    return { ...parsed, source: "gemini" };
+  } catch {
+    return { rawResponse: text, source: "gemini_unparsed", labels: [], safeSearch: { adult: "UNKNOWN", violence: "UNKNOWN" } };
+  }
+}
 
 /**
  * Sends push notification to master when a task is submitted for review.
@@ -147,7 +238,7 @@ export const onTaskStatusChange = functions.firestore
       };
 
       try {
-        await getMessaging().send(message);
+        await sendFcmWithRetry(message);
         functions.logger.info(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
       } catch (error) {
         functions.logger.error("Error sending notification:", error);
@@ -186,7 +277,7 @@ export const onTaskStatusChange = functions.firestore
       };
 
       try {
-        await getMessaging().send(reviewMessage);
+        await sendFcmWithRetry(reviewMessage);
         functions.logger.info(`Review notification sent to child ${childId} for task ${context.params.taskId}`);
       } catch (error) {
         functions.logger.error("Error sending review notification:", error);

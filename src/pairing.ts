@@ -16,6 +16,17 @@ export const createPairingCode = functions.https.onCall(async (_data: Record<str
   const startTime = Date.now();
   const masterId = requireAuth(context);
 
+  const masterDoc = await db().collection("masters").doc(masterId).get();
+  if (!masterDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "Master account not found.");
+  }
+  if (!hasActiveAccess(masterDoc.data())) {
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Active subscription or trial required to create pairing codes."
+    );
+  }
+
   const pairingCodesRef = db().collection("pairingCodes");
   const maxAttempts = 10;
 
@@ -137,6 +148,16 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       throw new functions.https.HttpsError(
         "resource-exhausted",
         "Your trial has expired. Please subscribe to continue using Mini-Master."
+      );
+    }
+
+    const childLimit = masterData?.subscription?.childLimit || 1;
+    const existingChildren = await db().collection("children")
+      .where("masterImei", "==", masterId).get();
+    if (existingChildren.size >= childLimit) {
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
       );
     }
 
@@ -285,6 +306,27 @@ export const validatePairingToken = functions.https.onCall(
       if (!masterId || typeof masterId !== "string") {
         await tokenRef.delete();
         throw new functions.https.HttpsError("internal", "Pairing token data is missing masterId.");
+      }
+
+      const masterDoc = await db().collection("masters").doc(masterId).get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+      const masterData = masterDoc.data();
+      if (!hasActiveAccess(masterData)) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Active subscription or trial required for pairing."
+        );
+      }
+      const childLimit = masterData?.subscription?.childLimit || 1;
+      const existingChildren = await db().collection("children")
+        .where("masterImei", "==", masterId).get();
+      if (existingChildren.size >= childLimit) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
+        );
       }
 
       const childDeviceRef = db().collection("children").doc(childId);

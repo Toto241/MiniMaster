@@ -6,7 +6,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
-import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
+import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
 
 export const createTask = functions.https.onCall(
   async (data: { childId: string; description: string; deadlineISO: string }, context: CallableContext) => {
@@ -24,6 +24,11 @@ export const createTask = functions.https.onCall(
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {
       throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    if (!hasActiveAccess(masterDoc.data())) {
+      throw new functions.https.HttpsError("resource-exhausted",
+        "Active subscription or trial required to create tasks.");
     }
 
     const childDeviceRef = db().collection("children").doc(childId);
