@@ -504,3 +504,340 @@ export const triggerScheduledJob = functions.https.onCall(
     }
   }
 );
+
+// ==================== AI ERROR ANALYSIS (GEMINI) ====================
+
+let knowledgeBaseAdmin = "";
+try {
+  const kbPath = path.join(__dirname, "..", "knowledge_base.txt");
+  knowledgeBaseAdmin = fs.readFileSync(kbPath, "utf-8");
+} catch { /* knowledge base file is optional */ }
+
+/**
+ * Analyzes recent error_logs with Gemini AI and returns structured diagnosis + fix proposals.
+ * Only accessible to admins. All analyses are logged to `ai_error_analyses`.
+ */
+export const analyzeSystemErrors = functions.https.onCall(
+  async (data: { hours?: number; functionFilter?: string; errorId?: string }, context: CallableContext) => {
+    requireAdmin(context);
+    const adminId = requireAuth(context);
+    checkRateLimit(adminId, "analyzeSystemErrors", 10, 3600000);
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new functions.https.HttpsError("failed-precondition", "GEMINI_API_KEY ist nicht konfiguriert.");
+    }
+
+    const hours = Math.min(Math.max(data?.hours || 24, 1), 168); // 1h–7d
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+    let query: FirebaseFirestore.Query = db().collection("error_logs")
+      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(since))
+      .orderBy("timestamp", "desc")
+      .limit(50);
+
+    // Single error analysis
+    if (data?.errorId && typeof data.errorId === "string") {
+      const errDoc = await db().collection("error_logs").doc(data.errorId).get();
+      if (!errDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Fehler-Eintrag nicht gefunden.");
+      }
+      const errData = errDoc.data()!;
+      const errors = [{ id: errDoc.id, ...errData }];
+      return await performAnalysis(apiKey, errors, adminId, context);
+    }
+
+    const snapshot = await query.get();
+    if (snapshot.empty) {
+      return { analyses: [], summary: "Keine Fehler im gewählten Zeitraum gefunden.", totalErrors: 0 };
+    }
+
+    // Group errors by function+message for deduplication
+    const errorGroups: Record<string, { count: number; latestId: string; functionName: string; message: string; stack: string; timestamp: any }> = {};
+    snapshot.docs.forEach((doc) => {
+      const d = doc.data();
+      const key = `${d.functionName || "unknown"}::${(d.message || "").substring(0, 100)}`;
+      if (!errorGroups[key]) {
+        errorGroups[key] = { count: 0, latestId: doc.id, functionName: d.functionName || "unknown", message: d.message || "", stack: d.stack || "", timestamp: d.timestamp };
+      }
+      errorGroups[key].count++;
+    });
+
+    // Filter by function if specified
+    let groups = Object.values(errorGroups);
+    if (data?.functionFilter && typeof data.functionFilter === "string") {
+      groups = groups.filter((g) => g.functionName === data.functionFilter);
+    }
+
+    // Sort by count desc, take top 10
+    groups.sort((a, b) => b.count - a.count);
+    const topErrors = groups.slice(0, 10);
+
+    return await performAnalysis(apiKey, topErrors.map((g) => ({
+      id: g.latestId,
+      functionName: g.functionName,
+      message: g.message,
+      stack: g.stack,
+      count: g.count,
+      timestamp: g.timestamp,
+    })), adminId, context);
+  }
+);
+
+async function performAnalysis(
+  apiKey: string,
+  errors: Array<{ id: string; functionName?: string; message?: string; stack?: string; count?: number; [key: string]: any }>,
+  adminId: string,
+  context: CallableContext,
+) {
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+
+  // Load runtime KB if available
+  let kb = knowledgeBaseAdmin;
+  try {
+    const kbDoc = await db().collection("operatorConfig").doc("knowledgeBase").get();
+    if (kbDoc.exists && kbDoc.data()?.content) kb = kbDoc.data()!.content;
+  } catch { /* use static KB */ }
+
+  const errorSummary = errors.map((e, i) => {
+    return `[Fehler ${i + 1}] Funktion: ${e.functionName || "?"}, Auftreten: ${e.count || 1}x\nNachricht: ${(e.message || "").substring(0, 300)}\nStack: ${(e.stack || "").substring(0, 500)}`;
+  }).join("\n\n");
+
+  const prompt = `Du bist ein DevOps-Experte für die MiniMaster Parental-Control-Suite (Firebase Cloud Functions, TypeScript).
+Analysiere die folgenden Systemfehler und erstelle für jeden eine strukturierte Diagnose mit Lösungsvorschlag.
+
+FEHLER:
+${errorSummary}
+
+${kb ? `WISSENSBASIS (Projektkontext):\n${kb.substring(0, 6000)}\n` : ""}
+WICHTIG: Antworte als JSON-Array. Jedes Element muss folgende Felder haben:
+[
+  {
+    "errorIndex": 0,
+    "severity": "critical|high|medium|low",
+    "category": "config|code|data|network|auth|resource",
+    "diagnosis": "Kurze Erklärung der Ursache (2-3 Sätze)",
+    "solution": "Konkrete Schritt-für-Schritt-Lösung",
+    "autoFixable": true/false,
+    "autoFixAction": "Name der automatischen Aktion falls möglich (z.B. 'restart_function', 'cleanup_expired', 'reindex'), sonst null",
+    "autoFixDescription": "Beschreibung was der Auto-Fix tut, sonst null"
+  }
+]
+
+Mögliche autoFixAction-Werte:
+- "cleanup_expired_subscriptions": Abgelaufene Abos bereinigen
+- "cleanup_expired_grants": Abgelaufene Zugriffsrechte entfernen
+- "regenerate_error_report": Fehlerreport neu generieren
+- "clear_error_logs": Alte Fehlerlogs (>30d) bereinigen
+- null: Kein Auto-Fix möglich (manuell notwendig)
+
+Antworte NUR mit dem JSON-Array, kein Markdown.`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2000, responseMimeType: "application/json" },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API Fehler (${response.status}): ${errText.substring(0, 200)}`);
+    }
+
+    const result = await response.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const rawText = result.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "[]";
+
+    let analyses: Array<{
+      errorIndex: number; severity: string; category: string;
+      diagnosis: string; solution: string;
+      autoFixable: boolean; autoFixAction: string | null; autoFixDescription: string | null;
+    }>;
+
+    try {
+      analyses = JSON.parse(rawText);
+      if (!Array.isArray(analyses)) analyses = [analyses];
+    } catch {
+      analyses = [{ errorIndex: 0, severity: "medium", category: "code", diagnosis: rawText.substring(0, 500), solution: "Manuelle Prüfung erforderlich.", autoFixable: false, autoFixAction: null, autoFixDescription: null }];
+    }
+
+    // Enrich with error metadata
+    const enriched = analyses.map((a, idx) => ({
+      ...a,
+      errorId: errors[idx]?.id || errors[0]?.id || "unknown",
+      functionName: errors[idx]?.functionName || errors[0]?.functionName || "unknown",
+      errorMessage: errors[idx]?.message || errors[0]?.message || "",
+      occurrences: errors[idx]?.count || 1,
+    }));
+
+    // Log analysis to Firestore
+    const analysisDoc = await db().collection("ai_error_analyses").add({
+      analyzedBy: adminId,
+      analyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+      errorCount: errors.length,
+      model,
+      analyses: enriched,
+      status: "pending", // pending | applied | dismissed
+    });
+
+    await AuditLogger.logSuccess(
+      "ai.error_analysis", context, `ai_error_analyses/${analysisDoc.id}`, "system",
+      { errorCount: errors.length, analysisCount: enriched.length, model }
+    );
+
+    return {
+      analysisId: analysisDoc.id,
+      analyses: enriched,
+      summary: `${enriched.length} Fehler analysiert. ${enriched.filter(a => a.autoFixable).length} automatisch behebbar.`,
+      totalErrors: errors.length,
+      model,
+    };
+  } catch (error) {
+    clearTimeout(timeout);
+    functions.logger.error("AI error analysis failed:", error);
+    throw new functions.https.HttpsError("internal", `KI-Fehleranalyse fehlgeschlagen: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Executes an auto-fix action proposed by the AI analysis.
+ * Logs all actions to ai_error_analyses and audit_logs.
+ */
+export const executeAutoFix = functions.https.onCall(
+  async (data: { analysisId: string; errorIndex: number; action: string }, context: CallableContext) => {
+    requireAdmin(context);
+    const adminId = requireAuth(context);
+    validateAppCheck(context, true);
+
+    const { analysisId, errorIndex, action } = data || {};
+    if (!analysisId || typeof analysisId !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "analysisId ist erforderlich.");
+    }
+    if (typeof errorIndex !== "number" || errorIndex < 0) {
+      throw new functions.https.HttpsError("invalid-argument", "errorIndex ist erforderlich.");
+    }
+    if (!action || typeof action !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "action ist erforderlich.");
+    }
+
+    // Verify analysis exists
+    const analysisRef = db().collection("ai_error_analyses").doc(analysisId);
+    const analysisDoc = await analysisRef.get();
+    if (!analysisDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Analyse nicht gefunden.");
+    }
+
+    // Allowlisted auto-fix actions
+    const ALLOWED_ACTIONS: Record<string, () => Promise<{ result: string; details: any }>> = {
+      cleanup_expired_subscriptions: async () => {
+        const subsSnap = await db().collection("subscriptions").where("status", "==", "active").get();
+        let expired = 0;
+        const now = admin.firestore.Timestamp.now();
+        for (const doc of subsSnap.docs) {
+          const expiresAt = doc.data().expiresAt;
+          if (expiresAt && expiresAt.toMillis() < now.toMillis()) {
+            await doc.ref.update({ status: "expired", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+            expired++;
+          }
+        }
+        return { result: `${expired} abgelaufene Abonnements bereinigt.`, details: { checked: subsSnap.size, expired } };
+      },
+
+      cleanup_expired_grants: async () => {
+        const grantsSnap = await db().collection("supportAccessGrants")
+          .where("expiresAt", "<", admin.firestore.Timestamp.now()).get();
+        let revoked = 0;
+        for (const doc of grantsSnap.docs) {
+          await doc.ref.delete();
+          revoked++;
+        }
+        return { result: `${revoked} abgelaufene Zugriffsrechte entfernt.`, details: { revoked } };
+      },
+
+      regenerate_error_report: async () => {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const errSnap = await db().collection("error_logs")
+          .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(since)).get();
+        const errorsByFunction: Record<string, number> = {};
+        errSnap.docs.forEach((doc) => {
+          const fn = doc.data().functionName || "unknown";
+          errorsByFunction[fn] = (errorsByFunction[fn] || 0) + 1;
+        });
+        await db().collection("error_summaries").add({
+          date: new Date(),
+          totalErrors: errSnap.size,
+          errorsByFunction,
+          generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          triggeredBy: "auto_fix",
+        });
+        return { result: `Fehlerreport für ${errSnap.size} Fehler erstellt.`, details: { totalErrors: errSnap.size } };
+      },
+
+      clear_error_logs: async () => {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const oldLogs = await db().collection("error_logs")
+          .where("timestamp", "<", admin.firestore.Timestamp.fromDate(thirtyDaysAgo))
+          .limit(500).get();
+        let deleted = 0;
+        for (const doc of oldLogs.docs) {
+          await doc.ref.delete();
+          deleted++;
+        }
+        return { result: `${deleted} alte Fehlerlog-Einträge (>30 Tage) gelöscht.`, details: { deleted } };
+      },
+    };
+
+    if (!ALLOWED_ACTIONS[action]) {
+      throw new functions.https.HttpsError("invalid-argument",
+        `Unbekannte Auto-Fix-Aktion: ${action}. Erlaubt: ${Object.keys(ALLOWED_ACTIONS).join(", ")}`);
+    }
+
+    try {
+      const fixResult = await ALLOWED_ACTIONS[action]();
+
+      // Update analysis doc with fix result
+      const analysisData = analysisDoc.data()!;
+      const updatedAnalyses = [...(analysisData.analyses || [])];
+      if (updatedAnalyses[errorIndex]) {
+        updatedAnalyses[errorIndex] = {
+          ...updatedAnalyses[errorIndex],
+          fixApplied: true,
+          fixResult: fixResult.result,
+          fixAppliedAt: new Date().toISOString(),
+          fixAppliedBy: adminId,
+        };
+      }
+      await analysisRef.update({
+        analyses: updatedAnalyses,
+        status: "applied",
+        lastFixAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await AuditLogger.logSuccess(
+        "ai.auto_fix", context, `ai_error_analyses/${analysisId}`, "system",
+        { action, errorIndex, ...fixResult.details }
+      );
+
+      functions.logger.info(`Auto-fix "${action}" executed by admin ${adminId}: ${fixResult.result}`);
+      return { success: true, ...fixResult };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "ai.auto_fix", context, `ai_error_analyses/${analysisId}`, "system",
+        error as Error, { action, errorIndex }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError("internal", `Auto-Fix fehlgeschlagen: ${(error as Error).message}`);
+    }
+  }
+);

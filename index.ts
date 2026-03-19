@@ -46,5 +46,6 @@ export {
   deleteUserAccount, sendDailyErrorReport, exportUserData, adminHealthCheck,
   testGeminiConnection, getKnowledgeBase, updateKnowledgeBase,
   sendTestFcmMessage, triggerScheduledJob,
+  analyzeSystemErrors, executeAutoFix,
 } from "./src/admin";
 
