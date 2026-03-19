@@ -161,6 +161,10 @@ After every production deploy, complete this sequence:
 For final release approval, execute and archive the commissioning checklist in [docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md).
 Apply the full release acceptance orchestration in [docs/COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md](docs/COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md).
 Track progress to >90% finalization using [docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md](docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md).
+Use the release decision template for every candidate: [docs/RELEASE_DECISION_TEMPLATE.md](docs/RELEASE_DECISION_TEMPLATE.md).
+Consolidate evidence in the release evidence register: [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+Review CI gate expectations in the CI runbook: [docs/CI_RUNBOOK.md](docs/CI_RUNBOOK.md).
+Validate security baseline before release: [docs/SECURITY_BASELINE_CHECKLIST.md](docs/SECURITY_BASELINE_CHECKLIST.md).
 
 ## 7. Evidence & Audit Trail
 

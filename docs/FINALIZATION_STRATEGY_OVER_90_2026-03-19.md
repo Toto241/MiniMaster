@@ -246,3 +246,21 @@ The repository is marked over 90% finalized only if all statements below are tru
 3. All commissioning keys passed and signed.
 4. Legacy auth production dependency removed or formally risk-accepted with target removal date.
 5. Child enforcement and compliance evidence complete for rollout scope.
+
+## 9. Deliverables Index
+
+All work package deliverables are tracked through the following artifacts:
+
+| WP | Deliverable | Location |
+|----|------------|----------|
+| WP-01 | CI Runbook | [docs/CI_RUNBOOK.md](CI_RUNBOOK.md) |
+| WP-01 | CI artifact archiving | [.github/workflows/ci.yml](../.github/workflows/ci.yml) (backend-quality-gate artifact) |
+| WP-02 | Legacy Auth Usage Monitor | [admin-panel/app.js](../admin-panel/app.js) (`loadLegacyAuthUsage`) + [admin-panel/index.html](../admin-panel/index.html) |
+| WP-02 | Migration Cutover Plan | [docs/LEGACY_AUTH_CUTOVER_PLAN.md](LEGACY_AUTH_CUTOVER_PLAN.md) |
+| WP-03 | Enforcement Test Matrix | [docs/CHILD_ENFORCEMENT_TEST_MATRIX.md](CHILD_ENFORCEMENT_TEST_MATRIX.md) |
+| WP-04 | Country Readiness Packets | [docs/COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md) |
+| WP-05 | Release Evidence Register | [docs/RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) |
+| WP-06 | Security Baseline Checklist | [docs/SECURITY_BASELINE_CHECKLIST.md](SECURITY_BASELINE_CHECKLIST.md) |
+| WP-06 | SRI on external scripts | [web-control/index.html](../web-control/index.html) + [admin-panel/index.html](../admin-panel/index.html) |
+| WP-07 | Release Decision Template | [docs/RELEASE_DECISION_TEMPLATE.md](RELEASE_DECISION_TEMPLATE.md) |
+| WP-07 | Readiness Scorecard | [docs/READINESS_SCORECARD_2026-03-19.md](READINESS_SCORECARD_2026-03-19.md) |
