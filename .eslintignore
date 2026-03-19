@@ -5,3 +5,5 @@ admin-panel/**
 scripts/**
 desktop/**
 lib/**
+childApp/build/**
+masterApp/build/**

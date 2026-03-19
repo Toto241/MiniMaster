@@ -8,6 +8,7 @@ jest.mock("firebase-admin", () => {
     constructor(public seconds: number, public nanoseconds: number) {}
     static now() { const d = new Date(); return new MockTimestamp(Math.floor(d.getTime()/1000), 0); }
     static fromDate(date: Date) { return new MockTimestamp(Math.floor(date.getTime()/1000),0); }
+    static fromMillis(ms: number) { return new MockTimestamp(Math.floor(ms/1000), 0); }
   }
 
   const firestoreNamespace = () => ({ collection: jest.fn() });

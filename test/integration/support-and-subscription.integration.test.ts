@@ -21,6 +21,9 @@ jest.mock("firebase-admin", () => {
     static fromDate(date: Date) {
       return new MockTimestamp(Math.floor(date.getTime() / 1000), 0);
     }
+    static fromMillis(ms: number) {
+      return new MockTimestamp(Math.floor(ms / 1000), 0);
+    }
     toMillis() {
       return this.seconds * 1000 + Math.floor(this.nanoseconds / 1_000_000);
     }

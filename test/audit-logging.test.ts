@@ -13,6 +13,9 @@ jest.mock("firebase-admin", () => {
     static fromDate(date: Date) {
       return new MockTimestamp(Math.floor(date.getTime() / 1000), 0);
     }
+    static fromMillis(ms: number) {
+      return new MockTimestamp(Math.floor(ms / 1000), 0);
+    }
   }
 
   const firestoreNamespace = () => ({ collection: jest.fn() });
@@ -92,7 +95,7 @@ describe("Audit Logging Infrastructure", () => {
   describe("setAdminClaim with audit logging", () => {
     it("logs successful admin claim grant", async () => {
       const wrapped = testEnv.wrap(fns.setAdminClaim);
-      
+
       await wrapped({ uid: "user123" }, asAdmin);
 
       // Verify audit log was written
@@ -155,7 +158,7 @@ describe("Audit Logging Infrastructure", () => {
       getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
 
       const wrapped = testEnv.wrap(fns.setDeviceLocked);
-      
+
       await wrapped({ childId: "c1", isLocked: true }, asMaster);
 
       // Verify audit log was written with correct action
@@ -179,7 +182,7 @@ describe("Audit Logging Infrastructure", () => {
       getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
 
       const wrapped = testEnv.wrap(fns.setDeviceLocked);
-      
+
       await wrapped({ childId: "c1", isLocked: false }, asMaster);
 
       // Verify audit log was written with unlock action
@@ -193,9 +196,9 @@ describe("Audit Logging Infrastructure", () => {
 
     it("logs denied access when master doesn't own device", async () => {
       getStub.mockResolvedValueOnce({ exists: true, data: () => ({}) });
-      getStub.mockResolvedValueOnce({ 
-        exists: true, 
-        data: () => ({ masterImei: "differentMaster" }) 
+      getStub.mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ masterImei: "differentMaster" })
       });
 
       const wrapped = testEnv.wrap(fns.setDeviceLocked);
@@ -218,16 +221,16 @@ describe("Audit Logging Infrastructure", () => {
   describe("createTask with audit logging", () => {
     it("logs denied access when master doesn't own child", async () => {
       getStub.mockResolvedValueOnce({ exists: true, data: () => ({}) });
-      getStub.mockResolvedValueOnce({ 
-        exists: true, 
-        data: () => ({ masterImei: "differentMaster" }) 
+      getStub.mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ masterImei: "differentMaster" })
       });
 
       const wrapped = testEnv.wrap(fns.createTask);
-      
+
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
+
       await expect(wrapped({
         childId: "c1",
         description: "Test Description",
@@ -251,15 +254,15 @@ describe("Audit Logging Infrastructure", () => {
       // Mock support ticket exists and is open
       getStub.mockResolvedValueOnce({
         exists: true,
-        data: () => ({ 
-          masterImei: "m1", 
+        data: () => ({
+          masterImei: "m1",
           status: "open",
           problemDescription: "Help needed"
         }),
       });
 
       const wrapped = testEnv.wrap(fns.grantSupportAccess);
-      
+
       await wrapped({ ticketId: "ticket123" }, asMaster);
 
       // Verify audit log was written (second call is the audit log)
@@ -283,10 +286,10 @@ describe("Audit Logging Infrastructure", () => {
       getStub.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
 
       const wrapped = testEnv.wrap(fns.setDeviceLocked);
-      
+
       // Function should still succeed even if logging fails
       const result = await wrapped({ childId: "c1", isLocked: true }, asMaster);
-      
+
       expect(result).toEqual({ success: true, isLocked: true });
     });
   });

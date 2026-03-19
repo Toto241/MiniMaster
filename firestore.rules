@@ -111,7 +111,7 @@ service cloud.firestore {
       allow create: if isMasterOfChild()
         && request.resource.data.keys().hasOnly([
           'description', 'deadline', 'status', 'photoUrl', 'createdAt',
-          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
+          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason', 'aiAnalysis'
         ])
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
@@ -126,7 +126,7 @@ service cloud.firestore {
       allow update: if (isMasterOfChild() || isChildDevice())
         && request.resource.data.keys().hasOnly([
           'description', 'deadline', 'status', 'photoUrl', 'createdAt',
-          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason'
+          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason', 'aiAnalysis'
         ])
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
@@ -182,6 +182,18 @@ service cloud.firestore {
         && request.resource.data.totalUsageMillis is number;
     }
 
+    // --- TAMPER EVENTS COLLECTION (nested under children) ---
+    // Records device tamper/bypass attempts reported by child devices
+    // Read for master (owner) and admins, write only via Cloud Functions
+    match /children/{childId}/tamperEvents/{eventId} {
+      function getChildForTamper() {
+        return get(/databases/$(database)/documents/children/$(childId));
+      }
+
+      allow read: if isSignedIn() && (getChildForTamper().data.masterImei == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions can write
+    }
+
     // --- DENY OLD NESTED FAMILY STRUCTURE ---
     // Prevent confusion by explicitly denying access to the old data model.
     match /families/{familyId} {
@@ -211,6 +223,14 @@ service cloud.firestore {
     // Error logs track all system errors for debugging and monitoring
     // Read-only for admins and auditors, write access only via Cloud Functions
     match /error_logs/{errorId} {
+      allow read: if isAdmin() || isAuditor();
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // --- ERROR SUMMARIES COLLECTION ---
+    // Aggregated error summaries for admin dashboards
+    // Read-only for admins and auditors, write access only via Cloud Functions
+    match /error_summaries/{summaryId} {
       allow read: if isAdmin() || isAuditor();
       allow write: if false; // Only Cloud Functions can write
     }

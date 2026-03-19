@@ -7,7 +7,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
-import { requireAuth, requireAdmin, AuditLogger } from "./shared";
+import { requireAdmin, AuditLogger } from "./shared";
 import type { OperatorRole } from "./shared";
 
 /**
