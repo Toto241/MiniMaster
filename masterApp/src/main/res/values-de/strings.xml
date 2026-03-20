@@ -61,4 +61,17 @@
     <string name="language_setup_title">App-Sprache auswählen</string>
     <string name="language_setup_description">Wählen Sie Ihre bevorzugte Sprache für MiniMaster. Sie können die Sprache später in einer künftigen Einstellungsansicht ändern.</string>
     <string name="language_continue">Weiter</string>
+
+    <!-- Zustimmung zu rechtlichen Bedingungen -->
+    <string name="legal_loading_message">Rechtliche Anforderungen werden geprüft...</string>
+    <string name="legal_retry">Rechtliche Prüfung erneut versuchen</string>
+    <string name="legal_error_title">Prüfung der rechtlichen Bedingungen fehlgeschlagen</string>
+    <string name="legal_consent_title">Rechtliche Bedingungen akzeptieren, um fortzufahren</string>
+    <string name="legal_consent_description">Beim ersten Start nach der Installation der Eltern-App müssen die aktuellen Nutzungsbedingungen und die Datenschutzerklärung geprüft und akzeptiert werden, bevor Sie fortfahren können.</string>
+    <string name="legal_open_terms">Nutzungsbedingungen öffnen (v%1$s)</string>
+    <string name="legal_open_privacy">Datenschutzerklärung öffnen (v%1$s)</string>
+    <string name="legal_accept_terms">Ich akzeptiere die Nutzungsbedingungen.</string>
+    <string name="legal_accept_privacy">Ich habe die Datenschutzerklärung zur Kenntnis genommen.</string>
+    <string name="legal_accept_continue">Akzeptieren und fortfahren</string>
+    <string name="legal_country_locale">Land: %1$s, Gebietsschema: %2$s</string>
 </resources>

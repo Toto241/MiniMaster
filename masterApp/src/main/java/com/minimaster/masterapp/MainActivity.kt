@@ -61,8 +61,8 @@ class MainActivity : ComponentActivity() {
             val legalCountry = remember(appLocale) { appLocale.country.ifBlank { "US" }.uppercase(Locale.ROOT) }
             val legalLocale = remember(appLocale) { appLocale.toLanguageTag().ifBlank { "en-US" } }
 
-            LaunchedEffect(languageSelected, registrationState, legalCountry, legalLocale) {
-                if (languageSelected && registrationState is RegistrationState.Success) {
+            LaunchedEffect(languageSelected, legalCountry, legalLocale) {
+                if (languageSelected) {
                     viewModel.refreshLegalConsentStatus(legalCountry, legalLocale)
                 }
             }
@@ -75,13 +75,6 @@ class MainActivity : ComponentActivity() {
                             languageSelected = true
                             recreate()
                         }
-                    )
-                }
-
-                registrationState !is RegistrationState.Success -> {
-                    RegistrationScreen(
-                        viewModel = viewModel,
-                        onRegistrationSuccess = {}
                     )
                 }
 
@@ -118,6 +111,13 @@ class MainActivity : ComponentActivity() {
                     LegalConsentErrorScreen(
                         message = state.message,
                         onRetry = { viewModel.refreshLegalConsentStatus(legalCountry, legalLocale) }
+                    )
+                }
+
+                registrationState !is RegistrationState.Success -> {
+                    RegistrationScreen(
+                        viewModel = viewModel,
+                        onRegistrationSuccess = {}
                     )
                 }
 
@@ -351,7 +351,7 @@ private fun LegalConsentLoadingScreen() {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Checking legal policy requirements...",
+                text = stringResource(R.string.legal_loading_message),
                 style = MaterialTheme.typography.body1,
                 textAlign = TextAlign.Center
             )
@@ -370,7 +370,7 @@ private fun LegalConsentErrorScreen(message: String, onRetry: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Legal check failed",
+                text = stringResource(R.string.legal_error_title),
                 style = MaterialTheme.typography.h6,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colors.error
@@ -383,7 +383,7 @@ private fun LegalConsentErrorScreen(message: String, onRetry: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(20.dp))
             Button(onClick = onRetry) {
-                Text("Retry")
+                Text(stringResource(R.string.legal_retry))
             }
         }
     }
@@ -405,14 +405,14 @@ private fun LegalConsentScreen(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Legal update required",
+                text = stringResource(R.string.legal_consent_title),
                 style = MaterialTheme.typography.h5,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Please review and accept the current Terms and Privacy Policy before continuing.",
+                text = stringResource(R.string.legal_consent_description),
                 style = MaterialTheme.typography.body1,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -424,7 +424,7 @@ private fun LegalConsentScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colors.primary),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Open Terms (v${policies.termsVersion})")
+                Text(stringResource(R.string.legal_open_terms, policies.termsVersion))
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
@@ -432,7 +432,7 @@ private fun LegalConsentScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colors.primary),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Open Privacy Policy (v${policies.privacyVersion})")
+                Text(stringResource(R.string.legal_open_privacy, policies.privacyVersion))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -443,7 +443,7 @@ private fun LegalConsentScreen(
             ) {
                 Checkbox(checked = termsAccepted, onCheckedChange = { termsAccepted = it })
                 Text(
-                    text = "I accept the Terms of Service.",
+                    text = stringResource(R.string.legal_accept_terms),
                     style = MaterialTheme.typography.body2,
                     modifier = Modifier.padding(start = 8.dp)
                 )
@@ -455,7 +455,7 @@ private fun LegalConsentScreen(
             ) {
                 Checkbox(checked = privacyAccepted, onCheckedChange = { privacyAccepted = it })
                 Text(
-                    text = "I acknowledge the Privacy Policy.",
+                    text = stringResource(R.string.legal_accept_privacy),
                     style = MaterialTheme.typography.body2,
                     modifier = Modifier.padding(start = 8.dp)
                 )
@@ -468,12 +468,12 @@ private fun LegalConsentScreen(
                 enabled = termsAccepted && privacyAccepted,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Accept and continue")
+                Text(stringResource(R.string.legal_accept_continue))
             }
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Country: ${policies.country}, Locale: ${policies.locale}",
+                text = stringResource(R.string.legal_country_locale, policies.country, policies.locale),
                 style = MaterialTheme.typography.caption,
                 color = Color.Gray
             )
