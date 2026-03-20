@@ -1717,6 +1717,27 @@ function buildDeployCommand(projectId) {
     return trimmedProjectId ? `${base} --project ${trimmedProjectId}` : base;
 }
 
+function buildCommissioningSnapshot(report) {
+    const validationSummary = report?.validationSummary || null;
+    const attestations = report?.attestations || {};
+    const confirmedAttestations = Object.values(attestations).filter(Boolean).length;
+    const pendingCount = Array.isArray(report?.pending) ? report.pending.length : 0;
+    const validationState = !validationSummary
+        ? "Validation ausstehend"
+        : validationSummary.errorCount > 0
+            ? `${validationSummary.errorCount} kritische Findings`
+            : validationSummary.warn > 0
+                ? `${validationSummary.warn} Warnungen offen`
+                : "Validierung vollständig grün";
+
+    return {
+        pendingCount,
+        confirmedAttestations,
+        validationState,
+        lastUpdated: new Date().toISOString(),
+    };
+}
+
 function renderCommissioningReport(report) {
     const container = document.getElementById("commissioning-report");
     if (!container) return;
@@ -1734,9 +1755,16 @@ function renderCommissioningReport(report) {
     const pendingHtml = report.pending.length > 0
         ? `<ul>${report.pending.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
         : "<p>Keine offenen Inbetriebnahme-Punkte erkannt.</p>";
+    const snapshot = buildCommissioningSnapshot(report);
 
     container.innerHTML = `
         <div class="commissioning-report ${report.pending.length === 0 ? "commissioning-complete" : ""}">
+            <div class="commissioning-snapshot">
+                <div><strong>Status:</strong> ${escapeHtml(snapshot.validationState)}</div>
+                <div><strong>Bestätigte Freigaben:</strong> ${snapshot.confirmedAttestations}</div>
+                <div><strong>Offene Punkte:</strong> ${snapshot.pendingCount}</div>
+                <div><strong>Aktualisiert:</strong> ${escapeHtml(new Date(snapshot.lastUpdated).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "medium", timeZone: "UTC" }))} UTC</div>
+            </div>
             <h4>Inbetriebnahmebericht</h4>
             <p><strong>Projekt:</strong> ${escapeHtml(report.projectId || "nicht gesetzt")}</p>
             <p><strong>Firebase-Webkonfiguration:</strong> ${report.firebaseConfigured ? "bereit" : "offen"}</p>
