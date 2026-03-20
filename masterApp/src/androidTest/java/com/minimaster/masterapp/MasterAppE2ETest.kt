@@ -3,9 +3,7 @@ package com.minimaster.masterapp
 import android.util.Log
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -18,20 +16,15 @@ class MasterAppE2ETest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun registrationScreenSmokeTest() {
+    fun firstLaunchShowsLegalConsentBeforeRegistration() {
         composeTestRule
-            .onNodeWithText("Parent Device Setup")
+            .onNodeWithText("Accept legal terms to continue")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Register This Device")
+            .onNodeWithText("Accept and continue")
             .assertIsDisplayed()
-            .assertIsEnabled()
 
-        composeTestRule
-            .onNodeWithText("Register This Device")
-            .performClick()
-
-        Log.d("E2E_TEST", "Master registration smoke test executed")
+        Log.d("E2E_TEST", "Master legal consent gate smoke test executed")
     }
 }
