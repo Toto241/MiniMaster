@@ -163,63 +163,524 @@ Updates child device information and settings.
 }
 ```
 
-### 7. lockChildDevice
+### 7. setDeviceLocked
 
-Immediately locks a child device and sends push notification.
-
-**Function Type**: `httpsCallable`
-
-**Parameters**:
-```typescript
-{
-  masterImei: string,     // Required: Master device IMEI (for authorization)
-  childImei: string       // Required: Child device IMEI to lock
-}
-```
-
-**Push Notification**: Sends FCM message with action `LOCK_DEVICE`
-
-### 8. unlockChildDevice
-
-Immediately unlocks a child device and sends push notification.
+Locks or unlocks a child device. Change is propagated via `onChildDeviceUpdateV2` FCM trigger.
 
 **Function Type**: `httpsCallable`
 
 **Parameters**:
 ```typescript
 {
-  masterImei: string,     // Required: Master device IMEI (for authorization)
-  childImei: string       // Required: Child device IMEI to unlock
-}
-```
-
-**Push Notification**: Sends FCM message with action `UNLOCK_DEVICE`
-
-### 9. getLinkedChildren
-
-Retrieves all child devices linked to a master device.
-
-**Function Type**: `httpsCallable`
-
-**Parameters**:
-```typescript
-{
-  masterImei: string      // Required: Master device IMEI
+  childId: string,        // Required: Child device ID
+  isLocked: boolean       // Required: true to lock, false to unlock
 }
 ```
 
 **Response**:
 ```typescript
 {
-  children: Array<{
-    imei: string,
-    deviceName?: string,
-    isLocked?: boolean,
-    lastSeen?: Timestamp,
-    allowedApps?: string[]
-  }>
+  success: boolean,
+  isLocked: boolean
 }
 ```
+
+**Errors**:
+- `invalid-argument`: Missing or invalid `childId` / `isLocked`
+- `not-found`: Master account not found
+- `permission-denied`: Master not authorized for this child
+- `internal`: Unexpected error
+
+### 8. updateAppBlacklist
+
+Updates the list of blocked apps for a child device.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  appBlacklist: string[]  // Required: Array of blocked app package names
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing or invalid parameters
+- `not-found`: Master account not found
+- `permission-denied`: Master not authorized for this child
+
+### 9. setUsageRules
+
+Sets daily usage limits and bedtime rules for a child device.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  usageRules: {
+    dailyLimit?: number,  // Daily screen time limit in minutes
+    bedtimeStart?: string,// Bedtime start (HH:MM format)
+    bedtimeEnd?: string   // Bedtime end (HH:MM format)
+  }
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+**Errors**:
+- `invalid-argument`: Invalid time format or parameters
+- `not-found`: Master account not found
+- `permission-denied`: Master not authorized for this child
+
+### 10. getRulesForChild
+
+Retrieves lock state, app blacklist, and usage rules for a child device.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string         // Required: Child device ID
+}
+```
+
+**Response**:
+```typescript
+{
+  isLocked: boolean,
+  appBlacklist: string[],
+  usageRules: object
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing `childId`
+- `not-found`: Child device not found
+- `permission-denied`: Not owner master or child device itself
+
+### 11. recordHeartbeat
+
+Child device reports online status. Updates `lastSeen` timestamp.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: None (uses `context.auth.uid` as child ID)
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+### 12. registerFcmToken
+
+Child device registers its FCM token for push notifications.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  token: string           // Required: FCM registration token
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+### 13. updateFCMToken
+
+Master device updates its FCM token.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  fcmToken: string        // Required: Updated FCM token
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+### 14. reportDailyUsage
+
+Child device reports daily screen time to `usageHistory` subcollection.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  date: string,           // Required: Date string (e.g., "2026-03-20")
+  usageMillis: number     // Required: Total usage in milliseconds
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing or invalid `date` / `usageMillis`
+
+### 15. reportTamperEvent
+
+Child device reports tamper/bypass attempts (e.g., AccessibilityService disabled). Sends FCM alert to parent.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  eventType: string,      // Required: Type of tamper event
+  timestamp: number       // Required: Event timestamp (epoch ms)
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing parameters
+- `permission-denied`: Child not authorized
+- `not-found`: Child document not found
+
+## Task Functions
+
+### createTask
+
+Creates a new task assigned to a child device.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  description: string,    // Required: Task description
+  deadlineISO: string,    // Required: Deadline as ISO date string
+  unlockDuration?: number // Optional: Minutes to unlock device after approval
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean,
+  taskId: string
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing required fields or invalid `unlockDuration`
+- `not-found`: Master account not found
+- `permission-denied`: Master not authorized for this child
+- `resource-exhausted`: No active subscription or trial
+
+### completeTask
+
+Child submits proof (photo) for task completion. Transitions status from `pending` → `pending_approval`.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  taskId: string,         // Required: Task ID
+  photoUrl: string        // Required: Firebase Storage URL (validated, max 2048 chars)
+}
+```
+
+**Response**: `{ success: boolean }`
+
+**Errors**:
+- `invalid-argument`: Missing fields or invalid `photoUrl`
+- `not-found`: Task doesn't exist
+- `failed-precondition`: Task not in `pending` state
+
+### approveTask
+
+Master approves a submitted task. Transitions status from `pending_approval` → `approved`.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  taskId: string          // Required: Task ID
+}
+```
+
+**Response**: `{ success: boolean }`
+
+**Errors**:
+- `invalid-argument`: Missing required fields
+- `not-found`: Master or task not found
+- `permission-denied`: Master not authorized
+- `failed-precondition`: Task not in `pending_approval` state
+
+### rejectTask
+
+Master rejects a submitted task. Transitions status from `pending_approval` → `rejected`.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  taskId: string,         // Required: Task ID
+  reason?: string         // Optional: Rejection reason
+}
+```
+
+**Response**: `{ success: boolean }`
+
+**Errors**:
+- `invalid-argument`: Missing required fields
+- `not-found`: Master or task not found
+- `permission-denied`: Master not authorized
+- `failed-precondition`: Task not in `pending_approval` state
+
+## Pairing Functions
+
+### generatePairingLink
+
+Generates a UUID-based pairing token with 5-minute expiry.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: None (uses `context.auth.uid`)
+
+**Response**:
+```typescript
+{
+  pairingToken: string    // UUID token
+}
+```
+
+**Errors**:
+- `not-found`: Master not found
+- `resource-exhausted`: No active subscription or trial
+
+## Subscription Functions
+
+### verifyPurchase
+
+Verifies a Google Play subscription purchase and activates it.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  purchaseToken: string,  // Required: Google Play purchase token
+  sku: string             // Required: Subscription SKU
+}
+```
+
+**Response**: `{ success: boolean, subscriptionStatus: "active" }`
+
+### getSubscriptionStatus
+
+Returns current subscription status, trial countdown, and child limit.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: None
+
+**Response**:
+```typescript
+{
+  subscriptionStatus: object,
+  trialDaysRemaining?: number,
+  isTrialActive?: boolean,
+  hasAccess: boolean,
+  childLimit: number
+}
+```
+
+### revokeSubscription (Admin)
+
+Revokes a subscription by ID or master ID.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  subscriptionId?: string,// Subscription document ID
+  masterId?: string       // OR master ID to find subscription
+}
+```
+
+**Response**: `{ message: string }`
+
+## Auth Functions
+
+### bootstrapFirstAdmin
+
+Promotes the first authenticated user to admin if no admin exists yet.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: None
+
+**Response**: `{ success: boolean, message: string }`
+
+### setAdminClaim (Admin)
+
+Sets `role: "admin"` custom claim for a user.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ uid: string }`
+
+### setUserRole (Admin)
+
+Sets an operator role custom claim for a user.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ uid: string, role: "admin" | "support" | "auditor" }`
+
+### revokeUserTokens (Admin)
+
+Revokes all refresh tokens for a user (security incident response).
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ uid: string }`
+
+## Support Functions
+
+### createSupportTicket
+
+User creates a support ticket with optional support access grant.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  problemDescription: string,   // Required: Problem text (max 5000 chars)
+  allowSupportAccess: boolean,  // Required: Grant 48h data access
+  consentSource?: string        // Optional: Source of consent
+}
+```
+
+**Response**: `{ success: boolean, ticketId: string }`
+
+### grantSupportAccess
+
+Master grants 48-hour support access for a ticket.
+
+**Parameters**: `{ ticketId: string }`
+
+### revokeSupportAccess
+
+Master revokes an existing support access grant.
+
+**Parameters**: `{ grantId: string }`
+
+### getTicketUserData
+
+Support/admin retrieves user data via active support grant.
+
+**Parameters**: `{ ticketId: string }`
+
+### provideSolutionFeedback
+
+User accepts or rejects AI-generated solution.
+
+**Parameters**: `{ ticketId: string, feedback: "accepted" | "rejected", comment?: string }`
+
+### aiExplainProblem (Admin/Support)
+
+AI assistant explains setup/config problems using Gemini or OpenAI fallback.
+
+**Parameters**:
+```typescript
+{
+  problemContext: string,      // Required: Problem description
+  consentGiven: boolean        // Required: User consent for AI processing
+}
+```
+
+**Response**: `{ explanation: string, suggestion: string, provider: string, model: string }`
+
+## Admin Functions
+
+### deleteUserAccount (Admin)
+
+Deletes user account and all associated data (GDPR Art. 17).
+
+**Parameters**: `{ masterId?: string }` (defaults to caller's own account)
+
+### exportUserData (Admin)
+
+GDPR/DSAR data export of all user-related collections.
+
+**Parameters**: `{ masterId?: string }`
+
+**Response**: `{ success: boolean, data: { masters, children, subscriptions, tickets, grants, consents, auditLogs } }`
+
+### analyzeSystemErrors (Admin)
+
+AI-powered analysis of system errors using Gemini.
+
+**Parameters**:
+```typescript
+{
+  hours?: number,           // Time window (default: 24h)
+  functionFilter?: string,  // Filter by function name
+  errorId?: string          // Analyze specific error
+}
+```
+
+**Response**: `{ analysisId: string, analyses: object[], summary: string, totalErrors: number, model: string }`
+
+### executeAutoFix (Admin)
+
+Executes allowlisted auto-fix actions from AI analysis results.
+
+**Parameters**: `{ analysisId: string, errorIndex: number, action: string }`
 
 ## Firestore Triggers
 
@@ -227,23 +688,19 @@ Retrieves all child devices linked to a master device.
 
 **Trigger**: `onDocumentUpdated("children/{childId}")`
 
-**Purpose**: Automatically sends push notifications when child device data changes
+**Purpose**: Sends FCM diff-push when child device settings change. Only sends changed fields (`isLocked`, `appBlacklist`, `usageRules`).
 
-**Triggered Changes**:
-- `isLocked` status changes → Sends LOCK_DEVICE or UNLOCK_DEVICE notification
-- `allowedApps` changes → Sends UPDATE_ALLOWED_APPS notification
-- Any other field changes → Sends DEVICE_UPDATE notification
+### analyzeTaskPhoto
 
-**FCM Message Format**:
-```typescript
-{
-  data: {
-    action: "LOCK_DEVICE" | "UNLOCK_DEVICE" | "UPDATE_ALLOWED_APPS" | "DEVICE_UPDATE",
-    childImei: string,
-    // Additional data based on action type
-  }
-}
-```
+**Trigger**: `onDocumentUpdated("children/{childId}/tasks/{taskId}")`
+
+**Purpose**: Analyzes task photo with Gemini Vision API when status transitions to `pending_approval`. Validates Firebase Storage URL to prevent SSRF. Falls back to stub analysis without API key. Result written as `aiAnalysis` field.
+
+### onTaskStatusChange
+
+**Trigger**: `onUpdate("children/{childId}/tasks/{taskId}")`
+
+**Purpose**: Sends FCM notification to master when task → `pending_approval`, and to child when task → `approved`/`rejected`.
 
 ## Data Models
 
@@ -256,6 +713,7 @@ interface MasterDevice {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+```
 
 ---
 
@@ -286,10 +744,23 @@ Records a master's acceptance of specific policy versions.
 
 ### publishLegalPolicy (Admin)
 
-Publishes a new version of a legal policy.
+Publishes a new version of a legal policy. Generates a SHA-256 integrity checksum automatically.
 
-**Parameters**: `{ policyType: "terms" | "privacy", country: string, locale: string, version: string, contentUrl: string }`
-**Errors**: `invalid-argument` (invalid policyType or missing version)
+**Parameters**:
+```typescript
+{
+  policyType: "terms" | "privacy",  // Required
+  country: string,                   // Required: ISO country code
+  locale: string,                    // Required: Locale code
+  version: string,                   // Required: Semantic version
+  contentUrl: string,                // Required: URL to policy content
+  effectiveAt?: string,              // Optional: ISO date when effective
+  isMajorChange?: boolean            // Optional: Forces re-consent if true
+}
+```
+
+**Response**: `{ success: true, policyId: string, checksum: string }`
+**Errors**: `invalid-argument` (invalid policyType, missing version, or missing fields)
 
 ### markLegalReconsentRequired (Admin)
 
@@ -389,37 +860,61 @@ interface PairingCode {
 ```typescript
 interface Task {
   description: string;
-  status: "pending" | "completed" | "approved" | "rejected";
+  status: "pending" | "pending_approval" | "approved" | "rejected";
   photoUrl?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   deadline: Timestamp;
   completedAt?: Timestamp;
+  masterImei: string;
+  rejectionReason?: string;
+  aiAnalysis?: object;
+  unlockDuration?: number;    // Minutes to unlock device after approval
+  unlockUntil?: Timestamp;    // Computed when approved with unlockDuration
 }
 ```
 
+### Task State Machine
+```
+pending → pending_approval   (completeTask: child submits photo proof)
+pending_approval → approved  (approveTask: master reviews & approves)
+pending_approval → rejected  (rejectTask: master rejects with optional reason)
+```
+
+Invalid transitions throw `failed-precondition`.
+
 ## Error Handling
 
-All Cloud Functions use Firebase's standard error codes:
+All Cloud Functions use standardized Firebase `HttpsError` codes (see `ERROR_CODES.md`):
 
-- `invalid-argument`: Invalid or missing parameters
-- `not-found`: Requested resource doesn't exist
-- `already-exists`: Resource already exists
-- `permission-denied`: Insufficient permissions
-- `deadline-exceeded`: Operation timeout or expired resource
-- `resource-exhausted`: Rate limit or quota exceeded
-- `internal`: Unexpected server error
+| Code | Usage |
+|------|-------|
+| `invalid-argument` | Missing/wrong type parameters (validate early) |
+| `unauthenticated` | Invalid IMEI/secretKey or missing auth |
+| `not-found` | Document doesn't exist |
+| `already-exists` | IMEI already registered |
+| `permission-denied` | Master not owner of child / admin check failed |
+| `deadline-exceeded` | Expired pairing token/code |
+| `failed-precondition` | Invalid task state transition |
+| `resource-exhausted` | Code collision limit (10) or free tier limit |
+| `internal` | Unexpected server error, data corruption |
 
 ## Rate Limiting
 
-- Pairing code generation: Limited to 10 attempts per request
-- Device updates: No explicit rate limiting (handled by Firebase)
-- Push notifications: Subject to FCM quotas
+- Pairing code generation: Max 10 collision retries per request
+- AI analysis: Rate-limited by Gemini/OpenAI API quotas
+- FCM notifications: Subject to FCM quotas
+- Support tickets: 1 pending ticket per user
 
 ## Security
 
-- All functions require Firebase Authentication
-- Master-child relationships are verified before operations
+- Legacy endpoints: IMEI + secretKey authentication (see `docs/LEGACY_AUTH_INVENTORY.md`)
+- New endpoints: Firebase Authentication via `context.auth`
+- Master-child ownership verified before all mutations
+- `photoUrl` validation: Must be Firebase Storage URL, max 2048 chars
+- AI inputs sanitized to prevent prompt injection
+- GDPR: `deleteUserAccount` and `exportUserData` for data subject rights
+- Session timeout: 30 min in web panels
 - Sensitive operations (lock/unlock) require master device authorization
 - Firestore security rules provide additional data access control
 - CSP, HSTS, X-Frame-Options (DENY), X-Content-Type-Options headers on all web hosting
