@@ -560,3 +560,29 @@ describe("auth legacy and catch branches", () => {
       .rejects.toThrow(/forced|internal/i);
   });
 });
+
+describe("support onTicketCreated trigger branches", () => {
+  it("onTicketCreated updates ticket with test-stub aiModel and skips notification when no fcmToken", async () => {
+    state.supportTickets["ticket-no-fcm"] = {
+      masterImei: "m1",
+      problemDescription: "My child device is still blocked after task approval.",
+    };
+    state.masters["m1"] = { imei: "m1" }; // no fcmToken
+
+    const wrapped = testEnv.wrap(fns.onTicketCreated);
+    await wrapped({ data: () => state.supportTickets["ticket-no-fcm"] }, { params: { ticketId: "ticket-no-fcm" } });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("onTicketCreated sends notification when master has fcmToken", async () => {
+    state.supportTickets["ticket-with-fcm"] = {
+      masterImei: "m1",
+      problemDescription: "Pairing code expires immediately on child app.",
+    };
+    state.masters["m1"] = { imei: "m1", fcmToken: "master-fcm-token" };
+
+    const wrapped = testEnv.wrap(fns.onTicketCreated);
+    await wrapped({ data: () => state.supportTickets["ticket-with-fcm"] }, { params: { ticketId: "ticket-with-fcm" } });
+    expect(mockSend).toHaveBeenCalled();
+  });
+});
