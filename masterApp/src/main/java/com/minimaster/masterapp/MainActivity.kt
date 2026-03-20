@@ -11,7 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
 import androidx.compose.material.Checkbox
@@ -54,12 +53,16 @@ class MainActivity : ComponentActivity() {
 
             var languageSelected by remember { mutableStateOf(hasMasterLanguageSelection(this)) }
             val context = LocalContext.current
-            val appLocale = remember {
-                val configured = context.resources.configuration.locales
-                if (configured.isEmpty) Locale.getDefault() else configured[0]
+            val savedLanguageTag = remember(languageSelected) { getSavedMasterLanguageTag(context) ?: "en" }
+            val savedCountryCode = remember(languageSelected) {
+                getSavedMasterCountryCode(context)
+                    ?: context.resources.configuration.locales[0]?.country?.ifBlank { "US" }
+                    ?: "US"
             }
-            val legalCountry = remember(appLocale) { appLocale.country.ifBlank { "US" }.uppercase(Locale.ROOT) }
-            val legalLocale = remember(appLocale) { appLocale.toLanguageTag().ifBlank { "en-US" } }
+            val legalCountry = remember(savedCountryCode) { savedCountryCode.uppercase(Locale.ROOT) }
+            val legalLocale = remember(savedLanguageTag, legalCountry) {
+                buildLegalLocale(languageTag = savedLanguageTag, countryCode = legalCountry)
+            }
 
             LaunchedEffect(languageSelected, legalCountry, legalLocale) {
                 if (languageSelected) {
@@ -70,8 +73,9 @@ class MainActivity : ComponentActivity() {
             when {
                 !languageSelected -> {
                     LanguageSelectionScreen(
-                        onLanguageSelected = { languageTag ->
-                            saveMasterLanguageSelection(this, languageTag)
+                        initialCountryCode = savedCountryCode,
+                        onSelectionConfirmed = { languageTag, countryCode ->
+                            saveMasterLanguageSelection(this, languageTag, countryCode)
                             languageSelected = true
                             recreate()
                         }
@@ -337,6 +341,14 @@ private fun getStableMasterId(context: Context): String {
 }
 
 private data class LanguageOption(val tag: String, val label: String)
+private data class CountryOption(val code: String, val label: String)
+
+private fun buildLegalLocale(languageTag: String, countryCode: String): String {
+    val locale = Locale.forLanguageTag(languageTag)
+    val language = locale.language.ifBlank { "en" }
+    val country = countryCode.ifBlank { "US" }
+    return "$language-$country"
+}
 
 @Composable
 private fun LegalConsentLoadingScreen() {
@@ -482,8 +494,11 @@ private fun LegalConsentScreen(
 }
 
 @Composable
-private fun LanguageSelectionScreen(onLanguageSelected: (String) -> Unit) {
-    val options = remember {
+private fun LanguageSelectionScreen(
+    initialCountryCode: String,
+    onSelectionConfirmed: (String, String) -> Unit
+) {
+    val languageOptions = remember {
         listOf(
             LanguageOption("en", "English"),
             LanguageOption("de", "Deutsch"),
@@ -519,7 +534,26 @@ private fun LanguageSelectionScreen(onLanguageSelected: (String) -> Unit) {
             LanguageOption("hu", "Hungarian")
         )
     }
-    var selectedTag by remember { mutableStateOf("en") }
+    val countryOptions = remember {
+        listOf(
+            CountryOption("US", "United States"),
+            CountryOption("DE", "Deutschland"),
+            CountryOption("FR", "France"),
+            CountryOption("GB", "United Kingdom"),
+            CountryOption("CA", "Canada"),
+            CountryOption("BR", "Brasil"),
+            CountryOption("MX", "Mexico"),
+            CountryOption("IN", "India"),
+            CountryOption("JP", "Japan"),
+            CountryOption("KR", "South Korea"),
+            CountryOption("ID", "Indonesia"),
+            CountryOption("ZA", "South Africa"),
+            CountryOption("AE", "United Arab Emirates"),
+            CountryOption("SA", "Saudi Arabia")
+        )
+    }
+    var selectedLanguageTag by remember { mutableStateOf("en") }
+    var selectedCountryCode by remember { mutableStateOf(initialCountryCode.uppercase(Locale.ROOT)) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
         Column(
@@ -542,25 +576,63 @@ private fun LanguageSelectionScreen(onLanguageSelected: (String) -> Unit) {
             )
 
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(options) { option ->
-                    Row(
+                item {
+                    Text(
+                        text = stringResource(R.string.language_setup_list_title),
+                        style = MaterialTheme.typography.h6,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { selectedTag = option.tag }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selectedTag == option.tag,
-                            onClick = { selectedTag = option.tag }
-                        )
-                        Text(text = option.label, modifier = Modifier.padding(start = 8.dp))
+                            .padding(bottom = 8.dp)
+                    )
+                    languageOptions.forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedLanguageTag = option.tag }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedLanguageTag == option.tag,
+                                onClick = { selectedLanguageTag = option.tag }
+                            )
+                            Text(text = option.label, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.country_setup_title),
+                        style = MaterialTheme.typography.h6,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.country_setup_description),
+                        style = MaterialTheme.typography.body2,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    countryOptions.forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedCountryCode = option.code }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedCountryCode == option.code,
+                                onClick = { selectedCountryCode = option.code }
+                            )
+                            Text(text = option.label, modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
             }
 
             Button(
-                onClick = { onLanguageSelected(selectedTag) },
+                onClick = { onSelectionConfirmed(selectedLanguageTag, selectedCountryCode) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(stringResource(R.string.language_continue))
