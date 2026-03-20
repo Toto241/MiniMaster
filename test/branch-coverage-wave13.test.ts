@@ -318,6 +318,35 @@ describe("support getTicketUserData fallbacks", () => {
     expect(res.grantExpiresAt).toBeNull();
     expect(Array.isArray(res.children)).toBe(true);
   });
+
+  it("throws not-found when support ticket does not exist", async () => {
+    const wrapped = testEnv.wrap(fns.getTicketUserData);
+    await expect(wrapped({ ticketId: "missing-ticket" }, asSupport as any)).rejects.toThrow(/ticket not found/i);
+  });
+
+  it("throws permission-denied when ticket has no accessGrantId", async () => {
+    state.supportTickets["t-no-grant"] = { masterImei: "m1" };
+    const wrapped = testEnv.wrap(fns.getTicketUserData);
+    await expect(wrapped({ ticketId: "t-no-grant" }, asSupport as any)).rejects.toThrow(/must grant access first/i);
+  });
+
+  it("throws permission-denied when grant status is not active", async () => {
+    state.supportTickets["t-revoked"] = { masterImei: "m1", accessGrantId: "g-revoked" };
+    state.supportAccessGrants["g-revoked"] = { status: "revoked" };
+    const wrapped = testEnv.wrap(fns.getTicketUserData);
+    await expect(wrapped({ ticketId: "t-revoked" }, asSupport as any)).rejects.toThrow(/grant is revoked/i);
+  });
+
+  it("marks expired grant and throws deadline-exceeded", async () => {
+    const admin = require("firebase-admin");
+    const past = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) - 120, 0);
+    state.supportTickets["t-expired"] = { masterImei: "m1", accessGrantId: "g-expired" };
+    state.supportAccessGrants["g-expired"] = { status: "active", expiresAt: past };
+
+    const wrapped = testEnv.wrap(fns.getTicketUserData);
+    await expect(wrapped({ ticketId: "t-expired" }, asSupport as any)).rejects.toThrow(/expired/i);
+    expect(state.supportAccessGrants["g-expired"].status).toBe("expired");
+  });
 });
 
 describe("legal fallback and branch paths", () => {
@@ -523,6 +552,12 @@ describe("pairing subscriptionStatus fallback metadata", () => {
     state.masters["m1"] = { imei: "m1" };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
     await expect(wrapped({ pairingToken: "tok-none" }, asChild)).rejects.toThrow(/exhausted|trial|subscription/i);
+  });
+
+  it("generatePairingLink uses subscriptionStatus fallback 'none' when subscription is missing", async () => {
+    state.masters["m1"] = { imei: "m1" };
+    const wrapped = testEnv.wrap(fns.generatePairingLink);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/exhausted|trial|subscribe/i);
   });
 });
 
@@ -897,6 +932,22 @@ describe("ownership mismatch and default fallback branches", () => {
     await expect(testEnv.wrap(fns.rejectTask)({ childId: "c1", taskId: "t1" }, asMaster)).rejects.toThrow(/authorized|permission/i);
   });
 
+  it("createTask/approveTask/rejectTask deny when child document exists but data is undefined", async () => {
+    state.children["c1"] = undefined as any;
+
+    await expect(testEnv.wrap(fns.createTask)({
+      childId: "c1",
+      description: "x",
+      deadlineISO: new Date(Date.now() + 60000).toISOString(),
+    }, asMaster)).rejects.toThrow(/authorized|permission/i);
+
+    await expect(testEnv.wrap(fns.approveTask)({ childId: "c1", taskId: "t1" }, asMaster))
+      .rejects.toThrow(/authorized|permission/i);
+
+    await expect(testEnv.wrap(fns.rejectTask)({ childId: "c1", taskId: "t1" }, asMaster))
+      .rejects.toThrow(/authorized|permission/i);
+  });
+
   it("getRulesForChild returns defaults when optional fields are absent", async () => {
     state.children.c1 = { masterImei: "m1", childImei: "c1" };
     const res = await testEnv.wrap(fns.getRulesForChild)({ childId: "c1" }, asMaster);
@@ -938,6 +989,27 @@ describe("pairing childLimit fallback branches", () => {
 
     await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
+  });
+
+  it("validatePairingCode succeeds with explicit childLimit when capacity is available", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingCodes["333334"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters.m1 = { imei: "m1", subscription: { status: "active", childLimit: 2 } };
+
+    const res = await testEnv.wrap(fns.validatePairingCode)({ pairingCode: "333334" }, { auth: { uid: "c2", token: {} } });
+    expect(res.childId).toBe("c2");
+  });
+
+  it("validatePairingToken succeeds with explicit childLimit when capacity is available", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingTokens["tok-limit-ok"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters.m1 = { imei: "m1", subscription: { status: "active", childLimit: 2 } };
+
+    const res = await testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit-ok" }, { auth: { uid: "c2", token: {} } });
+    expect(res.childId).toBe("c2");
+    expect(res.masterId).toBe("m1");
   });
 
   it("createPairingCode exhausts collision retries and throws resource-exhausted", async () => {
