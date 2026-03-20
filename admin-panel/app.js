@@ -5041,3 +5041,168 @@ async function loadAiFixHistory() {
         listEl.innerHTML = '<p style="color:#ef4444">Fehler beim Laden: ' + escapeHtml(err.message) + '</p>';
     }
 }
+
+// ==================== LEGAL / DATENSCHUTZ ====================
+
+async function loadActiveLegalPolicies() {
+    const country = (document.getElementById("legal-policy-country").value || "").trim().toUpperCase();
+    const locale = (document.getElementById("legal-policy-locale").value || "").trim();
+    const resultEl = document.getElementById("legal-policies-result");
+
+    if (!country || country.length !== 2) {
+        resultEl.innerHTML = "<div class='error'>Bitte gültigen 2-Buchstaben-Ländercode eingeben.</div>";
+        return;
+    }
+    if (!locale) {
+        resultEl.innerHTML = "<div class='error'>Bitte ein Locale eingeben (z.B. de-DE).</div>";
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Lade Richtlinien...</div>";
+    try {
+        const result = await functions.httpsCallable("getActiveLegalPolicies")({ country, locale });
+        const data = result.data;
+        resultEl.innerHTML =
+            "<div class='success-box'>" +
+            "<h4>AGB (Terms)</h4>" +
+            "<p><strong>Version:</strong> " + escapeHtml(data.terms.version) + "</p>" +
+            "<p><strong>URL:</strong> <a href='" + escapeHtml(data.terms.contentUrl) + "' target='_blank'>" + escapeHtml(data.terms.contentUrl) + "</a></p>" +
+            "<p><strong>Major Change:</strong> " + (data.terms.isMajorChange ? "Ja" : "Nein") + "</p>" +
+            "<hr style='border-color:#334155;margin:10px 0'>" +
+            "<h4>Datenschutz (Privacy)</h4>" +
+            "<p><strong>Version:</strong> " + escapeHtml(data.privacy.version) + "</p>" +
+            "<p><strong>URL:</strong> <a href='" + escapeHtml(data.privacy.contentUrl) + "' target='_blank'>" + escapeHtml(data.privacy.contentUrl) + "</a></p>" +
+            "<p><strong>Major Change:</strong> " + (data.privacy.isMajorChange ? "Ja" : "Nein") + "</p>" +
+            "</div>";
+    } catch (error) {
+        resultEl.innerHTML = "<div class='error'>Fehler: " + escapeHtml(error.message) + "</div>";
+    }
+}
+
+async function checkLegalReconsentStatus() {
+    const country = (document.getElementById("legal-consent-country").value || "").trim().toUpperCase();
+    const locale = (document.getElementById("legal-consent-locale").value || "").trim();
+    const resultEl = document.getElementById("legal-consent-result");
+
+    if (!country || country.length !== 2) {
+        resultEl.innerHTML = "<div class='error'>Bitte gültigen 2-Buchstaben-Ländercode eingeben.</div>";
+        return;
+    }
+    if (!locale) {
+        resultEl.innerHTML = "<div class='error'>Bitte ein Locale eingeben (z.B. de-DE).</div>";
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Prüfe Einwilligungsstatus...</div>";
+    try {
+        const result = await functions.httpsCallable("needsLegalReconsent")({ country, locale });
+        const data = result.data;
+        const statusClass = data.requiresReconsent ? "error" : "success-box";
+        const statusText = data.requiresReconsent ? "⚠️ Erneute Zustimmung erforderlich" : "✅ Zustimmung aktuell";
+
+        resultEl.innerHTML =
+            "<div class='" + statusClass + "'>" +
+            "<p><strong>Status:</strong> " + statusText + "</p>" +
+            "<p><strong>Grund:</strong> " + escapeHtml(data.reason) + "</p>" +
+            "<p><strong>Land/Locale:</strong> " + escapeHtml(data.country) + " / " + escapeHtml(data.locale) + "</p>" +
+            "<hr style='border-color:#334155;margin:10px 0'>" +
+            "<p><strong>Aktuelle AGB-Version:</strong> " + escapeHtml(data.terms.version) + "</p>" +
+            "<p><strong>Akzeptierte AGB-Version:</strong> " + escapeHtml(data.acceptedTermsVersion || "–") + "</p>" +
+            "<p><strong>Aktuelle Datenschutz-Version:</strong> " + escapeHtml(data.privacy.version) + "</p>" +
+            "<p><strong>Akzeptierte Datenschutz-Version:</strong> " + escapeHtml(data.acceptedPrivacyVersion || "–") + "</p>" +
+            "</div>";
+    } catch (error) {
+        resultEl.innerHTML = "<div class='error'>Fehler: " + escapeHtml(error.message) + "</div>";
+    }
+}
+
+async function publishLegalPolicy() {
+    const policyType = document.getElementById("legal-publish-type").value;
+    const country = (document.getElementById("legal-publish-country").value || "").trim().toUpperCase();
+    const locale = (document.getElementById("legal-publish-locale").value || "").trim();
+    const version = (document.getElementById("legal-publish-version").value || "").trim();
+    const contentUrl = (document.getElementById("legal-publish-url").value || "").trim();
+    const status = document.getElementById("legal-publish-status").value;
+    const isMajorChange = document.getElementById("legal-publish-major").checked;
+    const resultEl = document.getElementById("legal-publish-result");
+
+    if (!country || country.length !== 2) {
+        resultEl.innerHTML = "<div class='error'>Bitte gültigen 2-Buchstaben-Ländercode eingeben.</div>";
+        return;
+    }
+    if (!locale) {
+        resultEl.innerHTML = "<div class='error'>Bitte ein Locale eingeben.</div>";
+        return;
+    }
+    if (!version) {
+        resultEl.innerHTML = "<div class='error'>Bitte eine Versionsnummer eingeben.</div>";
+        return;
+    }
+    if (!contentUrl) {
+        resultEl.innerHTML = "<div class='error'>Bitte eine Content-URL eingeben.</div>";
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Veröffentliche Richtlinie...</div>";
+    try {
+        const result = await functions.httpsCallable("publishLegalPolicy")({
+            policyType, country, locale, version, contentUrl, status, isMajorChange,
+        });
+        const data = result.data;
+        resultEl.innerHTML =
+            "<div class='success-box'>" +
+            "<p><strong>✅ Richtlinie veröffentlicht</strong></p>" +
+            "<p><strong>Policy-ID:</strong> " + escapeHtml(data.policyId) + "</p>" +
+            "<p><strong>Typ:</strong> " + escapeHtml(data.policyType) + "</p>" +
+            "<p><strong>Land/Locale:</strong> " + escapeHtml(data.country) + " / " + escapeHtml(data.locale) + "</p>" +
+            "<p><strong>Version:</strong> " + escapeHtml(data.version) + "</p>" +
+            "<p><strong>Status:</strong> " + escapeHtml(data.status) + "</p>" +
+            "<p><strong>Checksum:</strong> <code>" + escapeHtml(data.checksum) + "</code></p>" +
+            "</div>";
+        showNotification("Richtlinie erfolgreich veröffentlicht.", "success");
+    } catch (error) {
+        resultEl.innerHTML = "<div class='error'>Fehler: " + escapeHtml(error.message) + "</div>";
+        showNotification("Fehler beim Veröffentlichen: " + error.message, "error");
+    }
+}
+
+async function triggerLegalReconsent() {
+    const country = (document.getElementById("legal-reconsent-country").value || "").trim().toUpperCase();
+    const locale = (document.getElementById("legal-reconsent-locale").value || "").trim();
+    const masterImei = (document.getElementById("legal-reconsent-master").value || "").trim();
+    const resultEl = document.getElementById("legal-reconsent-result");
+
+    if (!country || country.length !== 2) {
+        resultEl.innerHTML = "<div class='error'>Bitte gültigen 2-Buchstaben-Ländercode eingeben.</div>";
+        return;
+    }
+    if (!locale) {
+        resultEl.innerHTML = "<div class='error'>Bitte ein Locale eingeben.</div>";
+        return;
+    }
+
+    const scope = masterImei ? "Nutzer " + masterImei : "alle Nutzer für " + country + "/" + locale;
+    if (!confirm("Reconsent erzwingen für " + scope + "? Dies erfordert eine erneute Zustimmung.")) {
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Erzwinge Reconsent...</div>";
+    try {
+        const payload = { country, locale };
+        if (masterImei) {
+            payload.masterImei = masterImei;
+        }
+        const result = await functions.httpsCallable("markLegalReconsentRequired")(payload);
+        const data = result.data;
+        resultEl.innerHTML =
+            "<div class='success-box'>" +
+            "<p><strong>✅ Reconsent erzwungen</strong></p>" +
+            "<p><strong>Betroffene Nutzer:</strong> " + escapeHtml(String(data.updatedCount)) + "</p>" +
+            "<p><strong>Geltungsbereich:</strong> " + escapeHtml(data.scope) + "</p>" +
+            "</div>";
+        showNotification("Reconsent für " + data.updatedCount + " Nutzer erzwungen.", "success");
+    } catch (error) {
+        resultEl.innerHTML = "<div class='error'>Fehler: " + escapeHtml(error.message) + "</div>";
+        showNotification("Fehler: " + error.message, "error");
+    }
+}
