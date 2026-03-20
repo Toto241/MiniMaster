@@ -59,7 +59,10 @@
 
     <!-- First start language setup -->
     <string name="language_setup_title">Choose your app language</string>
-    <string name="language_setup_description">Select your preferred language for MiniMaster. You can change it later in a future settings screen.</string>
+    <string name="language_setup_description">Select your preferred language for MiniMaster. Then choose the country where the parent app will be used so we can show the correct legal terms before you continue.</string>
+    <string name="language_setup_list_title">App language</string>
+    <string name="country_setup_title">Country of use</string>
+    <string name="country_setup_description">We use this country selection to load the correct legal terms and privacy policy for the parent app.</string>
     <string name="language_continue">Continue</string>
 
     <!-- Legal consent gate -->
