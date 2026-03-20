@@ -78,6 +78,30 @@ describe("support testable helpers", () => {
     expect(res.rawResponse).toBe("");
   });
 
+  it("generateWithGemini throws API error when response is not ok", async () => {
+    process.env.GEMINI_API_KEY = "k";
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: () => Promise.resolve("backend unavailable"),
+    } as any);
+
+    await expect(__supportTestables.generateWithGemini("hello")).rejects.toThrow(/Gemini API error \(503\)/i);
+  });
+
+  it("generateWithGemini returns empty when candidate content parts are missing", async () => {
+    process.env.GEMINI_API_KEY = "k";
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{}],
+      }),
+    } as any);
+
+    const res = await __supportTestables.generateWithGemini("hello");
+    expect(res.rawResponse).toBe("");
+  });
+
   it("generateWithOpenAI falls back to empty message content", async () => {
     mockOpenAiCreate.mockResolvedValueOnce({ choices: [] });
     const res = await __supportTestables.generateWithOpenAI("hello");
