@@ -10,6 +10,33 @@ import * as crypto from "crypto";
 import { db } from "../firebase";
 import { requireAuth, AuditLogger, hasActiveAccess } from "./shared";
 
+const DEFAULT_CHILD_APP_LIMIT = 4;
+const DEFAULT_PARENT_APP_LIMIT = 2;
+const PAIRING_LINK_BASE_URL = process.env.PAIRING_LINK_BASE_URL || "https://minimaster.app/pair";
+const TRIAL_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+
+function hasPairingAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
+  if (hasActiveAccess(masterData)) return true;
+  return masterData?.subscription?.status === "trial_pending";
+}
+
+async function activateTrialIfPending(masterId: string, masterData: admin.firestore.DocumentData | undefined): Promise<void> {
+  if (masterData?.subscription?.status !== "trial_pending") return;
+
+  const now = admin.firestore.Timestamp.now();
+  const trialEndsAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + TRIAL_DURATION_MS);
+  const nextSubscription = {
+    ...(masterData.subscription || {}),
+    status: "trial",
+    trialStartedAt: now,
+    trialEndsAt,
+  };
+
+  await db().collection("masters").doc(masterId).update({
+    subscription: nextSubscription,
+  });
+}
+
 /**
  * Creates a new, unique 6-digit pairing code. The code expires after 24 hours.
  */
@@ -21,10 +48,10 @@ export const createPairingCode = functions.https.onCall(async (_data: Record<str
   if (!masterDoc.exists) {
     throw new functions.https.HttpsError("not-found", "Master account not found.");
   }
-  if (!hasActiveAccess(masterDoc.data())) {
+  if (!hasPairingAccess(masterDoc.data())) {
     throw new functions.https.HttpsError(
       "resource-exhausted",
-      "Active subscription or trial required to create pairing codes."
+      "Active subscription, pending trial, or active trial required to create pairing codes."
     );
   }
 
@@ -140,7 +167,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
     }
 
     const masterData = masterDoc.data();
-    if (!hasActiveAccess(masterData)) {
+    if (!hasPairingAccess(masterData)) {
       await AuditLogger.logDenied(
         "device.pair", context, `children/${childId}`, "device",
         "No active subscription or trial. Please subscribe to continue.",
@@ -152,7 +179,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       );
     }
 
-    const childLimit = masterData?.subscription?.childLimit || 1;
+    const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
     const existingChildren = await db().collection("children")
       .where("masterImei", "==", masterId).get();
     if (existingChildren.size >= childLimit) {
@@ -168,6 +195,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
       masterImei: masterId,
       pairedAt: now,
     }, { merge: true });
+    await activateTrialIfPending(masterId, masterData);
     functions.logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
 
     await pairingCodeRef.delete();
@@ -217,7 +245,7 @@ export const generatePairingLink = functions.https.onCall(
       }
 
       const masterData = doc.data();
-      if (!hasActiveAccess(masterData)) {
+      if (!hasPairingAccess(masterData)) {
         await AuditLogger.logDenied(
           "device.pair", context, `masters/${masterId}`, "device",
           "No active subscription or trial. Please subscribe to continue.",
@@ -233,6 +261,9 @@ export const generatePairingLink = functions.https.onCall(
       const now = admin.firestore.Timestamp.now();
       const expiresAtSeconds = now.seconds + 5 * 60;
       const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
+      const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
+      const parentAppLimit = masterData?.subscription?.parentAppLimit || DEFAULT_PARENT_APP_LIMIT;
+      const pairingLink = `${PAIRING_LINK_BASE_URL}?token=${encodeURIComponent(pairingToken)}`;
 
       const tokenRef = db().collection("pairingTokens").doc(pairingToken);
       await tokenRef.set({
@@ -247,7 +278,17 @@ export const generatePairingLink = functions.https.onCall(
       );
 
       functions.logger.info(`Pairing token created for masterId: ${masterId}`);
-      return { pairingToken: pairingToken };
+      return {
+        pairingToken: pairingToken,
+        pairingLink,
+        qrCodeValue: pairingLink,
+        shareMethod: "link_or_qr",
+        distribution: {
+          initiatedByParent: masterId,
+          parentAppLimit,
+          childAppLimit: childLimit,
+        },
+      };
 
     } catch (error) {
       await AuditLogger.logFailure(
@@ -314,13 +355,13 @@ export const validatePairingToken = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
       const masterData = masterDoc.data();
-      if (!hasActiveAccess(masterData)) {
+      if (!hasPairingAccess(masterData)) {
         throw new functions.https.HttpsError(
           "resource-exhausted",
           "Active subscription or trial required for pairing."
         );
       }
-      const childLimit = masterData?.subscription?.childLimit || 1;
+      const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
       const existingChildren = await db().collection("children")
         .where("masterImei", "==", masterId).get();
       if (existingChildren.size >= childLimit) {
@@ -336,6 +377,7 @@ export const validatePairingToken = functions.https.onCall(
         masterImei: masterId,
         pairedAt: now,
       });
+      await activateTrialIfPending(masterId, masterData);
 
       await tokenRef.delete();
 

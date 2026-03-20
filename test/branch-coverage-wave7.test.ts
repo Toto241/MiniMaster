@@ -104,7 +104,7 @@ function resetState() {
       m1: {
         imei: "m1", uid: "m1", secretKey: "secret123", fcmToken: "master-fcm-token",
         subscription: {
-          status: "active", childLimit: 2, type: "single_child_monthly",
+          status: "active", childLimit: 4, parentAppLimit: 2, type: "single_child_monthly",
           expiresAt: { seconds: Math.floor(Date.now() / 1000) + 86400 * 30, nanoseconds: 0, toMillis: () => Date.now() + 86400000 * 30 },
         },
       },

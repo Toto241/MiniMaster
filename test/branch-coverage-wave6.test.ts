@@ -121,7 +121,7 @@ function resetState() {
       m1: {
         imei: "m1", uid: "m1", secretKey: "secret123", fcmToken: "master-fcm-token",
         subscription: {
-          status: "active", childLimit: 2, type: "single_child_monthly",
+          status: "active", childLimit: 4, parentAppLimit: 2, type: "single_child_monthly",
           expiresAt: { seconds: Math.floor(Date.now() / 1000) + 86400 * 30, nanoseconds: 0, toMillis: () => Date.now() + 86400000 * 30 },
         },
       },
@@ -327,6 +327,8 @@ describe("verifyPurchase success paths", () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
     const res = await wrapped({ purchaseToken: "valid-token", sku: "family_monthly" }, asMaster);
     expect(res.success).toBe(true);
+    expect(state.masters["m1"].subscription.childLimit).toBe(4);
+    expect(state.masters["m1"].subscription.parentAppLimit).toBe(2);
   });
 
   it("single_child_yearly purchase succeeds (yearly duration)", async () => {
@@ -376,6 +378,17 @@ describe("getSubscriptionStatus instanceof branches", () => {
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
     expect(res.subscriptionStatus.status).toBe("trial");
+  });
+
+  it("returns default app limits for current subscription model", async () => {
+    state.masters["m1"].subscription = {
+      status: "active",
+      type: "family_monthly",
+    };
+    const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+    const res = await wrapped({}, asMaster);
+    expect(res.parentAppLimit).toBe(2);
+    expect(res.childLimit).toBe(4);
   });
 });
 
@@ -679,6 +692,9 @@ describe("registerMasterDevice deep branches", () => {
     const res = await wrapped({ imei: "m1" }, asMaster);
     expect(res.masterId).toBe("m1");
     expect(res.customToken).toBe("mock-custom-token");
+    expect(state.masters["m1"].subscription.status).toBe("trial_pending");
+    expect(state.masters["m1"].subscription.trialStartedAt).toBeUndefined();
+    expect(state.masters["m1"].subscription.trialEndsAt).toBeUndefined();
   });
 
   it("unauthenticated new registration", async () => {
@@ -752,6 +768,26 @@ describe("validatePairingCode full success", () => {
     expect(res.childId).toBeDefined();
   });
 
+  it("starts pending trial when first child is paired", async () => {
+    const admin = require("firebase-admin");
+    delete state.children["c1"];
+    state.masters["m1"].subscription = {
+      status: "trial_pending",
+      childLimit: 4,
+      parentAppLimit: 2,
+    };
+    state.pairingCodes["123457"] = {
+      masterId: "m1",
+      expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0),
+    };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    const res = await wrapped({ pairingCode: "123457" }, asChild);
+    expect(res.childId).toBeDefined();
+    expect(state.masters["m1"].subscription.status).toBe("trial");
+    expect(state.masters["m1"].subscription.trialStartedAt).toBeDefined();
+    expect(state.masters["m1"].subscription.trialEndsAt).toBeDefined();
+  });
+
   it("valid code with higher child limit succeeds", async () => {
     const admin = require("firebase-admin");
     state.pairingCodes["654321"] = {
@@ -776,6 +812,31 @@ describe("createPairingCode", () => {
     expect(res.pairingCode).toBeDefined();
     expect(typeof res.pairingCode).toBe("string");
     expect(res.pairingCode.length).toBe(6);
+  });
+});
+
+describe("generatePairingLink", () => {
+  it("returns a shareable link and QR payload", async () => {
+    const wrapped = testEnv.wrap(fns.generatePairingLink);
+    const res = await wrapped({}, asMaster);
+    expect(res.pairingToken).toBeDefined();
+    expect(res.pairingLink).toMatch(/^https:\/\/minimaster\.app\/pair\?token=/);
+    expect(res.qrCodeValue).toBe(res.pairingLink);
+    expect(res.shareMethod).toBe("link_or_qr");
+    expect(res.distribution.parentAppLimit).toBe(2);
+    expect(res.distribution.childAppLimit).toBe(4);
+  });
+
+  it("allows link generation while trial is pending", async () => {
+    state.masters["m1"].subscription = {
+      status: "trial_pending",
+      childLimit: 4,
+      parentAppLimit: 2,
+    };
+    const wrapped = testEnv.wrap(fns.generatePairingLink);
+    const res = await wrapped({}, asMaster);
+    expect(res.pairingToken).toBeDefined();
+    expect(res.pairingLink).toMatch(/^https:\/\/minimaster\.app\/pair\?token=/);
   });
 });
 
