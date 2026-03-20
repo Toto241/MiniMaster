@@ -45,6 +45,14 @@ describe("legal testable helpers", () => {
     });
     expect(partial.consentSource).toBe("x");
     expect(partial.appVersion).toBe("unknown");
+
+    const fromUndefined = __legalTestables.parseRecordConsentInput(undefined as any);
+    expect(fromUndefined).toEqual({
+      termsVersion: "",
+      privacyVersion: "",
+      consentSource: "master_app",
+      appVersion: "unknown",
+    });
   });
 
   it("parsePublishPolicyInput covers version/url/status/effectiveAt/isMajorChange branches", () => {

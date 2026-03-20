@@ -103,6 +103,7 @@ let state: Record<string, any> = {};
 const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } }, app: { appId: "test-app" } };
 const asAdminNoUid = { auth: { token: { role: "admin" } } };
 const asMaster = { auth: { uid: "m1", token: {} } };
+const asAuthNoUid = { auth: { token: {} } };
 const asChild = { auth: { uid: "c1", token: {} } };
 const asSupport = { auth: { uid: "support1", token: { role: "support" } } };
 
@@ -522,6 +523,21 @@ describe("support grant/revoke additional branches", () => {
     const res = await wrapped({ grantId: "g-linked" }, asMaster);
     expect(res.success).toBe(true);
   });
+
+  it("grantSupportAccess passes ownership check when ticket data is undefined and caller uid is undefined", async () => {
+    state.supportTickets["t-undef"] = undefined as any;
+    const wrapped = testEnv.wrap(fns.grantSupportAccess);
+    const res = await wrapped({ ticketId: "t-undef" }, asAuthNoUid as any);
+    expect(res.success).toBe(true);
+    expect(typeof res.grantId).toBe("string");
+  });
+
+  it("revokeSupportAccess reaches ticketId optional branch when grant data is undefined and caller uid is undefined", async () => {
+    state.supportAccessGrants["g-undef"] = undefined as any;
+    const wrapped = testEnv.wrap(fns.revokeSupportAccess);
+    const res = await wrapped({ grantId: "g-undef" }, asAuthNoUid as any);
+    expect(res.success).toBe(true);
+  });
 });
 
 describe("legal markLegalReconsentRequired single-master path", () => {
@@ -556,6 +572,36 @@ describe("pairing subscriptionStatus fallback metadata", () => {
 
   it("generatePairingLink uses subscriptionStatus fallback 'none' when subscription is missing", async () => {
     state.masters["m1"] = { imei: "m1" };
+    const wrapped = testEnv.wrap(fns.generatePairingLink);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/exhausted|trial|subscribe/i);
+  });
+
+  it("validatePairingCode uses subscriptionStatus fallback 'none' when subscription status is missing", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingCodes["222223"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters["m1"] = { imei: "m1", subscription: {} };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "222223" }, asChild)).rejects.toThrow(/exhausted|trial|subscribe/i);
+  });
+
+  it("generatePairingLink uses subscriptionStatus fallback 'none' when subscription status is missing", async () => {
+    state.masters["m1"] = { imei: "m1", subscription: {} };
+    const wrapped = testEnv.wrap(fns.generatePairingLink);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/exhausted|trial|subscribe/i);
+  });
+
+  it("validatePairingCode denied path when master doc exists but data is undefined", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingCodes["222224"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters["m1"] = undefined as any;
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "222224" }, asChild)).rejects.toThrow(/exhausted|trial|subscribe/i);
+  });
+
+  it("generatePairingLink denied path when master doc exists but data is undefined", async () => {
+    state.masters["m1"] = undefined as any;
     const wrapped = testEnv.wrap(fns.generatePairingLink);
     await expect(wrapped({}, asMaster)).rejects.toThrow(/exhausted|trial|subscribe/i);
   });
@@ -655,6 +701,18 @@ describe("support onTicketCreated trigger branches", () => {
     const wrapped = testEnv.wrap(fns.onTicketCreated);
     await wrapped({ data: () => state.supportTickets["ticket-with-fcm"] }, { params: { ticketId: "ticket-with-fcm" } });
     expect(mockSend).toHaveBeenCalled();
+  });
+
+  it("onTicketCreated skips notification when master doc exists but data is undefined", async () => {
+    state.supportTickets["ticket-master-undef"] = {
+      masterImei: "m1",
+      problemDescription: "Pairing code remains invalid.",
+    };
+    state.masters["m1"] = undefined as any;
+
+    const wrapped = testEnv.wrap(fns.onTicketCreated);
+    await wrapped({ data: () => state.supportTickets["ticket-master-undef"] }, { params: { ticketId: "ticket-master-undef" } });
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });
 
@@ -924,6 +982,17 @@ describe("ownership mismatch and default fallback branches", () => {
     await expect(testEnv.wrap(fns.setUsageRules)({ childId: "c1", usageRules: { dailyLimit: 60 } }, asMaster)).rejects.toThrow(/authorized|permission/i);
   });
 
+  it("setDeviceLocked/updateAppBlacklist/setUsageRules deny when child doc exists but data is undefined", async () => {
+    state.children.c1 = undefined as any;
+
+    await expect(testEnv.wrap(fns.setDeviceLocked)({ childId: "c1", isLocked: true }, asMaster))
+      .rejects.toThrow(/authorized|permission/i);
+    await expect(testEnv.wrap(fns.updateAppBlacklist)({ childId: "c1", appBlacklist: ["x"] }, asMaster))
+      .rejects.toThrow(/authorized|permission/i);
+    await expect(testEnv.wrap(fns.setUsageRules)({ childId: "c1", usageRules: { dailyLimit: 60 } }, asMaster))
+      .rejects.toThrow(/authorized|permission/i);
+  });
+
   it("createTask/approveTask/rejectTask deny when child belongs to another master", async () => {
     state.children.c1 = { masterImei: "other-master", childImei: "c1" };
 
@@ -956,10 +1025,31 @@ describe("ownership mismatch and default fallback branches", () => {
     expect(res.usageRules).toEqual({});
   });
 
+  it("getRulesForChild returns defaults when child doc data is undefined but requester is the child", async () => {
+    state.children.c1 = undefined as any;
+    const res = await testEnv.wrap(fns.getRulesForChild)({ childId: "c1" }, asChild);
+    expect(res.isLocked).toBe(false);
+    expect(res.appBlacklist).toEqual([]);
+    expect(res.usageRules).toEqual({});
+  });
+
   it("reportTamperEvent throws when child has no linked parent", async () => {
     state.children.c1 = { childImei: "c1" };
     await expect(testEnv.wrap(fns.reportTamperEvent)({ childId: "c1", eventType: "accessibility_service_disabled", timestamp: Date.now() }, asChild))
       .rejects.toThrow(/no parent linked/i);
+  });
+
+  it("reportTamperEvent throws when child doc data is undefined", async () => {
+    state.children.c1 = undefined as any;
+    await expect(testEnv.wrap(fns.reportTamperEvent)({ childId: "c1", eventType: "accessibility_service_disabled", timestamp: Date.now() }, asChild))
+      .rejects.toThrow(/no parent linked/i);
+  });
+
+  it("reportTamperEvent succeeds without FCM when master doc exists but data is undefined", async () => {
+    state.children.c1 = { childImei: "c1", masterImei: "m3" };
+    state.masters.m3 = undefined as any;
+    const res = await testEnv.wrap(fns.reportTamperEvent)({ childId: "c1", eventType: "device_admin_disable_requested", timestamp: Date.now() }, asChild);
+    expect(res.success).toBe(true);
   });
 
   it("reportTamperEvent succeeds without sending FCM when parent has no token", async () => {
@@ -967,6 +1057,40 @@ describe("ownership mismatch and default fallback branches", () => {
     state.masters.m2 = { imei: "m2" };
     const res = await testEnv.wrap(fns.reportTamperEvent)({ childId: "c1", eventType: "device_admin_disable_requested", timestamp: Date.now() }, asChild);
     expect(res.success).toBe(true);
+  });
+
+  it("reportTamperEvent catch branch when tamper event write fails", async () => {
+    state.children.c1 = { childImei: "c1", masterImei: "m1" };
+
+    const collectionSpy = jest.spyOn(db, "collection");
+    const originalImpl = collectionSpy.getMockImplementation();
+    collectionSpy.mockImplementation((name: string) => {
+      const coll: any = originalImpl ? originalImpl(name) : undefined;
+      if (name === "children") {
+        const realDoc = coll.doc;
+        coll.doc = jest.fn((id: string) => {
+          const ref = realDoc(id);
+          if (id === "c1") {
+            const realSubCollection = ref.collection;
+            ref.collection = jest.fn((sub: string) => {
+              const subColl: any = realSubCollection(sub);
+              if (sub === "tamperEvents") {
+                subColl.add = jest.fn(() => Promise.reject(new Error("tamper-write-failed")));
+              }
+              return subColl;
+            });
+          }
+          return ref;
+        });
+      }
+      return coll;
+    });
+
+    await expect(testEnv.wrap(fns.reportTamperEvent)({
+      childId: "c1",
+      eventType: "accessibility_service_disabled",
+      timestamp: Date.now(),
+    }, asChild)).rejects.toThrow(/failed to process tamper event/i);
   });
 });
 
@@ -1010,6 +1134,40 @@ describe("pairing childLimit fallback branches", () => {
     const res = await testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit-ok" }, { auth: { uid: "c2", token: {} } });
     expect(res.childId).toBe("c2");
     expect(res.masterId).toBe("m1");
+  });
+
+  it("validatePairingCode uses fallback childLimit=1 when access is granted via active trial", async () => {
+    const admin = require("firebase-admin");
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const futureTs = new admin.firestore.Timestamp(nowSeconds + 3600, 0);
+    state.pairingCodes["333335"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters.m1 = {
+      imei: "m1",
+      subscription: {
+        status: "trial",
+        trialEndsAt: new admin.firestore.Timestamp(nowSeconds + 3600, 0),
+      },
+    };
+
+    await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "333335" }, { auth: { uid: "c2", token: {} } }))
+      .rejects.toThrow(/child limit reached/i);
+  });
+
+  it("validatePairingToken uses fallback childLimit=1 when access is granted via active trial", async () => {
+    const admin = require("firebase-admin");
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const futureTs = new admin.firestore.Timestamp(nowSeconds + 3600, 0);
+    state.pairingTokens["tok-trial-limit"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters.m1 = {
+      imei: "m1",
+      subscription: {
+        status: "trial",
+        trialEndsAt: new admin.firestore.Timestamp(nowSeconds + 3600, 0),
+      },
+    };
+
+    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-trial-limit" }, { auth: { uid: "c2", token: {} } }))
+      .rejects.toThrow(/child limit reached/i);
   });
 
   it("createPairingCode exhausts collision retries and throws resource-exhausted", async () => {
