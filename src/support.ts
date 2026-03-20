@@ -159,6 +159,14 @@ function parseAiTicketResponse(rawResponse: string): AiTicketResponse {
   }
 }
 
+function resolveImpersonationRole(context: CallableContext): string {
+  return context.auth!.token.role as string || "support";
+}
+
+function resolveExplainRole(role: string | undefined): string {
+  return role || "unknown";
+}
+
 let knowledgeBase = "";
 const knowledgeBaseCandidates = [
   process.env.KNOWLEDGE_BASE_PATH,
@@ -428,20 +436,13 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
       let aiConfidenceScore = 0.0;
       let newStatus = "awaiting_user_feedback";
 
-      try {
-        const parsed = parseAiTicketResponse(aiResponse);
-        aiGeneratedSolution = parsed.solution;
-        aiConfidenceScore = parsed.confidence;
+      const parsed = parseAiTicketResponse(aiResponse);
+      aiGeneratedSolution = parsed.solution;
+      aiConfidenceScore = parsed.confidence;
 
-        if (aiConfidenceScore < 0.7) {
-          newStatus = "escalated";
-          aiGeneratedSolution += "\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.";
-        }
-      } catch (parseError) {
-        functions.logger.error("Failed to parse AI response as JSON:", parseError);
-        aiGeneratedSolution = "AI generated an invalid response. Escalating to human support.";
-        aiConfidenceScore = 0.0;
+      if (aiConfidenceScore < 0.7) {
         newStatus = "escalated";
+        aiGeneratedSolution += "\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.";
       }
 
       await admin.firestore().collection("supportTickets").doc(ticketId).update({
@@ -608,7 +609,7 @@ export const getTicketUserData = functions.https.onCall(
     const children = childrenSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     await AuditLogger.log(
-      "admin.user_impersonation", callerId, context.auth!.token.role as string || "support",
+      "admin.user_impersonation", callerId, resolveImpersonationRole(context),
       `masters/${masterImei}`, "user", "success",
       { ticketId, grantId: ticket.accessGrantId, childCount: children.length }
     );
@@ -690,7 +691,7 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
       }
 
       await AuditLogger.log(
-        "ai.explain_problem", context.auth.uid, role || "unknown",
+        "ai.explain_problem", context.auth.uid, resolveExplainRole(role),
         "system", "ai_query", "success",
         { provider: aiResult.provider, contextLength: problemContext.length }
       );
@@ -710,3 +711,10 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
     }
   }
 );
+
+export const __supportTestables = {
+  parseAiTicketResponse,
+  generateWithGemini,
+  resolveImpersonationRole,
+  resolveExplainRole,
+};
