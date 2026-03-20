@@ -800,6 +800,20 @@ describe("legal invalid-argument branch variants", () => {
     const wrapped = testEnv.wrap(fns.markLegalReconsentRequired);
     await expect(wrapped({ country: "DE" } as any, asAdmin)).rejects.toThrow(/locale/i);
   });
+
+  it("publishLegalPolicy succeeds with admin role but missing uid (publishedBy fallback)", async () => {
+    const wrapped = testEnv.wrap(fns.publishLegalPolicy);
+    const res = await wrapped({
+      policyType: "privacy",
+      country: "DE",
+      locale: "de-DE",
+      version: "10.1",
+      contentUrl: "https://example.com/privacy101",
+      status: "active",
+    }, asAdminNoUid as any);
+    expect(res.success).toBe(true);
+    expect(res.policyType).toBe("privacy");
+  });
 });
 
 describe("subscription branch variants", () => {
