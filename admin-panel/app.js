@@ -154,6 +154,9 @@ const defaultCommandBuilderConfig = {
     workspacePath: "D:\\Tools\\MiniMaster",
     firstAdminEmail: "",
     firstAdminPassword: "",
+    androidDeviceSerial: "",
+    masterApkPath: "masterApp/build/outputs/apk/debug/masterApp-debug.apk",
+    childApkPath: "childApp/build/outputs/apk/debug/childApp-debug.apk",
 };
 
 function loadCommandBuilderConfig() {
@@ -171,6 +174,9 @@ function getCommandBuilderFormValues() {
         workspacePath: (document.getElementById("cmd-workspace-path")?.value || defaultCommandBuilderConfig.workspacePath).trim(),
         firstAdminEmail: (document.getElementById("cmd-first-admin-email")?.value || "").trim(),
         firstAdminPassword: (document.getElementById("cmd-first-admin-password")?.value || "").trim(),
+        androidDeviceSerial: (document.getElementById("cmd-android-device-serial")?.value || "").trim(),
+        masterApkPath: (document.getElementById("cmd-master-apk-path")?.value || defaultCommandBuilderConfig.masterApkPath).trim(),
+        childApkPath: (document.getElementById("cmd-child-apk-path")?.value || defaultCommandBuilderConfig.childApkPath).trim(),
     };
 }
 
@@ -180,6 +186,9 @@ function renderCommandBuilderConfig(config) {
         "cmd-workspace-path": values.workspacePath,
         "cmd-first-admin-email": values.firstAdminEmail,
         "cmd-first-admin-password": values.firstAdminPassword,
+        "cmd-android-device-serial": values.androidDeviceSerial,
+        "cmd-master-apk-path": values.masterApkPath,
+        "cmd-child-apk-path": values.childApkPath,
     };
 
     Object.entries(mapping).forEach(([id, value]) => {
@@ -199,6 +208,20 @@ function saveCommandBuilderConfig(showMessage = true) {
 
 function escapePowerShellString(value) {
     return String(value || "").replace(/`/g, "``").replace(/"/g, "`\"");
+}
+
+function sanitizeAdbSerial(value) {
+    const serial = String(value || "").trim();
+    if (!serial) return "";
+    return /^[A-Za-z0-9._:-]+$/.test(serial) ? serial : "";
+}
+
+function sanitizeApkPath(value, fallbackPath) {
+    const apkPath = String(value || "").trim();
+    if (!apkPath) return fallbackPath;
+    if (!/\.apk$/i.test(apkPath)) return fallbackPath;
+    if (/[\r\n`;&|<>$"']/.test(apkPath)) return fallbackPath;
+    return apkPath;
 }
 
 function buildPowerShellScript(command, cwd) {
@@ -432,6 +455,16 @@ function buildCommandCatalog(projectId) {
     const projectSuffix = activeProjectId ? ` --project ${activeProjectId}` : "";
     const firstAdminEmail = values.firstAdminEmail || "admin@example.com";
     const firstAdminPassword = values.firstAdminPassword || "<PASSWORT>";
+    const rawAdbSerial = String(values.androidDeviceSerial || "").trim();
+    const adbSerial = sanitizeAdbSerial(rawAdbSerial);
+    const hasInvalidAdbSerial = Boolean(rawAdbSerial) && !adbSerial;
+    const adbDeviceTarget = hasInvalidAdbSerial
+        ? '-s "REPLACE_WITH_DEVICE_SERIAL" '
+        : (adbSerial ? `-s "${adbSerial}" ` : "");
+    const masterApkPath = sanitizeApkPath(values.masterApkPath, defaultCommandBuilderConfig.masterApkPath);
+    const childApkPath = sanitizeApkPath(values.childApkPath, defaultCommandBuilderConfig.childApkPath);
+    const hasInvalidMasterApkPath = Boolean(String(values.masterApkPath || "").trim()) && masterApkPath !== values.masterApkPath.trim();
+    const hasInvalidChildApkPath = Boolean(String(values.childApkPath || "").trim()) && childApkPath !== values.childApkPath.trim();
 
     return [
         {
@@ -553,6 +586,30 @@ function buildCommandCatalog(projectId) {
             command: "adb shell getprop ro.product.model",
             cwd: values.workspacePath,
             fileName: "minimaster-adb-check",
+        },
+        {
+            id: "android-install-master-apk",
+            label: "Eltern-App auf Mobiltelefon installieren",
+            description: hasInvalidAdbSerial
+                ? "Ungültige Device-Serial erkannt. Bitte nur Zeichen wie A-Z, 0-9, Punkt, Unterstrich, Doppelpunkt, Bindestrich verwenden."
+                : (hasInvalidMasterApkPath
+                    ? "Ungültiger APK-Pfad erkannt. Es wird automatisch der Standardpfad verwendet."
+                    : "Installiert die MasterApp-APK per ADB auf dem verbundenen Android-Gerät."),
+            command: `adb ${adbDeviceTarget}install -r "${masterApkPath}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-install-master-app",
+        },
+        {
+            id: "android-install-child-apk",
+            label: "Kinder-App auf Mobiltelefon installieren",
+            description: hasInvalidAdbSerial
+                ? "Ungültige Device-Serial erkannt. Bitte nur Zeichen wie A-Z, 0-9, Punkt, Unterstrich, Doppelpunkt, Bindestrich verwenden."
+                : (hasInvalidChildApkPath
+                    ? "Ungültiger APK-Pfad erkannt. Es wird automatisch der Standardpfad verwendet."
+                    : "Installiert die ChildApp-APK per ADB auf dem verbundenen Android-Gerät."),
+            command: `adb ${adbDeviceTarget}install -r "${childApkPath}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-install-child-app",
         },
         {
             id: "desktop-launcher",
