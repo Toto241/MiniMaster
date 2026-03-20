@@ -1,7 +1,8 @@
 /**
  * Subscription Management Cloud Functions.
  * Handles purchase verification, subscription status, revocation, and expiry checks.
- * Aligned with Monetization v2: 7-day trial → single_child_monthly (€1.99) / family_monthly (€4.99).
+ * Aligned with current monetization: one subscription includes up to
+ * 2 parent apps and up to 4 child apps.
  */
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
@@ -10,21 +11,31 @@ import { google } from "googleapis";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
 
-/** Valid subscription product IDs (v2 monetization model). */
+const DEFAULT_PARENT_APP_LIMIT = 2;
+const DEFAULT_CHILD_LIMIT = 4;
+
+/** Valid subscription product IDs (current monetization model). */
 const VALID_PRODUCT_IDS = [
-  "single_child_monthly",  // €1.99/month – 1 child
-  "family_monthly",        // €4.99/month – unlimited children
-  "single_child_yearly",   // €19.99/year – 1 child
-  "family_yearly",         // €49.99/year – unlimited children
+  "single_child_monthly",
+  "family_monthly",
+  "single_child_yearly",
+  "family_yearly",
 ];
 
 /**
  * Returns the child limit for a given subscription product.
  */
 function getChildLimit(sku: string): number {
-  if (sku.startsWith("family")) return 99; // effectively unlimited
-  if (sku.startsWith("single_child")) return 1;
-  return 1; // default conservative
+  if (VALID_PRODUCT_IDS.includes(sku)) return DEFAULT_CHILD_LIMIT;
+  return DEFAULT_CHILD_LIMIT;
+}
+
+/**
+ * Returns the parent app limit for a given subscription product.
+ */
+function getParentAppLimit(sku: string): number {
+  if (VALID_PRODUCT_IDS.includes(sku)) return DEFAULT_PARENT_APP_LIMIT;
+  return DEFAULT_PARENT_APP_LIMIT;
 }
 
 /**
@@ -78,6 +89,7 @@ export const verifyPurchase = functions.https.onCall(
           subscription: {
             status: "active",
             type: sku,
+            parentAppLimit: getParentAppLimit(sku),
             childLimit: getChildLimit(sku),
             startedAt: now,
             expiresAt: expiresAt,
@@ -86,7 +98,13 @@ export const verifyPurchase = functions.https.onCall(
 
         await AuditLogger.logSuccess(
           "subscription.verify_purchase", context, `masters/${masterId}`, "subscription",
-          { masterId, sku, childLimit: getChildLimit(sku), duration: Date.now() - startTime }
+          {
+            masterId,
+            sku,
+            parentAppLimit: getParentAppLimit(sku),
+            childLimit: getChildLimit(sku),
+            duration: Date.now() - startTime,
+          }
         );
 
         functions.logger.info(`Subscription ${sku} activated for master ${masterId}.`);
@@ -138,7 +156,8 @@ export const getSubscriptionStatus = functions.https.onCall(
     }
 
     result.hasAccess = hasActiveAccess(masterData);
-    result.childLimit = subscription.childLimit || 1;
+    result.parentAppLimit = subscription.parentAppLimit || DEFAULT_PARENT_APP_LIMIT;
+    result.childLimit = subscription.childLimit || DEFAULT_CHILD_LIMIT;
     return result;
   }
 );
