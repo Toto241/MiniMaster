@@ -288,14 +288,14 @@ describe("getSubscriptionStatus", () => {
     });
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
-    expect(res).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true, childLimit: 1 });
+    expect(res).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true, childLimit: 4, parentAppLimit: 2 });
   });
 
   it("returns none status if no subscription", async () => {
     getMock.mockResolvedValue({ exists: true, data: () => ({ secretKey: "sec" }) });
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
-    expect(res).toEqual({ subscriptionStatus: { status: "none" }, hasAccess: false, childLimit: 1 });
+    expect(res).toEqual({ subscriptionStatus: { status: "none" }, hasAccess: false, childLimit: 4, parentAppLimit: 2 });
   });
 
   it("throws not-found if master document is missing", async () => {
