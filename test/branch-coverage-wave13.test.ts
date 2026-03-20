@@ -437,3 +437,126 @@ describe("pairing malformed data branches", () => {
     await expect(wrapped({ pairingToken: "tok-null" }, asChild)).rejects.toThrow(/missing|internal/i);
   });
 });
+
+describe("support grant/revoke additional branches", () => {
+  it("grantSupportAccess denies when ticket does not belong to caller", async () => {
+    state.supportTickets["t-denied"] = { masterImei: "other-master" };
+    const wrapped = testEnv.wrap(fns.grantSupportAccess);
+    await expect(wrapped({ ticketId: "t-denied" }, asMaster)).rejects.toThrow(/denied|not found/i);
+  });
+
+  it("revokeSupportAccess denies when grant does not belong to caller", async () => {
+    state.supportAccessGrants["g-denied"] = { masterImei: "other-master", ticketId: "t1", status: "active" };
+    const wrapped = testEnv.wrap(fns.revokeSupportAccess);
+    await expect(wrapped({ grantId: "g-denied" }, asMaster)).rejects.toThrow(/denied|not found/i);
+  });
+
+  it("revokeSupportAccess succeeds even when grant has no ticketId", async () => {
+    state.supportAccessGrants["g-no-ticket"] = { masterImei: "m1", status: "active" };
+    const wrapped = testEnv.wrap(fns.revokeSupportAccess);
+    const res = await wrapped({ grantId: "g-no-ticket" }, asMaster);
+    expect(res.success).toBe(true);
+  });
+});
+
+describe("legal markLegalReconsentRequired single-master path", () => {
+  it("updates exactly one consent doc when masterImei is provided", async () => {
+    state.masterLegalConsents["m1_DE_de-DE"] = { country: "DE", locale: "de-DE", requiresReconsent: false };
+    const wrapped = testEnv.wrap(fns.markLegalReconsentRequired);
+    const res = await wrapped({ country: "DE", locale: "de-DE", masterImei: "m1" }, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.scope).toBe("single_master");
+    expect(res.updatedCount).toBe(1);
+  });
+});
+
+describe("pairing subscriptionStatus fallback metadata", () => {
+  it("validatePairingCode uses subscriptionStatus fallback 'none' when subscription is missing", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingCodes["222222"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters["m1"] = { imei: "m1" };
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "222222" }, asChild)).rejects.toThrow(/exhausted|trial|subscribe/i);
+  });
+
+  it("validatePairingToken uses subscriptionStatus fallback 'none' when subscription is missing", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingTokens["tok-none"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters["m1"] = { imei: "m1" };
+    const wrapped = testEnv.wrap(fns.validatePairingToken);
+    await expect(wrapped({ pairingToken: "tok-none" }, asChild)).rejects.toThrow(/exhausted|trial|subscription/i);
+  });
+});
+
+describe("admin analysis/KB branch coverage", () => {
+  it("getKnowledgeBase returns firestore source when content exists", async () => {
+    state.operatorConfig.knowledgeBase = { content: "Runtime KB content" };
+    const wrapped = testEnv.wrap(fns.getKnowledgeBase);
+    const res = await wrapped({}, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.source).toBe("firestore");
+    expect(res.content).toContain("Runtime KB");
+  });
+
+  it("testGeminiConnection falls back to empty response text when candidates are missing", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+    const wrapped = testEnv.wrap(fns.testGeminiConnection);
+    const res = await wrapped({}, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.response).toBe("");
+  });
+
+  it("analyzeSystemErrors uses KB prompt branch and rawText fallback [] when candidates are missing", async () => {
+    state.operatorConfig.knowledgeBase = { content: "KB for analysis branch" };
+    state.error_logs.e1 = {
+      // intentionally missing functionName/message/stack to trigger fallback tokens in summary
+      timestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+      count: 0,
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    const wrapped = testEnv.wrap(fns.analyzeSystemErrors);
+    const res = await wrapped({ hours: 1 }, asAdmin);
+    expect(res).toBeDefined();
+    expect(Array.isArray(res.analyses)).toBe(true);
+  });
+});
+
+describe("auth legacy and catch branches", () => {
+  it("registerMasterDevice works in legacy mode without auth context and uses project id telemetry", async () => {
+    process.env.GCLOUD_PROJECT = "minimaster-test-project";
+    delete state.masters["legacy-m"];
+
+    mockAuth.getUser.mockRejectedValueOnce({ code: "auth/user-not-found" });
+    mockAuth.createUser.mockResolvedValueOnce({ uid: "legacy-m", customClaims: {} });
+
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    const res = await wrapped({ imei: "legacy-m" }, {} as any);
+    expect(res.masterId).toBe("legacy-m");
+    expect(res.customToken).toBe("mock-custom-token");
+  });
+
+  it("generateCustomToken rejects in legacy mode when secretKey is invalid", async () => {
+    state.masters["m1"] = { imei: "m1", secretKey: "secret123" };
+    const wrapped = testEnv.wrap(fns.generateCustomToken);
+    await expect(wrapped({ masterImei: "m1", secretKey: "wrong" }, {} as any))
+      .rejects.toThrow(/invalid master imei or secret key/i);
+  });
+
+  it("registerMasterDevice rethrows HttpsError from catch branch", async () => {
+    const functionsV1 = require("firebase-functions/v1");
+    mockAuth.getUser.mockRejectedValueOnce(new functionsV1.https.HttpsError("internal", "forced"));
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    await expect(wrapped({ imei: "m1" }, { auth: { uid: "m1", token: {} } }))
+      .rejects.toThrow(/forced|internal/i);
+  });
+});
