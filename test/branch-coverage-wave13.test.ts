@@ -586,3 +586,92 @@ describe("support onTicketCreated trigger branches", () => {
     expect(mockSend).toHaveBeenCalled();
   });
 });
+
+describe("legal invalid-argument branch variants", () => {
+  it("getActiveLegalPolicies rejects when locale is not a string", async () => {
+    const wrapped = testEnv.wrap(fns.getActiveLegalPolicies);
+    await expect(wrapped({ country: "DE", locale: 123 as any }, asMaster)).rejects.toThrow(/locale/i);
+  });
+
+  it("needsLegalReconsent rejects when locale format is invalid", async () => {
+    const wrapped = testEnv.wrap(fns.needsLegalReconsent);
+    await expect(wrapped({ country: "DE", locale: "@@@" }, asMaster)).rejects.toThrow(/locale/i);
+  });
+
+  it("recordLegalConsent rejects when terms/privacy version are non-string", async () => {
+    const wrapped = testEnv.wrap(fns.recordLegalConsent);
+    await expect(wrapped({
+      country: "DE",
+      locale: "de-DE",
+      termsVersion: 123 as any,
+      privacyVersion: null as any,
+    }, asMaster)).rejects.toThrow(/termsVersion|privacyVersion/i);
+  });
+
+  it("recordLegalConsent writes explicit role when auth token role is present", async () => {
+    const admin = require("firebase-admin");
+    const ts = admin.firestore.Timestamp.now();
+    state.legalPolicies.termsRole = {
+      policyType: "terms",
+      country: "DE",
+      locale: "de-DE",
+      version: "11.1",
+      contentUrl: "https://example.com/t111",
+      effectiveAt: ts,
+      status: "active",
+      isMajorChange: false,
+    };
+    state.legalPolicies.privacyRole = {
+      policyType: "privacy",
+      country: "DE",
+      locale: "de-DE",
+      version: "11.2",
+      contentUrl: "https://example.com/p112",
+      effectiveAt: ts,
+      status: "active",
+      isMajorChange: false,
+    };
+    const wrapped = testEnv.wrap(fns.recordLegalConsent);
+    const res = await wrapped({
+      country: "DE",
+      locale: "de-DE",
+      termsVersion: "11.1",
+      privacyVersion: "11.2",
+    }, { auth: { uid: "m1", token: { role: "admin" } } });
+    expect(res.success).toBe(true);
+  });
+
+  it("publishLegalPolicy rejects when version/contentUrl are not strings", async () => {
+    const wrapped = testEnv.wrap(fns.publishLegalPolicy);
+    await expect(wrapped({
+      policyType: "terms",
+      country: "DE",
+      locale: "de-DE",
+      version: 42 as any,
+      contentUrl: null as any,
+    }, asAdmin)).rejects.toThrow(/version|contentUrl/i);
+  });
+});
+
+describe("subscription branch variants", () => {
+  it("getSubscriptionStatus returns active subscription object when present", async () => {
+    state.masters.m1 = {
+      imei: "m1",
+      subscription: {
+        status: "active",
+        childLimit: 3,
+      },
+    };
+    const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
+    const res = await wrapped({}, asMaster);
+    expect(res.subscriptionStatus.status).toBe("active");
+    expect(res.childLimit).toBe(3);
+  });
+
+  it("revokeSubscription keeps provided masterId instead of reading from subDoc", async () => {
+    state.subscriptions.sub2 = { masterId: "m1", status: "active" };
+    const wrapped = testEnv.wrap(fns.revokeSubscription);
+    const res = await wrapped({ subscriptionId: "sub2", masterId: "m1" }, asAdmin);
+    expect(res.message).toMatch(/revoked/i);
+  });
+});
