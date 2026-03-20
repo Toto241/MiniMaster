@@ -61,4 +61,17 @@
     <string name="language_setup_title">Choose your app language</string>
     <string name="language_setup_description">Select your preferred language for MiniMaster. You can change it later in a future settings screen.</string>
     <string name="language_continue">Continue</string>
+
+    <!-- Legal consent gate -->
+    <string name="legal_loading_message">Checking legal policy requirements...</string>
+    <string name="legal_retry">Retry legal check</string>
+    <string name="legal_error_title">Legal check failed</string>
+    <string name="legal_consent_title">Accept legal terms to continue</string>
+    <string name="legal_consent_description">On first launch after installing the parent app, you must review and accept the current Terms of Service and Privacy Policy before you can continue.</string>
+    <string name="legal_open_terms">Open Terms (v%1$s)</string>
+    <string name="legal_open_privacy">Open Privacy Policy (v%1$s)</string>
+    <string name="legal_accept_terms">I accept the Terms of Service.</string>
+    <string name="legal_accept_privacy">I acknowledge the Privacy Policy.</string>
+    <string name="legal_accept_continue">Accept and continue</string>
+    <string name="legal_country_locale">Country: %1$s, Locale: %2$s</string>
 </resources>
