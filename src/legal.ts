@@ -26,6 +26,80 @@ const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
 const DEFAULT_POLICY_VERSION = "2026.03.18-1";
 const DEFAULT_POLICY_BASE_URL = process.env.LEGAL_POLICY_BASE_URL || "https://minimaster.app/legal";
 
+type LegalCountryLocaleInput = { country?: unknown; locale?: unknown } | undefined;
+type RecordConsentInput = {
+  termsVersion?: unknown;
+  privacyVersion?: unknown;
+  consentSource?: unknown;
+  appVersion?: unknown;
+} | undefined;
+type PublishPolicyInput = {
+  policyType?: unknown;
+  country?: unknown;
+  locale?: unknown;
+  version?: unknown;
+  contentUrl?: unknown;
+  effectiveAt?: unknown;
+  isMajorChange?: unknown;
+  status?: unknown;
+} | undefined;
+
+function parseCountryLocaleInput(input: LegalCountryLocaleInput): { country: string; locale: string } {
+  return {
+    country: normalizeCountry(input?.country),
+    locale: normalizeLocale(input?.locale),
+  };
+}
+
+function parseRecordConsentInput(input: RecordConsentInput): {
+  termsVersion: string;
+  privacyVersion: string;
+  consentSource: string;
+  appVersion: string;
+} {
+  const termsVersion = typeof input?.termsVersion === "string" ? input.termsVersion : "";
+  const privacyVersion = typeof input?.privacyVersion === "string" ? input.privacyVersion : "";
+  const consentSource = typeof input?.consentSource === "string" && input.consentSource.length > 0
+    ? input.consentSource
+    : "master_app";
+  const appVersion = typeof input?.appVersion === "string" && input.appVersion.length > 0
+    ? input.appVersion
+    : "unknown";
+
+  return { termsVersion, privacyVersion, consentSource, appVersion };
+}
+
+function parsePublishPolicyInput(input: PublishPolicyInput): {
+  policyType: PolicyType;
+  country: string;
+  locale: string;
+  version: string;
+  contentUrl: string;
+  status: "draft" | "approved" | "active" | "retired";
+  effectiveAt: admin.firestore.Timestamp;
+  isMajorChange: boolean;
+} {
+  const policyType = normalizePolicyType(input?.policyType);
+  const { country, locale } = parseCountryLocaleInput(input);
+  const version = typeof input?.version === "string" && input.version.length > 0 ? input.version : "";
+  const contentUrl = typeof input?.contentUrl === "string" && input.contentUrl.length > 0 ? input.contentUrl : "";
+  const status = (input?.status as "draft" | "approved" | "active" | "retired" | undefined) || "active";
+  const effectiveAt = input?.effectiveAt instanceof admin.firestore.Timestamp
+    ? input.effectiveAt
+    : admin.firestore.Timestamp.now();
+  const isMajorChange = input?.isMajorChange === true;
+
+  return { policyType, country, locale, version, contentUrl, status, effectiveAt, isMajorChange };
+}
+
+function resolveAuditRole(context: CallableContext): string {
+  return context.auth?.token?.role || "master";
+}
+
+function resolveTargetMaster(raw: unknown): string | null {
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
 function normalizeCountry(raw: unknown): string {
   if (typeof raw !== "string" || raw.trim().length !== 2) {
     throw new functions.https.HttpsError("invalid-argument", "country must be a valid 2-letter ISO code.");
@@ -149,8 +223,7 @@ function buildConsentDocId(masterImei: string, country: string, locale: string):
 export const getActiveLegalPolicies = functions.https.onCall(
   async (data: { country: string; locale: string }, context: CallableContext) => {
     requireAuth(context);
-    const country = normalizeCountry(data?.country);
-    const locale = normalizeLocale(data?.locale);
+    const { country, locale } = parseCountryLocaleInput(data);
 
     const policies = await getEffectivePolicies(country, locale);
     return {
@@ -175,8 +248,7 @@ export const getActiveLegalPolicies = functions.https.onCall(
 export const needsLegalReconsent = functions.https.onCall(
   async (data: { country: string; locale: string }, context: CallableContext) => {
     const masterImei = requireAuth(context);
-    const country = normalizeCountry(data?.country);
-    const locale = normalizeLocale(data?.locale);
+    const { country, locale } = parseCountryLocaleInput(data);
 
     const policies = await getEffectivePolicies(country, locale);
     const consentRef = db().collection(LEGAL_CONSENTS_COLLECTION).doc(buildConsentDocId(masterImei, country, locale));
@@ -242,21 +314,11 @@ export const recordLegalConsent = functions.https.onCall(
     appVersion?: string;
   }, context: CallableContext) => {
     const masterImei = requireAuth(context);
-    const country = normalizeCountry(data?.country);
-    const locale = normalizeLocale(data?.locale);
-
-    const termsVersion = typeof data?.termsVersion === "string" ? data.termsVersion : "";
-    const privacyVersion = typeof data?.privacyVersion === "string" ? data.privacyVersion : "";
+    const { country, locale } = parseCountryLocaleInput(data);
+    const { termsVersion, privacyVersion, consentSource, appVersion } = parseRecordConsentInput(data);
     if (!termsVersion || !privacyVersion) {
       throw new functions.https.HttpsError("invalid-argument", "termsVersion and privacyVersion are required.");
     }
-
-    const consentSource = typeof data?.consentSource === "string" && data.consentSource.length > 0
-      ? data.consentSource
-      : "master_app";
-    const appVersion = typeof data?.appVersion === "string" && data.appVersion.length > 0
-      ? data.appVersion
-      : "unknown";
 
     const policies = await getEffectivePolicies(country, locale);
     if (policies.terms.version !== termsVersion || policies.privacy.version !== privacyVersion) {
@@ -284,7 +346,7 @@ export const recordLegalConsent = functions.https.onCall(
     await db().collection("audit_logs").add({
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId: masterImei,
-      userRole: context.auth?.token?.role || "master",
+      userRole: resolveAuditRole(context),
       action: "legal.consent_recorded",
       resource: `masterLegalConsents/${buildConsentDocId(masterImei, country, locale)}`,
       resourceType: "user",
@@ -321,13 +383,7 @@ export const publishLegalPolicy = functions.https.onCall(
     status?: "draft" | "approved" | "active" | "retired";
   }, context: CallableContext) => {
     requireAdmin(context);
-
-    const policyType = normalizePolicyType(data?.policyType);
-    const country = normalizeCountry(data?.country);
-    const locale = normalizeLocale(data?.locale);
-    const version = typeof data?.version === "string" && data.version.length > 0 ? data.version : "";
-    const contentUrl = typeof data?.contentUrl === "string" && data.contentUrl.length > 0 ? data.contentUrl : "";
-    const status = data?.status || "active";
+    const { policyType, country, locale, version, contentUrl, status, effectiveAt, isMajorChange } = parsePublishPolicyInput(data);
 
     if (!version) {
       throw new functions.https.HttpsError("invalid-argument", "version is required.");
@@ -335,11 +391,6 @@ export const publishLegalPolicy = functions.https.onCall(
     if (!contentUrl) {
       throw new functions.https.HttpsError("invalid-argument", "contentUrl is required.");
     }
-
-    const effectiveAt = data?.effectiveAt instanceof admin.firestore.Timestamp
-      ? data.effectiveAt
-      : admin.firestore.Timestamp.now();
-    const isMajorChange = data?.isMajorChange === true;
 
     const safeLocale = locale.replace(/[^A-Za-z0-9-]/g, "-");
     const safeVersion = version.replace(/[^A-Za-z0-9._-]/g, "-");
@@ -374,12 +425,8 @@ export const publishLegalPolicy = functions.https.onCall(
 export const markLegalReconsentRequired = functions.https.onCall(
   async (data: { country: string; locale: string; masterImei?: string }, context: CallableContext) => {
     requireAdmin(context);
-
-    const country = normalizeCountry(data?.country);
-    const locale = normalizeLocale(data?.locale);
-    const targetMaster = typeof data?.masterImei === "string" && data.masterImei.length > 0
-      ? data.masterImei
-      : null;
+    const { country, locale } = parseCountryLocaleInput(data);
+    const targetMaster = resolveTargetMaster(data?.masterImei);
 
     if (targetMaster) {
       const targetRef = db().collection(LEGAL_CONSENTS_COLLECTION).doc(buildConsentDocId(targetMaster, country, locale));
@@ -408,3 +455,17 @@ export const markLegalReconsentRequired = functions.https.onCall(
     return { success: true, updatedCount: snapshot.size, scope: "country_locale" };
   }
 );
+
+export const __legalTestables = {
+  normalizeCountry,
+  normalizeLocale,
+  normalizePolicyType,
+  buildDefaultPolicy,
+  mapPolicyDoc,
+  parseCountryLocaleInput,
+  parseRecordConsentInput,
+  parsePublishPolicyInput,
+  resolveAuditRole,
+  resolveTargetMaster,
+  buildConsentDocId,
+};

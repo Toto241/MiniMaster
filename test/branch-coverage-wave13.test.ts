@@ -188,7 +188,7 @@ beforeEach(() => {
           get: () => {
             const has = Object.prototype.hasOwnProperty.call(collData, docId);
             const d = collData[docId];
-            return Promise.resolve({ exists: has && d !== undefined, data: () => d, id: docId, ref });
+            return Promise.resolve({ exists: has, data: () => d, id: docId, ref });
           },
           update: jest.fn((upd: any) => { if (collData[docId]) Object.assign(collData[docId], upd); return Promise.resolve(); }),
           set: jest.fn((data: any, opts?: { merge?: boolean }) => {
@@ -449,6 +449,16 @@ describe("pairing malformed data branches", () => {
     const wrapped = testEnv.wrap(fns.validatePairingToken);
     await expect(wrapped({ pairingToken: "tok-null" }, asChild)).rejects.toThrow(/missing|internal/i);
   });
+
+  it("validatePairingCode not-found path throws HttpsError branch", async () => {
+    const wrapped = testEnv.wrap(fns.validatePairingCode);
+    await expect(wrapped({ pairingCode: "999999" }, asChild)).rejects.toThrow(/invalid|not found/i);
+  });
+
+  it("validatePairingToken not-found path throws HttpsError branch", async () => {
+    const wrapped = testEnv.wrap(fns.validatePairingToken);
+    await expect(wrapped({ pairingToken: "tok-missing" }, asChild)).rejects.toThrow(/invalid|not found/i);
+  });
 });
 
 describe("support grant/revoke additional branches", () => {
@@ -601,6 +611,16 @@ describe("support onTicketCreated trigger branches", () => {
 });
 
 describe("legal invalid-argument branch variants", () => {
+  it("getActiveLegalPolicies hits locale optional-chain branch when locale is missing", async () => {
+    const wrapped = testEnv.wrap(fns.getActiveLegalPolicies);
+    await expect(wrapped({ country: "DE" } as any, asMaster)).rejects.toThrow(/locale/i);
+  });
+
+  it("needsLegalReconsent hits locale optional-chain branch when locale is missing", async () => {
+    const wrapped = testEnv.wrap(fns.needsLegalReconsent);
+    await expect(wrapped({ country: "DE" } as any, asMaster)).rejects.toThrow(/locale/i);
+  });
+
   it("getActiveLegalPolicies rejects when locale is not a string", async () => {
     const wrapped = testEnv.wrap(fns.getActiveLegalPolicies);
     await expect(wrapped({ country: "DE", locale: 123 as any }, asMaster)).rejects.toThrow(/locale/i);
@@ -663,6 +683,16 @@ describe("legal invalid-argument branch variants", () => {
       version: 42 as any,
       contentUrl: null as any,
     }, asAdmin)).rejects.toThrow(/version|contentUrl/i);
+  });
+
+  it("publishLegalPolicy validates missing locale/value chain", async () => {
+    const wrapped = testEnv.wrap(fns.publishLegalPolicy);
+    await expect(wrapped({ policyType: "terms", country: "DE" } as any, asAdmin)).rejects.toThrow(/locale/i);
+  });
+
+  it("markLegalReconsentRequired validates missing locale", async () => {
+    const wrapped = testEnv.wrap(fns.markLegalReconsentRequired);
+    await expect(wrapped({ country: "DE" } as any, asAdmin)).rejects.toThrow(/locale/i);
   });
 });
 
@@ -896,6 +926,25 @@ describe("pairing childLimit fallback branches", () => {
     await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
   });
+
+  it("createPairingCode exhausts collision retries and throws resource-exhausted", async () => {
+    const collectionSpy = jest.spyOn(db, "collection");
+    const originalImpl = collectionSpy.getMockImplementation();
+    collectionSpy.mockImplementation((name: string) => {
+      const coll: any = originalImpl ? originalImpl(name) : undefined;
+      if (name === "pairingCodes") {
+        const realDoc = coll.doc;
+        coll.doc = jest.fn((id: string) => {
+          const ref = realDoc(id);
+          ref.get = jest.fn(() => Promise.resolve({ exists: true, data: () => ({ masterId: "m1" }), id }));
+          return ref;
+        });
+      }
+      return coll;
+    });
+
+    await expect(testEnv.wrap(fns.createPairingCode)({}, asMaster)).rejects.toThrow(/unique pairing code/i);
+  });
 });
 
 describe("auth/legal/support additional branch closures", () => {
@@ -957,6 +1006,12 @@ describe("auth/legal/support additional branch closures", () => {
     expect(res.scope).toBe("country_locale");
   });
 
+  it("markLegalReconsentRequired bulk scope with no matching docs returns updatedCount 0", async () => {
+    const res = await testEnv.wrap(fns.markLegalReconsentRequired)({ country: "FR", locale: "fr-FR" }, asAdmin);
+    expect(res.scope).toBe("country_locale");
+    expect(res.updatedCount).toBe(0);
+  });
+
   it("provideSolutionFeedback stores trimmed comment when feedback is rejected", async () => {
     state.supportTickets["t-feedback"] = { masterImei: "m1", status: "awaiting_user_feedback" };
     const res = await testEnv.wrap(fns.provideSolutionFeedback)({
@@ -965,6 +1020,23 @@ describe("auth/legal/support additional branch closures", () => {
       comment: "  still broken  ",
     }, asMaster);
     expect(res.success).toBe(true);
+  });
+
+  it("provideSolutionFeedback stores null comment when feedback is accepted", async () => {
+    state.supportTickets["t-accepted"] = { masterImei: "m1", status: "awaiting_user_feedback" };
+    const res = await testEnv.wrap(fns.provideSolutionFeedback)({
+      ticketId: "t-accepted",
+      feedback: "accepted",
+    }, asMaster);
+    expect(res.success).toBe(true);
+  });
+
+  it("provideSolutionFeedback permission branch with existing but undefined ticket data", async () => {
+    state.supportTickets["t-undef"] = undefined;
+    await expect(testEnv.wrap(fns.provideSolutionFeedback)({
+      ticketId: "t-undef",
+      feedback: "accepted",
+    }, asMaster)).rejects.toThrow(/permission|not found/i);
   });
 
   it("registerMasterDevice legacy telemetry uses null projectId fallback", async () => {
@@ -1011,5 +1083,64 @@ describe("shared and pairing remaining branch sides", () => {
   it("generatePairingLink denied path with explicit inactive subscription status", async () => {
     state.masters["m1"] = { imei: "m1", subscription: { status: "expired" } };
     await expect(testEnv.wrap(fns.generatePairingLink)({}, asMaster)).rejects.toThrow(/subscribe|trial/i);
+  });
+
+  it("setDeviceLocked catch branch on child update failure", async () => {
+    const collectionSpy = jest.spyOn(db, "collection");
+    const originalImpl = collectionSpy.getMockImplementation();
+    collectionSpy.mockImplementation((name: string) => {
+      const coll: any = originalImpl ? originalImpl(name) : undefined;
+      if (name === "children") {
+        const realDoc = coll.doc;
+        coll.doc = jest.fn((id: string) => {
+          const ref = realDoc(id);
+          if (id === "c1") {
+            ref.update = jest.fn(() => Promise.reject(new Error("update-failed")));
+          }
+          return ref;
+        });
+      }
+      return coll;
+    });
+
+    await expect(testEnv.wrap(fns.setDeviceLocked)({ childId: "c1", isLocked: true }, asMaster))
+      .rejects.toThrow(/unexpected error|updating the device lock state/i);
+  });
+
+  it("createTask catch branch on task write failure", async () => {
+    const collectionSpy = jest.spyOn(db, "collection");
+    const originalImpl = collectionSpy.getMockImplementation();
+    collectionSpy.mockImplementation((name: string) => {
+      const coll: any = originalImpl ? originalImpl(name) : undefined;
+      if (name === "children") {
+        const realDoc = coll.doc;
+        coll.doc = jest.fn((id: string) => {
+          const ref = realDoc(id);
+          if (id === "c1") {
+            const realSubCollection = ref.collection;
+            ref.collection = jest.fn((sub: string) => {
+              const subColl: any = realSubCollection(sub);
+              if (sub === "tasks") {
+                const realSubDoc = subColl.doc;
+                subColl.doc = jest.fn((taskId?: string) => {
+                  const taskRef = realSubDoc(taskId);
+                  taskRef.set = jest.fn(() => Promise.reject(new Error("task-set-failed")));
+                  return taskRef;
+                });
+              }
+              return subColl;
+            });
+          }
+          return ref;
+        });
+      }
+      return coll;
+    });
+
+    await expect(testEnv.wrap(fns.createTask)({
+      childId: "c1",
+      description: "fail-set",
+      deadlineISO: new Date(Date.now() + 120000).toISOString(),
+    }, asMaster)).rejects.toThrow(/task-set-failed/i);
   });
 });
