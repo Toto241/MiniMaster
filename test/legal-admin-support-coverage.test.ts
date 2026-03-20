@@ -510,7 +510,73 @@ describe("adminHealthCheck", () => {
   });
 });
 
+describe("exportUserData", () => {
+  it("exportiert Master-, Child-, Task- und Audit-Daten für DSAR", async () => {
+    state.children.c1 = { masterImei: "m1", name: "Child One" };
+    state.subscriptions.sub1 = { masterId: "m1", status: "active" };
+    state.supportTickets.ticket1 = { masterImei: "m1", status: "open" };
+    state.supportAccessGrants.grant1 = { masterImei: "m1", status: "active" };
+    state.masterLegalConsents.consent1 = { masterImei: "m1", locale: "de-DE" };
+    state.audit_logs.log1 = { userId: "m1", action: "device.delete" };
+
+    const originalCollection = (db.collection as jest.Mock).getMockImplementation();
+    (db.collection as jest.Mock).mockImplementation((name: string) => {
+      const base = originalCollection(name);
+      if (name !== "children") return base;
+
+      return {
+        ...base,
+        where: jest.fn(() => ({
+          get: jest.fn().mockResolvedValue({
+            empty: false,
+            size: 1,
+            docs: [{
+              id: "c1",
+              data: () => state.children.c1,
+              ref: {
+                collection: jest.fn((sub: string) => ({
+                  get: jest.fn().mockResolvedValue({
+                    docs: sub === "tasks"
+                      ? [{ id: "t1", data: () => ({ title: "Mathe", status: "open" }) }]
+                      : [{ id: "day1", data: () => ({ minutesUsed: 45 }) }],
+                  }),
+                })),
+              },
+            }],
+          }),
+        })),
+      };
+    });
+
+    const wrapped = testEnv.wrap(fns.exportUserData);
+    const res = await wrapped({ masterId: "m1" }, asAdmin);
+
+    expect(res.success).toBe(true);
+    expect(res.data.masterId).toBe("m1");
+    expect(res.data.masterProfile.imei).toBe("m1");
+    expect(res.data.children).toHaveLength(1);
+    expect(res.data.children[0].tasks).toEqual([
+      expect.objectContaining({ id: "t1", title: "Mathe" }),
+    ]);
+    expect(res.data.children[0].usageHistory).toEqual([
+      expect.objectContaining({ id: "day1", minutesUsed: 45 }),
+    ]);
+    expect(res.data.subscriptions).toEqual([
+      expect.objectContaining({ id: "sub1", status: "active" }),
+    ]);
+    expect(res.data.auditLogs).toEqual([
+      expect.objectContaining({ id: "log1", action: "device.delete" }),
+    ]);
+  });
+
+  it("benötigt eine vorhandene masterId", async () => {
+    const wrapped = testEnv.wrap(fns.exportUserData);
+    await expect(wrapped({}, asAdmin)).rejects.toThrow(/masterId is required/);
+  });
+});
+
 describe("getKnowledgeBase", () => {
+
   it("gibt Firestore-Inhalt zurück wenn vorhanden", async () => {
     state.operatorConfig = { knowledgeBase: { content: "Test KB content" } };
     const wrapped = testEnv.wrap(fns.getKnowledgeBase);
