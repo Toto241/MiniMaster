@@ -298,7 +298,6 @@ export const registerMasterDevice = functions.https.onCall(
       }
 
       const now = admin.firestore.Timestamp.now();
-      const trialEndsAt = new admin.firestore.Timestamp(now.seconds + 7 * 24 * 60 * 60, now.nanoseconds);
 
       await masterDeviceRef.set({
         imei: imei,
@@ -306,9 +305,9 @@ export const registerMasterDevice = functions.https.onCall(
         role: "master",
         createdAt: now,
         subscription: {
-          status: "trial",
-          trialStartedAt: now,
-          trialEndsAt: trialEndsAt,
+          status: "trial_pending",
+          parentAppLimit: 2,
+          childLimit: 4,
         },
       });
 
