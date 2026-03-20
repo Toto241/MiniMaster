@@ -11,6 +11,18 @@
  */
 import fft from "firebase-functions-test";
 import { db as getDb } from "../firebase";
+import * as shared from "../src/shared";
+
+const mockOpenAiCreate = jest.fn();
+jest.mock("openai", () => ({
+  OpenAI: jest.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: mockOpenAiCreate,
+      },
+    },
+  })),
+}));
 
 const mockSend = jest.fn().mockResolvedValue("mock-msg-id");
 jest.mock("firebase-admin/messaging", () => ({
@@ -130,6 +142,7 @@ function resetState() {
 
 beforeAll(() => {
   process.env.OPENAI_API_KEY = "test-key";
+  process.env.OPENAI_FALLBACK_ENABLED = "true";
   process.env.GEMINI_API_KEY = "test-gemini-key";
   fns = require("../index");
   db = getDb();
@@ -673,5 +686,129 @@ describe("subscription branch variants", () => {
     const wrapped = testEnv.wrap(fns.revokeSubscription);
     const res = await wrapped({ subscriptionId: "sub2", masterId: "m1" }, asAdmin);
     expect(res.message).toMatch(/revoked/i);
+  });
+
+  it("revokeSubscription fails when subscription has no masterId and none is provided", async () => {
+    state.subscriptions.sub3 = { status: "active" };
+    const wrapped = testEnv.wrap(fns.revokeSubscription);
+    await expect(wrapped({ subscriptionId: "sub3" }, asAdmin)).rejects.toThrow(/master account not found/i);
+  });
+});
+
+describe("shared helper branch coverage", () => {
+  it("requireMasterOwnership denies when child exists but belongs to another master", async () => {
+    state.children["c-foreign"] = { masterImei: "other-master", childImei: "c-foreign" };
+    await expect(shared.requireMasterOwnership(asMaster as any, "c-foreign"))
+      .rejects.toThrow(/owner|permission/i);
+  });
+
+  it("checkRateLimit uses default params when optional args are omitted", () => {
+    expect(() => shared.checkRateLimit("u-default", "act-default")).not.toThrow();
+  });
+
+  it("validateAppCheck uses default enforce=false and does not throw without app", () => {
+    expect(() => shared.validateAppCheck({ auth: { uid: "u1" } } as any)).not.toThrow();
+  });
+
+  it("validateAppCheck enforce=true in non-test mode throws and logs anonymous uid fallback", () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      expect(() => shared.validateAppCheck({} as any, true)).toThrow(/App Check/i);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  it("AuditLogger.log works with default metadata parameter", async () => {
+    await expect(shared.AuditLogger.log(
+      "system.error",
+      "u1",
+      "unknown",
+      "system",
+      "system",
+      "success"
+    )).resolves.toBeUndefined();
+  });
+});
+
+describe("legal targetMaster empty-string fallback", () => {
+  it("markLegalReconsentRequired treats empty masterImei as country-locale scope", async () => {
+    state.masterLegalConsents.l1 = { country: "DE", locale: "de-DE", requiresReconsent: false };
+    state.masterLegalConsents.l2 = { country: "DE", locale: "de-DE", requiresReconsent: false };
+    const wrapped = testEnv.wrap(fns.markLegalReconsentRequired);
+    const res = await wrapped({ country: "DE", locale: "de-DE", masterImei: "" }, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.scope).toBe("country_locale");
+  });
+});
+
+describe("support provider branch coverage", () => {
+  it("onTicketCreated uses OpenAI fallback when Gemini key is missing", async () => {
+    const prevNode = process.env.NODE_ENV;
+    const prevGemini = process.env.GEMINI_API_KEY;
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.GEMINI_API_KEY = "";
+      mockOpenAiCreate.mockResolvedValueOnce({ choices: [] }); // force rawResponse fallback ""
+
+      state.supportTickets["ticket-openai"] = {
+        masterImei: "m1",
+        problemDescription: "OpenAI fallback scenario for support.",
+      };
+      state.masters["m1"] = { imei: "m1" };
+
+      const wrapped = testEnv.wrap(fns.onTicketCreated);
+      await wrapped({ data: () => state.supportTickets["ticket-openai"] }, { params: { ticketId: "ticket-openai" } });
+    } finally {
+      process.env.NODE_ENV = prevNode;
+      process.env.GEMINI_API_KEY = prevGemini;
+    }
+  });
+
+  it("onTicketCreated handles Gemini non-ok response path", async () => {
+    const prevNode = process.env.NODE_ENV;
+    const prevGemini = process.env.GEMINI_API_KEY;
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.GEMINI_API_KEY = "gemini-key";
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500, text: () => Promise.resolve("boom") });
+
+      state.supportTickets["ticket-gemini-nonok"] = {
+        masterImei: "m1",
+        problemDescription: "Gemini non-ok branch.",
+      };
+
+      const wrapped = testEnv.wrap(fns.onTicketCreated);
+      await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-nonok"] }, { params: { ticketId: "ticket-gemini-nonok" } }))
+        .rejects.toThrow(/Gemini API error/i);
+    } finally {
+      process.env.NODE_ENV = prevNode;
+      process.env.GEMINI_API_KEY = prevGemini;
+    }
+  });
+
+  it("onTicketCreated handles Gemini AbortError timeout path", async () => {
+    const prevNode = process.env.NODE_ENV;
+    const prevGemini = process.env.GEMINI_API_KEY;
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.GEMINI_API_KEY = "gemini-key";
+      const abortErr: any = new Error("aborted");
+      abortErr.name = "AbortError";
+      mockFetch.mockRejectedValueOnce(abortErr);
+
+      state.supportTickets["ticket-gemini-abort"] = {
+        masterImei: "m1",
+        problemDescription: "Gemini timeout branch.",
+      };
+
+      const wrapped = testEnv.wrap(fns.onTicketCreated);
+      await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-abort"] }, { params: { ticketId: "ticket-gemini-abort" } }))
+        .rejects.toThrow(/timeout/i);
+    } finally {
+      process.env.NODE_ENV = prevNode;
+      process.env.GEMINI_API_KEY = prevGemini;
+    }
   });
 });
