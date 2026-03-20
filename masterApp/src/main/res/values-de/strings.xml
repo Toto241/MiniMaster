@@ -59,7 +59,10 @@
 
     <!-- Ersteinrichtung Sprache -->
     <string name="language_setup_title">App-Sprache auswählen</string>
-    <string name="language_setup_description">Wählen Sie Ihre bevorzugte Sprache für MiniMaster. Sie können die Sprache später in einer künftigen Einstellungsansicht ändern.</string>
+    <string name="language_setup_description">Wählen Sie zuerst die Sprache für MiniMaster und danach das Land, in dem die Eltern-App eingesetzt wird. Anschließend werden die passenden Vertragsbedingungen und Datenschutzinformationen angezeigt.</string>
+    <string name="language_setup_list_title">App-Sprache</string>
+    <string name="country_setup_title">Einsatzland</string>
+    <string name="country_setup_description">Anhand dieses Landes laden wir die passenden Vertragsbedingungen und Datenschutzinformationen für die Eltern-App.</string>
     <string name="language_continue">Weiter</string>
 
     <!-- Zustimmung zu rechtlichen Bedingungen -->
