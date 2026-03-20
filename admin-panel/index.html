@@ -82,6 +82,9 @@
                 <button class="nav-tab" onclick="switchTab('aimonitor', event)">
                     🤖 KI-Monitor
                 </button>
+                <button class="nav-tab" onclick="switchTab('legal', event)">
+                    📜 Recht &amp; Datenschutz
+                </button>
             </nav>
 
             <main class="main-content">
@@ -1171,6 +1174,92 @@
                 <div id="ai-fix-history" class="ai-fix-history" style="display: none">
                     <h3>Protokoll: KI-Analysen &amp; Auto-Fixes</h3>
                     <div id="ai-fix-history-list"></div>
+                </div>
+            </div>
+
+            <!-- ==================== LEGAL / DATENSCHUTZ TAB ==================== -->
+            <div id="tab-legal" class="tab-content" style="display: none">
+                <h2>📜 Recht &amp; Datenschutz – Richtlinienverwaltung</h2>
+
+                <!-- Section 1: Aktive Richtlinien laden -->
+                <div class="compliance-section" style="margin-block-end: 30px">
+                    <h3>Aktive Richtlinien abfragen</h3>
+                    <p>Zeigt die aktuell aktiven AGB- und Datenschutz-Richtlinien für ein Land/Locale.</p>
+                    <div class="dsar-form">
+                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
+                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
+                        <button onclick="loadActiveLegalPolicies()" class="btn btn-primary">
+                            Richtlinien laden
+                        </button>
+                    </div>
+                    <div id="legal-policies-result" class="data-list" style="margin-block-start: 15px"></div>
+                </div>
+
+                <!-- Section 2: Consent-Status prüfen -->
+                <div class="compliance-section" style="margin-block-end: 30px">
+                    <h3>Einwilligungsstatus prüfen</h3>
+                    <p>Prüft, ob ein bestimmter Nutzer den aktuellen Richtlinien zugestimmt hat (Reconsent nötig?).</p>
+                    <div class="dsar-form">
+                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
+                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
+                        <button onclick="checkLegalReconsentStatus()" class="btn btn-primary">
+                            Status prüfen
+                        </button>
+                    </div>
+                    <div id="legal-consent-result" class="data-list" style="margin-block-start: 15px"></div>
+                </div>
+
+                <!-- Section 3: Richtlinie veröffentlichen (Admin only) -->
+                <div class="compliance-section admin-only" style="margin-block-end: 30px">
+                    <h3>Richtlinie veröffentlichen</h3>
+                    <p>Erstellt oder aktualisiert eine AGB- oder Datenschutz-Richtlinie für ein bestimmtes Land/Locale.</p>
+                    <div class="dsar-form" style="flex-direction: column; gap: 10px; align-items: stretch">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                            <select id="legal-publish-type" style="width: 140px">
+                                <option value="terms">AGB (terms)</option>
+                                <option value="privacy">Datenschutz (privacy)</option>
+                            </select>
+                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
+                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
+                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="width: 180px" />
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="flex: 1; min-width: 250px" />
+                            <select id="legal-publish-status" style="width: 120px">
+                                <option value="active">Aktiv</option>
+                                <option value="draft">Entwurf</option>
+                                <option value="approved">Freigegeben</option>
+                                <option value="retired">Zurückgezogen</option>
+                            </select>
+                            <label style="display: flex; align-items: center; gap: 5px">
+                                <input type="checkbox" id="legal-publish-major" /> Major Change
+                            </label>
+                        </div>
+                        <div>
+                            <button onclick="publishLegalPolicy()" class="btn btn-primary">
+                                Richtlinie veröffentlichen
+                            </button>
+                        </div>
+                    </div>
+                    <div id="legal-publish-result" class="data-list" style="margin-block-start: 15px"></div>
+                </div>
+
+                <!-- Section 4: Reconsent erzwingen (Admin only) -->
+                <div class="compliance-section admin-only" style="margin-block-end: 30px">
+                    <h3>Reconsent erzwingen</h3>
+                    <p>
+                        Markiert Nutzer als „Erneute Zustimmung erforderlich". Entweder für einen einzelnen
+                        Nutzer (Master-ID) oder für alle Nutzer eines Landes/Locale.
+                    </p>
+                    <div class="dsar-form">
+                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
+                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
+                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="width: 220px" />
+                        <button onclick="triggerLegalReconsent()" class="btn btn-danger">
+                            Reconsent erzwingen
+                        </button>
+                    </div>
+                    <div id="legal-reconsent-result" class="data-list" style="margin-block-start: 15px"></div>
                 </div>
             </div>
 
