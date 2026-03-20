@@ -6,6 +6,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin } from "./shared";
 
@@ -19,6 +20,7 @@ interface EffectivePolicy {
   effectiveAt: admin.firestore.Timestamp;
   isMajorChange: boolean;
   contentUrl: string;
+  checksum?: string;
 }
 
 const LEGAL_POLICIES_COLLECTION = "legalPolicies";
@@ -164,6 +166,7 @@ function mapPolicyDoc(doc: admin.firestore.DocumentSnapshot): EffectivePolicy | 
     effectiveAt,
     isMajorChange: Boolean(data.isMajorChange),
     contentUrl,
+    ...(typeof data.checksum === "string" ? { checksum: data.checksum } : {}),
   };
 }
 
@@ -396,6 +399,10 @@ export const publishLegalPolicy = functions.https.onCall(
     const safeVersion = version.replace(/[^A-Za-z0-9._-]/g, "-");
     const docId = `${policyType}_${country}_${safeLocale}_${safeVersion}`;
 
+    const checksum = crypto.createHash("sha256")
+      .update(`${policyType}:${country}:${locale}:${version}:${contentUrl}`)
+      .digest("hex");
+
     await db().collection(LEGAL_POLICIES_COLLECTION).doc(docId).set({
       policyType,
       country,
@@ -404,6 +411,7 @@ export const publishLegalPolicy = functions.https.onCall(
       effectiveAt,
       isMajorChange,
       contentUrl,
+      checksum,
       status,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -418,6 +426,7 @@ export const publishLegalPolicy = functions.https.onCall(
       locale,
       version,
       status,
+      checksum,
     };
   }
 );

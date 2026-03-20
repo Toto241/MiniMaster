@@ -9,15 +9,21 @@ import { db } from "../firebase";
 import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
 
 export const createTask = functions.https.onCall(
-  async (data: { childId: string; description: string; deadlineISO: string }, context: CallableContext) => {
+  async (data: { childId: string; description: string; deadlineISO: string; unlockDuration?: number }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
     checkRateLimit(masterId, "createTask", 20);
-    const { childId, description, deadlineISO } = data;
+    const { childId, description, deadlineISO, unlockDuration } = data;
 
     if (!childId || !description || !deadlineISO) {
       throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    if (unlockDuration !== undefined) {
+      if (typeof unlockDuration !== "number" || !Number.isInteger(unlockDuration) || unlockDuration < 1 || unlockDuration > 1440) {
+        throw new functions.https.HttpsError("invalid-argument", "unlockDuration must be an integer between 1 and 1440 minutes.");
+      }
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
@@ -43,13 +49,17 @@ export const createTask = functions.https.onCall(
 
     try {
       const taskRef = childDeviceRef.collection("tasks").doc();
-      await taskRef.set({
+      const taskData: Record<string, unknown> = {
         description: description,
         deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
         status: "pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         masterImei: masterId,
-      });
+      };
+      if (unlockDuration !== undefined) {
+        taskData.unlockDuration = unlockDuration;
+      }
+      await taskRef.set(taskData);
 
       await AuditLogger.logSuccess(
         "task.create", context, `children/${childId}/tasks/${taskRef.id}`, "task",
@@ -166,6 +176,13 @@ export const approveTask = functions.https.onCall(
       }
 
       await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+      if (typeof taskData.unlockDuration === "number" && taskData.unlockDuration > 0) {
+        const unlockUntil = admin.firestore.Timestamp.fromMillis(
+          Date.now() + taskData.unlockDuration * 60 * 1000
+        );
+        await taskRef.update({ unlockUntil });
+      }
 
       await AuditLogger.logSuccess(
         "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",
