@@ -462,6 +462,11 @@ describe("pairing malformed data branches", () => {
 });
 
 describe("support grant/revoke additional branches", () => {
+  it("grantSupportAccess denies when ticket is missing", async () => {
+    const wrapped = testEnv.wrap(fns.grantSupportAccess);
+    await expect(wrapped({ ticketId: "missing-ticket" }, asMaster)).rejects.toThrow(/denied|not found/i);
+  });
+
   it("grantSupportAccess denies when ticket does not belong to caller", async () => {
     state.supportTickets["t-denied"] = { masterImei: "other-master" };
     const wrapped = testEnv.wrap(fns.grantSupportAccess);
@@ -478,6 +483,14 @@ describe("support grant/revoke additional branches", () => {
     state.supportAccessGrants["g-no-ticket"] = { masterImei: "m1", status: "active" };
     const wrapped = testEnv.wrap(fns.revokeSupportAccess);
     const res = await wrapped({ grantId: "g-no-ticket" }, asMaster);
+    expect(res.success).toBe(true);
+  });
+
+  it("revokeSupportAccess updates linked ticket when ticketId is present", async () => {
+    state.supportTickets["t-linked"] = { masterImei: "m1", accessGranted: true };
+    state.supportAccessGrants["g-linked"] = { masterImei: "m1", ticketId: "t-linked", status: "active" };
+    const wrapped = testEnv.wrap(fns.revokeSupportAccess);
+    const res = await wrapped({ grantId: "g-linked" }, asMaster);
     expect(res.success).toBe(true);
   });
 });
@@ -1083,6 +1096,58 @@ describe("shared and pairing remaining branch sides", () => {
   it("generatePairingLink denied path with explicit inactive subscription status", async () => {
     state.masters["m1"] = { imei: "m1", subscription: { status: "expired" } };
     await expect(testEnv.wrap(fns.generatePairingLink)({}, asMaster)).rejects.toThrow(/subscribe|trial/i);
+  });
+
+  it("validatePairingCode wraps unexpected non-Https errors as internal", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    const collectionSpy = jest.spyOn(db, "collection");
+    const originalImpl = collectionSpy.getMockImplementation();
+    collectionSpy.mockImplementation((name: string) => {
+      const coll: any = originalImpl ? originalImpl(name) : undefined;
+      if (name === "pairingCodes") {
+        const realDoc = coll.doc;
+        coll.doc = jest.fn((id: string) => {
+          const ref = realDoc(id);
+          ref.get = jest.fn(() => Promise.resolve({
+            exists: true,
+            data: () => ({ masterId: "m1", expiresAt: futureTs }),
+            id,
+          }));
+          return ref;
+        });
+      }
+      if (name === "children") {
+        coll.where = jest.fn(() => ({
+          get: jest.fn(() => Promise.reject(new Error("children-query-failed"))),
+        }));
+      }
+      return coll;
+    });
+
+    await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "555555" }, asChild))
+      .rejects.toThrow(/unexpected error occurred while validating the pairing code/i);
+  });
+
+  it("validatePairingToken wraps unexpected non-Https errors as internal", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingTokens["tok-unexpected"] = { masterId: "m1", expiresAt: futureTs };
+
+    const collectionSpy = jest.spyOn(db, "collection");
+    const originalImpl = collectionSpy.getMockImplementation();
+    collectionSpy.mockImplementation((name: string) => {
+      const coll: any = originalImpl ? originalImpl(name) : undefined;
+      if (name === "children") {
+        coll.where = jest.fn(() => ({
+          get: jest.fn(() => Promise.reject(new Error("children-query-failed-token"))),
+        }));
+      }
+      return coll;
+    });
+
+    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-unexpected" }, asChild))
+      .rejects.toThrow(/unexpected error occurred while validating the pairing token/i);
   });
 
   it("setDeviceLocked catch branch on child update failure", async () => {

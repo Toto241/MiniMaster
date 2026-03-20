@@ -715,6 +715,7 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
 export const __supportTestables = {
   parseAiTicketResponse,
   generateWithGemini,
+  generateWithOpenAI,
   resolveImpersonationRole,
   resolveExplainRole,
 };
