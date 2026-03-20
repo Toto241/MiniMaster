@@ -811,4 +811,205 @@ describe("support provider branch coverage", () => {
       process.env.GEMINI_API_KEY = prevGemini;
     }
   });
+
+  it("onTicketCreated fails when no AI provider is configured", async () => {
+    const prevNode = process.env.NODE_ENV;
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevOpenAi = process.env.OPENAI_API_KEY;
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.GEMINI_API_KEY = "";
+      process.env.OPENAI_API_KEY = "";
+
+      state.supportTickets["ticket-no-provider"] = {
+        masterImei: "m1",
+        problemDescription: "No provider configured branch.",
+      };
+
+      const wrapped = testEnv.wrap(fns.onTicketCreated);
+      await expect(wrapped({ data: () => state.supportTickets["ticket-no-provider"] }, { params: { ticketId: "ticket-no-provider" } }))
+        .rejects.toThrow(/no ai provider configured/i);
+    } finally {
+      process.env.NODE_ENV = prevNode;
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.OPENAI_API_KEY = prevOpenAi;
+    }
+  });
+});
+
+describe("ownership mismatch and default fallback branches", () => {
+  it("setDeviceLocked/updateAppBlacklist/setUsageRules deny when child belongs to another master", async () => {
+    state.children.c1 = { masterImei: "other-master", childImei: "c1" };
+
+    await expect(testEnv.wrap(fns.setDeviceLocked)({ childId: "c1", isLocked: true }, asMaster)).rejects.toThrow(/authorized|permission/i);
+    await expect(testEnv.wrap(fns.updateAppBlacklist)({ childId: "c1", appBlacklist: ["x"] }, asMaster)).rejects.toThrow(/authorized|permission/i);
+    await expect(testEnv.wrap(fns.setUsageRules)({ childId: "c1", usageRules: { dailyLimit: 60 } }, asMaster)).rejects.toThrow(/authorized|permission/i);
+  });
+
+  it("createTask/approveTask/rejectTask deny when child belongs to another master", async () => {
+    state.children.c1 = { masterImei: "other-master", childImei: "c1" };
+
+    await expect(testEnv.wrap(fns.createTask)({ childId: "c1", description: "x", deadlineISO: new Date(Date.now() + 60000).toISOString() }, asMaster)).rejects.toThrow(/authorized|permission/i);
+    await expect(testEnv.wrap(fns.approveTask)({ childId: "c1", taskId: "t1" }, asMaster)).rejects.toThrow(/authorized|permission/i);
+    await expect(testEnv.wrap(fns.rejectTask)({ childId: "c1", taskId: "t1" }, asMaster)).rejects.toThrow(/authorized|permission/i);
+  });
+
+  it("getRulesForChild returns defaults when optional fields are absent", async () => {
+    state.children.c1 = { masterImei: "m1", childImei: "c1" };
+    const res = await testEnv.wrap(fns.getRulesForChild)({ childId: "c1" }, asMaster);
+    expect(res.isLocked).toBe(false);
+    expect(res.appBlacklist).toEqual([]);
+    expect(res.usageRules).toEqual({});
+  });
+
+  it("reportTamperEvent throws when child has no linked parent", async () => {
+    state.children.c1 = { childImei: "c1" };
+    await expect(testEnv.wrap(fns.reportTamperEvent)({ childId: "c1", eventType: "accessibility_service_disabled", timestamp: Date.now() }, asChild))
+      .rejects.toThrow(/no parent linked/i);
+  });
+
+  it("reportTamperEvent succeeds without sending FCM when parent has no token", async () => {
+    state.children.c1 = { childImei: "c1", masterImei: "m2" };
+    state.masters.m2 = { imei: "m2" };
+    const res = await testEnv.wrap(fns.reportTamperEvent)({ childId: "c1", eventType: "device_admin_disable_requested", timestamp: Date.now() }, asChild);
+    expect(res.success).toBe(true);
+  });
+});
+
+describe("pairing childLimit fallback branches", () => {
+  it("validatePairingCode uses fallback childLimit=1 when active subscription has no childLimit", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingCodes["333333"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters.m1 = { imei: "m1", subscription: { status: "active" } };
+
+    await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "333333" }, { auth: { uid: "c2", token: {} } }))
+      .rejects.toThrow(/child limit reached/i);
+  });
+
+  it("validatePairingToken uses fallback childLimit=1 when active subscription has no childLimit", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingTokens["tok-limit"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters.m1 = { imei: "m1", subscription: { status: "active" } };
+
+    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit" }, { auth: { uid: "c2", token: {} } }))
+      .rejects.toThrow(/child limit reached/i);
+  });
+});
+
+describe("auth/legal/support additional branch closures", () => {
+  it("setUserRole handles undefined payload via catch path", async () => {
+    await expect(testEnv.wrap(fns.setUserRole)(undefined as any, asAdmin)).rejects.toThrow(/failed to set user role/i);
+  });
+
+  it("needsLegalReconsent tolerates null consent payload via fallback object", async () => {
+    const admin = require("firebase-admin");
+    const ts = admin.firestore.Timestamp.now();
+    state.legalPolicies.termsNull = {
+      policyType: "terms",
+      country: "DE",
+      locale: "de-DE",
+      version: "12.0",
+      contentUrl: "https://example.com/t120",
+      effectiveAt: ts,
+      status: "active",
+      isMajorChange: false,
+    };
+    state.legalPolicies.privacyNull = {
+      policyType: "privacy",
+      country: "DE",
+      locale: "de-DE",
+      version: "12.1",
+      contentUrl: "https://example.com/p121",
+      effectiveAt: ts,
+      status: "active",
+      isMajorChange: false,
+    };
+    state.masterLegalConsents["m1_DE_de-DE"] = null;
+
+    const res = await testEnv.wrap(fns.needsLegalReconsent)({ country: "DE", locale: "de-DE" }, asMaster);
+    expect(res.requiresReconsent).toBe(true);
+  });
+
+  it("publishLegalPolicy uses provided effectiveAt and caller uid", async () => {
+    const admin = require("firebase-admin");
+    const explicitTs = admin.firestore.Timestamp.now();
+
+    const res = await testEnv.wrap(fns.publishLegalPolicy)({
+      policyType: "privacy",
+      country: "DE",
+      locale: "de-DE",
+      version: "13.0",
+      contentUrl: "https://example.com/p130",
+      effectiveAt: explicitTs,
+    }, { auth: { uid: "admin-uid", token: { role: "admin" } } });
+
+    expect(res.success).toBe(true);
+    expect(res.policyType).toBe("privacy");
+  });
+
+  it("markLegalReconsentRequired treats non-string masterImei as bulk scope", async () => {
+    state.masterLegalConsents.x1 = { country: "DE", locale: "de-DE", requiresReconsent: false };
+    state.masterLegalConsents.x2 = { country: "DE", locale: "de-DE", requiresReconsent: false };
+
+    const res = await testEnv.wrap(fns.markLegalReconsentRequired)({ country: "DE", locale: "de-DE", masterImei: 123 as any }, asAdmin);
+    expect(res.scope).toBe("country_locale");
+  });
+
+  it("provideSolutionFeedback stores trimmed comment when feedback is rejected", async () => {
+    state.supportTickets["t-feedback"] = { masterImei: "m1", status: "awaiting_user_feedback" };
+    const res = await testEnv.wrap(fns.provideSolutionFeedback)({
+      ticketId: "t-feedback",
+      feedback: "rejected",
+      comment: "  still broken  ",
+    }, asMaster);
+    expect(res.success).toBe(true);
+  });
+
+  it("registerMasterDevice legacy telemetry uses null projectId fallback", async () => {
+    const prevProject = process.env.GCLOUD_PROJECT;
+    try {
+      delete process.env.GCLOUD_PROJECT;
+      delete state.masters["legacy-null-project"];
+      mockAuth.getUser.mockRejectedValueOnce({ code: "auth/user-not-found" });
+      mockAuth.createUser.mockResolvedValueOnce({ uid: "legacy-null-project", customClaims: {} });
+
+      const res = await testEnv.wrap(fns.registerMasterDevice)({ imei: "legacy-null-project" }, {} as any);
+      expect(res.masterId).toBe("legacy-null-project");
+    } finally {
+      if (prevProject !== undefined) process.env.GCLOUD_PROJECT = prevProject;
+    }
+  });
+});
+
+describe("shared and pairing remaining branch sides", () => {
+  it("requireMasterOwnership denies when child does not exist", async () => {
+    await expect(shared.requireMasterOwnership(asMaster as any, "missing-child"))
+      .rejects.toThrow(/owner|permission/i);
+  });
+
+  it("validateAppCheck test-mode uses anonymous fallback uid when no auth exists", () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "test";
+    try {
+      expect(() => shared.validateAppCheck({} as any, true)).not.toThrow();
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  it("validatePairingCode denied path with explicit inactive subscription status", async () => {
+    const admin = require("firebase-admin");
+    const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
+    state.pairingCodes["444444"] = { masterId: "m1", expiresAt: futureTs };
+    state.masters["m1"] = { imei: "m1", subscription: { status: "expired" } };
+
+    await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "444444" }, asChild)).rejects.toThrow(/subscribe|trial/i);
+  });
+
+  it("generatePairingLink denied path with explicit inactive subscription status", async () => {
+    state.masters["m1"] = { imei: "m1", subscription: { status: "expired" } };
+    await expect(testEnv.wrap(fns.generatePairingLink)({}, asMaster)).rejects.toThrow(/subscribe|trial/i);
+  });
 });
