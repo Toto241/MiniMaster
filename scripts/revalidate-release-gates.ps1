@@ -1,7 +1,8 @@
 param(
     [string]$Repo = "Toto241/MiniMaster",
     [string]$OutputFile = "docs/CI_REVALIDATION_LATEST.md",
-    [int]$HistoryLimit = 10
+    [int]$HistoryLimit = 10,
+    [switch]$RerunLatestFailed
 )
 
 Set-StrictMode -Version Latest
@@ -65,6 +66,50 @@ function Select-LatestSuccess {
     return ($Runs | Where-Object { $_.conclusion -eq "success" } | Select-Object -First 1)
 }
 
+function Test-BillingBlocker {
+    param([object[]]$Annotations)
+
+    if (-not $Annotations) {
+        return $false
+    }
+
+    $hit = $Annotations | Where-Object {
+        $_.message -match "payments have failed|spending limit needs to be increased|Billing & plans"
+    }
+    return [bool]$hit
+}
+
+function Invoke-RerunIfRequested {
+    param(
+        [string]$WorkflowName,
+        [object[]]$Runs,
+        [string]$RepoName,
+        [bool]$ShouldRerun
+    )
+
+    if (-not $ShouldRerun) {
+        return
+    }
+
+    $latest = $Runs | Select-Object -First 1
+    if (-not $latest) {
+        Write-Host "No runs available to rerun for workflow '$WorkflowName'."
+        return
+    }
+
+    if ($latest.conclusion -ne "failure") {
+        Write-Host "Latest run for '$WorkflowName' is not failed; rerun skipped."
+        return
+    }
+
+    try {
+        gh run rerun $latest.databaseId --repo $RepoName | Out-Null
+        Write-Host "Requested rerun for '$WorkflowName' run $($latest.databaseId)."
+    } catch {
+        Write-Host "Could not request rerun for '$WorkflowName': $($_.Exception.Message)"
+    }
+}
+
 function New-RunSection {
     param(
         [string]$WorkflowName,
@@ -85,9 +130,12 @@ function New-RunSection {
     }
 
     $runUrl = "https://github.com/$RepoName/actions/runs/$($latest.databaseId)"
+    $status = if ([string]::IsNullOrWhiteSpace([string]$latest.status)) { "unknown" } else { [string]$latest.status }
+    $conclusion = if ([string]::IsNullOrWhiteSpace([string]$latest.conclusion)) { "pending" } else { [string]$latest.conclusion }
+
     $lines += ""
     $lines += "- Latest run: [$($latest.databaseId)]($runUrl)"
-    $lines += "- Latest status: $($latest.status) / $($latest.conclusion)"
+    $lines += "- Latest status: $status / $conclusion"
     $lines += "- Head SHA: $($latest.headSha)"
     $lines += "- Updated at: $($latest.updatedAt)"
 
@@ -96,6 +144,14 @@ function New-RunSection {
         $lines += "- Latest success: [$($latestSuccess.databaseId)]($successUrl)"
     } else {
         $lines += "- Latest success: none in inspected history"
+    }
+
+    if ($status -ne "completed") {
+        $lines += ""
+        $lines += "Run is not completed yet; annotations are not available."
+        $lines += ""
+        $lines += "Billing blocker detected: pending"
+        return $lines
     }
 
     $annotations = Get-AnnotationsForRun -RunId $latest.databaseId -RepoName $RepoName
@@ -107,7 +163,7 @@ function New-RunSection {
         }
     }
 
-    $billingHit = $annotations | Where-Object { $_.message -match "payments have failed|spending limit needs to be increased|Billing & plans" }
+    $billingHit = Test-BillingBlocker -Annotations $annotations
     if ($billingHit) {
         $lines += ""
         $lines += "Billing blocker detected: yes"
@@ -124,16 +180,47 @@ Require-Command -Name "gh"
 $codeqlRuns = Get-Runs -Workflow "CodeQL Security Analysis" -RepoName $Repo -Limit $HistoryLimit
 $androidRuns = Get-Runs -Workflow "Android CI" -RepoName $Repo -Limit $HistoryLimit
 
+Invoke-RerunIfRequested -WorkflowName "CodeQL Security Analysis" -Runs $codeqlRuns -RepoName $Repo -ShouldRerun:$RerunLatestFailed
+Invoke-RerunIfRequested -WorkflowName "Android CI" -Runs $androidRuns -RepoName $Repo -ShouldRerun:$RerunLatestFailed
+
+if ($RerunLatestFailed) {
+    Start-Sleep -Seconds 2
+    $codeqlRuns = Get-Runs -Workflow "CodeQL Security Analysis" -RepoName $Repo -Limit $HistoryLimit
+    $androidRuns = Get-Runs -Workflow "Android CI" -RepoName $Repo -Limit $HistoryLimit
+}
+
 $now = Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz"
 $report = @()
 $report += "# CI Revalidation Report"
 $report += ""
 $report += "Generated: $now"
 $report += "Repository: $Repo"
+$report += "Rerun requested for latest failures: $($RerunLatestFailed.IsPresent.ToString().ToLowerInvariant())"
 $report += ""
 $report += (New-RunSection -WorkflowName "CodeQL Security Analysis" -Runs $codeqlRuns -RepoName $Repo)
 $report += ""
 $report += (New-RunSection -WorkflowName "Android CI" -Runs $androidRuns -RepoName $Repo)
+
+$codeqlAnnotations = @()
+$androidAnnotations = @()
+if ($codeqlRuns.Count -gt 0) {
+    $codeqlAnnotations = Get-AnnotationsForRun -RunId ($codeqlRuns[0].databaseId) -RepoName $Repo
+}
+if ($androidRuns.Count -gt 0) {
+    $androidAnnotations = Get-AnnotationsForRun -RunId ($androidRuns[0].databaseId) -RepoName $Repo
+}
+
+$hasBillingBlocker = (Test-BillingBlocker -Annotations $codeqlAnnotations) -or (Test-BillingBlocker -Annotations $androidAnnotations)
+
+$report += ""
+$report += "## Recommendation"
+if ($hasBillingBlocker) {
+    $report += "- Immediate action: Resolve GitHub Actions billing/spending-limit issue in account settings."
+    $report += "- Then rerun this script with -RerunLatestFailed to request reruns and regenerate evidence."
+} else {
+    $report += "- No billing blocker detected in latest run annotations."
+    $report += "- Continue with code/workflow-level troubleshooting if runs still fail."
+}
 
 $dir = Split-Path -Parent $OutputFile
 if ($dir -and -not (Test-Path $dir)) {
