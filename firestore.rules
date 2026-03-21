@@ -116,42 +116,35 @@ service cloud.firestore {
         return isSignedIn() && childId == request.auth.uid;
       }
 
+      function isValidTaskSchema() {
+        let d = request.resource.data;
+        return d.keys().hasOnly([
+            'description', 'deadline', 'status', 'photoUrl', 'createdAt',
+            'completedAt', 'updatedAt', 'masterImei', 'rejectionReason', 'aiAnalysis',
+            'unlockDuration', 'unlockUntil'
+          ])
+          && d.description is string
+          && d.description.size() > 0
+          && d.description.size() < 1000
+          && d.status is string
+          && d.status in ['pending', 'pending_approval', 'approved', 'rejected']
+          && (!('photoUrl' in d) || d.photoUrl is string || d.photoUrl == null)
+          && (!('rejectionReason' in d) || d.rejectionReason is string)
+          && (!('deadline' in d) || d.deadline is timestamp)
+          && (!('createdAt' in d) || d.createdAt is timestamp)
+          && (!('completedAt' in d) || d.completedAt is timestamp)
+          && (!('updatedAt' in d) || d.updatedAt is timestamp)
+          && (!('unlockDuration' in d) || d.unlockDuration is int)
+          && (!('unlockUntil' in d) || d.unlockUntil is timestamp)
+          && d.masterImei is string;
+      }
+
       allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
       // Only master can create tasks, and the task document must satisfy the schema.
-      allow create: if isMasterOfChild()
-        && request.resource.data.keys().hasOnly([
-          'description', 'deadline', 'status', 'photoUrl', 'createdAt',
-          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason', 'aiAnalysis',
-          'unlockDuration', 'unlockUntil'
-        ])
-        && request.resource.data.description is string
-        && request.resource.data.description.size() > 0
-        && request.resource.data.description.size() < 1000
-        && request.resource.data.status is string
-        && request.resource.data.status in ['pending', 'pending_approval', 'approved', 'rejected']
-        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
-        && (!('rejectionReason' in request.resource.data) || request.resource.data.rejectionReason is string)
-        && (!('unlockDuration' in request.resource.data) || request.resource.data.unlockDuration is int)
-        && (!('unlockUntil' in request.resource.data) || request.resource.data.unlockUntil is timestamp)
-        && request.resource.data.masterImei is string;
+      allow create: if isMasterOfChild() && isValidTaskSchema();
 
       // Both master and child device can update, but updates must satisfy the same schema.
-      allow update: if (isMasterOfChild() || isChildDevice())
-        && request.resource.data.keys().hasOnly([
-          'description', 'deadline', 'status', 'photoUrl', 'createdAt',
-          'completedAt', 'updatedAt', 'masterImei', 'rejectionReason', 'aiAnalysis',
-          'unlockDuration', 'unlockUntil'
-        ])
-        && request.resource.data.description is string
-        && request.resource.data.description.size() > 0
-        && request.resource.data.description.size() < 1000
-        && request.resource.data.status is string
-        && request.resource.data.status in ['pending', 'pending_approval', 'approved', 'rejected']
-        && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string || request.resource.data.photoUrl == null)
-        && (!('rejectionReason' in request.resource.data) || request.resource.data.rejectionReason is string)
-        && (!('unlockDuration' in request.resource.data) || request.resource.data.unlockDuration is int)
-        && (!('unlockUntil' in request.resource.data) || request.resource.data.unlockUntil is timestamp)
-        && request.resource.data.masterImei is string;
+      allow update: if (isMasterOfChild() || isChildDevice()) && isValidTaskSchema();
 
       allow delete: if isMasterOfChild(); // Only master can delete tasks
     }

@@ -470,7 +470,7 @@ describe("pairing.ts validatePairingToken subscription denied path", () => {
 // ═══ pairing.ts – validatePairingCode childLimit default (L155) ═══
 
 describe("pairing.ts validatePairingCode childLimit fallback", () => {
-  it("validatePairingCode when subscription has no childLimit → defaults to 1", async () => {
+  it("validatePairingCode when subscription has no childLimit → defaults to 4", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 86400, 0);
     state.pairingCodes["654321"] = {
@@ -486,8 +486,10 @@ describe("pairing.ts validatePairingCode childLimit fallback", () => {
       },
       // no childLimit in subscription
     };
-    // One child already paired → limit is 1 (default), so this should fail with resource-exhausted
+    // Four children already paired → limit is 4 (default), so this should fail with resource-exhausted
     state.children["existing-child"] = { masterImei: "m1", childImei: "existing" };
+    state.children["existing-child-2"] = { masterImei: "m1", childImei: "existing-2" };
+    state.children["existing-child-3"] = { masterImei: "m1", childImei: "existing-3" };
     const wrapped = testEnv.wrap(fns.validatePairingCode);
     await expect(wrapped({ pairingCode: "654321", childId: "new-child" }, { auth: { uid: "new-child", token: {} } }))
       .rejects.toThrow(/limit|exhausted/i);
@@ -497,7 +499,7 @@ describe("pairing.ts validatePairingCode childLimit fallback", () => {
 // ═══ pairing.ts – validatePairingToken childLimit default (L323) ═══
 
 describe("pairing.ts validatePairingToken childLimit fallback", () => {
-  it("validatePairingToken when subscription has no childLimit → defaults to 1", async () => {
+  it("validatePairingToken when subscription has no childLimit → defaults to 4", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 86400, 0);
     state.pairingTokens["tok123"] = {
@@ -512,6 +514,8 @@ describe("pairing.ts validatePairingToken childLimit fallback", () => {
       },
     };
     state.children["existing-child"] = { masterImei: "m1", childImei: "existing" };
+    state.children["existing-child-2"] = { masterImei: "m1", childImei: "existing-2" };
+    state.children["existing-child-3"] = { masterImei: "m1", childImei: "existing-3" };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
     await expect(wrapped({ pairingToken: "tok123" }, { auth: { uid: "new-child", token: {} } }))
       .rejects.toThrow(/limit|exhausted/i);

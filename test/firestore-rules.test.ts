@@ -123,6 +123,26 @@ describe("Firestore Security Rules - Structural Validation", () => {
     it("should validate task proof field as photoUrl", () => {
       expect(rulesContent).toContain("photoUrl");
     });
+
+    it("should type-check optional timestamp fields", () => {
+      expect(rulesContent).toContain("d.deadline is timestamp");
+      expect(rulesContent).toContain("d.createdAt is timestamp");
+      expect(rulesContent).toContain("d.completedAt is timestamp");
+      expect(rulesContent).toContain("d.updatedAt is timestamp");
+    });
+
+    it("should accept optional timestamp fields when absent", () => {
+      expect(rulesContent).toContain("!('deadline' in d)");
+      expect(rulesContent).toContain("!('createdAt' in d)");
+      expect(rulesContent).toContain("!('completedAt' in d)");
+      expect(rulesContent).toContain("!('updatedAt' in d)");
+    });
+
+    it("should validate task schema via a dedicated helper function", () => {
+      expect(rulesContent).toContain("function isValidTaskSchema()");
+      expect(rulesContent).toContain("isMasterOfChild() && isValidTaskSchema()");
+      expect(rulesContent).toContain("isChildDevice()) && isValidTaskSchema()");
+    });
   });
 
   // ==================== Support Ticket Access Tests ====================

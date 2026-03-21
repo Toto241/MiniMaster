@@ -139,7 +139,7 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md):** Recommended security enhancements.
 - **[Legacy Auth Inventory](docs/LEGACY_AUTH_INVENTORY.md):** Vollständiges Inventar aller secretKey/IMEI-Endpunkte mit Freeze-Richtlinie.
 - **[Auth Migration Plan](docs/AUTH_MIGRATION_PLAN.md):** Phasenplan zur Migration von secretKey/IMEI auf Firebase Auth.
-- **[Quality Review YYYY-MM-DD](docs/QUALITY_REVIEW_YYYY-MM-DD.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
+- **[Quality Review 2026-03-17](docs/QUALITY_REVIEW_2026-03-17.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
 - **[Language Global Roadmap](docs/LANGUAGE_GLOBAL_ROADMAP.md):** Global language prioritization, rollout waves, and locale strategy.
 - **[First-Start Language Implementation](docs/LANGUAGE_FIRST_START_IMPLEMENTATION.md):** Technical details for mandatory language selection on first launch.
 - **[Language Validation Report 2026-03-18](docs/LANGUAGE_VALIDATION_REPORT_2026-03-18.md):** Deep integration analysis and current validation outcomes.
