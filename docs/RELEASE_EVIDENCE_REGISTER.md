@@ -27,8 +27,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Coverage report (`npm test -- --coverage --runInBand`) | Stmts 99.56%, Branch 96.65%, Funcs 98.52%, Lines 99.65% | ✅ | Automated | 2026-03-21 |
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
-| CodeQL security scan (0 high/critical) | Letzter Run: failed - [Run 23380432454](https://github.com/Toto241/MiniMaster/actions/runs/23380432454) | ⬜ | Automated | 2026-03-21 |
-| Android build (if applicable) | Letzter Run: failed - [Run 23378478907](https://github.com/Toto241/MiniMaster/actions/runs/23378478907) | ⬜ | Automated | 2026-03-21 |
+| CodeQL security scan (0 high/critical) | Letzter Run: failed - [Run 23380432454](https://github.com/Toto241/MiniMaster/actions/runs/23380432454); Root cause (Compose weight import) in `childApp/.../MainActivity.kt` behoben, neuer CI-Run wartet auf Push (kein `workflow_dispatch`) | ⬜ | Automated | 2026-03-21 |
+| Android build (if applicable) | Letzter Run: failed - [Run 23378478907](https://github.com/Toto241/MiniMaster/actions/runs/23378478907); Root cause (Compose weight import) in `childApp/.../MainActivity.kt` behoben, neuer CI-Run wartet auf Push (kein `workflow_dispatch`) | ⬜ | Automated | 2026-03-21 |
 | Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
 
 ### 3.2 Functional Commissioning Gate
@@ -98,7 +98,7 @@ Dieses Register wird bei jedem Steering-Checkpoint aktualisiert und ist Teil des
 | Store Listing DE vollständig (Text + Screenshots) | Finaler Store-Listing-Entwurf + Asset-Paket | ⬜ | Product/Ops | offen |
 | Permissions Declaration einreichen (Accessibility/Usage/Overlay) | Bestätigte Permissions-Declaration | ⬜ | Compliance Owner | offen |
 | App-Access-Anleitung in Play Console hinterlegen | Link/Screenshot zur Reviewer-Anleitung | ⬜ | Product/Ops | offen |
-| CodeQL-Ergebnis verlinken | [Run 23380432454](https://github.com/Toto241/MiniMaster/actions/runs/23380432454) (aktuell failed; 0 high/critical als Ziel) | ⬜ | Engineering Owner | offen |
-| Android CI Build-Nachweis verlinken | [Run 23378478907](https://github.com/Toto241/MiniMaster/actions/runs/23378478907) (aktuell failed) | ⬜ | Engineering Owner | offen |
+| CodeQL-Ergebnis verlinken | [Run 23380432454](https://github.com/Toto241/MiniMaster/actions/runs/23380432454) (aktuell failed; Fix in childApp MainActivity umgesetzt; 0 high/critical als Ziel) | ⬜ | Engineering Owner | offen |
+| Android CI Build-Nachweis verlinken | [Run 23378478907](https://github.com/Toto241/MiniMaster/actions/runs/23378478907) (aktuell failed; Fix in childApp MainActivity umgesetzt) | ⬜ | Engineering Owner | offen |
 | Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST | ⬜ | QA/Operations | offen |
 | On-call/Eskalations-Roster verbindlich benennen | Roster mit Namen, Kontakt, Vertretung | ⬜ | Operations Lead | offen |
