@@ -166,6 +166,23 @@ Consolidate evidence in the release evidence register: [docs/RELEASE_EVIDENCE_RE
 Review CI gate expectations in the CI runbook: [docs/CI_RUNBOOK.md](docs/CI_RUNBOOK.md).
 Validate security baseline before release: [docs/SECURITY_BASELINE_CHECKLIST.md](docs/SECURITY_BASELINE_CHECKLIST.md).
 
+### 6.1 Release Cutover Checklist (Before Go-Live)
+
+Execute this list after technical smoke checks and before final Go/No-Go:
+
+1. Firebase key rotation/restrictions completed and logged in runbook notes.
+2. Play Console Data Safety form submitted and reviewed.
+3. IARC rating completed.
+4. Store listing finalized (texts, screenshots, contact).
+5. Permissions declaration submitted (Accessibility / Usage / Overlay).
+6. App access guide attached for reviewer access.
+7. CodeQL result linked in release evidence (`0 high/critical`).
+8. Android CI build evidence linked (workflow run + APK artifacts).
+9. Physical commissioning checklist executed and archived.
+10. On-call + escalation roster assigned and visible to operators.
+
+Source of truth for status tracking: [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) section "Before Go-Live: Operative Restpunkte".
+
 ## 7. Evidence & Audit Trail
 
 For every SEV-1 / SEV-2 incident record:
@@ -186,5 +203,7 @@ Required secrets / credentials should be maintained outside the repository:
 - Google Play / service account credentials
 - `GEMINI_API_KEY`
 - optional `OPENAI_API_KEY`
+
+For CI/CD-specific repository secrets and their exact names, use the deploy guide: [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md).
 
 Never commit service account JSON files, `google-services.json`, API keys or copied console tokens.

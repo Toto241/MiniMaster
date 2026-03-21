@@ -4,37 +4,62 @@ Status: mandatory template for every release candidate go/no-go decision.
 
 ## Release Candidate
 
-| Field | Value |
+|Field|Value|
 |-------|-------|
-| Candidate ID (commit/tag) | |
-| Branch | |
-| Freeze Date | |
-| Decision Date | |
-| Target Rollout Scope | |
+|Candidate ID (commit/tag)||
+|Branch||
+|Freeze Date||
+|Decision Date||
+|Target Rollout Scope||
+
+### Mandatory Input Artifacts
+
+1. `docs/RELEASE_EVIDENCE_REGISTER.md` (inkl. Abschnitt "Before Go-Live: Operative Restpunkte")
+2. `docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md`
+3. `docs/READINESS_SCORECARD_2026-03-19.md`
+4. `docs/RUNBOOK.md` (inkl. Release Cutover Checklist)
+5. Optional: `docs/COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md` als Baseline-Nachweis
 
 ## Gate Summary
 
-| Gate | Status | Evidence Link | Blocker |
+|Gate|Status|Evidence Link|Blocker|
 |------|--------|---------------|---------|
-| Technical Quality (build/lint/test) | ⬜ Pass / ⬜ Fail | | |
-| Functional Commissioning | ⬜ Pass / ⬜ Fail | | |
-| Security and Identity | ⬜ Pass / ⬜ Fail | | |
-| Compliance | ⬜ Pass / ⬜ Fail | | |
-| Operational Readiness | ⬜ Pass / ⬜ Fail | | |
+|Technical Quality (build/lint/test)|⬜ Pass / ⬜ Fail|||
+|Functional Commissioning|⬜ Pass / ⬜ Fail|||
+|Security and Identity|⬜ Pass / ⬜ Fail|||
+|Compliance|⬜ Pass / ⬜ Fail|||
+|Play Store Submission Readiness|⬜ Pass / ⬜ Fail|||
+|Operational Readiness|⬜ Pass / ⬜ Fail|||
 
 ## Open Issues
 
-| Priority | Count | Details |
+|Priority|Count|Details|
 |----------|-------|---------|
-| P0 (Release Blocker) | | |
-| P1 (Requires risk acceptance) | | |
-| P2/P3 (Post-release backlog) | | |
+|P0 (Release Blocker)|||
+|P1 (Requires risk acceptance)|||
+|P2/P3 (Post-release backlog)|||
 
 ## Decision Rules
 
 1. **Go:** All gates passed, zero P0 issues.
 2. **Conditional Go:** All gates passed, max one P1 with documented risk acceptance and due date.
 3. **No-Go:** Any gate failed or any P0 issue open.
+4. **No-Go:** Any "Before Go-Live: Operative Restpunkte" item is unresolved without owner + due date + explicit risk acceptance.
+
+## Pre-Go-Live Operational Blockers (from Release Evidence Register)
+
+|Item|Status|Owner|Due Date|Risk accepted?|
+|------|--------|-------|----------|----------------|
+|Firebase key rotation/restrictions|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|Play Console Data Safety|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|IARC rating|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|Store listing finalized|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|Permissions declaration|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|App access guide attached|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|CodeQL result linked|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|Android CI build evidence linked|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|Physical commissioning executed|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
+|On-call roster assigned|⬜ Open / ⬜ Closed|||⬜ Yes / ⬜ No|
 
 ## Decision
 
@@ -44,24 +69,24 @@ Status: mandatory template for every release candidate go/no-go decision.
 
 ## Risk Acceptance (if Conditional Go)
 
-| Risk ID | Description | Accepted By | Mitigation | Due Date |
+|Risk ID|Description|Accepted By|Mitigation|Due Date|
 |---------|-------------|-------------|------------|----------|
-| | | | | |
+||||||
 
 ## Sign-Off
 
-| Role | Name | Decision | Date |
+|Role|Name|Decision|Date|
 |------|------|----------|------|
-| Engineering Owner | | | |
-| Product/Ops Owner | | | |
-| Security/Compliance Owner | | | |
-| Release Manager | | | |
+|Engineering Owner||||
+|Product/Ops Owner||||
+|Security/Compliance Owner||||
+|Release Manager||||
 
 ## Follow-Up Backlog
 
-| Item | Owner | Priority | Due Date |
+|Item|Owner|Priority|Due Date|
 |------|-------|----------|----------|
-| | | | |
+|||||
 
 ---
 
@@ -69,6 +94,6 @@ Status: mandatory template for every release candidate go/no-go decision.
 
 1. Copy this template for each release candidate.
 2. Fill all fields before the go/no-go board meeting.
-3. Link to the Release Evidence Register for detailed evidence.
+3. Pull all blocker states from `docs/RELEASE_EVIDENCE_REGISTER.md` and keep both documents in sync.
 4. Archive the completed template with the release artifacts.
 5. Use consistent naming: `RELEASE_DECISION_<date>_<candidate-id>.md`
