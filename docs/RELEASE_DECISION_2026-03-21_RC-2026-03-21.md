@@ -24,7 +24,7 @@ Status: working decision record for the current candidate.
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Lint warnings + CodeQL/Android CI failed |
+| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test lokal gruen; CodeQL/Android CI letzter Run failed, Fix umgesetzt, CI-Rerun offen |
 | Functional Commissioning | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Mehrere commissioning checks offen |
 | Security and Identity | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Firebase key rotation/restrictions offen |
 | Compliance | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Dokumentierte Compliance-Evidenz vorhanden |
@@ -83,4 +83,5 @@ Reason: Mandatory gates are not passed and multiple before-go-live blockers are 
 | ----- | ----- | ----- | ----- |
 | CodeQL workflow auf gruen bringen | Engineering | P0 | offen |
 | Android CI workflow auf gruen bringen | Engineering | P0 | offen |
+| CI-Rerun nach Push ausloesen und Evidence-Links aktualisieren | Engineering | P0 | offen |
 | Operative Restpunkte aus Evidence Register schliessen | Product/Ops + Security + QA | P0 | offen |
