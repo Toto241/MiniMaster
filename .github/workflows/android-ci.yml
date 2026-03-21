@@ -25,6 +25,70 @@ jobs:
         uses: gradle/gradle-build-action@v3
       - name: Show Gradle version
         run: ./scripts/run-android-checks.sh --version
+      - name: Prepare Firebase placeholder configs
+        run: |
+          cat > masterApp/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-ci",
+              "storage_bucket": "placeholder-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:placeholdermaster",
+                  "android_client_info": {
+                    "package_name": "com.minimaster.masterapp"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          cat > childApp/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-ci",
+              "storage_bucket": "placeholder-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:placeholderchild",
+                  "android_client_info": {
+                    "package_name": "com.google.pairing"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
       - name: Build & Unit tests
         run: ./scripts/run-android-checks.sh clean testDebugUnitTest :masterApp:assembleDebug :childApp:assembleDebug
       - name: Lint
