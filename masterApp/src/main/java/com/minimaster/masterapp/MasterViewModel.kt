@@ -79,7 +79,8 @@ class MasterViewModel @Inject constructor(
     private val credentialsRepository: MasterCredentialsRepository
 ) : ViewModel() {
 
-    private var firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+    private var firebaseAuth: FirebaseAuth? = null
+    private fun auth(): FirebaseAuth = firebaseAuth ?: FirebaseAuth.getInstance().also { firebaseAuth = it }
 
     private val _registrationState = MutableStateFlow<RegistrationState>(RegistrationState.Idle)
     /** A [StateFlow] representing the current state of the device registration process. */
@@ -132,7 +133,7 @@ class MasterViewModel @Inject constructor(
                 val masterId = payload?.get("masterId") as? String
                 val customToken = payload?.get("customToken") as? String
                 if (masterId != null && customToken != null) {
-                    firebaseAuth.signInWithCustomToken(customToken).await()
+                    auth().signInWithCustomToken(customToken).await()
                     credentialsRepository.saveCredentials(masterId, "")
                     _debugState.value = DebugState(imei = masterId, secretKey = null)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
@@ -265,7 +266,7 @@ class MasterViewModel @Inject constructor(
         }
     }
 
-    internal fun setFirebaseAuthForTesting(firebaseAuth: FirebaseAuth) {
-        this.firebaseAuth = firebaseAuth
+    internal fun setFirebaseAuthForTesting(auth: FirebaseAuth) {
+        this.firebaseAuth = auth
     }
 }
