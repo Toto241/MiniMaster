@@ -45,6 +45,30 @@ Updates the Firebase configuration in the web applications (Admin Panel and Web-
 *   Click on the web app icon
 *   Copy the configuration values
 
+### 3. revalidate-release-gates.ps1
+
+Creates a fresh CI evidence snapshot for release gates (CodeQL + Android CI).
+
+**Prerequisites:**
+*   GitHub CLI (`gh`) installed and authenticated for the repository.
+
+**Usage:**
+```powershell
+pwsh ./scripts/revalidate-release-gates.ps1
+```
+
+Optional parameters:
+
+```powershell
+pwsh ./scripts/revalidate-release-gates.ps1 -Repo Toto241/MiniMaster -OutputFile docs/CI_REVALIDATION_LATEST.md -HistoryLimit 10
+```
+
+**What it does:**
+1.  Reads recent runs for workflows `CodeQL Security Analysis` and `Android CI`.
+2.  Captures latest run, latest success, and failure annotations.
+3.  Detects GitHub billing/spending-limit blockers in annotations.
+4.  Writes a Markdown report to `docs/CI_REVALIDATION_LATEST.md` (or custom output path).
+
 ## Getting Your Service Account Key
 
 To use the `setup-admin.js` script, you need a service account key:
