@@ -911,6 +911,45 @@ input:focus, select:focus, textarea:focus {
     flex: 1;
 }
 
+.p0-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+}
+
+.p0-card {
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    padding: 12px;
+    background: #f8fbff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.p0-card h4 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #0f172a;
+}
+
+.p0-card input[type="text"] {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 0.86rem;
+}
+
+#p0-notes {
+    inline-size: 100%;
+    margin-block-start: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.9rem;
+    resize: vertical;
+}
+
 .commissioning-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

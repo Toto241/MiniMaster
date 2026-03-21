@@ -5,6 +5,7 @@
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 const COMMAND_BUILDER_STORAGE_KEY = "operatorCommandBuilderConfig";
 const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations";
+const P0_BLOCKER_COCKPIT_STORAGE_KEY = "operatorP0BlockerCockpit";
 
 // ==================== SESSION TIMEOUT ====================
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
@@ -2454,6 +2455,7 @@ function switchTab(tabName, evt) {
 function initializeSetupAssistant() {
     renderSetupChecklist();
     renderCommissioningAttestations();
+    renderP0BlockerCockpit();
     renderAllPlatformSections();
     renderAiConsentStatus();
     renderBootstrapFirebaseConfig(firebaseConfig);
@@ -5363,6 +5365,193 @@ async function triggerLegalReconsent() {
 
 const PLAYSTORE_READINESS_KEY = "playStoreReadinessState";
 
+function getP0BlockerCockpitState() {
+    const defaults = {
+        checks: {
+            keyRotationDone: false,
+            keyRestrictionsDone: false,
+            playDataSafety: false,
+            playIarc: false,
+            playListing: false,
+            playPermissions: false,
+            playAppAccess: false,
+            commissioningAndroid: false,
+            commissioningAi: false,
+            commissioningSupport: false,
+            commissioningCompliance: false,
+            rosterAssigned: false,
+        },
+        keyEvidence: "",
+        playEvidence: "",
+        commissioningEvidence: "",
+        rosterPrimary: "",
+        rosterSecondary: "",
+        rosterSecurity: "",
+        rosterEvidence: "",
+        notes: "",
+        updatedAt: null,
+    };
+
+    try {
+        const raw = localStorage.getItem(P0_BLOCKER_COCKPIT_STORAGE_KEY);
+        if (!raw) return defaults;
+        const parsed = JSON.parse(raw);
+        return {
+            checks: { ...defaults.checks, ...(parsed.checks || {}) },
+            keyEvidence: parsed.keyEvidence || "",
+            playEvidence: parsed.playEvidence || "",
+            commissioningEvidence: parsed.commissioningEvidence || "",
+            rosterPrimary: parsed.rosterPrimary || "",
+            rosterSecondary: parsed.rosterSecondary || "",
+            rosterSecurity: parsed.rosterSecurity || "",
+            rosterEvidence: parsed.rosterEvidence || "",
+            notes: parsed.notes || "",
+            updatedAt: parsed.updatedAt || null,
+        };
+    } catch (_) {
+        return defaults;
+    }
+}
+
+function setP0BlockerCockpitState(state) {
+    localStorage.setItem(P0_BLOCKER_COCKPIT_STORAGE_KEY, JSON.stringify(state));
+}
+
+function renderP0BlockerCockpit() {
+    const state = getP0BlockerCockpitState();
+
+    const checkboxMap = {
+        "p0-key-rotation-done": "keyRotationDone",
+        "p0-key-restrictions-done": "keyRestrictionsDone",
+        "p0-play-data-safety": "playDataSafety",
+        "p0-play-iarc": "playIarc",
+        "p0-play-listing": "playListing",
+        "p0-play-permissions": "playPermissions",
+        "p0-play-app-access": "playAppAccess",
+        "p0-commissioning-android": "commissioningAndroid",
+        "p0-commissioning-ai": "commissioningAi",
+        "p0-commissioning-support": "commissioningSupport",
+        "p0-commissioning-compliance": "commissioningCompliance",
+        "p0-roster-assigned": "rosterAssigned",
+    };
+
+    Object.entries(checkboxMap).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = Boolean(state.checks[key]);
+    });
+
+    const valueMap = {
+        "p0-key-evidence": state.keyEvidence,
+        "p0-play-evidence": state.playEvidence,
+        "p0-commissioning-evidence": state.commissioningEvidence,
+        "p0-roster-primary": state.rosterPrimary,
+        "p0-roster-secondary": state.rosterSecondary,
+        "p0-roster-security": state.rosterSecurity,
+        "p0-roster-evidence": state.rosterEvidence,
+        "p0-notes": state.notes,
+    };
+
+    Object.entries(valueMap).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+
+    const total = Object.keys(state.checks).length;
+    const done = Object.values(state.checks).filter(Boolean).length;
+    const donePercent = total > 0 ? Math.round((done / total) * 100) : 0;
+    const isReady = done === total;
+    const summaryEl = document.getElementById("p0-blocker-summary");
+    if (summaryEl) {
+        const ts = state.updatedAt ? new Date(state.updatedAt).toLocaleString("de-DE") : "noch nie";
+        summaryEl.innerHTML =
+            "<div class='" + (isReady ? "success-box" : "error") + "'>" +
+            "<p><strong>P0 Status:</strong> " + (isReady ? "✅ Alle P0-Punkte abgeschlossen" : "⚠️ P0-Punkte offen") + "</p>" +
+            "<p><strong>Erledigt:</strong> " + done + "/" + total + " (" + donePercent + "%)</p>" +
+            "<p><strong>Aktualisiert:</strong> " + escapeHtml(ts) + "</p>" +
+            "</div>";
+    }
+}
+
+function collectP0BlockerCockpitFromUi() {
+    return {
+        checks: {
+            keyRotationDone: Boolean(document.getElementById("p0-key-rotation-done")?.checked),
+            keyRestrictionsDone: Boolean(document.getElementById("p0-key-restrictions-done")?.checked),
+            playDataSafety: Boolean(document.getElementById("p0-play-data-safety")?.checked),
+            playIarc: Boolean(document.getElementById("p0-play-iarc")?.checked),
+            playListing: Boolean(document.getElementById("p0-play-listing")?.checked),
+            playPermissions: Boolean(document.getElementById("p0-play-permissions")?.checked),
+            playAppAccess: Boolean(document.getElementById("p0-play-app-access")?.checked),
+            commissioningAndroid: Boolean(document.getElementById("p0-commissioning-android")?.checked),
+            commissioningAi: Boolean(document.getElementById("p0-commissioning-ai")?.checked),
+            commissioningSupport: Boolean(document.getElementById("p0-commissioning-support")?.checked),
+            commissioningCompliance: Boolean(document.getElementById("p0-commissioning-compliance")?.checked),
+            rosterAssigned: Boolean(document.getElementById("p0-roster-assigned")?.checked),
+        },
+        keyEvidence: (document.getElementById("p0-key-evidence")?.value || "").trim(),
+        playEvidence: (document.getElementById("p0-play-evidence")?.value || "").trim(),
+        commissioningEvidence: (document.getElementById("p0-commissioning-evidence")?.value || "").trim(),
+        rosterPrimary: (document.getElementById("p0-roster-primary")?.value || "").trim(),
+        rosterSecondary: (document.getElementById("p0-roster-secondary")?.value || "").trim(),
+        rosterSecurity: (document.getElementById("p0-roster-security")?.value || "").trim(),
+        rosterEvidence: (document.getElementById("p0-roster-evidence")?.value || "").trim(),
+        notes: (document.getElementById("p0-notes")?.value || "").trim(),
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+function saveP0BlockerCockpit() {
+    const state = collectP0BlockerCockpitFromUi();
+    setP0BlockerCockpitState(state);
+    renderP0BlockerCockpit();
+
+    const resultEl = document.getElementById("p0-blocker-result");
+    if (resultEl) {
+        resultEl.innerHTML = "<div class='success-box'>P0-Cockpit gespeichert.</div>";
+    }
+    showNotification("P0-Cockpit gespeichert.", "success");
+}
+
+function exportP0BlockerCockpit() {
+    const state = collectP0BlockerCockpitFromUi();
+    setP0BlockerCockpitState(state);
+    renderP0BlockerCockpit();
+
+    const payload = {
+        exportedAt: new Date().toISOString(),
+        tool: "MiniMaster Admin Panel",
+        type: "p0-blocker-cockpit",
+        ...state,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "p0-blocker-cockpit-" + safeDate + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const resultEl = document.getElementById("p0-blocker-result");
+    if (resultEl) {
+        resultEl.innerHTML = "<div class='success-box'>P0-Status exportiert.</div>";
+    }
+}
+
+function resetP0BlockerCockpit() {
+    if (!confirm("P0-Cockpit wirklich zurücksetzen?")) return;
+    localStorage.removeItem(P0_BLOCKER_COCKPIT_STORAGE_KEY);
+    renderP0BlockerCockpit();
+
+    const resultEl = document.getElementById("p0-blocker-result");
+    if (resultEl) {
+        resultEl.innerHTML = "<div class='success-box'>P0-Cockpit wurde zurückgesetzt.</div>";
+    }
+}
+
 function getPlayStoreReadinessState() {
     const defaults = {
         checks: {
@@ -5623,6 +5812,7 @@ function downloadReviewerGuide() {
 
 function exportReleaseArtefact() {
     const playStoreState = getPlayStoreReadinessState();
+    const p0BlockerState = getP0BlockerCockpitState();
     const platformState = getPlatformReadiness();
     const attestations = getCommissioningAttestations();
     const status = computeGoLiveStatus();
@@ -5642,6 +5832,7 @@ function exportReleaseArtefact() {
             totals: status.totals,
         },
         commissioningSummary: commissioningSummary || null,
+        p0BlockerCockpit: p0BlockerState,
         playStoreReadiness: playStoreState,
         platformChecksSummary: status.platformStatus,
         platformChecksDetail: platformState,
