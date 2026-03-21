@@ -24,7 +24,7 @@ Status: working decision record for the current candidate.
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test lokal gruen; CodeQL/Android CI Verifikationslaeufe laufen aktuell (in progress) |
+| Technical Quality (build/lint/test) | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test/Coverage gruen; CodeQL [Run 23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965) ✅; Android CI [Run 23382045689](https://github.com/Toto241/MiniMaster/actions/runs/23382045689) ✅ |
 | Functional Commissioning | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Mehrere commissioning checks offen |
 | Security and Identity | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Firebase key rotation/restrictions offen |
 | Compliance | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Dokumentierte Compliance-Evidenz vorhanden |
@@ -35,7 +35,7 @@ Status: working decision record for the current candidate.
 
 | Priority | Count | Details |
 | ----- | ----- | ----- |
-| P0 (Release Blocker) | 6 | Key rotation offen; Play Console Paket offen; Permissions/App Access offen; CodeQL failed; Android CI failed; commissioning offen |
+| P0 (Release Blocker) | 4 | Key rotation offen; Play Console Paket offen; Permissions/App Access offen; commissioning offen |
 | P1 (Requires risk acceptance) | 0 | - |
 | P2/P3 (Post-release backlog) | 0 | - |
 
@@ -49,8 +49,8 @@ Status: working decision record for the current candidate.
 | Store listing finalized | Open | Product/Ops | offen | No |
 | Permissions declaration | Open | Compliance Owner | offen | No |
 | App access guide attached | Open | Product/Ops | offen | No |
-| CodeQL result linked | Open (failed run linked) | Engineering Owner | offen | No |
-| Android CI build evidence linked | Open (failed run linked) | Engineering Owner | offen | No |
+| CodeQL result linked | **Closed** - [Run 23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965) success | Engineering Owner | 2026-03-21 | - |
+| Android CI build evidence linked | **Closed** - [Run 23382045689](https://github.com/Toto241/MiniMaster/actions/runs/23382045689) success | Engineering Owner | 2026-03-21 | - |
 | Physical commissioning executed | Open | QA/Operations | offen | No |
 | On-call roster assigned | Open | Operations Lead | offen | No |
 
