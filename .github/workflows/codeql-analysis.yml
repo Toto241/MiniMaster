@@ -50,11 +50,71 @@ jobs:
           # Custom query pack for extra security checks
           queries: security-and-quality,./codeql-custom-queries-actions
 
-      - name: Prepare Firebase config templates for Android build
+      - name: Prepare Firebase placeholder configs for Android build
         if: ${{ matrix.language == 'java' }}
         run: |
-          cp masterApp/google-services.template.json masterApp/google-services.json
-          cp childApp/google-services.template.json childApp/google-services.json
+          cat > masterApp/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-ci",
+              "storage_bucket": "placeholder-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:placeholdermaster",
+                  "android_client_info": {
+                    "package_name": "com.minimaster.masterapp"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          cat > childApp/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-ci",
+              "storage_bucket": "placeholder-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:placeholderchild",
+                  "android_client_info": {
+                    "package_name": "com.google.pairing"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
       # Autobuild attempts to build any compiled languages
       - name: Autobuild
