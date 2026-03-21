@@ -63,11 +63,20 @@ Optional parameters:
 pwsh ./scripts/revalidate-release-gates.ps1 -Repo Toto241/MiniMaster -OutputFile docs/CI_REVALIDATION_LATEST.md -HistoryLimit 10
 ```
 
+To request reruns for the latest failed runs before generating the report:
+
+```powershell
+pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed
+```
+
 **What it does:**
 1.  Reads recent runs for workflows `CodeQL Security Analysis` and `Android CI`.
-2.  Captures latest run, latest success, and failure annotations.
-3.  Detects GitHub billing/spending-limit blockers in annotations.
-4.  Writes a Markdown report to `docs/CI_REVALIDATION_LATEST.md` (or custom output path).
+2.  Optionally requests reruns for latest failed runs (`-RerunLatestFailed`).
+3.  Captures latest run, latest success, and failure annotations.
+4.  Detects GitHub billing/spending-limit blockers in annotations.
+5.  Writes a Markdown report to `docs/CI_REVALIDATION_LATEST.md` (or custom output path), including a recommendation section.
+
+**Note:** If a rerun was just triggered and is still queued/in-progress, the report marks annotation/billing evaluation as `pending` until the run completes.
 
 ## Getting Your Service Account Key
 
