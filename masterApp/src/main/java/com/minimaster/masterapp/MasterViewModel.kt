@@ -128,7 +128,7 @@ class MasterViewModel @Inject constructor(
             val data = hashMapOf("imei" to imei)
             try {
                 val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
-                val payload = result.data as? Map<*, *>
+                val payload = result.getData() as? Map<*, *>
                 val masterId = payload?.get("masterId") as? String
                 val customToken = payload?.get("customToken") as? String
                 if (masterId != null && customToken != null) {
@@ -192,7 +192,7 @@ class MasterViewModel @Inject constructor(
 
             try {
                 val result = functions.getHttpsCallable("needsLegalReconsent").call(data).await()
-                val payload = result.data as? Map<*, *> ?: run {
+                val payload = result.getData() as? Map<*, *> ?: run {
                     _legalConsentState.value = LegalConsentState.Error("Invalid legal status response.")
                     return@launch
                 }
