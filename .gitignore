@@ -19,6 +19,12 @@ coverage/
 local.properties
 *.hprof
 
+# Environment files (contain secrets – never commit)
+.env
+.env.local
+.env.*.local
+# .env.example is intentionally NOT ignored (it's the safe template)
+
 # Firebase app configs (must never be committed)
 **/google-services.json
 **/GoogleService-Info.plist
