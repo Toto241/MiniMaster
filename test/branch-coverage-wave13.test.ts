@@ -1109,21 +1109,27 @@ describe("ownership mismatch and default fallback branches", () => {
 });
 
 describe("pairing childLimit fallback branches", () => {
-  it("validatePairingCode uses fallback childLimit=1 when active subscription has no childLimit", async () => {
+  it("validatePairingCode uses fallback childLimit=4 when active subscription has no childLimit", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
     state.pairingCodes["333333"] = { masterId: "m1", expiresAt: futureTs };
     state.masters.m1 = { imei: "m1", subscription: { status: "active" } };
+    state.children["child-2"] = { masterImei: "m1" };
+    state.children["child-3"] = { masterImei: "m1" };
+    state.children["child-4"] = { masterImei: "m1" };
 
     await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "333333" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
   });
 
-  it("validatePairingToken uses fallback childLimit=1 when active subscription has no childLimit", async () => {
+  it("validatePairingToken uses fallback childLimit=4 when active subscription has no childLimit", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
     state.pairingTokens["tok-limit"] = { masterId: "m1", expiresAt: futureTs };
     state.masters.m1 = { imei: "m1", subscription: { status: "active" } };
+    state.children["child-2"] = { masterImei: "m1" };
+    state.children["child-3"] = { masterImei: "m1" };
+    state.children["child-4"] = { masterImei: "m1" };
 
     await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
@@ -1150,7 +1156,7 @@ describe("pairing childLimit fallback branches", () => {
     expect(res.masterId).toBe("m1");
   });
 
-  it("validatePairingCode uses fallback childLimit=1 when access is granted via active trial", async () => {
+  it("validatePairingCode uses fallback childLimit=4 when access is granted via active trial", async () => {
     const admin = require("firebase-admin");
     const nowSeconds = Math.floor(Date.now() / 1000);
     const futureTs = new admin.firestore.Timestamp(nowSeconds + 3600, 0);
@@ -1162,12 +1168,15 @@ describe("pairing childLimit fallback branches", () => {
         trialEndsAt: new admin.firestore.Timestamp(nowSeconds + 3600, 0),
       },
     };
+    state.children["child-2"] = { masterImei: "m1" };
+    state.children["child-3"] = { masterImei: "m1" };
+    state.children["child-4"] = { masterImei: "m1" };
 
     await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "333335" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
   });
 
-  it("validatePairingToken uses fallback childLimit=1 when access is granted via active trial", async () => {
+  it("validatePairingToken uses fallback childLimit=4 when access is granted via active trial", async () => {
     const admin = require("firebase-admin");
     const nowSeconds = Math.floor(Date.now() / 1000);
     const futureTs = new admin.firestore.Timestamp(nowSeconds + 3600, 0);
@@ -1179,6 +1188,9 @@ describe("pairing childLimit fallback branches", () => {
         trialEndsAt: new admin.firestore.Timestamp(nowSeconds + 3600, 0),
       },
     };
+    state.children["child-2"] = { masterImei: "m1" };
+    state.children["child-3"] = { masterImei: "m1" };
+    state.children["child-4"] = { masterImei: "m1" };
 
     await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-trial-limit" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);

@@ -1026,7 +1026,7 @@ describe("createPairingCode – Branch-Coverage", () => {
   it("wirft resource-exhausted ohne aktives Abo", async () => {
     state.masters.m1.subscription = { status: "expired", childLimit: 1 };
     const wrapped = testEnv.wrap(fns.createPairingCode);
-    await expect(wrapped({}, asMaster)).rejects.toThrow(/subscription or trial/i);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/subscription.*trial/i);
   });
 
 });

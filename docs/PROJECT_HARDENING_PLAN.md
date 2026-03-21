@@ -9,28 +9,37 @@ This PR completes the following changes. Reviewers should pay attention to the a
 ### Changes made
 
 **1. Task status notifications (`src/triggers.ts`)**
+
 - Extended `onTaskStatusChange` to notify the **child device** when a task is approved or rejected, in addition to the existing master notification when a task is submitted for review.
 - Child FCM token is fetched from `children/{childId}` and used to send a targeted data message with `taskId`, `childId`, and `status` fields.
 - If no FCM token is present for the child, a warning is logged and no notification is sent (no crash).
 
 **2. Firestore rules — task schema enforcement (`firestore.rules`)**
-- The previous implementation had a separate `allow create, update: if isSignedIn()` clause that allowed any authenticated user to write tasks. This has been replaced.
-- Task `create` is now gated by `isMasterOfChild()` **and** inline schema validation.
-- Task `update` is now gated by `isMasterOfChild() || isChildDevice()` **and** inline schema validation.
+
+- The previous implementation had a separate `allow create, update: if isSignedIn()` clause that allowed any authenticated user to write tasks. This has been removed.
+- Task schema validation is centralized in `isValidTaskSchema()` and enforced together with ownership checks for both `create` and `update`.
+- Task `create` is now gated by `isMasterOfChild()` **and** schema validation.
+- Task `update` is now gated by `isMasterOfChild() || isChildDevice()` **and** schema validation.
 - Accepted field set updated to match the actual data model: `description`, `deadline`, `status`, `photoUrl`, `createdAt`, `completedAt`, `updatedAt`, `masterImei`, `rejectionReason`.
 - Status values corrected to lowercase: `pending`, `pending_approval`, `approved`, `rejected`.
-- Optional fields (`photoUrl`, `rejectionReason`, `deadline`, timestamps) validated as the correct type when present.
+- Optional timestamp fields (`deadline`, `createdAt`, `completedAt`, `updatedAt`) are validated as `timestamp` when present.
+- Optional string fields (`photoUrl`, `rejectionReason`) are validated as the correct type when present.
 
 **3. New tests (`test/task-status-notifications.test.ts`, `test/firestore-rules.test.ts`)**
+
 - `test/task-status-notifications.test.ts` covers:
+
   - Master receives notification when task moves to `pending_approval`.
   - Child receives notification when task is `approved`.
   - Child receives notification when task is `rejected`.
   - No notification is sent when status does not change.
+
 - `test/firestore-rules.test.ts` covers:
+
   - Lowercase status values (`pending`, `pending_approval`, `approved`, `rejected`).
   - `photoUrl` field presence in the task schema.
   - Client writes to `pairingCodes` and `subscriptions` are denied.
+  - Timestamp guards and helper-based task schema validation are present.
 
 ### Rollout notes
 
