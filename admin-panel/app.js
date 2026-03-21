@@ -3662,6 +3662,7 @@ async function saveAdminResponse(ticketId) {
             respondedAt: firebase.firestore.FieldValue.serverTimestamp(),
             status: "awaiting_user_feedback"
         });
+        autoMarkP0Check("commissioningSupport", "commissioningEvidence", `[${new Date().toLocaleString("de-DE")}] Support-Antwort gespeichert (Ticket ${ticketId}).`);
         showNotification("Admin-Antwort erfolgreich gespeichert.", "success");
         loadSupportTickets();
     } catch (error) {
@@ -3675,6 +3676,7 @@ async function updateTicketStatus(ticketId, newStatus) {
             status: newStatus,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        autoMarkP0Check("commissioningSupport", "commissioningEvidence", `[${new Date().toLocaleString("de-DE")}] Ticket-Status aktualisiert (${ticketId} -> ${newStatus}).`);
         showNotification("Ticket status updated to " + newStatus + ".", "success");
         loadSupportTickets();
     } catch (error) {
@@ -3746,6 +3748,7 @@ async function triggerDsarExportForUser(masterId) {
                 <a href="${url}" download="dsar_export_${masterId}_${Date.now()}.json" class="btn btn-primary">Download JSON Export</a>
             </div>
         `;
+        autoMarkP0Check("commissioningCompliance", "commissioningEvidence", `[${new Date().toLocaleString("de-DE")}] DSAR-Export erfolgreich für ${masterId}.`);
         showNotification("DSAR export completed.", "success");
     } catch (error) {
         resultEl.innerHTML = `<div class='error'>Error exporting data: ${error.message}</div>`;
@@ -3821,6 +3824,7 @@ async function exportAuditLogs() {
                 <a href="${url}" download="audit_logs_${startDate}_${endDate}.json" class="btn btn-primary">Download JSON Export</a>
             </div>
         `;
+        autoMarkP0Check("commissioningCompliance", "commissioningEvidence", `[${new Date().toLocaleString("de-DE")}] Audit-Export erfolgreich (${startDate} bis ${endDate}, ${logs.length} Einträge).`);
     } catch (error) {
         resultEl.innerHTML = `<div class='error'>Error exporting audit logs: ${error.message}</div>`;
     }
@@ -5365,6 +5369,83 @@ async function triggerLegalReconsent() {
 
 const PLAYSTORE_READINESS_KEY = "playStoreReadinessState";
 
+function appendEvidenceLine(existing, note) {
+    const value = (existing || "").trim();
+    const line = (note || "").trim();
+    if (!line) return value;
+    if (!value) return line;
+    if (value.includes(line)) return value;
+    return value + "\n" + line;
+}
+
+function autoMarkP0Check(checkKey, evidenceField, note) {
+    const state = getP0BlockerCockpitState();
+    if (!state.checks[checkKey]) {
+        state.checks[checkKey] = true;
+    }
+    if (evidenceField && Object.prototype.hasOwnProperty.call(state, evidenceField)) {
+        state[evidenceField] = appendEvidenceLine(state[evidenceField], note);
+    }
+    state.updatedAt = new Date().toISOString();
+    setP0BlockerCockpitState(state);
+    renderP0BlockerCockpit();
+}
+
+function autoSyncP0FromExistingSignals() {
+    const state = getP0BlockerCockpitState();
+    const checks = { ...(state.checks || {}) };
+    let changed = false;
+
+    const playStore = getPlayStoreReadinessState();
+    const setupState = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
+    const att = getCommissioningAttestations();
+
+    const syncIfTrue = (targetKey, sourceValue) => {
+        if (sourceValue && !checks[targetKey]) {
+            checks[targetKey] = true;
+            changed = true;
+        }
+    };
+
+    syncIfTrue("playDataSafety", playStore?.checks?.dataSafety);
+    syncIfTrue("playIarc", playStore?.checks?.iarc);
+    syncIfTrue("playListing", playStore?.checks?.listing);
+    syncIfTrue("playPermissions", playStore?.checks?.permissionsDeclaration);
+    syncIfTrue("playAppAccess", playStore?.checks?.appAccessGuide);
+    syncIfTrue("keyRotationDone", playStore?.checks?.securityRotationDone);
+    syncIfTrue("keyRestrictionsDone", playStore?.checks?.securityRotationDone);
+
+    syncIfTrue("commissioningAndroid", setupState["android-apps"] || (att["android-master-registered"] && att["android-child-registered"] && att["device-sync-verified"]));
+    syncIfTrue("commissioningAi", setupState["ai-config"]);
+    syncIfTrue("commissioningSupport", setupState["support-workflow"] || att["support-flow-verified"]);
+    syncIfTrue("commissioningCompliance", setupState["compliance-flow"] || att["compliance-flow-verified"]);
+
+    if (changed) {
+        state.checks = checks;
+        state.updatedAt = new Date().toISOString();
+        setP0BlockerCockpitState(state);
+    }
+
+    return getP0BlockerCockpitState();
+}
+
+function getP0BlockCompletion(state) {
+    const checks = state.checks || {};
+    const blocks = {
+        security: Boolean(checks.keyRotationDone && checks.keyRestrictionsDone),
+        playConsole: Boolean(checks.playDataSafety && checks.playIarc && checks.playListing && checks.playPermissions && checks.playAppAccess),
+        commissioning: Boolean(checks.commissioningAndroid && checks.commissioningAi && checks.commissioningSupport && checks.commissioningCompliance),
+        roster: Boolean(checks.rosterAssigned),
+    };
+    const completedBlocks = Object.values(blocks).filter(Boolean).length;
+    return {
+        blocks,
+        completedBlocks,
+        totalBlocks: 4,
+        allDone: completedBlocks === 4,
+    };
+}
+
 function getP0BlockerCockpitState() {
     const defaults = {
         checks: {
@@ -5418,7 +5499,7 @@ function setP0BlockerCockpitState(state) {
 }
 
 function renderP0BlockerCockpit() {
-    const state = getP0BlockerCockpitState();
+    const state = autoSyncP0FromExistingSignals();
 
     const checkboxMap = {
         "p0-key-rotation-done": "keyRotationDone",
@@ -5460,13 +5541,15 @@ function renderP0BlockerCockpit() {
     const done = Object.values(state.checks).filter(Boolean).length;
     const donePercent = total > 0 ? Math.round((done / total) * 100) : 0;
     const isReady = done === total;
+    const blockStatus = getP0BlockCompletion(state);
     const summaryEl = document.getElementById("p0-blocker-summary");
     if (summaryEl) {
         const ts = state.updatedAt ? new Date(state.updatedAt).toLocaleString("de-DE") : "noch nie";
         summaryEl.innerHTML =
-            "<div class='" + (isReady ? "success-box" : "error") + "'>" +
-            "<p><strong>P0 Status:</strong> " + (isReady ? "✅ Alle P0-Punkte abgeschlossen" : "⚠️ P0-Punkte offen") + "</p>" +
+            "<div class='" + (blockStatus.allDone ? "success-box" : "error") + "'>" +
+            "<p><strong>P0 Status:</strong> " + (blockStatus.allDone ? "✅ Alle P0-Blocker abgeschlossen" : "⚠️ P0-Blocker offen") + "</p>" +
             "<p><strong>Erledigt:</strong> " + done + "/" + total + " (" + donePercent + "%)</p>" +
+            "<p><strong>Block-Abschluss:</strong> " + blockStatus.completedBlocks + "/" + blockStatus.totalBlocks + " (Security " + (blockStatus.blocks.security ? "✅" : "⚠️") + ", Play " + (blockStatus.blocks.playConsole ? "✅" : "⚠️") + ", Commissioning " + (blockStatus.blocks.commissioning ? "✅" : "⚠️") + ", Roster " + (blockStatus.blocks.roster ? "✅" : "⚠️") + ")</p>" +
             "<p><strong>Aktualisiert:</strong> " + escapeHtml(ts) + "</p>" +
             "</div>";
     }
@@ -5670,6 +5753,8 @@ function savePlayStoreReadiness() {
 
     setPlayStoreReadinessState(state);
     renderPlayStoreReadiness();
+    autoSyncP0FromExistingSignals();
+    renderP0BlockerCockpit();
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
     if (resultEl) resultEl.innerHTML = "<div class='success-box'>Play-Store-Readiness gespeichert.</div>";
