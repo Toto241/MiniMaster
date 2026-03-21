@@ -742,6 +742,7 @@
                             <div class="setup-actions" style="margin-block-start: 12px">
                                 <button onclick="runCommissioningAssistant()" class="btn btn-primary">Assistent ausführen</button>
                                 <button onclick="refreshCommissioningReport()" class="btn btn-secondary">Bericht aktualisieren</button>
+                                <button onclick="exportReleaseArtefact()" class="btn btn-secondary">Release-Artefakt exportieren</button>
                             </div>
 
                             <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
@@ -765,6 +766,7 @@
                                 manuelle Freigaben und den Plattform-Reifegrad aller drei Zielplattformen.
                             </p>
                             <div id="golive-ampel"></div>
+                            <div id="golive-final-gate" style="margin-block-start: 12px"></div>
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
@@ -1293,10 +1295,12 @@
                     <div class="dsar-form" style="margin-block-start: 12px">
                         <button onclick="savePlayStoreReadiness()" class="btn btn-primary">Readiness speichern</button>
                         <button onclick="exportPlayStoreReadiness()" class="btn btn-secondary">JSON exportieren</button>
+                        <button onclick="generateReviewerGuide()" class="btn btn-secondary">Reviewer-Anleitung generieren</button>
                         <button onclick="resetPlayStoreReadiness()" class="btn btn-danger">Zurücksetzen</button>
                     </div>
 
                     <div id="playstore-readiness-result" class="data-list" style="margin-block-start: 15px"></div>
+                    <div id="ps-reviewer-guide-output" class="data-list" style="margin-block-start: 10px"></div>
                 </div>
             </div>
 

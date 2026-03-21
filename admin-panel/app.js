@@ -1135,6 +1135,40 @@ function renderGoLiveAmpel() {
                 <span class="ampel-total-pct">${pct}% Gesamtfortschritt</span>
             </div>
         </div>`;
+
+    // Final-Go-Live-Gate: Button nur aktiv wenn Ampel grün
+    const gateContainer = document.getElementById("golive-final-gate");
+    if (gateContainer) {
+        const savedConfirmation = localStorage.getItem("finalGoLiveConfirmation");
+        if (savedConfirmation) {
+            try {
+                const conf = JSON.parse(savedConfirmation);
+                const ts = new Date(conf.confirmedAt).toLocaleString("de-DE");
+                gateContainer.innerHTML =
+                    "<div class='success-box'><p>✅ <strong>Go-Live bestätigt</strong> am " + escapeHtml(ts) + "</p>" +
+                    "<button onclick=\"localStorage.removeItem('finalGoLiveConfirmation');renderGoLiveAmpel()\" class='btn btn-secondary' style='margin-block-start:6px;font-size:0.8em'>Bestätigung zurücksetzen</button></div>";
+            } catch (_) {
+                localStorage.removeItem("finalGoLiveConfirmation");
+            }
+        } else if (status.ampel === "green") {
+            gateContainer.innerHTML =
+                "<button class='btn btn-primary' style='inline-size:100%' onclick='confirmFinalGoLive()'>✅ Finales Go-Live bestätigen</button>";
+        } else {
+            const openCount = status.totals.totalAll - status.totals.doneAll +
+                (status.playStoreReady ? 0 : (status.totals.playChecksTotal - status.totals.playChecksDone));
+            const reasons = [];
+            if (!status.backendReady) reasons.push("Backend-Validierung ausstehend");
+            if (!status.allAttestationsOk) reasons.push("Manuelle Freigaben offen");
+            if (!status.playStoreReady) reasons.push("Play-Store-Gates offen");
+            if (status.totals.doneCritical < status.totals.totalCritical)
+                reasons.push(`${status.totals.totalCritical - status.totals.doneCritical} kritische Plattform-Punkte offen`);
+            gateContainer.innerHTML =
+                "<button class='btn btn-primary' disabled style='inline-size:100%;opacity:0.5;cursor:not-allowed'>🔒 Finales Go-Live (gesperrt)</button>" +
+                "<p style='color:#ef4444;font-size:0.85em;margin-block-start:6px'>" +
+                escapeHtml(reasons.join(" · ") || `${openCount} offene Punkte`) +
+                " – Ampel muss grün sein.</p>";
+        }
+    }
 }
 
 function renderPlatformReadinessSection(platformKey) {
@@ -5485,4 +5519,164 @@ function exportPlayStoreReadiness() {
 
     const resultEl = document.getElementById("playstore-readiness-result");
     if (resultEl) resultEl.innerHTML = "<div class='success-box'>Readiness-Export erstellt.</div>";
+}
+
+// --- Reviewer-Anleitung (App Access Guide) ---
+
+function generateReviewerGuide() {
+    const state = getPlayStoreReadinessState();
+    const privacyUrl = state.privacyUrl || "(nicht eingetragen)";
+    const supportEmail = state.supportEmail || "(nicht eingetragen)";
+    const listingUrl = state.listingUrl || "(nicht eingetragen)";
+    const releaseNotes = state.releaseNotes || "(keine Hinweise)";
+    const date = new Date().toLocaleDateString("de-DE");
+
+    const guide =
+`APP-ACCESS-ANLEITUNG FÜR PLAY-STORE-REVIEWER
+Stand: ${date}
+
+=== App-Name ===
+MiniMaster – Kindersicherung & Elternkontrolle
+
+=== App-Typ ===
+Eltern-Kontrollsuite: Kindersicherung via Android Accessibility Service,
+App-Blockierung und Nutzungsregeln für Familien.
+
+=== Privacy Policy ===
+${privacyUrl}
+
+=== Support- & Datenschutz-E-Mail ===
+${supportEmail}
+
+=== Play-Console-Listing ===
+${listingUrl}
+
+=== Zugangsdaten für den Reviewer ===
+Die App erfordert zwei Android-Geräte:
+  1. Eltern-Gerät (MasterApp): Steuerung und Aufgabenverwaltung
+  2. Kind-Gerät (ChildApp): Empfängt Regeln, zeigt Blockierung
+
+Für den Review ohne zweites Gerät genügt die MasterApp allein
+(Familienmanagement und Kopplung testbar ohne aktive ChildApp).
+
+Test-Konto:
+  -- Kein festes Test-Konto erforderlich: Registrierung erfolgt per
+     IMEI-Sequenz und 6-stelligem Kopplungscode. --
+
+=== Geforderte Berechtigungen (Begründung) ===
+• PACKAGE_USAGE_STATS   – Nutzungszeit-Monitoring für die Kindersicherung
+• SYSTEM_ALERT_WINDOW   – Overlay-Sperre wenn Kind ein gesperrtes App öffnet
+• Barrierefreiheitsdienst – Erkennung geöffneter Apps für Blocking-Logik
+• FOREGROUND_SERVICE    – Dauerbetrieb der Überwachungs-Services
+
+=== Release-Notizen / Hinweise ===
+${releaseNotes}
+
+=== Kontakt bei Rückfragen ===
+${supportEmail}`;
+
+    window._lastReviewerGuide = guide;
+
+    const outputEl = document.getElementById("ps-reviewer-guide-output");
+    if (!outputEl) return;
+
+    const safeGuide = guide.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    outputEl.innerHTML =
+        "<h4 style='margin-block-end:8px'>Reviewer-Anleitung (App Access Guide)</h4>" +
+        "<pre style='white-space:pre-wrap;background:#f8f8f8;padding:12px;border:1px solid #ccc;font-size:12px;overflow:auto;max-block-size:400px'>" + safeGuide + "</pre>" +
+        "<div class='dsar-form' style='margin-block-start:8px'>" +
+        "<button onclick='copyReviewerGuide()' class='btn btn-secondary'>📋 Kopieren</button> " +
+        "<button onclick='downloadReviewerGuide()' class='btn btn-secondary'>⬇ Herunterladen (.txt)</button>" +
+        "</div>";
+}
+
+function copyReviewerGuide() {
+    if (!window._lastReviewerGuide) {
+        showNotification("Bitte zuerst die Anleitung generieren.", "warning");
+        return;
+    }
+    navigator.clipboard.writeText(window._lastReviewerGuide).then(() => {
+        showNotification("Reviewer-Anleitung in die Zwischenablage kopiert.", "success");
+    }).catch(() => {
+        showNotification("Kopieren fehlgeschlagen – bitte manuell kopieren.", "warning");
+    });
+}
+
+function downloadReviewerGuide() {
+    if (!window._lastReviewerGuide) {
+        showNotification("Bitte zuerst die Anleitung generieren.", "warning");
+        return;
+    }
+    const blob = new Blob([window._lastReviewerGuide], { type: "text/plain; charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "reviewer-guide-minimaster-" + safeDate + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// --- Kombinierter Release-Artefakt-Export ---
+
+function exportReleaseArtefact() {
+    const playStoreState = getPlayStoreReadinessState();
+    const platformState = getPlatformReadiness();
+    const attestations = getCommissioningAttestations();
+    const status = computeGoLiveStatus();
+
+    const payload = {
+        exportedAt: new Date().toISOString(),
+        tool: "MiniMaster Admin Panel",
+        version: "1.0",
+        type: "release-artefact",
+        goLiveStatus: {
+            ampel: status.ampel,
+            ampelLabel: status.ampelLabel,
+            ampelDescription: status.ampelDescription,
+            backendReady: status.backendReady,
+            allAttestationsOk: status.allAttestationsOk,
+            playStoreReady: status.playStoreReady,
+            totals: status.totals,
+        },
+        commissioningSummary: commissioningSummary || null,
+        playStoreReadiness: playStoreState,
+        platformChecksSummary: status.platformStatus,
+        platformChecksDetail: platformState,
+        attestations,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "minimaster-release-artefact-" + safeDate + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification("Release-Artefakt (kombinierter Nachweis) exportiert.", "success");
+}
+
+// --- Finale Go-Live-Bestätigung ---
+
+function confirmFinalGoLive() {
+    if (!confirm("Möchten Sie das finale Go-Live wirklich bestätigen?\nDieser Schritt sollte nur bei vollständig grüner Ampel ausgeführt werden.")) return;
+    const payload = {
+        confirmedAt: new Date().toISOString(),
+        confirmedBy: "Operator (Admin Panel)",
+        ampel: "green",
+    };
+    localStorage.setItem("finalGoLiveConfirmation", JSON.stringify(payload));
+    showNotification("Go-Live bestätigt und protokolliert. Deployment-Checkliste abarbeiten.", "success");
+    const gateContainer = document.getElementById("golive-final-gate");
+    if (gateContainer) {
+        const ts = new Date().toLocaleString("de-DE");
+        gateContainer.innerHTML =
+            "<div class='success-box'><p>✅ <strong>Go-Live bestätigt</strong> am " + escapeHtml(ts) + "</p></div>";
+    }
 }
