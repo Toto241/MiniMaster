@@ -23,7 +23,7 @@ describe("support testable helpers", () => {
   });
 
   it("parseAiTicketResponse handles valid and invalid payloads", () => {
-    const ok = __supportTestables.parseAiTicketResponse('{"solution":"ok","confidence":0.9}');
+    const ok = __supportTestables.parseAiTicketResponse("{\"solution\":\"ok\",\"confidence\":0.9}");
     expect(ok.solution).toBe("ok");
     expect(ok.confidence).toBe(0.9);
 
@@ -33,10 +33,10 @@ describe("support testable helpers", () => {
   });
 
   it("parseAiTicketResponse covers defaults for missing fields", () => {
-    const noSolution = __supportTestables.parseAiTicketResponse('{"confidence":0.5}');
+    const noSolution = __supportTestables.parseAiTicketResponse("{\"confidence\":0.5}");
     expect(noSolution.solution).toMatch(/unable to generate/i);
 
-    const nonNumericConfidence = __supportTestables.parseAiTicketResponse('{"solution":"x","confidence":"bad"}');
+    const nonNumericConfidence = __supportTestables.parseAiTicketResponse("{\"solution\":\"x\",\"confidence\":\"bad\"}");
     expect(nonNumericConfidence.confidence).toBe(0);
   });
 

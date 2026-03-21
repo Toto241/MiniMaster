@@ -23,7 +23,7 @@ describe("firebase getAdminApp emulator branch", () => {
     }));
 
     jest.isolateModules(() => {
-      const mod = require("../firebase");
+      const mod = jest.requireActual("../firebase");
       mod.getAdminApp();
     });
 
@@ -48,7 +48,7 @@ describe("firebase getAdminApp emulator branch", () => {
     }));
 
     jest.isolateModules(() => {
-      const mod = require("../firebase");
+      const mod = jest.requireActual("../firebase");
       mod.getAdminApp();
     });
 

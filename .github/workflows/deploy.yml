@@ -109,7 +109,7 @@ jobs:
       uses: android-actions/setup-android@v3
 
     - name: 'Cache Gradle packages'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -124,6 +124,11 @@ jobs:
     - name: 'Show Gradle version'
       run: ./gradlew --version
 
+    - name: 'Prepare Firebase config templates'
+      run: |
+        cp masterApp/google-services.template.json masterApp/google-services.json
+        cp childApp/google-services.template.json childApp/google-services.json
+
     - name: 'Build ${{ matrix.app }} Debug APK'
       run: ./gradlew :${{ matrix.app }}:assembleDebug
 
@@ -131,7 +136,7 @@ jobs:
       run: ./gradlew :${{ matrix.app }}:testDebugUnitTest
 
     - name: 'Upload ${{ matrix.app }} APK artifact'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.app }}-debug-apk
         path: ${{ matrix.app }}/build/outputs/apk/debug/*.apk
