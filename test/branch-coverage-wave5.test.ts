@@ -107,7 +107,6 @@ let state: Record<string, any> = {};
 
 const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
 const asMaster = { auth: { uid: "m1", token: {} } };
-const asSupport = { auth: { uid: "s1", token: { role: "support" } } };
 const asChild = { auth: { uid: "c1", token: {} } };
 const noAuth = {};
 

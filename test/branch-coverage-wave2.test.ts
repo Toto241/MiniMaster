@@ -93,7 +93,6 @@ const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
 const asSupport = { auth: { uid: "s1", token: { role: "support" } } };
 const asAuditor = { auth: { uid: "a1", token: { role: "auditor" } } };
 const asChild = { auth: { uid: "c1", token: {} } };
-const noAuth = {};
 
 function resetState() {
   state = {
@@ -928,7 +927,6 @@ describe("shared.ts branch coverage", () => {
     });
 
     it("log catches error when db write fails", async () => {
-      const origAdd = mockDbObj.collection("audit_logs").__mockAdd;
       // Temporarily make add throw
       const addFn = state._collectionMocks?.audit_logs?.add;
       if (addFn) {

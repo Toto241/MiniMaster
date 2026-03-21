@@ -470,7 +470,7 @@ describe("admin.ts sendDailyErrorReport branches", () => {
     };
     const fn = fns.sendDailyErrorReport;
     if (fn?.run) {
-      const res = await fn.run({});
+      await fn.run({});
       // Should complete without error — errors are grouped by "unknown"
     }
   });
