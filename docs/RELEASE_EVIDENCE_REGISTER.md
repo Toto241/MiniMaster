@@ -27,8 +27,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Coverage report (`npm test -- --coverage --runInBand`) | Stmts 99.56%, Branch 96.65%, Funcs 98.52%, Lines 99.65% | ✅ | Automated | 2026-03-21 |
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
-| CodeQL security scan (0 high/critical) | Letzter failed Run: [Run 23380432454](https://github.com/Toto241/MiniMaster/actions/runs/23380432454). Fixes umgesetzt (`childApp/MainActivity.kt` weight import + `masterApp/MasterViewModel.kt` getData). Aktueller Verifikationslauf in progress: [Run 23381534896](https://github.com/Toto241/MiniMaster/actions/runs/23381534896) | ⬜ | Automated | 2026-03-21 |
-| Android build (if applicable) | Letzter failed Run: [Run 23381426749](https://github.com/Toto241/MiniMaster/actions/runs/23381426749). Fixes umgesetzt (`childApp/MainActivity.kt` weight import + `masterApp/MasterViewModel.kt` getData). Aktueller Verifikationslauf in progress: [Run 23381534893](https://github.com/Toto241/MiniMaster/actions/runs/23381534893) | ⬜ | Automated | 2026-03-21 |
+| CodeQL security scan (0 high/critical) | Fixes: weight-import + getData + lazy FirebaseAuth-Init + test.core dep + RobolectricTestRunner. **Erfolgreich**: [Run 23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965) | ✅ | Automated | 2026-03-21 |
+| Android build (if applicable) | Fixes: weight-import + getData + lazy FirebaseAuth-Init + test.core dep + RobolectricTestRunner + MissingTranslation lint disable. **Erfolgreich**: [Run 23382045689](https://github.com/Toto241/MiniMaster/actions/runs/23382045689) | ✅ | Automated | 2026-03-21 |
 | Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
 
 ### 3.2 Functional Commissioning Gate
