@@ -713,8 +713,57 @@ function buildPrioritizedActionPlan() {
     const validation = commissioningSummary?.validationSummary || null;
     const validationChecks = validation?.checks || {};
     const platformState = getPlatformReadiness();
+    const playStoreState = getPlayStoreReadinessState();
     const missingAttestations = commissioningAttestationItems.filter(item => !getCommissioningAttestations()[item.key]);
     const steps = [];
+
+    const playStoreChecks = [
+        { key: "dataSafety", label: "Data-Safety-Formular in Play Console finalisieren" },
+        { key: "iarc", label: "IARC-Altersfreigabe abschließen" },
+        { key: "listing", label: "Store Listing vollständig vorbereiten" },
+        { key: "privacyUrlLinked", label: "Privacy-Policy-URL in Store und App konsistent verlinken" },
+        { key: "permissionsDeclaration", label: "Permissions Declaration (Accessibility/Usage/Overlay) einreichen" },
+        { key: "appAccessGuide", label: "App-Access-Anleitung für Play-Reviewer hinterlegen" },
+        { key: "securityRotationDone", label: "Firebase/API-Schlüssel rotieren bzw. restricten" },
+        { key: "goNoGoSignedOff", label: "Interne Go/No-Go-Freigabe dokumentieren" },
+    ];
+
+    playStoreChecks.forEach(item => {
+        if (playStoreState.checks[item.key]) return;
+        steps.push({
+            id: `playstore-${item.key}`,
+            category: "Play Store",
+            platform: "Release / Compliance",
+            severity: "critical",
+            title: item.label,
+            why: "Ohne diesen Nachweis ist eine sichere und belastbare Veröffentlichung im Google Play Store gefährdet.",
+            action: "Im Tab 'Recht & Datenschutz' unter 'Google Play Store Readiness' erledigen und anschließend erneut speichern.",
+        });
+    });
+
+    if (!playStoreState.privacyUrl || !/^https:\/\//i.test(playStoreState.privacyUrl)) {
+        steps.push({
+            id: "playstore-privacy-url-value",
+            category: "Play Store",
+            platform: "Release / Compliance",
+            severity: "critical",
+            title: "Gültige Privacy-Policy-URL eintragen",
+            why: "Eine fehlende oder ungültige Privacy-URL führt typischerweise zu Review-Rückfragen oder Ablehnung.",
+            action: "Im Play-Store-Readiness-Block eine öffentliche HTTPS-URL eintragen und speichern.",
+        });
+    }
+
+    if (!playStoreState.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail)) {
+        steps.push({
+            id: "playstore-support-email-value",
+            category: "Play Store",
+            platform: "Release / Compliance",
+            severity: "high",
+            title: "Gültige Support-/Privacy-E-Mail eintragen",
+            why: "Play-Review und Nutzeranfragen benötigen eine belastbare Kontaktadresse.",
+            action: "Im Play-Store-Readiness-Block eine gültige E-Mail setzen und speichern.",
+        });
+    }
 
     if (!validation) {
         steps.push({
@@ -959,6 +1008,7 @@ function computeGoLiveStatus() {
     const attestations = getCommissioningAttestations();
     const missingAttestations = getMissingAttestations();
     const platformState = getPlatformReadiness();
+    const playStoreState = getPlayStoreReadinessState();
     const validation = commissioningSummary?.validationSummary || null;
 
     const backendReady = validation
@@ -1001,15 +1051,22 @@ function computeGoLiveStatus() {
     const allCriticalDone = doneCritical === totalCritical;
     const allHighDone = doneHigh === totalHigh;
 
+    const playChecksTotal = Object.keys(playStoreState.checks || {}).length;
+    const playChecksDone = Object.values(playStoreState.checks || {}).filter(Boolean).length;
+    const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
+    const playStoreReady = playChecksDone === playChecksTotal && playMetaReady;
+
     let ampel, ampelLabel, ampelDescription;
-    if (backendReady && allAttestationsOk && allCriticalDone && allHighDone && doneAll === totalAll) {
+    if (backendReady && allAttestationsOk && allCriticalDone && allHighDone && doneAll === totalAll && playStoreReady) {
         ampel = "green";
         ampelLabel = "Go-Live freigegeben";
-        ampelDescription = "Backend, manuelle Freigaben und alle Plattformen sind produktionsbereit.";
+        ampelDescription = "Backend, manuelle Freigaben, Plattform-Checks und Play-Store-Gates sind produktionsbereit.";
     } else if (backendReady && allCriticalDone) {
         ampel = "yellow";
         ampelLabel = "Teilweise bereit";
-        ampelDescription = "Backend und kritische Punkte OK. Offene Freigaben oder HIGH-Punkte verhindern Vollfreigabe.";
+        ampelDescription = playStoreReady
+            ? "Backend und kritische Punkte OK. Offene Freigaben oder HIGH-Punkte verhindern Vollfreigabe."
+            : "Backend und kritische Punkte OK. Offene Play-Store-Pflichten verhindern Vollfreigabe.";
     } else {
         ampel = "red";
         ampelLabel = "Go-Live blockiert";
@@ -1021,8 +1078,9 @@ function computeGoLiveStatus() {
     return {
         ampel, ampelLabel, ampelDescription,
         backendReady, allAttestationsOk,
+        playStoreReady,
         platformStatus,
-        totals: { totalAll, doneAll, totalCritical, doneCritical, totalHigh, doneHigh },
+        totals: { totalAll, doneAll, totalCritical, doneCritical, totalHigh, doneHigh, playChecksTotal, playChecksDone },
     };
 }
 
@@ -1064,6 +1122,7 @@ function renderGoLiveAmpel() {
                 <div class="ampel-stat"><strong>${status.totals.doneAll}/${status.totals.totalAll}</strong><span>Gesamt</span></div>
                 <div class="ampel-stat"><strong>${status.backendReady ? "OK" : "FEHLT"}</strong><span>Backend</span></div>
                 <div class="ampel-stat"><strong>${status.allAttestationsOk ? "OK" : "OFFEN"}</strong><span>Freigaben</span></div>
+                <div class="ampel-stat"><strong>${status.playStoreReady ? "OK" : `${status.totals.playChecksDone}/${status.totals.playChecksTotal}`}</strong><span>Play Store</span></div>
             </div>
             <div class="ampel-platforms">
                 <h5>Plattform-Fortschritt</h5>
@@ -1770,6 +1829,7 @@ function renderCommissioningReport(report) {
             <p><strong>Firebase-Webkonfiguration:</strong> ${report.firebaseConfigured ? "bereit" : "offen"}</p>
             <p><strong>Parent Web-Control:</strong> ${report.webControlConfigured ? "shared config bereit" : "noch nicht freigegeben"}</p>
             <p><strong>Runtime-Konfiguration:</strong> ${report.runtimeConfigured ? "gespeichert" : "unvollständig"}</p>
+            <p><strong>Play Store Readiness:</strong> ${report.playStoreReady ? "bereit" : "offen"}</p>
             <p><strong>Validierung:</strong> ${report.validationSummary ? `${report.validationSummary.ok} OK, ${report.validationSummary.warn} WARN, ${report.validationSummary.errorCount} ERROR` : "noch nicht ausgeführt"}</p>
             <p><strong>Deploy-Befehl:</strong></p>
             ${renderCommandBlockHtml({
@@ -1855,15 +1915,31 @@ async function runCommissioningAssistant() {
             pending.push("Gemeinsame Firebase-Konfiguration für das Parent Web Panel bereitstellen.");
         }
 
+        const playStoreState = getPlayStoreReadinessState();
+        const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);
+        if (openPlayChecks.length > 0) {
+            pending.push(`Play-Store-Readiness: ${openPlayChecks.length} Pflicht-Check(s) offen.`);
+        }
+        if (!playStoreState.privacyUrl || !/^https:\/\//i.test(playStoreState.privacyUrl)) {
+            pending.push("Play-Store-Readiness: gültige Privacy-Policy-URL (https://) fehlt.");
+        }
+        if (!playStoreState.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail)) {
+            pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
+        }
+
         getMissingAttestations().forEach(item => {
             pending.push(`Manuelle Freigabe offen: ${item}`);
         });
+
+        const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
+        const playStoreReady = openPlayChecks.length === 0 && playMetaReady;
 
         commissioningSummary = {
             projectId: bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId,
             firebaseConfigured: !isPlaceholderFirebaseConfig(bootstrapConfig),
             webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
             runtimeConfigured: Boolean(mergedRuntimeConfig.cloud.projectId && mergedRuntimeConfig.ai.provider && mergedRuntimeConfig.ai.model),
+            playStoreReady,
             validationSummary,
             deployCommand: buildDeployCommand(bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId),
             roleAssignments,
@@ -1902,11 +1978,26 @@ function refreshCommissioningReport() {
     }
     missingAttestations.forEach(item => pending.push(`Manuelle Freigabe offen: ${item}`));
 
+    const playStoreState = getPlayStoreReadinessState();
+    const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);
+    if (openPlayChecks.length > 0) {
+        pending.push(`Play-Store-Readiness: ${openPlayChecks.length} Pflicht-Check(s) offen.`);
+    }
+    if (!playStoreState.privacyUrl || !/^https:\/\//i.test(playStoreState.privacyUrl)) {
+        pending.push("Play-Store-Readiness: gültige Privacy-Policy-URL (https://) fehlt.");
+    }
+    if (!playStoreState.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail)) {
+        pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
+    }
+    const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
+    const playStoreReady = openPlayChecks.length === 0 && playMetaReady;
+
     commissioningSummary = {
         projectId: runtimeConfig.cloud.projectId || firebaseConfig.projectId,
         firebaseConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
         webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
         runtimeConfigured: Boolean(runtimeConfig.cloud.projectId && runtimeConfig.ai.provider && runtimeConfig.ai.model),
+        playStoreReady,
         validationSummary: commissioningSummary?.validationSummary || null,
         deployCommand: buildDeployCommand(runtimeConfig.cloud.projectId || firebaseConfig.projectId),
         roleAssignments: commissioningSummary?.roleAssignments || [],
@@ -1927,6 +2018,7 @@ document.addEventListener("DOMContentLoaded", function() {
     renderAllPlatformSections();
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
+    renderPlayStoreReadiness();
 
     // Operator-Desktop-Modus Badge anzeigen
     if (isElectronOperator) {
@@ -5233,4 +5325,164 @@ async function triggerLegalReconsent() {
         resultEl.innerHTML = "<div class='error'>Fehler: " + escapeHtml(error.message) + "</div>";
         showNotification("Fehler: " + error.message, "error");
     }
+}
+
+const PLAYSTORE_READINESS_KEY = "playStoreReadinessState";
+
+function getPlayStoreReadinessState() {
+    const defaults = {
+        checks: {
+            dataSafety: false,
+            iarc: false,
+            listing: false,
+            privacyUrlLinked: false,
+            permissionsDeclaration: false,
+            appAccessGuide: false,
+            securityRotationDone: false,
+            goNoGoSignedOff: false,
+        },
+        privacyUrl: "",
+        supportEmail: "",
+        listingUrl: "",
+        releaseNotes: "",
+        updatedAt: null,
+    };
+
+    try {
+        const raw = localStorage.getItem(PLAYSTORE_READINESS_KEY);
+        if (!raw) return defaults;
+        const parsed = JSON.parse(raw);
+        return {
+            checks: { ...defaults.checks, ...(parsed.checks || {}) },
+            privacyUrl: parsed.privacyUrl || "",
+            supportEmail: parsed.supportEmail || "",
+            listingUrl: parsed.listingUrl || "",
+            releaseNotes: parsed.releaseNotes || "",
+            updatedAt: parsed.updatedAt || null,
+        };
+    } catch (_) {
+        return defaults;
+    }
+}
+
+function setPlayStoreReadinessState(state) {
+    localStorage.setItem(PLAYSTORE_READINESS_KEY, JSON.stringify(state));
+}
+
+function renderPlayStoreReadiness() {
+    const state = getPlayStoreReadinessState();
+
+    const checkboxes = {
+        "ps-check-data-safety": "dataSafety",
+        "ps-check-iarc": "iarc",
+        "ps-check-listing": "listing",
+        "ps-check-privacy-url": "privacyUrlLinked",
+        "ps-check-permissions": "permissionsDeclaration",
+        "ps-check-app-access": "appAccessGuide",
+        "ps-check-security": "securityRotationDone",
+        "ps-check-signoff": "goNoGoSignedOff",
+    };
+
+    Object.entries(checkboxes).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = Boolean(state.checks[key]);
+    });
+
+    const privacyUrlEl = document.getElementById("ps-privacy-url");
+    const supportEmailEl = document.getElementById("ps-support-email");
+    const listingUrlEl = document.getElementById("ps-listing-url");
+    const releaseNotesEl = document.getElementById("ps-release-notes");
+    if (privacyUrlEl) privacyUrlEl.value = state.privacyUrl;
+    if (supportEmailEl) supportEmailEl.value = state.supportEmail;
+    if (listingUrlEl) listingUrlEl.value = state.listingUrl;
+    if (releaseNotesEl) releaseNotesEl.value = state.releaseNotes;
+
+    const total = Object.keys(state.checks).length;
+    const completed = Object.values(state.checks).filter(Boolean).length;
+    const ready = completed === total && Boolean(state.privacyUrl) && Boolean(state.supportEmail);
+    const summaryEl = document.getElementById("playstore-readiness-summary");
+    if (summaryEl) {
+        const ts = state.updatedAt ? new Date(state.updatedAt).toLocaleString("de-DE") : "noch nie";
+        summaryEl.innerHTML =
+            "<div class='" + (ready ? "success-box" : "error") + "'>" +
+            "<p><strong>Status:</strong> " + (ready ? "✅ Veröffentlichungsbereit" : "⚠️ Noch nicht veröffentlichungsbereit") + "</p>" +
+            "<p><strong>Checkliste:</strong> " + completed + "/" + total + " erfüllt</p>" +
+            "<p><strong>Letzte Aktualisierung:</strong> " + escapeHtml(ts) + "</p>" +
+            "</div>";
+    }
+}
+
+function collectPlayStoreReadinessFromUi() {
+    return {
+        checks: {
+            dataSafety: Boolean(document.getElementById("ps-check-data-safety")?.checked),
+            iarc: Boolean(document.getElementById("ps-check-iarc")?.checked),
+            listing: Boolean(document.getElementById("ps-check-listing")?.checked),
+            privacyUrlLinked: Boolean(document.getElementById("ps-check-privacy-url")?.checked),
+            permissionsDeclaration: Boolean(document.getElementById("ps-check-permissions")?.checked),
+            appAccessGuide: Boolean(document.getElementById("ps-check-app-access")?.checked),
+            securityRotationDone: Boolean(document.getElementById("ps-check-security")?.checked),
+            goNoGoSignedOff: Boolean(document.getElementById("ps-check-signoff")?.checked),
+        },
+        privacyUrl: (document.getElementById("ps-privacy-url")?.value || "").trim(),
+        supportEmail: (document.getElementById("ps-support-email")?.value || "").trim(),
+        listingUrl: (document.getElementById("ps-listing-url")?.value || "").trim(),
+        releaseNotes: (document.getElementById("ps-release-notes")?.value || "").trim(),
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+function savePlayStoreReadiness() {
+    const resultEl = document.getElementById("playstore-readiness-result");
+    const state = collectPlayStoreReadinessFromUi();
+
+    if (!state.privacyUrl || !/^https:\/\//i.test(state.privacyUrl)) {
+        if (resultEl) resultEl.innerHTML = "<div class='error'>Bitte eine gültige Privacy-Policy-URL mit https:// eintragen.</div>";
+        return;
+    }
+    if (!state.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.supportEmail)) {
+        if (resultEl) resultEl.innerHTML = "<div class='error'>Bitte eine gültige Support-/Privacy-E-Mail eintragen.</div>";
+        return;
+    }
+
+    setPlayStoreReadinessState(state);
+    renderPlayStoreReadiness();
+    renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
+    if (resultEl) resultEl.innerHTML = "<div class='success-box'>Play-Store-Readiness gespeichert.</div>";
+    showNotification("Play-Store-Readiness gespeichert.", "success");
+}
+
+function resetPlayStoreReadiness() {
+    if (!confirm("Readiness-Daten wirklich zurücksetzen?")) return;
+    localStorage.removeItem(PLAYSTORE_READINESS_KEY);
+    renderPlayStoreReadiness();
+    renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
+    const resultEl = document.getElementById("playstore-readiness-result");
+    if (resultEl) resultEl.innerHTML = "<div class='success-box'>Readiness-Daten wurden zurückgesetzt.</div>";
+}
+
+function exportPlayStoreReadiness() {
+    const state = getPlayStoreReadinessState();
+    const payload = {
+        exportedAt: new Date().toISOString(),
+        tool: "MiniMaster Admin Panel",
+        type: "play-store-readiness",
+        ...state,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "playstore-readiness-" + safeDate + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const resultEl = document.getElementById("playstore-readiness-result");
+    if (resultEl) resultEl.innerHTML = "<div class='success-box'>Readiness-Export erstellt.</div>";
 }

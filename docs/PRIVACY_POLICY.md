@@ -71,12 +71,12 @@ Without your explicit consent, our support team has **no access** to your person
 
 ## 9. Data Deletion
 
-You may request to delete your account and all associated data at any time. To do so, please contact us at [your-email@example.com]. We will process your request within a reasonable timeframe.
+You may request to delete your account and all associated data at any time. To do so, please contact us at [privacy@minimaster.app](mailto:privacy@minimaster.app). We will process your request within a reasonable timeframe.
 
 ## 10. Contact Us
 
 If you have questions or comments about this Privacy Policy, please contact us at:
 
-[Your Company Name]
-[Your Email Address]
-[Your Website]
+MiniMaster Operations
+[privacy@minimaster.app](mailto:privacy@minimaster.app)
+[https://minimaster.app/privacy](https://minimaster.app/privacy)

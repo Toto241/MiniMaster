@@ -9,10 +9,12 @@ Web-Dashboard fuer Betreiber/Admins.
 - Support-Ticket-Management
 - Compliance-Exports (DSAR, Audit)
 - Cloud Setup & Assistant Tab (Health Checks, Checkliste, Setup-Report)
+- Recht & Datenschutz Tab mit Legal-Policy-Management (laden, veröffentlichen, Re-Consent)
+- Google Play Store Readiness Modul (Pflicht-Checks, Status, JSON-Export)
 
 ## Setup
 
-1. Firebase-Konfiguration in `admin-panel/app.js` setzen (`firebaseConfig` Platzhalter ersetzen).
+1. Firebase-Konfiguration über das Bootstrap-Formular im Dashboard speichern (lokal in `operatorFirebaseConfigOverride`).
 2. Sicherstellen, dass der Benutzer in Firebase Auth existiert und den Claim `role: "admin"` besitzt.
 3. Hosting bereitstellen oder lokal statisch ausliefern.
 

@@ -1261,6 +1261,43 @@
                     </div>
                     <div id="legal-reconsent-result" class="data-list" style="margin-block-start: 15px"></div>
                 </div>
+
+                <!-- Section 5: Play Store Readiness (Admin only) -->
+                <div class="compliance-section admin-only" style="margin-block-end: 30px">
+                    <h3>Google Play Store Readiness</h3>
+                    <p>
+                        Operative Checkliste für den tatsächlichen Release-Status. Die Werte werden lokal gespeichert
+                        (Browser localStorage) und können als JSON-Nachweis exportiert werden.
+                    </p>
+
+                    <div id="playstore-readiness-summary" class="data-list" style="margin-block-end: 10px"></div>
+
+                    <div class="dsar-form" style="display: grid; gap: 8px; align-items: start">
+                        <label><input type="checkbox" id="ps-check-data-safety" /> Data-Safety-Formular in Play Console vollständig und geprüft</label>
+                        <label><input type="checkbox" id="ps-check-iarc" /> IARC-Altersfreigabe abgeschlossen</label>
+                        <label><input type="checkbox" id="ps-check-listing" /> Store Listing vollständig (Beschreibung, Screenshots, Kontakt)</label>
+                        <label><input type="checkbox" id="ps-check-privacy-url" /> Öffentliche Privacy-Policy-URL in Store und App verlinkt</label>
+                        <label><input type="checkbox" id="ps-check-permissions" /> Permissions Declaration (Accessibility/Usage/Overlay) eingereicht und konsistent</label>
+                        <label><input type="checkbox" id="ps-check-app-access" /> App-Access-Anleitung für Reviewer hinterlegt</label>
+                        <label><input type="checkbox" id="ps-check-security" /> Schlüsselrotation/-restriktion nach Bereinigung durchgeführt</label>
+                        <label><input type="checkbox" id="ps-check-signoff" /> Interne Go/No-Go-Freigabe dokumentiert</label>
+                    </div>
+
+                    <div class="dsar-form" style="display: grid; gap: 10px; margin-block-start: 12px">
+                        <input type="url" id="ps-privacy-url" placeholder="Privacy Policy URL (https://...)" />
+                        <input type="email" id="ps-support-email" placeholder="Support-/Privacy-E-Mail" />
+                        <input type="url" id="ps-listing-url" placeholder="Play Console Listing URL (optional)" />
+                        <textarea id="ps-release-notes" rows="4" placeholder="Release-Notizen / Reviewer-Hinweise"></textarea>
+                    </div>
+
+                    <div class="dsar-form" style="margin-block-start: 12px">
+                        <button onclick="savePlayStoreReadiness()" class="btn btn-primary">Readiness speichern</button>
+                        <button onclick="exportPlayStoreReadiness()" class="btn btn-secondary">JSON exportieren</button>
+                        <button onclick="resetPlayStoreReadiness()" class="btn btn-danger">Zurücksetzen</button>
+                    </div>
+
+                    <div id="playstore-readiness-result" class="data-list" style="margin-block-start: 15px"></div>
+                </div>
             </div>
 
         </div>
