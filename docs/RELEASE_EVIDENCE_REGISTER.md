@@ -45,7 +45,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 |---------------|---------------|--------|-------------|------|
 | Legacy auth telemetry snapshot | docs/LEGACY_AUTH_INVENTORY.md | ✅ | Documented | 2026-03-19 |
 | Auth mode / feature flags confirmed | copilot-instructions.md: Legacy Auth Freeze active | ✅ | Documented | 2026-03-19 |
-| Secrets/config review | No google-services.json committed, env-only secrets | ✅ | Automated | 2026-03-19 |
+| Secrets/config review | Repo-Artefakte bereinigt (`start.html`, `Firebase-Konsole.txt`), Firebase-Key-Rotation/-Restriktion im Console-Runbook offen | ⬜ | Security Owner | |
 | Security baseline checklist | docs/SECURITY_BASELINE_CHECKLIST.md | ✅ | Documented | 2026-03-19 |
 
 ### 3.4 Compliance Gate

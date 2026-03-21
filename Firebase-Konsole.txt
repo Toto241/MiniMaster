@@ -7,5 +7,5 @@ App-Spitzname	MiniMaster Web Panel
 Hosting-Website auswählen	minimaster-28fbd (oder Default)
 → „App registrieren" klicken → Firebase zeigt das firebaseConfig-Objekt → API Key und App ID notieren.
 
-API Key: AIzaSyBjINek6A4RVqha9_wOBTVQZ5PDyl9MBkE 
-App ID:  1:716142639488:web:9bef591e96e72db771a965
+API Key: <AUS FIREBASE KONSOLE EINSETZEN>
+App ID:  <AUS FIREBASE KONSOLE EINSETZEN>
