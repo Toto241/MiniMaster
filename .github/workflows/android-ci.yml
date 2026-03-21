@@ -1,9 +1,9 @@
 name: Android CI
 on:
   push:
-    paths: ['**/*.kt', '**/build.gradle', 'settings.gradle', 'gradle/**']
+    paths: ['**/*.kt', '**/build.gradle', 'settings.gradle', 'gradle/**', '.github/workflows/android-ci.yml']
   pull_request:
-    paths: ['**/*.kt', '**/build.gradle', 'settings.gradle', 'gradle/**']
+    paths: ['**/*.kt', '**/build.gradle', 'settings.gradle', 'gradle/**', '.github/workflows/android-ci.yml']
 
 jobs:
   android:
