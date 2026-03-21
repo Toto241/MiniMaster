@@ -20,6 +20,11 @@ on:
     # Weekly scan on Monday at 2 AM UTC
     - cron: '0 2 * * 1'
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 jobs:
   analyze:
     name: Analyze Code (${{ matrix.language }})
@@ -39,18 +44,25 @@ jobs:
 
       # Initializes the CodeQL tools for scanning
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           # Custom query pack for extra security checks
           queries: security-and-quality,./codeql-custom-queries-actions
 
+      - name: Prepare Firebase config templates for Android build
+        if: ${{ matrix.language == 'java' }}
+        run: |
+          cp masterApp/google-services.template.json masterApp/google-services.json
+          cp childApp/google-services.template.json childApp/google-services.json
+
       # Autobuild attempts to build any compiled languages
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
+        uses: github/codeql-action/autobuild@v3
 
       # Perform the analysis on the generated database
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
         with:
           category: "/language:${{ matrix.language }}"

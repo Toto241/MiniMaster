@@ -15,7 +15,7 @@ describe("support module load branches", () => {
     }));
 
     jest.isolateModules(() => {
-      const mod = require("../src/support");
+      const mod = jest.requireActual("../src/support");
       expect(mod.createSupportTicket).toBeDefined();
       expect(mod.aiExplainProblem).toBeDefined();
     });
@@ -30,7 +30,7 @@ describe("support module load branches", () => {
     }));
 
     jest.isolateModules(() => {
-      const mod = require("../src/support");
+      const mod = jest.requireActual("../src/support");
       expect(mod.onTicketCreated).toBeDefined();
       expect(mod.getTicketUserData).toBeDefined();
     });
@@ -61,8 +61,10 @@ describe("support module load branches", () => {
 
     let wrapped: any;
     jest.isolateModules(() => {
+      // require() is necessary here to build a fresh wrapped function under isolateModules.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fft = require("firebase-functions-test")();
-      const mod = require("../src/support");
+      const mod = jest.requireActual("../src/support");
       wrapped = fft.wrap(mod.aiExplainProblem);
     });
 

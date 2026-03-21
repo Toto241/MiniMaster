@@ -1,4 +1,5 @@
 import { __legalTestables } from "../src/legal";
+import * as admin from "firebase-admin";
 
 describe("legal testable helpers", () => {
   it("mapPolicyDoc returns null for non-existing doc", () => {
@@ -56,7 +57,6 @@ describe("legal testable helpers", () => {
   });
 
   it("parsePublishPolicyInput covers version/url/status/effectiveAt/isMajorChange branches", () => {
-    const admin = require("firebase-admin");
     const ts = admin.firestore.Timestamp.now();
 
     const explicit = __legalTestables.parsePublishPolicyInput({

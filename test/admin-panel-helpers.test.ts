@@ -61,7 +61,19 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
   context.window = context;
   context.globalThis = context;
 
-  const exportTrailer = `\n;globalThis.__adminPanelTestExports = {\n  sanitizeAdbSerial,\n  sanitizeApkPath,\n  buildPowerShellScript,\n  buildDeployCommand,\n  buildCommissioningSnapshot,\n  renderCommissioningReport,\n  getMissingAttestations,\n  updateCommissioningAttestations\n};`;
+  const exportTrailer = [
+    "",
+    ";globalThis.__adminPanelTestExports = {",
+    "  sanitizeAdbSerial,",
+    "  sanitizeApkPath,",
+    "  buildPowerShellScript,",
+    "  buildDeployCommand,",
+    "  buildCommissioningSnapshot,",
+    "  renderCommissioningReport,",
+    "  getMissingAttestations,",
+    "  updateCommissioningAttestations",
+    "};",
+  ].join("\n");
 
   vm.runInNewContext(source + exportTrailer, context, { filename: "admin-panel/app.js" });
 
@@ -87,7 +99,7 @@ describe("admin-panel helper functions", () => {
     const { exports } = loadAdminPanelTestExports();
 
     expect(exports.buildDeployCommand("demo-project")).toContain("--project demo-project");
-    expect(exports.buildPowerShellScript("firebase deploy", "C:/MiniMaster")).toContain('Set-Location -Path "C:/MiniMaster"');
+    expect(exports.buildPowerShellScript("firebase deploy", "C:/MiniMaster")).toContain("Set-Location -Path \"C:/MiniMaster\"");
   });
 
   it("tracks commissioning attestations and missing checklist items", () => {
