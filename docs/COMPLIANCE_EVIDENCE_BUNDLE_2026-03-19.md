@@ -2,7 +2,9 @@
 
 ## 1. Übersicht
 
-Dieses Dokument fasst alle compliance-relevanten Nachweise zusammen, die für den Release Candidate RC-2026-03-19 erhoben wurden. Es dient als Prüfungsgrundlage für die Go/No-Go-Entscheidung.
+Dieses Dokument fasst alle compliance-relevanten Nachweise zusammen, die als Baseline für den Release Candidate RC-2026-03-19 erhoben wurden. Es dient als Prüfungsgrundlage für die Go/No-Go-Entscheidung und als historischer Nachweisstand.
+
+Aktueller Entscheidungsstand (laufender Kandidat) wird im `docs/RELEASE_EVIDENCE_REGISTER.md` geführt.
 
 ## 2. DSGVO / DSAR Compliance
 
@@ -12,7 +14,7 @@ Dieses Dokument fasst alle compliance-relevanten Nachweise zusammen, die für de
 **Test-Evidenz:** `test/branch-coverage-boost.test.ts` — deleteUserAccount-Tests (4 Tests)
 
 | Szenario | Test-ID | Ergebnis |
-|----------|---------|----------|
+| ---------- | --------- | ---------- |
 | Admin löscht Nutzer mit Kindgeräten | deleteUserAccount admin deleting | ✅ |
 | Nicht-Admin darf nur eigenes Konto löschen | deleteUserAccount non-admin self | ✅ |
 | Nicht-Admin darf kein fremdes Konto löschen | deleteUserAccount non-admin other | ✅ |
@@ -24,6 +26,7 @@ Dieses Dokument fasst alle compliance-relevanten Nachweise zusammen, die für de
 **Test-Evidenz:** `test/enforcement-automation.test.ts` — Audit-Logeinträge in allen 39 Enforcement-Tests verifiziert
 
 Audit-Events werden bei folgenden Aktionen protokolliert:
+
 - `device.lock` / `device.unlock`
 - `rules.update_blacklist` / `rules.update_usage`
 - `task.create` / `task.complete` / `task.approve`
@@ -33,6 +36,7 @@ Audit-Events werden bei folgenden Aktionen protokolliert:
 ### 2.3 Datenschutz-konforme Löschung (Art. 17 DSGVO)
 
 **Funktion:** `deleteUserAccount` (admin.ts)
+
 - Löscht Master-Dokument, alle zugehörigen Kind-Dokumente und deren Unter-Sammlungen
 - Authentifizierungsdaten werden via `auth().deleteUser()` entfernt
 - Audit-Log dokumentiert Löschvorgang
@@ -45,7 +49,7 @@ Audit-Events werden bei folgenden Aktionen protokolliert:
 ### 3.1 Automatisierte Matrix-Abdeckung
 
 | Matrix-Kategorie | Szenarien | Backend-Tests | Abdeckung |
-|-------------------|-----------|---------------|-----------|
+| ------------------- | ----------- | --------------- | ----------- |
 | A: App-Blocking | A-01 bis A-03 | 5 Tests | ✅ Vollständig |
 | B: Gerätesperre | B-01, B-02 | 5 Tests | ✅ Vollständig |
 | C: Nutzungsregeln | C-01, C-03 | 8 Tests | ✅ Vollständig |
@@ -57,6 +61,7 @@ Audit-Events werden bei folgenden Aktionen protokolliert:
 ### 3.2 Berechtigungsprüfung (Authorization Enforcement)
 
 Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
+
 - ✅ Master darf nur eigene Kinder steuern (permission-denied bei fremdem Kind)
 - ✅ Nicht authentifizierte Aufrufe werden abgelehnt
 - ✅ Kind darf nur eigene Daten lesen/melden
@@ -65,7 +70,7 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 ## 4. Test-Coverage-Bericht
 
 | Metrik | Wert | Ziel | Status |
-|--------|------|------|--------|
+| -------- | ------ | ------ | -------- |
 | Statements | 94.85% | >75% | ✅ |
 | Branches | 82.12% | >60% | ✅ |
 | Functions | 94.30% | >75% | ✅ |
@@ -76,7 +81,7 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 ### 4.1 Coverage pro Modul
 
 | Modul | Stmts | Branch | Funcs | Lines |
-|-------|-------|--------|-------|-------|
+| ------- | ------- | -------- | ------- | ------- |
 | device.ts | 87.93% | 85.47% | 100.00% | 87.69% |
 | admin.ts | 97.02% | 83.52% | 83.33% | 99.71% |
 | triggers.ts | 94.57% | 82.72% | 100.00% | 95.20% |
@@ -90,7 +95,7 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 ## 5. Rechtliche Dokumentation
 
 | Dokument | Pfad | Status |
-|----------|------|--------|
+| ---------- | ------ | -------- |
 | AGB-Template (DE) | docs/AGB_TEMPLATE_DE.md | ✅ |
 | Rechtskonformitätsmatrix | docs/LEGAL_COUNTRY_COMPLIANCE_MATRIX.md | ✅ |
 | Einwilligungsversioni. | docs/LEGAL_VERSIONING_RECONSENT_SPEC.md | ✅ |
@@ -100,7 +105,7 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 ## 6. Sicherheits-Baseline
 
 | Prüfpunkt | Referenz | Status |
-|------------|----------|--------|
+| ------------ | ---------- | -------- |
 | Sicherheits-Baseline-Checkliste | docs/SECURITY_BASELINE_CHECKLIST.md | ✅ |
 | Legacy-Auth-Inventar | docs/LEGACY_AUTH_INVENTORY.md | ✅ |
 | Auth-Migrations-Plan | docs/AUTH_MIGRATION_PLAN.md | ✅ |
@@ -116,6 +121,11 @@ Jede Enforcement-Funktion wird auf korrekte Zugriffskontrolle getestet:
 - [x] Readiness Scorecard: `docs/READINESS_SCORECARD_2026-03-19.md`
 - [x] CI Runbook: `docs/CI_RUNBOOK.md`
 - [x] Release Decision Template: `docs/RELEASE_DECISION_TEMPLATE.md`
+
+## 8. Bezug zum aktuellen RC (2026-03-21)
+
+- Dieser Bundle-Stand bleibt bewusst auf 2026-03-19 eingefroren (historische Baseline).
+- RC-spezifische Änderungen ab 2026-03-21 (Deploy-Workflow-Fix, Env-Dokumentation, Play-Store-Readiness-Erweiterung) sind im `docs/RELEASE_EVIDENCE_REGISTER.md` und `docs/READINESS_SCORECARD_2026-03-19.md` dokumentiert.
 
 ---
 

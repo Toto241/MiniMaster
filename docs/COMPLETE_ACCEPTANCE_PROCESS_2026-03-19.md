@@ -23,6 +23,7 @@ Required inputs before process start:
 3. Latest quality gate outputs.
 4. Current incident status and known risk list.
 5. Commissioning checklist artifact.
+6. Current release evidence register snapshot (including operational rest points).
 
 Process preconditions:
 
@@ -140,6 +141,29 @@ Exit criteria:
 
 ---
 
+### Stage 5b Play Store Submission Gate
+
+Objective: ensure app-store release prerequisites are complete for the rollout scope.
+
+Activities:
+
+1. Confirm Data Safety form completeness.
+2. Confirm IARC rating completion.
+3. Confirm store listing assets (text + screenshots + contact) are final.
+4. Confirm permissions declaration (Accessibility/Usage/Overlay) is submitted and consistent.
+5. Confirm reviewer app-access guide is attached.
+
+Required evidence:
+
+1. Play Console screenshots/links for all five items.
+2. Cross-check with `docs/RELEASE_EVIDENCE_REGISTER.md` section "Before Go-Live: Operative Restpunkte".
+
+Exit criteria:
+
+1. Play Store Submission Readiness marked pass in final decision template.
+
+---
+
 ### Stage 6 Operational Readiness Gate
 
 Objective: ensure team can safely operate, monitor and rollback the candidate.
@@ -171,6 +195,7 @@ Decision rule:
 1. Go only if all mandatory gates passed.
 2. No-Go if any P0 remains open.
 3. Conditional Go only with documented risk acceptance for non-critical residual items.
+4. No-Go if any unresolved "Before Go-Live" blocker has no owner, due date, and explicit risk acceptance.
 
 Outputs:
 
@@ -190,8 +215,11 @@ Every release candidate must contain links or attachments for:
 6. Commissioning checklist.
 7. Security review note.
 8. Compliance review note.
-9. Operational readiness note.
-10. Final sign-off record.
+9. Play Store submission readiness evidence.
+10. Operational blocker status table (owner + due date + risk state).
+11. Final release decision template.
+12. Operational readiness note.
+13. Final sign-off record.
 
 ## 6. Risk Classification and Escalation Rules
 
@@ -234,7 +262,8 @@ Gate outcomes:
 2. Functional Commissioning Gate: pass/fail
 3. Security and Identity Gate: pass/fail
 4. Compliance Gate: pass/fail
-5. Operational Readiness Gate: pass/fail
+5. Play Store Submission Gate: pass/fail
+6. Operational Readiness Gate: pass/fail
 
 Residual risk:
 
@@ -257,5 +286,7 @@ Approvals:
 This acceptance process is complementary to:
 
 1. Commissioning checklist: [docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md)
-2. Finalization strategy: [docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md](docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md)
-3. Runbook baseline: [RUNBOOK.md](../RUNBOOK.md)
+2. Release evidence register (source of truth): [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md)
+3. Release decision template: [docs/RELEASE_DECISION_TEMPLATE.md](docs/RELEASE_DECISION_TEMPLATE.md)
+4. Finalization strategy: [docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md](docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md)
+5. Runbook baseline: [RUNBOOK.md](../RUNBOOK.md)
