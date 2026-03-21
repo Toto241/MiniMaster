@@ -10,9 +10,9 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 | Field | Value |
 |-------|-------|
-| Release Candidate ID | RC-2026-03-19 |
+| Release Candidate ID | RC-2026-03-21 |
 | Branch | `main` |
-| Candidate Freeze Date | 2026-03-19 |
+| Candidate Freeze Date | 2026-03-21 |
 | Deployment Reference | _(pending final deploy)_ |
 
 ## 3. Mandatory Evidence Items
@@ -26,9 +26,10 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Test result (`npm test` — 428 tests) | 20 suites, 428/428 passed | ✅ | Automated | 2026-03-19 |
 | Coverage report (>75% statements) | Stmts 94.85%, Branch 82.12%, Funcs 94.30%, Lines 95.58% | ✅ | Automated | 2026-03-19 |
 | Firestore rules structural test | Rules validated in test suite | ✅ | Automated | 2026-03-19 |
+| Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
 | CodeQL security scan (0 high/critical) | codeql-analysis.yml workflow | ⬜ | | |
 | Android build (if applicable) | _(pending)_ | ⬜ | | |
-| Deployment result | _(pending final deploy)_ | ⬜ | | |
+| Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
 
 ### 3.2 Functional Commissioning Gate
 
@@ -45,7 +46,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 |---------------|---------------|--------|-------------|------|
 | Legacy auth telemetry snapshot | docs/LEGACY_AUTH_INVENTORY.md | ✅ | Documented | 2026-03-19 |
 | Auth mode / feature flags confirmed | copilot-instructions.md: Legacy Auth Freeze active | ✅ | Documented | 2026-03-19 |
-| Secrets/config review | Repo-Artefakte bereinigt (`start.html`, `Firebase-Konsole.txt`), Firebase-Key-Rotation/-Restriktion im Console-Runbook offen | ⬜ | Security Owner | |
+| Secrets/config review | `start.html`+`Firebase-Konsole.txt` bereinigt; `.env.example` + `.gitignore` aktualisiert; `deploy.yml` Projekt-ID-Bug (minimaster-app→minimaster-28fbd) behoben; Firebase-Key-Rotation im Console-Runbook offen | ⬜ | Security Owner | 2026-03-21 |
 | Security baseline checklist | docs/SECURITY_BASELINE_CHECKLIST.md | ✅ | Documented | 2026-03-19 |
 
 ### 3.4 Compliance Gate

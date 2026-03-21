@@ -1,6 +1,6 @@
 # MiniMaster Deployment Guide (aktualisiert)
 
-Stand: 2026-03-15
+Stand: 2026-03-21
 
 Diese Anleitung beschreibt den aktuellen Deploy- und Inbetriebnahmepfad fuer Backend, Hosting und Operator-Setup.
 
@@ -53,7 +53,7 @@ Alle Variablen sind in [`.env.example`](../.env.example) dokumentiert. Für den 
 ### Variablen-Übersicht
 
 | Variable | Erforderlich | Fallback | Verwendung |
-|----------|:---:|---------|-----------|
+| ---------- | :---: | --------- | ----------- |
 | `GEMINI_API_KEY` | ✅ ja | – | Gemini-Assistent, Support-KI, FCM-Analyse |
 | `GEMINI_MODEL` | nein | `gemini-2.0-flash` | Modellauswahl Gemini |
 | `OPENAI_API_KEY` | nein | – | Support-Ticket-Fallback |
@@ -75,11 +75,6 @@ firebase functions:secrets:set OPENAI_API_KEY
 cp .env.example .env
 # .env befüllen, dann:
 firebase deploy --only functions
-
-# Option B: firebase functions:config (Legacy, weiterhin unterstützt)
-firebase functions:config:set \
-  app.legal_policy_base_url="https://minimaster.app/legal" \
-  app.pairing_link_base_url="https://minimaster.app/pair"
 ```
 
 ### Lokal (Emulator)
@@ -98,7 +93,7 @@ Fuer automatische Ticket-Loesung:
 2. Optional: `GEMINI_MODEL` (Default: `gemini-2.0-flash`)
 3. Fallback: `OPENAI_API_KEY`
 
-## 6. Deployment ausfuehren
+## 7. Deployment ausfuehren
 
 Alles zusammen:
 
@@ -112,7 +107,7 @@ Oder per Script:
 ./deploy.sh
 ```
 
-## 7. Operator/Admin freischalten
+## 8. Operator/Admin freischalten
 
 Erstadmin erstellen (lokaler Service Account Key als `serviceAccountKey.json` im Projektroot erforderlich):
 
@@ -122,14 +117,14 @@ node scripts/setup-admin.js <email> <passwort>
 
 Danach Login im Operator-Dashboard pruefen (`admin-panel/index.html`).
 
-## 8. Validierung nach Deploy
+## 9. Validierung nach Deploy
 
 1. Operator-Dashboard Login (Admin-Claim)
 2. Cloud Setup & Assistant Tab: Full Validation starten
 3. Parent Web Panel Login und Device-Sync pruefen
 4. Support-Ticket-Workflow inkl. Feedback-Pflicht pruefen
 
-## 9. CI/CD Hinweise
+## 10. CI/CD Hinweise
 
 1. Gradle-Wrapper-Validierung laeuft ueber `gradle/actions/wrapper-validation@v3`
 2. Workflows:
@@ -137,7 +132,24 @@ Danach Login im Operator-Dashboard pruefen (`admin-panel/index.html`).
    - `.github/workflows/android-ci.yml`
    - `.github/workflows/deploy.yml`
 
-## 10. Bekannte Grenzen
+### GitHub Repository Secrets (fuer `.github/workflows/deploy.yml`)
+
+Folgende Secrets muessen im Repository unter `Settings > Secrets and variables > Actions` gesetzt sein:
+
+| Secret | Pflicht | Zweck |
+| ------ | :-----: | ----- |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | Ja | Authentifizierung fuer Firebase Deploy in GitHub Actions |
+| `GEMINI_API_KEY` | Nein | KI-Funktionen (Support, Analyse) |
+| `GEMINI_MODEL` | Nein | Ueberschreibt Modell-Default `gemini-2.0-flash` |
+| `OPENAI_API_KEY` | Nein | Fallback fuer Support-Workflows |
+| `OPENAI_FALLBACK_ENABLED` | Nein | Aktiviert OpenAI-Fallback (`true`/`false`) |
+| `LEGAL_POLICY_BASE_URL` | Nein | Basis-URL fuer Rechtsdokumente |
+| `PAIRING_LINK_BASE_URL` | Nein | Basis-URL fuer Pairing-Links |
+| `DISABLE_LEGACY_SECRETKEY_AUTH` | Nein | Legacy-Auth Feature-Flag (`true`/`false`) |
+
+Hinweis: Der Workflow schreibt diese Werte vor dem Functions-Deploy in eine temporäre `.env` im Runner-Workspace. Sie wird nicht ins Repo committed.
+
+## 11. Bekannte Grenzen
 
 1. Child-App-Blocking ist weiterhin als Prototype gekennzeichnet (siehe `ACCESSIBILITY_SERVICE_GUIDE.md` und `ARCHITECTURE.md`).
 2. Firestore-Datenmodell ist bewusst flat (`masters`, `children`, ...), kein `families/*`.

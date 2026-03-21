@@ -1,8 +1,8 @@
 # Readiness Scorecard (2026-03-19)
 
-Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared, subscription, legal, subscription branch-hardening, admin fallback branch-hardening and auth branch-hardening waves.
+Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared, subscription, legal, subscription branch-hardening, admin fallback branch-hardening, auth branch-hardening waves **+ Play-Store-Readiness-Modul, deploy.yml Bugfix, .env.example Dokumentation (2026-03-21)**.
 
-## Scoring Date: 2026-03-19 (Update #9)
+## Scoring Date: 2026-03-21 (Update #10)
 
 ---
 
@@ -93,6 +93,18 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 | CI-Gate-Stabilisierung dokumentiert | +2 | CI_GATE_STABILIZATION_PROOF_2026-03-19.md |
 | Security-Baseline SSRF-Test + Auth-Review | +1 | triggers-v2-coverage.test.ts (SSRF-Test) |
 
+### Zusätzliche Verbesserungen (Update #10, 2026-03-21)
+
+| Maßnahme | Nachweis |
+|----------|----------|
+| Play-Store-Readiness-Modul: 8-Punkte-Checkliste, Go-Live-Ampel-Gate, Prioritätsplan, Commissioning-Report | admin-panel/app.js + index.html |
+| Reviewer-Anleitungs-Generator (App Access Guide) | admin-panel/app.js: generateReviewerGuide() |
+| Kombinierter Release-Artefakt-Export (Commissioning + Play Store + Plattform) | admin-panel/app.js: exportReleaseArtefact() |
+| Finales Go-Live-Gate gesperrt bei offenen Play-Store-Checks | admin-panel/app.js: renderGoLiveAmpel() |
+| deploy.yml Kritischer Bugfix: FIREBASE_PROJECT_ID minimaster-app → minimaster-28fbd | .github/workflows/deploy.yml |
+| deploy.yml: Secrets-Übergabe (GEMINI_API_KEY, OPENAI_API_KEY, URLs) an Cloud Functions | .github/workflows/deploy.yml |
+| .env.example mit allen 8 process.env-Variablen dokumentiert | .env.example + docs/DEPLOYMENT_GUIDE.md |
+| .gitignore: .env-Dateien ausgeschlossen | .gitignore |
 ---
 
 ## Verbleibende Gaps (6 Punkte zu 100)
@@ -101,7 +113,7 @@ Status: **UPDATED** — scoring snapshot after enforcement automation, complianc
 |-----|--------|--------|
 | OEM-Gerätetests auf physischen Referenzgeräten | 1 | Pixel + Samsung Test-Matrix ausführen |
 | Legacy Auth Dashboard-Snapshot | 1 | Admin-Panel-Export archivieren |
-| Store-Listing-Artefakte (DE) | 1 | Screenshots, Beschreibungen finalisieren |
+| Play-Store-Listing-Artefakte DE (Screenshots, Beschreibungen) | 1 | Play Console Store-Listing vollständig ausfüllen |
 | On-Call-Roster zuweisen | 1 | Team-Mitglieder benennen |
 | CodeQL-Scan CI-Ergebnis verlinken | 1 | GitHub Security-Tab Referenz |
 | Commissioning physisch ausführen | 1 | COMMISSIONING_ACCEPTANCE_CHECKLIST durchlaufen |
