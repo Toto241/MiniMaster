@@ -151,6 +151,7 @@ if ($TestFilter) {
     if ($AppId -eq "master") {
         $testFiltersToRun = @(
             "com.minimaster.masterapp.MasterAppE2ETest",
+            "com.minimaster.masterapp.CommissioningMasterPhase1UiTest",
             "com.minimaster.masterapp.CommissioningMasterUiFlowTest"
         )
     } else {

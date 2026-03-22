@@ -2,6 +2,7 @@ package com.minimaster.masterapp
 
 import android.util.Log
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,5 +27,16 @@ class MasterAppE2ETest {
             .assertIsDisplayed()
 
         Log.d("E2E_TEST", "Master legal consent gate smoke test executed")
+    }
+
+    @Test
+    fun phase1_1_registrationIsBlockedUntilLegalConsent() {
+        composeTestRule
+            .onNodeWithText("Accept legal terms to continue")
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Register This Device")
+            .assertDoesNotExist()
     }
 }
