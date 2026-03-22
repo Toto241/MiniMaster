@@ -17,6 +17,7 @@ Dieses Setup automatisiert die commissioning-relevanten Android-Tests auf zwei p
 ### Master (`commissioning`)
 
 - `com.minimaster.masterapp.MasterAppE2ETest`
+- `com.minimaster.masterapp.CommissioningMasterPhase1UiTest`
 - `com.minimaster.masterapp.CommissioningMasterUiFlowTest`
 
 ### Child (`commissioning`)
@@ -42,6 +43,8 @@ pwsh -File scripts/run-dual-device-commissioning.ps1 -MasterSerial <MASTER_SERIA
 
 ## Mapping zur PHYSICAL_COMMISSIONING_CHECKLIST
 
+- Phase 1.1: Master first-launch consent/registration gate checks
+- Phase 1.2: Pairing-link generation UI states (idle/loading/success/error)
 - Phase 1.3: Pairing UI and deep-link handshake smoke tests
 - Phase 2.1: Task creation form and submit interaction
 - Phase 2.2: Child task completion action path
