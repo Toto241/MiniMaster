@@ -31,6 +31,9 @@
 .PARAMETER TestFilter
     Optionaler Gradle-Testfilter, z.B. "com.minimaster.masterapp.MasterAppE2ETest".
 
+.PARAMETER Suite
+    Testsuite: "default" (alle Tests des Moduls) oder "commissioning" (vordefinierte Commissioning-Klassen).
+
 .EXAMPLE
     pwsh -File scripts/run-usb-tests.ps1 -AppId master
     pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial R58M12345
@@ -49,7 +52,11 @@ param(
     [switch]$SkipActivation,
 
     [Parameter(Mandatory = $false)]
-    [string]$TestFilter = ""
+    [string]$TestFilter = "",
+
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("default", "commissioning")]
+    [string]$Suite = "default"
 )
 
 Set-StrictMode -Version Latest
@@ -60,13 +67,6 @@ function Write-Step([string]$msg) { Write-Host "`n▶  $msg" -ForegroundColor Cy
 function Write-Ok([string]$msg)   { Write-Host "✔  $msg" -ForegroundColor Green }
 function Write-Fail([string]$msg) { Write-Host "✘  $msg" -ForegroundColor Red }
 function Write-Info([string]$msg) { Write-Host "   $msg" -ForegroundColor Gray }
-
-function Invoke-Adb {
-    param([string[]]$Args)
-    $adbArgs = if ($script:adbTarget) { @("-s", $script:adbTarget) + $Args } else { $Args }
-    & adb @adbArgs
-    return $LASTEXITCODE
-}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot  = Split-Path -Parent $scriptDir
@@ -144,16 +144,54 @@ if (-not $SkipActivation) {
 # ── Step 5: Instrumented Tests ────────────────────────────────────────────────
 Write-Step "Schritt 5/7: Instrumented Tests ausführen ($appModule)"
 
-$gradleArgs = @("${appModule}:connectedDebugAndroidTest")
+$testFiltersToRun = @()
 if ($TestFilter) {
-    $gradleArgs += "-Pandroid.testInstrumentationRunnerArguments.class=$TestFilter"
+    $testFiltersToRun = @($TestFilter)
+} elseif ($Suite -eq "commissioning") {
+    if ($AppId -eq "master") {
+        $testFiltersToRun = @(
+            "com.minimaster.masterapp.MasterAppE2ETest",
+            "com.minimaster.masterapp.CommissioningMasterUiFlowTest"
+        )
+    } else {
+        $testFiltersToRun = @(
+            "com.google.pairing.PairingScreenUITest",
+            "com.google.pairing.DeepLinkE2ETest",
+            "com.google.pairing.CommissioningChildUiFlowTest"
+        )
+    }
 }
+
+if (Test-Path $xmlResultsDir) {
+    Remove-Item -Path $xmlResultsDir -Recurse -Force
+}
+
+$gradleExit = 0
+$previousAndroidSerial = $env:ANDROID_SERIAL
+$env:ANDROID_SERIAL = $script:adbTarget
 
 Push-Location $repoRoot
 try {
-    & $gradleCmd @gradleArgs
-    $gradleExit = $LASTEXITCODE
+    if ($testFiltersToRun.Count -eq 0) {
+        $gradleParams = @("${appModule}:connectedDebugAndroidTest")
+        & $gradleCmd @gradleParams
+        $gradleExit = $LASTEXITCODE
+    } else {
+        foreach ($filter in $testFiltersToRun) {
+            Write-Info "Führe Testklasse aus: $filter"
+            $gradleParams = @(
+                "${appModule}:connectedDebugAndroidTest",
+                "-Pandroid.testInstrumentationRunnerArguments.class=$filter"
+            )
+            & $gradleCmd @gradleParams
+            if ($LASTEXITCODE -ne 0) {
+                $gradleExit = $LASTEXITCODE
+                break
+            }
+        }
+    }
 } finally {
+    $env:ANDROID_SERIAL = $previousAndroidSerial
     Pop-Location
 }
 
