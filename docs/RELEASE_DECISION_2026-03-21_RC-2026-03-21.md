@@ -24,7 +24,7 @@ Status: working decision record for the current candidate.
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test/Coverage lokal gruen; CodeQL- und Android-CI-Reruns wurden am 2026-03-22 ausgefuehrt und erneut mit Billing/Spending-Limit Fehler beendet |
+| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test/Coverage lokal gruen (40/40 Suites, 1500/1500 Tests am 2026-03-22); CodeQL- und Android-CI-Reruns wurden am 2026-03-22 ausgefuehrt und erneut mit Billing/Spending-Limit Fehler beendet (externer Admin-Blocker) |
 | Functional Commissioning | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Mehrere commissioning checks offen |
 | Security and Identity | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Firebase key rotation/restrictions offen |
 | Compliance | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Dokumentierte Compliance-Evidenz vorhanden |
@@ -47,7 +47,7 @@ Status: working decision record for the current candidate.
 | Play Console Data Safety | Open | Product/Ops | offen | No |
 | IARC rating | Open | Product/Ops | offen | No |
 | Store listing finalized | Open | Product/Ops | offen | No |
-| Permissions declaration | Open | Compliance Owner | offen | No |
+| Permissions declaration | In progress - operative Vorlage vorhanden (`docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`), finale Play-Console-Einreichung offen | Compliance Owner | offen | No |
 | App access guide attached | In progress - reviewer guide draft vorhanden (`docs/APP_ACCESS_REVIEWER_GUIDE.md`), Play Console Verlinkung offen | Product/Ops | offen | No |
 | CodeQL result linked | Open - Run [23401992153](https://github.com/Toto241/MiniMaster/actions/runs/23401992153) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |
 | Android CI build evidence linked | Open - Run [23401992162](https://github.com/Toto241/MiniMaster/actions/runs/23401992162) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |
@@ -100,6 +100,7 @@ Reason: Mandatory gates are not passed and multiple before-go-live blockers are 
 
 ## Immediate Operator Actions (After Billing Fix)
 
+0. Externe Gesamtstrecke nach `docs/RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md` abarbeiten.
 1. VS Code Task ausfuehren: `CI: Revalidate Release Gates (+ Rerun Failed)`
 2. Danach VS Code Task ausfuehren: `CI: Revalidate Release Gates`
 3. Pruefen, dass in `docs/CI_REVALIDATION_LATEST.md` beide Pipelines auf `completed / success` stehen.
