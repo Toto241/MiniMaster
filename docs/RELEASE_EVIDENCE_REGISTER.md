@@ -21,9 +21,9 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 | Evidence Item | Link/Reference | Status | Verified By | Date |
 | --------------- | --------------- | -------- | ------------- | ------ |
-| Build artifact (`npm run build`) | Local build successful (`tsc -p tsconfig.json`) | ✅ | Automated | 2026-03-21 |
-| Lint result (`npm run lint`) | 0 errors, 0 warnings | ✅ | Automated | 2026-03-21 |
-| Test result (`npm test -- --runInBand`) | 38 suites, 1482/1482 passed | ✅ | Automated | 2026-03-21 |
+| Build artifact (`npm run build`) | Local build successful (`tsc -p tsconfig.json`) | ✅ | Automated | 2026-03-22 |
+| Lint result (`npm run lint`) | 0 errors, 0 warnings | ✅ | Automated | 2026-03-22 |
+| Test result (`npm test -- --runInBand`) | 40 suites, 1500/1500 passed | ✅ | Automated | 2026-03-22 |
 | Coverage report (`npm test -- --coverage --runInBand`) | Stmts 99.56%, Branch 96.65%, Funcs 98.52%, Lines 99.65% | ✅ | Automated | 2026-03-21 |
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
@@ -88,6 +88,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 Dieses Register wird bei jedem Steering-Checkpoint aktualisiert und ist Teil des endgültigen Release-Artefakts. Alle Links müssen vor der Go/No-Go-Entscheidung verifiziert und aktuell sein.
 
+Fuer die externe Umsetzungsstrecke (Billing/Console/Sign-off) siehe: `docs/RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md`.
+
 ## 6. Before Go-Live: Operative Restpunkte
 
 | Aktion | Zielnachweis | Status | Owner | Zieltermin |
@@ -96,9 +98,9 @@ Dieses Register wird bei jedem Steering-Checkpoint aktualisiert und ist Teil des
 | Play Console Data-Safety final einreichen | Play Console Review-Screenshot | ⬜ | Product/Ops | offen |
 | IARC Rating finalisieren | IARC-Freigabe im Play Console Dashboard | ⬜ | Product/Ops | offen |
 | Store Listing DE vollständig (Text + Screenshots) | Finaler Store-Listing-Entwurf + Asset-Paket | ⬜ | Product/Ops | offen |
-| Permissions Declaration einreichen (Accessibility/Usage/Overlay) | Bestätigte Permissions-Declaration | ⬜ | Compliance Owner | offen |
+| Permissions Declaration einreichen (Accessibility/Usage/Overlay) | Arbeitsstand dokumentiert in `docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`; finale Einreichbestaetigung aus Play Console noch offen | ⬜ | Compliance Owner | offen |
 | App-Access-Anleitung in Play Console hinterlegen | Link/Screenshot zur Reviewer-Anleitung (operationalisierter Draft in `docs/APP_ACCESS_REVIEWER_GUIDE.md`; Play Console Verlinkung noch offen) | ⬜ | Product/Ops | offen |
-| GitHub Actions Billing/Spending-Limit bereinigen | Billing-&-Plans-Nachweis; danach CodeQL Job startbar | ⬜ | Repo Owner | offen |
+| GitHub Actions Billing/Spending-Limit bereinigen | Billing-&-Plans-Nachweis; danach CodeQL Job startbar (externe Owner-Aktion erforderlich) | ⬜ | Repo Owner | offen |
 | CodeQL-Ergebnis verlinken | Letzter Run: [23401992153](https://github.com/Toto241/MiniMaster/actions/runs/23401992153) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |
 | Android CI Build-Nachweis verlinken | Letzter Run: [23401992162](https://github.com/Toto241/MiniMaster/actions/runs/23401992162) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |
 | Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST | ⬜ | QA/Operations | offen |
@@ -116,14 +118,14 @@ Status legend:
 
 | # | Task | Owner | ETA | Abhaengigkeit | Nachweis fuer "Done" | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | 2026-03-22 18:00 | - | Screenshot/Export aus Billing & Plans + bestaetigter Runner-Start | 🔄 |
+| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | 2026-03-22 18:00 | - | Screenshot/Export aus Billing & Plans + bestaetigter Runner-Start | ⛔ |
 | 2 | CI-Rerun nach Billing-Fix ausloesen (`-RerunLatestFailed`) | Engineering Owner | 2026-03-22 19:00 | 1 | Aktualisiertes `docs/CI_REVALIDATION_LATEST.md` mit laufenden Jobs | ✅ |
 | 3 | CodeQL-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | ⛔ |
 | 4 | Android-CI-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | ⛔ |
 | 5 | Firebase-Key-Rotation nach Runbook durchfuehren | Security Owner | 2026-03-23 10:00 | - | Key-ID alt/neu + Loeschzeit in Evidence Register dokumentiert | ⬜ |
 | 6 | Play Console Data Safety einreichen | Product/Ops | 2026-03-23 12:00 | - | Review-Screenshot + Formularstatus "Submitted" | ⬜ |
 | 7 | IARC-Rating finalisieren | Product/Ops | 2026-03-23 12:30 | 6 | IARC/Content-Rating Screenshot in Play Console | ⬜ |
-| 8 | Permissions Declaration + App-Access-Guide hinterlegen | Compliance Owner + Product/Ops | 2026-03-23 14:00 | 6 | Bestaetigte Declarations + Reviewer-Guide Link | ⬜ |
+| 8 | Permissions Declaration + App-Access-Guide hinterlegen | Compliance Owner + Product/Ops | 2026-03-23 14:00 | 6 | Bestaetigte Declarations + Reviewer-Guide Link (`docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md` vorbereitet) | 🔄 |
 | 9 | Physische Commissioning-Checks abschliessen | QA/Operations | 2026-03-23 16:00 | 5, 8 | Ausgefuellte [docs/PHYSICAL_COMMISSIONING_CHECKLIST.md](docs/PHYSICAL_COMMISSIONING_CHECKLIST.md) + Sign-off | ⬜ |
 | 10 | On-call/Eskalations-Roster benennen | Operations Lead | 2026-03-23 16:30 | - | Namen + Kontakte + Vertretung in Runbook/Evidence | ⬜ |
 | 11 | Go/No-Go Re-Decision dokumentieren | Release Manager | 2026-03-23 18:00 | 1-10 | Aktualisierte [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | ⬜ |
