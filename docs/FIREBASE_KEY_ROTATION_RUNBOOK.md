@@ -1,7 +1,7 @@
 # Firebase Key Rotation Runbook (Pre-Go-Live)
 
-**Status:** Critical Security Task — Must complete before production rollout  
-**Audience:** Security Team / DevOps Lead  
+**Status:** Critical Security Task — Must complete before production rollout
+**Audience:** Security Team / DevOps Lead
 **Timeline:** ~2 hours (with GCP approval buffer)
 
 ---
@@ -65,7 +65,7 @@ GCP Cloud Console
    - **New key will be downloaded automatically**
    - **Save to secure location** (password-protected file manager / 1Password / Azure Key Vault)
 
-**⚠️ Important:** 
+**⚠️ Important:**
 - Do NOT commit to Git
 - Do NOT share unencrypted
 - Expires in 90 days — plan next rotation
@@ -86,7 +86,7 @@ Write-Host "Type: $($key.type)"  # Should be "service_account"
 
 ### 2a. Deploy Cloud Functions with New Key
 
-**Location:** CI/CD or Local Firebase CLI  
+**Location:** CI/CD or Local Firebase CLI
 
 ```bash
 # Local testing (using new key in environment)
@@ -151,11 +151,11 @@ GitHub → Actions → "CI: Revalidate Release Gates"
   → Click "Run workflow"
 ```
 
-**Wait for completion (~10 min)**  
-Expected result: 
+**Wait for completion (~10 min)**
+Expected result:
 - ✅ `npm run build` passes
 - ✅ `npm run lint` passes
-- ✅ `npm run test` passes (428/428 tests)
+- ✅ `npm run test` passes (1500/1500 tests, 40 suites)
 - ✅ `firebase deploy --dry-run` successful
 
 ---
@@ -177,7 +177,7 @@ Expected result:
 2. Click **Delete** (⚠️ irreversible)
 3. Confirm: "Yes, delete this key"
 
-**Result:** Old key can no longer authenticate to Firebase  
+**Result:** Old key can no longer authenticate to Firebase
 **Impact:** Any lingering processes using old key will fail immediately
 
 ### 4c. Document Key ID for Audit
@@ -302,7 +302,7 @@ Set recurring calendar event:
 - [ ] New key generated and securely stored
 - [ ] New key tested against staging endpoints
 - [ ] New key deployed to GitHub Secrets
-- [ ] CI/CD test deployment passes (428/428 tests)
+- [ ] CI/CD test deployment passes (1500/1500 tests, 40 suites)
 - [ ] Old key revoked successfully
 - [ ] Key rotation documented in RELEASE_EVIDENCE_REGISTER.md
 - [ ] No production incidents post-rotation (24h monitoring)
