@@ -127,3 +127,20 @@ Every handover must include:
 - [ ] Escalation matrix validated in dry run
 - [ ] Mandatory runbooks confirmed reachable
 - [ ] Evidence register updated with completion state
+
+## 11. Assignment Protocol (Operations Lead — Fill-In Guide)
+
+Schritt-fuer-Schritt, um alle TODO-Felder zu schliessen:
+
+1. **Incident Commander**: Teamlead oder erfahrene Ingenieur-Kontaktperson benennen, Mobilnummer + Chat-Handle eintragen.
+2. **Backend On-call**: Firebase/Functions-verantwortlichen Entwickler eintragen; Pager-ID aus internem Alerting-Tool kopieren.
+3. **Android On-call**: Android-Lead fuer Master- und Child-App eintragen.
+4. **Security On-call**: Security Owner oder Stellvertreter mit direkter Rufnummer.
+5. **Product/Ops On-call**: Product Manager mit Availability-Fenster (typisch Buerozeiten + Pager-Fallback).
+6. **Coverage window**: Start = geplanter Deploy-Zeitpunkt; End = T+72h (Pilot-Beobachtungsphase).
+7. **Paging channel**: Slack-Kanal `#minimaster-oncall` oder PagerDuty-Service-ID eintragen.
+8. **Bridge URL**: Google Meet / Teams-Kanal fuer Incident Bridge anlegen, URL hier eintragen.
+9. **Reachability test**: Test-Ping an alle benannten Kontakte senden; Antwort-Zeitstempel in Section 9 eintragen.
+10. **Sign-off** in Section 8 ausfuellen, sobald alle Kontakte bestaetigt sind.
+
+> Ziel: Abschluss bis 2026-03-23 16:30 — danach Section 9 + Evidence Register aktualisieren.

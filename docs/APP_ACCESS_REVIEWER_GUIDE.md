@@ -117,7 +117,24 @@ Expected outcome:
 
 | Function | Contact | Availability |
 | --- | --- | --- |
-| Product/Ops | TODO | TODO |
+| Product/Ops | TODO | Werktags 09:00-18:00 CET, danach Pager |
+| Engineering support | TODO | Werktags 09:00-18:00 CET, danach Pager |
+| Escalation (Incident) | TODO | 24/7 via Incident Bridge |
+
+### 8.1 Credential Rotation Schedule
+
+1. Nach abgeschlossener Play-Review: Reviewer-Konten in Firebase Auth deaktivieren.
+2. Reviewer-Passwort-Reset erzwingen fuer alle `minimaster-qa-*`-Accounts.
+3. Bestaetigung in Section 10 Evidence Log eintragen.
+4. Spaetestens 48h nach Reviewabschluss durchfuehren.
+
+### 8.2 Contact Fill-In Guide (Product/Ops)
+
+Fuer jede TODO-Zelle:
+- Name + Nachname + Rolle
+- E-Mail-Adresse (intern)
+- Mobilnummer fuer Eskalation
+- Die Zeile erst als ausgefuellt markieren wenn der Kontakt per Test-Ping bestaetigt hat.
 | Engineering support | TODO | TODO |
 | Escalation | TODO | TODO |
 
