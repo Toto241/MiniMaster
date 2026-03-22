@@ -177,7 +177,7 @@
     }
 
     .status-label { color: var(--ink); font-weight: 700; }
-    .status-value { color: var(--muted); text-align: right; }
+    .status-value { color: var(--muted); text-align: end; }
 
     .panel {
       border-radius: 22px;
@@ -247,6 +247,17 @@
     .icon-admin { background: var(--purple); }
     .icon-parent { background: var(--primary); }
     .icon-child { background: var(--green); }
+    .icon-debug { background: var(--orange); }
+
+    code {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 0.85em;
+      background: rgba(15, 23, 42, 0.06);
+      padding: 2px 6px;
+      border-radius: 5px;
+      color: var(--ink);
+      word-break: break-all;
+    }
 
     .card ul,
     .test-grid ul,
@@ -282,7 +293,7 @@
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: auto;
+      margin-block-start: auto;
     }
 
     .btn {
@@ -406,7 +417,7 @@
     .checklist {
       display: grid;
       gap: 8px;
-      margin-top: 4px;
+      margin-block-start: 4px;
     }
 
     .callout {
@@ -449,8 +460,8 @@
       box-shadow: 0 24px 70px rgba(15, 23, 42, 0.3);
     }
 
-    .modal h3 { font-size: 1.2rem; margin-bottom: 6px; }
-    .modal-sub { font-size: 0.9rem; margin-bottom: 18px; color: var(--muted); }
+    .modal h3 { font-size: 1.2rem; margin-block-end: 6px; }
+    .modal-sub { font-size: 0.9rem; margin-block-end: 18px; color: var(--muted); }
     .modal-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -469,14 +480,14 @@
     }
     .modal input:focus { outline: none; border-color: var(--primary); }
     .modal-actions {
-      margin-top: 20px;
+      margin-block-start: 20px;
       display: flex;
       gap: 10px;
       justify-content: flex-end;
       flex-wrap: wrap;
     }
     .modal-status {
-      margin-top: 14px;
+      margin-block-start: 14px;
       font-size: 0.85rem;
       padding: 10px 12px;
       border-radius: 10px;
@@ -485,19 +496,19 @@
     .modal-status.success { display: block; background: var(--green-soft); color: #065f46; }
     .modal-status.error { display: block; background: var(--red-soft); color: #991b1b; }
 
-    @media (max-width: 920px) {
+    @media (max-inline-size: 920px) {
       .hero { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 640px) {
+    @media (max-inline-size: 640px) {
       body { padding-inline: 12px; }
       .hero, .panel, .card { padding: 20px; }
       .hero-title { align-items: flex-start; }
       .logo-circle { inline-size: 64px; block-size: 64px; font-size: 2rem; }
       .panel-header { flex-direction: column; }
       .apk-path { align-items: flex-start; }
-      .btn { width: 100%; justify-content: center; }
-      .actions .btn, .quick-links .btn, .modal-actions .btn { width: auto; }
+      .btn { inline-size: 100%; justify-content: center; }
+      .actions .btn, .quick-links .btn, .modal-actions .btn { inline-size: auto; }
     }
   </style>
 </head>
@@ -508,17 +519,18 @@
         <ul class="hero-badges">
           <li>🧭 Startseite</li>
           <li>🔗 Web- & Admin-Integration</li>
-          <li>🧪 Test- und Rollout-Hinweise</li>
-        </ul>
+          <li>🧪 Test- und Rollout-Hinweise</li>          <li>🔐 USB-Debug-Schnittstelle</li>
+          <li>📦 v1.1.0</li>        </ul>
 
         <div class="hero-title">
           <div class="logo-circle">M</div>
           <div>
             <h1>MiniMaster Betriebszentrale</h1>
             <p class="lead">
-              Zentrale Startseite für Operatoren, Eltern-Panel und Kinder-App. Von hier aus lassen sich Firebase-Konfiguration,
+              Zentrale Startseite für Operatoren, Eltern-Panel und Kinder-App (v1.1.0 · Build 2). Von hier aus lassen sich Firebase-Konfiguration,
               Web-Panels, APK-Pfade, Dokumentation und Prüfhinweise konsistent steuern. Die gespeicherte Konfiguration wird direkt
-              mit dem Operator-Dashboard und dem Eltern-Panel über denselben Browser-Speicher synchronisiert.
+              mit dem Operator-Dashboard und dem Eltern-Panel synchronisiert. Neu: gesicherte USB-Debug-Schnittstelle
+              für Eltern- und Kinder-App mit HMAC-SHA256 Challenge-Response und automatisiertem USB-Testlauf.
             </p>
           </div>
         </div>
@@ -547,6 +559,14 @@
           <li>
             <span class="status-label">Web-Integration</span>
             <span class="status-value">start.html → admin-panel + web-control</span>
+          </li>
+          <li>
+            <span class="status-label">Android-Apps</span>
+            <span class="status-value">v1.1.0 · versionCode 2 · minSdk 24</span>
+          </li>
+          <li>
+            <span class="status-label">USB-Debug-Schnittstelle</span>
+            <span class="status-value">HMAC-SHA256 · 30 Min. Session · Secure-by-Default</span>
           </li>
           <li>
             <span class="status-label">Empfohlener nächster Schritt</span>
@@ -579,8 +599,12 @@
           <p>APK-Pfade lassen sich mit einem Klick kopieren und für ADB, File Explorer oder Build-Checks verwenden.</p>
         </div>
         <div class="mini-card">
-          <strong>4. Testtiefe auswählen</strong>
-          <p>Nutze unten die Trennung zwischen automatisch prüfbaren und bewusst manuellen Validierungen.</p>
+          <strong>4. Debug-Secrets einrichten (einmalig)</strong>
+          <p>Secret generieren (<code>generate-debug-token.ps1 -GenSecret</code>) und in <code>local.properties</code> eintragen. Beide Apps neu bauen.</p>
+        </div>
+        <div class="mini-card">
+          <strong>5. USB-Testlauf starten</strong>
+          <p><code>run-usb-tests.ps1 -AppId master|child</code> automatisiert Challenge → Token → Aktivierung → Tests → Deaktivierung → Ampelausgabe.</p>
         </div>
       </div>
     </section>
@@ -630,6 +654,7 @@
         </div>
         <div class="actions">
           <a class="btn btn-primary" href="web-control/index.html">Eltern-Panel öffnen</a>
+          <a class="btn btn-outline" href="docs/DEBUG_INTERFACE_GUIDE.md">🔐 Debug-Guide</a>
           <a class="btn btn-outline" href="README.md">Setup lesen</a>
         </div>
       </article>
@@ -654,9 +679,86 @@
         </div>
         <div class="actions">
           <a class="btn btn-green" href="README.md#testing">Testleitfaden</a>
+          <a class="btn btn-outline" href="docs/DEBUG_INTERFACE_GUIDE.md">🔐 Debug-Guide</a>
           <a class="btn btn-outline" href="docs/DEPLOYMENT_GUIDE.md">Deployment Guide</a>
         </div>
       </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>🔐 USB-Debug-Schnittstelle</h2>
+          <p>Gesicherte Diagnose- und Testschnittstelle für Eltern- und Kinder-App &ndash; <strong>kein separater Debug-Build</strong>.
+          Aktivierung ausschließlich via ADB (USB-Kabel + USB-Debugging) mit HMAC-SHA256 Challenge-Response.
+          Sessions laufen nach 30 Minuten automatisch ab. Ohne konfiguriertes Secret ist die Schnittstelle dauerhaft deaktiviert (Secure-by-Default).</p>
+        </div>
+        <div class="tag">Secure-by-Default &middot; HMAC-SHA256 &middot; ADB-only</div>
+      </div>
+      <div class="panel-grid">
+        <div class="mini-card">
+          <strong>Secret einrichten (einmalig)</strong>
+          <p>Secret generieren:<br><code>generate-debug-token.ps1 -GenSecret</code><br>
+          In <code>local.properties</code> eintragen:<br>
+          <code>debug.session.secret.master=&hellip;</code><br>
+          <code>debug.session.secret.child=&hellip;</code><br>
+          Anschließend beide Apps neu bauen.</p>
+        </div>
+        <div class="mini-card">
+          <strong>Challenge &rarr; Token &rarr; Aktivieren</strong>
+          <p>1.&nbsp;<code>adb shell am broadcast -a &hellip;DEBUG_GET_CHALLENGE</code><br>
+          2.&nbsp;Nonce aus Logcat lesen:<br><code>adb logcat -s MINIMASTER_DEBUG_CHALLENGE -d</code><br>
+          3.&nbsp;<code>generate-debug-token.ps1 -AppId master -Challenge &lt;NONCE&gt;</code><br>
+          4.&nbsp;<code>adb shell am broadcast -a &hellip;DEBUG_ACTIVATE -e response &lt;TOKEN&gt;</code></p>
+        </div>
+        <div class="mini-card">
+          <strong>Status abfragen</strong>
+          <p><code>adb shell am broadcast -a &hellip;DEBUG_DUMP_STATE</code><br>
+          Gibt JSON-Statusdump ins Logcat aus:<br>
+          <code>adb logcat -s MINIMASTER_DEBUG_STATE -d</code><br>
+          Zeigt: Registrierungsstatus, IMEI-Last4, FCM-Token-Last8, Consent-Flag, Sperrstatus u.v.m.</p>
+        </div>
+        <div class="mini-card">
+          <strong>Deaktivieren</strong>
+          <p>Nach Testlauf sofort deaktivieren:<br>
+          <code>adb shell am broadcast -a &hellip;DEBUG_DEACTIVATE</code><br>
+          Sessions laufen automatisch nach 30 Min. ab. Admin-Panel enthält alle 11 Kommandos im Befehlskatalog.</p>
+        </div>
+      </div>
+      <div class="test-grid" style="margin-block-start:14px">
+        <section>
+          <h3>Eltern-App &middot; ADB-Aktionen</h3>
+          <ul>
+            <li><code>com.minimaster.masterapp.DEBUG_GET_CHALLENGE</code></li>
+            <li><code>com.minimaster.masterapp.DEBUG_ACTIVATE</code> &mdash; Extra: <code>response</code></li>
+            <li><code>com.minimaster.masterapp.DEBUG_DUMP_STATE</code> &rarr; Tag: <code>MINIMASTER_DEBUG_STATE</code></li>
+            <li><code>com.minimaster.masterapp.DEBUG_DEACTIVATE</code></li>
+          </ul>
+        </section>
+        <section>
+          <h3>Kinder-App &middot; ADB-Aktionen</h3>
+          <ul>
+            <li><code>com.google.pairing.DEBUG_GET_CHALLENGE</code></li>
+            <li><code>com.google.pairing.DEBUG_ACTIVATE</code> &mdash; Extra: <code>response</code></li>
+            <li><code>com.google.pairing.DEBUG_DUMP_STATE</code> &rarr; Tag: <code>MINIMASTER_DEBUG_STATE_CHILD</code></li>
+            <li><code>com.google.pairing.DEBUG_DEACTIVATE</code></li>
+          </ul>
+        </section>
+        <section>
+          <h3>Vollautomatischer USB-Testlauf</h3>
+          <ul>
+            <li><code>run-usb-tests.ps1 -AppId master</code> &mdash; Eltern-App komplett</li>
+            <li><code>run-usb-tests.ps1 -AppId child</code> &mdash; Kinder-App komplett</li>
+            <li>Ablauf: Challenge &rarr; Token &rarr; Aktivierung &rarr; <code>connectedDebugAndroidTest</code> &rarr; Deaktivierung &rarr; XML-Auswertung</li>
+            <li>Ampelausgabe: 🟢 BESTANDEN / 🔴 FEHLGESCHLAGEN + Testdetails</li>
+            <li>11 Admin-Panel-Kommandos: <code>debug-master-*</code> / <code>debug-child-*</code> / <code>debug-usb-run-tests-*</code></li>
+          </ul>
+        </section>
+      </div>
+      <div class="actions">
+        <a class="btn btn-outline" href="docs/DEBUG_INTERFACE_GUIDE.md">📘 Vollständiger Debug-Guide</a>
+        <a class="btn btn-outline" href="admin-panel/index.html">🛡️ Admin-Panel mit Debug-Kommandos</a>
+      </div>
     </section>
 
     <section class="panel">
@@ -671,18 +773,26 @@
           <h3>Automatisch prüfbar</h3>
           <ul>
             <li>Modal-Logik, Feldvalidierung und localStorage-Speicherung der Firebase-Konfiguration.</li>
-            <li>Clipboard-Flow inkl. Fallback auf `document.execCommand('copy')`.</li>
+            <li>Clipboard-Flow inkl. Fallback auf <code>document.execCommand('copy')</code>.</li>
             <li>Pfadaufbau für APK-Kopierfunktionen basierend auf dem aktuellen Startpfad.</li>
             <li>Live-Statusdarstellung auf Basis der gespeicherten Firebase-Werte.</li>
+            <li>HMAC-SHA256 Token-Generierung via <code>generate-debug-token.ps1</code>.</li>
+            <li>Vollständiger USB-Testlauf via <code>run-usb-tests.ps1</code>: Challenge &rarr; Aktivierung &rarr; <code>connectedDebugAndroidTest</code> &rarr; Deaktivierung &rarr; XML-Parsing &rarr; Ampelausgabe.</li>
+            <li>Gradle Instrumented Tests für beide Apps (<code>:masterApp:connectedDebugAndroidTest</code>, <code>:childApp:connectedDebugAndroidTest</code>).</li>
+            <li>Unit-Tests: <code>:masterApp:testDebugUnitTest</code>, <code>:childApp:testDebugUnitTest</code> (via Admin-Panel-Kommandos).</li>
           </ul>
         </section>
         <section>
           <h3>Bewusst manuell prüfen</h3>
           <ul>
             <li>Visuelles Layout, Responsive Verhalten und Lesbarkeit auf Desktop/Tablet/Mobil.</li>
-            <li>Browser-spezifisches Clipboard-Verhalten unter `file://` und `http://`.</li>
+            <li>Browser-spezifisches Clipboard-Verhalten unter <code>file://</code> und <code>http://</code>.</li>
             <li>Echte Navigation in Admin-Panel, Eltern-Panel und Dokumentationslinks.</li>
-            <li>Reale Wirkung der gespeicherten Konfiguration in den angebundenen Panels.</li>
+            <li>Reale Wirkung der gespeicherten Firebase-Konfiguration in den angebundenen Panels.</li>
+            <li>Gerätekopplung per QR-Code oder 6-stelligem Code auf echten Geräten testen.</li>
+            <li>AccessibilityService-Durchsetzung (App-Blockierung, Overlay) auf echtem Gerät prüfen.</li>
+            <li>USB-Debug-Session manuell komplett durchspielen: Admin-Panel &rarr; Challenge &rarr; Token &rarr; Dump-State &rarr; Deaktivieren.</li>
+            <li>Automatisches Session-Ablaufen nach 30 Minuten verifizieren.</li>
           </ul>
         </section>
       </div>
@@ -690,7 +800,7 @@
 
     <div class="info-bar">
       <span class="dot"></span>
-      <span id="info-bar-text">MiniMaster ist bereit für Konfigurationsprüfung, Panel-Zugriff und APK-basierte Gerätevalidierung.</span>
+      <span id="info-bar-text">MiniMaster v1.1.0 ist bereit für Konfigurationsprüfung, Panel-Zugriff, APK-basierte Gerätevalidierung und USB-Debug-Testläufe.</span>
     </div>
 
     <section class="panel">
@@ -705,20 +815,27 @@
         <li>Operator-Dashboard öffnen und Projekt-/Commissioning-Status kontrollieren.</li>
         <li>Eltern-Panel starten und Login, Geräteübersicht sowie Task-/Rules-Flow kurz prüfen.</li>
         <li>APKs oder Android Studio nutzen, um Child- und Master-App auf realen Geräten zu validieren.</li>
+        <li><strong>Debug-Secrets einrichten (einmalig):</strong> <code>generate-debug-token.ps1 -GenSecret</code> ausführen, Werte in <code>local.properties</code> eintragen, beide Apps neu bauen.</li>
+        <li><strong>USB-Testlauf starten:</strong> Gerät per USB verbinden &rarr; <code>run-usb-tests.ps1 -AppId master</code> und <code>-AppId child</code> &rarr; Ampelergebnis prüfen.</li>
+        <li><strong>Debug-Session deaktivieren:</strong> Nach Testlauf sicherstellen, dass keine aktive Session verbleibt (<code>DEBUG_DEACTIVATE</code> oder automatisches Ablaufen nach 30 Min).</li>
       </ol>
       <ul class="checklist">
-        <li>Speicherstatus muss als „vollständig“ erscheinen.</li>
-        <li>Ein reales `projectId` sollte sichtbar sein, nicht nur Platzhalterwerte.</li>
-        <li>Mindestens ein Web-Flow und ein Geräte-Flow sollten vor Release manuell bestätigt sein.</li>
+        <li>Firebase-Speicherstatus zeigt &bdquo;vollständig&ldquo; &ndash; kein Platzhalterwert sichtbar.</li>
+        <li>Ein reales <code>projectId</code> ist konfiguriert und im Dashboard sichtbar.</li>
+        <li>Debug-Secrets in <code>local.properties</code> eingetragen (kein <code>DISABLED</code>-Status nach Rebuild).</li>
+        <li>USB-Tests zeigen grünes Ampelergebnis 🟢 für beide Apps.</li>
+        <li>Debug-Session nach Testlauf erfolgreich deaktiviert (Session-Log: &bdquo;DEACTIVATED&ldquo;).</li>
+        <li>Mindestens ein Web-Flow und ein Geräte-Flow vor Release manuell bestätigt.</li>
       </ul>
     </section>
 
     <div class="footer">
-      MiniMaster v1.0 ·
+      MiniMaster v1.1.0 · Build 2 ·
       <a href="README.md">Dokumentation</a> ·
       <a href="API_DOCUMENTATION.md">API-Referenz</a> ·
       <a href="docs/DEPLOYMENT_GUIDE.md">Deployment Guide</a> ·
-      <a href="docs/QUALITY_REVIEW_2026-03-17.md">Quality Review</a>
+      <a href="docs/DEBUG_INTERFACE_GUIDE.md">Debug-Interface Guide</a> ·
+      <a href="docs/CI_REVALIDATION_LATEST.md">CI-Revalidierung</a>
     </div>
   </div>
 
