@@ -6,9 +6,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Support different screen sizes and densities -->
-    <supports-screens 
+    <supports-screens
         android:smallScreens="true"
-        android:normalScreens="true" 
+        android:normalScreens="true"
         android:largeScreens="true"
         android:xlargeScreens="true"
         android:anyDensity="true" />
@@ -41,6 +41,22 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!--
+          Debug diagnostic interface – only reachable via ADB (USB + USB-debugging).
+          android:exported="false" prevents any external app from sending these broadcasts.
+          The session requires challenge-response HMAC authentication (see DebugSessionManager).
+        -->
+        <receiver
+            android:name=".debug.DebugBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.minimaster.masterapp.DEBUG_GET_CHALLENGE" />
+                <action android:name="com.minimaster.masterapp.DEBUG_ACTIVATE" />
+                <action android:name="com.minimaster.masterapp.DEBUG_DEACTIVATE" />
+                <action android:name="com.minimaster.masterapp.DEBUG_DUMP_STATE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -21,6 +21,12 @@ android {
         versionName "1.1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Debug session secret – set in local.properties, NEVER commit to VCS.
+        // If unset the debug interface is disabled (secure-by-default).
+        def debugSecretChild = project.hasProperty('debug.session.secret.child')
+            ? project.getProperty('debug.session.secret.child') : 'DISABLED'
+        buildConfigField("String", "DEBUG_SESSION_SECRET_CHILD", "\"${debugSecretChild}\"")
     }
 
     buildTypes {
