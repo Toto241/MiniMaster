@@ -628,6 +628,100 @@ function buildCommandCatalog(projectId) {
             cwd: values.workspacePath,
             fileName: "minimaster-desktop-electron",
         },
+
+        // ─── USB-Debug-Schnittstelle: Eltern-App ───────────────────────────────
+        {
+            id: "debug-master-challenge",
+            label: "[Debug] Eltern-App: Challenge anfordern",
+            description: "Fordert einen einmaligen HMAC-Nonce für die Eltern-App an und liest ihn aus dem Logcat. Danach scripts/generate-debug-token.ps1 ausführen.",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.minimaster.masterapp.DEBUG_GET_CHALLENGE\nadb ${adbDeviceTarget}logcat -s MINIMASTER_DEBUG_CHALLENGE -d -T 1`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-master-challenge",
+        },
+        {
+            id: "debug-master-activate",
+            label: "[Debug] Eltern-App: Session aktivieren",
+            description: "Aktiviert die Debug-Session. TOKEN aus generate-debug-token.ps1 ersetzen. Gültig für 30 Minuten.",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.minimaster.masterapp.DEBUG_ACTIVATE -e response REPLACE_WITH_TOKEN`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-master-activate",
+        },
+        {
+            id: "debug-master-deactivate",
+            label: "[Debug] Eltern-App: Session beenden",
+            description: "Beendet die aktive Debug-Session der Eltern-App sofort.",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.minimaster.masterapp.DEBUG_DEACTIVATE`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-master-deactivate",
+        },
+        {
+            id: "debug-master-dump-state",
+            label: "[Debug] Eltern-App: Status abfragen",
+            description: "Gibt den aktuellen App-Status als JSON ins Logcat aus (Session muss aktiv sein).",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.minimaster.masterapp.DEBUG_DUMP_STATE\nadb ${adbDeviceTarget}logcat -s MINIMASTER_DEBUG_STATE -d -T 1`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-master-dump",
+        },
+
+        // ─── USB-Debug-Schnittstelle: Kinder-App ───────────────────────────────
+        {
+            id: "debug-child-challenge",
+            label: "[Debug] Kinder-App: Challenge anfordern",
+            description: "Fordert einen einmaligen HMAC-Nonce für die Kinder-App an und liest ihn aus dem Logcat.",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.google.pairing.DEBUG_GET_CHALLENGE\nadb ${adbDeviceTarget}logcat -s MINIMASTER_DEBUG_CHALLENGE_CHILD -d -T 1`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-child-challenge",
+        },
+        {
+            id: "debug-child-activate",
+            label: "[Debug] Kinder-App: Session aktivieren",
+            description: "Aktiviert die Debug-Session. TOKEN aus generate-debug-token.ps1 -AppId child ersetzen.",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.google.pairing.DEBUG_ACTIVATE -e response REPLACE_WITH_TOKEN`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-child-activate",
+        },
+        {
+            id: "debug-child-deactivate",
+            label: "[Debug] Kinder-App: Session beenden",
+            description: "Beendet die aktive Debug-Session der Kinder-App sofort.",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.google.pairing.DEBUG_DEACTIVATE`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-child-deactivate",
+        },
+        {
+            id: "debug-child-dump-state",
+            label: "[Debug] Kinder-App: Status abfragen",
+            description: "Gibt den aktuellen App-Status als JSON ins Logcat aus (Session muss aktiv sein).",
+            command: `adb ${adbDeviceTarget}shell am broadcast -a com.google.pairing.DEBUG_DUMP_STATE\nadb ${adbDeviceTarget}logcat -s MINIMASTER_DEBUG_STATE_CHILD -d -T 1`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-child-dump",
+        },
+
+        // ─── USB-Test-Orchestrierung ────────────────────────────────────────────
+        {
+            id: "debug-usb-run-tests-master",
+            label: "[Debug] USB-Tests: Eltern-App (vollständig)",
+            description: "Vollautomatischer USB-Testlauf: Challenge → Token → Aktivierung → connectedDebugAndroidTest → Deaktivierung → Ergebnisübersicht.",
+            command: `pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial "${adbSerial || "auto"}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-tests-master",
+        },
+        {
+            id: "debug-usb-run-tests-child",
+            label: "[Debug] USB-Tests: Kinder-App (vollständig)",
+            description: "Vollautomatischer USB-Testlauf für die Kinder-App mit Ampelausgabe.",
+            command: `pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial "${adbSerial || "auto"}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-tests-child",
+        },
+        {
+            id: "debug-usb-run-tests-all",
+            label: "[Debug] USB-Tests: Beide Apps (sequenziell)",
+            description: "Führt die vollständigen USB-Tests für Eltern- und Kinder-App nacheinander aus.",
+            command: `pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial "${adbSerial || "auto"}"\npwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial "${adbSerial || "auto"}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-tests-all",
+        },
     ];
 }
 

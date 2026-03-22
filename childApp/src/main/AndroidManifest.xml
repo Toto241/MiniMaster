@@ -14,9 +14,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- Support different screen sizes and densities -->
-    <supports-screens 
+    <supports-screens
         android:smallScreens="true"
-        android:normalScreens="true" 
+        android:normalScreens="true"
         android:largeScreens="true"
         android:xlargeScreens="true"
         android:anyDensity="true" />
@@ -47,7 +47,7 @@
                 <data android:scheme="minimaster" android:host="pair" />
             </intent-filter>
         </activity>
-        
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
@@ -90,7 +90,7 @@
             android:exported="false"
             android:foregroundServiceType="specialUse">
         </service>
-        
+
         <!-- Accessibility Service for app monitoring and blocking -->
         <service
             android:name=".child.MiniMasterAccessibilityService"
@@ -103,6 +103,22 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!--
+          Debug diagnostic interface – only reachable via ADB (USB + USB-debugging).
+          android:exported="false" prevents any external app from sending these broadcasts.
+          The session requires challenge-response HMAC authentication (see DebugSessionManager).
+        -->
+        <receiver
+            android:name=".debug.DebugBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.pairing.DEBUG_GET_CHALLENGE" />
+                <action android:name="com.google.pairing.DEBUG_ACTIVATE" />
+                <action android:name="com.google.pairing.DEBUG_DEACTIVATE" />
+                <action android:name="com.google.pairing.DEBUG_DUMP_STATE" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"
