@@ -63,19 +63,21 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     createElement: jest.fn(() => {
       let inner = "";
       return {
-        set textContent(value: string) { inner = String(value || '')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/\"/g, '&quot;')
-          .replace(/'/g, '&#39;'); },
+        set textContent(value: string) {
+          inner = String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        },
         get textContent() { return inner; },
         get innerHTML() { return inner; },
         set innerHTML(value: string) { inner = value; },
       };
     }),
     querySelector: jest.fn((selector: string) => {
-      if (selector === 'input[name="support-access-consent"]:checked') return consentRadio;
+      if (selector === "input[name=\"support-access-consent\"]:checked") return consentRadio;
       if (selector === ".dashboard") return { style: { display: "block" } };
       return null;
     }),
@@ -268,7 +270,7 @@ describe("web-control browser flows", () => {
   it("createSupportTicket requires description and consent", async () => {
     const { context, elements, documentMock } = loadWebControl();
     documentMock.querySelector.mockImplementation((selector: string) => {
-      if (selector === 'input[name=\"support-access-consent\"]:checked') return null;
+      if (selector === "input[name=\"support-access-consent\"]:checked") return null;
       return null;
     });
     const event = { preventDefault: jest.fn() };
@@ -276,5 +278,35 @@ describe("web-control browser flows", () => {
     await context.__webControlTestExports.createSupportTicket(event);
 
     expect(elements.get("notification")?.textContent).toContain("Please describe your problem");
+  });
+
+  it("createSupportTicket submits consent-aware payload and resets the form on success", async () => {
+    const { context, elements, callableFactory, documentMock } = loadWebControl();
+    context.__webControlTestExports.setFunctionsForTesting({ httpsCallable: callableFactory });
+    elements.get("problem-description")!.value = "Kind kann Aufgaben nicht synchronisieren";
+
+    const checkedConsent = { value: "yes", checked: true };
+    documentMock.querySelector.mockImplementation((selector: string) => {
+      if (selector === "input[name=\"support-access-consent\"]:checked") return checkedConsent;
+      return null;
+    });
+
+    const event = { preventDefault: jest.fn() };
+
+    await context.__webControlTestExports.createSupportTicket(event);
+
+    expect(callableFactory).toHaveBeenCalledWith("createSupportTicket");
+    expect(elements.get("problem-description")?.value).toBe("");
+    expect(checkedConsent.checked).toBe(false);
+    expect(elements.get("notification")?.textContent).toContain("Support ticket created successfully");
+  });
+
+  it("showNotification writes message and severity class to the notification banner", () => {
+    const { context, elements } = loadWebControl();
+
+    context.__webControlTestExports.showNotification("Alles synchronisiert", "success");
+
+    expect(elements.get("notification")?.textContent).toBe("Alles synchronisiert");
+    expect(elements.get("notification")?.className).toBe("notification success");
   });
 });
