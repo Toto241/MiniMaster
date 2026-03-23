@@ -78,6 +78,34 @@ pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed
 
 **Note:** If a rerun was just triggered and is still queued/in-progress, the report marks annotation/billing evaluation as `pending` until the run completes.
 
+### 4. run-security-tests.js
+
+Runs security validation checks from `docs/TEST_SCENARIOS_SECURITY.md`.
+
+**Prerequisites:**
+*   A Firebase Admin service account key file (default: `serviceAccountKey.json` in repo root).
+
+**Interactive usage:**
+```bash
+node scripts/run-security-tests.js
+```
+
+**CI / non-interactive usage:**
+```bash
+node scripts/run-security-tests.js --mode ci --admin-email admin@example.com --unauthorized-access-failed true --functions-deployed true
+```
+
+Environment variable alternatives for CI:
+*   `SECURITY_TEST_MODE` (`ci` or `interactive`)
+*   `SECURITY_TEST_ADMIN_EMAIL`
+*   `SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED`
+*   `SECURITY_TEST_FUNCTIONS_DEPLOYED`
+*   `SECURITY_TEST_SERVICE_ACCOUNT`
+
+NPM script aliases:
+*   `npm run test:security` (interactive)
+*   `npm run test:security:ci` (non-interactive, requires CI inputs)
+
 ## Getting Your Service Account Key
 
 To use the `setup-admin.js` script, you need a service account key:

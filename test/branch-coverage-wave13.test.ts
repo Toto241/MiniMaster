@@ -916,7 +916,7 @@ describe("support provider branch coverage", () => {
     }
   });
 
-  it("onTicketCreated handles Gemini non-ok response path", async () => {
+  it("onTicketCreated bleibt im Consent-Flow bei Gemini non-ok Setup", async () => {
     const prevNode = process.env.NODE_ENV;
     const prevGemini = process.env.GEMINI_API_KEY;
     try {
@@ -931,14 +931,15 @@ describe("support provider branch coverage", () => {
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
       await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-nonok"] }, { params: { ticketId: "ticket-gemini-nonok" } }))
-        .rejects.toThrow(/Gemini API error/i);
+        .resolves.toBeUndefined();
+      expect(state.supportTickets["ticket-gemini-nonok"].conversationStatus).toBe("awaiting_debug_consent");
     } finally {
       process.env.NODE_ENV = prevNode;
       process.env.GEMINI_API_KEY = prevGemini;
     }
   });
 
-  it("onTicketCreated handles Gemini AbortError timeout path", async () => {
+  it("onTicketCreated bleibt im Consent-Flow bei Gemini AbortError-Setup", async () => {
     const prevNode = process.env.NODE_ENV;
     const prevGemini = process.env.GEMINI_API_KEY;
     try {
@@ -955,14 +956,15 @@ describe("support provider branch coverage", () => {
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
       await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-abort"] }, { params: { ticketId: "ticket-gemini-abort" } }))
-        .rejects.toThrow(/timeout/i);
+        .resolves.toBeUndefined();
+      expect(state.supportTickets["ticket-gemini-abort"].conversationStatus).toBe("awaiting_debug_consent");
     } finally {
       process.env.NODE_ENV = prevNode;
       process.env.GEMINI_API_KEY = prevGemini;
     }
   });
 
-  it("onTicketCreated fails when no AI provider is configured", async () => {
+  it("onTicketCreated bleibt im Consent-Flow ohne konfigurierten Provider", async () => {
     const prevNode = process.env.NODE_ENV;
     const prevGemini = process.env.GEMINI_API_KEY;
     const prevOpenAi = process.env.OPENAI_API_KEY;
@@ -978,7 +980,8 @@ describe("support provider branch coverage", () => {
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
       await expect(wrapped({ data: () => state.supportTickets["ticket-no-provider"] }, { params: { ticketId: "ticket-no-provider" } }))
-        .rejects.toThrow(/no ai provider configured/i);
+        .resolves.toBeUndefined();
+      expect(state.supportTickets["ticket-no-provider"].conversationStatus).toBe("awaiting_debug_consent");
     } finally {
       process.env.NODE_ENV = prevNode;
       process.env.GEMINI_API_KEY = prevGemini;
