@@ -10,7 +10,7 @@ import { OpenAI } from "openai";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
-import { AuditLogger, requireSupportOrAdmin } from "./shared";
+import { AuditLogger, checkRateLimit, requireSupportOrAdmin } from "./shared";
 
 // ==================== AI CLIENT ====================
 
@@ -67,7 +67,14 @@ type DebugSnapshot = {
 
 const MAX_CONVERSATION_ROUNDS = 7;
 const AI_SOLUTION_CONFIDENCE = 0.75;
-const AI_LOW_CONFIDENCE = 0.6;
+
+function shouldEscalateAfterAttempts(
+  solved: boolean,
+  nextRound: number,
+  nextFailures: number
+): boolean {
+  return !solved && nextRound >= MAX_CONVERSATION_ROUNDS && nextFailures >= MAX_CONVERSATION_ROUNDS;
+}
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const OPENAI_FALLBACK_ENABLED = process.env.OPENAI_FALLBACK_ENABLED === "true";
@@ -662,11 +669,7 @@ Antworte NUR als JSON mit:
   const solved = parsed.confidence >= AI_SOLUTION_CONFIDENCE && !needsMoreInfo;
   const nextRound = currentRound + 1;
   const nextFailures = solved ? currentFailures : currentFailures + 1;
-  const shouldEscalate =
-    !solved &&
-    nextRound >= MAX_CONVERSATION_ROUNDS &&
-    nextFailures >= MAX_CONVERSATION_ROUNDS &&
-    parsed.confidence < AI_LOW_CONFIDENCE;
+  const shouldEscalate = shouldEscalateAfterAttempts(solved, nextRound, nextFailures);
 
   let response = parsed.solution;
   let status: TicketConversationStatus = "waiting_user_response";
@@ -879,6 +882,7 @@ export const analyzeWithDebugData = functions.https.onCall(
     }
 
     const ticketData = ticketDoc.data() || {};
+    checkRateLimit(context.auth.uid, "support.analyze_with_debug_data", 20, 60_000);
     const role = String(context.auth.token.role || "");
     const isSupport = role === "admin" || role === "support";
     if (!isSupport && ticketData.masterImei !== context.auth.uid) {
@@ -923,6 +927,7 @@ export const grantDebugAccess = functions.https.onCall(
     }
 
     const masterImei = context.auth.uid;
+    checkRateLimit(masterImei, "support.grant_debug_access", 10, 60_000);
     const ticketRef = db().collection("supportTickets").doc(ticketId);
     const ticketDoc = await ticketRef.get();
     if (!ticketDoc.exists) {
@@ -932,6 +937,12 @@ export const grantDebugAccess = functions.https.onCall(
     const ticketData = ticketDoc.data() || {};
     if (ticketData.masterImei !== masterImei) {
       throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+    if (String(ticketData.conversationStatus || "") !== "awaiting_debug_consent") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Debug consent is not expected in the current ticket state."
+      );
     }
 
     const expiresAt = new Date();
@@ -1007,8 +1018,15 @@ export const skipDebugMode = functions.https.onCall(
     }
 
     const ticketData = ticketDoc.data() || {};
+    checkRateLimit(context.auth.uid, "support.skip_debug_mode", 10, 60_000);
     if (ticketData.masterImei !== context.auth.uid) {
       throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+    if (String(ticketData.conversationStatus || "") !== "awaiting_debug_consent") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Debug consent is not expected in the current ticket state."
+      );
     }
 
     await appendConversationEntry(ticketId, {
@@ -1063,8 +1081,15 @@ export const processUserReplyMessage = functions.https.onCall(
     }
 
     const ticketData = ticketDoc.data() || {};
+    checkRateLimit(context.auth.uid, "support.process_user_reply", 15, 60_000);
     if (ticketData.masterImei !== context.auth.uid) {
       throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+    if (ticketData.status === "closed_by_ai" || ticketData.status === "escalated") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Ticket is already closed or escalated and cannot accept new AI replies."
+      );
     }
 
     const currentRound = Number(ticketData.conversationRound || 0);
@@ -1129,6 +1154,7 @@ export const getDebugInfo = functions.https.onCall(
     }
 
     const ticketData = ticketDoc.data() || {};
+    checkRateLimit(context.auth.uid, "support.get_debug_info", 30, 60_000);
     const role = String(context.auth.token.role || "");
     const isSupport = role === "admin" || role === "support";
     if (!isSupport && ticketData.masterImei !== context.auth.uid) {
@@ -1145,6 +1171,13 @@ export const getDebugInfo = functions.https.onCall(
     }
 
     const grant = grantDoc.data() || {};
+    const debugScope = Array.isArray(grant.debugScope) ? grant.debugScope : [];
+    if (debugScope.length > 0 && !debugScope.includes("diagnostic_logs")) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Debug scope does not allow diagnostic data access."
+      );
+    }
     const expiresAt = grant.expiresAt as admin.firestore.Timestamp | undefined;
     if (expiresAt && expiresAt.toMillis() <= Date.now()) {
       await grantDoc.ref.update({ status: "expired" });
@@ -1378,4 +1411,6 @@ export const __supportTestables = {
   generateWithOpenAI,
   resolveImpersonationRole,
   resolveExplainRole,
+  shouldEscalateAfterAttempts,
+  buildInitialDebugConsentQuestion,
 };
