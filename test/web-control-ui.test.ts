@@ -37,8 +37,11 @@ function loadWebControl(initialStorage: StorageMap = {}) {
   const storage = new Map(Object.entries(initialStorage));
   const elements = new Map<string, MockElement>();
   [
+    "dashboard-action-bar",
     "devices-list",
     "task-child-id",
+    "task-child-select",
+    "task-child-selector-group",
     "task-description",
     "task-deadline",
     "task-creation-modal",
@@ -50,6 +53,10 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     "notification",
     "problem-description",
     "support-tickets",
+    "task-review-section",
+    "subscription-section",
+    "support-section",
+    "subscription-status-card",
   ].forEach((id) => elements.set(id, createElement(id)));
 
   const domContentLoadedHandlers: Array<() => void> = [];
@@ -163,6 +170,11 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     "  openRulesModal,",
     "  saveRules,",
     "  createSupportTicket,",
+    "  showTaskAssignment,",
+    "  showReviewTasks,",
+    "  showSubscription,",
+    "  showSupport,",
+    "  showDashboard,",
     "  showNotification,",
     "  setFunctionsForTesting: function(mock) { functions = mock; },",
     "  setDbForTesting: function(mock) { db = mock; },",
@@ -309,4 +321,35 @@ describe("web-control browser flows", () => {
     expect(elements.get("notification")?.textContent).toBe("Alles synchronisiert");
     expect(elements.get("notification")?.className).toBe("notification success");
   });
+
+  it("showTaskAssignment opens the shared task modal with a device selector when multiple children exist", async () => {
+    const { context, elements } = loadWebControl();
+    context.__webControlTestExports.setCurrentMasterImeiForTesting("m1");
+    context.__webControlTestExports.renderDevices([{ id: "child-1" }, { id: "child-2" }]);
+
+    await context.__webControlTestExports.showTaskAssignment();
+
+    expect(elements.get("task-creation-modal")?.style?.display).toBe("flex");
+    expect(elements.get("task-child-selector-group")?.style?.display).toBe("block");
+    expect(elements.get("task-child-select")?.innerHTML).toContain("child-1");
+    expect(elements.get("task-child-select")?.innerHTML).toContain("child-2");
+  });
+
+  it("section navigation keeps the dashboard shell visible while switching to support content", () => {
+    const { context, elements } = loadWebControl();
+    context.__webControlTestExports.setDbForTesting({
+      collection: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        get: jest.fn().mockResolvedValue({ empty: true, forEach: jest.fn() }),
+      })),
+    });
+
+    context.__webControlTestExports.showSupport();
+
+    expect(elements.get("dashboard-action-bar")?.style?.display).toBe("none");
+    expect(elements.get("devices-list")?.style?.display).toBe("none");
+    expect(elements.get("support-section")?.style?.display).toBe("block");
+  });
+
 });

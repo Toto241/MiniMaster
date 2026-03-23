@@ -164,7 +164,8 @@ fun MasterAppNavigation(viewModel: MasterViewModel = hiltViewModel()) {
             DashboardScreen(
                 onNavigateToCreateTask = { childId -> navController.navigate("createTask/$childId") },
                 onNavigateToReview = { navController.navigate("taskReview") },
-                onNavigateToSubscription = { navController.navigate("subscription") }
+                onNavigateToSubscription = { navController.navigate("subscription") },
+                onNavigateToUsageRules = { childId -> navController.navigate("usageRules/$childId") }
             )
         }
         composable("subscription") {
@@ -172,6 +173,9 @@ fun MasterAppNavigation(viewModel: MasterViewModel = hiltViewModel()) {
         }
         composable("taskReview") {
             TaskReviewScreen(onBack = { navController.popBackStack() })
+        }
+        composable("usageRules/{childId}") {
+            UsageRulesScreen(onBack = { navController.popBackStack() })
         }
         composable("createTask/{childId}") { backStackEntry ->
             val childId = backStackEntry.arguments?.getString("childId") ?: ""
