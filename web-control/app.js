@@ -93,6 +93,27 @@ let app, db, functions;
 let currentMasterImei = null;
 let devicesListener = null; // Firestore listener for real-time updates
 let usageChartInstance = null;
+let cachedDevices = [];
+
+function getDashboardChromeElements() {
+    return [
+        document.getElementById('dashboard-action-bar'),
+        document.getElementById('devices-list')
+    ].filter(Boolean);
+}
+
+function setDashboardChromeVisible(visible) {
+    getDashboardChromeElements().forEach(element => {
+        element.style.display = visible ? '' : 'none';
+    });
+}
+
+function hideSecondarySections() {
+    ['task-review-section', 'subscription-section', 'support-section'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+}
 
 /**
  * Initializes the Firebase app, services, and attempts to restore the user's
@@ -252,6 +273,7 @@ function loadDevices() {
  * @param {Array<object>} devices - An array of device objects from Firestore.
  */
 function renderDevices(devices) {
+    cachedDevices = Array.isArray(devices) ? devices : [];
     const devicesListElement = document.getElementById('devices-list');
 
     if (devices.length === 0) {
@@ -329,10 +351,59 @@ function toggleDeviceLock(childImei, isLocked) {
  * Opens the task creation modal and pre-fills the child ID.
  * @param {string} childId - The ID of the child device for which to create the task.
  */
-function openTaskModal(childId) {
+
+async function showTaskAssignment() {
+    if (!currentMasterImei) {
+        showNotification('Please log in first.', 'error');
+        return;
+    }
+
+    let devices = cachedDevices;
+    if (!devices.length) {
+        try {
+            const snapshot = await db.collection('children')
+                .where('masterImei', '==', currentMasterImei)
+                .get();
+            devices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            cachedDevices = devices;
+        } catch (error) {
+            console.error('Error loading devices for task assignment:', error);
+            showNotification('Unable to load devices for task assignment: ' + error.message, 'error');
+            return;
+        }
+    }
+
+    if (!devices.length) {
+        showNotification('No paired devices found. Pair a child device first.', 'info');
+        return;
+    }
+
+    const childSelect = document.getElementById('task-child-select');
+    const selectorGroup = document.getElementById('task-child-selector-group');
+    if (!childSelect || !selectorGroup) {
+        showNotification('Task assignment UI is not available.', 'error');
+        return;
+    }
+
+    childSelect.innerHTML = devices
+        .map(device => `<option value="${escapeHtml(device.id)}">${escapeHtml(device.id)}</option>`)
+        .join('');
+    selectorGroup.style.display = devices.length > 1 ? 'block' : 'none';
+    openTaskModal(devices[0].id, { useSelector: devices.length > 1 });
+}
+
+function openTaskModal(childId, options = {}) {
+    const useSelector = options.useSelector === true;
     document.getElementById('task-child-id').value = childId;
     document.getElementById('task-description').value = '';
     document.getElementById('task-deadline').value = '';
+
+    const selectorGroup = document.getElementById('task-child-selector-group');
+    const childSelect = document.getElementById('task-child-select');
+    if (selectorGroup && childSelect) {
+        selectorGroup.style.display = useSelector ? 'block' : 'none';
+        childSelect.value = childId;
+    }
 
     document.getElementById('task-creation-modal').style.display = 'flex';
 }
@@ -344,8 +415,10 @@ function closeTaskModal() {
     document.getElementById('task-creation-modal').style.display = 'none';
     const descriptionField = document.getElementById('task-description');
     const deadlineField = document.getElementById('task-deadline');
+    const selectorGroup = document.getElementById('task-child-selector-group');
     if (descriptionField) descriptionField.value = '';
     if (deadlineField) deadlineField.value = '';
+    if (selectorGroup) selectorGroup.style.display = 'none';
 }
 
 /**
@@ -354,7 +427,11 @@ function closeTaskModal() {
  */
 function createTask(event) {
     event.preventDefault();
-    const childId = document.getElementById('task-child-id').value;
+    const selectorGroup = document.getElementById('task-child-selector-group');
+    const selectedChildId = document.getElementById('task-child-select')?.value;
+    const childId = selectorGroup && selectorGroup.style.display !== 'none' && selectedChildId
+        ? selectedChildId
+        : document.getElementById('task-child-id').value;
     const description = document.getElementById('task-description').value.trim();
     const deadlineValue = document.getElementById('task-deadline').value;
 
@@ -517,10 +594,9 @@ function saveRules(event) {
  * Switches the view to the task review section and loads tasks pending approval.
  */
 function showReviewTasks() {
-    document.querySelector('.dashboard').style.display = 'none';
+    setDashboardChromeVisible(false);
+    hideSecondarySections();
     document.getElementById('task-review-section').style.display = 'block';
-    document.getElementById('subscription-section').style.display = 'none';
-
     loadTasksToReview();
 }
 
@@ -622,20 +698,54 @@ function approveTaskReview(taskId, childImei) {
 /**
  * Switches the view to the subscription management section.
  */
-function showSubscription() {
-    document.querySelector('.dashboard').style.display = 'none';
-    document.getElementById('task-review-section').style.display = 'none';
+async function showSubscription() {
+    setDashboardChromeVisible(false);
+    hideSecondarySections();
     document.getElementById('subscription-section').style.display = 'block';
+    await loadSubscriptionStatus();
 }
 
 /**
  * Switches the view back to the main device dashboard.
  */
 function showDashboard() {
-    document.querySelector('.dashboard').style.display = 'block';
-    document.getElementById('task-review-section').style.display = 'none';
-    document.getElementById('subscription-section').style.display = 'none';
-    document.getElementById('support-section').style.display = 'none';
+    setDashboardChromeVisible(true);
+    hideSecondarySections();
+}
+
+
+async function loadSubscriptionStatus() {
+    const statusCard = document.getElementById('subscription-status-card');
+    if (!statusCard) return;
+
+    statusCard.innerHTML = '<div class="loading">Loading subscription status...</div>';
+
+    try {
+        const getSubscriptionStatus = functions.httpsCallable('getSubscriptionStatus');
+        const result = await getSubscriptionStatus({});
+        const data = result.data || {};
+        const subscription = data.subscriptionStatus || {};
+        const status = escapeHtml(subscription.status || 'none');
+        const expiresAt = subscription.expiresAt?.seconds
+            ? new Date(subscription.expiresAt.seconds * 1000).toLocaleString()
+            : 'N/A';
+        const trialDays = Number.isFinite(data.trialDaysRemaining) ? data.trialDaysRemaining : null;
+        const accessText = data.hasAccess ? 'Active access' : 'No active access';
+
+        statusCard.innerHTML = `
+            <h4>Current Subscription</h4>
+            <p><strong>Status:</strong> ${status}</p>
+            <p><strong>Access:</strong> ${accessText}</p>
+            <p><strong>Child device limit:</strong> ${escapeHtml(String(data.childLimit || 0))}</p>
+            <p><strong>Parent app limit:</strong> ${escapeHtml(String(data.parentAppLimit || 0))}</p>
+            <p><strong>Expires:</strong> ${expiresAt}</p>
+            ${trialDays !== null ? `<p><strong>Trial days remaining:</strong> ${escapeHtml(String(trialDays))}</p>` : ''}
+            <p class="help-text">Purchases are currently completed via the parent Android app. Use this panel to inspect the live entitlement state.</p>
+        `;
+    } catch (error) {
+        console.error('Error loading subscription status:', error);
+        statusCard.innerHTML = `<p>Unable to load subscription status: ${escapeHtml(error.message)}</p>`;
+    }
 }
 
 // --- Utility Functions ---
@@ -673,9 +783,8 @@ window.onclick = function(event) {
 // ==================== SUPPORT FUNCTIONS ====================
 
 function showSupport() {
-    document.querySelector('.dashboard').style.display = 'none';
-    document.getElementById('task-review-section').style.display = 'none';
-    document.getElementById('subscription-section').style.display = 'none';
+    setDashboardChromeVisible(false);
+    hideSecondarySections();
     document.getElementById('support-section').style.display = 'block';
     loadSupportTickets();
 }

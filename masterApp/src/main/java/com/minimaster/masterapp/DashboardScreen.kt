@@ -120,7 +120,7 @@ fun ChildDeviceItem(
                     Text(stringResource(R.string.create_task))
                 }
                 OutlinedButton(onClick = onUsageRulesClick) {
-                    Text("Usage Rules")
+                    Text(stringResource(R.string.usage_rules))
                 }
             }
         }

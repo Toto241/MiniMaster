@@ -2608,7 +2608,7 @@ function showDashboard(user) {
  */
 function applyRoleRestrictions(role) {
     const tabAccess = {
-        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup"],
+        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup", "firebase", "aimonitor", "legal"],
         support: ["overview", "support"],
         auditor: ["overview", "errorlogs", "compliance"]
     };

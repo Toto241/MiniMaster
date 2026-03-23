@@ -122,9 +122,17 @@ export const setUsageRules = functions.https.onCall(
       throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'usageRules' object.");
     }
 
-    // Schema validation: only allow known keys with correct types
+    // Schema validation: accept both current web/mobile rule schemas and legacy simple keys.
     const rules = usageRules as Record<string, unknown>;
-    const allowedKeys = new Set(["dailyLimit", "bedtimeStart", "bedtimeEnd", "scheduledDowntime"]);
+    const allowedKeys = new Set([
+      "dailyLimit",
+      "bedtimeStart",
+      "bedtimeEnd",
+      "scheduledDowntime",
+      "dailyLimitSeconds",
+      "allowedHours",
+      "appLimits",
+    ]);
     const invalidKeys = Object.keys(rules).filter((k) => !allowedKeys.has(k));
     if (invalidKeys.length > 0) {
       throw new functions.https.HttpsError("invalid-argument", `Unknown usageRules keys: ${invalidKeys.join(", ")}`);
@@ -132,12 +140,32 @@ export const setUsageRules = functions.https.onCall(
     if (rules.dailyLimit !== undefined && (typeof rules.dailyLimit !== "number" || rules.dailyLimit < 0)) {
       throw new functions.https.HttpsError("invalid-argument", "dailyLimit must be a non-negative number.");
     }
+    if (rules.dailyLimitSeconds !== undefined && (typeof rules.dailyLimitSeconds !== "number" || rules.dailyLimitSeconds < 0)) {
+      throw new functions.https.HttpsError("invalid-argument", "dailyLimitSeconds must be a non-negative number.");
+    }
     const timeRegex = /^\d{2}:\d{2}$/;
     if (rules.bedtimeStart !== undefined && (typeof rules.bedtimeStart !== "string" || !timeRegex.test(rules.bedtimeStart))) {
       throw new functions.https.HttpsError("invalid-argument", "bedtimeStart must be in HH:MM format.");
     }
     if (rules.bedtimeEnd !== undefined && (typeof rules.bedtimeEnd !== "string" || !timeRegex.test(rules.bedtimeEnd))) {
       throw new functions.https.HttpsError("invalid-argument", "bedtimeEnd must be in HH:MM format.");
+    }
+    if (rules.allowedHours !== undefined) {
+      const allowedHours = rules.allowedHours as Record<string, unknown>;
+      if (typeof allowedHours !== "object" || allowedHours === null || !timeRegex.test(String(allowedHours.start || "")) || !timeRegex.test(String(allowedHours.end || ""))) {
+        throw new functions.https.HttpsError("invalid-argument", "allowedHours must include start/end in HH:MM format.");
+      }
+    }
+    if (rules.appLimits !== undefined) {
+      const appLimits = rules.appLimits as Record<string, unknown>;
+      if (typeof appLimits !== "object" || appLimits === null) {
+        throw new functions.https.HttpsError("invalid-argument", "appLimits must be an object.");
+      }
+      for (const [packageName, limit] of Object.entries(appLimits)) {
+        if (!packageName || typeof limit !== "number" || limit < 0) {
+          throw new functions.https.HttpsError("invalid-argument", "appLimits entries must contain a package name and non-negative numeric limit.");
+        }
+      }
     }
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
