@@ -631,6 +631,23 @@ User accepts or rejects AI-generated solution.
 
 **Parameters**: `{ ticketId: string, feedback: "accepted" | "rejected", comment?: string }`
 
+### onSupportTicketUpdated (Firestore Trigger)
+
+Wird bei Ticket-Updates ausgelöst und sendet bei geänderter `adminResponse` automatisch eine Rückfrage-/Antwort-E-Mail an die im Ticket enthaltene ReplyTo-Adresse.
+
+**Trigger**: `onUpdate` auf `supportTickets/{ticketId}`
+
+**Voraussetzungen**:
+- Ticket enthält ReplyTo-Markierung im Problemtext (z. B. `[ReplyTo] name@example.com`)
+- ENV `RESEND_API_KEY` gesetzt
+- ENV `SUPPORT_FROM_EMAIL` gesetzt
+
+**Ticket-Metafelder (automatisch gesetzt):**
+- `lastFollowUpEmailStatus`: `sent | failed | skipped_invalid_reply_to`
+- `lastFollowUpEmailProvider`: aktuell `resend` (oder `none`)
+- `lastFollowUpEmailError`: Fehlertext bei Fehlschlag
+- `lastFollowUpEmailAt`: Zeitstempel der letzten Verarbeitung
+
 ### aiExplainProblem (Admin/Support)
 
 AI assistant explains setup/config problems using Gemini or OpenAI fallback.
