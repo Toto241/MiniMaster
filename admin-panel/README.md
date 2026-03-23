@@ -2,6 +2,8 @@
 
 Web-Dashboard fuer Betreiber/Admins.
 
+Das Panel kann jetzt auch als Python-Webanwendung ueber `python_admin/app.py` betrieben werden. Dabei bleibt die bestehende Oberfläche erhalten, direkte CLI-/PowerShell-Ausführung erfolgt dann ueber die Python-API statt nur ueber Electron.
+
 ## Funktionen
 
 - KPI Uebersicht (Users, Tasks, Tickets, Errors)
@@ -31,7 +33,7 @@ node scripts/setup-admin.js <email> <passwort>
 
 ## Lokal starten
 
-Das Panel ist statisch und kann mit einem beliebigen HTTP-Server gestartet werden, z. B.:
+Das Panel kann weiterhin statisch mit einem beliebigen HTTP-Server gestartet werden, z. B.:
 
 ```bash
 python -m http.server 8080
@@ -45,3 +47,11 @@ Dann `http://localhost:8080/admin-panel/` aufrufen.
 - Firebase init Fehler: Platzhalter in `firebaseConfig` wurden nicht ersetzt.
 - Keine Daten sichtbar: Firestore Rules/Collections oder Berechtigungen pruefen.
 - P0-Cockpit aktualisiert sich nicht: Browser-Cache leeren und sicherstellen, dass Aktionen erfolgreich durchlaufen (nur erfolgreiche Flows auto-markieren).
+
+## Python-Webanwendung
+
+```bash
+python3 python_admin/app.py
+```
+
+Dann `http://127.0.0.1:8765/admin-panel/` aufrufen. In diesem Modus lassen sich die bisherigen freigegebenen CLI- und PowerShell-Kommandos direkt aus der Befehlszentrale starten.
