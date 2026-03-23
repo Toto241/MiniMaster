@@ -13,7 +13,19 @@ param(
     [string]$MasterSerial,
 
     [Parameter(Mandatory = $true)]
-    [string]$ChildSerial
+    [string]$ChildSerial,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$InstallApk,
+
+    [Parameter(Mandatory = $false)]
+    [string]$MasterApkPath = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$ChildApkPath = "",
+
+    [Parameter(Mandatory = $false)]
+    [switch]$UninstallFirst
 )
 
 Set-StrictMode -Version Latest
@@ -33,12 +45,34 @@ Write-Host "Child device:  $ChildSerial" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "[1/2] Master Commissioning-Suite" -ForegroundColor Cyan
-& pwsh -File $singleRunner -AppId master -AdbSerial $MasterSerial -Suite commissioning
+$masterCmd = @(
+    "-File", $singleRunner,
+    "-AppId", "master",
+    "-AdbSerial", $MasterSerial,
+    "-Suite", "commissioning"
+)
+if ($InstallApk) { $masterCmd += "-InstallApk" }
+if ($UninstallFirst) { $masterCmd += "-UninstallFirst" }
+if (-not [string]::IsNullOrWhiteSpace($MasterApkPath)) {
+    $masterCmd += @("-ApkPath", $MasterApkPath)
+}
+& pwsh @masterCmd
 $masterExit = $LASTEXITCODE
 
 Write-Host ""
 Write-Host "[2/2] Child Commissioning-Suite" -ForegroundColor Cyan
-& pwsh -File $singleRunner -AppId child -AdbSerial $ChildSerial -Suite commissioning
+$childCmd = @(
+    "-File", $singleRunner,
+    "-AppId", "child",
+    "-AdbSerial", $ChildSerial,
+    "-Suite", "commissioning"
+)
+if ($InstallApk) { $childCmd += "-InstallApk" }
+if ($UninstallFirst) { $childCmd += "-UninstallFirst" }
+if (-not [string]::IsNullOrWhiteSpace($ChildApkPath)) {
+    $childCmd += @("-ApkPath", $ChildApkPath)
+}
+& pwsh @childCmd
 $childExit = $LASTEXITCODE
 
 Write-Host ""
