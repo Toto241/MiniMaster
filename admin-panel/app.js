@@ -1245,7 +1245,7 @@ function renderGoLiveAmpel() {
             <div class="ampel-platform-row">
                 <span class="ampel-platform-label">${escapeHtml(ps.label)}</span>
                 <div class="ampel-progress-bar">
-                    <div class="ampel-progress-fill" style="width:${ps.percent}%;background:${barColor}"></div>
+                    <div class="ampel-progress-fill" style="inline-size:${ps.percent}%;background:${barColor}"></div>
                 </div>
                 <span class="ampel-platform-pct">${ps.percent}%</span>
                 <span class="ampel-platform-detail">${ps.done}/${ps.total}</span>
@@ -1275,7 +1275,7 @@ function renderGoLiveAmpel() {
             </div>
             <div class="ampel-total-bar">
                 <div class="ampel-progress-bar ampel-progress-bar-lg">
-                    <div class="ampel-progress-fill" style="width:${pct}%;background:${status.ampel === 'green' ? '#22c55e' : status.ampel === 'yellow' ? '#eab308' : '#ef4444'}"></div>
+                    <div class="ampel-progress-fill" style="inline-size:${pct}%;background:${status.ampel === 'green' ? '#22c55e' : status.ampel === 'yellow' ? '#eab308' : '#ef4444'}"></div>
                 </div>
                 <span class="ampel-total-pct">${pct}% Gesamtfortschritt</span>
             </div>
@@ -1635,7 +1635,7 @@ function renderWizardStep(wizardId, stepIndex) {
                 <span>${completedCount}/${totalSteps} Schritte (${progressPct}%)</span>
             </div>
             <div class="ampel-progress-bar" style="margin-block-end:12px">
-                <div class="ampel-progress-fill" style="width:${progressPct}%;background:${progressPct === 100 ? '#22c55e' : '#3b82f6'}"></div>
+                <div class="ampel-progress-fill" style="inline-size:${progressPct}%;background:${progressPct === 100 ? '#22c55e' : '#3b82f6'}"></div>
             </div>
             <div class="wizard-step-nav">${stepsNav}</div>
             <div class="wizard-step-content">
@@ -2431,7 +2431,7 @@ async function bootstrapFirstAdminAction() {
         if (statusEl) {
             statusEl.innerHTML = `<div class="admin-success-box">
                 <h4>✅ ${escapeHtml(result.data.message)}</h4>
-                <button onclick="window.location.reload()" class="btn btn-primary" style="margin-top:8px">Dashboard öffnen</button>
+                <button onclick="window.location.reload()" class="btn btn-primary" style="margin-block-start:8px">Dashboard öffnen</button>
             </div>`;
         }
         showNotification("Admin-Zugang aktiviert!", "success");
@@ -4932,7 +4932,7 @@ async function loadTaskChart() {
             var pct = Math.round((counts[key] / max) * 100);
             html += '<div class="bar-row">' +
                 '<span class="bar-label">' + labels[key] + '</span>' +
-                '<div class="bar-track"><div class="bar-fill bar-' + key + '" style="width:' + pct + '%"></div></div>' +
+                '<div class="bar-track"><div class="bar-fill bar-' + key + '" style="inline-size:' + pct + '%"></div></div>' +
                 '<span class="bar-count">' + counts[key] + '</span>' +
                 '</div>';
         });
@@ -5020,7 +5020,7 @@ async function loadErrorTrendChart() {
             var cls = day.count > maxCount * 0.75 ? "spark-high" : day.count > maxCount * 0.4 ? "spark-med" : "";
             html += '<div class="spark-col">' +
                 '<span class="spark-count">' + day.count + '</span>' +
-                '<div class="spark-bar ' + cls + '" style="height:' + h + 'px"></div>' +
+                '<div class="spark-bar ' + cls + '" style="block-size:' + h + 'px"></div>' +
                 '<span class="spark-label">' + day.label + '</span>' +
                 '</div>';
         });
@@ -5079,7 +5079,7 @@ async function loadFunnelChart() {
             var pct = registered ? Math.round((step.count / registered) * 100) : 0;
             if (idx > 0) html += '<span class="funnel-arrow">›</span>';
             html += '<div class="funnel-step">' +
-                '<div class="funnel-bar" style="height:' + h + 'px;background:' + step.color + '"></div>' +
+                '<div class="funnel-bar" style="block-size:' + h + 'px;background:' + step.color + '"></div>' +
                 '<span class="funnel-count">' + step.count + '</span>' +
                 '<span class="funnel-label">' + step.label + ' (' + pct + '%)</span>' +
                 '</div>';
