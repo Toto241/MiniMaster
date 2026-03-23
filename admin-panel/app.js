@@ -44,12 +44,32 @@ function stopSessionMonitoring() {
     sessionWarningTimer = null;
 }
 
-// Electron Operator-Bridge-Erkennung
+// Laufzeit-Erkennung: Electron Operator oder Python-Webanwendung
 const isElectronOperator = Boolean(
     typeof window !== "undefined" &&
     window.miniMasterDesktop &&
     window.miniMasterDesktop.isOperatorContext
 );
+let isPythonOperator = false;
+
+async function detectPythonOperatorRuntime() {
+    if (isElectronOperator || typeof window === "undefined" || !window.fetch) return false;
+    try {
+        const response = await fetch("/api/runtime-info", {
+            headers: { "Accept": "application/json" },
+        });
+        if (!response.ok) return false;
+        const payload = await response.json();
+        isPythonOperator = Boolean(payload && payload.isOperatorContext && payload.runtime === "python");
+        return isPythonOperator;
+    } catch (_error) {
+        return false;
+    }
+}
+
+function canExecuteCommandsDirectly() {
+    return isElectronOperator || isPythonOperator;
+}
 
 // Firebase configuration — configure via Bootstrap-Formular or replace placeholders
 const fallbackFirebaseConfig = {
@@ -322,9 +342,29 @@ function downloadPowerShellCommand(payload) {
 let activeCLICommandId = null;
 let cliOutputCleanup = null;
 
+async function executeCommandViaPythonBridge(data) {
+    const response = await fetch("/api/commands/run", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        body: JSON.stringify({
+            command: data.command,
+            cwd: data.cwd,
+        }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || "Python-Bridge Fehler");
+    }
+    return payload;
+}
+
 async function executeCommandDirect(payload) {
-    if (!isElectronOperator) {
-        showNotification("CLI-Ausführung nur im Operator-Desktop-Modus verfügbar.", "error");
+    if (!canExecuteCommandsDirectly()) {
+        showNotification("Direkte CLI-/PowerShell-Ausführung ist nur im Operator-Desktop-Modus oder in der Python-Webanwendung verfügbar.", "error");
         return;
     }
 
@@ -344,19 +384,27 @@ async function executeCommandDirect(payload) {
     outputEl.style.display = "block";
     if (statusEl) statusEl.innerHTML = '<span class="cli-running">⏳ Wird ausgeführt…</span>';
 
-    // Live-Output Listener
-    if (cliOutputCleanup) cliOutputCleanup();
-    cliOutputCleanup = window.miniMasterDesktop.onCLIOutput((msg) => {
-        if (outputEl) {
-            outputEl.textContent += msg.data;
-            outputEl.scrollTop = outputEl.scrollHeight;
-        }
-    });
+    // Live-Output Listener nur im Electron-Modus
+    if (isElectronOperator) {
+        if (cliOutputCleanup) cliOutputCleanup();
+        cliOutputCleanup = window.miniMasterDesktop.onCLIOutput((msg) => {
+            if (outputEl) {
+                outputEl.textContent += msg.data;
+                outputEl.scrollTop = outputEl.scrollHeight;
+            }
+        });
+    }
 
     try {
-        const result = await window.miniMasterDesktop.runCLI(data.command, data.cwd);
+        const result = isElectronOperator
+            ? await window.miniMasterDesktop.runCLI(data.command, data.cwd)
+            : await executeCommandViaPythonBridge(data);
         activeCLICommandId = null;
         if (cliOutputCleanup) { cliOutputCleanup(); cliOutputCleanup = null; }
+        if (outputEl && !isElectronOperator) {
+            outputEl.textContent = result.output || "";
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
 
         if (result.code === 0) {
             if (statusEl) statusEl.innerHTML = '<span class="cli-success">✅ Erfolgreich abgeschlossen</span>';
@@ -379,11 +427,11 @@ function renderCommandBlockHtml(entry) {
     const statusId = `cli-status-${entry.id}`;
     const payload = encodeCommandPayload(entry);
 
-    const executeBtn = isElectronOperator
+    const executeBtn = canExecuteCommandsDirectly()
         ? `<button onclick="executeCommandDirect('${payload}')" class="btn btn-execute btn-sm">▶ Ausführen</button>`
         : "";
 
-    const outputArea = isElectronOperator
+    const outputArea = canExecuteCommandsDirectly()
         ? `<div id="${statusId}" class="cli-status"></div><pre id="${outputId}" class="cli-output-area" style="display:none"></pre>`
         : "";
 
@@ -2190,7 +2238,8 @@ function refreshCommissioningReport() {
     renderPrioritizedActionPlan();
 }
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", async function() {
+    await detectPythonOperatorRuntime();
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     renderCommandCatalog(firebaseConfig.projectId);
@@ -2199,10 +2248,15 @@ document.addEventListener("DOMContentLoaded", function() {
     renderPrioritizedActionPlan();
     renderPlayStoreReadiness();
 
-    // Operator-Desktop-Modus Badge anzeigen
-    if (isElectronOperator) {
+    // Operator-Laufzeit-Badge anzeigen
+    if (canExecuteCommandsDirectly()) {
         const badge = document.getElementById("electron-operator-badge");
-        if (badge) badge.style.display = "block";
+        if (badge) {
+            badge.style.display = "block";
+            if (isPythonOperator) {
+                badge.innerHTML = '<span class="operator-badge">🐍 Python-Operator-Modus</span> CLI- und PowerShell-Befehle können direkt aus diesem Dashboard ausgeführt werden.';
+            }
+        }
     }
 
     if (isPlaceholderFirebaseConfig(firebaseConfig)) {
