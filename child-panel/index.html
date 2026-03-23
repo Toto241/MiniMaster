@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniMaster Kinder-Panel</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: linear-gradient(145deg, #eefcf4 0%, #f8fffb 100%);
+      --card: #ffffff;
+      --ink: #123122;
+      --muted: #4e6759;
+      --primary: #15803d;
+      --secondary: #1f6feb;
+      --border: rgba(15, 23, 42, 0.08);
+      --shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      min-block-size: 100vh;
+      padding: 24px 14px;
+    }
+
+    .shell {
+      inline-size: min(980px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+    h2 { font-size: 1.1rem; }
+    p { color: var(--muted); line-height: 1.6; }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      text-decoration: none;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: var(--secondary); color: #fff; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(15, 23, 42, 0.15);
+      color: #193049;
+    }
+
+    .steps { list-style: none; display: grid; gap: 10px; }
+    .steps li {
+      background: #f7fcf9;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--muted);
+    }
+
+    .steps strong { color: #1b4332; }
+
+    .form-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    label { font-size: 0.86rem; font-weight: 700; color: var(--ink); }
+
+    input,
+    select,
+    textarea {
+      inline-size: 100%;
+      border: 1px solid rgba(15, 23, 42, 0.18);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    textarea { min-block-size: 120px; resize: vertical; }
+
+    .help {
+      font-size: 0.86rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .status {
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      background: #f8fbff;
+      color: var(--ink);
+    }
+
+    .status.success { background: #ecfdf5; color: #166534; border-color: #86efac; }
+    .status.error { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+
+    .ticket-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .ticket-item {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fffb;
+      display: grid;
+      gap: 6px;
+    }
+
+    .ticket-meta {
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .inline {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <h1>MiniMaster Kinder-Panel</h1>
+      <p>
+        Dieses Panel ist der dedizierte Bereich fuer Kindergeraete (Pairing, Status und technische
+        Pruefpunkte). Es trennt den Child-Flow klar vom Eltern-Flow.
+      </p>
+      <div class="actions">
+        <a class="btn btn-primary" href="../docs/CHILDAPP_LOCK_LOGIC.md">Child-Logik ansehen</a>
+        <a class="btn btn-secondary" href="../docs/DEBUG_INTERFACE_GUIDE.md">USB-Debug Child-Flow</a>
+        <a class="btn btn-ghost" href="../start.html">Zur Startseite</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Kindergeraet: empfohlener Ablauf</h2>
+      <ul class="steps">
+        <li><strong>1) Pairing:</strong> QR-/Link-Flow oder 6-stelligen Code aus Elternbereich nutzen.</li>
+        <li><strong>2) Berechtigungen:</strong> Accessibility/Overlay/Background gemaess Setup setzen.</li>
+        <li><strong>3) Sync pruefen:</strong> Lock-Status, App-Blacklist und UsageRules synchronisieren.</li>
+        <li><strong>4) Nachweis:</strong> Task-Foto-Flow und Heartbeat (lastSeen) validieren.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Verknuepfte Panels</h2>
+      <div class="actions">
+        <a class="btn btn-secondary" href="../parent-panel/index.html">Zum Eltern-Panel</a>
+        <a class="btn btn-ghost" href="../admin-panel/index.html">Zum Operator-Dashboard</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Fehler/Frage als Ticket an Anbieter senden</h2>
+      <p>
+        Ueber dieses Kinder-Panel koennen Stoerungen oder Fragen direkt als Ticket gemeldet werden.
+        Rueckfragen des Supports erfolgen an die hinterlegte Kontaktadresse.
+      </p>
+
+      <div id="ticket-auth-status" class="status">Nicht authentifiziert.</div>
+
+      <div class="form-grid">
+        <div>
+          <label for="ticket-master-imei">Master IMEI / Eltern-Benutzer-ID</label>
+          <input id="ticket-master-imei" type="text" placeholder="z. B. 123456789012345" />
+        </div>
+        <div>
+          <label for="ticket-secret-key">Secret Key (Elternkonto)</label>
+          <input id="ticket-secret-key" type="password" placeholder="Secret Key" />
+        </div>
+      </div>
+
+      <div class="inline">
+        <button class="btn btn-secondary" type="button" onclick="authenticateForTickets()">Authentifizieren</button>
+        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()">Meine Tickets laden</button>
+      </div>
+
+      <div class="form-grid">
+        <div>
+          <label for="ticket-sender-name">Absender Name</label>
+          <input id="ticket-sender-name" type="text" placeholder="Name des Meldenden" />
+        </div>
+        <div>
+          <label for="ticket-sender-email">Rueckfrage E-Mail</label>
+          <input id="ticket-sender-email" type="email" placeholder="name@example.com" />
+        </div>
+        <div>
+          <label for="ticket-sender-role">Absender Rolle</label>
+          <select id="ticket-sender-role">
+            <option value="child" selected>Kind</option>
+            <option value="parent">Elternteil</option>
+            <option value="caregiver">Betreuungsperson</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label for="ticket-problem">Fehler / Frage</label>
+        <textarea id="ticket-problem" placeholder="Bitte Problem, Zeitpunkt und betroffene Funktion beschreiben."></textarea>
+      </div>
+
+      <div class="inline">
+        <label><input type="radio" name="ticket-support-access" value="yes" /> Support-Zugriff fuer 48h erlauben</label>
+        <label><input type="radio" name="ticket-support-access" value="no" checked /> Kein zusaetzlicher Zugriff</label>
+      </div>
+
+      <p class="help">
+        Tipp: Fuer schnellere Rueckfragen bitte eine erreichbare E-Mail angeben.
+      </p>
+
+      <div class="inline">
+        <button class="btn btn-primary" type="button" onclick="submitSupportTicket()">Ticket erstellen</button>
+      </div>
+
+      <div id="ticket-submit-status" class="status">Noch kein Ticket gesendet.</div>
+      <div id="ticket-list" class="ticket-list"></div>
+    </section>
+  </main>
+
+  <script>
+    const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
+    const fallbackFirebaseConfig = {
+      apiKey: "your-api-key",
+      authDomain: "your-project.firebaseapp.com",
+      projectId: "your-project-id",
+      storageBucket: "your-project.firebasestorage.app",
+      messagingSenderId: "your-messaging-sender-id",
+      appId: "your-app-id"
+    };
+
+    let app = null;
+    let db = null;
+    let functions = null;
+    let auth = null;
+    let currentMasterImei = null;
+
+    function loadFirebaseConfig() {
+      try {
+        const raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && parsed.projectId && parsed.apiKey) return parsed;
+      } catch (error) {
+        console.warn("Firebase override konnte nicht geladen werden:", error);
+      }
+      return fallbackFirebaseConfig;
+    }
+
+    function setStatus(elementId, message, type) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      el.textContent = message;
+      el.className = type ? "status " + type : "status";
+    }
+
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+    }
+
+    function initFirebase() {
+      const config = loadFirebaseConfig();
+      if (!config || !config.projectId || String(config.projectId).includes("your-")) {
+        setStatus("ticket-auth-status", "Firebase-Konfiguration fehlt. Bitte zuerst auf der Startseite konfigurieren.", "error");
+        return;
+      }
+      app = firebase.initializeApp(config, "child-panel-app");
+      db = firebase.firestore(app);
+      functions = firebase.app("child-panel-app").functions();
+      auth = firebase.app("child-panel-app").auth();
+
+      auth.onAuthStateChanged((user) => {
+        if (user) {
+          currentMasterImei = user.uid;
+          setStatus("ticket-auth-status", "Authentifiziert als " + user.uid, "success");
+          loadOwnTickets();
+        }
+      });
+    }
+
+    async function authenticateForTickets() {
+      try {
+        if (!functions || !auth) {
+          setStatus("ticket-auth-status", "Firebase ist nicht initialisiert.", "error");
+          return;
+        }
+        const masterImei = document.getElementById("ticket-master-imei").value.trim();
+        const secretKey = document.getElementById("ticket-secret-key").value.trim();
+        if (!masterImei || !secretKey) {
+          setStatus("ticket-auth-status", "Master IMEI und Secret Key sind erforderlich.", "error");
+          return;
+        }
+        setStatus("ticket-auth-status", "Authentifiziere...", "");
+        const tokenFn = functions.httpsCallable("generateCustomToken");
+        const tokenResult = await tokenFn({ masterImei, secretKey });
+        await auth.signInWithCustomToken(tokenResult.data.customToken);
+      } catch (error) {
+        setStatus("ticket-auth-status", "Authentifizierung fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
+      }
+    }
+
+    async function submitSupportTicket() {
+      try {
+        if (!functions || !currentMasterImei) {
+          setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
+          return;
+        }
+        const senderName = document.getElementById("ticket-sender-name").value.trim();
+        const senderEmail = document.getElementById("ticket-sender-email").value.trim();
+        const senderRole = document.getElementById("ticket-sender-role").value;
+        const problem = document.getElementById("ticket-problem").value.trim();
+        const consentValue = document.querySelector("input[name='ticket-support-access']:checked")?.value;
+        const allowSupportAccess = consentValue === "yes";
+
+        if (!senderName) {
+          setStatus("ticket-submit-status", "Bitte Absendernamen eintragen.", "error");
+          return;
+        }
+        if (!isValidEmail(senderEmail)) {
+          setStatus("ticket-submit-status", "Bitte eine gueltige Rueckfrage-E-Mail eintragen.", "error");
+          return;
+        }
+        if (!problem) {
+          setStatus("ticket-submit-status", "Bitte Problem oder Frage beschreiben.", "error");
+          return;
+        }
+
+        const enrichedProblem = [
+          "[Sender] " + senderName,
+          "[SenderRole] " + senderRole,
+          "[ReplyTo] " + senderEmail,
+          "[SourcePanel] child-panel",
+          "",
+          problem
+        ].join("\n");
+
+        const createTicket = functions.httpsCallable("createSupportTicket");
+        const result = await createTicket({
+          problemDescription: enrichedProblem,
+          allowSupportAccess,
+          consentSource: "child-panel"
+        });
+
+        if (result.data && result.data.success) {
+          setStatus("ticket-submit-status", "Ticket erstellt: " + result.data.ticketId + ". Rueckfragen gehen an " + senderEmail, "success");
+          document.getElementById("ticket-problem").value = "";
+          loadOwnTickets();
+        } else {
+          setStatus("ticket-submit-status", "Ticket konnte nicht erstellt werden.", "error");
+        }
+      } catch (error) {
+        setStatus("ticket-submit-status", "Fehler beim Erstellen: " + (error.message || "Unbekannter Fehler"), "error");
+      }
+    }
+
+    async function loadOwnTickets() {
+      const listEl = document.getElementById("ticket-list");
+      if (!listEl) return;
+      if (!db || !currentMasterImei) {
+        listEl.innerHTML = "";
+        return;
+      }
+      listEl.innerHTML = "<div class='status'>Lade Tickets...</div>";
+      try {
+        const snapshot = await db.collection("supportTickets")
+          .where("masterImei", "==", currentMasterImei)
+          .orderBy("createdAt", "desc")
+          .limit(10)
+          .get();
+
+        if (snapshot.empty) {
+          listEl.innerHTML = "<div class='status'>Noch keine Tickets vorhanden.</div>";
+          return;
+        }
+
+        const html = [];
+        snapshot.forEach((doc) => {
+          const t = doc.data();
+          const created = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate().toLocaleString() : "-";
+          const response = t.adminResponse || t.aiGeneratedSolution || "Noch keine Rueckmeldung.";
+          html.push(
+            "<article class='ticket-item'>" +
+              "<strong>Ticket " + doc.id + "</strong>" +
+              "<div class='ticket-meta'><span>Status: " + String(t.status || "open") + "</span><span>Erstellt: " + created + "</span></div>" +
+              "<div><strong>Rueckmeldung:</strong><br>" + String(response).replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</div>" +
+            "</article>"
+          );
+        });
+        listEl.innerHTML = html.join("");
+      } catch (error) {
+        listEl.innerHTML = "<div class='status error'>Tickets konnten nicht geladen werden: " + (error.message || "Unbekannter Fehler") + "</div>";
+      }
+    }
+
+    initFirebase();
+    window.authenticateForTickets = authenticateForTickets;
+    window.submitSupportTicket = submitSupportTicket;
+    window.loadOwnTickets = loadOwnTickets;
+  </script>
+</body>
+</html>

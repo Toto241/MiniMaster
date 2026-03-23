@@ -29,7 +29,7 @@ export {
 // Support & AI
 export {
   createSupportTicket, grantSupportAccess, revokeSupportAccess, cleanupExpiredGrants,
-  onTicketCreated, provideSolutionFeedback, getTicketUserData, aiExplainProblem,
+  onTicketCreated, onSupportTicketUpdated, provideSolutionFeedback, getTicketUserData, aiExplainProblem,
 } from "./src/support";
 
 // Legal Policies & Consent

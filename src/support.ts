@@ -24,6 +24,12 @@ type AiGenerationResult = {
   rawResponse: string;
 };
 
+type TicketContactMeta = {
+  replyToEmail?: string;
+  senderName?: string;
+  sourcePanel?: string;
+};
+
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const OPENAI_FALLBACK_ENABLED = process.env.OPENAI_FALLBACK_ENABLED === "true";
 
@@ -165,6 +171,85 @@ function resolveImpersonationRole(context: CallableContext): string {
 
 function resolveExplainRole(role: string | undefined): string {
   return role || "unknown";
+}
+
+function extractTicketContactMeta(problemDescription: string | undefined): TicketContactMeta {
+  const text = String(problemDescription || "");
+  const lines = text.split(/\r?\n/).map((line) => line.trim());
+
+  const replyToLine = lines.find((line) => line.startsWith("[ReplyTo] "));
+  const senderLine = lines.find((line) => line.startsWith("[Sender] "));
+  const sourcePanelLine = lines.find((line) => line.startsWith("[SourcePanel] "));
+
+  const replyToEmail = replyToLine ? replyToLine.replace("[ReplyTo] ", "").trim() : undefined;
+  const senderName = senderLine ? senderLine.replace("[Sender] ", "").trim() : undefined;
+  const sourcePanel = sourcePanelLine ? sourcePanelLine.replace("[SourcePanel] ", "").trim() : undefined;
+
+  return {
+    replyToEmail,
+    senderName,
+    sourcePanel,
+  };
+}
+
+function isValidEmailAddress(email: string | undefined): boolean {
+  if (!email) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+async function sendSupportFollowUpEmail(params: {
+  ticketId: string;
+  toEmail: string;
+  senderName?: string;
+  sourcePanel?: string;
+  message: string;
+}): Promise<{ success: boolean; provider: string; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.SUPPORT_FROM_EMAIL;
+
+  if (!apiKey || !fromEmail) {
+    const missing = [
+      !apiKey ? "RESEND_API_KEY" : null,
+      !fromEmail ? "SUPPORT_FROM_EMAIL" : null,
+    ].filter(Boolean).join(", ");
+    const error = `Email provider not configured (${missing}).`;
+    functions.logger.warn(error, { ticketId: params.ticketId });
+    return { success: false, provider: "none", error };
+  }
+
+  try {
+    const subject = `[MiniMaster Support] Rueckfrage zu Ticket ${params.ticketId}`;
+    const senderInfo = params.senderName ? `Hallo ${params.senderName},` : "Hallo,";
+    const sourceLine = params.sourcePanel ? `Panel: ${params.sourcePanel}` : "Panel: unbekannt";
+    const textBody = `${senderInfo}\n\n${params.message}\n\n---\nTicket: ${params.ticketId}\n${sourceLine}\n\nMiniMaster Support`;
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [params.toEmail],
+        subject,
+        text: textBody,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const error = `Resend API error (${response.status}): ${errorText}`;
+      functions.logger.error(error, { ticketId: params.ticketId, toEmail: params.toEmail });
+      return { success: false, provider: "resend", error };
+    }
+
+    return { success: true, provider: "resend" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown email sending error";
+    functions.logger.error("Failed to send support follow-up email", { ticketId: params.ticketId, message });
+    return { success: false, provider: "resend", error: message };
+  }
 }
 
 let knowledgeBase = "";
@@ -498,6 +583,59 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
 
       throw error;
     }
+  });
+
+export const onSupportTicketUpdated = functions.firestore
+  .document("supportTickets/{ticketId}")
+  .onUpdate(async (change, context) => {
+    const ticketId = context.params.ticketId;
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+
+    const adminResponseBefore = typeof before.adminResponse === "string" ? before.adminResponse.trim() : "";
+    const adminResponseAfter = typeof after.adminResponse === "string" ? after.adminResponse.trim() : "";
+
+    // Send follow-up only when a new/changed admin response is present.
+    if (!adminResponseAfter || adminResponseAfter === adminResponseBefore) {
+      return;
+    }
+
+    const meta = extractTicketContactMeta(after.problemDescription);
+    const replyToEmail = meta.replyToEmail;
+
+    if (!replyToEmail || !isValidEmailAddress(replyToEmail)) {
+      functions.logger.warn("No valid ReplyTo email found for support ticket follow-up", {
+        ticketId,
+        replyToEmail: replyToEmail || null,
+      });
+
+      await change.after.ref.update({
+        lastFollowUpEmailStatus: "skipped_invalid_reply_to",
+        lastFollowUpEmailAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    const sendResult = await sendSupportFollowUpEmail({
+      ticketId,
+      toEmail: replyToEmail,
+      senderName: meta.senderName,
+      sourcePanel: meta.sourcePanel,
+      message: adminResponseAfter,
+    });
+
+    await change.after.ref.update({
+      lastFollowUpEmailStatus: sendResult.success ? "sent" : "failed",
+      lastFollowUpEmailProvider: sendResult.provider,
+      lastFollowUpEmailError: sendResult.error || null,
+      lastFollowUpEmailAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info("Support follow-up email processing completed", {
+      ticketId,
+      status: sendResult.success ? "sent" : "failed",
+      provider: sendResult.provider,
+    });
   });
 
 export const provideSolutionFeedback = functions.https.onCall(
