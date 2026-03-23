@@ -1269,6 +1269,12 @@ input:focus, select:focus, textarea:focus {
     color: #334155;
 }
 
+.python-test-actions {
+    margin-block-start: auto;
+    display: flex;
+    justify-content: flex-end;
+}
+
 .python-test-doc {
     border: 1px dashed #cbd5e1;
     border-radius: 8px;
@@ -1290,6 +1296,46 @@ input:focus, select:focus, textarea:focus {
 .python-muted-caption {
     font-size: 0.82rem;
     color: #64748b;
+}
+
+.python-protocol-selected-card {
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 14px;
+}
+
+.python-protocol-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.python-protocol-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: #334155;
+}
+
+.python-protocol-form input,
+.python-protocol-form select,
+.python-protocol-form textarea {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font: inherit;
+    background: white;
+}
+
+.python-protocol-form textarea {
+    resize: vertical;
+    min-block-size: 120px;
+}
+
+.python-protocol-form-wide {
+    grid-column: 1 / -1;
 }
 
 
