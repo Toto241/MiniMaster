@@ -748,6 +748,45 @@
                             <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
                                 <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
                             </div>
+
+                            <div class="setup-card" style="margin-block-start: 16px; margin-block-end: 0">
+                                <h4>Python Test-Orchestrierung (Run / Evaluate / Log)</h4>
+                                <p>
+                                    Startet einen strukturierten Automationslauf direkt im Python-Operator,
+                                    bewertet offene Go-Live-Punkte und protokolliert das Ergebnis als Laufhistorie.
+                                </p>
+                                <div class="setup-actions" style="align-items: center; gap: 10px; flex-wrap: wrap">
+                                    <label class="setup-checklist-item" style="margin: 0">
+                                        <input type="checkbox" id="python-automation-run-commands" checked />
+                                        Lokale Gate-Kommandos ausf&uuml;hren (validate:readiness + ci:revalidate)
+                                    </label>
+                                    <label class="setup-checklist-item" style="margin: 0">
+                                        <input type="checkbox" id="python-automation-refresh-validation" checked />
+                                        Vorher Full Validation aktualisieren
+                                    </label>
+                                    <input
+                                        type="number"
+                                        id="python-automation-timeout"
+                                        min="30"
+                                        max="7200"
+                                        step="30"
+                                        value="1800"
+                                        placeholder="Timeout (Sekunden)"
+                                        style="max-inline-size: 220px"
+                                    />
+                                </div>
+                                <div class="setup-actions" style="margin-block-start: 10px">
+                                    <button onclick="runPythonAutomationSuite()" class="btn btn-primary">Python Testlauf starten</button>
+                                    <button onclick="loadPythonAutomationHistory()" class="btn btn-secondary">Historie laden</button>
+                                    <button onclick="exportLatestPythonAutomationRun()" class="btn btn-secondary">Letzten Lauf exportieren</button>
+                                </div>
+                                <div id="python-automation-results" class="data-list" style="margin-block-start: 12px">
+                                    <div class="info">Noch kein Python-Automationslauf ausgef&uuml;hrt.</div>
+                                </div>
+                                <div id="python-automation-history" class="data-list" style="margin-block-start: 12px">
+                                    <div class="info">Noch keine Laufhistorie geladen.</div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">

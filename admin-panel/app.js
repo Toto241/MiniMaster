@@ -122,6 +122,8 @@ let ticketLastDoc = null;
 let currentSubFilter = "all";
 let currentTicketFilter = "all";
 let setupValidationResults = [];
+let pythonCommissioningLastRun = null;
+let pythonCommissioningHistoryRuns = [];
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -360,6 +362,265 @@ async function executeCommandViaPythonBridge(data) {
         throw new Error(payload.error || "Python-Bridge Fehler");
     }
     return payload;
+}
+
+function collectCommissioningAutomationContext() {
+    const runtimeConfig = getOperatorConfigFormValues();
+    const attestationState = getCommissioningAttestations();
+    const playStoreState = getPlayStoreReadinessState();
+    const validationSummary = commissioningSummary?.validationSummary || null;
+
+    return {
+        runtimeConfig,
+        attestations: attestationState,
+        playStoreState,
+        validationSummary,
+        setupChecklist: JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}"),
+    };
+}
+
+function formatPythonAutomationStatus(status) {
+    if (status === "pass") return "✅ PASS";
+    if (status === "manual_required") return "🟡 MANUELL";
+    if (status === "fail") return "❌ FAIL";
+    return "ℹ️ UNBEKANNT";
+}
+
+function renderPythonAutomationResult(run) {
+    const resultEl = document.getElementById("python-automation-results");
+    if (!resultEl) return;
+
+    if (!run) {
+        resultEl.innerHTML = "<div class='info'>Noch kein Python-Automationslauf ausgeführt.</div>";
+        return;
+    }
+
+    const evaluation = run.evaluation || {};
+    const checks = Array.isArray(evaluation.checks) ? evaluation.checks : [];
+    const commands = Array.isArray(run.commands?.results) ? run.commands.results : [];
+    const pending = Array.isArray(run.pending) ? run.pending : [];
+
+    const checksRows = checks.map(item => `
+        <tr>
+            <td>${escapeHtml(item.title || "-")}</td>
+            <td>${escapeHtml(formatPythonAutomationStatus(item.status))}</td>
+            <td>${escapeHtml(item.details || "-")}</td>
+        </tr>
+    `).join("");
+
+    const commandRows = commands.length > 0
+        ? commands.map(item => `
+            <tr>
+                <td>${escapeHtml(item.label || "-")}</td>
+                <td>${escapeHtml(item.command || "-")}</td>
+                <td>${escapeHtml(item.status === "pass" ? "✅ PASS" : "❌ FAIL")}</td>
+                <td>${escapeHtml(String(item.code ?? "-"))}</td>
+                <td>${escapeHtml(String(item.durationMs ?? "-"))} ms</td>
+            </tr>
+            <tr>
+                <td colspan='5'>
+                    <details>
+                        <summary>Kommandoausgabe anzeigen</summary>
+                        <pre class='code-block'>${escapeHtml(item.output || "Keine Ausgabe.")}</pre>
+                    </details>
+                </td>
+            </tr>
+        `).join("")
+        : "<tr><td colspan='5'>Keine lokalen Kommandos ausgeführt.</td></tr>";
+
+    const pendingHtml = pending.length > 0
+        ? `<ul>${pending.map(item => `<li>${escapeHtml(item.title || "Offener Punkt")}: ${escapeHtml(item.details || "")}</li>`).join("")}</ul>`
+        : "<div class='success-box'>Keine offenen Punkte aus dem Python-Lauf.</div>";
+
+    resultEl.innerHTML = `
+        <div class='${run.overall === "pass" ? "success-box" : "error"}'>
+            <strong>Gesamtstatus:</strong> ${escapeHtml(formatPythonAutomationStatus(run.overall))}<br />
+            <strong>Run-ID:</strong> ${escapeHtml(run.runId || "-")}<br />
+            <strong>Zeit:</strong> ${escapeHtml(run.startedAt || "-")} → ${escapeHtml(run.finishedAt || "-")}
+        </div>
+
+        <h5 style='margin-block-start: 10px'>Automatisierte Bewertung</h5>
+        <table>
+            <tr><th>Check</th><th>Status</th><th>Details</th></tr>
+            ${checksRows || "<tr><td colspan='3'>Keine Checks vorhanden.</td></tr>"}
+        </table>
+
+        <h5 style='margin-block-start: 10px'>Kommandolauf</h5>
+        <table>
+            <tr><th>Schritt</th><th>Befehl</th><th>Status</th><th>Code</th><th>Dauer</th></tr>
+            ${commandRows}
+        </table>
+
+        <h5 style='margin-block-start: 10px'>Offene Punkte</h5>
+        ${pendingHtml}
+    `;
+}
+
+function mergePythonPendingIntoCommissioning(run) {
+    if (!run || !Array.isArray(run.pending)) return;
+    if (!commissioningSummary) refreshCommissioningReport();
+    if (!commissioningSummary) return;
+
+    const existing = Array.isArray(commissioningSummary.pending) ? [...commissioningSummary.pending] : [];
+    const incoming = run.pending
+        .map(item => (item?.title ? `${item.title}: ${item.details || ""}`.trim() : ""))
+        .filter(Boolean)
+        .map(text => `Python-Automation: ${text}`);
+
+    const deduped = Array.from(new Set([...existing, ...incoming]));
+    commissioningSummary.pending = deduped;
+    renderCommissioningReport(commissioningSummary);
+    renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
+}
+
+async function runPythonAutomationSuite() {
+    const resultEl = document.getElementById("python-automation-results");
+    if (!resultEl) return;
+
+    if (!isPythonOperator) {
+        resultEl.innerHTML = "<div class='error'>Python-Operator nicht erkannt. Bitte Dashboard über python_admin/app.py starten.</div>";
+        showNotification("Python-Operator nicht erkannt. Lauf nicht gestartet.", "error");
+        return;
+    }
+
+    resultEl.innerHTML = "<div class='loading'>Starte Python-Automationslauf...</div>";
+
+    const runCommands = Boolean(document.getElementById("python-automation-run-commands")?.checked);
+    const refreshValidation = Boolean(document.getElementById("python-automation-refresh-validation")?.checked);
+    const timeoutRaw = parseInt(document.getElementById("python-automation-timeout")?.value || "1800", 10);
+    const timeoutSec = Number.isFinite(timeoutRaw) ? Math.min(7200, Math.max(30, timeoutRaw)) : 1800;
+
+    try {
+        if (refreshValidation) {
+            resultEl.innerHTML = "<div class='loading'>Aktualisiere Full Validation vor dem Python-Lauf...</div>";
+            await runFullSetupValidation();
+            refreshCommissioningReport();
+        }
+
+        const response = await fetch("/api/commissioning/run", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            body: JSON.stringify({
+                context: collectCommissioningAutomationContext(),
+                options: {
+                    runCommands,
+                    timeoutSec,
+                },
+            }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Python-Automationslauf fehlgeschlagen.");
+        }
+
+        pythonCommissioningLastRun = payload;
+        renderPythonAutomationResult(payload);
+        mergePythonPendingIntoCommissioning(payload);
+        await loadPythonAutomationHistory();
+
+        const level = payload.overall === "pass" ? "success" : "warning";
+        showNotification("Python-Automationslauf abgeschlossen: " + formatPythonAutomationStatus(payload.overall), level);
+    } catch (error) {
+        resultEl.innerHTML = `<div class='error'>Python-Automationslauf fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        showNotification("Python-Automationslauf fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+function renderPythonAutomationHistory(runs) {
+    const historyEl = document.getElementById("python-automation-history");
+    if (!historyEl) return;
+
+    pythonCommissioningHistoryRuns = Array.isArray(runs) ? runs : [];
+
+    if (!Array.isArray(runs) || runs.length === 0) {
+        historyEl.innerHTML = "<div class='info'>Noch keine Läufe protokolliert.</div>";
+        return;
+    }
+
+    const rows = runs.map((item, index) => {
+        const cmdCounts = item?.commands?.statusCounts || {};
+        const evalCounts = item?.evaluation?.statusCounts || {};
+        return `
+            <tr>
+                <td>${escapeHtml(item.runId || "-")}</td>
+                <td>${escapeHtml(item.startedAt || "-")}</td>
+                <td>${escapeHtml(formatPythonAutomationStatus(item.overall || ""))}</td>
+                <td>${escapeHtml(String(evalCounts.pass || 0))}/${escapeHtml(String(evalCounts.fail || 0))}/${escapeHtml(String(evalCounts.manual_required || 0))}</td>
+                <td>${escapeHtml(String(cmdCounts.pass || 0))}/${escapeHtml(String(cmdCounts.fail || 0))}</td>
+                <td><button class='btn btn-secondary btn-sm' onclick='showPythonAutomationHistoryRun(${index})'>Anzeigen</button></td>
+            </tr>
+        `;
+    }).join("");
+
+    historyEl.innerHTML = `
+        <table>
+            <tr>
+                <th>Run-ID</th>
+                <th>Start</th>
+                <th>Status</th>
+                <th>Checks (Pass/Fail/Manuell)</th>
+                <th>Kommandos (Pass/Fail)</th>
+                <th>Details</th>
+            </tr>
+            ${rows}
+        </table>
+    `;
+}
+
+function showPythonAutomationHistoryRun(index) {
+    const selected = pythonCommissioningHistoryRuns[index];
+    if (!selected) {
+        showNotification("Historienlauf konnte nicht geladen werden.", "error");
+        return;
+    }
+    pythonCommissioningLastRun = selected;
+    renderPythonAutomationResult(selected);
+    showNotification("Historienlauf geladen: " + (selected.runId || "-"), "info");
+}
+
+async function loadPythonAutomationHistory() {
+    const historyEl = document.getElementById("python-automation-history");
+    if (!historyEl) return;
+
+    if (!isPythonOperator) {
+        historyEl.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    historyEl.innerHTML = "<div class='loading'>Lade Laufhistorie...</div>";
+    try {
+        const response = await fetch("/api/commissioning/history?limit=10", {
+            headers: { "Accept": "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Historie konnte nicht geladen werden.");
+        }
+        renderPythonAutomationHistory(payload.runs || []);
+    } catch (error) {
+        historyEl.innerHTML = `<div class='error'>Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function exportLatestPythonAutomationRun() {
+    if (!pythonCommissioningLastRun) {
+        showNotification("Es liegt noch kein Python-Automationslauf zum Export vor.", "info");
+        return;
+    }
+
+    const blob = new Blob([JSON.stringify(pythonCommissioningLastRun, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `python_commissioning_run_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification("Python-Automationslauf exportiert.", "success");
 }
 
 async function executeCommandDirect(payload) {
@@ -2255,6 +2516,7 @@ document.addEventListener("DOMContentLoaded", async function() {
             badge.style.display = "block";
             if (isPythonOperator) {
                 badge.innerHTML = '<span class="operator-badge">🐍 Python-Operator-Modus</span> CLI- und PowerShell-Befehle können direkt aus diesem Dashboard ausgeführt werden.';
+                loadPythonAutomationHistory();
             }
         }
     }
