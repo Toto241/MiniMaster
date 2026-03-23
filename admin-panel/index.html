@@ -780,8 +780,26 @@
                                     <button onclick="loadPythonAutomationHistory()" class="btn btn-secondary">Historie laden</button>
                                     <button onclick="exportLatestPythonAutomationRun()" class="btn btn-secondary">Letzten Lauf exportieren</button>
                                 </div>
+                                <div class="setup-actions" style="align-items: center; gap: 10px; flex-wrap: wrap; margin-block-start: 8px">
+                                    <label class="setup-checklist-item" style="margin: 0">
+                                        <input type="checkbox" id="python-automation-show-open-only" />
+                                        Im Ergebnis nur offene/fehlgeschlagene Checks anzeigen
+                                    </label>
+                                </div>
                                 <div id="python-automation-results" class="data-list" style="margin-block-start: 12px">
                                     <div class="info">Noch kein Python-Automationslauf ausgef&uuml;hrt.</div>
+                                </div>
+                                <div class="setup-actions" style="align-items: center; gap: 10px; flex-wrap: wrap; margin-block-start: 8px">
+                                    <input
+                                        type="text"
+                                        id="python-automation-history-search"
+                                        placeholder="Historie filtern (Run-ID/Status/Zeit)"
+                                        style="min-inline-size: 260px"
+                                    />
+                                    <label class="setup-checklist-item" style="margin: 0">
+                                        <input type="checkbox" id="python-automation-history-open-only" />
+                                        Nur L&auml;ufe mit offenen Punkten
+                                    </label>
                                 </div>
                                 <div id="python-automation-history" class="data-list" style="margin-block-start: 12px">
                                     <div class="info">Noch keine Laufhistorie geladen.</div>

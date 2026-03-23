@@ -386,6 +386,21 @@ function formatPythonAutomationStatus(status) {
     return "ℹ️ UNBEKANNT";
 }
 
+function shouldShowOnlyOpenAutomationChecks() {
+    return Boolean(document.getElementById("python-automation-show-open-only")?.checked);
+}
+
+function getPythonAutomationHistoryFilters() {
+    return {
+        search: (document.getElementById("python-automation-history-search")?.value || "").trim().toLowerCase(),
+        openOnly: Boolean(document.getElementById("python-automation-history-open-only")?.checked),
+    };
+}
+
+function rerenderPythonAutomationHistoryFromCache() {
+    renderPythonAutomationHistory(pythonCommissioningHistoryRuns);
+}
+
 function renderPythonAutomationResult(run) {
     const resultEl = document.getElementById("python-automation-results");
     if (!resultEl) return;
@@ -396,7 +411,10 @@ function renderPythonAutomationResult(run) {
     }
 
     const evaluation = run.evaluation || {};
-    const checks = Array.isArray(evaluation.checks) ? evaluation.checks : [];
+    const checksRaw = Array.isArray(evaluation.checks) ? evaluation.checks : [];
+    const checks = shouldShowOnlyOpenAutomationChecks()
+        ? checksRaw.filter(item => item?.status === "fail" || item?.status === "manual_required")
+        : checksRaw;
     const commands = Array.isArray(run.commands?.results) ? run.commands.results : [];
     const pending = Array.isArray(run.pending) ? run.pending : [];
 
@@ -542,7 +560,31 @@ function renderPythonAutomationHistory(runs) {
         return;
     }
 
-    const rows = runs.map((item, index) => {
+    const filters = getPythonAutomationHistoryFilters();
+    const filteredRuns = runs.filter(item => {
+        if (filters.openOnly) {
+            const counts = item?.evaluation?.statusCounts || {};
+            const openCount = Number(counts.fail || 0) + Number(counts.manual_required || 0);
+            if (openCount <= 0) return false;
+        }
+
+        if (!filters.search) return true;
+        const haystack = [
+            String(item?.runId || ""),
+            String(item?.overall || ""),
+            String(item?.startedAt || ""),
+            String(item?.finishedAt || ""),
+        ].join(" ").toLowerCase();
+        return haystack.includes(filters.search);
+    });
+
+    if (filteredRuns.length === 0) {
+        historyEl.innerHTML = "<div class='info'>Keine Läufe passen auf die aktuellen Filter.</div>";
+        return;
+    }
+
+    const rows = filteredRuns.map((item) => {
+        const originalIndex = runs.indexOf(item);
         const cmdCounts = item?.commands?.statusCounts || {};
         const evalCounts = item?.evaluation?.statusCounts || {};
         return `
@@ -552,12 +594,13 @@ function renderPythonAutomationHistory(runs) {
                 <td>${escapeHtml(formatPythonAutomationStatus(item.overall || ""))}</td>
                 <td>${escapeHtml(String(evalCounts.pass || 0))}/${escapeHtml(String(evalCounts.fail || 0))}/${escapeHtml(String(evalCounts.manual_required || 0))}</td>
                 <td>${escapeHtml(String(cmdCounts.pass || 0))}/${escapeHtml(String(cmdCounts.fail || 0))}</td>
-                <td><button class='btn btn-secondary btn-sm' onclick='showPythonAutomationHistoryRun(${index})'>Anzeigen</button></td>
+                <td><button class='btn btn-secondary btn-sm' onclick='showPythonAutomationHistoryRun(${originalIndex})'>Anzeigen</button></td>
             </tr>
         `;
     }).join("");
 
     historyEl.innerHTML = `
+        <div class='info' style='margin-block-end: 8px'>${escapeHtml(String(filteredRuns.length))} von ${escapeHtml(String(runs.length))} Lauf/Läufe sichtbar.</div>
         <table>
             <tr>
                 <th>Run-ID</th>
@@ -2508,6 +2551,23 @@ document.addEventListener("DOMContentLoaded", async function() {
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
     renderPlayStoreReadiness();
+
+    const openOnlyChecksEl = document.getElementById("python-automation-show-open-only");
+    if (openOnlyChecksEl) {
+        openOnlyChecksEl.addEventListener("change", () => {
+            if (pythonCommissioningLastRun) renderPythonAutomationResult(pythonCommissioningLastRun);
+        });
+    }
+
+    const historySearchEl = document.getElementById("python-automation-history-search");
+    if (historySearchEl) {
+        historySearchEl.addEventListener("input", rerenderPythonAutomationHistoryFromCache);
+    }
+
+    const historyOpenOnlyEl = document.getElementById("python-automation-history-open-only");
+    if (historyOpenOnlyEl) {
+        historyOpenOnlyEl.addEventListener("change", rerenderPythonAutomationHistoryFromCache);
+    }
 
     // Operator-Laufzeit-Badge anzeigen
     if (canExecuteCommandsDirectly()) {
