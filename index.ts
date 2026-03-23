@@ -30,6 +30,7 @@ export {
 export {
   createSupportTicket, grantSupportAccess, revokeSupportAccess, cleanupExpiredGrants,
   onTicketCreated, onSupportTicketUpdated, provideSolutionFeedback, getTicketUserData, aiExplainProblem,
+  grantDebugAccess, skipDebugMode, analyzeWithDebugData, processUserReplyMessage, getDebugInfo,
 } from "./src/support";
 
 // Legal Policies & Consent

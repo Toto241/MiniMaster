@@ -156,6 +156,10 @@
       align-items: center;
       flex-wrap: wrap;
     }
+
+    .reply-input {
+      min-block-size: 80px;
+    }
   </style>
 </head>
 <body>
@@ -297,6 +301,15 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
     }
 
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function initFirebase() {
       const config = loadFirebaseConfig();
       if (!config || !config.projectId || String(config.projectId).includes("your-")) {
@@ -392,6 +405,52 @@
       }
     }
 
+    async function handleDebugConsent(ticketId, allowDebug) {
+      try {
+        if (!functions || !currentMasterImei) {
+          setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
+          return;
+        }
+        setStatus("ticket-submit-status", "Verarbeite Debug-Entscheidung...", "");
+        const callable = functions.httpsCallable(allowDebug ? "grantDebugAccess" : "skipDebugMode");
+        await callable({ ticketId });
+        setStatus(
+          "ticket-submit-status",
+          allowDebug
+            ? "Debug-Modus wurde aktiviert. KI arbeitet jetzt automatisch weiter."
+            : "Debug-Modus wurde abgelehnt. KI arbeitet ohne Debug-Daten weiter.",
+          "success"
+        );
+        await loadOwnTickets();
+      } catch (error) {
+        setStatus("ticket-submit-status", "Aktion fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
+      }
+    }
+
+    async function submitTicketReply(ticketId) {
+      try {
+        if (!functions || !currentMasterImei) {
+          setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
+          return;
+        }
+        const textarea = document.getElementById("reply-" + ticketId);
+        const message = textarea ? textarea.value.trim() : "";
+        if (!message) {
+          setStatus("ticket-submit-status", "Bitte zuerst eine Antwort eingeben.", "error");
+          return;
+        }
+
+        setStatus("ticket-submit-status", "Sende Antwort an KI...", "");
+        const replyFn = functions.httpsCallable("processUserReplyMessage");
+        await replyFn({ ticketId, message });
+        if (textarea) textarea.value = "";
+        setStatus("ticket-submit-status", "Antwort wurde gesendet. KI analysiert weiter.", "success");
+        await loadOwnTickets();
+      } catch (error) {
+        setStatus("ticket-submit-status", "Antwort konnte nicht gesendet werden: " + (error.message || "Unbekannter Fehler"), "error");
+      }
+    }
+
     async function loadOwnTickets() {
       const listEl = document.getElementById("ticket-list");
       if (!listEl) return;
@@ -416,12 +475,36 @@
         snapshot.forEach((doc) => {
           const t = doc.data();
           const created = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate().toLocaleString() : "-";
+          const status = String(t.status || "open");
+          const conversationStatus = String(t.conversationStatus || "-");
           const response = t.adminResponse || t.aiGeneratedSolution || "Noch keine Rueckmeldung.";
+
+          let actions = "";
+          if (conversationStatus === "awaiting_debug_consent") {
+            actions =
+              "<div class='inline'>" +
+                "<button class='btn btn-primary' type='button' onclick=\"handleDebugConsent('" + doc.id + "', true)\">Ja, Debug-Modus aktivieren</button>" +
+                "<button class='btn btn-ghost' type='button' onclick=\"handleDebugConsent('" + doc.id + "', false)\">Nein, ohne Debug weiter</button>" +
+              "</div>";
+          }
+
+          let replyBox = "";
+          if (conversationStatus === "waiting_user_response" || status === "awaiting_user_feedback") {
+            replyBox =
+              "<div>" +
+                "<label for='reply-" + doc.id + "'>Antwort an KI</label>" +
+                "<textarea id='reply-" + doc.id + "' class='reply-input' placeholder='Antwort oder weitere Beobachtung eingeben...'></textarea>" +
+                "<div class='inline'><button class='btn btn-secondary' type='button' onclick=\"submitTicketReply('" + doc.id + "')\">Antwort senden</button></div>" +
+              "</div>";
+          }
+
           html.push(
             "<article class='ticket-item'>" +
               "<strong>Ticket " + doc.id + "</strong>" +
-              "<div class='ticket-meta'><span>Status: " + String(t.status || "open") + "</span><span>Erstellt: " + created + "</span></div>" +
-              "<div><strong>Rueckmeldung:</strong><br>" + String(response).replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</div>" +
+              "<div class='ticket-meta'><span>Status: " + status + "</span><span>Conversation: " + conversationStatus + "</span><span>Erstellt: " + created + "</span></div>" +
+              "<div><strong>Rueckmeldung:</strong><br>" + escapeHtml(response) + "</div>" +
+              actions +
+              replyBox +
             "</article>"
           );
         });
@@ -433,6 +516,8 @@
 
     initFirebase();
     window.authenticateForTickets = authenticateForTickets;
+    window.handleDebugConsent = handleDebugConsent;
+    window.submitTicketReply = submitTicketReply;
     window.submitSupportTicket = submitSupportTicket;
     window.loadOwnTickets = loadOwnTickets;
   </script>
