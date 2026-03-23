@@ -200,6 +200,47 @@
       gap: 14px;
     }
 
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 12px;
+    }
+
+    .flow-step {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 16px;
+      background: #f8fbff;
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .flow-step .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: #1e3a8a;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .flow-step p { color: var(--muted); font-size: 0.9rem; }
+
+    .details-compact {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 10px 12px;
+    }
+
+    .details-compact summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
     .mini-card {
       padding: 16px;
       border-radius: 18px;
@@ -527,10 +568,9 @@
           <div>
             <h1>MiniMaster Betriebszentrale</h1>
             <p class="lead">
-              Zentrale Startseite für Operatoren, Eltern-Panel und Kinder-App (v1.1.0 · Build 2). Von hier aus lassen sich Firebase-Konfiguration,
-              Web-Panels, APK-Pfade, Dokumentation und Prüfhinweise konsistent steuern. Die gespeicherte Konfiguration wird direkt
-              mit dem Operator-Dashboard und dem Eltern-Panel synchronisiert. Neu: gesicherte USB-Debug-Schnittstelle
-              für Eltern- und Kinder-App mit HMAC-SHA256 Challenge-Response und automatisiertem USB-Testlauf.
+              Diese Seite ist dein operativer Einstiegspunkt: zuerst Konfiguration pr&uuml;fen, dann passendes Panel &ouml;ffnen,
+              danach gezielt den n&auml;chsten Schritt ausf&uuml;hren (Pairing, Tests oder Rollout). Alle Inhalte sind auf diesen
+              Ablauf ausgerichtet statt auf Volltext-Dokumentation.
             </p>
           </div>
         </div>
@@ -580,31 +620,40 @@
     <section class="panel">
       <div class="panel-header">
         <div>
-          <h2>Schnellstart & Integration</h2>
-          <p>Die Startseite bündelt die wichtigsten Arbeitsabläufe für Inbetriebnahme, tägliche Administration und Testvorbereitung.</p>
+          <h2>Was soll ich hier als Erstes tun?</h2>
+          <p>Nutze diesen Ablauf als Standard. Er deckt den h&auml;ufigsten Weg von Setup bis operativer Nutzung ab.</p>
         </div>
-        <div class="tag">Priorität: sichere Konfiguration → Panel-Zugriff → Geräteprüfung</div>
+        <div class="tag">Empfohlen: Konfiguration &rarr; Rolle &rarr; Aktion</div>
       </div>
-      <div class="panel-grid">
+      <div class="flow-grid">
+        <div class="flow-step">
+          <span class="kicker">Schritt 1 · Setup</span>
+          <strong>Firebase-Konfiguration speichern</strong>
+          <p>Ohne g&uuml;ltige Werte sind Admin- und Eltern-Panel nur eingeschr&auml;nkt nutzbar.</p>
+        </div>
+        <div class="flow-step">
+          <span class="kicker">Schritt 2 · Einstieg</span>
+          <strong>Rolle w&auml;hlen und Panel &ouml;ffnen</strong>
+          <p>Operatoren starten im Admin-Dashboard, Eltern im Web-Control Panel.</p>
+        </div>
+        <div class="flow-step">
+          <span class="kicker">Schritt 3 · Android</span>
+          <strong>APK/Pairing/USB nur bei Bedarf</strong>
+          <p>Erweiterte Android- und Debug-Aktionen erst nutzen, wenn Schritt 1 und 2 gr&uuml;n sind.</p>
+        </div>
+      </div>
+      <div class="panel-grid" style="margin-block-start: 12px">
         <div class="mini-card">
-          <strong>1. Firebase konfigurieren</strong>
-          <p>Die hier gespeicherten Werte werden von Operator-Dashboard und Web-Control gemeinsam genutzt.</p>
+          <strong>Operator</strong>
+          <p>Admin-Rollen, Audit, Betrieb, Kommandos und Commissioning.</p>
         </div>
         <div class="mini-card">
-          <strong>2. Panels verifizieren</strong>
-          <p>Öffne Admin- und Eltern-Panel direkt über die Karten und prüfe Login, Datenzugriff und Berechtigungen.</p>
+          <strong>Eltern</strong>
+          <p>Tagesbetrieb: Ger&auml;te sperren, Aufgaben verwalten, Regeln setzen.</p>
         </div>
         <div class="mini-card">
-          <strong>3. Android-Artefakte bereitstellen</strong>
-          <p>APK-Pfade lassen sich mit einem Klick kopieren und für ADB, File Explorer oder Build-Checks verwenden.</p>
-        </div>
-        <div class="mini-card">
-          <strong>4. Debug-Secrets einrichten (einmalig)</strong>
-          <p>Secret generieren (<code>generate-debug-token.ps1 -GenSecret</code>) und in <code>local.properties</code> eintragen. Beide Apps neu bauen.</p>
-        </div>
-        <div class="mini-card">
-          <strong>5. USB-Testlauf starten</strong>
-          <p><code>run-usb-tests.ps1 -AppId master|child</code> automatisiert Challenge → Token → Aktivierung → Tests → Deaktivierung → Ampelausgabe.</p>
+          <strong>Technik/QA</strong>
+          <p>APK-Pfade, USB-Debug, automatisierte Testl&auml;ufe und Ger&auml;tevalidierung.</p>
         </div>
       </div>
     </section>
@@ -689,42 +738,30 @@
       <div class="panel-header">
         <div>
           <h2>🔐 USB-Debug-Schnittstelle</h2>
-          <p>Gesicherte Diagnose- und Testschnittstelle für Eltern- und Kinder-App &ndash; <strong>kein separater Debug-Build</strong>.
-          Aktivierung ausschließlich via ADB (USB-Kabel + USB-Debugging) mit HMAC-SHA256 Challenge-Response.
-          Sessions laufen nach 30 Minuten automatisch ab. Ohne konfiguriertes Secret ist die Schnittstelle dauerhaft deaktiviert (Secure-by-Default).</p>
+          <p>Gesicherte Diagnose- und Testschnittstelle f&uuml;r Eltern- und Kinder-App. Nutze sie nur f&uuml;r technische Tests, nicht f&uuml;r den normalen Betrieb.</p>
         </div>
         <div class="tag">Secure-by-Default &middot; HMAC-SHA256 &middot; ADB-only</div>
       </div>
       <div class="panel-grid">
         <div class="mini-card">
-          <strong>Secret einrichten (einmalig)</strong>
-          <p>Secret generieren:<br><code>generate-debug-token.ps1 -GenSecret</code><br>
-          In <code>local.properties</code> eintragen:<br>
-          <code>debug.session.secret.master=&hellip;</code><br>
-          <code>debug.session.secret.child=&hellip;</code><br>
-          Anschließend beide Apps neu bauen.</p>
+          <strong>1) Einmalig vorbereiten</strong>
+          <p>Debug-Secret erzeugen und in <code>local.properties</code> eintragen. Danach beide Apps neu bauen.</p>
         </div>
         <div class="mini-card">
-          <strong>Challenge &rarr; Token &rarr; Aktivieren</strong>
-          <p>1.&nbsp;<code>adb shell am broadcast -a &hellip;DEBUG_GET_CHALLENGE</code><br>
-          2.&nbsp;Nonce aus Logcat lesen:<br><code>adb logcat -s MINIMASTER_DEBUG_CHALLENGE -d</code><br>
-          3.&nbsp;<code>generate-debug-token.ps1 -AppId master -Challenge &lt;NONCE&gt;</code><br>
-          4.&nbsp;<code>adb shell am broadcast -a &hellip;DEBUG_ACTIVATE -e response &lt;TOKEN&gt;</code></p>
+          <strong>2) Session aktivieren</strong>
+          <p>Challenge holen, Token generieren, Aktivierung senden. Dieser Ablauf ist im Runner bereits automatisiert.</p>
         </div>
         <div class="mini-card">
-          <strong>Status abfragen</strong>
-          <p><code>adb shell am broadcast -a &hellip;DEBUG_DUMP_STATE</code><br>
-          Gibt JSON-Statusdump ins Logcat aus:<br>
-          <code>adb logcat -s MINIMASTER_DEBUG_STATE -d</code><br>
-          Zeigt: Registrierungsstatus, IMEI-Last4, FCM-Token-Last8, Consent-Flag, Sperrstatus u.v.m.</p>
+          <strong>3) Tests fahren</strong>
+          <p>F&uuml;r Standardf&auml;lle direkt <code>run-usb-tests.ps1 -AppId master|child</code> nutzen (inkl. Ergebnisampel).</p>
         </div>
         <div class="mini-card">
-          <strong>Deaktivieren</strong>
-          <p>Nach Testlauf sofort deaktivieren:<br>
-          <code>adb shell am broadcast -a &hellip;DEBUG_DEACTIVATE</code><br>
-          Sessions laufen automatisch nach 30 Min. ab. Admin-Panel enthält alle 11 Kommandos im Befehlskatalog.</p>
+          <strong>4) Session beenden</strong>
+          <p>Nach Tests immer deaktivieren. Sp&auml;testens nach 30 Minuten endet die Session automatisch.</p>
         </div>
       </div>
+      <details class="details-compact" style="margin-block-start: 12px">
+        <summary>Erweiterte USB-Details anzeigen</summary>
       <div class="test-grid" style="margin-block-start:14px">
         <section>
           <h3>Eltern-App &middot; ADB-Aktionen</h3>
@@ -755,6 +792,7 @@
           </ul>
         </section>
       </div>
+      </details>
       <div class="actions">
         <a class="btn btn-outline" href="docs/DEBUG_INTERFACE_GUIDE.md">📘 Vollständiger Debug-Guide</a>
         <a class="btn btn-outline" href="admin-panel/index.html">🛡️ Admin-Panel mit Debug-Kommandos</a>

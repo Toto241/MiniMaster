@@ -936,19 +936,53 @@ npm test -- --runInBand
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
                             <p>
-                                Stellt alle relevanten Betriebsbefehle zentral zusammen und wandelt sie per Button
-                                in PowerShell um. Das gilt für Deploy, Vorbereitungsbefehle und die Erstadmin-Anlage.
+                                Erzeugt aus wenigen Eingaben lauff&auml;hige Betriebsbefehle (inkl. USB-Runner, Rollout und Erstadmin).
+                                Aufbau: erst Basisdaten, dann Android-spezifische Felder, danach Befehle generieren.
                             </p>
 
-                            <div class="commissioning-grid">
-                                <input type="text" id="cmd-workspace-path" placeholder="Arbeitsverzeichnis, z. B. D:/Tools/MiniMaster" />
-                                <input type="email" id="cmd-first-admin-email" placeholder="Optional: Erstadmin E-Mail" />
-                                <input type="text" id="cmd-first-admin-password" placeholder="Optional: Erstadmin Passwort" />
-                                <input type="text" id="cmd-android-device-serial" aria-label="ADB Device-Serial" placeholder="Optional: Allgemeine ADB Device-Serial (Fallback für Master/Child)" />
-                                <input type="text" id="cmd-master-device-serial" aria-label="ADB Master Device-Serial" placeholder="Optional: Master Device-Serial (überschreibt allgemeinen Fallback)" />
-                                <input type="text" id="cmd-child-device-serial" aria-label="ADB Child Device-Serial" placeholder="Optional: Child Device-Serial (überschreibt allgemeinen Fallback)" />
-                                <input type="text" id="cmd-master-apk-path" aria-label="Pfad Eltern-App APK" placeholder="Pfad Eltern-App APK (MasterApp)" />
-                                <input type="text" id="cmd-child-apk-path" aria-label="Pfad Kinder-App APK" placeholder="Pfad Kinder-App APK (ChildApp)" />
+                            <div class="data-list" style="margin-block-start: 12px">
+                                <div class="info">
+                                    <strong>Schnellablauf in 3 Schritten:</strong><br />
+                                    1) Basisdaten pr&uuml;fen (Workspace, optional Erstadmin)<br />
+                                    2) Bei Android-Tests Serial/APK-Pfade setzen<br />
+                                    3) <em>Befehle generieren</em> klicken und Zielkommando kopieren/ausf&uuml;hren
+                                </div>
+                            </div>
+
+                            <div class="setup-grid" style="margin-block-start: 12px; gap: 14px">
+                                <div class="setup-card" style="margin: 0">
+                                    <h4>Basisdaten</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 8px">
+                                        <label for="cmd-workspace-path">Arbeitsverzeichnis</label>
+                                        <input type="text" id="cmd-workspace-path" placeholder="z. B. D:/Tools/MiniMaster" />
+                                        <label for="cmd-first-admin-email">Erstadmin E-Mail (optional)</label>
+                                        <input type="email" id="cmd-first-admin-email" placeholder="optional: admin@example.com" />
+                                        <label for="cmd-first-admin-password">Erstadmin Passwort (optional)</label>
+                                        <input type="text" id="cmd-first-admin-password" placeholder="optional: Erstadmin Passwort" />
+                                    </div>
+                                </div>
+
+                                <div class="setup-card" style="margin: 0">
+                                    <h4>Android / USB-Runner</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 8px">
+                                        <label for="cmd-android-device-serial">Allgemeine ADB-Serial (Fallback)</label>
+                                        <input type="text" id="cmd-android-device-serial" aria-label="ADB Device-Serial" placeholder="optional: allgemeine Serial f&uuml;r alle Kommandos" />
+                                        <label for="cmd-master-device-serial">Master-Device-Serial (optional, &uuml;berschreibt Fallback)</label>
+                                        <input type="text" id="cmd-master-device-serial" aria-label="ADB Master Device-Serial" placeholder="optional: nur f&uuml;r Master/Dual" />
+                                        <label for="cmd-child-device-serial">Child-Device-Serial (optional, &uuml;berschreibt Fallback)</label>
+                                        <input type="text" id="cmd-child-device-serial" aria-label="ADB Child Device-Serial" placeholder="optional: nur f&uuml;r Child/Dual" />
+                                    </div>
+                                </div>
+
+                                <div class="setup-card" style="margin: 0">
+                                    <h4>APK-Pfade (optional)</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 8px">
+                                        <label for="cmd-master-apk-path">Pfad Eltern-App APK</label>
+                                        <input type="text" id="cmd-master-apk-path" aria-label="Pfad Eltern-App APK" placeholder="MasterApp APK Pfad" />
+                                        <label for="cmd-child-apk-path">Pfad Kinder-App APK</label>
+                                        <input type="text" id="cmd-child-apk-path" aria-label="Pfad Kinder-App APK" placeholder="ChildApp APK Pfad" />
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
