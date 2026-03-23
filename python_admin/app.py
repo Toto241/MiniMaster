@@ -56,6 +56,347 @@ COMMISSIONING_COMMANDS = (
     },
 )
 
+COMMISSIONING_TEST_GROUPS = (
+    {
+        "id": "runtime",
+        "title": "Runtime & Cloud-Basis",
+        "description": "Prüft, ob Projektbindung, AI-Runtime und App-Check für den Go-Live vorbereitet sind.",
+        "tests": (
+            {
+                "id": "cloud-project-id",
+                "title": "Cloud Project ID gesetzt",
+                "description": "Die Runtime-Konfiguration enthält eine produktive Firebase/Cloud-Projekt-ID.",
+                "automationType": "automatic",
+                "source": "runtime",
+                "successCriteria": "projectId ist im Runtime-Block gepflegt.",
+            },
+            {
+                "id": "ai-runtime-config",
+                "title": "AI Runtime vollständig",
+                "description": "Provider, Modell, Secret-Referenz und Systemprompt sind für den AI-Flow hinterlegt.",
+                "automationType": "automatic",
+                "source": "runtime",
+                "successCriteria": "provider, model, keyRef und systemPrompt sind gesetzt.",
+            },
+            {
+                "id": "app-check-mode",
+                "title": "App Check Mode gesetzt",
+                "description": "Der Operator hat den gewünschten App-Check-Modus dokumentiert.",
+                "automationType": "automatic",
+                "source": "runtime",
+                "successCriteria": "appCheckMode enthält einen gültigen Wert.",
+            },
+        ),
+    },
+    {
+        "id": "service-approvals",
+        "title": "Freigaben & Registrierungen",
+        "description": "Erfasst alle identifizierten manuellen Nachweise, die vor dem Go-Live abgezeichnet sein müssen.",
+        "tests": (
+            {
+                "id": "firebase-services-approved",
+                "title": "Firebase Service-Freigaben",
+                "description": "Authentication, Firestore, Storage, Functions und Messaging sind aktiviert oder bewusst freigegeben.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Alle Pflicht-Freigaben sind im Operator-Panel bestätigt.",
+            },
+            {
+                "id": "android-app-registration",
+                "title": "Android App-Registrierung",
+                "description": "MasterApp und ChildApp sind im Projekt registriert und für Tests verwendbar.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Beide Android-App-Registrierungen sind bestätigt.",
+            },
+            {
+                "id": "firebase-project-binding",
+                "title": "Firebase Projekt lokal gebunden",
+                "description": "Das lokale Arbeitsverzeichnis wurde mit dem produktiven Projekt verknüpft.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "firebase use --add wurde lokal durchgeführt.",
+            },
+            {
+                "id": "service-account-ready",
+                "title": "Service Account für Setup bereit",
+                "description": "Der lokale Setup-Operator kann mit dem vorgesehenen Service Account arbeiten.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Der Service-Account-Nachweis ist vorhanden.",
+            },
+        ),
+    },
+    {
+        "id": "release-readiness",
+        "title": "Release & Store-Readiness",
+        "description": "Deckt die bereits identifizierten Go-Live-Blocker rund um Play Store und Gesamtsystem ab.",
+        "tests": (
+            {
+                "id": "play-store-readiness",
+                "title": "Play Store Readiness",
+                "description": "Alle Play-Store-Pflichtpunkte sowie Privacy-URL und Support-Adresse sind gepflegt.",
+                "automationType": "manual",
+                "source": "playstore",
+                "successCriteria": "Alle Play-Store-Checks sind erfüllt und die Metadaten sind gültig.",
+            },
+            {
+                "id": "full-validation-status",
+                "title": "Full Validation fehlerfrei",
+                "description": "Die browserseitige Full Validation meldet keine kritischen Fehler mehr.",
+                "automationType": "automatic",
+                "source": "backend",
+                "successCriteria": "errorCount der Full Validation ist 0.",
+            },
+        ),
+    },
+    {
+        "id": "local-gates",
+        "title": "Lokale Gate-Kommandos",
+        "description": "Führt die identifizierten lokalen Skript-Gates im Python-Operator aus und protokolliert deren Ergebnis.",
+        "tests": tuple(
+            {
+                "id": str(command_def["id"]),
+                "title": str(command_def["label"]),
+                "description": f"Lokales Kommando: {command_def['command']}",
+                "automationType": "command",
+                "source": "command",
+                "successCriteria": "Das Kommando beendet sich mit Exit-Code 0.",
+                "command": str(command_def["command"]),
+            }
+            for command_def in COMMISSIONING_COMMANDS
+        ),
+    },
+    {
+        "id": "documented-physical-commissioning",
+        "title": "Dokumentierte physische Commissioning-Tests",
+        "description": "Spiegelt die dokumentierten Abnahmetests aus der Physical Commissioning Checklist wider.",
+        "tests": (
+            {
+                "id": "doc-master-app-registration-auth",
+                "title": "Test 1.1: Master App Registration & Auth",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-11-master-app-registration--auth",
+            },
+            {
+                "id": "doc-generate-pairing-code",
+                "title": "Test 1.2: Generate Pairing Code",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-12-generate-pairing-code",
+            },
+            {
+                "id": "doc-child-app-registration-code",
+                "title": "Test 1.3: Child App Registration via Code",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-13-child-app-registration-via-code",
+            },
+            {
+                "id": "doc-create-task",
+                "title": "Test 2.1: Create a Task",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-21-create-a-task",
+            },
+            {
+                "id": "doc-child-submits-task-photo",
+                "title": "Test 2.2: Child Submits Task with Photo",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-22-child-submits-task-with-photo",
+            },
+            {
+                "id": "doc-task-approval-workflow",
+                "title": "Test 2.3: Complete Task Approval Workflow",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-23-complete-task-approval-workflow",
+            },
+            {
+                "id": "doc-create-app-blocking-rule",
+                "title": "Test 3.1: Create App Blocking Rule",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-31-create-app-blocking-rule",
+            },
+            {
+                "id": "doc-verify-app-blocking-enforcement",
+                "title": "Test 3.2: Verify App Blocking Enforcement",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-32-verify-app-blocking-enforcement",
+            },
+            {
+                "id": "doc-screen-lock-enforcement",
+                "title": "Test 3.3: Screen Lock Enforcement",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-33-screen-lock-enforcement",
+            },
+            {
+                "id": "doc-tamper-detection-device-admin-disable",
+                "title": "Test 4.1: Tamper Detection — Device Admin Disable",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-41-tamper-detection--device-admin-disable",
+            },
+            {
+                "id": "doc-usb-debug-mode-interface",
+                "title": "Test 4.2: USB Debug Mode — Verify Debug Interface",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-42-usb-debug-mode--verify-debug-interface",
+            },
+            {
+                "id": "doc-offline-rule-enforcement",
+                "title": "Test 5.1: Offline Rule Enforcement",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-51-offline-rule-enforcement",
+            },
+            {
+                "id": "doc-heartbeat-sync-recovery",
+                "title": "Test 5.2: Heartbeat & Sync Recovery",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-52-heartbeat--sync-recovery",
+            },
+            {
+                "id": "doc-required-permissions-granted",
+                "title": "Test 6.1: Verify Required Permissions Granted",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-61-verify-required-permissions-granted",
+            },
+            {
+                "id": "doc-no-excessive-permissions",
+                "title": "Test 6.2: Verify No Excessive Permissions",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-62-verify-no-excessive-permissions",
+            },
+            {
+                "id": "doc-soak-test-1h",
+                "title": "Test 7.1: 1-Hour Soak Test",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-71-1-hour-soak-test",
+            },
+            {
+                "id": "doc-network-resilience",
+                "title": "Test 7.2: Network Resilience",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-72-network-resilience",
+            },
+            {
+                "id": "doc-final-checklist-evidence",
+                "title": "Test 8.1: Final Checklist & Evidence Collection",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-81-final-checklist--evidence-collection",
+            },
+            {
+                "id": "doc-pre-go-live-decision",
+                "title": "Test 8.2: Pre-Go-Live Decision",
+                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-82-pre-go-live-decision",
+            },
+        ),
+    },
+    {
+        "id": "documented-task-scenarios",
+        "title": "Dokumentierte Aufgaben- und Freischalt-Szenarien",
+        "description": "Spiegelt die dokumentierten Unlock- und Sicherheits-Testfälle wider.",
+        "tests": (
+            {
+                "id": "doc-task-unlock-success",
+                "title": "Testfall 1: Erfolgreicher Aufgaben-Zyklus (Freischaltung)",
+                "description": "Dokumentierter Aufgaben- und Freischalt-Flow aus dem Testfall-Dokument.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Szenario gemaess docs/TEST_SCENARIOS_TASK_UNLOCK.md erfolgreich nachgestellt und protokolliert.",
+                "documentation": "docs/TEST_SCENARIOS_TASK_UNLOCK.md#testfall-1-erfolgreicher-aufgaben-zyklus-freischaltung",
+            },
+            {
+                "id": "doc-task-unlock-reject",
+                "title": "Testfall 2: Ablehnung der Aufgabe (Sperre bleibt aktiv)",
+                "description": "Dokumentierter Negativtest fuer den Aufgaben-Workflow.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Szenario gemaess docs/TEST_SCENARIOS_TASK_UNLOCK.md erfolgreich nachgestellt und protokolliert.",
+                "documentation": "docs/TEST_SCENARIOS_TASK_UNLOCK.md#testfall-2-ablehnung-der-aufgabe-sperre-bleibt-aktiv",
+            },
+            {
+                "id": "doc-task-unlock-security",
+                "title": "Testfall 3: Sicherheitsprüfung (Unautorisierter Zugriff)",
+                "description": "Dokumentierter Sicherheitstest fuer unautorisierte Zugriffe.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Szenario gemaess docs/TEST_SCENARIOS_TASK_UNLOCK.md erfolgreich nachgestellt und protokolliert.",
+                "documentation": "docs/TEST_SCENARIOS_TASK_UNLOCK.md#testfall-3-sicherheitsprufung-unautorisierter-zugriff",
+            },
+        ),
+    },
+    {
+        "id": "documented-support-compliance",
+        "title": "Dokumentierte Support- und Compliance-Szenarien",
+        "description": "Erfasst den dokumentierten Support-/Compliance-Gate aus dem Admin-Support-Workflow.",
+        "tests": (
+            {
+                "id": "doc-support-compliance-test",
+                "title": "Support- und Compliance-Testfall durchlaufen",
+                "description": "Dokumentierter Go-Live-Schritt aus dem PC Admin AI Support Workflow.",
+                "automationType": "documented",
+                "source": "docs",
+                "successCriteria": "Szenario gemaess docs/PC_ADMIN_AI_SUPPORT_WORKFLOW.md erfolgreich nachgestellt und protokolliert.",
+                "documentation": "docs/PC_ADMIN_AI_SUPPORT_WORKFLOW.md#empfohlene-reihenfolge-fur-go-live",
+            },
+        ),
+    },
+)
+
 
 @dataclass(frozen=True)
 class CommandRequest:
@@ -329,6 +670,50 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
     }
 
 
+def get_commissioning_test_catalog() -> dict[str, object]:
+    groups: list[dict[str, object]] = []
+    automated_count = 0
+    manual_count = 0
+    command_count = 0
+    documented_count = 0
+
+    for group in COMMISSIONING_TEST_GROUPS:
+        tests: list[dict[str, object]] = []
+        for test in cast(tuple[dict[str, object], ...], group["tests"]):
+            test_copy = dict(test)
+            automation_type = str(test_copy.get("automationType", "automatic"))
+            if automation_type == "command":
+                command_count += 1
+            elif automation_type == "documented":
+                documented_count += 1
+            elif automation_type == "manual":
+                manual_count += 1
+            else:
+                automated_count += 1
+            tests.append(test_copy)
+
+        groups.append(
+            {
+                "id": str(group["id"]),
+                "title": str(group["title"]),
+                "description": str(group["description"]),
+                "tests": tests,
+            }
+        )
+
+    return {
+        "groups": groups,
+        "summary": {
+            "groupCount": len(groups),
+            "testCount": automated_count + manual_count + command_count + documented_count,
+            "automatedCount": automated_count,
+            "manualCount": manual_count,
+            "commandCount": command_count,
+            "documentedCount": documented_count,
+        },
+    }
+
+
 def run_commissioning_commands(run_commands: bool, timeout_sec: int) -> list[dict[str, object]]:
     if not run_commands:
         return []
@@ -552,6 +937,9 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "count": limit,
                 },
             )
+
+        if parsed.path == "/api/commissioning/catalog":
+            return self._write_json(HTTPStatus.OK, get_commissioning_test_catalog())
 
         if parsed.path == "/admin-panel":
             self.path = "/admin-panel/"

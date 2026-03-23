@@ -124,6 +124,7 @@ let currentTicketFilter = "all";
 let setupValidationResults = [];
 let pythonCommissioningLastRun = null;
 let pythonCommissioningHistoryRuns = [];
+let pythonCommissioningCatalog = null;
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -383,11 +384,51 @@ function formatPythonAutomationStatus(status) {
     if (status === "pass") return "✅ PASS";
     if (status === "manual_required") return "🟡 MANUELL";
     if (status === "fail") return "❌ FAIL";
+    if (status === "not_run") return "⏸ NOCH NICHT GELAUFEN";
     return "ℹ️ UNBEKANNT";
+}
+
+function getPythonAutomationStatusMeta(status) {
+    if (status === "pass") {
+        return { label: "PASS", className: "python-status-pass", cardClass: "status-pass" };
+    }
+    if (status === "manual_required") {
+        return { label: "MANUELL", className: "python-status-manual_required", cardClass: "status-manual_required" };
+    }
+    if (status === "fail") {
+        return { label: "FAIL", className: "python-status-fail", cardClass: "status-fail" };
+    }
+    return { label: "OFFEN", className: "python-status-not_run", cardClass: "status-not_run" };
+}
+
+function formatPythonAutomationType(type) {
+    if (type === "command") return "Lokales Gate-Kommando";
+    if (type === "documented") return "Dokumentierter Testplan";
+    if (type === "manual") return "Manueller Nachweis";
+    return "Automatisch bewertet";
+}
+
+function getPythonAutomationTypeChipClass(type) {
+    if (type === "command") return "python-automation-chip-command";
+    if (type === "documented") return "python-automation-chip-documented";
+    if (type === "manual") return "python-automation-chip-manual";
+    return "python-automation-chip-auto";
 }
 
 function shouldShowOnlyOpenAutomationChecks() {
     return Boolean(document.getElementById("python-automation-show-open-only")?.checked);
+}
+
+function getPythonAutomationCatalogFilters() {
+    return {
+        search: (document.getElementById("python-automation-catalog-search")?.value || "").trim().toLowerCase(),
+        mode: document.getElementById("python-automation-catalog-filter")?.value || "all",
+    };
+}
+
+function rerenderPythonAutomationCatalogFromCache() {
+    renderPythonAutomationOverview(pythonCommissioningCatalog, pythonCommissioningLastRun);
+    renderPythonAutomationCatalog(pythonCommissioningCatalog, pythonCommissioningLastRun);
 }
 
 function getPythonAutomationHistoryFilters() {
@@ -399,6 +440,253 @@ function getPythonAutomationHistoryFilters() {
 
 function rerenderPythonAutomationHistoryFromCache() {
     renderPythonAutomationHistory(pythonCommissioningHistoryRuns);
+}
+
+function buildPythonAutomationRunIndex(run) {
+    const map = new Map();
+
+    if (Array.isArray(run?.evaluation?.checks)) {
+        run.evaluation.checks.forEach(item => {
+            if (!item?.id) return;
+            map.set(item.id, {
+                status: item.status || "not_run",
+                details: item.details || "",
+                source: item.source || "evaluation",
+                evaluatedAt: run.finishedAt || run.startedAt || "",
+            });
+        });
+    }
+
+    if (Array.isArray(run?.commands?.results)) {
+        run.commands.results.forEach(item => {
+            if (!item?.id) return;
+            map.set(item.id, {
+                status: item.status || "not_run",
+                details: item.output
+                    ? `Exit-Code ${item.code ?? "-"}. ${String(item.output).slice(0, 180)}`
+                    : `Exit-Code ${item.code ?? "-"}.`,
+                source: "command",
+                evaluatedAt: run.finishedAt || run.startedAt || "",
+            });
+        });
+    }
+
+    return map;
+}
+
+function getPythonAutomationTestStatus(test, run, runIndex) {
+    const mapped = runIndex.get(test.id);
+    if (mapped) return mapped;
+
+    if (!run) {
+        return {
+            status: "not_run",
+            details: test.automationType === "documented"
+                ? "Dokumentierter Testplan ist erfasst, aber noch nicht als Laufnachweis protokolliert."
+                : "Noch kein protokollierter Python-Lauf verfügbar.",
+            source: test.source,
+            evaluatedAt: "",
+        };
+    }
+
+    if (test.automationType === "command") {
+        if (!run?.commands?.executed) {
+            return {
+                status: "not_run",
+                details: "Die lokalen Gate-Kommandos waren in diesem Lauf deaktiviert.",
+                source: test.source,
+                evaluatedAt: run.finishedAt || run.startedAt || "",
+            };
+        }
+
+        return {
+            status: "not_run",
+            details: "Dieses Kommando wurde in diesem Lauf nicht mehr erreicht (Fail-Fast oder vorzeitiger Abbruch).",
+            source: test.source,
+            evaluatedAt: run.finishedAt || run.startedAt || "",
+        };
+    }
+
+    return {
+        status: "not_run",
+        details: test.automationType === "documented"
+            ? "Dokumentierter Testplan muss manuell durchlaufen und außerhalb des Dashboards belegt werden."
+            : "Für diesen Prüffall liegt im ausgewählten Lauf kein Einzelstatus vor.",
+        source: test.source,
+        evaluatedAt: run.finishedAt || run.startedAt || "",
+    };
+}
+
+function renderPythonAutomationOverview(catalog, run) {
+    const overviewEl = document.getElementById("python-automation-overview");
+    if (!overviewEl) return;
+
+    if (!catalog?.summary) {
+        overviewEl.innerHTML = "<div class='info'>Noch keine Python-Testfallübersicht verfügbar.</div>";
+        return;
+    }
+
+    const summary = catalog.summary;
+    const evalCounts = run?.evaluation?.statusCounts || {};
+    const cmdCounts = run?.commands?.statusCounts || {};
+    const openCount = Number(evalCounts.fail || 0) + Number(evalCounts.manual_required || 0) + Number(cmdCounts.fail || 0);
+
+    overviewEl.innerHTML = `
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.testCount || 0))}</strong>
+            <span>identifizierte Prüffälle</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.automatedCount || 0))}</strong>
+            <span>automatisch bewertbare Checks</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.manualCount || 0))}</strong>
+            <span>manuelle Nachweise</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.documentedCount || 0))}</strong>
+            <span>dokumentierte Testpläne</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.commandCount || 0))}</strong>
+            <span>lokale Gate-Kommandos</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${run ? escapeHtml(String(openCount)) : "-"}</strong>
+            <span>${run ? `offene Punkte im Lauf ${escapeHtml(run.runId || "-")}` : "Noch kein Lauf ausgewählt"}</span>
+        </div>
+    `;
+}
+
+function renderPythonAutomationCatalog(catalog, run) {
+    const catalogEl = document.getElementById("python-automation-catalog");
+    if (!catalogEl) return;
+
+    if (!catalog?.groups?.length) {
+        catalogEl.innerHTML = "<div class='info'>Noch kein Python-Testkatalog geladen.</div>";
+        return;
+    }
+
+    const filters = getPythonAutomationCatalogFilters();
+    const runIndex = buildPythonAutomationRunIndex(run);
+    const showOpenOnly = shouldShowOnlyOpenAutomationChecks();
+
+    const renderedGroups = catalog.groups.map(group => {
+        const tests = (group.tests || []).filter(test => {
+            const resolved = getPythonAutomationTestStatus(test, run, runIndex);
+            const status = resolved.status || "not_run";
+            const haystack = [
+                String(test.id || ""),
+                String(test.title || ""),
+                String(test.description || ""),
+                String(test.source || ""),
+                String(group.title || ""),
+            ].join(" ").toLowerCase();
+
+            if (showOpenOnly && !(status === "fail" || status === "manual_required" || status === "not_run")) {
+                return false;
+            }
+
+            if (filters.mode === "open" && !(status === "fail" || status === "manual_required" || status === "not_run")) {
+                return false;
+            }
+
+            if (filters.mode !== "all" && filters.mode !== "open" && test.automationType !== filters.mode) {
+                return false;
+            }
+
+            if (filters.search && !haystack.includes(filters.search)) {
+                return false;
+            }
+
+            return true;
+        });
+
+        if (tests.length === 0) {
+            return "";
+        }
+
+        const cards = tests.map(test => {
+            const resolved = getPythonAutomationTestStatus(test, run, runIndex);
+            const statusMeta = getPythonAutomationStatusMeta(resolved.status);
+            const extraCardClass = test.automationType === "documented" ? " status-documented" : "";
+            const evaluatedAt = resolved.evaluatedAt
+                ? new Date(resolved.evaluatedAt).toLocaleString("de-DE")
+                : "noch nicht protokolliert";
+            const documentationHtml = test.documentation
+                ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(test.documentation)}</div>`
+                : "";
+
+            return `
+                <article class='python-test-card ${statusMeta.cardClass}${extraCardClass}'>
+                    <div class='python-test-card-header'>
+                        <div>
+                            <h6>${escapeHtml(test.title || test.id || "Prüffall")}</h6>
+                            <p class='python-muted-caption'>ID: ${escapeHtml(test.id || "-")} · Quelle: ${escapeHtml(test.source || "-")}</p>
+                        </div>
+                        <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
+                    </div>
+                    <div class='python-test-meta'>
+                        <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType)}'>${escapeHtml(formatPythonAutomationType(test.automationType))}</span>
+                    </div>
+                    <p>${escapeHtml(test.description || "")}</p>
+                    <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
+                    ${test.command ? `<div class='python-test-detail'><strong>Kommando:</strong> ${escapeHtml(test.command)}</div>` : ""}
+                    ${documentationHtml}
+                    <div class='python-test-detail'><strong>Letzte Bewertung:</strong> ${escapeHtml(resolved.details || "Kein Detail verfügbar.")}</div>
+                    <div class='python-muted-caption'>Zuletzt bewertet: ${escapeHtml(evaluatedAt)}</div>
+                </article>
+            `;
+        }).join("");
+
+        return `
+            <section class='python-automation-group'>
+                <h6>${escapeHtml(group.title || "Testgruppe")}</h6>
+                <p>${escapeHtml(group.description || "")}</p>
+                <div class='python-automation-card-grid'>
+                    ${cards}
+                </div>
+            </section>
+        `;
+    }).filter(Boolean);
+
+    if (renderedGroups.length === 0) {
+        catalogEl.innerHTML = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
+        return;
+    }
+
+    catalogEl.innerHTML = renderedGroups.join("");
+}
+
+async function loadPythonAutomationCatalog() {
+    const catalogEl = document.getElementById("python-automation-catalog");
+    if (!catalogEl) return;
+
+    if (!isPythonOperator) {
+        pythonCommissioningCatalog = null;
+        renderPythonAutomationOverview(null, pythonCommissioningLastRun);
+        catalogEl.innerHTML = "<div class='info'>Der Python-Testkatalog ist nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    catalogEl.innerHTML = "<div class='loading'>Lade Python-Testkatalog...</div>";
+    try {
+        const response = await fetch("/api/commissioning/catalog", {
+            headers: { "Accept": "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Testkatalog konnte nicht geladen werden.");
+        }
+        pythonCommissioningCatalog = payload;
+        renderPythonAutomationOverview(payload, pythonCommissioningLastRun);
+        renderPythonAutomationCatalog(payload, pythonCommissioningLastRun);
+    } catch (error) {
+        pythonCommissioningCatalog = null;
+        renderPythonAutomationOverview(null, pythonCommissioningLastRun);
+        catalogEl.innerHTML = `<div class='error'>Testkatalog konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+    }
 }
 
 function renderPythonAutomationResult(run) {
@@ -417,6 +705,11 @@ function renderPythonAutomationResult(run) {
         : checksRaw;
     const commands = Array.isArray(run.commands?.results) ? run.commands.results : [];
     const pending = Array.isArray(run.pending) ? run.pending : [];
+    const evalCounts = run.evaluation?.statusCounts || {};
+    const cmdCounts = run.commands?.statusCounts || {};
+
+    renderPythonAutomationOverview(pythonCommissioningCatalog, run);
+    renderPythonAutomationCatalog(pythonCommissioningCatalog, run);
 
     const checksRows = checks.map(item => `
         <tr>
@@ -457,7 +750,27 @@ function renderPythonAutomationResult(run) {
             <strong>Zeit:</strong> ${escapeHtml(run.startedAt || "-")} → ${escapeHtml(run.finishedAt || "-")}
         </div>
 
+        <div class='python-result-summary'>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evalCounts.pass || 0))}</strong>
+                <span>Checks bestanden</span>
+            </div>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evalCounts.fail || 0))}</strong>
+                <span>Checks fehlgeschlagen</span>
+            </div>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evalCounts.manual_required || 0))}</strong>
+                <span>manuelle Punkte offen</span>
+            </div>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(cmdCounts.pass || 0))}/${escapeHtml(String(cmdCounts.fail || 0))}</strong>
+                <span>Kommandos Pass/Fail</span>
+            </div>
+        </div>
+
         <h5 style='margin-block-start: 10px'>Automatisierte Bewertung</h5>
+        ${shouldShowOnlyOpenAutomationChecks() ? "<p class='python-muted-caption'>Aktiver Filter: Es werden nur offene oder fehlgeschlagene Checks angezeigt.</p>" : ""}
         <table>
             <tr><th>Check</th><th>Status</th><th>Details</th></tr>
             ${checksRows || "<tr><td colspan='3'>Keine Checks vorhanden.</td></tr>"}
@@ -539,6 +852,9 @@ async function runPythonAutomationSuite() {
         pythonCommissioningLastRun = payload;
         renderPythonAutomationResult(payload);
         mergePythonPendingIntoCommissioning(payload);
+        if (!pythonCommissioningCatalog) {
+            await loadPythonAutomationCatalog();
+        }
         await loadPythonAutomationHistory();
 
         const level = payload.overall === "pass" ? "success" : "warning";
@@ -557,6 +873,10 @@ function renderPythonAutomationHistory(runs) {
 
     if (!Array.isArray(runs) || runs.length === 0) {
         historyEl.innerHTML = "<div class='info'>Noch keine Läufe protokolliert.</div>";
+        if (!pythonCommissioningLastRun) {
+            renderPythonAutomationOverview(pythonCommissioningCatalog, null);
+            renderPythonAutomationCatalog(pythonCommissioningCatalog, null);
+        }
         return;
     }
 
@@ -644,7 +964,12 @@ async function loadPythonAutomationHistory() {
         if (!response.ok) {
             throw new Error(payload.error || "Historie konnte nicht geladen werden.");
         }
-        renderPythonAutomationHistory(payload.runs || []);
+        const runs = payload.runs || [];
+        if (!pythonCommissioningLastRun && runs.length > 0) {
+            pythonCommissioningLastRun = runs[0];
+            renderPythonAutomationResult(runs[0]);
+        }
+        renderPythonAutomationHistory(runs);
     } catch (error) {
         historyEl.innerHTML = `<div class='error'>Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
     }
@@ -2551,12 +2876,24 @@ document.addEventListener("DOMContentLoaded", async function() {
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
     renderPlayStoreReadiness();
+    renderPythonAutomationOverview(null, null);
 
     const openOnlyChecksEl = document.getElementById("python-automation-show-open-only");
     if (openOnlyChecksEl) {
         openOnlyChecksEl.addEventListener("change", () => {
             if (pythonCommissioningLastRun) renderPythonAutomationResult(pythonCommissioningLastRun);
+            else rerenderPythonAutomationCatalogFromCache();
         });
+    }
+
+    const catalogSearchEl = document.getElementById("python-automation-catalog-search");
+    if (catalogSearchEl) {
+        catalogSearchEl.addEventListener("input", rerenderPythonAutomationCatalogFromCache);
+    }
+
+    const catalogFilterEl = document.getElementById("python-automation-catalog-filter");
+    if (catalogFilterEl) {
+        catalogFilterEl.addEventListener("change", rerenderPythonAutomationCatalogFromCache);
     }
 
     const historySearchEl = document.getElementById("python-automation-history-search");
@@ -2576,6 +2913,7 @@ document.addEventListener("DOMContentLoaded", async function() {
             badge.style.display = "block";
             if (isPythonOperator) {
                 badge.innerHTML = '<span class="operator-badge">🐍 Python-Operator-Modus</span> CLI- und PowerShell-Befehle können direkt aus diesem Dashboard ausgeführt werden.';
+                loadPythonAutomationCatalog();
                 loadPythonAutomationHistory();
             }
         }
