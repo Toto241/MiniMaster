@@ -34,6 +34,16 @@
 .PARAMETER Suite
     Testsuite: "default" (alle Tests des Moduls) oder "commissioning" (vordefinierte Commissioning-Klassen).
 
+.PARAMETER InstallApk
+    Installiert die Ziel-APK vor dem Testlauf per ADB (adb install -r -d).
+
+.PARAMETER ApkPath
+    Optionaler expliziter Pfad zur APK. Wenn leer und -InstallApk gesetzt ist,
+    wird automatisch die neueste APK im Modul-Ausgabeordner gesucht.
+
+.PARAMETER UninstallFirst
+    Deinstalliert die App vor der Installation (nur wirksam mit -InstallApk).
+
 .EXAMPLE
     pwsh -File scripts/run-usb-tests.ps1 -AppId master
     pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial R58M12345
@@ -56,7 +66,16 @@ param(
 
     [Parameter(Mandatory = $false)]
     [ValidateSet("default", "commissioning")]
-    [string]$Suite = "default"
+    [string]$Suite = "default",
+
+    [Parameter(Mandatory = $false)]
+    [switch]$InstallApk,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ApkPath = "",
+
+    [Parameter(Mandatory = $false)]
+    [switch]$UninstallFirst
 )
 
 Set-StrictMode -Version Latest
@@ -67,6 +86,19 @@ function Write-Step([string]$msg) { Write-Host "`n▶  $msg" -ForegroundColor Cy
 function Write-Ok([string]$msg)   { Write-Host "✔  $msg" -ForegroundColor Green }
 function Write-Fail([string]$msg) { Write-Host "✘  $msg" -ForegroundColor Red }
 function Write-Info([string]$msg) { Write-Host "   $msg" -ForegroundColor Gray }
+function Resolve-LatestApkPath([string]$appId, [string]$repoRootPath) {
+    $apkRoot = Join-Path $repoRootPath "$($appId)App\build\outputs\apk"
+    if (-not (Test-Path $apkRoot)) {
+        return $null
+    }
+    $latest = Get-ChildItem -Path $apkRoot -Recurse -File -Filter "*.apk" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if (-not $latest) {
+        return $null
+    }
+    return $latest.FullName
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot  = Split-Path -Parent $scriptDir
@@ -99,9 +131,41 @@ if ($AdbSerial -eq "auto") {
     Write-Ok "Gerät: $script:adbTarget"
 }
 
-# ── Step 2-4: Challenge → Token → Aktivierung ────────────────────────────────
+# ── Step 2: APK-Installation (optional) ──────────────────────────────────────
+if ($InstallApk) {
+    Write-Step "Schritt 2/8: APK installieren ($AppId)"
+
+    $resolvedApkPath = $ApkPath
+    if ([string]::IsNullOrWhiteSpace($resolvedApkPath)) {
+        $resolvedApkPath = Resolve-LatestApkPath -appId $AppId -repoRootPath $repoRoot
+        if (-not $resolvedApkPath) {
+            Write-Fail "Keine APK gefunden. Entweder zuerst bauen oder -ApkPath angeben."
+            exit 1
+        }
+    }
+
+    if (-not (Test-Path $resolvedApkPath)) {
+        Write-Fail "APK-Pfad existiert nicht: $resolvedApkPath"
+        exit 1
+    }
+
+    if ($UninstallFirst) {
+        Write-Info "Deinstalliere vorhandene App-Version: $appPackage"
+        & adb -s $script:adbTarget uninstall $appPackage | Out-Null
+    }
+
+    Write-Info "Installiere APK: $resolvedApkPath"
+    & adb -s $script:adbTarget install -r -d "$resolvedApkPath"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "APK-Installation fehlgeschlagen."
+        exit 1
+    }
+    Write-Ok "APK installiert."
+}
+
+# ── Step 3-5: Challenge → Token → Aktivierung ────────────────────────────────
 if (-not $SkipActivation) {
-    Write-Step "Schritt 2/7: Challenge anfordern ($AppId)"
+    Write-Step "Schritt 3/8: Challenge anfordern ($AppId)"
     & adb -s $script:adbTarget shell am broadcast -a "$appPackage.DEBUG_GET_CHALLENGE" | Out-Null
     Start-Sleep -Milliseconds 500
 
@@ -115,7 +179,7 @@ if (-not $SkipActivation) {
     $challenge = ($challengeLine -split "CHALLENGE:")[1].Trim()
     Write-Ok "Challenge: $challenge"
 
-    Write-Step "Schritt 3/7: HMAC-Token generieren"
+    Write-Step "Schritt 4/8: HMAC-Token generieren"
     $tokenOutput = & pwsh -File "$scriptDir\generate-debug-token.ps1" -AppId $AppId -Challenge $challenge 2>&1
     $token = ($tokenOutput | Where-Object { $_ -match "^[0-9a-f]{64}$" } | Select-Object -Last 1).Trim()
     if (-not $token) {
@@ -125,7 +189,7 @@ if (-not $SkipActivation) {
     }
     Write-Ok "Token generiert."
 
-    Write-Step "Schritt 4/7: Debug-Session aktivieren"
+    Write-Step "Schritt 5/8: Debug-Session aktivieren"
     & adb -s $script:adbTarget shell am broadcast -a $activateAction -e response $token | Out-Null
     Start-Sleep -Milliseconds 300
     $activationLog = & adb -s $script:adbTarget logcat -s "MINIMASTER_DEBUG$(if ($AppId -eq 'child') { '_CHILD' } else { '' })" -d -T 1 2>&1
@@ -142,7 +206,7 @@ if (-not $SkipActivation) {
 }
 
 # ── Step 5: Instrumented Tests ────────────────────────────────────────────────
-Write-Step "Schritt 5/7: Instrumented Tests ausführen ($appModule)"
+Write-Step "Schritt 6/8: Instrumented Tests ausführen ($appModule)"
 
 $testFiltersToRun = @()
 if ($TestFilter) {
@@ -197,12 +261,12 @@ try {
 }
 
 # ── Step 6: Session deaktivieren ──────────────────────────────────────────────
-Write-Step "Schritt 6/7: Debug-Session deaktivieren"
+Write-Step "Schritt 7/8: Debug-Session deaktivieren"
 & adb -s $script:adbTarget shell am broadcast -a $deactivateAction | Out-Null
 Write-Ok "Session deaktiviert."
 
 # ── Step 7: Ergebnisse parsen ─────────────────────────────────────────────────
-Write-Step "Schritt 7/7: Testergebnisse auswerten"
+Write-Step "Schritt 8/8: Testergebnisse auswerten"
 
 $totalTests = 0
 $failedTests = 0

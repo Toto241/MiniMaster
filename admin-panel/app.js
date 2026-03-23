@@ -707,6 +707,16 @@ function buildCommandCatalog(projectId) {
             fileName: "minimaster-debug-usb-tests-master",
         },
         {
+            id: "debug-usb-run-tests-master-install",
+            label: "[Debug] USB-Tests: Eltern-App inkl. APK-Install",
+            description: hasInvalidMasterApkPath
+                ? "Ungültiger Master-APK-Pfad erkannt. Es wird der Standardpfad verwendet."
+                : "Installiert die Eltern-App-APK vor dem USB-Testlauf über die integrierte Runner-Schnittstelle.",
+            command: `pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial "${adbSerial || "auto"}" -InstallApk -ApkPath "${masterApkPath}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-tests-master-install",
+        },
+        {
             id: "debug-usb-run-tests-child",
             label: "[Debug] USB-Tests: Kinder-App (vollständig)",
             description: "Vollautomatischer USB-Testlauf für die Kinder-App mit Ampelausgabe.",
@@ -715,12 +725,40 @@ function buildCommandCatalog(projectId) {
             fileName: "minimaster-debug-usb-tests-child",
         },
         {
+            id: "debug-usb-run-tests-child-install",
+            label: "[Debug] USB-Tests: Kinder-App inkl. APK-Install",
+            description: hasInvalidChildApkPath
+                ? "Ungültiger Child-APK-Pfad erkannt. Es wird der Standardpfad verwendet."
+                : "Installiert die Kinder-App-APK vor dem USB-Testlauf über die integrierte Runner-Schnittstelle.",
+            command: `pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial "${adbSerial || "auto"}" -InstallApk -ApkPath "${childApkPath}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-tests-child-install",
+        },
+        {
             id: "debug-usb-run-tests-all",
             label: "[Debug] USB-Tests: Beide Apps (sequenziell)",
             description: "Führt die vollständigen USB-Tests für Eltern- und Kinder-App nacheinander aus.",
             command: `pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial "${adbSerial || "auto"}"\npwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial "${adbSerial || "auto"}"`,
             cwd: values.workspacePath,
             fileName: "minimaster-debug-usb-tests-all",
+        },
+        {
+            id: "debug-usb-run-tests-all-install",
+            label: "[Debug] USB-Tests: Beide Apps inkl. APK-Install",
+            description: "Führt die USB-Tests für Eltern- und Kinder-App nacheinander aus und installiert zuvor beide APKs über die Runner-Schnittstelle.",
+            command: `pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial "${adbSerial || "auto"}" -InstallApk -ApkPath "${masterApkPath}"\npwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial "${adbSerial || "auto"}" -InstallApk -ApkPath "${childApkPath}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-tests-all-install",
+        },
+        {
+            id: "debug-usb-run-dual-install",
+            label: "[Debug] USB-Tests: Dual-Runner inkl. APK-Install",
+            description: hasInvalidAdbSerial
+                ? "Dual-Runner benötigt zwei Device-Serials. Bitte im Befehl MASTER_SERIAL und CHILD_SERIAL ersetzen."
+                : "Startet den Dual-Runner mit integrierter APK-Installation. Für echtes Dual-Device die Serials im Befehl anpassen.",
+            command: `pwsh -File scripts/run-dual-device-commissioning.ps1 -MasterSerial "${adbSerial || "MASTER_SERIAL"}" -ChildSerial "${adbSerial || "CHILD_SERIAL"}" -InstallApk -MasterApkPath "${masterApkPath}" -ChildApkPath "${childApkPath}"`,
+            cwd: values.workspacePath,
+            fileName: "minimaster-debug-usb-dual-install",
         },
     ];
 }

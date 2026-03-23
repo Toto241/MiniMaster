@@ -35,10 +35,35 @@ pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial <MASTER_SERIAL> -S
 pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial <CHILD_SERIAL> -Suite commissioning
 ```
 
+### Einzel-App mit APK-Installation
+
+```powershell
+# Neueste APK im jeweiligen Modul automatisch finden und installieren
+pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial <MASTER_SERIAL> -Suite commissioning -InstallApk
+
+# Explizite APK-Datei installieren
+pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial <CHILD_SERIAL> -Suite commissioning -InstallApk -ApkPath "D:\builds\childApp-release.apk"
+```
+
 ### Duales Commissioning (empfohlen)
 
 ```powershell
 pwsh -File scripts/run-dual-device-commissioning.ps1 -MasterSerial <MASTER_SERIAL> -ChildSerial <CHILD_SERIAL>
+```
+
+### Duales Commissioning mit APK-Installation
+
+```powershell
+# Auto-APK-Erkennung je Modul
+pwsh -File scripts/run-dual-device-commissioning.ps1 -MasterSerial <MASTER_SERIAL> -ChildSerial <CHILD_SERIAL> -InstallApk
+
+# Explizite APK-Pfade + sauberes Reinstall
+pwsh -File scripts/run-dual-device-commissioning.ps1 \
+  -MasterSerial <MASTER_SERIAL> \
+  -ChildSerial <CHILD_SERIAL> \
+  -InstallApk -UninstallFirst \
+  -MasterApkPath "D:\builds\masterApp-release.apk" \
+  -ChildApkPath "D:\builds\childApp-release.apk"
 ```
 
 ## Mapping zur PHYSICAL_COMMISSIONING_CHECKLIST

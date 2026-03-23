@@ -13,6 +13,7 @@ Web-Dashboard fuer Betreiber/Admins.
 - Google Play Store Readiness Modul (Pflicht-Checks, Status, JSON-Export)
 - P0 Blocker Cockpit (Go-Live): Security/Play/Commissioning/Operations-Blocker mit Evidenz, Export und Reset
 - Automatisches Markieren von P0-Checks bei erfolgreichen Support-/Compliance-Aktionen und Readiness-Signalen
+- Befehlszentrale mit USB-Debug/Commissioning-Kommandos inkl. APK-Installations-Schnittstelle (`run-usb-tests.ps1 -InstallApk`, Dual-Runner)
 
 ## Setup
 

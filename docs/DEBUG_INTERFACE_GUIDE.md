@@ -137,17 +137,24 @@ pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial R58M12345
 # Einzelnen Test ausführen
 pwsh -File scripts/run-usb-tests.ps1 -AppId master `
     -TestFilter "com.minimaster.masterapp.MasterAppE2ETest"
+
+# Vorher APK installieren (auto-detect)
+pwsh -File scripts/run-usb-tests.ps1 -AppId master -InstallApk
+
+# Vorher APK installieren (expliziter Pfad)
+pwsh -File scripts/run-usb-tests.ps1 -AppId child -InstallApk -ApkPath "D:\builds\childApp-release.apk"
 ```
 
 ### Was der Testlauf macht
 
 1. ADB-Gerät erkennen
-2. Challenge anfordern → aus Logcat lesen
-3. HMAC-Token generieren (`generate-debug-token.ps1`)
-4. Debug-Session aktivieren
-5. `./gradlew :<AppModule>:connectedDebugAndroidTest` ausführen
-6. Debug-Session deaktivieren
-7. XML-Testergebnisse parsen → **Ampelausgabe**
+2. Optional APK installieren (`-InstallApk`, optional `-ApkPath`)
+3. Challenge anfordern → aus Logcat lesen
+4. HMAC-Token generieren (`generate-debug-token.ps1`)
+5. Debug-Session aktivieren
+6. `./gradlew :<AppModule>:connectedDebugAndroidTest` ausführen
+7. Debug-Session deaktivieren
+8. XML-Testergebnisse parsen → **Ampelausgabe**
 
 ### Ampelausgabe
 
