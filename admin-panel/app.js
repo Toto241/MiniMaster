@@ -156,6 +156,8 @@ const defaultCommandBuilderConfig = {
     firstAdminEmail: "",
     firstAdminPassword: "",
     androidDeviceSerial: "",
+    masterDeviceSerial: "",
+    childDeviceSerial: "",
     masterApkPath: "masterApp/build/outputs/apk/debug/masterApp-debug.apk",
     childApkPath: "childApp/build/outputs/apk/debug/childApp-debug.apk",
 };
@@ -176,6 +178,8 @@ function getCommandBuilderFormValues() {
         firstAdminEmail: (document.getElementById("cmd-first-admin-email")?.value || "").trim(),
         firstAdminPassword: (document.getElementById("cmd-first-admin-password")?.value || "").trim(),
         androidDeviceSerial: (document.getElementById("cmd-android-device-serial")?.value || "").trim(),
+        masterDeviceSerial: (document.getElementById("cmd-master-device-serial")?.value || "").trim(),
+        childDeviceSerial: (document.getElementById("cmd-child-device-serial")?.value || "").trim(),
         masterApkPath: (document.getElementById("cmd-master-apk-path")?.value || defaultCommandBuilderConfig.masterApkPath).trim(),
         childApkPath: (document.getElementById("cmd-child-apk-path")?.value || defaultCommandBuilderConfig.childApkPath).trim(),
     };
@@ -188,6 +192,8 @@ function renderCommandBuilderConfig(config) {
         "cmd-first-admin-email": values.firstAdminEmail,
         "cmd-first-admin-password": values.firstAdminPassword,
         "cmd-android-device-serial": values.androidDeviceSerial,
+        "cmd-master-device-serial": values.masterDeviceSerial,
+        "cmd-child-device-serial": values.childDeviceSerial,
         "cmd-master-apk-path": values.masterApkPath,
         "cmd-child-apk-path": values.childApkPath,
     };
@@ -459,6 +465,12 @@ function buildCommandCatalog(projectId) {
     const rawAdbSerial = String(values.androidDeviceSerial || "").trim();
     const adbSerial = sanitizeAdbSerial(rawAdbSerial);
     const hasInvalidAdbSerial = Boolean(rawAdbSerial) && !adbSerial;
+    const rawMasterDeviceSerial = String(values.masterDeviceSerial || rawAdbSerial).trim();
+    const rawChildDeviceSerial = String(values.childDeviceSerial || rawAdbSerial).trim();
+    const masterDeviceSerial = sanitizeAdbSerial(rawMasterDeviceSerial);
+    const childDeviceSerial = sanitizeAdbSerial(rawChildDeviceSerial);
+    const hasInvalidMasterDeviceSerial = Boolean(rawMasterDeviceSerial) && !masterDeviceSerial;
+    const hasInvalidChildDeviceSerial = Boolean(rawChildDeviceSerial) && !childDeviceSerial;
     const adbDeviceTarget = hasInvalidAdbSerial
         ? '-s "REPLACE_WITH_DEVICE_SERIAL" '
         : (adbSerial ? `-s "${adbSerial}" ` : "");
@@ -753,10 +765,10 @@ function buildCommandCatalog(projectId) {
         {
             id: "debug-usb-run-dual-install",
             label: "[Debug] USB-Tests: Dual-Runner inkl. APK-Install",
-            description: hasInvalidAdbSerial
-                ? "Dual-Runner benötigt zwei Device-Serials. Bitte im Befehl MASTER_SERIAL und CHILD_SERIAL ersetzen."
-                : "Startet den Dual-Runner mit integrierter APK-Installation. Für echtes Dual-Device die Serials im Befehl anpassen.",
-            command: `pwsh -File scripts/run-dual-device-commissioning.ps1 -MasterSerial "${adbSerial || "MASTER_SERIAL"}" -ChildSerial "${adbSerial || "CHILD_SERIAL"}" -InstallApk -MasterApkPath "${masterApkPath}" -ChildApkPath "${childApkPath}"`,
+            description: (hasInvalidMasterDeviceSerial || hasInvalidChildDeviceSerial)
+                ? "Ungültige Master-/Child-Serial erkannt. Bitte nur Zeichen wie A-Z, 0-9, Punkt, Unterstrich, Doppelpunkt, Bindestrich verwenden."
+                : "Startet den Dual-Runner mit integrierter APK-Installation und getrennten Master-/Child-Serials.",
+            command: `pwsh -File scripts/run-dual-device-commissioning.ps1 -MasterSerial "${masterDeviceSerial || "MASTER_SERIAL"}" -ChildSerial "${childDeviceSerial || "CHILD_SERIAL"}" -InstallApk -MasterApkPath "${masterApkPath}" -ChildApkPath "${childApkPath}"`,
             cwd: values.workspacePath,
             fileName: "minimaster-debug-usb-dual-install",
         },
