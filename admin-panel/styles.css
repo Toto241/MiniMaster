@@ -1008,6 +1008,290 @@ input:focus, select:focus, textarea:focus {
     background: #f0fdf4;
 }
 
+.python-automation-shell {
+    border: 1px solid #dbeafe;
+    background:
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 28%),
+        linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.python-automation-intro {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.python-automation-intro h4 {
+    margin: 0 0 6px;
+    color: #0f172a;
+}
+
+.python-automation-intro p,
+.python-automation-panel-header p,
+.python-test-card p {
+    margin: 0;
+    color: #475569;
+}
+
+.python-automation-legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.python-automation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.python-automation-chip-auto {
+    background: #e0f2fe;
+    color: #075985;
+    border-color: #bae6fd;
+}
+
+.python-automation-chip-manual {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.python-automation-chip-documented {
+    background: #ecfccb;
+    color: #3f6212;
+    border-color: #d9f99d;
+}
+
+.python-automation-chip-command {
+    background: #ede9fe;
+    color: #5b21b6;
+    border-color: #ddd6fe;
+}
+
+.python-automation-chip-neutral {
+    background: #e2e8f0;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.python-automation-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.python-automation-metric {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.python-automation-metric strong {
+    display: block;
+    font-size: 1.35rem;
+    color: #0f172a;
+}
+
+.python-automation-metric span {
+    color: #475569;
+    font-size: 0.88rem;
+}
+
+.python-automation-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.python-automation-panel {
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 16px;
+}
+
+.python-automation-panel-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-block-end: 10px;
+}
+
+.python-automation-panel-header h5 {
+    margin: 0 0 4px;
+    color: #0f172a;
+}
+
+.python-automation-toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.python-automation-toolbar input,
+.python-automation-toolbar select {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+    min-inline-size: 220px;
+    background: white;
+}
+
+.python-inline-check {
+    margin: 0;
+    background: #f8fafc;
+}
+
+.python-automation-group {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    background: #f8fafc;
+}
+
+.python-automation-group + .python-automation-group {
+    margin-block-start: 12px;
+}
+
+.python-automation-group h6 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    color: #0f172a;
+}
+
+.python-automation-group p {
+    margin: 0;
+}
+
+.python-automation-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+    margin-block-start: 12px;
+}
+
+.python-test-card {
+    border: 1px solid #dbeafe;
+    border-left-width: 5px;
+    border-radius: 12px;
+    background: white;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.python-test-card.status-pass {
+    border-left-color: #16a34a;
+}
+
+.python-test-card.status-fail {
+    border-left-color: #dc2626;
+}
+
+.python-test-card.status-manual_required {
+    border-left-color: #d97706;
+}
+
+.python-test-card.status-not_run {
+    border-left-color: #94a3b8;
+}
+
+.python-test-card.status-documented {
+    border-left-color: #65a30d;
+}
+
+.python-test-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.python-test-card-header h6 {
+    margin: 0 0 4px;
+    font-size: 0.96rem;
+    color: #0f172a;
+}
+
+.python-test-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.python-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.python-status-pass {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.python-status-fail {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.python-status-manual_required {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.python-status-not_run {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.python-test-detail {
+    font-size: 0.88rem;
+    color: #334155;
+}
+
+.python-test-doc {
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 8px 10px;
+}
+
+.python-result-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-block: 12px;
+}
+
+.python-result-summary .python-automation-metric {
+    padding: 12px;
+}
+
+.python-muted-caption {
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
 
 .priority-plan-list {
     display: grid;
@@ -1355,6 +1639,20 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+    .python-automation-toolbar input,
+    .python-automation-toolbar select {
+        min-inline-size: 0;
+        inline-size: 100%;
+    }
+
+    .python-test-card-header,
+    .python-automation-panel-header,
+    .python-automation-intro {
+        flex-direction: column;
+    }
 }
 
 /* ==================== AI RESPONSE CARD ==================== */

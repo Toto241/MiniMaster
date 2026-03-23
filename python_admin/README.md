@@ -35,6 +35,10 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
 
 ## Commissioning API
 
+- `GET /api/commissioning/catalog`
+  - liefert den Python-seitig definierten Testfallkatalog fuer den Bereich `Einrichtung & Assistent`
+  - gruppiert automatische Checks, manuelle Nachweise, dokumentierte Testplaene und lokale Gate-Kommandos
+
 - `POST /api/commissioning/run`
   - startet einen Automationslauf fuer offene Inbetriebnahme-Punkte
   - bewertet Runtime-/Play-Store-/Attestation-Status
