@@ -55,6 +55,14 @@ service cloud.firestore {
         && request.resource.data.problemDescription.size() < 5000
         && request.resource.data.status == 'open';
       allow update: if isSupportOrAdmin();
+
+      match /conversationHistory/{messageId} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.masterImei
+          || isSupportOrAdmin()
+        );
+        allow write: if false; // Only Cloud Functions (Admin SDK)
+      }
     }
 
     // --- SUPPORT ACCESS GRANTS COLLECTION ---

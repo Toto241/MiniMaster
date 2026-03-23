@@ -30,6 +30,45 @@ type TicketContactMeta = {
   sourcePanel?: string;
 };
 
+type TicketConversationStatus =
+  | "awaiting_debug_consent"
+  | "debug_active"
+  | "analyzing"
+  | "waiting_user_response"
+  | "closed"
+  | "escalated";
+
+type ConversationRole = "assistant" | "user" | "system";
+
+type ConversationEntry = {
+  role: ConversationRole;
+  content: string;
+  confidence?: number;
+  metadata?: Record<string, unknown>;
+};
+
+type DebugSnapshot = {
+  appStatus: {
+    isLocked: boolean;
+    appBlacklistCount: number;
+    usageRulesCount: number;
+  };
+  activityData: {
+    lastSeen: string | null;
+    updatedAt: string | null;
+  };
+  networkDiagnostics: {
+    fcmTokenPresent: boolean;
+  };
+  recentTamperEvents: number;
+  recentUsageReports: number;
+  fetchedAt: string;
+};
+
+const MAX_CONVERSATION_ROUNDS = 7;
+const AI_SOLUTION_CONFIDENCE = 0.75;
+const AI_LOW_CONFIDENCE = 0.6;
+
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const OPENAI_FALLBACK_ENABLED = process.env.OPENAI_FALLBACK_ENABLED === "true";
 
@@ -195,6 +234,44 @@ function extractTicketContactMeta(problemDescription: string | undefined): Ticke
 function isValidEmailAddress(email: string | undefined): boolean {
   if (!email) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+async function appendConversationEntry(
+  ticketId: string,
+  entry: ConversationEntry
+): Promise<void> {
+  await db()
+    .collection("supportTickets")
+    .doc(ticketId)
+    .collection("conversationHistory")
+    .add({
+      role: entry.role,
+      content: entry.content,
+      confidence: typeof entry.confidence === "number" ? entry.confidence : null,
+      metadata: entry.metadata || {},
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+}
+
+function buildInitialDebugConsentQuestion(): string {
+  return [
+    "Ich kann dir jetzt direkt helfen.",
+    "",
+    "Moechtest du den Debug-Modus aktivieren, damit ich technische Diagnose-Daten abrufen und den Fehler automatisch analysieren kann?",
+    "",
+    "Wenn du zustimmst, analysiere ich danach automatisch weiter.",
+  ].join("\n");
+}
+
+function formatDate(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof admin.firestore.Timestamp) {
+    return value.toDate().toISOString();
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return null;
 }
 
 async function sendSupportFollowUpEmail(params: {
@@ -477,6 +554,171 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
   }
 });
 
+async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> {
+  const childrenSnap = await db()
+    .collection("children")
+    .where("masterImei", "==", masterImei)
+    .limit(1)
+    .get();
+
+  const childDoc = childrenSnap.docs[0];
+  const childData = childDoc?.data() || {};
+
+  let recentTamperEvents = 0;
+  let recentUsageReports = 0;
+
+  if (childDoc) {
+    const [tamperSnap, usageSnap] = await Promise.all([
+      childDoc.ref.collection("tamperEvents").limit(20).get(),
+      childDoc.ref.collection("usageHistory").limit(14).get(),
+    ]);
+    recentTamperEvents = tamperSnap.size;
+    recentUsageReports = usageSnap.size;
+  }
+
+  const appBlacklist = Array.isArray(childData.appBlacklist) ? childData.appBlacklist : [];
+  const usageRules = Array.isArray(childData.usageRules) ? childData.usageRules : [];
+
+  return {
+    appStatus: {
+      isLocked: Boolean(childData.isLocked),
+      appBlacklistCount: appBlacklist.length,
+      usageRulesCount: usageRules.length,
+    },
+    activityData: {
+      lastSeen: formatDate(childData.lastSeen),
+      updatedAt: formatDate(childData.updatedAt),
+    },
+    networkDiagnostics: {
+      fcmTokenPresent: typeof childData.fcmToken === "string" && childData.fcmToken.length > 0,
+    },
+    recentTamperEvents,
+    recentUsageReports,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function runAiAnalysisRound(params: {
+  ticketId: string;
+  ticketData: FirebaseFirestore.DocumentData;
+  userMessage?: string;
+  useDebugData: boolean;
+}): Promise<{ status: TicketConversationStatus; response: string; confidence: number }> {
+  const { ticketId, ticketData, userMessage, useDebugData } = params;
+  const masterImei = String(ticketData.masterImei || "");
+  const currentRound = Number(ticketData.conversationRound || 0);
+  const currentFailures = Number(ticketData.aiAttemptFailures || 0);
+
+  let debugSnapshot: DebugSnapshot | null = null;
+  if (useDebugData && masterImei) {
+    try {
+      debugSnapshot = await collectDebugSnapshot(masterImei);
+    } catch (error) {
+      functions.logger.warn("collectDebugSnapshot failed, continuing without debug snapshot", {
+        ticketId,
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+
+  const prompt = `Du bist technischer Support-Agent fuer MiniMaster.
+Problem:
+${String(ticketData.problemDescription || "")}
+
+Neue Rueckmeldung vom Nutzer:
+${String(userMessage || "(keine neue Rueckmeldung, bitte proaktive Analyse)")}
+
+Diagnose-Daten (falls verfuegbar):
+${debugSnapshot ? JSON.stringify(debugSnapshot) : "keine"}
+
+Antworte NUR als JSON mit:
+{
+  "solution": "konkrete, verstaendliche Handlungsempfehlung in Deutsch",
+  "confidence": 0.0,
+  "needsMoreInfo": true,
+  "nextQuestion": "gezielte Rueckfrage wenn needsMoreInfo=true"
+}`;
+
+  const generation = await generateAiCompletion(prompt);
+  const parsed = parseAiTicketResponse(generation.rawResponse);
+
+  let needsMoreInfo = true;
+  let nextQuestion = "Kannst du den letzten Schritt bestaetigen und die genaue Fehlermeldung senden?";
+  try {
+    const raw = JSON.parse(generation.rawResponse) as {
+      needsMoreInfo?: boolean;
+      nextQuestion?: string;
+    };
+    if (typeof raw.needsMoreInfo === "boolean") {
+      needsMoreInfo = raw.needsMoreInfo;
+    }
+    if (typeof raw.nextQuestion === "string" && raw.nextQuestion.trim().length > 0) {
+      nextQuestion = raw.nextQuestion.trim();
+    }
+  } catch {
+    // Keep default follow-up fields when AI output does not include optional keys.
+  }
+
+  const solved = parsed.confidence >= AI_SOLUTION_CONFIDENCE && !needsMoreInfo;
+  const nextRound = currentRound + 1;
+  const nextFailures = solved ? currentFailures : currentFailures + 1;
+  const shouldEscalate =
+    !solved &&
+    nextRound >= MAX_CONVERSATION_ROUNDS &&
+    nextFailures >= MAX_CONVERSATION_ROUNDS &&
+    parsed.confidence < AI_LOW_CONFIDENCE;
+
+  let response = parsed.solution;
+  let status: TicketConversationStatus = "waiting_user_response";
+
+  if (solved) {
+    status = "closed";
+    response = `${parsed.solution}\n\n✅ Problem wurde voraussichtlich geloest.`;
+  } else if (shouldEscalate) {
+    status = "escalated";
+    response = `${parsed.solution}\n\n⚠️ Alle KI-Loesungsversuche sind gescheitert. Das Ticket wird jetzt an den menschlichen Support eskaliert.`;
+  } else {
+    response = `${parsed.solution}\n\nRueckfrage: ${nextQuestion}`;
+  }
+
+  await db().collection("supportTickets").doc(ticketId).update({
+    aiGeneratedSolution: response,
+    aiConfidenceScore: parsed.confidence,
+    aiSolutionStatus: solved ? "accepted" : "generated",
+    aiProvider: generation.provider,
+    aiModel: generation.provider === "gemini" ? GEMINI_MODEL : (generation.provider === "openai" ? "gpt-4o" : "test-stub"),
+    status: status === "closed" ? "closed_by_ai" : (status === "escalated" ? "escalated" : "awaiting_user_feedback"),
+    conversationStatus: status,
+    conversationRound: nextRound,
+    aiAttemptFailures: nextFailures,
+    debugDataSnapshot: debugSnapshot,
+    debugDataFetchedAt: debugSnapshot ? admin.firestore.FieldValue.serverTimestamp() : null,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await appendConversationEntry(ticketId, {
+    role: "assistant",
+    content: response,
+    confidence: parsed.confidence,
+    metadata: {
+      round: nextRound,
+      solved,
+      escalated: shouldEscalate,
+      debugUsed: Boolean(debugSnapshot),
+    },
+  });
+
+  if (shouldEscalate) {
+    functions.logger.warn("Ticket escalated after repeated failed AI attempts", {
+      ticketId,
+      nextRound,
+      nextFailures,
+    });
+  }
+
+  return { status, response, confidence: parsed.confidence };
+}
+
 // ==================== AI SUPPORT ====================
 
 export const onTicketCreated = functions.firestore
@@ -488,59 +730,30 @@ export const onTicketCreated = functions.firestore
     functions.logger.info(`New support ticket created: ${ticketId}`);
 
     try {
-      const problemDescription = ticketData.problemDescription || "";
-      if (!problemDescription || problemDescription.trim().length === 0) {
-        functions.logger.info("Empty problem description, skipping AI analysis.");
+      const problemDescription = String(ticketData.problemDescription || "").trim();
+      if (!problemDescription) {
+        functions.logger.info("Empty problem description, skipping consent flow.");
         return;
       }
 
-      const prompt = `You are a helpful support agent for the MiniMaster application, a parental control app that allows parents to manage their children's device usage through task-based unlocking.
-
-A user has submitted the following support request:
-
-"${problemDescription}"
-
-Based on the following knowledge base, provide a clear, step-by-step solution to the user's problem. If you are not confident in your answer (confidence < 0.7), state that you are escalating the ticket to a human agent.
-
-Knowledge Base:
-${knowledgeBase}
-
-Your response MUST be in JSON format with exactly two fields:
-{
-  "solution": "Your step-by-step solution here",
-  "confidence": 0.85
-}
-
-The confidence should be a float between 0 and 1, where 1 means you are absolutely certain the solution is correct.`;
-
-      const generation = await generateAiCompletion(prompt);
-      const aiResponse = generation.rawResponse;
-      functions.logger.info("AI Response:", aiResponse);
-
-      let aiGeneratedSolution = "";
-      let aiConfidenceScore = 0.0;
-      let newStatus = "awaiting_user_feedback";
-
-      const parsed = parseAiTicketResponse(aiResponse);
-      aiGeneratedSolution = parsed.solution;
-      aiConfidenceScore = parsed.confidence;
-
-      if (aiConfidenceScore < 0.7) {
-        newStatus = "escalated";
-        aiGeneratedSolution += "\n\n⚠️ This ticket has been escalated to a human support agent for further assistance.";
-      }
-
+      const consentQuestion = buildInitialDebugConsentQuestion();
       await admin.firestore().collection("supportTickets").doc(ticketId).update({
-        aiGeneratedSolution: aiGeneratedSolution,
-        aiConfidenceScore: aiConfidenceScore,
-        aiProvider: generation.provider,
-        aiModel: generation.provider === "gemini" ? GEMINI_MODEL : (generation.provider === "openai" ? "gpt-4o" : "test-stub"),
-        aiSolutionStatus: "generated",
-        status: newStatus,
+        conversationRound: 0,
+        aiAttemptFailures: 0,
+        conversationStatus: "awaiting_debug_consent",
+        aiGeneratedSolution: consentQuestion,
+        aiSolutionStatus: "pending",
+        status: "awaiting_user_feedback",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Ticket ${ticketId} updated with AI solution (confidence: ${aiConfidenceScore})`);
+      await appendConversationEntry(ticketId, {
+        role: "assistant",
+        content: consentQuestion,
+        metadata: { stage: "initial_debug_consent" },
+      });
+
+      functions.logger.info(`Ticket ${ticketId} moved to debug consent flow.`);
 
       const masterImei = ticketData.masterImei;
       const masterDoc = await admin.firestore().collection("masters").doc(masterImei).get();
@@ -553,13 +766,11 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
           const notificationMessage = {
             notification: {
               title: "Support Ticket Update",
-              body: newStatus === "escalated"
-                ? "Your ticket has been escalated to a human agent."
-                : "We have a proposed solution for your support ticket!",
+              body: "Bitte bestaetige, ob die KI den Debug-Modus fuer die automatische Analyse aktivieren darf.",
             },
             data: {
               ticketId: ticketId,
-              type: "support_ticket_update",
+              type: "support_ticket_debug_consent",
             },
             token: fcmToken,
           };
@@ -569,15 +780,27 @@ The confidence should be a float between 0 and 1, where 1 means you are absolute
         }
       }
 
+      const meta = extractTicketContactMeta(problemDescription);
+      if (meta.replyToEmail && isValidEmailAddress(meta.replyToEmail)) {
+        await sendSupportFollowUpEmail({
+          ticketId,
+          toEmail: meta.replyToEmail,
+          senderName: meta.senderName,
+          sourcePanel: meta.sourcePanel,
+          message: `${consentQuestion}\n\nAntworte mit: JA DEBUG oder NEIN DEBUG.`,
+        });
+      }
+
       return;
     } catch (error) {
       functions.logger.error("Error in onTicketCreated:", error);
 
       await admin.firestore().collection("supportTickets").doc(ticketId).update({
-        aiGeneratedSolution: "An error occurred while analyzing your ticket. A human support agent will assist you shortly.",
+        aiGeneratedSolution: "Beim Start des KI-Supportprozesses ist ein Fehler aufgetreten. Das Ticket wird an den Support eskaliert.",
         aiConfidenceScore: 0.0,
         aiSolutionStatus: "error",
         status: "escalated",
+        conversationStatus: "escalated",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -637,6 +860,305 @@ export const onSupportTicketUpdated = functions.firestore
       provider: sendResult.provider,
     });
   });
+
+export const analyzeWithDebugData = functions.https.onCall(
+  async (data: { ticketId: string; userMessage?: string }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const ticketId = String(data?.ticketId || "").trim();
+    if (!ticketId) {
+      throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const ticketRef = db().collection("supportTickets").doc(ticketId);
+    const ticketDoc = await ticketRef.get();
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
+    }
+
+    const ticketData = ticketDoc.data() || {};
+    const role = String(context.auth.token.role || "");
+    const isSupport = role === "admin" || role === "support";
+    if (!isSupport && ticketData.masterImei !== context.auth.uid) {
+      throw new functions.https.HttpsError("permission-denied", "You do not have permission for this ticket.");
+    }
+
+    const result = await runAiAnalysisRound({
+      ticketId,
+      ticketData,
+      userMessage: data.userMessage,
+      useDebugData: Boolean(ticketData.accessGranted && ticketData.debugAccessGrantId),
+    });
+
+    const meta = extractTicketContactMeta(String(ticketData.problemDescription || ""));
+    if (meta.replyToEmail && isValidEmailAddress(meta.replyToEmail)) {
+      await sendSupportFollowUpEmail({
+        ticketId,
+        toEmail: meta.replyToEmail,
+        senderName: meta.senderName,
+        sourcePanel: meta.sourcePanel,
+        message: result.response,
+      });
+    }
+
+    return {
+      success: true,
+      status: result.status,
+      confidence: result.confidence,
+    };
+  }
+);
+
+export const grantDebugAccess = functions.https.onCall(
+  async (data: { ticketId: string }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const ticketId = String(data?.ticketId || "").trim();
+    if (!ticketId) {
+      throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const masterImei = context.auth.uid;
+    const ticketRef = db().collection("supportTickets").doc(ticketId);
+    const ticketDoc = await ticketRef.get();
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
+    }
+
+    const ticketData = ticketDoc.data() || {};
+    if (ticketData.masterImei !== masterImei) {
+      throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 48);
+
+    const grantRef = await db().collection("supportAccessGrants").add({
+      masterImei,
+      ticketId,
+      grantedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      status: "active",
+      consentMode: "debug_mode_activation",
+      debugScope: ["diagnostic_logs", "app_status", "system_info", "activity_data", "network_diag"],
+    });
+
+    await ticketRef.update({
+      accessGranted: true,
+      accessGrantId: grantRef.id,
+      debugAccessGrantId: grantRef.id,
+      debugAccessGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
+      conversationStatus: "debug_active",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await appendConversationEntry(ticketId, {
+      role: "user",
+      content: "Ja, Debug-Modus aktivieren.",
+      metadata: { debugConsent: true },
+    });
+
+    const refreshedDoc = await ticketRef.get();
+    const result = await runAiAnalysisRound({
+      ticketId,
+      ticketData: refreshedDoc.data() || {},
+      userMessage: "Der Nutzer hat Debug-Modus erlaubt. Bitte automatisch analysieren.",
+      useDebugData: true,
+    });
+
+    const meta = extractTicketContactMeta(String(refreshedDoc.data()?.problemDescription || ""));
+    if (meta.replyToEmail && isValidEmailAddress(meta.replyToEmail)) {
+      await sendSupportFollowUpEmail({
+        ticketId,
+        toEmail: meta.replyToEmail,
+        senderName: meta.senderName,
+        sourcePanel: meta.sourcePanel,
+        message: result.response,
+      });
+    }
+
+    return {
+      success: true,
+      grantId: grantRef.id,
+      status: result.status,
+    };
+  }
+);
+
+export const skipDebugMode = functions.https.onCall(
+  async (data: { ticketId: string }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const ticketId = String(data?.ticketId || "").trim();
+    if (!ticketId) {
+      throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const ticketRef = db().collection("supportTickets").doc(ticketId);
+    const ticketDoc = await ticketRef.get();
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
+    }
+
+    const ticketData = ticketDoc.data() || {};
+    if (ticketData.masterImei !== context.auth.uid) {
+      throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+
+    await appendConversationEntry(ticketId, {
+      role: "user",
+      content: "Nein, bitte ohne Debug-Modus weiterarbeiten.",
+      metadata: { debugConsent: false },
+    });
+
+    await ticketRef.update({
+      conversationStatus: "analyzing",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const result = await runAiAnalysisRound({
+      ticketId,
+      ticketData,
+      userMessage: "Der Nutzer moechte keine Debug-Daten teilen. Bitte trotzdem bestmoeglich helfen.",
+      useDebugData: false,
+    });
+
+    const meta = extractTicketContactMeta(String(ticketData.problemDescription || ""));
+    if (meta.replyToEmail && isValidEmailAddress(meta.replyToEmail)) {
+      await sendSupportFollowUpEmail({
+        ticketId,
+        toEmail: meta.replyToEmail,
+        senderName: meta.senderName,
+        sourcePanel: meta.sourcePanel,
+        message: result.response,
+      });
+    }
+
+    return { success: true, status: result.status };
+  }
+);
+
+export const processUserReplyMessage = functions.https.onCall(
+  async (data: { ticketId: string; message: string }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const ticketId = String(data?.ticketId || "").trim();
+    const message = String(data?.message || "").trim();
+    if (!ticketId || !message) {
+      throw new functions.https.HttpsError("invalid-argument", "Ticket ID and message are required.");
+    }
+
+    const ticketRef = db().collection("supportTickets").doc(ticketId);
+    const ticketDoc = await ticketRef.get();
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
+    }
+
+    const ticketData = ticketDoc.data() || {};
+    if (ticketData.masterImei !== context.auth.uid) {
+      throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+
+    const currentRound = Number(ticketData.conversationRound || 0);
+    if (currentRound >= MAX_CONVERSATION_ROUNDS) {
+      throw new functions.https.HttpsError("failed-precondition", "Maximum AI rounds reached. Ticket is escalated.");
+    }
+
+    await appendConversationEntry(ticketId, {
+      role: "user",
+      content: message,
+      metadata: { round: currentRound },
+    });
+
+    await ticketRef.update({
+      lastUserMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+      conversationStatus: "analyzing",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const refreshedDoc = await ticketRef.get();
+    const refreshed = refreshedDoc.data() || {};
+    const result = await runAiAnalysisRound({
+      ticketId,
+      ticketData: refreshed,
+      userMessage: message,
+      useDebugData: Boolean(refreshed.accessGranted && refreshed.debugAccessGrantId),
+    });
+
+    const meta = extractTicketContactMeta(String(refreshed.problemDescription || ""));
+    if (meta.replyToEmail && isValidEmailAddress(meta.replyToEmail)) {
+      await sendSupportFollowUpEmail({
+        ticketId,
+        toEmail: meta.replyToEmail,
+        senderName: meta.senderName,
+        sourcePanel: meta.sourcePanel,
+        message: result.response,
+      });
+    }
+
+    return {
+      success: true,
+      status: result.status,
+      confidence: result.confidence,
+    };
+  }
+);
+
+export const getDebugInfo = functions.https.onCall(
+  async (data: { ticketId: string }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+    }
+
+    const ticketId = String(data?.ticketId || "").trim();
+    if (!ticketId) {
+      throw new functions.https.HttpsError("invalid-argument", "Ticket ID is required.");
+    }
+
+    const ticketDoc = await db().collection("supportTickets").doc(ticketId).get();
+    if (!ticketDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Ticket not found.");
+    }
+
+    const ticketData = ticketDoc.data() || {};
+    const role = String(context.auth.token.role || "");
+    const isSupport = role === "admin" || role === "support";
+    if (!isSupport && ticketData.masterImei !== context.auth.uid) {
+      throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
+    }
+
+    if (!ticketData.debugAccessGrantId) {
+      throw new functions.https.HttpsError("failed-precondition", "Debug mode is not activated for this ticket.");
+    }
+
+    const grantDoc = await db().collection("supportAccessGrants").doc(String(ticketData.debugAccessGrantId)).get();
+    if (!grantDoc.exists || grantDoc.data()?.status !== "active") {
+      throw new functions.https.HttpsError("permission-denied", "Debug access grant is not active.");
+    }
+
+    const grant = grantDoc.data() || {};
+    const expiresAt = grant.expiresAt as admin.firestore.Timestamp | undefined;
+    if (expiresAt && expiresAt.toMillis() <= Date.now()) {
+      await grantDoc.ref.update({ status: "expired" });
+      throw new functions.https.HttpsError("deadline-exceeded", "Debug access grant expired.");
+    }
+
+    const snapshot = await collectDebugSnapshot(String(ticketData.masterImei || ""));
+    return {
+      ticketId,
+      grantId: ticketData.debugAccessGrantId,
+      snapshot,
+    };
+  }
+);
 
 export const provideSolutionFeedback = functions.https.onCall(
   async (data: { ticketId: string; feedback: string; comment?: string }, context: CallableContext) => {

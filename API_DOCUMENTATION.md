@@ -631,6 +631,66 @@ User accepts or rejects AI-generated solution.
 
 **Parameters**: `{ ticketId: string, feedback: "accepted" | "rejected", comment?: string }`
 
+### grantDebugAccess
+
+Parent confirms that KI may activate debug mode for the current ticket.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{ ticketId: string }
+```
+
+**Behavior**:
+- Creates a time-limited debug support grant (48h)
+- Sets ticket to debug-active state
+- Starts KI follow-up analysis automatically
+
+### skipDebugMode
+
+Parent declines debug mode; KI continues without diagnostic data.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{ ticketId: string }
+```
+
+### processUserReplyMessage
+
+Submits a user reply for iterative KI support rounds.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{ ticketId: string, message: string }
+```
+
+### analyzeWithDebugData
+
+Runs one KI analysis round for a ticket. Uses debug snapshot if an active debug grant exists.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{ ticketId: string, userMessage?: string }
+```
+
+### getDebugInfo
+
+Returns the current debug snapshot for a ticket (requires active debug grant).
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{ ticketId: string }
+```
+
 ### onSupportTicketUpdated (Firestore Trigger)
 
 Wird bei Ticket-Updates ausgelöst und sendet bei geänderter `adminResponse` automatisch eine Rückfrage-/Antwort-E-Mail an die im Ticket enthaltene ReplyTo-Adresse.
