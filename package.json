@@ -13,6 +13,8 @@
     "desktop-operator": "electron desktop/main.js --operator",
     "test:rules:structural": "jest --config jest.config.cjs --runInBand test/firestore-rules.test.ts",
     "test:rules:emulator": "npx firebase-tools emulators:exec --project demo-minimaster --only firestore \"node --max-old-space-size=4096 ./node_modules/jest/bin/jest.js --config jest.config.cjs --runInBand test/firestore-rules.emulator.test.ts\"",
+    "test:security": "node scripts/run-security-tests.js",
+    "test:security:ci": "node scripts/run-security-tests.js --mode ci",
     "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural",
     "ci:revalidate": "pwsh ./scripts/revalidate-release-gates.ps1",
     "ci:revalidate:rerun": "pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed"

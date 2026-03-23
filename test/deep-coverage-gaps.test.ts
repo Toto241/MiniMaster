@@ -171,6 +171,11 @@ beforeEach(() => {
             const key = `${coll}/${docId}/${sub}`;
             if (!state[key]) state[key] = {};
             return {
+              add: jest.fn((data: any) => {
+                const subId = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                (state[key] as any)[subId] = data;
+                return Promise.resolve({ id: subId });
+              }),
               get: jest.fn(() => Promise.resolve({
                 empty: Object.keys(state[key]).length === 0,
                 size: Object.keys(state[key]).length,
@@ -679,7 +684,7 @@ describe("shared.ts utilities", () => {
 // ══════════════════════════════════════════════════════════════════════════
 
 describe("onTicketCreated trigger", () => {
-  it("generiert AI-Lösung und aktualisiert Ticket", async () => {
+  it("startet den Debug-Consent-Flow und aktualisiert Ticket", async () => {
     state.supportTickets["ticket-new"] = {
       masterImei: "m1", problemDescription: "App stürzt ab beim Starten", status: "open",
     };
@@ -692,7 +697,9 @@ describe("onTicketCreated trigger", () => {
 
     const ticket = state.supportTickets["ticket-new"];
     expect(ticket.aiGeneratedSolution).toBeDefined();
-    expect(ticket.aiProvider).toBe("test-stub");
+    expect(ticket.conversationStatus).toBe("awaiting_debug_consent");
+    expect(ticket.aiSolutionStatus).toBe("pending");
+    expect(ticket.status).toBe("awaiting_user_feedback");
   });
 
   it("überspringt bei leerer Problembeschreibung", async () => {
@@ -705,7 +712,7 @@ describe("onTicketCreated trigger", () => {
     await wrapped(snapshot as any, { params: { ticketId: "ticket-empty" } } as any);
   });
 
-  it("eskaliert bei niedriger AI-Confidence", async () => {
+  it("bleibt im Consent-Status bei normaler Problembeschreibung", async () => {
     state.supportTickets["ticket-low-conf"] = {
       masterImei: "m1", problemDescription: "Unklares Problem das niemand versteht", status: "open",
     };
@@ -715,12 +722,13 @@ describe("onTicketCreated trigger", () => {
     };
     const wrapped = testEnv.wrap(fns.onTicketCreated);
     await wrapped(snapshot as any, { params: { ticketId: "ticket-low-conf" } } as any);
-    // Test stub returns confidence 0.85 > 0.7, so status should be awaiting_user_feedback
     const ticket = state.supportTickets["ticket-low-conf"];
+    expect(ticket.conversationStatus).toBe("awaiting_debug_consent");
+    expect(ticket.aiSolutionStatus).toBe("pending");
     expect(ticket.status).toBe("awaiting_user_feedback");
   });
 
-  it("nutzt Gemini im Produktionsmodus und eskaliert bei niedriger Confidence", async () => {
+  it("ignoriert Provider-Konfiguration im onTicketCreated-Consent-Start", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalGemini = process.env.GEMINI_API_KEY;
     process.env.NODE_ENV = "production";
@@ -745,14 +753,14 @@ describe("onTicketCreated trigger", () => {
     const wrapped = testEnv.wrap(fns.onTicketCreated);
     await wrapped(snapshot as any, { params: { ticketId: "ticket-prod-low" } } as any);
 
-    expect(state.supportTickets["ticket-prod-low"].status).toBe("escalated");
-    expect(state.supportTickets["ticket-prod-low"].aiProvider).toBe("gemini");
+    expect(state.supportTickets["ticket-prod-low"].conversationStatus).toBe("awaiting_debug_consent");
+    expect(state.supportTickets["ticket-prod-low"].status).toBe("awaiting_user_feedback");
 
     process.env.NODE_ENV = originalNodeEnv;
     process.env.GEMINI_API_KEY = originalGemini;
   });
 
-  it("schreibt Fehlerstatus wenn die KI-Analyse fehlschlägt", async () => {
+  it("wirft nicht, wenn externe Provider fehlschlagen, da onTicketCreated keinen Provider call nutzt", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalGemini = process.env.GEMINI_API_KEY;
     process.env.NODE_ENV = "production";
@@ -771,10 +779,11 @@ describe("onTicketCreated trigger", () => {
 
     const wrapped = testEnv.wrap(fns.onTicketCreated);
     await expect(wrapped(snapshot as any, { params: { ticketId: "ticket-prod-error" } } as any))
-      .rejects.toThrow(/gemini unavailable/i);
+      .resolves.toBeUndefined();
 
-    expect(state.supportTickets["ticket-prod-error"].status).toBe("escalated");
-    expect(state.supportTickets["ticket-prod-error"].aiSolutionStatus).toBe("error");
+    expect(state.supportTickets["ticket-prod-error"].conversationStatus).toBe("awaiting_debug_consent");
+    expect(state.supportTickets["ticket-prod-error"].aiSolutionStatus).toBe("pending");
+    expect(state.supportTickets["ticket-prod-error"].status).toBe("awaiting_user_feedback");
 
     process.env.NODE_ENV = originalNodeEnv;
     process.env.GEMINI_API_KEY = originalGemini;
