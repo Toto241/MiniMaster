@@ -885,6 +885,70 @@
                                         </div>
                                     </section>
                                 </div>
+
+                                <div class="python-automation-layout" style="margin-block-start: 14px">
+                                    <section class="python-automation-panel" id="python-automation-protocol-panel">
+                                        <div class="python-automation-panel-header">
+                                            <div>
+                                                <h5>5. Testfall bewerten &amp; protokollieren</h5>
+                                                <p>
+                                                    Fuer dokumentierte und manuelle Prueffaelle kann hier direkt ein belastbarer Nachweis mit Status,
+                                                    Evidenzreferenz und Operator-Notiz hinterlegt werden.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div id="python-automation-protocol-selected" class="data-list" style="margin-block-start: 12px">
+                                            <div class="info">Noch kein Testfall fuer die Protokollierung ausgewaehlt.</div>
+                                        </div>
+                                        <div class="python-protocol-form" style="margin-block-start: 12px">
+                                            <label>
+                                                <span>Status</span>
+                                                <select id="python-automation-protocol-status">
+                                                    <option value="pass">Bestanden</option>
+                                                    <option value="manual_required">Teilweise / Nacharbeit noetig</option>
+                                                    <option value="fail">Nicht bestanden</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                <span>Operator / Verantwortlich</span>
+                                                <input type="text" id="python-automation-protocol-operator" placeholder="z. B. QA Operator" />
+                                            </label>
+                                            <label>
+                                                <span>Evidenzreferenz</span>
+                                                <input type="text" id="python-automation-protocol-evidence-ref" placeholder="Ticket, Foto, Video, ADB-Log, Checklist-ID" />
+                                            </label>
+                                            <label class="python-protocol-form-wide">
+                                                <span>Notizen</span>
+                                                <textarea id="python-automation-protocol-notes" rows="4" placeholder="Beobachtungen, Restarbeiten, Besonderheiten"></textarea>
+                                            </label>
+                                            <label class="setup-checklist-item python-inline-check" id="python-automation-protocol-doc-row" style="display: none">
+                                                <input type="checkbox" id="python-automation-protocol-doc-check" />
+                                                Dokumentierten Ablauf und Evidenzquelle abgeglichen
+                                            </label>
+                                        </div>
+                                        <div class="setup-actions" style="margin-block-start: 10px">
+                                            <button onclick="savePythonAutomationEvidence()" class="btn btn-primary">Nachweis speichern</button>
+                                            <button onclick="renderPythonAutomationProtocolEditor()" class="btn btn-secondary">Formular auf letzten Nachweis setzen</button>
+                                        </div>
+                                    </section>
+
+                                    <section class="python-automation-panel">
+                                        <div class="python-automation-panel-header">
+                                            <div>
+                                                <h5>6. Nachweis-Historie</h5>
+                                                <p>
+                                                    Zeigt alle gespeicherten manuellen Bewertungen und laesst sie direkt wieder in das Protokollformular laden.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                            <button onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary">Nachweise laden</button>
+                                        </div>
+                                        <div id="python-automation-protocol-history" class="data-list" style="margin-block-start: 12px">
+                                            <div class="info">Noch keine manuellen Nachweise geladen.</div>
+                                        </div>
+                                    </section>
+                                </div>
                             </div>
                         </div>
 

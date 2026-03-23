@@ -125,6 +125,9 @@ let setupValidationResults = [];
 let pythonCommissioningLastRun = null;
 let pythonCommissioningHistoryRuns = [];
 let pythonCommissioningCatalog = null;
+let pythonCommissioningEvidenceHistory = [];
+let pythonCommissioningEvidenceIndex = new Map();
+let pythonCommissioningSelectedTestId = null;
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -442,6 +445,124 @@ function rerenderPythonAutomationHistoryFromCache() {
     renderPythonAutomationHistory(pythonCommissioningHistoryRuns);
 }
 
+function setPythonAutomationEvidenceCache(payload) {
+    pythonCommissioningEvidenceHistory = Array.isArray(payload?.entries) ? payload.entries : [];
+    pythonCommissioningEvidenceIndex = new Map(Object.entries(payload?.latestByTestId || {}));
+}
+
+function getLatestPythonAutomationEvidence(testId) {
+    if (!testId) return null;
+    return pythonCommissioningEvidenceIndex.get(testId) || null;
+}
+
+function findPythonAutomationTestById(testId) {
+    if (!testId || !pythonCommissioningCatalog?.groups) return null;
+    for (const group of pythonCommissioningCatalog.groups) {
+        for (const test of group.tests || []) {
+            if (test?.id === testId) {
+                return { group, test };
+            }
+        }
+    }
+    return null;
+}
+
+function formatPythonAutomationTimestamp(value) {
+    if (!value) return "noch nicht protokolliert";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString("de-DE");
+}
+
+function formatPythonAutomationEvidenceDetails(entry) {
+    if (!entry) return "";
+    const parts = [];
+    if (entry.operator) parts.push(`durch ${entry.operator}`);
+    if (entry.evidenceRef) parts.push(`Evidenz ${entry.evidenceRef}`);
+    if (entry.notes) parts.push(entry.notes);
+    return parts.join(" · ");
+}
+
+function ensurePythonAutomationSelectedTest() {
+    if (findPythonAutomationTestById(pythonCommissioningSelectedTestId)) {
+        return;
+    }
+
+    const allTests = pythonCommissioningCatalog?.groups?.flatMap(group => group.tests || []) || [];
+    const preferred = allTests.find(test => test.automationType === "documented" || test.automationType === "manual") || allTests[0] || null;
+    pythonCommissioningSelectedTestId = preferred?.id || null;
+}
+
+function openPythonAutomationProtocol(encodedTestId) {
+    pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
+    renderPythonAutomationProtocolEditor();
+    document.getElementById("python-automation-protocol-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function clearPythonAutomationProtocolForm() {
+    const statusEl = document.getElementById("python-automation-protocol-status");
+    const operatorEl = document.getElementById("python-automation-protocol-operator");
+    const evidenceRefEl = document.getElementById("python-automation-protocol-evidence-ref");
+    const notesEl = document.getElementById("python-automation-protocol-notes");
+    const docCheckEl = document.getElementById("python-automation-protocol-doc-check");
+
+    if (statusEl) statusEl.value = "pass";
+    if (operatorEl) operatorEl.value = "";
+    if (evidenceRefEl) evidenceRefEl.value = "";
+    if (notesEl) notesEl.value = "";
+    if (docCheckEl) docCheckEl.checked = false;
+}
+
+function renderPythonAutomationProtocolEditor() {
+    const summaryEl = document.getElementById("python-automation-protocol-selected");
+    const docRowEl = document.getElementById("python-automation-protocol-doc-row");
+    if (!summaryEl) return;
+
+    ensurePythonAutomationSelectedTest();
+    const selected = findPythonAutomationTestById(pythonCommissioningSelectedTestId);
+    if (!selected) {
+        summaryEl.innerHTML = "<div class='info'>Noch kein Testfall fuer die Protokollierung ausgewaehlt.</div>";
+        clearPythonAutomationProtocolForm();
+        if (docRowEl) docRowEl.style.display = "none";
+        return;
+    }
+
+    const { group, test } = selected;
+    const evidence = getLatestPythonAutomationEvidence(test.id);
+    const evidenceDetails = evidence
+        ? `<div class='python-muted-caption'>Letzter Nachweis: ${escapeHtml(formatPythonAutomationStatus(evidence.status))} · ${escapeHtml(formatPythonAutomationTimestamp(evidence.createdAt))}</div>`
+        : "<div class='python-muted-caption'>Noch kein manueller Nachweis vorhanden.</div>";
+
+    summaryEl.innerHTML = `
+        <div class='python-protocol-selected-card'>
+            <div class='python-test-card-header'>
+                <div>
+                    <h6>${escapeHtml(test.title || test.id || "Prueffall")}</h6>
+                    <p class='python-muted-caption'>Gruppe: ${escapeHtml(group.title || "-")} · ID: ${escapeHtml(test.id || "-")}</p>
+                </div>
+                <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType)}'>${escapeHtml(formatPythonAutomationType(test.automationType))}</span>
+            </div>
+            <p>${escapeHtml(test.description || "")}</p>
+            <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
+            ${test.documentation ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(test.documentation)}</div>` : ""}
+            ${evidenceDetails}
+        </div>
+    `;
+
+    const statusEl = document.getElementById("python-automation-protocol-status");
+    const operatorEl = document.getElementById("python-automation-protocol-operator");
+    const evidenceRefEl = document.getElementById("python-automation-protocol-evidence-ref");
+    const notesEl = document.getElementById("python-automation-protocol-notes");
+    const docCheckEl = document.getElementById("python-automation-protocol-doc-check");
+
+    if (statusEl) statusEl.value = evidence?.status || "pass";
+    if (operatorEl && document.activeElement !== operatorEl) operatorEl.value = evidence?.operator || "";
+    if (evidenceRefEl && document.activeElement !== evidenceRefEl) evidenceRefEl.value = evidence?.evidenceRef || "";
+    if (notesEl && document.activeElement !== notesEl) notesEl.value = evidence?.notes || "";
+    if (docCheckEl) docCheckEl.checked = Boolean(evidence?.documentationChecked);
+    if (docRowEl) docRowEl.style.display = test.automationType === "documented" ? "flex" : "none";
+}
+
 function buildPythonAutomationRunIndex(run) {
     const map = new Map();
 
@@ -477,6 +598,17 @@ function buildPythonAutomationRunIndex(run) {
 function getPythonAutomationTestStatus(test, run, runIndex) {
     const mapped = runIndex.get(test.id);
     if (mapped) return mapped;
+
+    const evidence = getLatestPythonAutomationEvidence(test.id);
+    if (evidence) {
+        return {
+            status: evidence.status || "not_run",
+            details: evidence.details || formatPythonAutomationEvidenceDetails(evidence) || "Manuell protokollierter Nachweis vorhanden.",
+            source: "evidence",
+            evaluatedAt: evidence.createdAt || "",
+            evidence,
+        };
+    }
 
     if (!run) {
         return {
@@ -530,6 +662,7 @@ function renderPythonAutomationOverview(catalog, run) {
     const evalCounts = run?.evaluation?.statusCounts || {};
     const cmdCounts = run?.commands?.statusCounts || {};
     const openCount = Number(evalCounts.fail || 0) + Number(evalCounts.manual_required || 0) + Number(cmdCounts.fail || 0);
+    const evidenceCount = Array.from(pythonCommissioningEvidenceIndex.values()).length;
 
     overviewEl.innerHTML = `
         <div class='python-automation-metric'>
@@ -547,6 +680,10 @@ function renderPythonAutomationOverview(catalog, run) {
         <div class='python-automation-metric'>
             <strong>${escapeHtml(String(summary.documentedCount || 0))}</strong>
             <span>dokumentierte Testpläne</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(evidenceCount))}</strong>
+            <span>Testfälle mit Nachweis</span>
         </div>
         <div class='python-automation-metric'>
             <strong>${escapeHtml(String(summary.commandCount || 0))}</strong>
@@ -614,9 +751,14 @@ function renderPythonAutomationCatalog(catalog, run) {
             const evaluatedAt = resolved.evaluatedAt
                 ? new Date(resolved.evaluatedAt).toLocaleString("de-DE")
                 : "noch nicht protokolliert";
+            const evidence = getLatestPythonAutomationEvidence(test.id);
             const documentationHtml = test.documentation
                 ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(test.documentation)}</div>`
                 : "";
+            const evidenceHtml = evidence
+                ? `<div class='python-test-detail'><strong>Manueller Nachweis:</strong> ${escapeHtml(formatPythonAutomationEvidenceDetails(evidence) || "Nachweis protokolliert.")}</div>`
+                : "";
+            const encodedTestId = encodeURIComponent(String(test.id || ""));
 
             return `
                 <article class='python-test-card ${statusMeta.cardClass}${extraCardClass}'>
@@ -634,8 +776,12 @@ function renderPythonAutomationCatalog(catalog, run) {
                     <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
                     ${test.command ? `<div class='python-test-detail'><strong>Kommando:</strong> ${escapeHtml(test.command)}</div>` : ""}
                     ${documentationHtml}
+                    ${evidenceHtml}
                     <div class='python-test-detail'><strong>Letzte Bewertung:</strong> ${escapeHtml(resolved.details || "Kein Detail verfügbar.")}</div>
                     <div class='python-muted-caption'>Zuletzt bewertet: ${escapeHtml(evaluatedAt)}</div>
+                    <div class='python-test-actions'>
+                        <button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTestId}')">Bewerten &amp; protokollieren</button>
+                    </div>
                 </article>
             `;
         }).join("");
@@ -680,8 +826,10 @@ async function loadPythonAutomationCatalog() {
             throw new Error(payload.error || "Testkatalog konnte nicht geladen werden.");
         }
         pythonCommissioningCatalog = payload;
+        ensurePythonAutomationSelectedTest();
         renderPythonAutomationOverview(payload, pythonCommissioningLastRun);
         renderPythonAutomationCatalog(payload, pythonCommissioningLastRun);
+        renderPythonAutomationProtocolEditor();
     } catch (error) {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
@@ -972,6 +1120,128 @@ async function loadPythonAutomationHistory() {
         renderPythonAutomationHistory(runs);
     } catch (error) {
         historyEl.innerHTML = `<div class='error'>Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function renderPythonAutomationEvidenceHistory(entries) {
+    const historyEl = document.getElementById("python-automation-protocol-history");
+    if (!historyEl) return;
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+        historyEl.innerHTML = "<div class='info'>Noch keine manuellen Nachweise protokolliert.</div>";
+        return;
+    }
+
+    const rows = entries.map(entry => {
+        const encodedTestId = encodeURIComponent(String(entry.testId || ""));
+        return `
+            <tr>
+                <td>${escapeHtml(formatPythonAutomationTimestamp(entry.createdAt))}</td>
+                <td>${escapeHtml(entry.testTitle || entry.testId || "-")}</td>
+                <td>${escapeHtml(formatPythonAutomationStatus(entry.status || ""))}</td>
+                <td>${escapeHtml(entry.operator || "-")}</td>
+                <td>${escapeHtml(entry.evidenceRef || entry.notes || "-")}</td>
+                <td><button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTestId}')">Oeffnen</button></td>
+            </tr>
+        `;
+    }).join("");
+
+    historyEl.innerHTML = `
+        <table>
+            <tr>
+                <th>Zeit</th>
+                <th>Testfall</th>
+                <th>Status</th>
+                <th>Operator</th>
+                <th>Evidenz / Notiz</th>
+                <th>Aktion</th>
+            </tr>
+            ${rows}
+        </table>
+    `;
+}
+
+async function loadPythonAutomationEvidenceHistory() {
+    const historyEl = document.getElementById("python-automation-protocol-history");
+    if (!historyEl) return;
+
+    if (!isPythonOperator) {
+        historyEl.innerHTML = "<div class='info'>Nachweis-Historie ist nur im Python-Operator verfuegbar.</div>";
+        return;
+    }
+
+    historyEl.innerHTML = "<div class='loading'>Lade Nachweis-Historie...</div>";
+    try {
+        const response = await fetch("/api/commissioning/evidence?limit=80", {
+            headers: { "Accept": "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Nachweis-Historie konnte nicht geladen werden.");
+        }
+        setPythonAutomationEvidenceCache(payload);
+        renderPythonAutomationOverview(pythonCommissioningCatalog, pythonCommissioningLastRun);
+        renderPythonAutomationCatalog(pythonCommissioningCatalog, pythonCommissioningLastRun);
+        renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
+        renderPythonAutomationProtocolEditor();
+    } catch (error) {
+        historyEl.innerHTML = `<div class='error'>Nachweis-Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+async function savePythonAutomationEvidence() {
+    if (!isPythonOperator) {
+        showNotification("Nachweise koennen nur im Python-Operator gespeichert werden.", "error");
+        return;
+    }
+
+    const selected = findPythonAutomationTestById(pythonCommissioningSelectedTestId);
+    if (!selected) {
+        showNotification("Bitte zuerst einen Testfall fuer die Protokollierung auswaehlen.", "error");
+        return;
+    }
+
+    const status = document.getElementById("python-automation-protocol-status")?.value || "pass";
+    const operator = (document.getElementById("python-automation-protocol-operator")?.value || "").trim();
+    const evidenceRef = (document.getElementById("python-automation-protocol-evidence-ref")?.value || "").trim();
+    const notes = (document.getElementById("python-automation-protocol-notes")?.value || "").trim();
+    const documentationChecked = Boolean(document.getElementById("python-automation-protocol-doc-check")?.checked);
+
+    if (!operator) {
+        showNotification("Bitte den Operator fuer den Nachweis angeben.", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/commissioning/evidence", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            body: JSON.stringify({
+                testId: selected.test.id,
+                status,
+                operator,
+                evidenceRef,
+                notes,
+                documentationChecked,
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Nachweis konnte nicht gespeichert werden.");
+        }
+
+        await loadPythonAutomationEvidenceHistory();
+        if (pythonCommissioningLastRun) {
+            renderPythonAutomationResult(pythonCommissioningLastRun);
+        } else {
+            rerenderPythonAutomationCatalogFromCache();
+        }
+        showNotification(`Nachweis gespeichert fuer ${selected.test.title || selected.test.id}.`, "success");
+    } catch (error) {
+        showNotification("Nachweis konnte nicht gespeichert werden: " + error.message, "error");
     }
 }
 
@@ -2915,6 +3185,7 @@ document.addEventListener("DOMContentLoaded", async function() {
                 badge.innerHTML = '<span class="operator-badge">🐍 Python-Operator-Modus</span> CLI- und PowerShell-Befehle können direkt aus diesem Dashboard ausgeführt werden.';
                 loadPythonAutomationCatalog();
                 loadPythonAutomationHistory();
+                loadPythonAutomationEvidenceHistory();
             }
         }
     }

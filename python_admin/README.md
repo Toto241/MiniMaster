@@ -48,4 +48,13 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
 - `GET /api/commissioning/history?limit=10`
   - liefert die letzten protokollierten Laeufe (neueste zuerst)
 
+- `POST /api/commissioning/evidence`
+  - speichert einen manuellen Nachweis fuer einen einzelnen Testfall
+  - erwartet `testId`, `status`, `operator` sowie optional `evidenceRef`, `notes`, `documentationChecked`
+  - schreibt jeden Nachweis als JSON-Zeile in `python_admin/logs/commissioning_evidence.jsonl`
+
+- `GET /api/commissioning/evidence?limit=80`
+  - liefert die letzten protokollierten Nachweise (neueste zuerst)
+  - enthaelt zusaetzlich `latestByTestId`, damit die UI pro Testfall den letzten Nachweisstatus direkt darstellen kann
+
 Timeout fuer Kommandoausfuehrungen kann mit `MINIMASTER_COMMAND_TIMEOUT_SEC` konfiguriert werden (Standard: `1800` Sekunden).

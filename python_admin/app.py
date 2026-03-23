@@ -19,11 +19,15 @@ from uuid import uuid4
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
+COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
 DEFAULT_HOST = os.environ.get("MINIMASTER_ADMIN_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("MINIMASTER_ADMIN_PORT", "8765"))
 DEFAULT_HISTORY_LIMIT = 15
 MAX_HISTORY_LIMIT = 100
+DEFAULT_EVIDENCE_LIMIT = 50
+MAX_EVIDENCE_LIMIT = 500
 DEFAULT_COMMAND_TIMEOUT_SEC = int(os.environ.get("MINIMASTER_COMMAND_TIMEOUT_SEC", "1800"))
+ALLOWED_EVIDENCE_STATUSES = {"pass", "fail", "manual_required"}
 
 ALLOWED_COMMANDS = {
     "adb",
@@ -670,6 +674,86 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
     }
 
 
+def iter_commissioning_tests() -> Iterable[tuple[dict[str, object], dict[str, object]]]:
+    for group in COMMISSIONING_TEST_GROUPS:
+        for test in cast(tuple[dict[str, object], ...], group["tests"]):
+            yield cast(dict[str, object], group), test
+
+
+def find_commissioning_test(test_id: str) -> tuple[dict[str, object], dict[str, object]] | None:
+    needle = test_id.strip()
+    if not needle:
+        return None
+
+    for group, test in iter_commissioning_tests():
+        if str(test.get("id", "")).strip() == needle:
+            return group, test
+    return None
+
+
+def normalize_text_field(value: object, *, field_name: str, max_length: int, required: bool = False) -> str:
+    normalized = str(value or "").strip()
+    if required and not normalized:
+        raise ValueError(f"{field_name} fehlt.")
+    if len(normalized) > max_length:
+        raise ValueError(f"{field_name} ist zu lang (max. {max_length} Zeichen).")
+    return normalized
+
+
+def format_evidence_details(entry: dict[str, object]) -> str:
+    operator = str(entry.get("operator") or "Operator unbekannt")
+    notes = str(entry.get("notes") or "")
+    evidence_ref = str(entry.get("evidenceRef") or "")
+    detail_parts = [f"Manuell protokolliert durch {operator}."]
+    if evidence_ref:
+        detail_parts.append(f"Evidenz: {evidence_ref}.")
+    if notes:
+        detail_parts.append(f"Notiz: {notes}")
+    return " ".join(detail_parts).strip()
+
+
+def build_commissioning_evidence_entry(payload: dict[str, object]) -> dict[str, object]:
+    test_id = normalize_text_field(payload.get("testId"), field_name="testId", max_length=120, required=True)
+    match = find_commissioning_test(test_id)
+    if not match:
+        raise ValueError("Unbekannter Testfall.")
+
+    group, test = match
+    status = normalize_text_field(payload.get("status"), field_name="status", max_length=40, required=True)
+    if status not in ALLOWED_EVIDENCE_STATUSES:
+        raise ValueError("status muss pass, fail oder manual_required sein.")
+
+    operator = normalize_text_field(payload.get("operator"), field_name="operator", max_length=120, required=True)
+    notes = normalize_text_field(payload.get("notes"), field_name="notes", max_length=4000)
+    evidence_ref = normalize_text_field(payload.get("evidenceRef"), field_name="evidenceRef", max_length=500)
+    documentation_checked = bool_from_payload(payload.get("documentationChecked"), default=False)
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    return {
+        "entryId": f"evidence-{uuid4().hex[:12]}",
+        "createdAt": created_at,
+        "testId": test_id,
+        "testTitle": str(test.get("title") or test_id),
+        "groupId": str(group.get("id") or ""),
+        "groupTitle": str(group.get("title") or ""),
+        "automationType": str(test.get("automationType") or "automatic"),
+        "source": str(test.get("source") or ""),
+        "status": status,
+        "operator": operator,
+        "notes": notes,
+        "evidenceRef": evidence_ref,
+        "documentation": str(test.get("documentation") or ""),
+        "documentationChecked": documentation_checked,
+        "details": format_evidence_details(
+            {
+                "operator": operator,
+                "notes": notes,
+                "evidenceRef": evidence_ref,
+            }
+        ),
+    }
+
+
 def get_commissioning_test_catalog() -> dict[str, object]:
     groups: list[dict[str, object]] = []
     automated_count = 0
@@ -712,6 +796,54 @@ def get_commissioning_test_catalog() -> dict[str, object]:
             "documentedCount": documented_count,
         },
     }
+
+
+def append_commissioning_evidence_log(entry: dict[str, object]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with COMMISSIONING_EVIDENCE_LOG_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def load_commissioning_evidence_history(limit: int, *, test_id: str | None = None) -> list[dict[str, object]]:
+    if not COMMISSIONING_EVIDENCE_LOG_FILE.exists():
+        return []
+
+    lines = COMMISSIONING_EVIDENCE_LOG_FILE.read_text(encoding="utf-8").splitlines()
+    history: list[dict[str, object]] = []
+    filter_test_id = (test_id or "").strip()
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if filter_test_id and str(entry.get("testId") or "").strip() != filter_test_id:
+            continue
+        history.append(entry)
+        if len(history) >= limit:
+            break
+    return history
+
+
+def load_latest_commissioning_evidence() -> dict[str, dict[str, object]]:
+    latest: dict[str, dict[str, object]] = {}
+    if not COMMISSIONING_EVIDENCE_LOG_FILE.exists():
+        return latest
+
+    lines = COMMISSIONING_EVIDENCE_LOG_FILE.read_text(encoding="utf-8").splitlines()
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        test_id = str(entry.get("testId") or "").strip()
+        if not test_id or test_id in latest:
+            continue
+        latest[test_id] = entry
+    return latest
 
 
 def run_commissioning_commands(run_commands: bool, timeout_sec: int) -> list[dict[str, object]]:
@@ -768,6 +900,12 @@ def load_commissioning_history(limit: int) -> list[dict[str, object]]:
         if len(history) >= limit:
             break
     return history
+
+
+def save_commissioning_evidence(payload: dict[str, object]) -> dict[str, object]:
+    entry = build_commissioning_evidence_entry(payload)
+    append_commissioning_evidence_log(entry)
+    return entry
 
 
 def run_commissioning_suite(
@@ -941,6 +1079,24 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/commissioning/catalog":
             return self._write_json(HTTPStatus.OK, get_commissioning_test_catalog())
 
+        if parsed.path == "/api/commissioning/evidence":
+            query = parse_qs(parsed.query)
+            limit = parse_int(
+                query.get("limit", [DEFAULT_EVIDENCE_LIMIT])[0],
+                DEFAULT_EVIDENCE_LIMIT,
+                min_value=1,
+                max_value=MAX_EVIDENCE_LIMIT,
+            )
+            test_id = str(query.get("testId", [""])[0]).strip() or None
+            return self._write_json(
+                HTTPStatus.OK,
+                {
+                    "entries": load_commissioning_evidence_history(limit, test_id=test_id),
+                    "latestByTestId": load_latest_commissioning_evidence(),
+                    "count": limit,
+                },
+            )
+
         if parsed.path == "/admin-panel":
             self.path = "/admin-panel/"
         return super().do_GET()
@@ -951,6 +1107,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
             return self._handle_run_commissioning()
+        if parsed.path == "/api/commissioning/evidence":
+            return self._handle_save_commissioning_evidence()
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden."})
 
     def _handle_run_command(self) -> None:
@@ -993,6 +1151,17 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
         return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_save_commissioning_evidence(self) -> None:
+        try:
+            payload = self._read_json_body()
+            entry = save_commissioning_evidence(payload)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        return self._write_json(HTTPStatus.OK, entry)
 
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))
