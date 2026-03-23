@@ -77,4 +77,22 @@
     <string name="legal_accept_privacy">I acknowledge the Privacy Policy.</string>
     <string name="legal_accept_continue">Accept and continue</string>
     <string name="legal_country_locale">Country: %1$s, Locale: %2$s</string>
+
+    <string name="usage_rules">Usage Rules</string>
+    <string name="rules_saved_successfully">Rules saved successfully</string>
+    <string name="usage_rules_back">Back</string>
+    <string name="daily_screen_time_limit">Daily Screen Time Limit</string>
+    <string name="minutes_per_day">Minutes per day (0 = unlimited)</string>
+    <string name="allowed_time_window">Allowed Time Window</string>
+    <string name="allowed_time_window_description">Set a time window when the device can be used. Outside this window, all apps are blocked.</string>
+    <string name="start_time_label">Start (HH:MM)</string>
+    <string name="end_time_label">End (HH:MM)</string>
+    <string name="per_app_time_limits">Per-App Time Limits</string>
+    <string name="per_app_time_limits_description">Set individual time limits for specific apps.</string>
+    <string name="minutes_per_day_short">%1$d min/day</string>
+    <string name="remove_limit">Remove limit</string>
+    <string name="package_name">Package name</string>
+    <string name="minutes_short">Min</string>
+    <string name="add">Add</string>
+    <string name="save_rules">Save Rules</string>
 </resources>

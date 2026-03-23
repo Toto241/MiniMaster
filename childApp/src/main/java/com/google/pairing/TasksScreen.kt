@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,10 +47,10 @@ fun TasksScreen(
     Column(modifier = Modifier
         .fillMaxSize()
         .padding(16.dp)) {
-        Text("Your Tasks", style = MaterialTheme.typography.h4)
+        Text(stringResource(R.string.your_tasks_title), style = MaterialTheme.typography.h4)
         Spacer(modifier = Modifier.height(16.dp))
         if (tasks.isEmpty()) {
-            Text("No tasks for now, good job!")
+            Text(stringResource(R.string.no_tasks_for_now))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(tasks) { task ->
@@ -89,7 +90,7 @@ fun TaskItem(task: Task, onCompleteClick: () -> Unit) {
                     .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 
                 Text(
-                    text = "Status: $displayStatus",
+                    text = stringResource(R.string.task_status_format, displayStatus),
                     style = MaterialTheme.typography.caption,
                     color = when (task.status) {
                         "pending" -> Color.Red
@@ -104,7 +105,7 @@ fun TaskItem(task: Task, onCompleteClick: () -> Unit) {
             // Show complete button only if status is pending
             if (task.status == "pending") {
                 Button(onClick = onCompleteClick) {
-                    Text("Complete")
+                    Text(stringResource(R.string.task_complete_button))
                 }
             }
         }

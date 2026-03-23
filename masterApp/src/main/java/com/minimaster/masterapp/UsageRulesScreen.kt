@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ fun UsageRulesScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val scaffoldState = rememberScaffoldState()
+    val rulesSavedMessage = stringResource(R.string.rules_saved_successfully)
 
     LaunchedEffect(state.error) {
         state.error?.let {
@@ -36,7 +38,7 @@ fun UsageRulesScreen(
 
     LaunchedEffect(state.saveSuccess) {
         if (state.saveSuccess) {
-            scaffoldState.snackbarHostState.showSnackbar("Rules saved successfully")
+            scaffoldState.snackbarHostState.showSnackbar(rulesSavedMessage)
             viewModel.errorShown()
         }
     }
@@ -45,10 +47,10 @@ fun UsageRulesScreen(
         scaffoldState = scaffoldState,
         topBar = {
             TopAppBar(
-                title = { Text("Usage Rules") },
+                title = { Text(stringResource(R.string.usage_rules)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.usage_rules_back))
                     }
                 }
             )
@@ -63,7 +65,7 @@ fun UsageRulesScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Section: Daily Limit
-            Text("Daily Screen Time Limit", style = MaterialTheme.typography.h6)
+            Text(stringResource(R.string.daily_screen_time_limit), style = MaterialTheme.typography.h6)
             var dailyLimitText by remember { mutableStateOf(if (state.dailyLimitMinutes > 0) state.dailyLimitMinutes.toString() else "") }
             OutlinedTextField(
                 value = dailyLimitText,
@@ -72,7 +74,7 @@ fun UsageRulesScreen(
                     val minutes = it.toIntOrNull() ?: 0
                     viewModel.updateDailyLimit(minutes)
                 },
-                label = { Text("Minutes per day (0 = unlimited)") },
+                label = { Text(stringResource(R.string.minutes_per_day)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -80,9 +82,9 @@ fun UsageRulesScreen(
             Divider()
 
             // Section: Allowed Time Window
-            Text("Allowed Time Window", style = MaterialTheme.typography.h6)
+            Text(stringResource(R.string.allowed_time_window), style = MaterialTheme.typography.h6)
             Text(
-                "Set a time window when the device can be used. Outside this window, all apps are blocked.",
+                stringResource(R.string.allowed_time_window_description),
                 style = MaterialTheme.typography.caption
             )
             Row(
@@ -98,7 +100,7 @@ fun UsageRulesScreen(
                         startTime = it
                         viewModel.updateAllowedStartTime(it)
                     },
-                    label = { Text("Start (HH:MM)") },
+                    label = { Text(stringResource(R.string.start_time_label)) },
                     placeholder = { Text("08:00") },
                     modifier = Modifier.weight(1f)
                 )
@@ -108,7 +110,7 @@ fun UsageRulesScreen(
                         endTime = it
                         viewModel.updateAllowedEndTime(it)
                     },
-                    label = { Text("End (HH:MM)") },
+                    label = { Text(stringResource(R.string.end_time_label)) },
                     placeholder = { Text("20:00") },
                     modifier = Modifier.weight(1f)
                 )
@@ -117,9 +119,9 @@ fun UsageRulesScreen(
             Divider()
 
             // Section: Per-App Limits
-            Text("Per-App Time Limits", style = MaterialTheme.typography.h6)
+            Text(stringResource(R.string.per_app_time_limits), style = MaterialTheme.typography.h6)
             Text(
-                "Set individual time limits for specific apps.",
+                stringResource(R.string.per_app_time_limits_description),
                 style = MaterialTheme.typography.caption
             )
 
@@ -131,10 +133,10 @@ fun UsageRulesScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(pkg, style = MaterialTheme.typography.body1)
-                        Text("$minutes min/day", style = MaterialTheme.typography.caption)
+                        Text(stringResource(R.string.minutes_per_day_short, minutes), style = MaterialTheme.typography.caption)
                     }
                     IconButton(onClick = { viewModel.removePerAppLimit(pkg) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove limit")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_limit))
                     }
                 }
             }
@@ -150,13 +152,13 @@ fun UsageRulesScreen(
                 OutlinedTextField(
                     value = newPkg,
                     onValueChange = { newPkg = it },
-                    label = { Text("Package name") },
+                    label = { Text(stringResource(R.string.package_name)) },
                     modifier = Modifier.weight(2f)
                 )
                 OutlinedTextField(
                     value = newLimit,
                     onValueChange = { newLimit = it },
-                    label = { Text("Min") },
+                    label = { Text(stringResource(R.string.minutes_short)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f)
                 )
@@ -170,7 +172,7 @@ fun UsageRulesScreen(
                         }
                     }
                 ) {
-                    Text("Add")
+                    Text(stringResource(R.string.add))
                 }
             }
 
@@ -189,7 +191,7 @@ fun UsageRulesScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text("Save Rules")
+                Text(stringResource(R.string.save_rules))
             }
         }
     }

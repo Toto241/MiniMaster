@@ -82,7 +82,7 @@ fun TaskLockScreenContent(task: TaskModel) {
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxSize().padding(32.dp)
     ) {
-        Text(text = "Task Required", style = MaterialTheme.typography.h4, color = Color.Red)
+        Text(text = stringResource(R.string.task_required_title), style = MaterialTheme.typography.h4, color = Color.Red)
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(text = task.description, style = MaterialTheme.typography.h6)
@@ -92,24 +92,24 @@ fun TaskLockScreenContent(task: TaskModel) {
             TaskStatus.PENDING, TaskStatus.REJECTED -> {
                 Text(
                     text = if (task.status == TaskStatus.REJECTED.value)
-                        "Proof rejected. Please submit again."
+                        stringResource(R.string.task_proof_rejected)
                     else
-                        "To unlock the device, please complete this task.",
+                        stringResource(R.string.task_complete_to_unlock),
                     color = Color.Red
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { showProofSubmission = true }) {
-                    Text("Submit Proof")
+                    Text(stringResource(R.string.task_submit_proof))
                 }
             }
             TaskStatus.PENDING_APPROVAL -> {
-                Text(text = "Proof submitted. Waiting for parent approval.", color = Color.Blue)
+                Text(text = stringResource(R.string.task_waiting_for_approval), color = Color.Blue)
                 Spacer(modifier = Modifier.height(16.dp))
                 CircularProgressIndicator()
             }
             else -> {
                 // Should not happen as the AccessibilityService removes the lock on APPROVED
-                Text(text = "Status: ${task.status}")
+                Text(text = stringResource(R.string.task_status_format, task.status))
             }
         }
     }
