@@ -944,9 +944,9 @@ npm test -- --runInBand
                                 <input type="text" id="cmd-workspace-path" placeholder="Arbeitsverzeichnis, z. B. D:/Tools/MiniMaster" />
                                 <input type="email" id="cmd-first-admin-email" placeholder="Optional: Erstadmin E-Mail" />
                                 <input type="text" id="cmd-first-admin-password" placeholder="Optional: Erstadmin Passwort" />
-                                <input type="text" id="cmd-android-device-serial" aria-label="ADB Device-Serial" placeholder="Optional: ADB Device-Serial (adb devices)" />
-                                <input type="text" id="cmd-master-device-serial" aria-label="ADB Master Device-Serial" placeholder="Optional: Master Device-Serial (für Dual-Runner)" />
-                                <input type="text" id="cmd-child-device-serial" aria-label="ADB Child Device-Serial" placeholder="Optional: Child Device-Serial (für Dual-Runner)" />
+                                <input type="text" id="cmd-android-device-serial" aria-label="ADB Device-Serial" placeholder="Optional: Allgemeine ADB Device-Serial (Fallback für Master/Child)" />
+                                <input type="text" id="cmd-master-device-serial" aria-label="ADB Master Device-Serial" placeholder="Optional: Master Device-Serial (überschreibt allgemeinen Fallback)" />
+                                <input type="text" id="cmd-child-device-serial" aria-label="ADB Child Device-Serial" placeholder="Optional: Child Device-Serial (überschreibt allgemeinen Fallback)" />
                                 <input type="text" id="cmd-master-apk-path" aria-label="Pfad Eltern-App APK" placeholder="Pfad Eltern-App APK (MasterApp)" />
                                 <input type="text" id="cmd-child-apk-path" aria-label="Pfad Kinder-App APK" placeholder="Pfad Kinder-App APK (ChildApp)" />
                             </div>
@@ -1164,7 +1164,7 @@ npm test -- --runInBand
                     <h3>Live Audit-Log Viewer</h3>
                     <p>Durchsuche die Audit-Logs in Echtzeit.</p>
                     <div class="sub-filters">
-                        <select id="audit-action-filter" class="form-input" style="width: auto; display: inline-block">
+                        <select id="audit-action-filter" class="form-input" style="inline-size: auto; display: inline-block">
                             <option value="">Alle Aktionen</option>
                             <option value="auth.login">auth.login</option>
                             <option value="auth.register">auth.register</option>
@@ -1178,7 +1178,7 @@ npm test -- --runInBand
                             <option value="support.ticket">support.ticket</option>
                             <option value="admin.role">admin.role</option>
                         </select>
-                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="width: 80px; display: inline-block" />
+                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="inline-size: 80px; display: inline-block" />
                         <button onclick="loadAuditLogs()" class="btn btn-primary">Laden</button>
                     </div>
                     <div id="audit-log-list" class="data-list"></div>
@@ -1273,8 +1273,8 @@ npm test -- --runInBand
                     <h3>Aktive Richtlinien abfragen</h3>
                     <p>Zeigt die aktuell aktiven AGB- und Datenschutz-Richtlinien für ein Land/Locale.</p>
                     <div class="dsar-form">
-                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
-                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
+                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
+                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
                         <button onclick="loadActiveLegalPolicies()" class="btn btn-primary">
                             Richtlinien laden
                         </button>
@@ -1287,8 +1287,8 @@ npm test -- --runInBand
                     <h3>Einwilligungsstatus prüfen</h3>
                     <p>Prüft, ob ein bestimmter Nutzer den aktuellen Richtlinien zugestimmt hat (Reconsent nötig?).</p>
                     <div class="dsar-form">
-                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
-                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
+                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
+                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
                         <button onclick="checkLegalReconsentStatus()" class="btn btn-primary">
                             Status prüfen
                         </button>
@@ -1302,17 +1302,17 @@ npm test -- --runInBand
                     <p>Erstellt oder aktualisiert eine AGB- oder Datenschutz-Richtlinie für ein bestimmtes Land/Locale.</p>
                     <div class="dsar-form" style="flex-direction: column; gap: 10px; align-items: stretch">
                         <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                            <select id="legal-publish-type" style="width: 140px">
+                            <select id="legal-publish-type" style="inline-size: 140px">
                                 <option value="terms">AGB (terms)</option>
                                 <option value="privacy">Datenschutz (privacy)</option>
                             </select>
-                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
-                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
-                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="width: 180px" />
+                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
+                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
+                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="inline-size: 180px" />
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="flex: 1; min-width: 250px" />
-                            <select id="legal-publish-status" style="width: 120px">
+                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="flex: 1; min-inline-size: 250px" />
+                            <select id="legal-publish-status" style="inline-size: 120px">
                                 <option value="active">Aktiv</option>
                                 <option value="draft">Entwurf</option>
                                 <option value="approved">Freigegeben</option>
@@ -1339,9 +1339,9 @@ npm test -- --runInBand
                         Nutzer (Master-ID) oder für alle Nutzer eines Landes/Locale.
                     </p>
                     <div class="dsar-form">
-                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="width: 80px" />
-                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="width: 140px" />
-                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="width: 220px" />
+                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
+                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
+                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="inline-size: 220px" />
                         <button onclick="triggerLegalReconsent()" class="btn btn-danger">
                             Reconsent erzwingen
                         </button>
