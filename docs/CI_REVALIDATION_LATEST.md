@@ -1,35 +1,32 @@
 # CI Revalidation Report
 
-Generated: 2026-03-22 13:50:04 +01:00
+Generated: 2026-03-23 13:48:04 +01:00
 Repository: Toto241/MiniMaster
-Rerun requested for latest failures: false
+Rerun requested for latest failures: true
 
 ## CodeQL Security Analysis
 
-- Latest run: [23401992153](https://github.com/Toto241/MiniMaster/actions/runs/23401992153)
-- Latest status: completed / failure
-- Head SHA: eb1d2bb58fc9d3f092db69af2343d1e92315ba85
-- Updated at: 03/22/2026 12:48:33
-- Latest success: [23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965)
+- Latest run: [23437807577](https://github.com/Toto241/MiniMaster/actions/runs/23437807577)
+- Latest status: queued / pending
+- Head SHA: c24265a9c9f34d4ec3e22a373c4765fbc94e76b4
+- Updated at: 03/23/2026 12:48:00
+- Latest success: none in inspected history
 
-### Latest Failure Annotations
-- [Analyze Code (javascript)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
-- [Analyze Code (java)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
+Run is not completed yet; annotations are not available.
 
-Billing blocker detected: yes
+Billing blocker detected: pending
 
 ## Android CI
 
-- Latest run: [23401992162](https://github.com/Toto241/MiniMaster/actions/runs/23401992162)
-- Latest status: completed / failure
-- Head SHA: eb1d2bb58fc9d3f092db69af2343d1e92315ba85
-- Updated at: 03/22/2026 12:48:34
+- Latest run: [23406412886](https://github.com/Toto241/MiniMaster/actions/runs/23406412886)
+- Latest status: queued / pending
+- Head SHA: e1c1a3bc68a2805ed474560a593be765a20a8de0
+- Updated at: 03/23/2026 12:48:01
 - Latest success: none in inspected history
 
-### Latest Failure Annotations
-- [android] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
+Run is not completed yet; annotations are not available.
 
-Billing blocker detected: yes
+Billing blocker detected: pending
 
 ## Recommendation
 - Immediate action: Resolve GitHub Actions billing/spending-limit issue in account settings.

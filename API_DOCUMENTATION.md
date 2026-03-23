@@ -647,6 +647,11 @@ Parent confirms that KI may activate debug mode for the current ticket.
 - Sets ticket to debug-active state
 - Starts KI follow-up analysis automatically
 
+**Guardrails**:
+- Requires ticket owner auth
+- Allowed only while `conversationStatus == "awaiting_debug_consent"`
+- Rate-limited server-side
+
 ### skipDebugMode
 
 Parent declines debug mode; KI continues without diagnostic data.
@@ -658,6 +663,11 @@ Parent declines debug mode; KI continues without diagnostic data.
 { ticketId: string }
 ```
 
+**Guardrails**:
+- Requires ticket owner auth
+- Allowed only while `conversationStatus == "awaiting_debug_consent"`
+- Rate-limited server-side
+
 ### processUserReplyMessage
 
 Submits a user reply for iterative KI support rounds.
@@ -668,6 +678,12 @@ Submits a user reply for iterative KI support rounds.
 ```typescript
 { ticketId: string, message: string }
 ```
+
+**Guardrails**:
+- Requires ticket owner auth
+- Blocked if ticket already `closed_by_ai` or `escalated`
+- Enforces max conversation rounds in backend
+- Rate-limited server-side
 
 ### analyzeWithDebugData
 
@@ -690,6 +706,12 @@ Returns the current debug snapshot for a ticket (requires active debug grant).
 ```typescript
 { ticketId: string }
 ```
+
+**Guardrails**:
+- Requires ticket owner or support/admin role
+- Requires active, non-expired debug grant
+- Checks debug scope before returning diagnostics
+- Rate-limited server-side
 
 ### onSupportTicketUpdated (Firestore Trigger)
 
