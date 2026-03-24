@@ -128,6 +128,8 @@ let pythonCommissioningCatalog = null;
 let pythonCommissioningEvidenceHistory = [];
 let pythonCommissioningEvidenceIndex = new Map();
 let pythonCommissioningSelectedTestId = null;
+let pythonEvidenceFilterStatus = "";
+let pythonEvidenceFilterTestId = "";
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -887,12 +889,81 @@ function renderPythonAutomationResult(run) {
         `).join("")
         : "<tr><td colspan='5'>Keine lokalen Kommandos ausgeführt.</td></tr>";
 
-    const pendingHtml = pending.length > 0
-        ? `<ul>${pending.map(item => `<li>${escapeHtml(item.title || "Offener Punkt")}: ${escapeHtml(item.details || "")}</li>`).join("")}</ul>`
+    const pendingFiltered = shouldShowOnlyOpenAutomationChecks()
+        ? pending.filter(item => item.status === "fail" || item.status === "manual_required")
+        : pending;
+    const pendingHtml = pendingFiltered.length > 0
+        ? `<ul>${pendingFiltered.map(item => `<li><strong>${escapeHtml(item.title || "Offener Punkt")}</strong>: ${escapeHtml(item.details || "")}</li>`).join("")}</ul>`
         : "<div class='success-box'>Keine offenen Punkte aus dem Python-Lauf.</div>";
 
+    const evCov = run.evidenceCoverage || {};
+    const evCounts = evCov.counts || {};
+    const evOverall = evCov.overall || "pass";
+    const evScore = typeof evCov.coverageScore === "number" ? evCov.coverageScore : 100;
+    const evUncoveredRows = Array.isArray(evCov.uncovered) && evCov.uncovered.length > 0
+        ? evCov.uncovered.map(item => `
+            <tr>
+                <td>${escapeHtml(item.testTitle || item.testId || "-")}</td>
+                <td>${escapeHtml(item.automationType || "-")}</td>
+                <td>${escapeHtml(item.groupTitle || "-")}</td>
+                <td><button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.testId || ""))}')">Protokollieren</button></td>
+            </tr>
+        `).join("")
+        : null;
+    const evFailedRows = Array.isArray(evCov.failedEvidence) && evCov.failedEvidence.length > 0
+        ? evCov.failedEvidence.map(item => `
+            <tr>
+                <td>${escapeHtml(item.testTitle || item.testId || "-")}</td>
+                <td>${escapeHtml(item.groupTitle || "-")}</td>
+                <td>${escapeHtml(item.operator || "-")}</td>
+                <td>${escapeHtml(item.details || "-")}</td>
+                <td><button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.testId || ""))}')">Korrigieren</button></td>
+            </tr>
+        `).join("")
+        : null;
+
+    const evidenceSectionHtml = (evCounts.total > 0) ? `
+        <h5 style='margin-block-start: 16px'>Nachweis-Abdeckung (Manuell &amp; Dokumentiert)</h5>
+        <div class='python-result-summary' style='margin-block-end: 10px'>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evScore))} %</strong>
+                <span>Nachweis-Score</span>
+            </div>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evCounts.covered || 0))}</strong>
+                <span>Abgedeckt</span>
+            </div>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evCounts.uncovered || 0))}</strong>
+                <span>Ohne Nachweis</span>
+            </div>
+            <div class='python-automation-metric'>
+                <strong>${escapeHtml(String(evCounts.failed || 0))}</strong>
+                <span>Nachweis FAIL</span>
+            </div>
+        </div>
+        ${evUncoveredRows ? `
+            <details open>
+                <summary><strong>Fehlende Nachweise (${escapeHtml(String(evCounts.uncovered || 0))})</strong></summary>
+                <table style='margin-block-start: 6px'>
+                    <tr><th>Testfall</th><th>Typ</th><th>Gruppe</th><th>Aktion</th></tr>
+                    ${evUncoveredRows}
+                </table>
+            </details>
+        ` : `<div class='success-box' style='margin-block-end: 8px'>Alle manuellen/dokumentierten Testfälle haben Nachweise.</div>`}
+        ${evFailedRows ? `
+            <details open>
+                <summary><strong>Fehlgeschlagene Nachweise (${escapeHtml(String(evCounts.failed || 0))})</strong></summary>
+                <table style='margin-block-start: 6px'>
+                    <tr><th>Testfall</th><th>Gruppe</th><th>Operator</th><th>Details</th><th>Aktion</th></tr>
+                    ${evFailedRows}
+                </table>
+            </details>
+        ` : ""}
+    ` : "";
+
     resultEl.innerHTML = `
-        <div class='${run.overall === "pass" ? "success-box" : "error"}'>
+        <div class='${run.overall === "pass" ? "success-box" : run.overall === "manual_required" ? "warning-box" : "error"}'>
             <strong>Gesamtstatus:</strong> ${escapeHtml(formatPythonAutomationStatus(run.overall))}<br />
             <strong>Run-ID:</strong> ${escapeHtml(run.runId || "-")}<br />
             <strong>Zeit:</strong> ${escapeHtml(run.startedAt || "-")} → ${escapeHtml(run.finishedAt || "-")}
@@ -929,6 +1000,8 @@ function renderPythonAutomationResult(run) {
             <tr><th>Schritt</th><th>Befehl</th><th>Status</th><th>Code</th><th>Dauer</th></tr>
             ${commandRows}
         </table>
+
+        ${evidenceSectionHtml}
 
         <h5 style='margin-block-start: 10px'>Offene Punkte</h5>
         ${pendingHtml}
@@ -1128,11 +1201,26 @@ function renderPythonAutomationEvidenceHistory(entries) {
     if (!historyEl) return;
 
     if (!Array.isArray(entries) || entries.length === 0) {
-        historyEl.innerHTML = "<div class='info'>Noch keine manuellen Nachweise protokolliert.</div>";
+        historyEl.innerHTML = `
+            ${buildPythonEvidenceFilterToolbar([])}
+            <div class='info'>Noch keine manuellen Nachweise protokolliert.</div>
+        `;
         return;
     }
 
-    const rows = entries.map(entry => {
+    const statusFilter = pythonEvidenceFilterStatus.trim().toLowerCase();
+    const testIdFilter = pythonEvidenceFilterTestId.trim().toLowerCase();
+    const filtered = entries.filter(entry => {
+        if (statusFilter && String(entry.status || "").toLowerCase() !== statusFilter) return false;
+        if (testIdFilter) {
+            const byId = String(entry.testId || "").toLowerCase().includes(testIdFilter);
+            const byTitle = String(entry.testTitle || "").toLowerCase().includes(testIdFilter);
+            if (!byId && !byTitle) return false;
+        }
+        return true;
+    });
+
+    const rows = filtered.map(entry => {
         const encodedTestId = encodeURIComponent(String(entry.testId || ""));
         return `
             <tr>
@@ -1146,20 +1234,76 @@ function renderPythonAutomationEvidenceHistory(entries) {
         `;
     }).join("");
 
+    const summary = filtered.length < entries.length
+        ? `<p class='python-muted-caption'>${escapeHtml(String(filtered.length))} von ${escapeHtml(String(entries.length))} Nachweisen werden angezeigt.</p>`
+        : "";
+
     historyEl.innerHTML = `
-        <table>
-            <tr>
-                <th>Zeit</th>
-                <th>Testfall</th>
-                <th>Status</th>
-                <th>Operator</th>
-                <th>Evidenz / Notiz</th>
-                <th>Aktion</th>
-            </tr>
-            ${rows}
-        </table>
+        ${buildPythonEvidenceFilterToolbar(entries)}
+        ${summary}
+        ${rows ? `
+            <table>
+                <tr>
+                    <th>Zeit</th>
+                    <th>Testfall</th>
+                    <th>Status</th>
+                    <th>Operator</th>
+                    <th>Evidenz / Notiz</th>
+                    <th>Aktion</th>
+                </tr>
+                ${rows}
+            </table>
+        ` : "<div class='info'>Keine Nachweise entsprechen dem aktuellen Filter.</div>"}
     `;
 }
+
+function buildPythonEvidenceFilterToolbar(entries) {
+    const distinctTestIds = [...new Set(
+        (Array.isArray(entries) ? entries : [])
+            .filter(e => e.testId)
+            .map(e => ({ id: String(e.testId), title: String(e.testTitle || e.testId) }))
+            .map(e => JSON.stringify(e))
+    )].map(s => JSON.parse(s));
+
+    const testOptions = distinctTestIds.map(({ id, title }) =>
+        `<option value="${escapeHtml(id)}" ${pythonEvidenceFilterTestId === id ? "selected" : ""}>${escapeHtml(title)}</option>`
+    ).join("");
+
+    return `
+        <div class='python-evidence-filter-bar'>
+            <label>
+                Status:
+                <select id='py-evidence-filter-status' onchange='applyPythonEvidenceFilter()'>
+                    <option value=''>Alle</option>
+                    <option value='pass' ${pythonEvidenceFilterStatus === "pass" ? "selected" : ""}>✅ Pass</option>
+                    <option value='fail' ${pythonEvidenceFilterStatus === "fail" ? "selected" : ""}>❌ Fail</option>
+                    <option value='manual_required' ${pythonEvidenceFilterStatus === "manual_required" ? "selected" : ""}>⚠️ Manuell prüfen</option>
+                </select>
+            </label>
+            <label>
+                Testfall:
+                <select id='py-evidence-filter-testid' onchange='applyPythonEvidenceFilter()'>
+                    <option value=''>Alle</option>
+                    ${testOptions}
+                </select>
+            </label>
+            <button class='btn btn-secondary btn-sm' onclick='resetPythonEvidenceFilter()'>Filter zurücksetzen</button>
+        </div>
+    `;
+}
+
+function applyPythonEvidenceFilter() {
+    pythonEvidenceFilterStatus = document.getElementById("py-evidence-filter-status")?.value || "";
+    pythonEvidenceFilterTestId = document.getElementById("py-evidence-filter-testid")?.value || "";
+    renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
+}
+
+function resetPythonEvidenceFilter() {
+    pythonEvidenceFilterStatus = "";
+    pythonEvidenceFilterTestId = "";
+    renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
+}
+
 
 async function loadPythonAutomationEvidenceHistory() {
     const historyEl = document.getElementById("python-automation-protocol-history");
