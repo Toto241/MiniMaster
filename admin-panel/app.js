@@ -3860,7 +3860,9 @@ function renderAdminActivationContent(user) {
             </p>
             <div class="phase-grid" style="margin-block-start: 10px;">
                 <div class="form-group">
-                    <label for="access-key-role">Rolle für Schlüsseldatei</label>
+                    <label for="access-key-role">Rolle für Schlüsseldatei
+                        <span class="field-tooltip-badge" title="Bestimmt die Berechtigung nach dem Einlösen: admin = Vollzugriff, support = Support-Bereich, auditor = Audit/Compliance." aria-label="Rollenhilfe">?</span>
+                    </label>
                     <select id="access-key-role" class="form-input">
                         <option value="admin">admin</option>
                         <option value="support">support</option>
@@ -3868,7 +3870,9 @@ function renderAdminActivationContent(user) {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="access-key-ttl">Gültigkeit (Minuten)</label>
+                    <label for="access-key-ttl">Gültigkeit (Minuten)
+                        <span class="field-tooltip-badge" title="Ablaufzeit des One-Time-Schlüssels. Erlaubter Bereich: 1 bis 10080 Minuten (7 Tage)." aria-label="TTL-Hilfe">?</span>
+                    </label>
                     <input id="access-key-ttl" class="form-input" type="number" min="1" max="10080" step="1" value="60" />
                 </div>
             </div>
@@ -3882,7 +3886,9 @@ function renderAdminActivationContent(user) {
             <hr style="margin: 14px 0; border: none; border-top: 1px solid #fed7aa;" />
 
             <div class="form-group">
-                <label for="access-key-file">Schlüsseldatei einlösen</label>
+                <label for="access-key-file">Schlüsseldatei einlösen
+                    <span class="field-tooltip-badge" title="Nur unveränderte JSON-Schlüsseldateien aus diesem Admin-Panel verwenden. Jede Datei ist nur einmal gültig." aria-label="Datei-Hilfe">?</span>
+                </label>
                 <input id="access-key-file" type="file" class="form-input" accept="application/json,.json" />
             </div>
             <div class="phase-actions">
@@ -4153,7 +4159,7 @@ async function recheckAdminAccess() {
     try {
         const user = auth.currentUser;
         if (!user) {
-            if (statusEl) statusEl.innerHTML = "<div class='error'>Nicht angemeldet.</div>";
+            renderAuthError(statusEl, { code: "unauthenticated" }, "Nicht angemeldet.", "adminActivation");
             return;
         }
 
@@ -4170,12 +4176,15 @@ async function recheckAdminAccess() {
                 </div>`;
             }
         } else {
-            if (statusEl) {
-                statusEl.innerHTML = "<div class='error'>Noch keine Operator-Rolle zugewiesen. Bitte führen Sie die oben beschriebenen Schritte aus.</div>";
-            }
+            renderAuthError(
+                statusEl,
+                { code: "permission-denied" },
+                "Noch keine Operator-Rolle zugewiesen. Bitte führen Sie die oben beschriebenen Schritte aus.",
+                "adminActivation"
+            );
         }
     } catch (error) {
-        if (statusEl) statusEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
+        renderAuthError(statusEl, error, `Fehler: ${error?.message || "Unbekannter Fehler"}`, "adminActivation");
     }
 }
 
@@ -4201,12 +4210,13 @@ async function bootstrapFirstAdminAction() {
         showNotification("Admin-Zugang aktiviert!", "success");
     } catch (err) {
         let msg = err.message || "Unbekannter Fehler";
-        if (err.code === "permission-denied") {
+        const errCode = normalizeAuthErrorCode(err);
+        if (errCode === "permission-denied") {
             msg = "Es existiert bereits ein Admin. Bitten Sie den bestehenden Admin, Ihnen eine Rolle zuzuweisen.";
-        } else if (err.code === "unauthenticated") {
+        } else if (errCode === "unauthenticated") {
             msg = "Sie müssen angemeldet sein. Bitte registrieren oder einloggen.";
         }
-        if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+        renderAuthError(statusEl, err, msg, "adminActivation");
         if (btn) {
             btn.disabled = false;
             btn.textContent = "🔑 Als ersten Admin aktivieren";
@@ -4226,12 +4236,12 @@ async function handleRegistration(event) {
     const submitBtn = document.getElementById("register-submit-btn");
 
     if (password !== passwordConfirm) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Die Passwörter stimmen nicht überein.</div>";
+        renderAuthError(statusEl, { code: "invalid-argument" }, "Die Passwörter stimmen nicht überein.", "registration");
         return;
     }
 
     if (password.length < 8) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Das Passwort muss mindestens 8 Zeichen lang sein.</div>";
+        renderAuthError(statusEl, { code: "auth/weak-password" }, "Das Passwort muss mindestens 8 Zeichen lang sein.", "registration");
         return;
     }
 
@@ -4268,7 +4278,7 @@ async function handleRegistration(event) {
             msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
         }
         console.error("Registration error:", error.code, error.message);
-        if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+        renderAuthError(statusEl, error, msg, "registration");
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Konto erstellen";
@@ -4283,6 +4293,122 @@ function formatAuthDebugCode(error) {
     return `<div class='info' style='margin-top:6px'>Technischer Fehlercode: <code>${escapeHtml(code)}</code></div>`;
 }
 
+function normalizeAuthErrorCode(error) {
+    const raw = typeof error?.code === "string" ? error.code.trim().toLowerCase() : "";
+    if (!raw) return "";
+    return raw.startsWith("functions/") ? raw.slice("functions/".length) : raw;
+}
+
+function getAuthErrorHint(error, fallbackMessage, scope) {
+    const code = normalizeAuthErrorCode(error);
+    const message = (fallbackMessage || error?.message || "").toString();
+
+    if (message.includes("Unexpected token") || message.includes("JSON")) {
+        return {
+            title: "Datenformat ungültig",
+            tip: "Die empfangenen Daten konnten nicht korrekt verarbeitet werden. Seite neu laden und Vorgang erneut ausführen.",
+        };
+    }
+
+    const map = {
+        "auth/email-already-in-use": {
+            title: "E-Mail bereits vergeben",
+            tip: "Diese E-Mail existiert bereits. Nutzen Sie den Login-Tab oder Passwort-Reset.",
+        },
+        "auth/weak-password": {
+            title: "Passwort zu schwach",
+            tip: "Verwenden Sie ein längeres Passwort mit Buchstaben, Zahlen und Sonderzeichen.",
+        },
+        "auth/invalid-email": {
+            title: "E-Mail ungültig",
+            tip: "Bitte E-Mail-Format prüfen, z. B. name@domain.tld.",
+        },
+        "auth/user-not-found": {
+            title: "Konto nicht gefunden",
+            tip: "Für diese E-Mail existiert kein Passwort-Konto oder Enumeration-Protection ist aktiv.",
+        },
+        "auth/wrong-password": {
+            title: "Passwort falsch",
+            tip: "Passwort erneut eingeben oder den Reset-Flow verwenden.",
+        },
+        "auth/invalid-credential": {
+            title: "Ungültige Zugangsdaten",
+            tip: "E-Mail/Passwort prüfen. Bei wiederholtem Fehler Passwort zurücksetzen.",
+        },
+        "auth/too-many-requests": {
+            title: "Zu viele Versuche",
+            tip: "Bitte kurz warten und erneut versuchen. Bei Bedarf Passwort-Reset nutzen.",
+        },
+        "auth/network-request-failed": {
+            title: "Netzwerkproblem",
+            tip: "Internetverbindung, Firewall/Proxy und Firebase-Konfiguration prüfen.",
+        },
+        "auth/operation-not-allowed": {
+            title: "Methode deaktiviert",
+            tip: "In Firebase Authentication ist die gewünschte Anmeldemethode nicht aktiviert.",
+        },
+        "permission-denied": {
+            title: "Keine Berechtigung",
+            tip: "Der Vorgang ist mit dem aktuellen Konto nicht erlaubt.",
+        },
+        "unauthenticated": {
+            title: "Nicht angemeldet",
+            tip: "Bitte anmelden und Vorgang erneut ausführen.",
+        },
+        "invalid-argument": {
+            title: "Ungültige Eingabe",
+            tip: "Bitte Eingabefelder prüfen und erneut versuchen.",
+        },
+    };
+
+    if (map[code]) return map[code];
+
+    const defaults = {
+        registration: {
+            title: "Registrierung fehlgeschlagen",
+            tip: "E-Mail/Passwort und Firebase Auth-Einstellungen prüfen.",
+        },
+        adminActivation: {
+            title: "Admin-Aktivierung fehlgeschlagen",
+            tip: "Berechtigungen und Bootstrap-Status prüfen, dann Vorgang erneut ausführen.",
+        },
+        providerCheck: {
+            title: "Provider-Prüfung fehlgeschlagen",
+            tip: "Verbindung und Firebase Auth-Konfiguration prüfen.",
+        },
+        reset: {
+            title: "Reset fehlgeschlagen",
+            tip: "E-Mail prüfen und bei Bedarf nach kurzer Wartezeit erneut versuchen.",
+        },
+        login: {
+            title: "Anmeldung fehlgeschlagen",
+            tip: "Zugangsdaten prüfen oder Passwort-Reset verwenden.",
+        },
+    };
+
+    return defaults[scope] || {
+        title: "Allgemeiner Fehler",
+        tip: "Bitte Eingaben und Verbindung prüfen. Falls der Fehler bleibt, Debug-Code auswerten.",
+    };
+}
+
+function renderAuthError(statusEl, error, fallbackMessage, scope) {
+    if (!statusEl) return;
+    const message = (fallbackMessage || error?.message || "Unbekannter Fehler").toString();
+    const hint = getAuthErrorHint(error, message, scope);
+    const code = normalizeAuthErrorCode(error);
+    const codeLabel = code ? `Code: ${code}` : "Code: lokal";
+
+    statusEl.innerHTML = `
+        <div class='error'>
+            ${escapeHtml(message)}
+            <span class='error-tooltip-badge' title='${escapeHtml(hint.tip)}' aria-label='${escapeHtml(hint.tip)}'>ⓘ</span>
+        </div>
+        <div class='access-error-help'><strong>${escapeHtml(hint.title)}.</strong> ${escapeHtml(hint.tip)} <span class='access-error-code'>${escapeHtml(codeLabel)}</span></div>
+        ${formatAuthDebugCode(error)}
+    `;
+}
+
 async function handleCheckAuthProviders() {
     const emailInput = document.getElementById("login-email");
     const statusEl = document.getElementById("login-status");
@@ -4290,12 +4416,12 @@ async function handleCheckAuthProviders() {
     const email = (emailInput?.value || "").trim();
 
     if (!email) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine E-Mail-Adresse eingeben.</div>";
+        renderAuthError(statusEl, { code: "invalid-argument" }, "Bitte zuerst eine E-Mail-Adresse eingeben.", "providerCheck");
         return;
     }
 
     if (!auth) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Firebase Authentication ist noch nicht initialisiert.</div>";
+        renderAuthError(statusEl, { code: "unauthenticated" }, "Firebase Authentication ist noch nicht initialisiert.", "providerCheck");
         return;
     }
 
@@ -4321,9 +4447,7 @@ async function handleCheckAuthProviders() {
         }
     } catch (error) {
         const msg = error?.message || "Prüfung fehlgeschlagen.";
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${formatAuthDebugCode(error)}`;
-        }
+        renderAuthError(statusEl, error, msg, "providerCheck");
     } finally {
         if (checkBtn) checkBtn.disabled = false;
     }
@@ -4337,12 +4461,12 @@ async function handleForgotPassword() {
     const email = (emailInput?.value || "").trim();
 
     if (!email) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst die hinterlegte E-Mail-Adresse eingeben.</div>";
+        renderAuthError(statusEl, { code: "invalid-argument" }, "Bitte zuerst die hinterlegte E-Mail-Adresse eingeben.", "reset");
         return;
     }
 
     if (!auth) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Firebase Authentication ist noch nicht initialisiert.</div>";
+        renderAuthError(statusEl, { code: "unauthenticated" }, "Firebase Authentication ist noch nicht initialisiert.", "reset");
         return;
     }
 
@@ -4361,9 +4485,12 @@ async function handleForgotPassword() {
 
         if (Array.isArray(methods) && methods.length > 0 && !methods.includes("password")) {
             const readableMethods = methods.join(", ");
-            if (statusEl) {
-                statusEl.innerHTML = `<div class='error'>Für diese E-Mail ist keine Passwort-Anmeldung aktiviert (gefunden: ${escapeHtml(readableMethods)}). Bitte mit dem passenden Provider anmelden oder ein Passwort-Konto erstellen.</div>`;
-            }
+            renderAuthError(
+                statusEl,
+                { code: "permission-denied" },
+                `Für diese E-Mail ist keine Passwort-Anmeldung aktiviert (gefunden: ${escapeHtml(readableMethods)}). Bitte mit dem passenden Provider anmelden oder ein Passwort-Konto erstellen.`,
+                "reset"
+            );
             return;
         }
 
@@ -4399,9 +4526,7 @@ async function handleForgotPassword() {
             msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
         }
         console.error("Password reset error:", error.code, error.message);
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${formatAuthDebugCode(error)}`;
-        }
+        renderAuthError(statusEl, error, msg, "reset");
     } finally {
         if (resetBtn) resetBtn.disabled = false;
         if (resetProminentBtn) resetProminentBtn.disabled = false;
@@ -4430,9 +4555,7 @@ function handleLogin(event) {
                 msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
             }
             console.error("Login error:", error.code, error.message);
-            if (statusEl) {
-                statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${formatAuthDebugCode(error)}`;
-            }
+            renderAuthError(statusEl, error, msg, "login");
         });
 }
 
