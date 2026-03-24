@@ -1338,6 +1338,43 @@ input:focus, select:focus, textarea:focus {
     grid-column: 1 / -1;
 }
 
+.python-evidence-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    margin-block-end: 12px;
+}
+
+.python-evidence-filter-bar label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.82rem;
+    color: #475569;
+}
+
+.python-evidence-filter-bar select {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 0.88rem;
+    background: white;
+}
+
+.warning-box {
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #78350f;
+}
+
 
 .priority-plan-list {
     display: grid;

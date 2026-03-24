@@ -908,6 +908,86 @@ def save_commissioning_evidence(payload: dict[str, object]) -> dict[str, object]
     return entry
 
 
+def evaluate_evidence_coverage(
+    evidence_index: dict[str, dict[str, object]]
+) -> dict[str, object]:
+    """Bewertet, ob alle manuellen und dokumentierten Testfaelle durch Nachweise abgedeckt sind."""
+    covered: list[dict[str, object]] = []
+    uncovered: list[dict[str, object]] = []
+    failed_evidence: list[dict[str, object]] = []
+
+    for group, test in iter_commissioning_tests():
+        automation_type = str(test.get("automationType") or "automatic")
+        if automation_type not in ("manual", "documented"):
+            continue
+
+        test_id = str(test.get("id") or "")
+        test_title = str(test.get("title") or test_id)
+        group_title = str(group.get("title") or "")
+        entry = evidence_index.get(test_id)
+
+        if entry is None:
+            uncovered.append(
+                {
+                    "testId": test_id,
+                    "testTitle": test_title,
+                    "groupTitle": group_title,
+                    "automationType": automation_type,
+                    "status": "not_verified",
+                    "details": f"Kein Nachweis fuer '{test_title}' vorhanden.",
+                }
+            )
+        elif str(entry.get("status") or "") == "fail":
+            failed_evidence.append(
+                {
+                    "testId": test_id,
+                    "testTitle": test_title,
+                    "groupTitle": group_title,
+                    "automationType": automation_type,
+                    "status": "fail",
+                    "operator": str(entry.get("operator") or ""),
+                    "details": format_evidence_details(entry),
+                }
+            )
+        else:
+            covered.append(
+                {
+                    "testId": test_id,
+                    "testTitle": test_title,
+                    "groupTitle": group_title,
+                    "automationType": automation_type,
+                    "status": str(entry.get("status") or "pass"),
+                    "operator": str(entry.get("operator") or ""),
+                    "details": format_evidence_details(entry),
+                }
+            )
+
+    total = len(covered) + len(uncovered) + len(failed_evidence)
+    coverage_score = round(len(covered) / total * 100) if total > 0 else 100
+
+    evidence_overall: str
+    if failed_evidence:
+        evidence_overall = "fail"
+    elif uncovered:
+        evidence_overall = "manual_required"
+    else:
+        evidence_overall = "pass"
+
+    return {
+        "covered": covered,
+        "uncovered": uncovered,
+        "failedEvidence": failed_evidence,
+        "counts": {
+            "total": total,
+            "covered": len(covered),
+            "uncovered": len(uncovered),
+            "failed": len(failed_evidence),
+        },
+        "coverageScore": coverage_score,
+        "overall": evidence_overall,
+    }
+
+
 def run_commissioning_suite(
     context: dict[str, object], *, run_commands: bool, timeout_sec: int
 ) -> dict[str, object]:
@@ -916,6 +996,8 @@ def run_commissioning_suite(
 
     evaluation = evaluate_commissioning_context(context)
     command_results = run_commissioning_commands(run_commands, timeout_sec)
+    evidence_index = load_latest_commissioning_evidence()
+    evidence_coverage = evaluate_evidence_coverage(evidence_index)
 
     command_counts = {
         "pass": sum(1 for item in command_results if item["status"] == "pass"),
@@ -933,9 +1015,31 @@ def run_commissioning_suite(
                 }
             )
 
+    for item in evidence_coverage["failedEvidence"]:
+        pending.append(
+            {
+                "title": f"Nachweis fehlgeschlagen: {item['testTitle']}",
+                "status": "fail",
+                "details": item["details"],
+                "source": "evidence",
+            }
+        )
+
+    for item in evidence_coverage["uncovered"]:
+        pending.append(
+            {
+                "title": f"Kein Nachweis: {item['testTitle']}",
+                "status": "manual_required",
+                "details": item["details"],
+                "source": "evidence",
+            }
+        )
+
     overall = evaluation["overall"]
-    if command_counts["fail"] > 0:
+    if command_counts["fail"] > 0 or evidence_coverage["overall"] == "fail":
         overall = "fail"
+    elif overall == "pass" and evidence_coverage["overall"] == "manual_required":
+        overall = "manual_required"
 
     finished_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     result = {
@@ -944,6 +1048,7 @@ def run_commissioning_suite(
         "finishedAt": finished_at,
         "overall": overall,
         "evaluation": evaluation,
+        "evidenceCoverage": evidence_coverage,
         "commands": {
             "executed": run_commands,
             "timeoutSec": timeout_sec,
