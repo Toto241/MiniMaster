@@ -3023,6 +3023,311 @@ function applyImportedBootstrapFirebaseConfig(config, sourceLabel = "Import") {
     showNotification(`${sourceLabel}: Firebase-Konfiguration für ${normalizedConfig.projectId} übernommen.`, "success");
 }
 
+function getBootstrapProjectId() {
+    return (document.getElementById("bootstrap-project-id")?.value || "").trim();
+}
+
+const recoveryProgressSteps = ["validate", "cloud", "local", "reload"];
+const recoveryProgressStateLabels = {
+    pending: "Offen",
+    running: "Läuft",
+    done: "Fertig",
+    manual: "Manuell",
+    error: "Fehler",
+};
+
+function setRecoveryProgressStep(stepName, state = "pending") {
+    const container = document.getElementById("bootstrap-recovery-progress");
+    if (!container) return;
+
+    const stepEl = container.querySelector(`[data-step='${stepName}']`);
+    if (!stepEl) return;
+
+    stepEl.classList.remove("state-running", "state-done", "state-manual", "state-error");
+    if (state !== "pending") {
+        stepEl.classList.add(`state-${state}`);
+    }
+
+    const stateEl = stepEl.querySelector(".recovery-progress-state");
+    if (stateEl) {
+        stateEl.textContent = recoveryProgressStateLabels[state] || recoveryProgressStateLabels.pending;
+    }
+}
+
+function resetRecoveryProgress() {
+    recoveryProgressSteps.forEach(step => setRecoveryProgressStep(step, "pending"));
+}
+
+function markRecoveryProgressBeforeExecution(includeLocalCleanup) {
+    setRecoveryProgressStep("validate", "done");
+    setRecoveryProgressStep("cloud", "running");
+    setRecoveryProgressStep("local", includeLocalCleanup ? "pending" : "manual");
+    setRecoveryProgressStep("reload", "pending");
+}
+
+function setRecoveryAlive(isRunning, message) {
+    const aliveEl = document.getElementById("bootstrap-recovery-alive");
+    if (!aliveEl) return;
+
+    aliveEl.classList.toggle("is-running", Boolean(isRunning));
+    const messageEl = aliveEl.querySelector(".recovery-alive-message");
+    if (messageEl && typeof message === "string" && message.trim().length > 0) {
+        messageEl.textContent = message;
+    }
+}
+
+function buildFirebaseRecoveryCommands(projectId) {
+    return [
+        "npm install",
+        `firebase use ${projectId}`,
+        "firebase deploy --only firestore:rules,firestore:indexes,storage",
+        "firebase deploy --only functions",
+    ];
+}
+
+function buildFirebaseRecoveryScript(projectId) {
+    return buildFirebaseRecoveryCommands(projectId).join("\n");
+}
+
+function appendRecoveryLog(statusEl, line) {
+    if (!statusEl) return;
+    const existing = statusEl.getAttribute("data-log") || "";
+    const next = existing ? `${existing}\n${line}` : line;
+    statusEl.setAttribute("data-log", next);
+    statusEl.innerHTML = `<pre class='code-block' style='margin:0'>${escapeHtml(next)}</pre>`;
+}
+
+async function executeFirebaseRecoveryCommands(projectId, statusEl, cwd, onCommandStart) {
+    const commands = buildFirebaseRecoveryCommands(projectId);
+    for (const command of commands) {
+        if (typeof onCommandStart === "function") {
+            onCommandStart(command);
+        }
+        appendRecoveryLog(statusEl, `> ${command}`);
+        const result = await executeCommandViaPythonBridge({ command, cwd });
+        const output = (result?.output || "").trim();
+        if (output) appendRecoveryLog(statusEl, output);
+        if (Number(result?.code) !== 0) {
+            throw new Error(`Befehl fehlgeschlagen (Code ${result?.code ?? "?"}): ${command}`);
+        }
+    }
+}
+
+async function resetPanelForFreshBootstrap(preservedConfig) {
+    stopSessionMonitoring();
+
+    if (auth && auth.currentUser) {
+        try {
+            await auth.signOut();
+        } catch (signOutError) {
+            console.warn("Sign-out during fresh setup reset failed:", signOutError);
+        }
+    }
+
+    try {
+        sessionStorage.clear();
+    } catch (sessionError) {
+        console.warn("sessionStorage clear during fresh setup failed:", sessionError);
+    }
+
+    try {
+        localStorage.clear();
+        if (preservedConfig && hasCompleteFirebaseConfig(preservedConfig) && !isPlaceholderFirebaseConfig(preservedConfig)) {
+            localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(preservedConfig));
+        }
+    } catch (localError) {
+        console.warn("localStorage clear during fresh setup failed:", localError);
+    }
+
+    await Promise.allSettled([
+        clearIndexedDbBestEffort(),
+        clearCachesBestEffort(),
+        unregisterServiceWorkersBestEffort(),
+    ]);
+}
+
+async function copyFirebaseRecoveryScript() {
+    const statusEl = document.getElementById("bootstrap-recovery-status");
+    const projectId = getBootstrapProjectId();
+
+    resetRecoveryProgress();
+    setRecoveryAlive(false, "Bereit");
+
+    if (!projectId) {
+        setRecoveryProgressStep("validate", "error");
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine Project ID im Firebase-Formular eintragen.</div>";
+        return;
+    }
+
+    setRecoveryProgressStep("validate", "done");
+    setRecoveryProgressStep("cloud", "manual");
+    setRecoveryProgressStep("local", "manual");
+    setRecoveryProgressStep("reload", "pending");
+    setRecoveryAlive(false, "Manuelle Ausführung");
+
+    try {
+        const script = buildFirebaseRecoveryScript(projectId);
+        await copyTextToClipboard(script);
+        if (statusEl) statusEl.innerHTML = "<div class='success-box'>Recovery-Skript kopiert. Im Terminal ausführen und danach auf Speichern &amp; verbinden klicken.</div>";
+        showNotification("Recovery-Skript wurde kopiert.", "success");
+    } catch (error) {
+        if (statusEl) statusEl.innerHTML = `<div class='error'>Kopieren fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
+    }
+}
+
+async function runFirebaseRecoveryAutopilot() {
+    const statusEl = document.getElementById("bootstrap-recovery-status");
+    const projectId = getBootstrapProjectId();
+
+    resetRecoveryProgress();
+    setRecoveryAlive(false, "Bereit");
+
+    if (!projectId) {
+        setRecoveryProgressStep("validate", "error");
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine Project ID im Firebase-Formular eintragen.</div>";
+        return;
+    }
+
+    if (!canExecuteCommandsDirectly()) {
+        setRecoveryProgressStep("validate", "done");
+        setRecoveryProgressStep("cloud", "manual");
+        setRecoveryProgressStep("local", "manual");
+        setRecoveryAlive(false, "Manuelle Ausführung");
+        await copyFirebaseRecoveryScript();
+        if (statusEl) {
+            statusEl.innerHTML += "<div class='info' style='margin-block-start:8px'>Direkte Ausführung ist in diesem Modus nicht verfügbar. Skript wurde kopiert.</div>";
+        }
+        return;
+    }
+
+    const confirmed = confirm(
+        "Recovery-Autopilot starten?\n\n" +
+        "Folgende Schritte werden ausgeführt: npm install, firebase use, Deploy von Rules/Indexes/Storage und Functions."
+    );
+    if (!confirmed) return;
+
+    const cwd = getCommandBuilderFormValues()?.workspacePath || ".";
+    let activeStep = "cloud";
+    markRecoveryProgressBeforeExecution(false);
+    setRecoveryAlive(true, "Recovery läuft");
+
+    if (statusEl) {
+        statusEl.setAttribute("data-log", "");
+        appendRecoveryLog(statusEl, `Recovery gestartet für Projekt: ${projectId}`);
+    }
+
+    try {
+        setRecoveryAlive(true, "Cloud-Recovery aktiv");
+        await executeFirebaseRecoveryCommands(projectId, statusEl, cwd, command => {
+            setRecoveryAlive(true, `Aktiv: ${command}`);
+        });
+        setRecoveryProgressStep("cloud", "done");
+
+        activeStep = "reload";
+        setRecoveryProgressStep("reload", "running");
+        setRecoveryAlive(true, "Neuinitialisierung läuft");
+        appendRecoveryLog(statusEl, "Recovery abgeschlossen. Wechsle zur Verbindung...");
+        showNotification("Firebase-Cloud-Recovery abgeschlossen. Verbindung wird aufgebaut...", "success");
+        setRecoveryProgressStep("reload", "done");
+        setRecoveryAlive(false, "Recovery abgeschlossen");
+        reloadWithBootstrapConfig();
+    } catch (error) {
+        setRecoveryProgressStep(activeStep, "error");
+        setRecoveryAlive(false, "Fehler");
+        appendRecoveryLog(statusEl, `Fehler: ${error?.message || "Unbekannter Fehler"}`);
+        showNotification("Recovery fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
+async function runStartFromScratchAutopilot() {
+    const statusEl = document.getElementById("bootstrap-recovery-status");
+    const projectId = getBootstrapProjectId();
+
+    resetRecoveryProgress();
+    setRecoveryAlive(false, "Bereit");
+
+    if (!projectId) {
+        setRecoveryProgressStep("validate", "error");
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine Project ID im Firebase-Formular eintragen.</div>";
+        return;
+    }
+
+    const firstConfirm = confirm(
+        "Start bei Null ausführen?\n\n" +
+        "Dieser Ablauf stellt die Firebase-Cloud wieder her und bereinigt danach das lokale Admin-Panel."
+    );
+    if (!firstConfirm) return;
+
+    const resetToken = window.prompt(
+        "Sicherheitsabfrage: Bitte zur Bestätigung exakt RESET eingeben."
+    );
+    if ((resetToken || "").trim() !== "RESET") {
+        setRecoveryProgressStep("validate", "error");
+        setRecoveryAlive(false, "Abgebrochen");
+        if (statusEl) {
+            statusEl.innerHTML = "<div class='info'>Start bei Null abgebrochen (Bestätigung RESET nicht korrekt).</div>";
+        }
+        return;
+    }
+
+    if (!canExecuteCommandsDirectly()) {
+        setRecoveryProgressStep("validate", "done");
+        setRecoveryProgressStep("cloud", "manual");
+        setRecoveryProgressStep("local", "manual");
+        setRecoveryAlive(false, "Manuelle Ausführung");
+        await copyFirebaseRecoveryScript();
+        if (statusEl) {
+            statusEl.innerHTML += "<div class='info' style='margin-block-start:8px'>Ein-Klick-Ausführung ist in diesem Modus nicht verfügbar. Recovery-Skript wurde kopiert.</div>";
+        }
+        return;
+    }
+
+    const normalizedFromForm = normalizeBootstrapFirebaseConfig(getBootstrapFirebaseFormValues());
+    const preservedConfig = hasCompleteFirebaseConfig(normalizedFromForm) && !isPlaceholderFirebaseConfig(normalizedFromForm)
+        ? normalizedFromForm
+        : normalizeBootstrapFirebaseConfig(firebaseConfig);
+
+    const cwd = getCommandBuilderFormValues()?.workspacePath || ".";
+    let activeStep = "cloud";
+    markRecoveryProgressBeforeExecution(true);
+    setRecoveryAlive(true, "Start bei Null läuft");
+
+    if (statusEl) {
+        statusEl.setAttribute("data-log", "");
+        appendRecoveryLog(statusEl, `Start-bei-Null gestartet für Projekt: ${projectId}`);
+    }
+
+    try {
+        setRecoveryAlive(true, "Cloud-Recovery aktiv");
+        await executeFirebaseRecoveryCommands(projectId, statusEl, cwd, command => {
+            setRecoveryAlive(true, `Aktiv: ${command}`);
+        });
+        setRecoveryProgressStep("cloud", "done");
+
+        activeStep = "local";
+        setRecoveryProgressStep("local", "running");
+        setRecoveryAlive(true, "Lokale Bereinigung aktiv");
+        appendRecoveryLog(statusEl, "Cloud-Recovery abgeschlossen. Bereinige lokales Panel...");
+
+        await resetPanelForFreshBootstrap(preservedConfig);
+        setRecoveryProgressStep("local", "done");
+
+        activeStep = "reload";
+        setRecoveryProgressStep("reload", "running");
+        setRecoveryAlive(true, "Neuinitialisierung läuft");
+        appendRecoveryLog(statusEl, "Lokales Panel bereinigt. Lade Neuinitialisierung...");
+        showNotification("Start bei Null abgeschlossen. Neuinitialisierung wird geladen...", "success");
+        setRecoveryProgressStep("reload", "done");
+        setRecoveryAlive(false, "Abgeschlossen");
+        window.location.replace(`${window.location.pathname}?freshSetup=${Date.now()}`);
+    } catch (error) {
+        setRecoveryProgressStep(activeStep, "error");
+        setRecoveryAlive(false, "Fehler");
+        appendRecoveryLog(statusEl, `Fehler: ${error?.message || "Unbekannter Fehler"}`);
+        showNotification("Start bei Null fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
 async function loadBootstrapFirebaseConfigFromUrl() {
     const urlInput = document.getElementById("bootstrap-config-url");
     const statusEl = document.getElementById("bootstrap-import-status");

@@ -278,6 +278,144 @@ body {
     margin: 0;
 }
 
+.recovery-progress {
+    display: grid;
+    gap: 8px;
+    margin-block-start: 10px;
+    padding: 10px;
+    border: 1px solid #fdba74;
+    border-radius: 8px;
+    background: #fffbeb;
+}
+
+.recovery-progress-step {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.recovery-progress-dot {
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 999px;
+    background: #94a3b8;
+}
+
+.recovery-progress-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.recovery-progress-state {
+    font-size: 0.76rem;
+    color: #64748b;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.recovery-progress-step.state-running {
+    background: #eff6ff;
+}
+
+.recovery-progress-step.state-running .recovery-progress-dot {
+    background: #2563eb;
+}
+
+.recovery-progress-step.state-running .recovery-progress-state {
+    color: #1d4ed8;
+}
+
+.recovery-progress-step.state-done {
+    background: #f0fdf4;
+}
+
+.recovery-progress-step.state-done .recovery-progress-dot {
+    background: #16a34a;
+}
+
+.recovery-progress-step.state-done .recovery-progress-state {
+    color: #15803d;
+}
+
+.recovery-progress-step.state-manual {
+    background: #fff7ed;
+}
+
+.recovery-progress-step.state-manual .recovery-progress-dot {
+    background: #ea580c;
+}
+
+.recovery-progress-step.state-manual .recovery-progress-state {
+    color: #c2410c;
+}
+
+.recovery-progress-step.state-error {
+    background: #fef2f2;
+}
+
+.recovery-progress-step.state-error .recovery-progress-dot {
+    background: #dc2626;
+}
+
+.recovery-progress-step.state-error .recovery-progress-state {
+    color: #b91c1c;
+}
+
+.recovery-alive {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-block-start: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    font-size: 0.8rem;
+    color: #9a3412;
+}
+
+.recovery-alive-label {
+    font-weight: 700;
+}
+
+.recovery-alive-message {
+    font-weight: 600;
+}
+
+.recovery-alive-cursor {
+    inline-size: 8px;
+    block-size: 1em;
+    background: currentColor;
+    border-radius: 1px;
+    opacity: 0;
+}
+
+.recovery-alive.is-running {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.recovery-alive.is-running .recovery-alive-cursor {
+    opacity: 1;
+    animation: recovery-cursor-blink 0.9s steps(1, end) infinite;
+}
+
+@keyframes recovery-cursor-blink {
+    0%, 45% {
+        opacity: 1;
+    }
+    46%, 100% {
+        opacity: 0;
+    }
+}
+
 .phase-actions {
     display: flex;
     gap: 10px;
