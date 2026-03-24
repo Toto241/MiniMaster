@@ -3008,6 +3008,119 @@ function extractFirebaseConfigFromText(text) {
     return null;
 }
 
+function extractFirebaseConfigFromGoogleServices(rawConfig, metaOut = null) {
+    if (!rawConfig || typeof rawConfig !== "object") return null;
+
+    const projectInfo = rawConfig.project_info;
+    const clients = Array.isArray(rawConfig.client) ? rawConfig.client : [];
+    if (!projectInfo || clients.length === 0) return null;
+
+    const projectId = String(projectInfo.project_id || "").trim();
+    const storageBucket = String(projectInfo.storage_bucket || "").trim();
+    const messagingSenderId = String(projectInfo.project_number || "").trim();
+    if (!projectId || !storageBucket || !messagingSenderId) return null;
+
+    const preferredClient = clients.find(client => {
+        const packageName = client?.client_info?.android_client_info?.package_name;
+        return packageName === "com.google.pairing";
+    }) || clients[0];
+
+    const selectedPackageName = String(preferredClient?.client_info?.android_client_info?.package_name || "").trim();
+
+    const apiKey = String(preferredClient?.api_key?.[0]?.current_key || "").trim();
+    const appId = String(preferredClient?.client_info?.mobilesdk_app_id || "").trim();
+    if (!apiKey || !appId) return null;
+
+    if (metaOut && typeof metaOut === "object") {
+        metaOut.format = "google-services.json";
+        metaOut.packageName = selectedPackageName;
+    }
+
+    return normalizeBootstrapFirebaseConfig({
+        apiKey,
+        authDomain: `${projectId}.firebaseapp.com`,
+        projectId,
+        storageBucket,
+        messagingSenderId,
+        appId,
+    });
+}
+
+let pendingBootstrapImport = null;
+
+function getBootstrapImportStatusElement() {
+    return document.getElementById("bootstrap-import-status");
+}
+
+function showBootstrapImportPreview(config, sourceLabel, meta = {}) {
+    const statusEl = getBootstrapImportStatusElement();
+    if (!statusEl) return;
+
+    const normalizedConfig = normalizeBootstrapFirebaseConfig(config);
+    if (!hasCompleteFirebaseConfig(normalizedConfig) || isPlaceholderFirebaseConfig(normalizedConfig)) {
+        throw new Error("Vorschau konnte nicht erstellt werden: Konfiguration unvollständig.");
+    }
+
+    pendingBootstrapImport = {
+        config: normalizedConfig,
+        sourceLabel,
+    };
+
+    const lines = [
+        `<li><strong>Quelle:</strong> ${escapeHtml(meta.source || sourceLabel)}</li>`,
+        `<li><strong>Format:</strong> ${escapeHtml(meta.format || "firebaseConfig")}</li>`,
+        `<li><strong>Project ID:</strong> <code>${escapeHtml(normalizedConfig.projectId)}</code></li>`,
+        `<li><strong>App ID:</strong> <code>${escapeHtml(normalizedConfig.appId)}</code></li>`,
+    ];
+
+    if (meta.packageName) {
+        lines.push(`<li><strong>Package-Quelle:</strong> <code>${escapeHtml(meta.packageName)}</code></li>`);
+    }
+
+    statusEl.innerHTML = `
+        <div class='info'>
+            <strong>Import-Vorschau</strong>
+            <ul style='margin:8px 0 0 18px;padding:0;'>${lines.join("")}</ul>
+            <div class='phase-actions' style='margin-block-start:10px'>
+                <button type='button' class='btn btn-primary' onclick='confirmBootstrapImportPreview()'>Übernehmen</button>
+                <button type='button' class='btn btn-secondary' onclick='cancelBootstrapImportPreview()'>Abbrechen</button>
+            </div>
+        </div>
+    `;
+}
+
+function cancelBootstrapImportPreview() {
+    pendingBootstrapImport = null;
+    const statusEl = getBootstrapImportStatusElement();
+    if (statusEl) {
+        statusEl.innerHTML = "<div class='info'>Import-Vorschau verworfen.</div>";
+    }
+}
+
+function confirmBootstrapImportPreview() {
+    const statusEl = getBootstrapImportStatusElement();
+    if (!pendingBootstrapImport) {
+        if (statusEl) {
+            statusEl.innerHTML = "<div class='error'>Keine Import-Vorschau verfügbar.</div>";
+        }
+        return;
+    }
+
+    const { config, sourceLabel } = pendingBootstrapImport;
+    pendingBootstrapImport = null;
+
+    try {
+        applyImportedBootstrapFirebaseConfig(config, sourceLabel || "Import");
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='success-box'>Konfiguration übernommen: ${escapeHtml(config.projectId)}.</div>`;
+        }
+    } catch (error) {
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>Übernahme fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
+        }
+    }
+}
+
 function applyImportedBootstrapFirebaseConfig(config, sourceLabel = "Import") {
     const normalizedConfig = normalizeBootstrapFirebaseConfig(config);
     if (!hasCompleteFirebaseConfig(normalizedConfig) || isPlaceholderFirebaseConfig(normalizedConfig)) {
@@ -3353,9 +3466,19 @@ async function loadBootstrapFirebaseConfigFromUrl() {
         const contentType = response.headers.get("content-type") || "";
         const payloadText = await response.text();
         let extractedConfig = null;
+        let detectedFormat = "firebaseConfig";
 
         if (contentType.includes("application/json")) {
-            extractedConfig = normalizeBootstrapFirebaseConfig(JSON.parse(payloadText));
+            const parsedJson = JSON.parse(payloadText);
+            const directConfig = parsedJson?.firebaseConfig && typeof parsedJson.firebaseConfig === "object"
+                ? parsedJson.firebaseConfig
+                : parsedJson;
+            extractedConfig = normalizeBootstrapFirebaseConfig(directConfig);
+            if (!hasCompleteFirebaseConfig(extractedConfig)) {
+                const meta = {};
+                extractedConfig = extractFirebaseConfigFromGoogleServices(parsedJson, meta);
+                if (meta?.format) detectedFormat = meta.format;
+            }
         } else {
             extractedConfig = extractFirebaseConfigFromText(payloadText);
         }
@@ -3364,15 +3487,71 @@ async function loadBootstrapFirebaseConfigFromUrl() {
             throw new Error("Inhalt konnte nicht als firebaseConfig erkannt werden.");
         }
 
-        applyImportedBootstrapFirebaseConfig(extractedConfig, "URL-Import");
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='success-box'>Konfiguration aus URL übernommen: ${escapeHtml(extractedConfig.projectId)}.</div>`;
-        }
+        showBootstrapImportPreview(extractedConfig, "URL-Import", {
+            source: url,
+            format: detectedFormat,
+        });
     } catch (error) {
         if (statusEl) {
             statusEl.innerHTML = `<div class='error'>Import fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
         }
         console.error("[loadBootstrapFirebaseConfigFromUrl] Fehler:", error);
+    }
+}
+
+async function loadBootstrapFirebaseConfigFromFile() {
+    const fileInput = document.getElementById("bootstrap-config-file");
+    const statusEl = document.getElementById("bootstrap-import-status");
+    const file = fileInput?.files?.[0];
+
+    if (!file) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine JSON-Datei auswählen.</div>";
+        return;
+    }
+
+    if (file.size > 1024 * 1024) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Datei ist zu groß. Bitte eine JSON-Datei bis 1 MB verwenden.</div>";
+        return;
+    }
+
+    if (statusEl) statusEl.innerHTML = "<div class='info'>Lese lokale JSON-Datei ...</div>";
+
+    try {
+        const payloadText = await file.text();
+        let extractedConfig = null;
+        const importMeta = {
+            source: file.name,
+            format: "firebaseConfig",
+            packageName: "",
+        };
+
+        try {
+            const parsed = JSON.parse(payloadText);
+            const directConfig = parsed?.firebaseConfig && typeof parsed.firebaseConfig === "object"
+                ? parsed.firebaseConfig
+                : parsed;
+            extractedConfig = normalizeBootstrapFirebaseConfig(directConfig);
+            if (!hasCompleteFirebaseConfig(extractedConfig)) {
+                const meta = {};
+                extractedConfig = extractFirebaseConfigFromGoogleServices(parsed, meta);
+                if (meta?.format) importMeta.format = meta.format;
+                if (meta?.packageName) importMeta.packageName = meta.packageName;
+            }
+        } catch (_parseError) {
+            extractedConfig = extractFirebaseConfigFromText(payloadText);
+        }
+
+        if (!hasCompleteFirebaseConfig(extractedConfig) || isPlaceholderFirebaseConfig(extractedConfig)) {
+            throw new Error("Datei enthält keine nutzbare Firebase-Konfiguration.");
+        }
+
+        showBootstrapImportPreview(extractedConfig, `Datei-Import (${file.name})`, importMeta);
+    } catch (error) {
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>Import fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
+        }
+    } finally {
+        if (fileInput) fileInput.value = "";
     }
 }
 
