@@ -753,6 +753,24 @@ input:focus, select:focus, textarea:focus {
     font-weight: 600;
 }
 
+.field-tooltip-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline-start: 6px;
+    inline-size: 16px;
+    block-size: 16px;
+    border-radius: 999px;
+    border: 1px solid #93c5fd;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: help;
+    vertical-align: middle;
+    user-select: none;
+}
+
 /* --- Modal --- */
 .modal {
     position: fixed;
