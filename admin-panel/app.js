@@ -2968,6 +2968,109 @@ function getBootstrapFirebaseFormValues() {
     };
 }
 
+function normalizeBootstrapFirebaseConfig(rawConfig) {
+    if (!rawConfig || typeof rawConfig !== "object") return null;
+    return {
+        apiKey: String(rawConfig.apiKey || "").trim(),
+        authDomain: String(rawConfig.authDomain || "").trim(),
+        projectId: String(rawConfig.projectId || "").trim(),
+        storageBucket: String(rawConfig.storageBucket || "").trim(),
+        messagingSenderId: String(rawConfig.messagingSenderId || "").trim(),
+        appId: String(rawConfig.appId || "").trim(),
+    };
+}
+
+function extractFirebaseConfigFromText(text) {
+    if (typeof text !== "string" || text.trim().length === 0) return null;
+
+    const directObjectMatch = text.match(/\{[\s\S]*\}/);
+    if (!directObjectMatch) return null;
+
+    try {
+        const parsedDirect = JSON.parse(directObjectMatch[0]);
+        const normalizedDirect = normalizeBootstrapFirebaseConfig(parsedDirect);
+        if (hasCompleteFirebaseConfig(normalizedDirect)) return normalizedDirect;
+    } catch (_error) {
+        // noop - fallback to JS object literal parser below
+    }
+
+    try {
+        const objectLiteral = directObjectMatch[0]
+            .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, "$1\"$2\":")
+            .replace(/'/g, "\"");
+        const parsedLiteral = JSON.parse(objectLiteral);
+        const normalizedLiteral = normalizeBootstrapFirebaseConfig(parsedLiteral);
+        if (hasCompleteFirebaseConfig(normalizedLiteral)) return normalizedLiteral;
+    } catch (_error) {
+        return null;
+    }
+
+    return null;
+}
+
+function applyImportedBootstrapFirebaseConfig(config, sourceLabel = "Import") {
+    const normalizedConfig = normalizeBootstrapFirebaseConfig(config);
+    if (!hasCompleteFirebaseConfig(normalizedConfig) || isPlaceholderFirebaseConfig(normalizedConfig)) {
+        throw new Error("Die geladene Datei enthält keine vollständige Firebase-Webkonfiguration.");
+    }
+
+    renderBootstrapFirebaseConfig(normalizedConfig);
+    localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(normalizedConfig));
+    firebaseConfig = normalizedConfig;
+    updateSetupChecklistState({ "firebase-config": true });
+    refreshCommissioningReport();
+    renderCommandCatalog(firebaseConfig.projectId);
+    showNotification(`${sourceLabel}: Firebase-Konfiguration für ${normalizedConfig.projectId} übernommen.`, "success");
+}
+
+async function loadBootstrapFirebaseConfigFromUrl() {
+    const urlInput = document.getElementById("bootstrap-config-url");
+    const statusEl = document.getElementById("bootstrap-import-status");
+    const url = (urlInput?.value || "").trim();
+
+    if (!url) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte eine URL für die Konfigurationsdatei eingeben.</div>";
+        return;
+    }
+
+    if (!/^https?:\/\//i.test(url)) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Nur http(s)-URLs sind erlaubt.</div>";
+        return;
+    }
+
+    if (statusEl) statusEl.innerHTML = "<div class='info'>Lade Konfiguration aus dem Internet ...</div>";
+
+    try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error(`Download fehlgeschlagen (${response.status})`);
+        }
+        const contentType = response.headers.get("content-type") || "";
+        const payloadText = await response.text();
+        let extractedConfig = null;
+
+        if (contentType.includes("application/json")) {
+            extractedConfig = normalizeBootstrapFirebaseConfig(JSON.parse(payloadText));
+        } else {
+            extractedConfig = extractFirebaseConfigFromText(payloadText);
+        }
+
+        if (!extractedConfig) {
+            throw new Error("Inhalt konnte nicht als firebaseConfig erkannt werden.");
+        }
+
+        applyImportedBootstrapFirebaseConfig(extractedConfig, "URL-Import");
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='success-box'>Konfiguration aus URL übernommen: ${escapeHtml(extractedConfig.projectId)}.</div>`;
+        }
+    } catch (error) {
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>Import fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        }
+        console.error("[loadBootstrapFirebaseConfigFromUrl] Fehler:", error);
+    }
+}
+
 function renderBootstrapFirebaseConfig(config) {
     const values = config || firebaseConfig || fallbackFirebaseConfig;
     const mapping = {
@@ -2991,6 +3094,35 @@ function renderBootstrapFirebaseConfig(config) {
     } else {
         statusEl.innerHTML = `<div class='success-box'>Aktive Firebase-Konfiguration: ${escapeHtml(values.projectId || "unbekannt")}</div>`;
     }
+}
+
+function setupBootstrapConfigLiveSync() {
+    const fields = [
+        "bootstrap-api-key",
+        "bootstrap-auth-domain",
+        "bootstrap-project-id",
+        "bootstrap-storage-bucket",
+        "bootstrap-messaging-sender-id",
+        "bootstrap-app-id",
+    ];
+
+    fields.forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (!input) return;
+        input.addEventListener("input", () => {
+            const currentValues = getBootstrapFirebaseFormValues();
+            firebaseConfig = { ...firebaseConfig, ...currentValues };
+            renderBootstrapFirebaseConfig(firebaseConfig);
+
+            if (hasCompleteFirebaseConfig(currentValues) && !isPlaceholderFirebaseConfig(currentValues)) {
+                localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(currentValues));
+                firebaseConfig = currentValues;
+                updateSetupChecklistState({ "firebase-config": true });
+                refreshCommissioningReport();
+                renderCommandCatalog(firebaseConfig.projectId);
+            }
+        });
+    });
 }
 
 function persistBootstrapFirebaseConfig(showReloadHint = true) {
@@ -3294,6 +3426,7 @@ function refreshCommissioningReport() {
 document.addEventListener("DOMContentLoaded", async function() {
     await detectPythonOperatorRuntime();
     renderBootstrapFirebaseConfig(firebaseConfig);
+    setupBootstrapConfigLiveSync();
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     renderCommandCatalog(firebaseConfig.projectId);
     renderAllPlatformSections();
