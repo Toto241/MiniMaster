@@ -159,6 +159,7 @@ Each source file is also thoroughly documented.
 The project has a comprehensive test suite to ensure code quality and stability.
 
 - **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
+- **Central Python test automation:** Run `python scripts/test_automation.py --group backend`, `python scripts/test_automation.py --group android`, or `python scripts/test_automation.py --group all` for a single inventory- and prerequisite-aware entry point. Results are written to `build/test-automation/latest-summary.json`.
 - **Android Lint (blocking for errors):** `./scripts/run-android-checks.sh lint`
 - **Android Unit Tests:** `./scripts/run-android-checks.sh :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
 - **Android Instrumentation Build:** `./scripts/run-android-checks.sh :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest`
@@ -176,6 +177,18 @@ For repository validation after changes, run this sequence:
 4. Optional full device validation (master): `./scripts/run-android-checks.sh :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest`
 5. Optional full device validation (child): `./scripts/run-android-checks.sh :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest`
 6. CI gate evidence snapshot (CodeQL + Android CI metadata): `pwsh ./scripts/revalidate-release-gates.ps1`
+
+### Python Test Runner
+
+The repository now includes a Python-based orchestrator that inventories and runs the main automated suites across backend, Android, and connected-device scopes.
+
+- `python scripts/test_automation.py --list` lists all known suites.
+- `python scripts/test_automation.py --inventory` prints the current test inventory.
+- `python scripts/test_automation.py --group backend` runs build, lint, Jest, rules, and security checks.
+- `python scripts/test_automation.py --group android` runs Android lint, JVM unit tests, and instrumentation build checks.
+- `python scripts/test_automation.py --group device` runs the selected connected tests when `adb` and a device/emulator are available.
+
+Suites with missing external prerequisites are marked as skipped by default with a concrete reason. Use `--strict-skips` if skipped suites should fail the run.
 
 ## License
 

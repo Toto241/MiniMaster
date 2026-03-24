@@ -1,9 +1,10 @@
 package com.minimaster.masterapp
 
 import android.util.Log
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
@@ -36,7 +37,7 @@ class MasterAppE2ETest {
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Register This Device")
-            .assertDoesNotExist()
+            .onAllNodesWithText("Register This Device")
+            .assertCountEquals(0)
     }
 }

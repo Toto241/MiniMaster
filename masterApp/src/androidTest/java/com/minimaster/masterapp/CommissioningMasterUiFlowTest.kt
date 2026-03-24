@@ -2,13 +2,12 @@ package com.minimaster.masterapp
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.isToggleable
-import androidx.compose.ui.test.onFirst
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -105,7 +104,7 @@ class CommissioningMasterUiFlowTest {
             )
         }
 
-        composeTestRule.onAllNodes(isToggleable()).onFirst().performClick()
+        composeTestRule.onNodeWithContentDescription("child-lock-switch").performClick()
         assertEquals(true, toggledState)
     }
 }
