@@ -78,6 +78,44 @@ async function hasAnyAdminUser(): Promise<boolean> {
   return false;
 }
 
+async function listOperatorUsers(): Promise<admin.auth.UserRecord[]> {
+  const operatorUsers: admin.auth.UserRecord[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const listResult = await auth().listUsers(1000, pageToken);
+    for (const user of listResult.users) {
+      const role = typeof user.customClaims?.role === "string" ? user.customClaims.role : "";
+      if (VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
+        operatorUsers.push(user);
+      }
+    }
+    pageToken = listResult.pageToken;
+  } while (pageToken);
+
+  return operatorUsers;
+}
+
+async function deleteAllOperatorAccessKeys(): Promise<number> {
+  let deleted = 0;
+
+  let hasMore = true;
+  while (hasMore) {
+    const snapshot = await db().collection("operatorAccessKeys").limit(500).get();
+    if (snapshot.empty) {
+      hasMore = false;
+      continue;
+    }
+
+    const batch = db().batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    deleted += snapshot.size;
+  }
+
+  return deleted;
+}
+
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -252,6 +290,100 @@ export const setUserRole = functions.https.onCall(
       );
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to set user role.");
+    }
+  }
+);
+
+/**
+ * Resets all existing operator accounts (admin/support/auditor) for development setups.
+ * Requires an admin caller and explicit confirmation token.
+ */
+export const resetOperatorAccounts = functions.https.onCall(
+  async (data: { confirmText?: string }, context: CallableContext) => {
+    const startTime = Date.now();
+    requireAdmin(context);
+
+    const runtimeConfig = functions.config();
+    const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
+    const resetEnabled =
+      process.env.FUNCTIONS_EMULATOR === "true" ||
+      process.env.ENABLE_OPERATOR_ACCOUNT_RESET === "true" ||
+      runtimeFlag;
+    if (!resetEnabled) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Operator account reset is disabled. Enable via FUNCTIONS_EMULATOR=true, ENABLE_OPERATOR_ACCOUNT_RESET=true, or firebase functions:config:set minimaster.enable_operator_account_reset=true."
+      );
+    }
+
+    const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
+    if (confirmText !== "RESET_OPERATOR_ACCOUNTS") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "confirmText must be exactly RESET_OPERATOR_ACCOUNTS."
+      );
+    }
+
+    const callerUid = context.auth!.uid;
+
+    try {
+      const operatorUsers = await listOperatorUsers();
+      const accessKeysDeleted = await deleteAllOperatorAccessKeys();
+
+      const deletedUids: string[] = [];
+      const failedUids: string[] = [];
+      for (const user of operatorUsers) {
+        try {
+          await auth().deleteUser(user.uid);
+          deletedUids.push(user.uid);
+        } catch (error) {
+          functions.logger.error("Failed to delete operator user during reset.", {
+            uid: user.uid,
+            error: (error as Error).message,
+          });
+          failedUids.push(user.uid);
+        }
+      }
+
+      await AuditLogger.logSuccess(
+        "admin.reset_operator_accounts",
+        context,
+        "operatorAccounts/reset",
+        "user",
+        {
+          requestedBy: callerUid,
+          matchedUsers: operatorUsers.length,
+          deletedUsers: deletedUids.length,
+          failedUsers: failedUids.length,
+          accessKeysDeleted,
+          duration: Date.now() - startTime,
+        }
+      );
+
+      return {
+        success: failedUids.length === 0,
+        requestedBy: callerUid,
+        matchedUsers: operatorUsers.length,
+        deletedUsers: deletedUids.length,
+        failedUsers: failedUids,
+        accessKeysDeleted,
+      };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "admin.reset_operator_accounts",
+        context,
+        "operatorAccounts/reset",
+        "user",
+        error as Error,
+        { requestedBy: callerUid }
+      );
+
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError(
+        "internal",
+        "Operator account reset failed.",
+        error
+      );
     }
   }
 );

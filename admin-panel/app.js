@@ -7248,6 +7248,77 @@ async function assignUserRole() {
     }
 }
 
+async function resetOperatorAccountsFromAdminPanel() {
+    if (currentUserRole !== "admin") {
+        showNotification("Nur Admins können Betreiberkonten zurücksetzen.", "error");
+        return;
+    }
+
+    const resultEl = document.getElementById("operator-reset-result");
+    if (resultEl) {
+        resultEl.innerHTML = "<div class='info'>Achtung: Dieser Vorgang ist destruktiv und nur für Entwicklung gedacht.</div>";
+    }
+
+    const firstConfirm = window.confirm(
+        "Alle Betreiberkonten wirklich zurücksetzen?\n\n" +
+        "Dadurch werden alle Accounts mit Rollen admin/support/auditor gelöscht."
+    );
+    if (!firstConfirm) return;
+
+    const secondConfirm = window.prompt(
+        "Sicherheitsabfrage: Bitte exakt RESET_OPERATOR_ACCOUNTS eingeben."
+    );
+    if ((secondConfirm || "").trim() !== "RESET_OPERATOR_ACCOUNTS") {
+        if (resultEl) {
+            resultEl.innerHTML = "<div class='info'>Reset abgebrochen (Bestätigung nicht korrekt).</div>";
+        }
+        return;
+    }
+
+    if (resultEl) {
+        resultEl.innerHTML = "<div class='loading'>Betreiberkonten werden zurückgesetzt...</div>";
+    }
+
+    try {
+        const resetFn = functions.httpsCallable("resetOperatorAccounts");
+        const response = await resetFn({ confirmText: "RESET_OPERATOR_ACCOUNTS" });
+        const payload = response?.data || {};
+
+        const deletedUsers = Number(payload.deletedUsers || 0);
+        const matchedUsers = Number(payload.matchedUsers || 0);
+        const accessKeysDeleted = Number(payload.accessKeysDeleted || 0);
+        const failedUsers = Array.isArray(payload.failedUsers) ? payload.failedUsers : [];
+
+        if (resultEl) {
+            resultEl.innerHTML = `
+                <div class='success-box'>
+                    Betreiberkonten-Reset abgeschlossen.<br>
+                    Erkannt: ${matchedUsers} | Gelöscht: ${deletedUsers} | Zugangsschlüssel gelöscht: ${accessKeysDeleted}
+                    ${failedUsers.length > 0 ? `<br>Fehler bei: ${escapeHtml(failedUsers.join(", "))}` : ""}
+                </div>
+            `;
+        }
+
+        showNotification("Betreiberkonten zurückgesetzt. Sie werden jetzt abgemeldet.", failedUsers.length > 0 ? "warning" : "success");
+
+        setTimeout(async () => {
+            try {
+                if (auth && auth.currentUser) {
+                    await auth.signOut();
+                }
+            } catch (signOutError) {
+                console.warn("Sign-out after operator reset failed:", signOutError);
+            }
+            window.location.reload();
+        }, 1500);
+    } catch (error) {
+        if (resultEl) {
+            resultEl.innerHTML = `<div class='error'>Reset fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        }
+        showNotification("Reset fehlgeschlagen: " + error.message, "error");
+    }
+}
+
 // ==================== FIREBASE TAB: FUNCTIONS STATUS ====================
 
 async function loadFunctionsStatus() {

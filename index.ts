@@ -15,6 +15,7 @@ export {
   bootstrapFirstAdmin,
   createOperatorAccessKey,
   redeemOperatorAccessKey,
+  resetOperatorAccounts,
 } from "./src/auth";
 
 // Pairing
