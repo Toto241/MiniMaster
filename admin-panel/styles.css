@@ -393,6 +393,10 @@ body {
     color: #64748b;
 }
 
+#forgot-password-prominent-btn {
+    margin-top: -4px;
+}
+
 .form-group {
     display: flex;
     flex-direction: column;
