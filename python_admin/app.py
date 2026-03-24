@@ -1122,6 +1122,28 @@ def run_command(request: CommandRequest, timeout_sec: int | None = None) -> dict
             exit_code = process.returncode
             if exit_code != 0:
                 break
+        except FileNotFoundError:
+            if os.name != "nt":
+                raise
+
+            # Windows fallback: some tools (npm/firebase) may not resolve directly
+            # in this runtime, but work through cmd.exe command resolution.
+            process = subprocess.run(
+                ["cmd", "/c", line],
+                cwd=str(request.cwd),
+                capture_output=True,
+                text=True,
+                check=False,
+                env=os.environ.copy(),
+                timeout=timeout_sec if timeout_sec and timeout_sec > 0 else None,
+            )
+            if process.stdout:
+                combined_output.append(process.stdout)
+            if process.stderr:
+                combined_output.append(process.stderr)
+            exit_code = process.returncode
+            if exit_code != 0:
+                break
         except subprocess.TimeoutExpired as exc:
             if exc.stdout:
                 timed_out_stdout = exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout
