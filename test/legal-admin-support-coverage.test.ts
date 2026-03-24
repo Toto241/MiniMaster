@@ -31,6 +31,7 @@ const mockAuth = {
   createCustomToken: jest.fn().mockResolvedValue("mock-token"),
   revokeRefreshTokens: jest.fn().mockResolvedValue(undefined),
   deleteUser: jest.fn().mockResolvedValue(undefined),
+  listUsers: jest.fn().mockResolvedValue({ users: [], pageToken: undefined }),
 };
 
 const mockMessaging = { send: mockSend };
@@ -189,6 +190,7 @@ beforeEach(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
+      delete: (ref: any) => { ops.push(() => ref.delete()); },
       commit: () => Promise.all(ops.map((o) => o())),
     };
   });
@@ -761,5 +763,57 @@ describe("aiExplainProblem", () => {
       context: "kurz",
       consentGiven: true,
     }, asAdmin)).rejects.toThrow(/10|Zeichen/i);
+  });
+});
+
+describe("resetOperatorAccounts", () => {
+  it("wirft failed-precondition wenn Reset-Flag nicht gesetzt ist", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    const oldEmulator = process.env.FUNCTIONS_EMULATOR;
+    delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.FUNCTIONS_EMULATOR;
+
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin))
+      .rejects.toThrow(/disabled/i);
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+    if (oldEmulator === undefined) delete process.env.FUNCTIONS_EMULATOR;
+    else process.env.FUNCTIONS_EMULATOR = oldEmulator;
+  });
+
+  it("löscht Operator-User und Zugangsschlüssel bei aktivem Reset-Flag", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+
+    state.operatorAccessKeys = {
+      key1: { role: "admin" },
+      key2: { role: "support" },
+    };
+
+    (mockAuth.listUsers as jest.Mock)
+      .mockResolvedValueOnce({
+        users: [
+          { uid: "admin-a", customClaims: { role: "admin" } },
+          { uid: "support-a", customClaims: { role: "support" } },
+          { uid: "normal-a", customClaims: { role: "master" } },
+        ],
+        pageToken: undefined,
+      });
+
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const result = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin);
+
+    expect(result.success).toBe(true);
+    expect(result.matchedUsers).toBe(2);
+    expect(result.deletedUsers).toBe(2);
+    expect(result.accessKeysDeleted).toBe(2);
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("admin-a");
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("support-a");
+    expect(state.operatorAccessKeys).toEqual({});
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
   });
 });

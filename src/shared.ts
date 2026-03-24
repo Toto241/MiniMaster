@@ -138,6 +138,7 @@ export type AuditAction =
   | "admin.grant_support_access"
   | "admin.revoke_support_access"
   | "admin.set_admin_claim"
+  | "admin.reset_operator_accounts"
   | "admin.user_impersonation"
   | "admin.revoke_subscription"
   | "ai.explain_problem"
