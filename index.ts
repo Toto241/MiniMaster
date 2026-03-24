@@ -6,7 +6,16 @@
  */
 
 // Auth & Registration
-export { setAdminClaim, setUserRole, generateCustomToken, registerMasterDevice, revokeUserTokens, bootstrapFirstAdmin } from "./src/auth";
+export {
+  setAdminClaim,
+  setUserRole,
+  generateCustomToken,
+  registerMasterDevice,
+  revokeUserTokens,
+  bootstrapFirstAdmin,
+  createOperatorAccessKey,
+  redeemOperatorAccessKey,
+} from "./src/auth";
 
 // Pairing
 export { createPairingCode, validatePairingCode, generatePairingLink, validatePairingToken } from "./src/pairing";

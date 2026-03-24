@@ -6,6 +6,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import { createHash } from "crypto";
 import { db, auth } from "../firebase";
 import { requireAdmin, AuditLogger } from "./shared";
 import type { OperatorRole } from "./shared";
@@ -61,6 +62,158 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
 });
 
 const VALID_OPERATOR_ROLES: OperatorRole[] = ["admin", "support", "auditor"];
+
+async function hasAnyAdminUser(): Promise<boolean> {
+  let pageToken: string | undefined;
+  do {
+    const listResult = await auth().listUsers(1000, pageToken);
+    for (const user of listResult.users) {
+      if (user.customClaims && (user.customClaims as Record<string, unknown>).role === "admin") {
+        return true;
+      }
+    }
+    pageToken = listResult.pageToken;
+  } while (pageToken);
+
+  return false;
+}
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+/**
+ * Creates an operator access key record that can be redeemed exactly once.
+ * - admin callers can create keys for any operator role.
+ * - if no admin exists yet, authenticated callers can create an admin bootstrap key.
+ */
+export const createOperatorAccessKey = functions.https.onCall(
+  async (
+    data: { keyHash?: string; role?: string; ttlMinutes?: number; label?: string },
+    context: CallableContext
+  ) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
+
+    const keyHash = typeof data?.keyHash === "string" ? data.keyHash.trim().toLowerCase() : "";
+    const requestedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "admin";
+    const ttlMinutes = Number.isFinite(data?.ttlMinutes) ? Number(data.ttlMinutes) : 60;
+    const label = typeof data?.label === "string" ? data.label.trim().slice(0, 120) : "";
+
+    if (!/^[a-f0-9]{64}$/.test(keyHash)) {
+      throw new functions.https.HttpsError("invalid-argument", "keyHash muss ein SHA-256-Hash (hex) sein.");
+    }
+    if (!VALID_OPERATOR_ROLES.includes(requestedRole as OperatorRole)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `Role must be one of: ${VALID_OPERATOR_ROLES.join(", ")}`
+      );
+    }
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 10080) {
+      throw new functions.https.HttpsError("invalid-argument", "ttlMinutes muss zwischen 1 und 10080 liegen.");
+    }
+
+    const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "";
+    if (callerRole !== "admin") {
+      const adminExists = await hasAnyAdminUser();
+      if (adminExists || requestedRole !== "admin") {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "Nur ein Admin kann Zugangsschlüssel erzeugen. Ausnahme: Erst-Bootstrap (kein Admin vorhanden)."
+        );
+      }
+    }
+
+    const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + ttlMinutes * 60 * 1000);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const docRef = db().collection("operatorAccessKeys").doc();
+    await docRef.set({
+      keyHash,
+      role: requestedRole,
+      label,
+      createdByUid: context.auth.uid,
+      createdAt: now,
+      expiresAt,
+      usedAt: null,
+      redeemedByUid: null,
+    });
+
+    return {
+      keyId: docRef.id,
+      role: requestedRole,
+      expiresAtMs: expiresAt.toMillis(),
+    };
+  }
+);
+
+/**
+ * Redeems an operator access key and grants role to the authenticated caller.
+ * The key is one-time use and server-validated via SHA-256 hash lookup.
+ */
+export const redeemOperatorAccessKey = functions.https.onCall(
+  async (data: { key?: string }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
+
+    const rawKey = typeof data?.key === "string" ? data.key.trim() : "";
+    if (rawKey.length < 43) {
+      throw new functions.https.HttpsError("invalid-argument", "Ungültige Schlüsseldatei oder Schlüsselwert.");
+    }
+
+    const keyHash = sha256Hex(rawKey);
+    const querySnapshot = await db()
+      .collection("operatorAccessKeys")
+      .where("keyHash", "==", keyHash)
+      .limit(1)
+      .get();
+
+    if (querySnapshot.empty) {
+      throw new functions.https.HttpsError("permission-denied", "Schlüssel ist ungültig oder wurde widerrufen.");
+    }
+
+    const keyRef = querySnapshot.docs[0].ref;
+
+    const grantedRole = await db().runTransaction(async (tx) => {
+      const keyDoc = await tx.get(keyRef);
+      if (!keyDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
+      }
+
+      const payload = keyDoc.data() || {};
+      const role = typeof payload.role === "string" ? payload.role : "";
+      const usedAt = payload.usedAt || null;
+      const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
+
+      if (!VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
+        throw new functions.https.HttpsError("internal", "Ungültige Rolleninformation im Schlüssel.");
+      }
+      if (usedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "Dieser Zugangsschlüssel wurde bereits eingelöst.");
+      }
+      if (!expiresAt || expiresAt.toMillis() < Date.now()) {
+        throw new functions.https.HttpsError("deadline-exceeded", "Dieser Zugangsschlüssel ist abgelaufen.");
+      }
+
+      tx.update(keyRef, {
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+        redeemedByUid: context.auth?.uid,
+      });
+
+      return role as OperatorRole;
+    });
+
+    await auth().setCustomUserClaims(context.auth.uid, { role: grantedRole });
+
+    return {
+      success: true,
+      role: grantedRole,
+      message: `Zugang wurde freigeschaltet. Rolle: ${grantedRole}`,
+    };
+  }
+);
 
 /**
  * Sets an operator role (admin/support/auditor) for a specified user UID.
@@ -118,19 +271,7 @@ export const bootstrapFirstAdmin = functions.https.onCall(
     const callerUid = context.auth.uid;
 
     try {
-      // Check if ANY admin already exists — iterate all users
-      let pageToken: string | undefined;
-      let adminExists = false;
-      do {
-        const listResult = await auth().listUsers(1000, pageToken);
-        for (const user of listResult.users) {
-          if (user.customClaims && (user.customClaims as Record<string, unknown>).role === "admin") {
-            adminExists = true;
-            break;
-          }
-        }
-        pageToken = listResult.pageToken;
-      } while (pageToken && !adminExists);
+      const adminExists = await hasAnyAdminUser();
 
       if (adminExists) {
         throw new functions.https.HttpsError(
