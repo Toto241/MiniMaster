@@ -214,6 +214,16 @@
                                 </button>
                             </div>
 
+                            <div class="auth-reset-card">
+                                <div>
+                                    <strong>Passwort vergessen?</strong>
+                                    <p>Ein Reset-Link kann jederzeit an die hinterlegte Operator-E-Mail gesendet werden.</p>
+                                </div>
+                                <button type="button" class="btn btn-secondary" onclick="openPasswordResetFlow()">
+                                    Passwort zurücksetzen
+                                </button>
+                            </div>
+
                             <!-- Registrierungsformular -->
                             <form id="register-form" class="auth-form">
                                 <div class="form-group">
@@ -243,6 +253,14 @@
                                 <div class="form-group">
                                     <label for="login-password">Passwort</label>
                                     <input type="password" id="login-password" placeholder="Passwort" required />
+                                </div>
+                                <div class="auth-inline-actions">
+                                    <button type="button" class="auth-link-btn" id="forgot-password-btn">
+                                        Passwort vergessen? Reset-Link senden
+                                    </button>
+                                    <p class="auth-help-text">
+                                        Ein Zurücksetzungs-Link wird an die angegebene E-Mail-Adresse gesendet.
+                                    </p>
                                 </div>
                                 <button type="submit" class="btn btn-primary btn-full">
                                     Anmelden
