@@ -198,6 +198,51 @@
                                 <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary">Speichern &amp; verbinden</button>
                             </div>
 
+                            <div class="firebase-import-box" style="margin-block-start: 14px; border-color: #fed7aa; background: #fff7ed;">
+                                <h4>Notfall-Neueinrichtung nach Cloud-Löschung</h4>
+                                <p>
+                                    Wenn Firestore/Functions/Storage gelöscht wurden, können Sie die Basis direkt von hier wiederherstellen.
+                                    Danach wird automatisch in die Kontoeinrichtung gewechselt.
+                                </p>
+                                <div class="phase-actions" style="margin-block-start: 10px;">
+                                    <button type="button" class="btn btn-secondary" onclick="copyFirebaseRecoveryScript()">Recovery-Skript kopieren</button>
+                                    <button type="button" class="btn btn-primary" onclick="runFirebaseRecoveryAutopilot()">Recovery jetzt ausführen</button>
+                                    <button type="button" class="btn btn-danger" onclick="runStartFromScratchAutopilot()">Start bei Null (Cloud + Panel)</button>
+                                </div>
+                                <div id="bootstrap-recovery-progress" class="recovery-progress" aria-live="polite">
+                                    <div class="recovery-progress-step" data-step="validate">
+                                        <span class="recovery-progress-dot"></span>
+                                        <span class="recovery-progress-label">1. Vorprüfung</span>
+                                        <span class="recovery-progress-state">Offen</span>
+                                    </div>
+                                    <div class="recovery-progress-step" data-step="cloud">
+                                        <span class="recovery-progress-dot"></span>
+                                        <span class="recovery-progress-label">2. Cloud-Recovery</span>
+                                        <span class="recovery-progress-state">Offen</span>
+                                    </div>
+                                    <div class="recovery-progress-step" data-step="local">
+                                        <span class="recovery-progress-dot"></span>
+                                        <span class="recovery-progress-label">3. Lokale Bereinigung</span>
+                                        <span class="recovery-progress-state">Offen</span>
+                                    </div>
+                                    <div class="recovery-progress-step" data-step="reload">
+                                        <span class="recovery-progress-dot"></span>
+                                        <span class="recovery-progress-label">4. Neuinitialisierung</span>
+                                        <span class="recovery-progress-state">Offen</span>
+                                    </div>
+                                </div>
+                                <div id="bootstrap-recovery-alive" class="recovery-alive" aria-live="polite">
+                                    <span class="recovery-alive-label">Status:</span>
+                                    <span class="recovery-alive-message">Bereit</span>
+                                    <span class="recovery-alive-cursor" aria-hidden="true"></span>
+                                </div>
+                                <div id="bootstrap-recovery-status" class="phase-status" style="margin-block-start: 8px"></div>
+                                <small class="text-muted">
+                                    Hinweis: Direkte Ausführung funktioniert im Python-Operator-/Desktop-Modus.
+                                    Im Browsermodus können Sie das Skript kopieren und im Terminal ausführen.
+                                </small>
+                            </div>
+
                             <details class="phase-help">
                                 <summary>Wo finde ich diese Werte?</summary>
                                 <div class="phase-help-content">
