@@ -3614,6 +3614,175 @@ function openPasswordResetFlow() {
     }
 }
 
+function handlePrepareCloudReset() {
+    showAuthMode("login");
+
+    const firstConfirm = window.confirm(
+        "Cloud-Reset-Hinweise anzeigen?\n\n" +
+        "Diese Aktion betrifft potenziell produktive Firebase-Daten."
+    );
+    if (!firstConfirm) return;
+
+    const resetToken = window.prompt(
+        "Sicherheitsabfrage: Bitte zur Bestätigung exakt RESET eingeben."
+    );
+    if ((resetToken || "").trim() !== "RESET") {
+        const statusEl = document.getElementById("login-status");
+        if (statusEl) {
+            statusEl.innerHTML = "<div class='info'>Cloud-Reset-Vorbereitung abgebrochen (Bestätigung RESET nicht korrekt).</div>";
+        }
+        return;
+    }
+
+    const loginStatusEl = document.getElementById("login-status");
+    const loginEmailEl = document.getElementById("login-email");
+    const registerEmailEl = document.getElementById("register-email");
+    const operatorEmail = (loginEmailEl?.value || registerEmailEl?.value || "").trim();
+    const projectId = (firebaseConfig?.projectId || "<FIREBASE_PROJECT_ID>").trim();
+    const safeProjectId = escapeHtml(projectId || "<FIREBASE_PROJECT_ID>");
+    const safeEmail = operatorEmail ? escapeHtml(operatorEmail) : "<operator@example.com>";
+
+    if (!loginStatusEl) return;
+
+    loginStatusEl.innerHTML = `
+        <div class='error'>
+            <strong>ACHTUNG:</strong> Cloud-Reset löscht produktive Daten in Firebase (nicht nur lokal im Browser).
+            Nur durchführen, wenn ein vollständiges Backup und Freigabe vorliegen.
+        </div>
+        <div class='info' style='margin-top:8px'>
+            <strong>Geführter Cloud-Reset (manuell):</strong>
+            <ol style='margin:8px 0 0 18px; padding:0;'>
+                <li>Backup erstellen (Firestore Export / Auth User Export).</li>
+                <li>In Firebase Console unter <strong>Authentication → Users</strong> den betroffenen Operator prüfen: <code>${safeEmail}</code></li>
+                <li>Nur falls freigegeben: Operator-Konto löschen und neu anlegen.</li>
+                <li>Falls nötig: zugehörige Operator-Dokumente in Firestore bereinigen (gezielt, nicht pauschal).</li>
+                <li>Anschließend im Panel erneut anmelden und Setup-Assistenten prüfen.</li>
+            </ol>
+        </div>
+        <div class='info' style='margin-top:8px'>
+            <strong>CLI-Referenz (Projekt: ${safeProjectId}):</strong>
+            <pre style='white-space:pre-wrap;margin:8px 0 0 0'>
+firebase use ${safeProjectId}
+# Operator in Firebase Auth gezielt entfernen (falls freigegeben)
+firebase auth:delete ${safeEmail}
+
+# Danach neues Operator-Konto im Admin-Panel neu erstellen
+            </pre>
+        </div>
+    `;
+
+    if (loginEmailEl && !loginEmailEl.value.trim() && operatorEmail) {
+        loginEmailEl.value = operatorEmail;
+    }
+    if (loginEmailEl) {
+        loginEmailEl.focus();
+    }
+}
+
+async function clearIndexedDbBestEffort() {
+    if (typeof indexedDB === "undefined" || typeof indexedDB.deleteDatabase !== "function") return;
+    if (typeof indexedDB.databases !== "function") return;
+
+    try {
+        const databases = await indexedDB.databases();
+        for (const dbInfo of databases || []) {
+            const dbName = dbInfo && typeof dbInfo.name === "string" ? dbInfo.name : "";
+            if (!dbName) continue;
+            try {
+                indexedDB.deleteDatabase(dbName);
+            } catch (deleteError) {
+                console.warn("IndexedDB delete failed for", dbName, deleteError);
+            }
+        }
+    } catch (error) {
+        console.warn("IndexedDB cleanup skipped:", error);
+    }
+}
+
+async function unregisterServiceWorkersBestEffort() {
+    if (!("serviceWorker" in navigator) || typeof navigator.serviceWorker.getRegistrations !== "function") return;
+
+    try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.allSettled((registrations || []).map(reg => reg.unregister()));
+    } catch (error) {
+        console.warn("Service worker cleanup skipped:", error);
+    }
+}
+
+async function clearCachesBestEffort() {
+    if (typeof caches === "undefined" || typeof caches.keys !== "function") return;
+
+    try {
+        const cacheKeys = await caches.keys();
+        await Promise.allSettled((cacheKeys || []).map(key => caches.delete(key)));
+    } catch (error) {
+        console.warn("Cache cleanup skipped:", error);
+    }
+}
+
+async function handleFullAdminPanelReset() {
+    const firstConfirm = window.confirm(
+        "Admin-Panel wirklich vollständig zurücksetzen?\n\n" +
+        "Dabei werden lokale Konfiguration, Sitzung, Caches und Service-Worker gelöscht."
+    );
+    if (!firstConfirm) return;
+
+    const secondConfirm = window.confirm(
+        "Letzte Sicherheitsabfrage: Dieser Vorgang kann lokal nicht rückgängig gemacht werden. Fortfahren?"
+    );
+    if (!secondConfirm) return;
+
+    const resetToken = window.prompt(
+        "Sicherheitsabfrage: Bitte zur Bestätigung exakt RESET eingeben."
+    );
+    if ((resetToken || "").trim() !== "RESET") {
+        const statusEl = document.getElementById("login-status");
+        if (statusEl) {
+            statusEl.innerHTML = "<div class='info'>Vollständiger Panel-Reset abgebrochen (Bestätigung RESET nicht korrekt).</div>";
+        }
+        return;
+    }
+
+    try {
+        stopSessionMonitoring();
+
+        if (auth && auth.currentUser) {
+            try {
+                await auth.signOut();
+            } catch (signOutError) {
+                console.warn("Sign-out during reset failed:", signOutError);
+            }
+        }
+
+        try {
+            sessionStorage.clear();
+        } catch (sessionError) {
+            console.warn("sessionStorage clear failed:", sessionError);
+        }
+
+        try {
+            localStorage.clear();
+        } catch (localError) {
+            console.warn("localStorage clear failed:", localError);
+        }
+
+        await Promise.allSettled([
+            clearIndexedDbBestEffort(),
+            clearCachesBestEffort(),
+            unregisterServiceWorkersBestEffort(),
+        ]);
+
+        window.location.replace(`${window.location.pathname}?panelReset=${Date.now()}`);
+    } catch (error) {
+        console.error("Full admin panel reset failed:", error);
+        const statusEl = document.getElementById("login-status");
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>Vollständiger Reset fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
+        }
+    }
+}
+
 function showOnboarding() {
     document.getElementById("onboarding-section").style.display = "block";
     document.getElementById("dashboard-section").style.display = "none";

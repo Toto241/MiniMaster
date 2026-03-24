@@ -375,10 +375,22 @@ body {
     color: #475569;
 }
 
+.auth-reset-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 @media (max-width: 680px) {
     .auth-reset-card {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .auth-reset-card-actions {
+        justify-content: stretch;
     }
 }
 
