@@ -24,6 +24,8 @@ local.properties
 .env.local
 .env.*.local
 # .env.example is intentionally NOT ignored (it's the safe template)
+.security-test.env
+scripts/security-test.env
 
 # Firebase app configs (must never be committed)
 **/google-services.json

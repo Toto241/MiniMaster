@@ -30,4 +30,15 @@
     <string name="language_setup_title">ऐप की भाषा चुनें</string>
     <string name="language_setup_description">Mini-Master चाइल्ड ऐप के लिए अपनी पसंदीदा भाषा चुनें। आप इसे बाद में सेटिंग स्क्रीन में बदल सकते हैं।</string>
     <string name="language_continue">जारी रखें</string>
+
+    <!-- Task lock and proof flow -->
+    <string name="task_required_title">Task Required</string>
+    <string name="task_proof_rejected">Proof rejected. Please submit again.</string>
+    <string name="task_complete_to_unlock">To unlock the device, please complete this task.</string>
+    <string name="task_submit_proof">Submit Proof</string>
+    <string name="task_waiting_for_approval">Proof submitted. Waiting for parent approval.</string>
+    <string name="task_status_format">Status: %1$s</string>
+    <string name="your_tasks_title">Your Tasks</string>
+    <string name="no_tasks_for_now">No tasks for now, good job!</string>
+    <string name="task_complete_button">Complete</string>
 </resources>
