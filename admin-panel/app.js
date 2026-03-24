@@ -3815,6 +3815,8 @@ function renderAdminActivationContent(user) {
     const container = document.getElementById("admin-activation-content");
     if (!container) return;
 
+    const projectIdHint = escapeHtml(firebaseConfig?.projectId || "unbekannt");
+
     container.innerHTML = `
         <div class="admin-info-box">
             <h4>Ihr Konto: ${escapeHtml(user.email || "")}</h4>
@@ -3850,11 +3852,298 @@ function renderAdminActivationContent(user) {
             </p>
         </div>
 
+        <div class="admin-info-box" style="background: #fff7ed; border-color: #fed7aa;">
+            <h4>🔐 Zugang über generierte Schlüsseldatei (256 Bit)</h4>
+            <p>
+                Sie können eine Zugangsschlüsseldatei direkt im Admin-Panel erzeugen und einmalig einlösen.
+                Projekt: <strong>${projectIdHint}</strong>
+            </p>
+            <div class="phase-grid" style="margin-block-start: 10px;">
+                <div class="form-group">
+                    <label for="access-key-role">Rolle für Schlüsseldatei</label>
+                    <select id="access-key-role" class="form-input">
+                        <option value="admin">admin</option>
+                        <option value="support">support</option>
+                        <option value="auditor">auditor</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="access-key-ttl">Gültigkeit (Minuten)</label>
+                    <input id="access-key-ttl" class="form-input" type="number" min="1" max="10080" step="1" value="60" />
+                </div>
+            </div>
+            <div class="phase-actions" style="margin-block-start: 8px;">
+                <button onclick="generateOperatorAccessKeyFile()" class="btn btn-secondary" id="btn-generate-access-key">
+                    Schlüsseldatei erzeugen
+                </button>
+            </div>
+            <div id="access-key-generate-status" class="phase-status" style="margin-block-start: 8px"></div>
+
+            <hr style="margin: 14px 0; border: none; border-top: 1px solid #fed7aa;" />
+
+            <div class="form-group">
+                <label for="access-key-file">Schlüsseldatei einlösen</label>
+                <input id="access-key-file" type="file" class="form-input" accept="application/json,.json" />
+            </div>
+            <div class="phase-actions">
+                <button onclick="redeemOperatorAccessKeyFile()" class="btn btn-primary" id="btn-redeem-access-key">
+                    Zugang mit Schlüsseldatei freischalten
+                </button>
+            </div>
+            <div id="access-key-redeem-status" class="phase-status" style="margin-block-start: 8px"></div>
+        </div>
+
         <div class="phase-actions" style="margin-block-start: 16px">
             <button onclick="recheckAdminAccess()" class="btn btn-primary">Zugang prüfen</button>
             <button onclick="logout()" class="btn btn-secondary">Abmelden</button>
         </div>
     `;
+}
+
+function toBase64Url(bytes) {
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function sha256HexBrowser(text) {
+    if (!window.crypto || !window.crypto.subtle || typeof window.crypto.subtle.digest !== "function") {
+        throw new Error("Web Crypto API ist nicht verfügbar.");
+    }
+    const data = new TextEncoder().encode(text);
+    const digest = await window.crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function buildKeyFingerprint(keyHash) {
+    const normalized = (keyHash || "").trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(normalized)) return "unbekannt";
+    return `${normalized.slice(0, 12)}...${normalized.slice(-8)}`;
+}
+
+function downloadJson(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function copyAccessKeyFingerprint(fingerprint) {
+    const value = typeof fingerprint === "string" ? fingerprint.trim() : "";
+    if (!value || value === "unbekannt") {
+        showNotification("Kein gültiger Fingerprint zum Kopieren vorhanden.", "error");
+        return;
+    }
+
+    try {
+        await copyTextToClipboard(value);
+        showNotification("Fingerprint kopiert.", "success");
+    } catch (error) {
+        showNotification("Fingerprint konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
+function normalizeCallableErrorCode(error) {
+    const raw = typeof error?.code === "string" ? error.code.trim().toLowerCase() : "";
+    if (!raw) return "";
+    return raw.startsWith("functions/") ? raw.slice("functions/".length) : raw;
+}
+
+function getAccessKeyErrorHint(error, fallbackMessage) {
+    const code = normalizeCallableErrorCode(error);
+    const message = (fallbackMessage || error?.message || "").toString();
+
+    if (message.includes("Unexpected token") || message.includes("JSON")) {
+        return {
+            title: "Dateiformat ungültig",
+            tip: "Die Datei ist kein valides JSON. Bitte nur eine unveränderte .json-Schlüsseldatei aus dem Admin-Panel verwenden.",
+        };
+    }
+
+    const map = {
+        "invalid-argument": {
+            title: "Ungültige Eingabe",
+            tip: "Schlüsseldatei, Rolle oder Ablaufzeit sind ungültig. Bitte Eingaben prüfen und erneut versuchen.",
+        },
+        "unauthenticated": {
+            title: "Nicht angemeldet",
+            tip: "Sie müssen im Operator-Konto angemeldet sein, bevor Schlüssel erzeugt oder eingelöst werden können.",
+        },
+        "permission-denied": {
+            title: "Keine Berechtigung",
+            tip: "Dieser Schlüssel ist ungültig/widerrufen oder Ihr Konto darf aktuell keine Schlüssel erzeugen.",
+        },
+        "deadline-exceeded": {
+            title: "Schlüssel abgelaufen",
+            tip: "Die Schlüsseldatei hat das Ablaufdatum überschritten. Bitte eine neue Datei erzeugen.",
+        },
+        "failed-precondition": {
+            title: "Bereits verwendet",
+            tip: "Die Schlüsseldatei wurde bereits eingelöst (One-Time-Key). Bitte neue Datei generieren.",
+        },
+        "not-found": {
+            title: "Schlüssel nicht gefunden",
+            tip: "Zum Schlüssel existiert kein passender Eintrag mehr im Backend. Bitte neue Datei erzeugen.",
+        },
+        "unavailable": {
+            title: "Backend nicht erreichbar",
+            tip: "Cloud Functions sind aktuell nicht erreichbar. Netzwerk/Deployment prüfen und erneut versuchen.",
+        },
+        "internal": {
+            title: "Interner Serverfehler",
+            tip: "Im Backend ist ein interner Fehler aufgetreten. Bitte Logs prüfen und Vorgang wiederholen.",
+        },
+    };
+
+    return map[code] || {
+        title: "Allgemeiner Fehler",
+        tip: "Bitte Eingaben und Verbindung prüfen. Falls der Fehler bleibt, Debug-Code und Logs auswerten.",
+    };
+}
+
+function renderAccessKeyError(statusEl, error, fallbackMessage) {
+    if (!statusEl) return;
+    const message = (fallbackMessage || error?.message || "Unbekannter Fehler").toString();
+    const hint = getAccessKeyErrorHint(error, message);
+    const code = normalizeCallableErrorCode(error);
+    const codeLabel = code ? `Code: ${code}` : "Code: lokal";
+
+    statusEl.innerHTML = `
+        <div class='error'>
+            ${escapeHtml(message)}
+            <span class='error-tooltip-badge' title='${escapeHtml(hint.tip)}' aria-label='${escapeHtml(hint.tip)}'>ⓘ</span>
+        </div>
+        <div class='access-error-help'><strong>${escapeHtml(hint.title)}.</strong> ${escapeHtml(hint.tip)} <span class='access-error-code'>${escapeHtml(codeLabel)}</span></div>
+        ${formatAuthDebugCode(error)}
+    `;
+}
+
+async function generateOperatorAccessKeyFile() {
+    const statusEl = document.getElementById("access-key-generate-status");
+    const btn = document.getElementById("btn-generate-access-key");
+    const roleEl = document.getElementById("access-key-role");
+    const ttlEl = document.getElementById("access-key-ttl");
+
+    if (!functions) {
+        renderAccessKeyError(statusEl, { code: "local/not-initialized" }, "Firebase Functions ist nicht initialisiert.");
+        return;
+    }
+
+    const role = (roleEl?.value || "admin").trim().toLowerCase();
+    const ttlMinutes = parseInt((ttlEl?.value || "60").trim(), 10);
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 10080) {
+        renderAccessKeyError(statusEl, { code: "functions/invalid-argument" }, "Gültigkeit muss zwischen 1 und 10080 Minuten liegen.");
+        return;
+    }
+
+    const firstConfirm = window.confirm(
+        "Zugangsschlüsseldatei wirklich erzeugen?\n\n" +
+        "Die Datei gewährt bis zum Ablaufdatum Zugriff auf die gewählte Rolle."
+    );
+    if (!firstConfirm) return;
+
+    if (btn) btn.disabled = true;
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Erzeuge 256-Bit-Schlüssel und registriere ihn im Backend...</div>";
+
+    try {
+        const randomBytes = new Uint8Array(32); // 32 bytes = 256 bits
+        window.crypto.getRandomValues(randomBytes);
+        const key = toBase64Url(randomBytes);
+        const keyHash = await sha256HexBrowser(key);
+        const fingerprint = buildKeyFingerprint(keyHash);
+
+        const createKeyFn = functions.httpsCallable("createOperatorAccessKey");
+        const response = await createKeyFn({ keyHash, role, ttlMinutes });
+        const payload = response?.data || {};
+        const expiresAtMs = Number(payload.expiresAtMs || (Date.now() + ttlMinutes * 60 * 1000));
+
+        const fileData = {
+            format: "MiniMasterOperatorAccessKey/v1",
+            projectId: firebaseConfig?.projectId || null,
+            keyId: payload.keyId || null,
+            role: payload.role || role,
+            keyHash,
+            fingerprint,
+            key,
+            issuedAt: new Date().toISOString(),
+            expiresAt: new Date(expiresAtMs).toISOString(),
+        };
+
+        const fileName = `minimaster-access-key-${fileData.role}-${Date.now()}.json`;
+        downloadJson(fileName, fileData);
+
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='success-box'>✅ Schlüsseldatei erzeugt und gespeichert.<br />Rolle: <strong>${escapeHtml(fileData.role)}</strong> · Ablauf: <strong>${escapeHtml(fileData.expiresAt)}</strong><br />Fingerprint: <code>${escapeHtml(fileData.fingerprint)}</code><br /><button class='btn btn-secondary btn-sm' style='margin-top:8px' onclick='copyAccessKeyFingerprint(${JSON.stringify(fileData.fingerprint)})'>Fingerprint kopieren</button></div>`;
+        }
+        showNotification("Zugangsschlüsseldatei wurde erzeugt.", "success");
+    } catch (error) {
+        const msg = error?.message || "Erzeugung fehlgeschlagen.";
+        renderAccessKeyError(statusEl, error, msg);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function redeemOperatorAccessKeyFile() {
+    const statusEl = document.getElementById("access-key-redeem-status");
+    const btn = document.getElementById("btn-redeem-access-key");
+    const fileInput = document.getElementById("access-key-file");
+
+    if (!functions) {
+        renderAccessKeyError(statusEl, { code: "local/not-initialized" }, "Firebase Functions ist nicht initialisiert.");
+        return;
+    }
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        renderAccessKeyError(statusEl, { code: "functions/invalid-argument" }, "Bitte zuerst eine Schlüsseldatei auswählen.");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    if (btn) btn.disabled = true;
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Schlüsseldatei wird geprüft und eingelöst...</div>";
+
+    try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const key = typeof parsed?.key === "string" ? parsed.key.trim() : "";
+        const expectedHash = typeof parsed?.keyHash === "string" ? parsed.keyHash.trim().toLowerCase() : "";
+        const expectedFingerprint = typeof parsed?.fingerprint === "string" ? parsed.fingerprint.trim() : "";
+
+        if (!key || key.length < 43) {
+            throw new Error("Die ausgewählte Datei enthält keinen gültigen 256-Bit-Schlüssel.");
+        }
+
+        const actualHash = await sha256HexBrowser(key);
+        const actualFingerprint = buildKeyFingerprint(actualHash);
+
+        if (expectedHash && expectedHash !== actualHash) {
+            throw new Error("Schlüsseldatei ist inkonsistent: keyHash passt nicht zum Schlüsselwert.");
+        }
+        if (expectedFingerprint && expectedFingerprint !== actualFingerprint) {
+            throw new Error("Schlüsseldatei ist inkonsistent: Fingerprint passt nicht zum Schlüsselwert.");
+        }
+
+        const redeemFn = functions.httpsCallable("redeemOperatorAccessKey");
+        const result = await redeemFn({ key });
+        const grantedRole = escapeHtml(result?.data?.role || "unbekannt");
+
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='success-box'>✅ Zugang freigeschaltet. Rolle: <strong>${grantedRole}</strong>. Token wird aktualisiert...<br />Fingerprint: <code>${escapeHtml(actualFingerprint)}</code><br /><button class='btn btn-secondary btn-sm' style='margin-top:8px' onclick='copyAccessKeyFingerprint(${JSON.stringify(actualFingerprint)})'>Fingerprint kopieren</button></div>`;
+        }
+
+        await recheckAdminAccess();
+        showNotification("Zugang über Schlüsseldatei erfolgreich freigeschaltet.", "success");
+    } catch (error) {
+        const msg = error?.message || "Einlösen fehlgeschlagen.";
+        renderAccessKeyError(statusEl, error, msg);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 async function recheckAdminAccess() {

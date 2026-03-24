@@ -717,6 +717,42 @@ input:focus, select:focus, textarea:focus {
     font-weight: bold;
 }
 
+.error-tooltip-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline-start: 8px;
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 999px;
+    border: 1px solid #fca5a5;
+    background: #fff1f2;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    cursor: help;
+    vertical-align: middle;
+}
+
+.access-error-help {
+    margin-block-start: 8px;
+    padding: 8px 10px;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    background: #fff7ed;
+    color: #7c2d12;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    text-align: start;
+}
+
+.access-error-code {
+    display: inline-block;
+    margin-inline-start: 6px;
+    color: #9a3412;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
 /* --- Modal --- */
 .modal {
     position: fixed;
