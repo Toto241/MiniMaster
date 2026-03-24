@@ -122,6 +122,20 @@ def command_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 
+def local_properties_values() -> dict[str, str]:
+    local_properties = REPO_ROOT / "local.properties"
+    if not local_properties.exists():
+        return {}
+    values: dict[str, str] = {}
+    for line in local_properties.read_text(encoding="utf-8", errors="ignore").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
 def has_connected_adb_device() -> bool:
     adb = adb_command()
     if not command_exists(adb):
@@ -292,7 +306,18 @@ class SuiteResult:
 
 PREREQ_CHECKS: dict[str, Callable[[], tuple[bool, str | None]]] = {
     "npm": lambda: (command_exists(npm_command()), f"{npm_command()} not found in PATH."),
+    "pwsh": lambda: (command_exists("pwsh"), "pwsh not found in PATH."),
+    "bash": lambda: (command_exists("bash"), "bash not found in PATH."),
     "node_modules": lambda: ((REPO_ROOT / "node_modules").exists(), "node_modules is missing. Run npm install first."),
+    "local_properties": lambda: ((REPO_ROOT / "local.properties").exists(), "local.properties is missing."),
+    "debug_secret_master": lambda: (
+        bool(local_properties_values().get("debug.session.secret.master", "").strip()),
+        "debug.session.secret.master missing in local.properties.",
+    ),
+    "debug_secret_child": lambda: (
+        bool(local_properties_values().get("debug.session.secret.child", "").strip()),
+        "debug.session.secret.child missing in local.properties.",
+    ),
     "java": lambda: (java_available(), "Java not found. Configure JAVA_HOME or install a supported JDK."),
     "android_sdk": lambda: (resolve_android_sdk() is not None, "Android SDK not found. Set ANDROID_HOME/ANDROID_SDK_ROOT or local.properties."),
     "adb": lambda: (command_exists(adb_command()), f"{adb_command()} not found in PATH."),
@@ -325,6 +350,9 @@ SUITES: tuple[Suite, ...] = (
     Suite("android-instrumentation-build-child", "childApp instrumentation build", "android", [str(gradle_wrapper()), ":childApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-connected-master", "masterApp connected test", "device", [str(gradle_wrapper()), ":masterApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
     Suite("android-connected-child", "childApp connected test", "device", [str(gradle_wrapper()), ":childApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
+    Suite("android-usb-master", "masterApp USB commissioning", "device", ["pwsh", "-File", str(REPO_ROOT / "scripts" / "run-usb-tests.ps1"), "-AppId", "master", "-Suite", "commissioning"], ("pwsh", "gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_master"), timeout_sec=7200),
+    Suite("android-usb-child", "childApp USB commissioning", "device", ["pwsh", "-File", str(REPO_ROOT / "scripts" / "run-usb-tests.ps1"), "-AppId", "child", "-Suite", "commissioning"], ("pwsh", "gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_child"), timeout_sec=7200),
+    Suite("android-e2e-shell", "Cross-app E2E shell flow", "device", ["bash", str(REPO_ROOT / "run_e2e_test.sh")], ("bash", "gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=7200),
     Suite("release-revalidate", "Release gate revalidation", "release", [npm_command(), "run", "ci:revalidate"], ("npm", "node_modules"), timeout_sec=3600),
 )
 
@@ -427,14 +455,35 @@ def print_results(results: list[SuiteResult]) -> None:
             print(f"  duration: {result.duration_sec:.2f}s, returncode: {result.returncode}")
 
 
-def write_summary(path: Path, selected: list[Suite], results: list[SuiteResult]) -> None:
+def write_summary(path: Path, selected: list[Suite], results: list[SuiteResult], append_history: bool) -> None:
     ensure_parent_dir(path)
-    payload = {
+    run_payload = {
         "generated_at_epoch": int(time.time()),
         "repo_root": str(REPO_ROOT),
         "inventory": inventory_counts(),
         "selected_suites": [suite.suite_id for suite in selected],
         "results": [asdict(result) for result in results],
+    }
+    if not append_history:
+        path.write_text(json.dumps(run_payload, indent=2), encoding="utf-8")
+        return
+
+    history: list[dict[str, object]] = []
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(existing, dict):
+                if isinstance(existing.get("history"), list):
+                    history = [item for item in existing["history"] if isinstance(item, dict)]
+                elif "results" in existing:
+                    history = [existing]
+        except json.JSONDecodeError:
+            history = []
+
+    history.append(run_payload)
+    payload = {
+        "latest": run_payload,
+        "history": history[-25:],
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -454,6 +503,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--list", action="store_true", help="List known suites and exit.")
     parser.add_argument("--inventory", action="store_true", help="Print inventory summary and exit.")
     parser.add_argument("--json-out", type=Path, default=DEFAULT_SUMMARY_PATH, help="Write JSON summary to this path.")
+    parser.add_argument("--append-history", action="store_true", help="Append run payload to summary history (default enabled).")
+    parser.add_argument("--no-append-history", action="store_true", help="Disable summary history and overwrite JSON output.")
     parser.add_argument("--strict-skips", action="store_true", help="Treat skipped suites as failures.")
     parser.add_argument("--continue-on-fail", action="store_true", help="Continue after a failing suite.")
     return parser.parse_args()
@@ -479,7 +530,13 @@ def main() -> int:
         if result.status == "failed" and not args.continue_on_fail:
             break
 
-    write_summary(args.json_out, selected, results)
+    append_history = True
+    if args.no_append_history:
+        append_history = False
+    elif args.append_history:
+        append_history = True
+
+    write_summary(args.json_out, selected, results, append_history=append_history)
     print(f"Summary written to {args.json_out}")
     return overall_exit_code(results, strict_skips=args.strict_skips)
 
