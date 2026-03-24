@@ -184,6 +184,17 @@
                                         Aus URL laden
                                     </button>
                                 </div>
+                                <div class="firebase-import-row" style="margin-block-start:8px;">
+                                    <input
+                                        type="file"
+                                        id="bootstrap-config-file"
+                                        class="form-input"
+                                        accept=".json,application/json"
+                                    />
+                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromFile()">
+                                        JSON-Datei importieren
+                                    </button>
+                                </div>
                                 <div id="bootstrap-import-status" class="phase-status"></div>
                                 <small class="text-muted">
                                     Live-Sync ist aktiv: Bei jeder Eingabe werden gültige Werte automatisch lokal gespeichert
