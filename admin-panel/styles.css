@@ -248,6 +248,36 @@ body {
     margin: 12px 0;
 }
 
+.firebase-import-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 14px;
+    margin-block-end: 14px;
+}
+
+.firebase-import-box h4 {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    color: #0f172a;
+}
+
+.firebase-import-box p {
+    margin: 0 0 10px;
+    color: #475569;
+    font-size: 0.86rem;
+}
+
+.firebase-import-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.firebase-import-row .form-input {
+    margin: 0;
+}
+
 .phase-actions {
     display: flex;
     gap: 10px;
@@ -492,6 +522,10 @@ body {
 @media (max-inline-size: 640px) {
     .firebase-config-form {
         grid-template-columns: 1fr;
+    }
+    .firebase-import-row {
+        flex-direction: column;
+        align-items: stretch;
     }
     .onboarding-stepper {
         flex-wrap: wrap;
