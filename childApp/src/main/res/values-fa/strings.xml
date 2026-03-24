@@ -46,4 +46,15 @@
     <string name="language_setup_title">Choose your app language</string>
     <string name="language_setup_description">Select your preferred language for Mini-Master Child App. You can change it later in a future settings screen.</string>
     <string name="language_continue">Continue</string>
+
+    <!-- Task lock and proof flow -->
+    <string name="task_required_title">Task Required</string>
+    <string name="task_proof_rejected">Proof rejected. Please submit again.</string>
+    <string name="task_complete_to_unlock">To unlock the device, please complete this task.</string>
+    <string name="task_submit_proof">Submit Proof</string>
+    <string name="task_waiting_for_approval">Proof submitted. Waiting for parent approval.</string>
+    <string name="task_status_format">Status: %1$s</string>
+    <string name="your_tasks_title">Your Tasks</string>
+    <string name="no_tasks_for_now">No tasks for now, good job!</string>
+    <string name="task_complete_button">Complete</string>
 </resources>

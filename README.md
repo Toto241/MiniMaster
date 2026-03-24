@@ -188,6 +188,8 @@ The repository now includes a Python-based orchestrator that inventories and run
 - `python scripts/test_automation.py --group android` runs Android lint, JVM unit tests, and instrumentation build checks.
 - `python scripts/test_automation.py --group device` runs the selected connected tests when `adb` and a device/emulator are available.
 
+Optional: provide security CI inputs via `.security-test.env` or `scripts/security-test.env` (template: `scripts/security-test.env.template`) so `backend-security` can run without ad-hoc shell exports.
+
 Suites with missing external prerequisites are marked as skipped by default with a concrete reason. Use `--strict-skips` if skipped suites should fail the run.
 
 ## License

@@ -18,6 +18,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 IS_WINDOWS = os.name == "nt"
 DEFAULT_SUMMARY_PATH = REPO_ROOT / "build" / "test-automation" / "latest-summary.json"
 IGNORED_INVENTORY_PARTS = {".git", ".venv", "node_modules", "build", "coverage", "lib", ".gradle"}
+SECURITY_ENV_FILES = (
+    REPO_ROOT / ".security-test.env",
+    REPO_ROOT / "scripts" / "security-test.env",
+)
 
 
 def npm_command() -> str:
@@ -163,9 +167,39 @@ def ensure_parent_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def load_env_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def resolved_security_env() -> dict[str, str]:
+    resolved: dict[str, str] = {}
+    for env_file in SECURITY_ENV_FILES:
+        resolved.update(load_env_file(env_file))
+    for key in (
+        "SECURITY_TEST_ADMIN_EMAIL",
+        "SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED",
+        "SECURITY_TEST_FUNCTIONS_DEPLOYED",
+        "SECURITY_TEST_SERVICE_ACCOUNT",
+    ):
+        env_value = os.environ.get(key)
+        if env_value and env_value.strip():
+            resolved[key] = env_value.strip()
+    return resolved
+
+
 def has_security_ci_inputs() -> bool:
+    values = resolved_security_env()
     return all(
-        bool(os.environ.get(name, "").strip())
+        bool(values.get(name, "").strip())
         for name in (
             "SECURITY_TEST_ADMIN_EMAIL",
             "SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED",
@@ -175,7 +209,43 @@ def has_security_ci_inputs() -> bool:
 
 
 def has_security_service_account() -> bool:
-    return (REPO_ROOT / "serviceAccountKey.json").exists()
+    exists, _ = security_service_account_status()
+    return exists
+
+
+def security_service_account_status() -> tuple[bool, str | None]:
+    values = resolved_security_env()
+    configured = values.get("SECURITY_TEST_SERVICE_ACCOUNT", "").strip()
+    if configured:
+        candidate = Path(configured)
+        if not candidate.is_absolute():
+            candidate = REPO_ROOT / configured
+        if candidate.exists():
+            return True, None
+        return (
+            False,
+            (
+                "Security service account file not found at "
+                f"{candidate}. Set SECURITY_TEST_SERVICE_ACCOUNT in "
+                ".security-test.env or scripts/security-test.env, or place serviceAccountKey.json in repo root."
+            ),
+        )
+
+    fallback = REPO_ROOT / "serviceAccountKey.json"
+    if fallback.exists():
+        return True, None
+    return (
+        False,
+        (
+            "serviceAccountKey.json missing for security runner at "
+            f"{fallback}. Set SECURITY_TEST_SERVICE_ACCOUNT in .security-test.env "
+            "or scripts/security-test.env, or add serviceAccountKey.json to repo root."
+        ),
+    )
+
+
+def check_security_service_account_prereq() -> tuple[bool, str | None]:
+    return security_service_account_status()
 
 
 def prepare_command(command: list[str]) -> list[str]:
@@ -191,6 +261,8 @@ def build_process_env(suite: Suite) -> dict[str, str]:
         if java_home is not None:
             env["JAVA_HOME"] = str(java_home)
             env["PATH"] = str(java_home / "bin") + os.pathsep + env.get("PATH", "")
+    if suite.suite_id == "backend-security":
+        env.update(resolved_security_env())
     return env
 
 
@@ -234,10 +306,7 @@ PREREQ_CHECKS: dict[str, Callable[[], tuple[bool, str | None]]] = {
         has_security_ci_inputs(),
         "Security CI inputs missing. Set SECURITY_TEST_ADMIN_EMAIL, SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED and SECURITY_TEST_FUNCTIONS_DEPLOYED.",
     ),
-    "security_service_account": lambda: (
-        has_security_service_account(),
-        "serviceAccountKey.json missing for security runner.",
-    ),
+    "security_service_account": check_security_service_account_prereq,
 }
 
 
@@ -248,6 +317,7 @@ SUITES: tuple[Suite, ...] = (
     Suite("backend-rules-structural", "Firestore rules structural", "backend", [npm_command(), "run", "test:rules:structural"], ("npm", "node_modules")),
     Suite("backend-rules-emulator", "Firestore rules emulator", "backend", [npm_command(), "run", "test:rules:emulator"], ("npm", "node_modules", "java"), timeout_sec=1800),
     Suite("backend-security", "Security regression script", "backend", [npm_command(), "run", "test:security:ci"], ("npm", "node_modules", "security_ci_inputs", "security_service_account"), timeout_sec=1800),
+    Suite("android-task-translation-check", "Child task translation completeness", "android", [sys.executable, str(REPO_ROOT / "scripts" / "sync_child_task_translations.py")], tuple()),
     Suite("android-lint", "Android lint", "android", [str(gradle_wrapper()), "lint"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-unit-master", "masterApp unit tests", "android", [str(gradle_wrapper()), ":masterApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-unit-child", "childApp unit tests", "android", [str(gradle_wrapper()), ":childApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
