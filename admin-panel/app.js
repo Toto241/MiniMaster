@@ -3366,6 +3366,10 @@ document.addEventListener("DOMContentLoaded", async function() {
         if (forgotPasswordProminentBtn) {
             forgotPasswordProminentBtn.addEventListener("click", handleForgotPassword);
         }
+        const checkProviderBtn = document.getElementById("check-provider-btn");
+        if (checkProviderBtn) {
+            checkProviderBtn.addEventListener("click", handleCheckAuthProviders);
+        }
 
         // Setup registration form submission
         const registerForm = document.getElementById("register-form");
@@ -3652,7 +3656,19 @@ async function handleRegistration(event) {
     } catch (error) {
         let msg = error.message;
         if (error.code === "auth/email-already-in-use") {
-            msg = "Diese E-Mail-Adresse wird bereits verwendet. Wechseln Sie zu 'Bestehendes Konto nutzen'.";
+            let providerHint = "";
+            try {
+                const methods = await auth.fetchSignInMethodsForEmail(email);
+                if (Array.isArray(methods) && methods.length > 0) {
+                    providerHint = ` Gefundene Anmeldearten: ${methods.join(", ")}.`;
+                    if (!methods.includes("password")) {
+                        providerHint += " Für dieses Konto ist kein Passwort-Login aktiv.";
+                    }
+                }
+            } catch (_methodsError) {
+                // Best effort only.
+            }
+            msg = "Diese E-Mail-Adresse wird bereits verwendet. Wechseln Sie zu 'Bestehendes Konto nutzen'." + providerHint;
         } else if (error.code === "auth/weak-password") {
             msg = "Das Passwort ist zu schwach. Verwenden Sie mindestens 8 Zeichen mit Buchstaben und Zahlen.";
         } else if (error.code === "auth/invalid-email") {
@@ -3674,6 +3690,52 @@ function formatAuthDebugCode(error) {
     const code = (error && typeof error.code === "string") ? error.code.trim() : "";
     if (!code) return "";
     return `<div class='info' style='margin-top:6px'>Technischer Fehlercode: <code>${escapeHtml(code)}</code></div>`;
+}
+
+async function handleCheckAuthProviders() {
+    const emailInput = document.getElementById("login-email");
+    const statusEl = document.getElementById("login-status");
+    const checkBtn = document.getElementById("check-provider-btn");
+    const email = (emailInput?.value || "").trim();
+
+    if (!email) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine E-Mail-Adresse eingeben.</div>";
+        return;
+    }
+
+    if (!auth) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Firebase Authentication ist noch nicht initialisiert.</div>";
+        return;
+    }
+
+    if (checkBtn) checkBtn.disabled = true;
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Prüfe Anmeldearten für diese E-Mail...</div>";
+
+    try {
+        const methods = await auth.fetchSignInMethodsForEmail(email);
+
+        if (!Array.isArray(methods) || methods.length === 0) {
+            if (statusEl) {
+                statusEl.innerHTML = "<div class='info'>ℹ️ Keine Anmeldearten zurückgegeben. Das kann bedeuten: (1) kein Konto vorhanden oder (2) Firebase Email Enumeration Protection ist aktiv.</div>";
+            }
+            return;
+        }
+
+        const hasPassword = methods.includes("password");
+        const readable = methods.map(method => `<code>${escapeHtml(method)}</code>`).join(", ");
+        if (statusEl) {
+            statusEl.innerHTML = hasPassword
+                ? `<div class='success-box'>✅ Passwort-Login ist aktiv. Gefundene Anmeldearten: ${readable}</div>`
+                : `<div class='error'>Für diese E-Mail ist kein Passwort-Login aktiv. Gefundene Anmeldearten: ${readable}</div>`;
+        }
+    } catch (error) {
+        const msg = error?.message || "Prüfung fehlgeschlagen.";
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${formatAuthDebugCode(error)}`;
+        }
+    } finally {
+        if (checkBtn) checkBtn.disabled = false;
+    }
 }
 
 async function handleForgotPassword() {
@@ -3698,11 +3760,42 @@ async function handleForgotPassword() {
     if (statusEl) statusEl.innerHTML = "<div class='loading'>Sende Passwort-Reset-Link...</div>";
 
     try {
+        // Diagnose: Falls das Konto kein Passwort-Provider-Konto ist, kommt keine Reset-Mail.
+        let methods = null;
+        try {
+            methods = await auth.fetchSignInMethodsForEmail(email);
+        } catch (methodsError) {
+            console.warn("fetchSignInMethodsForEmail failed:", methodsError?.code || methodsError?.message || methodsError);
+        }
+
+        if (Array.isArray(methods) && methods.length > 0 && !methods.includes("password")) {
+            const readableMethods = methods.join(", ");
+            if (statusEl) {
+                statusEl.innerHTML = `<div class='error'>Für diese E-Mail ist keine Passwort-Anmeldung aktiviert (gefunden: ${escapeHtml(readableMethods)}). Bitte mit dem passenden Provider anmelden oder ein Passwort-Konto erstellen.</div>`;
+            }
+            return;
+        }
+
+        // Hinweis: Bei aktivierter Email Enumeration Protection kann Firebase hier absichtlich
+        // eine leere Liste liefern, obwohl ein Konto existiert. Daher niemals bei [] abbrechen.
+
         await auth.sendPasswordResetEmail(email);
         if (statusEl) {
-            statusEl.innerHTML = "<div class='success-box'>✅ Passwort-Reset-E-Mail versendet. Bitte Posteingang und Spam-Ordner prüfen.</div>";
+            const senderHint = firebaseConfig?.projectId
+                ? `Absender meist: noreply@${escapeHtml(firebaseConfig.projectId)}.firebaseapp.com.`
+                : "Absender meist: noreply@<projekt>.firebaseapp.com.";
+            if (Array.isArray(methods) && methods.length === 0) {
+                statusEl.innerHTML = `<div class='info'>ℹ️ Reset-Anfrage wurde an Firebase übergeben. Wegen aktivem Kontoschutz kann der Versand nicht verifiziert werden. Bitte in Firebase Console unter Authentication → Users prüfen, ob für diese E-Mail ein Passwort-Provider existiert.</div><div class='info' style='margin-top:6px'>${senderHint}</div>`;
+            } else {
+                statusEl.innerHTML = `<div class='success-box'>✅ Passwort-Reset-E-Mail versendet. Bitte Posteingang, Spam und ggf. Gmail-Kategorie "Werbung" prüfen.<br />${senderHint}</div>`;
+            }
         }
-        showNotification("Passwort-Reset-E-Mail wurde versendet.", "success");
+        showNotification(
+            Array.isArray(methods) && methods.length === 0
+                ? "Reset-Anfrage übergeben (Versand durch Firebase nicht verifizierbar)."
+                : "Passwort-Reset-E-Mail wurde versendet.",
+            Array.isArray(methods) && methods.length === 0 ? "info" : "success"
+        );
     } catch (error) {
         let msg = error.message;
         if (error.code === "auth/user-not-found") {
