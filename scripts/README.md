@@ -139,6 +139,38 @@ python scripts/sync_child_task_translations.py --apply
 
 This script is used by `scripts/test_automation.py` as suite `android-task-translation-check`.
 
+### 6. test_automation.py
+
+Zentraler Python-Runner fuer Build-, Test- und Gate-Suites.
+
+**Inventar und Suite-Liste:**
+
+```bash
+python scripts/test_automation.py --inventory
+python scripts/test_automation.py --list
+```
+
+**Backend + Android (Standard):**
+
+```bash
+python scripts/test_automation.py --continue-on-fail
+```
+
+**Alle Gruppen (inkl. Device + Release):**
+
+```bash
+python scripts/test_automation.py --group all --continue-on-fail
+```
+
+**Wichtige Hinweise:**
+
+1. Device-Suites benoetigen ein verbundenes ADB-Geraet/Emulator.
+2. `android-usb-master` und `android-usb-child` benoetigen Debug-Secrets in `local.properties`:
+    - `debug.session.secret.master`
+    - `debug.session.secret.child`
+3. Die JSON-Zusammenfassung wird unter `build/test-automation/latest-summary.json` als Historie gespeichert.
+4. Mit `--no-append-history` kann das fruehere Ueberschreiben-Verhalten erzwungen werden.
+
 ### Security CI input file (optional)
 
 For `scripts/test_automation.py` you can provide security-test inputs in one of these files:
