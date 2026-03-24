@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- The official name of the application, displayed in the app launcher and system settings. -->
     <string name="app_name">Mini-Master Child App</string>
 
@@ -46,13 +46,13 @@
     <string name="language_setup_title">Choose your app language</string>
     <string name="language_setup_description">Select your preferred language for Mini-Master Child App. You can change it later in a future settings screen.</string>
     <string name="language_continue">Continue</string>
-    <string name="task_required_title">Task Required</string>
-    <string name="task_proof_rejected">Proof rejected. Please submit again.</string>
-    <string name="task_complete_to_unlock">To unlock the device, please complete this task.</string>
-    <string name="task_submit_proof">Submit Proof</string>
-    <string name="task_waiting_for_approval">Proof submitted. Waiting for parent approval.</string>
-    <string name="task_status_format">Status: %1$s</string>
-    <string name="your_tasks_title">Your Tasks</string>
-    <string name="no_tasks_for_now">No tasks for now, good job!</string>
-    <string name="task_complete_button">Complete</string>
+    <string name="task_required_title" tools:ignore="MissingTranslation">Task Required</string>
+    <string name="task_proof_rejected" tools:ignore="MissingTranslation">Proof rejected. Please submit again.</string>
+    <string name="task_complete_to_unlock" tools:ignore="MissingTranslation">To unlock the device, please complete this task.</string>
+    <string name="task_submit_proof" tools:ignore="MissingTranslation">Submit Proof</string>
+    <string name="task_waiting_for_approval" tools:ignore="MissingTranslation">Proof submitted. Waiting for parent approval.</string>
+    <string name="task_status_format" tools:ignore="MissingTranslation">Status: %1$s</string>
+    <string name="your_tasks_title" tools:ignore="MissingTranslation">Your Tasks</string>
+    <string name="no_tasks_for_now" tools:ignore="MissingTranslation">No tasks for now, good job!</string>
+    <string name="task_complete_button" tools:ignore="MissingTranslation">Complete</string>
 </resources>

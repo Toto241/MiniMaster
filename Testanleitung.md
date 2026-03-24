@@ -159,6 +159,22 @@ Nachdem die Geräte erfolgreich gekoppelt wurden, können die folgenden Kernfunk
 
 Das Projekt enthält bereits eine Reihe von automatisierten Tests und kann um einen End-to-End-Test erweitert werden.
 
+### 4.0. Zentrale Python-Automatisierung
+
+Zusätzlich zu den Einzelbefehlen steht jetzt ein zentraler Python-Runner zur Verfuegung:
+
+```bash
+python scripts/test_automation.py --list
+python scripts/test_automation.py --inventory
+python scripts/test_automation.py --group backend
+python scripts/test_automation.py --group android
+python scripts/test_automation.py --group device
+```
+
+Der Runner fuehrt bekannte Testsuiten ueber einen einheitlichen Einstieg aus, prueft Voraussetzungen wie `node_modules`, Java, Android SDK und angeschlossene `adb`-Geraete vorab und schreibt eine JSON-Zusammenfassung nach `build/test-automation/latest-summary.json`.
+
+Fehlende externe Voraussetzungen werden standardmaessig als `skipped` protokolliert, damit der Lauf reproduzierbar bleibt. Mit `--strict-skips` koennen solche Faelle als Fehler gewertet werden.
+
 ### 3.1. Backend Unit-Tests
 Diese Tests validieren die Logik der Cloud Functions (in `index.ts`) isoliert.
 *   **Befehl:** `npm test`
