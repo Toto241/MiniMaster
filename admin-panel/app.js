@@ -3215,16 +3215,70 @@ function appendRecoveryLog(statusEl, line) {
     statusEl.innerHTML = `<pre class='code-block' style='margin:0'>${escapeHtml(next)}</pre>`;
 }
 
+function isRetryableFirebaseQueueConflict(command, output, code) {
+    if (Number(code) === 0) return false;
+    const normalizedCommand = String(command || "").toLowerCase();
+    if (!normalizedCommand.includes("firebase deploy")) return false;
+
+    const normalizedOutput = String(output || "").toLowerCase();
+    return normalizedOutput.includes("http error: 409") || normalizedOutput.includes("unable to queue the operation");
+}
+
+function waitMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function executeBridgeCommandWithRetry({
+    command,
+    cwd,
+    logTarget,
+    appendLog,
+    maxRetries = 3,
+    retryDelayMs = 45000,
+}) {
+    let attempt = 0;
+    while (attempt < maxRetries) {
+        attempt += 1;
+        if (typeof appendLog === "function") {
+            appendLog(logTarget, `> ${command}${attempt > 1 ? ` (Retry ${attempt}/${maxRetries})` : ""}`);
+        }
+
+        const result = await executeCommandViaPythonBridge({ command, cwd });
+        const output = (result?.output || "").trim();
+        if (output && typeof appendLog === "function") {
+            appendLog(logTarget, output);
+        }
+
+        if (Number(result?.code) === 0) {
+            return result;
+        }
+
+        if (isRetryableFirebaseQueueConflict(command, output, result?.code) && attempt < maxRetries) {
+            if (typeof appendLog === "function") {
+                appendLog(logTarget, `Hinweis: Firebase meldet 409/Queue-Konflikt. Neuer Versuch in ${Math.round(retryDelayMs / 1000)}s ...`);
+            }
+            await waitMs(retryDelayMs);
+            continue;
+        }
+
+        return result;
+    }
+
+    return { code: 1, output: "Unbekannter Fehler im Retry-Loop." };
+}
+
 async function executeFirebaseRecoveryCommands(projectId, statusEl, cwd, onCommandStart) {
     const commands = buildFirebaseRecoveryCommands(projectId);
     for (const command of commands) {
         if (typeof onCommandStart === "function") {
             onCommandStart(command);
         }
-        appendRecoveryLog(statusEl, `> ${command}`);
-        const result = await executeCommandViaPythonBridge({ command, cwd });
-        const output = (result?.output || "").trim();
-        if (output) appendRecoveryLog(statusEl, output);
+        const result = await executeBridgeCommandWithRetry({
+            command,
+            cwd,
+            logTarget: statusEl,
+            appendLog: appendRecoveryLog,
+        });
         if (Number(result?.code) !== 0) {
             throw new Error(`Befehl fehlgeschlagen (Code ${result?.code ?? "?"}): ${command}`);
         }
@@ -4107,8 +4161,8 @@ function handlePrepareCloudReset() {
     showAuthMode("login");
 
     const firstConfirm = window.confirm(
-        "Cloud-Reset-Hinweise anzeigen?\n\n" +
-        "Diese Aktion betrifft potenziell produktive Firebase-Daten."
+        "Cloud-Reset automatisch starten?\n\n" +
+        "Nach Freigabe werden die notwendigen Cloud-Befehle direkt ausgeführt."
     );
     if (!firstConfirm) return;
 
@@ -4118,7 +4172,7 @@ function handlePrepareCloudReset() {
     if ((resetToken || "").trim() !== "RESET") {
         const statusEl = document.getElementById("login-status");
         if (statusEl) {
-            statusEl.innerHTML = "<div class='info'>Cloud-Reset-Vorbereitung abgebrochen (Bestätigung RESET nicht korrekt).</div>";
+            statusEl.innerHTML = "<div class='info'>Cloud-Reset abgebrochen (Bestätigung RESET nicht korrekt).</div>";
         }
         return;
     }
@@ -4127,45 +4181,74 @@ function handlePrepareCloudReset() {
     const loginEmailEl = document.getElementById("login-email");
     const registerEmailEl = document.getElementById("register-email");
     const operatorEmail = (loginEmailEl?.value || registerEmailEl?.value || "").trim();
-    const projectId = (firebaseConfig?.projectId || "<FIREBASE_PROJECT_ID>").trim();
-    const safeProjectId = escapeHtml(projectId || "<FIREBASE_PROJECT_ID>");
-    const safeEmail = operatorEmail ? escapeHtml(operatorEmail) : "<operator@example.com>";
+    const projectId = (firebaseConfig?.projectId || "").trim();
 
     if (!loginStatusEl) return;
 
-    loginStatusEl.innerHTML = `
-        <div class='error'>
-            <strong>ACHTUNG:</strong> Cloud-Reset löscht produktive Daten in Firebase (nicht nur lokal im Browser).
-            Nur durchführen, wenn ein vollständiges Backup und Freigabe vorliegen.
-        </div>
-        <div class='info' style='margin-top:8px'>
-            <strong>Geführter Cloud-Reset (manuell):</strong>
-            <ol style='margin:8px 0 0 18px; padding:0;'>
-                <li>Backup erstellen (Firestore Export / Auth User Export).</li>
-                <li>In Firebase Console unter <strong>Authentication → Users</strong> den betroffenen Operator prüfen: <code>${safeEmail}</code></li>
-                <li>Nur falls freigegeben: Operator-Konto löschen und neu anlegen.</li>
-                <li>Falls nötig: zugehörige Operator-Dokumente in Firestore bereinigen (gezielt, nicht pauschal).</li>
-                <li>Anschließend im Panel erneut anmelden und Setup-Assistenten prüfen.</li>
-            </ol>
-        </div>
-        <div class='info' style='margin-top:8px'>
-            <strong>CLI-Referenz (Projekt: ${safeProjectId}):</strong>
-            <pre style='white-space:pre-wrap;margin:8px 0 0 0'>
-firebase use ${safeProjectId}
-# Operator in Firebase Auth gezielt entfernen (falls freigegeben)
-firebase auth:delete ${safeEmail}
-
-# Danach neues Operator-Konto im Admin-Panel neu erstellen
-            </pre>
-        </div>
-    `;
-
-    if (loginEmailEl && !loginEmailEl.value.trim() && operatorEmail) {
-        loginEmailEl.value = operatorEmail;
+    if (isPlaceholderProjectId(projectId)) {
+        loginStatusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID setzen (nicht your-project-id).</div>";
+        return;
     }
-    if (loginEmailEl) {
-        loginEmailEl.focus();
+
+    const cloudResetCommands = [
+        "npm install",
+        `firebase use ${projectId}`,
+        ...(operatorEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(operatorEmail)
+            ? [`firebase auth:delete ${operatorEmail}`]
+            : []),
+        "firebase deploy --only firestore:rules,firestore:indexes,storage",
+        "firebase deploy --only functions",
+    ];
+
+    const appendCloudResetLog = line => {
+        const existing = loginStatusEl.getAttribute("data-cloud-reset-log") || "";
+        const next = existing ? `${existing}\n${line}` : line;
+        loginStatusEl.setAttribute("data-cloud-reset-log", next);
+        loginStatusEl.innerHTML = `<pre class='code-block' style='margin:0'>${escapeHtml(next)}</pre>`;
+    };
+
+    if (!canExecuteCommandsDirectly()) {
+        const script = cloudResetCommands.join("\n");
+        copyTextToClipboard(script)
+            .then(() => {
+                loginStatusEl.innerHTML = "<div class='info'>Direkte Ausführung ist hier nicht verfügbar. Cloud-Reset-Skript wurde kopiert und kann im Terminal ausgeführt werden.</div>";
+            })
+            .catch(() => {
+                loginStatusEl.innerHTML = "<div class='error'>Direkte Ausführung ist hier nicht verfügbar und Skript konnte nicht kopiert werden.</div>";
+            });
+        return;
     }
+
+    loginStatusEl.setAttribute("data-cloud-reset-log", "");
+    appendCloudResetLog(`Cloud-Reset gestartet für Projekt: ${projectId}`);
+
+    const cwd = getCommandBuilderFormValues()?.workspacePath || ".";
+
+    (async () => {
+        try {
+            for (const command of cloudResetCommands) {
+                const result = await executeBridgeCommandWithRetry({
+                    command,
+                    cwd,
+                    logTarget: null,
+                    appendLog: (_unused, line) => appendCloudResetLog(line),
+                });
+                if (Number(result?.code) !== 0) {
+                    throw new Error(`Befehl fehlgeschlagen (Code ${result?.code ?? "?"}): ${command}`);
+                }
+            }
+
+            appendCloudResetLog("Cloud-Reset erfolgreich abgeschlossen.");
+            showNotification("Cloud-Reset erfolgreich abgeschlossen.", "success");
+            if (loginEmailEl && !loginEmailEl.value.trim() && operatorEmail) {
+                loginEmailEl.value = operatorEmail;
+            }
+            if (loginEmailEl) loginEmailEl.focus();
+        } catch (error) {
+            appendCloudResetLog(`Fehler: ${error?.message || "Unbekannter Fehler"}`);
+            showNotification("Cloud-Reset fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
+        }
+    })();
 }
 
 async function clearIndexedDbBestEffort() {
