@@ -3362,6 +3362,10 @@ document.addEventListener("DOMContentLoaded", async function() {
         if (forgotPasswordBtn) {
             forgotPasswordBtn.addEventListener("click", handleForgotPassword);
         }
+        const forgotPasswordProminentBtn = document.getElementById("forgot-password-prominent-btn");
+        if (forgotPasswordProminentBtn) {
+            forgotPasswordProminentBtn.addEventListener("click", handleForgotPassword);
+        }
 
         // Setup registration form submission
         const registerForm = document.getElementById("register-form");
@@ -3666,10 +3670,17 @@ async function handleRegistration(event) {
 
 // ==================== AUTHENTICATION ====================
 
+function formatAuthDebugCode(error) {
+    const code = (error && typeof error.code === "string") ? error.code.trim() : "";
+    if (!code) return "";
+    return `<div class='info' style='margin-top:6px'>Technischer Fehlercode: <code>${escapeHtml(code)}</code></div>`;
+}
+
 async function handleForgotPassword() {
     const emailInput = document.getElementById("login-email");
     const statusEl = document.getElementById("login-status");
     const resetBtn = document.getElementById("forgot-password-btn");
+    const resetProminentBtn = document.getElementById("forgot-password-prominent-btn");
     const email = (emailInput?.value || "").trim();
 
     if (!email) {
@@ -3683,6 +3694,7 @@ async function handleForgotPassword() {
     }
 
     if (resetBtn) resetBtn.disabled = true;
+    if (resetProminentBtn) resetProminentBtn.disabled = true;
     if (statusEl) statusEl.innerHTML = "<div class='loading'>Sende Passwort-Reset-Link...</div>";
 
     try {
@@ -3703,9 +3715,12 @@ async function handleForgotPassword() {
             msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
         }
         console.error("Password reset error:", error.code, error.message);
-        if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${formatAuthDebugCode(error)}`;
+        }
     } finally {
         if (resetBtn) resetBtn.disabled = false;
+        if (resetProminentBtn) resetProminentBtn.disabled = false;
     }
 }
 
@@ -3731,7 +3746,9 @@ function handleLogin(event) {
                 msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
             }
             console.error("Login error:", error.code, error.message);
-            if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+            if (statusEl) {
+                statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${formatAuthDebugCode(error)}`;
+            }
         });
 }
 
