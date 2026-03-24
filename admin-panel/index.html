@@ -243,9 +243,17 @@
                                     <strong>Passwort vergessen?</strong>
                                     <p>Ein Reset-Link kann jederzeit an die hinterlegte Operator-E-Mail gesendet werden.</p>
                                 </div>
-                                <button type="button" class="btn btn-secondary" onclick="openPasswordResetFlow()">
-                                    Passwort zurücksetzen
-                                </button>
+                                <div class="auth-reset-card-actions">
+                                    <button type="button" class="btn btn-secondary" onclick="openPasswordResetFlow()">
+                                        Passwort zurücksetzen
+                                    </button>
+                                    <button type="button" class="btn btn-outline" onclick="handlePrepareCloudReset()">
+                                        Cloud-Reset vorbereiten
+                                    </button>
+                                    <button type="button" class="btn btn-danger" onclick="handleFullAdminPanelReset()">
+                                        Panel vollständig zurücksetzen
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Registrierungsformular -->
