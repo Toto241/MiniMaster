@@ -3140,6 +3140,11 @@ function getBootstrapProjectId() {
     return (document.getElementById("bootstrap-project-id")?.value || "").trim();
 }
 
+function isPlaceholderProjectId(projectId) {
+    const normalized = String(projectId || "").trim().toLowerCase();
+    return !normalized || normalized.includes("your-project");
+}
+
 const recoveryProgressSteps = ["validate", "cloud", "local", "reload"];
 const recoveryProgressStateLabels = {
     pending: "Offen",
@@ -3266,9 +3271,9 @@ async function copyFirebaseRecoveryScript() {
     resetRecoveryProgress();
     setRecoveryAlive(false, "Bereit");
 
-    if (!projectId) {
+    if (isPlaceholderProjectId(projectId)) {
         setRecoveryProgressStep("validate", "error");
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine Project ID im Firebase-Formular eintragen.</div>";
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).</div>";
         return;
     }
 
@@ -3295,9 +3300,9 @@ async function runFirebaseRecoveryAutopilot() {
     resetRecoveryProgress();
     setRecoveryAlive(false, "Bereit");
 
-    if (!projectId) {
+    if (isPlaceholderProjectId(projectId)) {
         setRecoveryProgressStep("validate", "error");
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine Project ID im Firebase-Formular eintragen.</div>";
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).</div>";
         return;
     }
 
@@ -3359,9 +3364,9 @@ async function runStartFromScratchAutopilot() {
     resetRecoveryProgress();
     setRecoveryAlive(false, "Bereit");
 
-    if (!projectId) {
+    if (isPlaceholderProjectId(projectId)) {
         setRecoveryProgressStep("validate", "error");
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine Project ID im Firebase-Formular eintragen.</div>";
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).</div>";
         return;
     }
 
