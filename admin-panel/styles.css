@@ -321,11 +321,76 @@ body {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+.auth-reset-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    margin-block-end: 18px;
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+
+.auth-reset-card strong {
+    display: block;
+    color: #1e3a8a;
+    margin-block-end: 2px;
+}
+
+.auth-reset-card p {
+    margin: 0;
+    font-size: 0.84rem;
+    color: #475569;
+}
+
+@media (max-width: 680px) {
+    .auth-reset-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 /* --- Auth Forms --- */
 .auth-form {
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+.auth-inline-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.auth-link-btn {
+    align-self: flex-start;
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: #1d4ed8;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.auth-link-btn:hover {
+    color: #1e3a8a;
+}
+
+.auth-link-btn:disabled {
+    color: #94a3b8;
+    cursor: wait;
+}
+
+.auth-help-text {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #64748b;
 }
 
 .form-group {

@@ -1031,8 +1031,18 @@ async function runPythonAutomationSuite() {
     if (!resultEl) return;
 
     if (!isPythonOperator) {
-        resultEl.innerHTML = "<div class='error'>Python-Operator nicht erkannt. Bitte Dashboard über python_admin/app.py starten.</div>";
-        showNotification("Python-Operator nicht erkannt. Lauf nicht gestartet.", "error");
+        resultEl.innerHTML = `
+            <div class='warning-box'>
+                <strong>⚙️ Python-Server nicht erkannt</strong><br />
+                Die Python-basierte Testzentrale ist nur verfügbar, wenn das Dashboard über
+                <code>start.bat</code> oder <code>python -m python_admin.app</code> gestartet wurde.<br />
+                <strong>Aktuell erkannte Zugriffsart:</strong> file:// oder fremder HTTP-Server – kein Python-Operator.<br />
+                <br />
+                <strong>Lösung:</strong> <code>start.bat</code> ausführen oder manuell
+                <code>python -m python_admin.app</code> starten und dann
+                <a href="http://127.0.0.1:8765/admin-panel/" target="_blank">http://127.0.0.1:8765/admin-panel/</a> öffnen.
+            </div>
+        `;
         return;
     }
 
@@ -3348,6 +3358,10 @@ document.addEventListener("DOMContentLoaded", async function() {
 
         // Setup login form submission
         document.getElementById("login-form").addEventListener("submit", handleLogin);
+        const forgotPasswordBtn = document.getElementById("forgot-password-btn");
+        if (forgotPasswordBtn) {
+            forgotPasswordBtn.addEventListener("click", handleForgotPassword);
+        }
 
         // Setup registration form submission
         const registerForm = document.getElementById("register-form");
@@ -3434,6 +3448,28 @@ function showAuthMode(mode) {
         loginForm.style.display = "flex";
         toggleRegister.classList.remove("active");
         toggleLogin.classList.add("active");
+    }
+}
+
+function openPasswordResetFlow() {
+    showAuthMode("login");
+
+    const loginEmailEl = document.getElementById("login-email");
+    const registerEmailEl = document.getElementById("register-email");
+    const loginStatusEl = document.getElementById("login-status");
+    const fallbackEmail = (registerEmailEl?.value || "").trim();
+
+    if (loginEmailEl && fallbackEmail && !loginEmailEl.value.trim()) {
+        loginEmailEl.value = fallbackEmail;
+    }
+
+    if (loginStatusEl) {
+        loginStatusEl.innerHTML = "<div class='info'>E-Mail eingeben oder prüfen und dann den Reset-Link senden.</div>";
+    }
+
+    if (loginEmailEl) {
+        loginEmailEl.focus();
+        loginEmailEl.select();
     }
 }
 
@@ -3629,6 +3665,49 @@ async function handleRegistration(event) {
 }
 
 // ==================== AUTHENTICATION ====================
+
+async function handleForgotPassword() {
+    const emailInput = document.getElementById("login-email");
+    const statusEl = document.getElementById("login-status");
+    const resetBtn = document.getElementById("forgot-password-btn");
+    const email = (emailInput?.value || "").trim();
+
+    if (!email) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst die hinterlegte E-Mail-Adresse eingeben.</div>";
+        return;
+    }
+
+    if (!auth) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Firebase Authentication ist noch nicht initialisiert.</div>";
+        return;
+    }
+
+    if (resetBtn) resetBtn.disabled = true;
+    if (statusEl) statusEl.innerHTML = "<div class='loading'>Sende Passwort-Reset-Link...</div>";
+
+    try {
+        await auth.sendPasswordResetEmail(email);
+        if (statusEl) {
+            statusEl.innerHTML = "<div class='success-box'>✅ Passwort-Reset-E-Mail versendet. Bitte Posteingang und Spam-Ordner prüfen.</div>";
+        }
+        showNotification("Passwort-Reset-E-Mail wurde versendet.", "success");
+    } catch (error) {
+        let msg = error.message;
+        if (error.code === "auth/user-not-found") {
+            msg = "Für diese E-Mail-Adresse wurde kein Operator-Konto gefunden.";
+        } else if (error.code === "auth/invalid-email") {
+            msg = "Die E-Mail-Adresse ist ungültig.";
+        } else if (error.code === "auth/too-many-requests") {
+            msg = "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut.";
+        } else if (error.code === "auth/network-request-failed") {
+            msg = "Netzwerkfehler. Prüfen Sie die Internetverbindung und die Firebase-Konfiguration.";
+        }
+        console.error("Password reset error:", error.code, error.message);
+        if (statusEl) statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>`;
+    } finally {
+        if (resetBtn) resetBtn.disabled = false;
+    }
+}
 
 function handleLogin(event) {
     event.preventDefault();

@@ -576,7 +576,7 @@
         </div>
 
         <div class="quick-links">
-          <a class="btn btn-primary" href="admin-panel/index.html">🛡️ Operator-Dashboard öffnen</a>
+          <a class="btn btn-primary" href="http://127.0.0.1:8765/admin-panel/">🛡️ Operator-Dashboard öffnen</a>
           <a class="btn btn-green" href="parent-panel/index.html">👨‍👩‍👧 Eltern-Panel öffnen</a>
           <a class="btn btn-green" href="child-panel/index.html">📱 Kinder-Panel öffnen</a>
           <button class="btn btn-outline" type="button" onclick="openFirebaseModal()">🔥 Firebase-Konfiguration bearbeiten</button>
@@ -677,8 +677,12 @@
           <strong>Empfehlung</strong>
           <p>Vor jedem Testlauf zuerst die Firebase-Werte prüfen und anschließend den Health-/Commissioning-Bereich im Dashboard öffnen.</p>
         </div>
+        <div class="callout" style="background:#fffbeb; border-left-color: #f59e0b; margin-block-start: 8px">
+          <strong>⚙️ Python-Server erforderlich</strong>
+          <p>Die <strong>Python-basierte Testzentrale</strong> (Commissioning, Automationsläufe, Nachweise) ist nur verfügbar, wenn das Dashboard über <code>start.bat</code> oder <code>python -m python_admin.app</code> gestartet wurde. Der Link "Admin öffnen" verweist auf <code>http://127.0.0.1:8765</code>.</p>
+        </div>
         <div class="actions">
-          <a class="btn btn-purple" href="admin-panel/index.html">Admin öffnen</a>
+          <a class="btn btn-purple" href="http://127.0.0.1:8765/admin-panel/">Admin öffnen</a>
           <a class="btn btn-outline" href="admin-panel/logs.html">Audit-Logs</a>
           <button class="btn btn-outline" type="button" onclick="openFirebaseModal()">Firebase-Config laden</button>
         </div>
@@ -798,7 +802,7 @@
       </details>
       <div class="actions">
         <a class="btn btn-outline" href="docs/DEBUG_INTERFACE_GUIDE.md">📘 Vollständiger Debug-Guide</a>
-        <a class="btn btn-outline" href="admin-panel/index.html">🛡️ Admin-Panel mit Debug-Kommandos</a>
+        <a class="btn btn-outline" href="http://127.0.0.1:8765/admin-panel/">🛡️ Admin-Panel mit Debug-Kommandos</a>
       </div>
     </section>
 
