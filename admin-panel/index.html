@@ -167,6 +167,30 @@
                                 </div>
                             </div>
 
+                            <div class="firebase-import-box">
+                                <h4>Konfiguration aus dem Internet laden</h4>
+                                <p>
+                                    Optional: Lade eine veröffentlichte JSON-/JS-Datei (z. B. aus Hosting oder GitHub Raw),
+                                    die ein <code>firebaseConfig</code>-Objekt enthält.
+                                </p>
+                                <div class="firebase-import-row">
+                                    <input
+                                        type="url"
+                                        id="bootstrap-config-url"
+                                        class="form-input"
+                                        placeholder="https://example.com/firebase-config.json"
+                                    />
+                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromUrl()">
+                                        Aus URL laden
+                                    </button>
+                                </div>
+                                <div id="bootstrap-import-status" class="phase-status"></div>
+                                <small class="text-muted">
+                                    Live-Sync ist aktiv: Bei jeder Eingabe werden gültige Werte automatisch lokal gespeichert
+                                    und direkt als aktive Firebase-Einstellung übernommen.
+                                </small>
+                            </div>
+
                             <div id="bootstrap-config-status" class="phase-status"></div>
 
                             <div class="phase-actions">
