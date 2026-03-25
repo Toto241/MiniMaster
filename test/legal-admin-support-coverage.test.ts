@@ -816,4 +816,136 @@ describe("resetOperatorAccounts", () => {
     if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
     else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
   });
+
+  it("erlaubt im Dev-Reset-Modus auch nicht-admin Nutzern das Zurücksetzen", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+
+    state.operatorAccessKeys = {
+      key1: { role: "admin" },
+    };
+
+    (mockAuth.listUsers as jest.Mock)
+      .mockResolvedValueOnce({
+        users: [
+          { uid: "admin-old", customClaims: { role: "admin" } },
+        ],
+        pageToken: undefined,
+      });
+
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const result = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asMaster);
+
+    expect(result.success).toBe(true);
+    expect(result.requestedBy).toBe("m1");
+    expect(result.deletedUsers).toBe(1);
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("admin-old");
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+  });
+});
+
+describe("resetAllAuthUsers", () => {
+  it("wirft failed-precondition wenn Reset-Flag nicht gesetzt ist", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    const oldEmulator = process.env.FUNCTIONS_EMULATOR;
+    delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.FUNCTIONS_EMULATOR;
+
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    await expect(wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asAdmin))
+      .rejects.toThrow(/disabled/i);
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+    if (oldEmulator === undefined) delete process.env.FUNCTIONS_EMULATOR;
+    else process.env.FUNCTIONS_EMULATOR = oldEmulator;
+  });
+
+  it("löscht im Dev-Reset-Modus alle Nutzer unabhängig von der Rolle", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+
+    state.operatorAccessKeys = {
+      key1: { role: "admin" },
+      key2: { role: "support" },
+    };
+
+    (mockAuth.listUsers as jest.Mock)
+      .mockResolvedValueOnce({
+        users: [
+          { uid: "admin-a", customClaims: { role: "admin" } },
+          { uid: "support-a", customClaims: { role: "support" } },
+          { uid: "master-a", customClaims: { role: "master" } },
+          { uid: "child-a", customClaims: {} },
+        ],
+        pageToken: undefined,
+      });
+
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const result = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asMaster);
+
+    expect(result.success).toBe(true);
+    expect(result.matchedUsers).toBe(4);
+    expect(result.deletedUsers).toBe(4);
+    expect(result.accessKeysDeleted).toBe(2);
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("admin-a");
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("support-a");
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("master-a");
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("child-a");
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+  });
+
+  it("überspringt standardmäßig den aktuell angemeldeten Nutzer für stabilen Abschluss", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+
+    (mockAuth.listUsers as jest.Mock)
+      .mockResolvedValueOnce({
+        users: [
+          { uid: "m1", customClaims: { role: "master" } },
+          { uid: "admin-a", customClaims: { role: "admin" } },
+        ],
+        pageToken: undefined,
+      });
+
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const result = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asMaster);
+
+    expect(result.success).toBe(true);
+    expect(result.matchedUsers).toBe(1);
+    expect(result.deletedUsers).toBe(1);
+    expect(result.skippedCurrentSessionUsers).toEqual(["m1"]);
+    expect(mockAuth.deleteUser).toHaveBeenCalledTimes(1);
+    expect(mockAuth.deleteUser).toHaveBeenCalledWith("admin-a");
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+  });
+});
+
+describe("resetAllAuthUsersHealth", () => {
+  it("liefert Reachability-Status und Flags für angemeldete Nutzer", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+    const res = await wrapped({}, asMaster);
+
+    expect(res.reachable).toBe(true);
+    expect(res.resetEnabled).toBe(true);
+    expect(res.callerRole).toBe("master");
+    expect(res.requiredConfirmText).toBe("RESET_ALL_AUTH_USERS");
+
+    if (oldEnable === undefined) delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    else process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+  });
+
+  it("wirft unauthenticated ohne Anmeldung", async () => {
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+    await expect(wrapped({}, {} as any)).rejects.toThrow(/angemeldet/i);
+  });
 });

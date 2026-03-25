@@ -4411,6 +4411,22 @@ function renderAdminActivationContent(user) {
                 </button>
             </div>
             <div id="bootstrap-admin-status" class="phase-status" style="margin-block-start: 8px"></div>
+
+            <hr style="margin: 14px 0; border: none; border-top: 1px solid #bbf7d0;" />
+            <p>
+                Entwicklungsmodus: Falls eine falsche Einrichtung vorliegt, können Sie
+                <strong>alle bisherigen Nutzerkonten</strong> zurücksetzen.
+            </p>
+            <div class="phase-actions" style="margin-block-start: 12px">
+                <button onclick="resetAllUsersFromOnboarding()" class="btn btn-danger" id="btn-reset-all-users-onboarding">
+                    🧨 Alle Nutzer zurücksetzen
+                </button>
+                <button onclick="checkResetAllUsersHealth()" class="btn btn-secondary" id="btn-check-reset-health">
+                    Verfügbarkeit prüfen
+                </button>
+            </div>
+            <div id="reset-all-users-health" class="phase-status" style="margin-block-start: 8px"></div>
+            <div id="reset-all-users-status" class="phase-status" style="margin-block-start: 8px"></div>
         </div>
 
         <div class="admin-info-box" style="background: #f8fafc; border-color: #e2e8f0;">
@@ -4476,6 +4492,11 @@ function renderAdminActivationContent(user) {
             <button onclick="logout()" class="btn btn-secondary">Abmelden</button>
         </div>
     `;
+
+    // Probe callable availability after rendering step-3 actions.
+    setTimeout(() => {
+        checkResetAllUsersHealth();
+    }, 0);
 }
 
 function toBase64Url(bytes) {
@@ -4796,6 +4817,131 @@ async function bootstrapFirstAdminAction() {
     }
 }
 
+async function resetAllUsersFromOnboarding() {
+    const btn = document.getElementById("btn-reset-all-users-onboarding");
+    const statusEl = document.getElementById("reset-all-users-status");
+    const requestId = `ui-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const firstConfirm = window.confirm(
+        "ACHTUNG: Alle bisherigen Nutzerkonten wirklich löschen?\n\n" +
+        "Dies ist nur für die Entwicklung gedacht und löscht ALLE Auth-Nutzer."
+    );
+    if (!firstConfirm) return;
+
+    const secondConfirm = window.prompt("Zur Bestätigung exakt eingeben: RESET_ALL_AUTH_USERS");
+    if ((secondConfirm || "").trim() !== "RESET_ALL_AUTH_USERS") {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein.</div>";
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ Lösche alle Nutzer...";
+    }
+    if (statusEl) {
+        statusEl.innerHTML = `<div class='loading'>Reset wird ausgeführt...</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(requestId)}</code></div>`;
+    }
+
+    try {
+        const resetFn = functions.httpsCallable("resetAllAuthUsers");
+        const result = await resetFn({
+            confirmText: "RESET_ALL_AUTH_USERS",
+            requestId,
+            includeCurrentSessionUser: false,
+        });
+        const deletedUsers = Number(result?.data?.deletedUsers || 0);
+        const backendRequestId = String(result?.data?.requestId || requestId);
+        const skippedCurrentSessionUsers = Array.isArray(result?.data?.skippedCurrentSessionUsers)
+            ? result.data.skippedCurrentSessionUsers.length
+            : 0;
+
+        if (statusEl) {
+            const skippedHint = skippedCurrentSessionUsers > 0
+                ? `<div class='info' style='margin-block-start:6px'>Aktive Sitzung wurde aus Stabilitätsgründen übersprungen: <strong>${escapeHtml(String(skippedCurrentSessionUsers))}</strong>.</div>`
+                : "";
+            statusEl.innerHTML = `<div class='success-box'>✅ Reset abgeschlossen. Gelöschte Nutzer: <strong>${escapeHtml(String(deletedUsers))}</strong>.</div>${skippedHint}<div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(backendRequestId)}</code></div>`;
+        }
+        showNotification(`Reset abgeschlossen: ${deletedUsers} Nutzer gelöscht. [${backendRequestId}]`, "success");
+
+        await auth.signOut();
+        setTimeout(() => {
+            window.location.reload();
+        }, 800);
+    } catch (error) {
+        let msg = error?.message || "Reset fehlgeschlagen.";
+        const code = normalizeAuthErrorCode(error);
+        if (code === "failed-precondition") {
+            msg = "Reset ist deaktiviert. Aktivieren Sie ENABLE_OPERATOR_ACCOUNT_RESET oder den Emulator-Modus.";
+        } else if (code === "internal") {
+            const raw = String(error?.message || "").toLowerCase();
+            if (raw.includes("not found") || raw.includes("404") || raw.includes("no function") || raw.includes("unavailable")) {
+                msg = "Cloud Function resetAllAuthUsers ist nicht erreichbar. Bitte Functions deployen (mindestens resetAllAuthUsers) und erneut versuchen.";
+            } else if (raw.includes("all-user reset failed:")) {
+                msg = error.message;
+            } else {
+                msg = "Serverfehler beim All-User-Reset. Bitte Functions-Logs prüfen und danach erneut versuchen.";
+            }
+        }
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${renderCallableDebugInfo(error, { functionName: "resetAllAuthUsers", requestId })}`;
+        }
+        showNotification(msg, "error");
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "🧨 Alle Nutzer zurücksetzen";
+        }
+    }
+}
+
+async function checkResetAllUsersHealth() {
+    const statusEl = document.getElementById("reset-all-users-health");
+    const btn = document.getElementById("btn-check-reset-health");
+    const requestId = `ui-health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (!statusEl) return;
+    if (!functions) {
+        statusEl.innerHTML = "<div class='error'>❌ Firebase Functions ist nicht initialisiert.</div>";
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    statusEl.innerHTML = `<div class='loading'>Prüfe Erreichbarkeit von resetAllAuthUsers...</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(requestId)}</code></div>`;
+
+    try {
+        const healthFn = functions.httpsCallable("resetAllAuthUsersHealth");
+        const result = await healthFn({ requestId });
+        const data = result?.data || {};
+        const resetEnabled = Boolean(data.resetEnabled);
+        const callerRole = escapeHtml(String(data.callerRole || "none"));
+        const backendRequestId = escapeHtml(String(data.requestId || requestId));
+
+        if (resetEnabled) {
+            statusEl.innerHTML = `<div class='success-box'>✅ resetAllAuthUsers ist erreichbar. Reset aktiv. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
+        } else {
+            statusEl.innerHTML = `<div class='info'>🟡 resetAllAuthUsers ist erreichbar, aber Reset ist deaktiviert. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
+        }
+        return;
+    } catch (error) {
+        const code = normalizeAuthErrorCode(error);
+        const message = String(error?.message || "").toLowerCase();
+
+        if (code === "unauthenticated") {
+            statusEl.innerHTML = "<div class='info'>🟡 resetAllAuthUsers ist erreichbar, Anmeldung fehlt jedoch.</div>";
+        } else if (
+            code === "unavailable" ||
+            message.includes("not found") ||
+            message.includes("404") ||
+            message.includes("no function")
+        ) {
+            statusEl.innerHTML = "<div class='error'>❌ resetAllAuthUsersHealth ist nicht erreichbar. Bitte Cloud Functions deployen und danach Seite neu laden.</div>";
+        } else {
+            statusEl.innerHTML = `<div class='error'>❌ Verfügbarkeit unklar: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>${renderCallableDebugInfo(error, { functionName: "resetAllAuthUsersHealth", requestId })}`;
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 // ==================== REGISTRATION ====================
 
 async function handleRegistration(event) {
@@ -4862,13 +5008,46 @@ async function handleRegistration(event) {
 function formatAuthDebugCode(error) {
     const code = (error && typeof error.code === "string") ? error.code.trim() : "";
     if (!code) return "";
-    return `<div class='info' style='margin-top:6px'>Technischer Fehlercode: <code>${escapeHtml(code)}</code></div>`;
+    return `<div class='info' style='margin-block-start:6px'>Technischer Fehlercode: <code>${escapeHtml(code)}</code></div>`;
 }
 
 function normalizeAuthErrorCode(error) {
     const raw = typeof error?.code === "string" ? error.code.trim().toLowerCase() : "";
     if (!raw) return "";
     return raw.startsWith("functions/") ? raw.slice("functions/".length) : raw;
+}
+
+function safeDebugStringify(value) {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch (_error) {
+        return String(value);
+    }
+}
+
+function renderCallableDebugInfo(error, options = {}) {
+    const normalizedCode = normalizeAuthErrorCode(error) || "unknown";
+    const rawCode = typeof error?.code === "string" ? error.code : "";
+    const message = String(error?.message || "Unbekannter Fehler");
+    const functionName = String(options.functionName || "unknown");
+    const requestId = options.requestId ? String(options.requestId) : "n/a";
+    const serverDetails = error?.details;
+
+    let detailsHtml = "";
+    if (serverDetails !== undefined) {
+        detailsHtml = `<details style='margin-block-start:8px'><summary>Server-Details anzeigen</summary><pre style='white-space:pre-wrap;margin-block-start:8px'>${escapeHtml(safeDebugStringify(serverDetails))}</pre></details>`;
+    }
+
+    return `<div class='info' style='margin-block-start:8px'>
+        <strong>Debug-Info</strong><br>
+        Funktion: <code>${escapeHtml(functionName)}</code><br>
+        Request-ID: <code>${escapeHtml(requestId)}</code><br>
+        Fehlercode (normalisiert): <code>${escapeHtml(normalizedCode)}</code><br>
+        Fehlercode (raw): <code>${escapeHtml(rawCode || "n/a")}</code><br>
+        Zeit: <code>${escapeHtml(new Date().toISOString())}</code><br>
+        Nachricht: <code>${escapeHtml(message)}</code>
+        ${detailsHtml}
+    </div>`;
 }
 
 function getAuthErrorHint(error, fallbackMessage, scope) {
