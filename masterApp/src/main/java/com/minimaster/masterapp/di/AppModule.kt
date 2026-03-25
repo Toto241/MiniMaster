@@ -52,7 +52,7 @@ object AppModule {
     @Provides
     @Singleton
     fun provideFirebaseFunctions(): FirebaseFunctions {
-        return Firebase.functions("europe-west1")
+        return Firebase.functions("us-central1")
     }
 
     /**
