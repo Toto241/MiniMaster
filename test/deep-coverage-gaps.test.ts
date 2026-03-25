@@ -349,7 +349,7 @@ describe("provideSolutionFeedback – deep coverage", () => {
   it("wrappt unerwartete Update-Fehler als internal", async () => {
     const originalCollection = sharedFirestore.collection.getMockImplementation();
     sharedFirestore.collection = jest.fn((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "supportTickets") {
         return {
           ...base,
@@ -664,7 +664,7 @@ describe("shared.ts utilities", () => {
   it("handleError fängt Logging-Fehler intern ab", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "error_logs") {
         return {
           ...base,
@@ -898,7 +898,7 @@ describe("createSupportTicket – deep coverage", () => {
   it("wrappt Datenbankfehler als internal", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "supportTickets") {
         return {
           ...base,
@@ -944,7 +944,7 @@ describe("grantSupportAccess", () => {
   it("wrappt unerwartete Grant-Fehler als internal", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "supportAccessGrants") {
         return {
           ...base,
@@ -983,7 +983,7 @@ describe("revokeSupportAccess", () => {
   it("wrappt unerwartete Revoke-Fehler als internal", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "supportAccessGrants") {
         return {
           ...base,
@@ -1033,7 +1033,7 @@ describe("cleanupExpiredGrants", () => {
   it("fängt Cleanup-Fehler ab und gibt null zurück", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "supportAccessGrants") {
         return {
           ...base,

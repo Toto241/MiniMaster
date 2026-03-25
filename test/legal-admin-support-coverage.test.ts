@@ -247,7 +247,7 @@ describe("getActiveLegalPolicies", () => {
 
     (db.collection as jest.Mock).mockImplementation((name: string) => {
       if (name !== "legalPolicies") {
-        return originalCollection(name);
+        return originalCollection!(name);
       }
 
       const filters: Array<{ field: string; value: unknown }> = [];
@@ -284,7 +284,7 @@ describe("getActiveLegalPolicies", () => {
 
     (db.collection as jest.Mock).mockImplementation((name: string) => {
       if (name !== "legalPolicies") {
-        return originalCollection(name);
+        return originalCollection!(name);
       }
 
       const filters: Array<{ field: string; value: unknown }> = [];
@@ -481,7 +481,7 @@ describe("adminHealthCheck", () => {
   it("meldet Firestore- und Storage-Prüffehler im Ergebnis", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "children") {
         return {
           ...base,
@@ -523,7 +523,7 @@ describe("exportUserData", () => {
 
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name !== "children") return base;
 
       return {
@@ -705,7 +705,7 @@ describe("triggerScheduledJob", () => {
   it("wrappt unerwartete Job-Fehler als internal", async () => {
     const originalCollection = (db.collection as jest.Mock).getMockImplementation();
     (db.collection as jest.Mock).mockImplementation((name: string) => {
-      const base = originalCollection(name);
+      const base = originalCollection!(name);
       if (name === "subscriptions") {
         return {
           ...base,
