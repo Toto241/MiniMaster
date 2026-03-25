@@ -1015,7 +1015,8 @@ def run_commissioning_suite(
                 }
             )
 
-    for item in evidence_coverage["failedEvidence"]:
+    failed_evidence_items = cast(list[dict[str, object]], evidence_coverage["failedEvidence"])
+    for item in failed_evidence_items:
         pending.append(
             {
                 "title": f"Nachweis fehlgeschlagen: {item['testTitle']}",
@@ -1025,7 +1026,8 @@ def run_commissioning_suite(
             }
         )
 
-    for item in evidence_coverage["uncovered"]:
+    uncovered_items = cast(list[dict[str, object]], evidence_coverage["uncovered"])
+    for item in uncovered_items:
         pending.append(
             {
                 "title": f"Kein Nachweis: {item['testTitle']}",

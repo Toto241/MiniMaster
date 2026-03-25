@@ -687,7 +687,7 @@ describe("support onTicketCreated trigger branches", () => {
     state.masters["m1"] = { imei: "m1" }; // no fcmToken
 
     const wrapped = testEnv.wrap(fns.onTicketCreated);
-    await wrapped({ data: () => state.supportTickets["ticket-no-fcm"] }, { params: { ticketId: "ticket-no-fcm" } });
+    await wrapped({ data: () => state.supportTickets["ticket-no-fcm"] }, { params: { ticketId: "ticket-no-fcm" } } as any);
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -699,7 +699,7 @@ describe("support onTicketCreated trigger branches", () => {
     state.masters["m1"] = { imei: "m1", fcmToken: "master-fcm-token" };
 
     const wrapped = testEnv.wrap(fns.onTicketCreated);
-    await wrapped({ data: () => state.supportTickets["ticket-with-fcm"] }, { params: { ticketId: "ticket-with-fcm" } });
+    await wrapped({ data: () => state.supportTickets["ticket-with-fcm"] }, { params: { ticketId: "ticket-with-fcm" } } as any);
     expect(mockSend).toHaveBeenCalled();
   });
 
@@ -711,7 +711,7 @@ describe("support onTicketCreated trigger branches", () => {
     state.masters["m1"] = undefined as any;
 
     const wrapped = testEnv.wrap(fns.onTicketCreated);
-    await wrapped({ data: () => state.supportTickets["ticket-master-undef"] }, { params: { ticketId: "ticket-master-undef" } });
+    await wrapped({ data: () => state.supportTickets["ticket-master-undef"] }, { params: { ticketId: "ticket-master-undef" } } as any);
     expect(mockSend).not.toHaveBeenCalled();
   });
 });
@@ -909,7 +909,7 @@ describe("support provider branch coverage", () => {
       state.masters["m1"] = { imei: "m1" };
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
-      await wrapped({ data: () => state.supportTickets["ticket-openai"] }, { params: { ticketId: "ticket-openai" } });
+      await wrapped({ data: () => state.supportTickets["ticket-openai"] }, { params: { ticketId: "ticket-openai" } } as any);
     } finally {
       process.env.NODE_ENV = prevNode;
       process.env.GEMINI_API_KEY = prevGemini;
@@ -930,7 +930,7 @@ describe("support provider branch coverage", () => {
       };
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
-      await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-nonok"] }, { params: { ticketId: "ticket-gemini-nonok" } }))
+      await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-nonok"] }, { params: { ticketId: "ticket-gemini-nonok" } } as any))
         .resolves.toBeUndefined();
       expect(state.supportTickets["ticket-gemini-nonok"].conversationStatus).toBe("awaiting_debug_consent");
     } finally {
@@ -955,7 +955,7 @@ describe("support provider branch coverage", () => {
       };
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
-      await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-abort"] }, { params: { ticketId: "ticket-gemini-abort" } }))
+      await expect(wrapped({ data: () => state.supportTickets["ticket-gemini-abort"] }, { params: { ticketId: "ticket-gemini-abort" } } as any))
         .resolves.toBeUndefined();
       expect(state.supportTickets["ticket-gemini-abort"].conversationStatus).toBe("awaiting_debug_consent");
     } finally {
@@ -979,7 +979,7 @@ describe("support provider branch coverage", () => {
       };
 
       const wrapped = testEnv.wrap(fns.onTicketCreated);
-      await expect(wrapped({ data: () => state.supportTickets["ticket-no-provider"] }, { params: { ticketId: "ticket-no-provider" } }))
+      await expect(wrapped({ data: () => state.supportTickets["ticket-no-provider"] }, { params: { ticketId: "ticket-no-provider" } } as any))
         .resolves.toBeUndefined();
       expect(state.supportTickets["ticket-no-provider"].conversationStatus).toBe("awaiting_debug_consent");
     } finally {
@@ -1081,7 +1081,8 @@ describe("ownership mismatch and default fallback branches", () => {
 
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
-    collectionSpy.mockImplementation((name: string) => {
+    collectionSpy.mockImplementation((...args: unknown[]) => {
+      const name = args[0] as string;
       const coll: any = originalImpl ? originalImpl(name) : undefined;
       if (name === "children") {
         const realDoc = coll.doc;
@@ -1202,7 +1203,8 @@ describe("pairing childLimit fallback branches", () => {
   it("createPairingCode exhausts collision retries and throws resource-exhausted", async () => {
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
-    collectionSpy.mockImplementation((name: string) => {
+    collectionSpy.mockImplementation((...args: unknown[]) => {
+      const name = args[0] as string;
       const coll: any = originalImpl ? originalImpl(name) : undefined;
       if (name === "pairingCodes") {
         const realDoc = coll.doc;
@@ -1362,7 +1364,8 @@ describe("shared and pairing remaining branch sides", () => {
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
-    collectionSpy.mockImplementation((name: string) => {
+    collectionSpy.mockImplementation((...args: unknown[]) => {
+      const name = args[0] as string;
       const coll: any = originalImpl ? originalImpl(name) : undefined;
       if (name === "pairingCodes") {
         const realDoc = coll.doc;
@@ -1395,7 +1398,8 @@ describe("shared and pairing remaining branch sides", () => {
 
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
-    collectionSpy.mockImplementation((name: string) => {
+    collectionSpy.mockImplementation((...args: unknown[]) => {
+      const name = args[0] as string;
       const coll: any = originalImpl ? originalImpl(name) : undefined;
       if (name === "children") {
         coll.where = jest.fn(() => ({
@@ -1412,7 +1416,8 @@ describe("shared and pairing remaining branch sides", () => {
   it("setDeviceLocked catch branch on child update failure", async () => {
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
-    collectionSpy.mockImplementation((name: string) => {
+    collectionSpy.mockImplementation((...args: unknown[]) => {
+      const name = args[0] as string;
       const coll: any = originalImpl ? originalImpl(name) : undefined;
       if (name === "children") {
         const realDoc = coll.doc;
@@ -1434,7 +1439,8 @@ describe("shared and pairing remaining branch sides", () => {
   it("createTask catch branch on task write failure", async () => {
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
-    collectionSpy.mockImplementation((name: string) => {
+    collectionSpy.mockImplementation((...args: unknown[]) => {
+      const name = args[0] as string;
       const coll: any = originalImpl ? originalImpl(name) : undefined;
       if (name === "children") {
         const realDoc = coll.doc;
