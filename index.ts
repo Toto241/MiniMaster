@@ -16,6 +16,8 @@ export {
   createOperatorAccessKey,
   redeemOperatorAccessKey,
   resetOperatorAccounts,
+  resetAllAuthUsers,
+  resetAllAuthUsersHealth,
 } from "./src/auth";
 
 // Pairing

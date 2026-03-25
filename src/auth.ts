@@ -301,7 +301,9 @@ export const setUserRole = functions.https.onCall(
 export const resetOperatorAccounts = functions.https.onCall(
   async (data: { confirmText?: string }, context: CallableContext) => {
     const startTime = Date.now();
-    requireAdmin(context);
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
 
     const runtimeConfig = functions.config();
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
@@ -309,11 +311,23 @@ export const resetOperatorAccounts = functions.https.onCall(
       process.env.FUNCTIONS_EMULATOR === "true" ||
       process.env.ENABLE_OPERATOR_ACCOUNT_RESET === "true" ||
       runtimeFlag;
+
+    const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "";
+    const callerIsAdmin = callerRole === "admin";
+
     if (!resetEnabled) {
+      requireAdmin(context);
       throw new functions.https.HttpsError(
         "failed-precondition",
         "Operator account reset is disabled. Enable via FUNCTIONS_EMULATOR=true, ENABLE_OPERATOR_ACCOUNT_RESET=true, or firebase functions:config:set minimaster.enable_operator_account_reset=true."
       );
+    }
+
+    if (!callerIsAdmin) {
+      functions.logger.warn("DEV resetOperatorAccounts invoked by non-admin user.", {
+        uid: context.auth.uid,
+        role: callerRole || "none",
+      });
     }
 
     const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
@@ -324,11 +338,21 @@ export const resetOperatorAccounts = functions.https.onCall(
       );
     }
 
-    const callerUid = context.auth!.uid;
+    const callerUid = context.auth.uid;
 
     try {
       const operatorUsers = await listOperatorUsers();
-      const accessKeysDeleted = await deleteAllOperatorAccessKeys();
+      let accessKeysDeleted = 0;
+      let accessKeyCleanupWarning: string | null = null;
+      try {
+        accessKeysDeleted = await deleteAllOperatorAccessKeys();
+      } catch (cleanupError) {
+        accessKeyCleanupWarning = (cleanupError as Error).message || "unknown operatorAccessKeys cleanup error";
+        functions.logger.error("resetOperatorAccounts operatorAccessKeys cleanup failed (non-fatal).", {
+          requestedBy: callerUid,
+          accessKeyCleanupWarning,
+        });
+      }
 
       const deletedUids: string[] = [];
       const failedUids: string[] = [];
@@ -352,6 +376,7 @@ export const resetOperatorAccounts = functions.https.onCall(
         "user",
         {
           requestedBy: callerUid,
+          requestedByRole: callerRole || "none",
           matchedUsers: operatorUsers.length,
           deletedUsers: deletedUids.length,
           failedUsers: failedUids.length,
@@ -385,6 +410,222 @@ export const resetOperatorAccounts = functions.https.onCall(
         error
       );
     }
+  }
+);
+
+/**
+ * Resets all existing Firebase Auth users for development setups.
+ * Deletes users regardless of role. Requires explicit confirmation token.
+ */
+export const resetAllAuthUsers = functions.https.onCall(
+  async (data: { confirmText?: string; requestId?: string; includeCurrentSessionUser?: boolean }, context: CallableContext) => {
+    const startTime = Date.now();
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
+
+    const runtimeConfig = functions.config();
+    const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
+    const resetEnabled =
+      process.env.FUNCTIONS_EMULATOR === "true" ||
+      process.env.ENABLE_OPERATOR_ACCOUNT_RESET === "true" ||
+      runtimeFlag;
+
+    const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "";
+    if (!resetEnabled) {
+      requireAdmin(context);
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "All-user reset is disabled. Enable via FUNCTIONS_EMULATOR=true, ENABLE_OPERATOR_ACCOUNT_RESET=true, or firebase functions:config:set minimaster.enable_operator_account_reset=true."
+      );
+    }
+
+    const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
+    const includeCurrentSessionUser = data?.includeCurrentSessionUser === true;
+    const requestId =
+      typeof data?.requestId === "string" && data.requestId.trim().length > 0
+        ? data.requestId.trim().slice(0, 80)
+        : `srv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    if (confirmText !== "RESET_ALL_AUTH_USERS") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "confirmText must be exactly RESET_ALL_AUTH_USERS."
+      );
+    }
+
+    functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+      uid: context.auth.uid,
+      role: callerRole || "none",
+      requestId,
+      includeCurrentSessionUser,
+    });
+
+    const callerUid = context.auth.uid;
+
+    try {
+      const usersToDelete: admin.auth.UserRecord[] = [];
+      const skippedCurrentUserUids: string[] = [];
+      let pageToken: string | undefined;
+      do {
+        const listResult = await auth().listUsers(1000, pageToken);
+        for (const user of listResult.users) {
+          const isCurrentCaller = user.uid === callerUid;
+          if (isCurrentCaller && !includeCurrentSessionUser) {
+            skippedCurrentUserUids.push(user.uid);
+            continue;
+          }
+          usersToDelete.push(user);
+        }
+        pageToken = listResult.pageToken;
+      } while (pageToken);
+
+      functions.logger.info("resetAllAuthUsers user selection complete.", {
+        requestId,
+        callerUid,
+        matchedUsers: usersToDelete.length,
+        skippedCurrentSessionUsers: skippedCurrentUserUids.length,
+      });
+
+      const deletedUids: string[] = [];
+      const failedUids: string[] = [];
+      for (const user of usersToDelete) {
+        try {
+          await auth().deleteUser(user.uid);
+          deletedUids.push(user.uid);
+        } catch (error) {
+          functions.logger.error("Failed to delete user during all-user reset.", {
+            uid: user.uid,
+            error: (error as Error).message,
+          });
+          failedUids.push(user.uid);
+        }
+      }
+
+      let accessKeysDeleted = 0;
+      let accessKeyCleanupWarning: string | null = null;
+      try {
+        accessKeysDeleted = await deleteAllOperatorAccessKeys();
+      } catch (cleanupError) {
+        accessKeyCleanupWarning = (cleanupError as Error).message || "unknown operatorAccessKeys cleanup error";
+        functions.logger.error("resetAllAuthUsers operatorAccessKeys cleanup failed (non-fatal).", {
+          requestId,
+          accessKeyCleanupWarning,
+        });
+      }
+
+      let auditLogWarning: string | null = null;
+      try {
+        await AuditLogger.logSuccess(
+          "admin.reset_operator_accounts",
+          context,
+          "users/reset-all",
+          "user",
+          {
+            resetScope: "all_auth_users",
+            requestId,
+            requestedBy: callerUid,
+            requestedByRole: callerRole || "none",
+            matchedUsers: usersToDelete.length,
+            skippedCurrentSessionUsers: skippedCurrentUserUids.length,
+            deletedUsers: deletedUids.length,
+            failedUsers: failedUids.length,
+            accessKeysDeleted,
+            accessKeyCleanupWarning,
+            duration: Date.now() - startTime,
+          }
+        );
+      } catch (auditError) {
+        auditLogWarning = (auditError as Error).message || "unknown audit logging error";
+        functions.logger.error("resetAllAuthUsers audit logging failed (non-fatal).", {
+          requestId,
+          auditLogWarning,
+        });
+      }
+
+      return {
+        success: failedUids.length === 0,
+        requestId,
+        requestedBy: callerUid,
+        matchedUsers: usersToDelete.length,
+        skippedCurrentSessionUsers: skippedCurrentUserUids,
+        deletedUsers: deletedUids.length,
+        failedUsers: failedUids,
+        accessKeysDeleted,
+        accessKeyCleanupWarning,
+        auditLogWarning,
+      };
+    } catch (error) {
+      functions.logger.error("resetAllAuthUsers failed.", {
+        requestId,
+        requestedBy: callerUid,
+        role: callerRole || "none",
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+      });
+
+      try {
+        await AuditLogger.logFailure(
+          "admin.reset_operator_accounts",
+          context,
+          "users/reset-all",
+          "user",
+          error as Error,
+          { requestedBy: callerUid, resetScope: "all_auth_users", requestId }
+        );
+      } catch (auditFailureError) {
+        functions.logger.error("resetAllAuthUsers failure-audit logging failed (non-fatal).", {
+          requestId,
+          message: (auditFailureError as Error).message,
+        });
+      }
+
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError(
+        "internal",
+        `All-user reset failed: ${(error as Error).message}`,
+        {
+          requestId,
+          resetScope: "all_auth_users",
+          callerUid,
+          callerRole: callerRole || "none",
+          originalMessage: (error as Error).message,
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Read-only health endpoint for resetAllAuthUsers.
+ * Helps the admin panel verify reachability and reset gating without side effects.
+ */
+export const resetAllAuthUsersHealth = functions.https.onCall(
+  async (data: { requestId?: string } | Record<string, never>, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
+
+    const requestId =
+      typeof (data as { requestId?: string })?.requestId === "string" && (data as { requestId?: string }).requestId?.trim()
+        ? (data as { requestId?: string }).requestId!.trim().slice(0, 80)
+        : `srv-health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const runtimeConfig = functions.config();
+    const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
+    const resetEnabled =
+      process.env.FUNCTIONS_EMULATOR === "true" ||
+      process.env.ENABLE_OPERATOR_ACCOUNT_RESET === "true" ||
+      runtimeFlag;
+
+    const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "none";
+    return {
+      reachable: true,
+      requestId,
+      resetEnabled,
+      callerRole,
+      isAdmin: callerRole === "admin",
+      requiredConfirmText: "RESET_ALL_AUTH_USERS",
+    };
   }
 );
 
