@@ -418,11 +418,8 @@ export const resetOperatorAccounts = functions.https.onCall(
  * Deletes users regardless of role. Requires explicit confirmation token.
  */
 export const resetAllAuthUsers = functions.https.onCall(
-  async (data: { confirmText?: string; requestId?: string; includeCurrentSessionUser?: boolean }, context: CallableContext) => {
+  async (data: { confirmText?: string; requestId?: string; includeCurrentSessionUser?: boolean; recoveryToken?: string }, context: CallableContext) => {
     const startTime = Date.now();
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
-    }
 
     const runtimeConfig = functions.config();
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
@@ -431,12 +428,26 @@ export const resetAllAuthUsers = functions.https.onCall(
       process.env.ENABLE_OPERATOR_ACCOUNT_RESET === "true" ||
       runtimeFlag;
 
-    const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "";
+    const recoveryTokenConfig = String(runtimeConfig?.minimaster?.admin_recovery_token || "");
+    const recoveryTokenData = typeof data?.recoveryToken === "string" ? data.recoveryToken.trim() : "";
+    const recoveryTokenAllowed =
+      recoveryTokenConfig.length > 0 &&
+      recoveryTokenData.length > 0 &&
+      recoveryTokenData === recoveryTokenConfig;
+
+    const callerRole = context.auth && typeof context.auth.token.role === "string" ? context.auth.token.role : "";
     if (!resetEnabled) {
       requireAdmin(context);
       throw new functions.https.HttpsError(
         "failed-precondition",
         "All-user reset is disabled. Enable via FUNCTIONS_EMULATOR=true, ENABLE_OPERATOR_ACCOUNT_RESET=true, or firebase functions:config:set minimaster.enable_operator_account_reset=true."
+      );
+    }
+
+    if (!context.auth && !recoveryTokenAllowed) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Sie müssen angemeldet sein oder einen gültigen Recovery-Token angeben."
       );
     }
 
@@ -454,13 +465,14 @@ export const resetAllAuthUsers = functions.https.onCall(
     }
 
     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
-      uid: context.auth.uid,
+      uid: context.auth?.uid || "recovery-token",
       role: callerRole || "none",
       requestId,
       includeCurrentSessionUser,
+      recoveryTokenUsed: recoveryTokenAllowed,
     });
 
-    const callerUid = context.auth.uid;
+    const callerUid = context.auth?.uid || "recovery-token";
 
     try {
       const usersToDelete: admin.auth.UserRecord[] = [];
@@ -469,7 +481,7 @@ export const resetAllAuthUsers = functions.https.onCall(
       do {
         const listResult = await auth().listUsers(1000, pageToken);
         for (const user of listResult.users) {
-          const isCurrentCaller = user.uid === callerUid;
+          const isCurrentCaller = context.auth ? user.uid === callerUid : false;
           if (isCurrentCaller && !includeCurrentSessionUser) {
             skippedCurrentUserUids.push(user.uid);
             continue;
@@ -525,6 +537,7 @@ export const resetAllAuthUsers = functions.https.onCall(
             requestId,
             requestedBy: callerUid,
             requestedByRole: callerRole || "none",
+            recoveryTokenUsed: recoveryTokenAllowed,
             matchedUsers: usersToDelete.length,
             skippedCurrentSessionUsers: skippedCurrentUserUids.length,
             deletedUsers: deletedUids.length,
@@ -616,12 +629,14 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
       process.env.FUNCTIONS_EMULATOR === "true" ||
       process.env.ENABLE_OPERATOR_ACCOUNT_RESET === "true" ||
       runtimeFlag;
+    const recoveryTokenConfigured = String(runtimeConfig?.minimaster?.admin_recovery_token || "").trim().length > 0;
 
     const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "none";
     return {
       reachable: true,
       requestId,
       resetEnabled,
+      recoveryTokenConfigured,
       callerRole,
       isAdmin: callerRole === "admin",
       requiredConfirmText: "RESET_ALL_AUTH_USERS",
