@@ -4417,6 +4417,11 @@ function renderAdminActivationContent(user) {
                 Entwicklungsmodus: Falls eine falsche Einrichtung vorliegt, können Sie
                 <strong>alle bisherigen Nutzerkonten</strong> zurücksetzen.
             </p>
+            <p style="margin-block-start: 6px;">
+                Optionaler Recovery-Pfad: Setzen Sie serverseitig
+                <code>minimaster.admin_recovery_token</code>, damit auch ohne Admin-Rolle
+                ein kontrollierter Reset möglich ist.
+            </p>
             <div class="phase-actions" style="margin-block-start: 12px">
                 <button onclick="resetAllUsersFromOnboarding()" class="btn btn-danger" id="btn-reset-all-users-onboarding">
                     🧨 Alle Nutzer zurücksetzen
@@ -4833,6 +4838,9 @@ async function resetAllUsersFromOnboarding() {
         if (statusEl) statusEl.innerHTML = "<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein.</div>";
         return;
     }
+    const recoveryToken = (window.prompt(
+        "Optional: Recovery-Token eingeben (nur nötig, wenn Sie kein Admin sind oder Zugangsdaten verloren wurden)."
+    ) || "").trim();
 
     if (btn) {
         btn.disabled = true;
@@ -4848,6 +4856,7 @@ async function resetAllUsersFromOnboarding() {
             confirmText: "RESET_ALL_AUTH_USERS",
             requestId,
             includeCurrentSessionUser: false,
+            recoveryToken,
         });
         const deletedUsers = Number(result?.data?.deletedUsers || 0);
         const backendRequestId = String(result?.data?.requestId || requestId);
@@ -4872,6 +4881,10 @@ async function resetAllUsersFromOnboarding() {
         const code = normalizeAuthErrorCode(error);
         if (code === "failed-precondition") {
             msg = "Reset ist deaktiviert. Aktivieren Sie ENABLE_OPERATOR_ACCOUNT_RESET oder den Emulator-Modus.";
+        } else if (code === "permission-denied") {
+            msg = "Keine Berechtigung für All-User-Reset. Als Nicht-Admin bitte gültigen Recovery-Token verwenden.";
+        } else if (code === "unauthenticated") {
+            msg = "Nicht angemeldet bzw. Recovery-Token ungültig. Bitte anmelden oder korrekten Recovery-Token eingeben.";
         } else if (code === "internal") {
             const raw = String(error?.message || "").toLowerCase();
             if (raw.includes("not found") || raw.includes("404") || raw.includes("no function") || raw.includes("unavailable")) {
@@ -4912,13 +4925,17 @@ async function checkResetAllUsersHealth() {
         const result = await healthFn({ requestId });
         const data = result?.data || {};
         const resetEnabled = Boolean(data.resetEnabled);
+        const recoveryTokenConfigured = Boolean(data.recoveryTokenConfigured);
         const callerRole = escapeHtml(String(data.callerRole || "none"));
         const backendRequestId = escapeHtml(String(data.requestId || requestId));
+        const recoveryHint = recoveryTokenConfigured
+            ? "Recovery-Token ist konfiguriert."
+            : "Kein Recovery-Token konfiguriert.";
 
         if (resetEnabled) {
-            statusEl.innerHTML = `<div class='success-box'>✅ resetAllAuthUsers ist erreichbar. Reset aktiv. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
+            statusEl.innerHTML = `<div class='success-box'>✅ resetAllAuthUsers ist erreichbar. Reset aktiv. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>${escapeHtml(recoveryHint)}</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
         } else {
-            statusEl.innerHTML = `<div class='info'>🟡 resetAllAuthUsers ist erreichbar, aber Reset ist deaktiviert. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
+            statusEl.innerHTML = `<div class='info'>🟡 resetAllAuthUsers ist erreichbar, aber Reset ist deaktiviert. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>${escapeHtml(recoveryHint)}</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
         }
         return;
     } catch (error) {
