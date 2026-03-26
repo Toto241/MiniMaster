@@ -2335,7 +2335,7 @@ function renderGoLiveAmpel() {
     if (!container) return;
 
     const status = computeGoLiveStatus();
-    const pct = status.totals.totalAll > 0 ? Math.round((status.totals.doneAll / status.totals.totalAll) * 100) : 0;
+    const pct = (status.totals.totalAll > 0) ? Math.round((status.totals.doneAll / status.totals.totalAll) * 100) : 0;
 
     let platformBars = "";
     for (const [, ps] of Object.entries(status.platformStatus)) {
@@ -3672,7 +3672,7 @@ function persistBootstrapFirebaseConfig(showReloadHint = true) {
     const values = getBootstrapFirebaseFormValues();
     const statusEl = document.getElementById("bootstrap-config-status");
 
-    console.log("[Firebase Config] Gelesene Formularwerte:", JSON.stringify(values, null, 2));
+    // Redacted: do not log Firebase config values to console
 
     const requiredKeys = ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"];
     const emptyFields = requiredKeys.filter(key => typeof values[key] !== "string" || values[key].trim().length === 0);
@@ -5380,7 +5380,9 @@ function handleLogin(event) {
     const email = document.getElementById("login-email").value;
     const password = document.getElementById("login-password").value;
     const statusEl = document.getElementById("login-status");
+    const submitBtn = event.target.querySelector("button[type=submit]");
 
+    if (submitBtn) submitBtn.disabled = true;
     if (statusEl) statusEl.innerHTML = "<div class='loading'>Anmeldung...</div>";
 
     auth.signInWithEmailAndPassword(email, password)
@@ -5398,6 +5400,9 @@ function handleLogin(event) {
             }
             console.error("Login error:", error.code, error.message);
             renderAuthError(statusEl, error, msg, "login");
+        })
+        .finally(() => {
+            if (submitBtn) submitBtn.disabled = false;
         });
 }
 
@@ -6187,12 +6192,12 @@ async function loadUsers(direction) {
             const subClass = subStatus === "active" ? "status-active" : subStatus === "expired" ? "status-expired" : "";
 
             html += `<tr>
-                <td title="${doc.id}">${doc.id.substring(0, 12)}...</td>
-                <td>${email}</td>
-                <td><span class="${subClass}">${subStatus}</span></td>
+                <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
+                <td>${escapeHtml(email)}</td>
+                <td><span class="${subClass}">${escapeHtml(subStatus)}</span></td>
                 <td>${created}</td>
                 <td>
-                    <button onclick="viewUserDetails('${doc.id}')" class="btn btn-secondary btn-sm">View</button>
+                    <button onclick="viewUserDetails('${escapeHtml(doc.id)}')" class="btn btn-secondary btn-sm">View</button>
                 </td>
             </tr>`;
         });
@@ -6424,13 +6429,13 @@ async function loadSubscriptions(direction) {
             const statusClass = sub.status === "active" ? "status-active" : "status-expired";
 
             html += `<tr>
-                <td title="${doc.id}">${doc.id.substring(0, 12)}...</td>
-                <td><span class="${statusClass}">${sub.status}</span></td>
-                <td>${sub.type || "N/A"}</td>
+                <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
+                <td><span class="${statusClass}">${escapeHtml(sub.status)}</span></td>
+                <td>${escapeHtml(sub.type || "N/A")}</td>
                 <td>${started}</td>
                 <td>${expires}</td>
                 <td>
-                    ${sub.status === "active" ? `<button onclick="revokeUserSubscription('${doc.id}')" class="btn btn-danger btn-sm">Revoke</button>` : ""}
+                    ${sub.status === "active" ? `<button onclick="revokeUserSubscription('${escapeHtml(doc.id)}')" class="btn btn-danger btn-sm">Revoke</button>` : ""}
                 </td>
             </tr>`;
         });
@@ -6505,8 +6510,8 @@ async function loadSupportTickets(direction) {
             const aiConfidence = ticket.aiConfidenceScore ? (ticket.aiConfidenceScore * 100).toFixed(0) + "%" : "N/A";
 
             html += `<tr>
-                <td title="${doc.id}">${doc.id.substring(0, 8)}...</td>
-                <td title="${ticket.masterImei}">${(ticket.masterImei || "").substring(0, 10)}...</td>
+                <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 8))}...</td>
+                <td title="${escapeHtml(ticket.masterImei || '')}">${escapeHtml((ticket.masterImei || "").substring(0, 10))}...</td>
                 <td><span class="${statusClass}">${ticket.status}</span></td>
                 <td>${aiConfidence}</td>
                 <td>${createdAt}</td>
