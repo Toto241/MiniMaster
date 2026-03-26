@@ -1,0 +1,742 @@
+  console.info
+    {"severity":"INFO","message":"Knowledge base loaded from D:\\Tools\\MiniMaster\\knowledge_base.txt"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"admin.set_admin_claim","userId":"admin1","status":"failure","error":"Auth service down","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:287:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:311:5)"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:287:7
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:311:5)
+
+  console.error
+    {"action":"admin.set_admin_claim","userId":"admin1","status":"failure","error":"A valid user UID is required.","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:287:7"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:287:7
+
+  console.error
+    {"action":"admin.set_admin_claim","userId":"admin1","status":"failure","error":"Role must be one of: admin, support, auditor","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:287:7"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:287:7
+
+  console.warn
+    {"uid":"support1","role":"support","severity":"WARNING","message":"DEV resetOperatorAccounts invoked by non-admin user."}
+
+      325 |
+      326 |     if (!callerIsAdmin) {
+    > 327 |       functions.logger.warn("DEV resetOperatorAccounts invoked by non-admin user.", {
+          |                        ^
+      328 |         uid: context.auth.uid,
+      329 |         role: callerRole || "none",
+      330 |       });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:327:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:349:23)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"support1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"requestedBy":"admin1","accessKeyCleanupWarning":"(0 , firebase_1.db)(...).collection(...).limit is not a function","severity":"ERROR","message":"Error: resetOperatorAccounts operatorAccessKeys cleanup failed (non-fatal).\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:351:26\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:371:17)"}
+
+      349 |       } catch (cleanupError) {
+      350 |         accessKeyCleanupWarning = (cleanupError as Error).message || "unknown operatorAccessKeys cleanup error";
+    > 351 |         functions.logger.error("resetOperatorAccounts operatorAccessKeys cleanup failed (non-fatal).", {
+          |                          ^
+      352 |           requestedBy: callerUid,
+      353 |           accessKeyCleanupWarning,
+      354 |         });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:351:26
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:371:17)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"uid":"op2","error":"Delete failed","severity":"ERROR","message":"Error: Failed to delete operator user during reset.\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:364:28\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:389:17)"}
+
+      362 |           deletedUids.push(user.uid);
+      363 |         } catch (error) {
+    > 364 |           functions.logger.error("Failed to delete operator user during reset.", {
+          |                            ^
+      365 |             uid: user.uid,
+      366 |             error: (error as Error).message,
+      367 |           });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:364:28
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:389:17)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"failure","error":"Unexpected list error","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:397:7\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:399:5)"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:397:7
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:399:5)
+
+  console.info
+    {"hasAuth":false,"callerUid":"none","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.181Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.184Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210185-q0hr9f","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:435:23)
+
+  console.info
+    {"requestId":"srv-1774546210185-q0hr9f","callerUid":"admin1","matchedUsers":0,"skippedCurrentSessionUsers":0,"severity":"INFO","message":"resetAllAuthUsers user selection complete."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"requestId":"srv-1774546210185-q0hr9f","accessKeyCleanupWarning":"(0 , firebase_1.db)(...).collection(...).limit is not a function","severity":"ERROR","message":"Error: resetAllAuthUsers operatorAccessKeys cleanup failed (non-fatal).\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:537:26\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:435:17)"}
+
+      535 |       } catch (cleanupError) {
+      536 |         accessKeyCleanupWarning = (cleanupError as Error).message || "unknown operatorAccessKeys cleanup error";
+    > 537 |         functions.logger.error("resetAllAuthUsers operatorAccessKeys cleanup failed (non-fatal).", {
+          |                          ^
+      538 |           requestId,
+      539 |           accessKeyCleanupWarning,
+      540 |         });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:537:26
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:435:17)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.199Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210199-itcy6f","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:443:23)
+
+  console.info
+    {"requestId":"srv-1774546210199-itcy6f","callerUid":"admin1","matchedUsers":0,"skippedCurrentSessionUsers":0,"severity":"INFO","message":"resetAllAuthUsers user selection complete."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.207Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210207-rdxocx","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:454:18)
+
+  console.error
+    {"requestId":"srv-1774546210207-rdxocx","requestedBy":"admin1","role":"admin","message":"Error: resetAllAuthUsers failed.\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:586:24","stack":"Error: List users crashed\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:451:46)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)","severity":"ERROR"}
+
+      584 |       };
+      585 |     } catch (error) {
+    > 586 |       functions.logger.error("resetAllAuthUsers failed.", {
+          |                        ^
+      587 |         requestId,
+      588 |         requestedBy: callerUid,
+      589 |         role: callerRole || "none",
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:586:24
+
+  console.error
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"failure","error":"List users crashed","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:595:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:454:5)"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:595:9
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:454:5)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.220Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210221-rww9h4","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:466:18)
+
+  console.error
+    {"requestId":"srv-1774546210221-rww9h4","requestedBy":"admin1","role":"admin","message":"Error: resetAllAuthUsers failed.\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:586:24\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:466:18)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)","stack":"Error: Service unavailable\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:462:13)\n    at D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:397:39\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:404:13)\n    at Object.mockConstructor [as listUsers] (D:\\Tools\\MiniMaster\\node_modules\\jest-mock\\build\\index.js:148:19)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:497:41\n    at D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\common\\onInit.js:33:16\n    at Function.fixedLen [as run] (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\v1\\providers\\https.js:76:47)\n    at wrapped (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions-test\\lib\\v1.js:71:30)\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:466:18)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)","severity":"ERROR"}
+
+      584 |       };
+      585 |     } catch (error) {
+    > 586 |       functions.logger.error("resetAllAuthUsers failed.", {
+          |                        ^
+      587 |         requestId,
+      588 |         requestedBy: callerUid,
+      589 |         role: callerRole || "none",
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:586:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:466:18)
+
+  console.error
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"failure","error":"Service unavailable","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:595:9"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:595:9
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.239Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210240-9ck7o6","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:483:23)
+
+  console.info
+    {"requestId":"srv-1774546210240-9ck7o6","callerUid":"admin1","matchedUsers":2,"skippedCurrentSessionUsers":0,"severity":"INFO","message":"resetAllAuthUsers user selection complete."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"uid":"u2","error":"Cannot delete","severity":"ERROR","message":"Error: Failed to delete user during all-user reset.\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:523:28\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:483:17)"}
+
+      521 |           deletedUids.push(user.uid);
+      522 |         } catch (error) {
+    > 523 |           functions.logger.error("Failed to delete user during all-user reset.", {
+          |                            ^
+      524 |             uid: user.uid,
+      525 |             error: (error as Error).message,
+      526 |           });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:523:28
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:483:17)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText","includeCurrentSessionUser"],"timestamp":"2026-03-26T17:30:10.250Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210251-uj4t0u","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:499:23)
+
+  console.info
+    {"requestId":"srv-1774546210251-uj4t0u","callerUid":"admin1","matchedUsers":1,"skippedCurrentSessionUsers":1,"severity":"INFO","message":"resetAllAuthUsers user selection complete."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText","includeCurrentSessionUser"],"timestamp":"2026-03-26T17:30:10.258Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210259-cw4wlf","includeCurrentSessionUser":true,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:516:23)
+
+  console.info
+    {"requestId":"srv-1774546210259-cw4wlf","callerUid":"admin1","matchedUsers":1,"skippedCurrentSessionUsers":0,"severity":"INFO","message":"resetAllAuthUsers user selection complete."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"admin.reset_operator_accounts","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"action":"auth.token_generated","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"masterImei":"m1","severity":"WARNING","message":"LEGACY_AUTH_USED generateCustomToken via masterImei/secretKey."}
+
+      750 |       }
+      751 |
+    > 752 |       functions.logger.warn("LEGACY_AUTH_USED generateCustomToken via masterImei/secretKey.", { masterImei });
+          |                        ^
+      753 |       await logLegacyAuthUsage("generateCustomToken", "secretKey", masterImei);
+      754 |
+      755 |       uid = masterImei;
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:752:24
+
+  console.error
+    {"action":"auth.token_generated","userId":"admin1","status":"failure","error":"User not found","severity":"ERROR","message":"Error: Audit Event\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at AuditLogger.log (D:\\Tools\\MiniMaster\\src\\shared.ts:200:26)\n    at AuditLogger.logFailure (D:\\Tools\\MiniMaster\\src\\shared.ts:231:5)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:779:9\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:585:5)"}
+
+      198 |
+      199 |       if (status === "failure" || status === "denied") {
+    > 200 |         functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+          |                          ^
+      201 |       } else {
+      202 |         functions.logger.info("Audit Event", { action, userId, status });
+      203 |       }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at AuditLogger.log (src/shared.ts:200:26)
+      at AuditLogger.logFailure (src/shared.ts:231:5)
+      at src/auth.ts:779:9
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:585:5)
+
+  console.error
+    {"severity":"ERROR","message":"Error generating custom token: Error: User not found\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:583:44)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"}
+
+      781 |         );
+      782 |       }
+    > 783 |       functions.logger.error("Error generating custom token:", error);
+          |                        ^
+      784 |       throw new functions.https.HttpsError("internal", "An unexpected error occurred while generating the token.", error);
+      785 |     }
+      786 |   }
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:783:24
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:585:5)
+
+  console.info
+    {"action":"device.register","userId":"admin1","status":"success","severity":"INFO","message":"Audit Event"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"severity":"INFO","message":"Master account registered for uid: admin1"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"imei":"new-device-1","severity":"WARNING","message":"LEGACY_AUTH_USED registerMasterDevice without authenticated context."}
+
+      811 |
+      812 |     if (!context.auth) {
+    > 813 |       functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
+          |                        ^
+      814 |       await logLegacyAuthUsage("registerMasterDevice", "imei_registration", imei);
+      815 |     }
+      816 |
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:813:24
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:615:23)
+
+  console.info
+    {"severity":"INFO","message":"Master account registered for uid: new-device-1"}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.303Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.307Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210308-i528si","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:673:23)
+
+  console.info
+    {"requestId":"srv-1774546210308-i528si","callerUid":"admin1","matchedUsers":0,"skippedCurrentSessionUsers":0,"severity":"INFO","message":"resetAllAuthUsers user selection complete."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.error
+    {"requestId":"srv-1774546210308-i528si","auditLogWarning":"Audit boom","severity":"ERROR","message":"Error: resetAllAuthUsers audit logging failed (non-fatal).\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:567:26\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:673:17)"}
+
+      565 |       } catch (auditError) {
+      566 |         auditLogWarning = (auditError as Error).message || "unknown audit logging error";
+    > 567 |         functions.logger.error("resetAllAuthUsers audit logging failed (non-fatal).", {
+          |                          ^
+      568 |           requestId,
+      569 |           auditLogWarning,
+      570 |         });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:567:26
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:673:17)
+
+  console.info
+    {"hasAuth":true,"callerUid":"admin1","dataKeys":["confirmText"],"timestamp":"2026-03-26T17:30:10.323Z","severity":"INFO","message":"resetAllAuthUsers ENTRY ÔÇö function invoked."}
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+
+  console.warn
+    {"uid":"admin1","role":"admin","requestId":"srv-1774546210324-52543q","includeCurrentSessionUser":false,"recoveryTokenUsed":false,"severity":"WARNING","message":"DEV resetAllAuthUsers invoked."}
+
+      480 |     }
+      481 |
+    > 482 |     functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+          |                      ^
+      483 |       uid: context.auth?.uid || "recovery-token",
+      484 |       role: callerRole || "none",
+      485 |       requestId,
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.warn (node_modules/firebase-functions/lib/logger/index.js:121:5)
+      at src/auth.ts:482:22
+      at node_modules/firebase-functions/lib/common/onInit.js:33:16
+      at Function.fixedLen [as run] (node_modules/firebase-functions/lib/v1/providers/https.js:76:47)
+      at wrapped (node_modules/firebase-functions-test/lib/v1.js:71:30)
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:687:18)
+
+  console.error
+    {"requestId":"srv-1774546210324-52543q","requestedBy":"admin1","role":"admin","message":"Error: resetAllAuthUsers failed.\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:586:24","stack":"Error: Service unavailable\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:684:46)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)","severity":"ERROR"}
+
+      584 |       };
+      585 |     } catch (error) {
+    > 586 |       functions.logger.error("resetAllAuthUsers failed.", {
+          |                        ^
+      587 |         requestId,
+      588 |         requestedBy: callerUid,
+      589 |         role: callerRole || "none",
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:586:24
+
+  console.error
+    {"requestId":"srv-1774546210324-52543q","message":"Error: resetAllAuthUsers failure-audit logging failed (non-fatal).\n    at entryFromArgs (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:144:19)\n    at Object.error (D:\\Tools\\MiniMaster\\node_modules\\firebase-functions\\lib\\logger\\index.js:131:11)\n    at D:\\Tools\\MiniMaster\\src\\auth.ts:604:26\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:687:5)","severity":"ERROR"}
+
+      602 |         );
+      603 |       } catch (auditFailureError) {
+    > 604 |         functions.logger.error("resetAllAuthUsers failure-audit logging failed (non-fatal).", {
+          |                          ^
+      605 |           requestId,
+      606 |           message: (auditFailureError as Error).message,
+      607 |         });
+
+      at write (node_modules/firebase-functions/lib/logger/index.js:81:74)
+      at Object.error (node_modules/firebase-functions/lib/logger/index.js:131:5)
+      at src/auth.ts:604:26
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:687:5)
+
+FAIL test/branch-coverage-auth.test.ts (116 MB heap size)
+  redeemOperatorAccessKey ÔÇö transaction branches
+    ÔêÜ wirft not-found wenn keyDoc im Transaction nicht existiert (line 220) (27 ms)
+    ÔêÜ wirft internal bei ung├╝ltiger Rolle im Schl├╝ssel (line 229) (10 ms)
+  setUserRole ÔÇö error branches
+    ÔêÜ wirft bei setCustomUserClaims-Fehler einen internen Fehler (catch wrap) (15 ms)
+    ÔêÜ wirft HttpsError durch ohne Wrapping (catch re-throw) (6 ms)
+    ÔêÜ wirft bei ung├╝ltiger Rolle (3 ms)
+  resetOperatorAccounts ÔÇö branch coverage
+    ÔêÜ wirft failed-precondition wenn resetEnabled=false (line 350) (2 ms)
+    ÔêÜ loggt Warnung bei non-admin Caller (line 364) (9 ms)
+    ÔêÜ behandelt accessKey-Cleanup-Fehler (line 397) (7 ms)
+    ÔêÜ erfasst failedUids bei deleteUser-Fehler (line 400) (7 ms)
+    ÔêÜ wirft HttpsError im outer catch durch (line 434) (4 ms)
+  resetAllAuthUsers ÔÇö branch coverage
+    ÔêÜ erlaubt Zugang per Recovery-Token ohne Auth (line 463, 476) (3 ms)
+    ÔêÜ behandelt accessKey-Cleanup-Fehler (line 523) (15 ms)
+    ÔêÜ verarbeitet leere Benutzerliste korrekt (8 ms)
+    ÔêÜ behandelt outer catch mit generic Error (line 586-611) (13 ms)
+    ÔêÜ wirft HttpsError im outer catch durch (line 586) (18 ms)
+    ÔêÜ behandelt deleteUser-Fehler f├╝r einzelne User (11 ms)
+    ÔêÜ skippt aktuellen Caller bei includeCurrentSessionUser=false (8 ms)
+    ÔêÜ l├Âscht aktuellen Caller bei includeCurrentSessionUser=true (8 ms)
+  resetAllAuthUsersHealth ÔÇö branches
+    ÔêÜ gibt Health-Status mit recoveryTokenConfigured=false zur├╝ck (1 ms)
+    ÔêÜ gibt callerRole zur├╝ck f├╝r non-admin (1 ms)
+    ÔêÜ akzeptiert requestId Parameter (1 ms)
+  generateCustomToken ÔÇö branches
+    ÔêÜ generiert Token f├╝r authentifizierten User (2 ms)
+    ÔêÜ generiert Token via Legacy IMEI/secretKey (6 ms)
+    ÔêÜ wirft bei ung├╝ltigem masterImei/secretKey (1 ms)
+    ÔêÜ wirft bei fehlendem masterImei ohne auth (1 ms)
+    ÔêÜ wirft bei getUser-Fehler internal error (8 ms)
+  registerMasterDevice ÔÇö branches
+    ÔêÜ registriert neues Ger├ñt mit Auth (3 ms)
+    ÔêÜ wirft bei fehlendem imei Parameter (1 ms)
+    ÔêÜ wirft bei authenticated uid !== imei mismatch (1 ms)
+    ÔêÜ registriert via Legacy IMEI ohne Auth (6 ms)
+  resetOperatorAccounts ÔÇö additional branches
+    ÔêÜ wirft unauthenticated ohne Auth (line 305) (1 ms)
+    ÔêÜ wirft invalid-argument bei falschem confirmText (line 335) (1 ms)
+    ÔêÜ wirft invalid-argument bei leerem confirmText (1 ms)
+  resetAllAuthUsers ÔÇö additional branches
+    ÔêÜ wirft invalid-argument bei falschem confirmText (line 476) (2 ms)
+    ├ù behandelt functions.config()-Fehler im IIFE (lines 434-437) (1 ms)
+    ÔêÜ behandelt AuditLogger.logSuccess-Fehler (lines 566-567) (16 ms)
+    ÔêÜ behandelt AuditLogger.logFailure-Fehler im outer catch (line 604) (15 ms)
+  resetAllAuthUsersHealth ÔÇö config throw (lines 645-648)
+    ├ù behandelt functions.config()-Fehler gracefully (1 ms)
+
+  ÔùÅ resetAllAuthUsers ÔÇö additional branches ÔÇ║ behandelt functions.config()-Fehler im IIFE (lines 434-437)
+
+    TypeError: Cannot set property config of [object Object] which has only a getter
+
+      652 |     const functions = require("firebase-functions/v1");
+      653 |     const origConfig = functions.config;
+    > 654 |     functions.config = () => { throw new Error("Config unavailable"); };
+          |                     ^
+      655 |     try {
+      656 |       const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+      657 |       // Even with config throw, resetEnabled via FUNCTIONS_EMULATOR still works
+
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:654:21)
+
+  ÔùÅ resetAllAuthUsersHealth ÔÇö config throw (lines 645-648) ÔÇ║ behandelt functions.config()-Fehler gracefully
+
+    TypeError: Cannot set property config of [object Object] which has only a getter
+
+      695 |     const functions = require("firebase-functions/v1");
+      696 |     const origConfig = functions.config;
+    > 697 |     functions.config = () => { throw new Error("Config unavailable"); };
+          |                     ^
+      698 |     try {
+      699 |       const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+      700 |       const res = await wrapped({}, asAdmin);
+
+      at Object.<anonymous> (test/branch-coverage-auth.test.ts:697:21)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 36 passed, 38 total
+Snapshots:   0 total
+Time:        1.653 s, estimated 2 s
+Ran all test suites matching /test\\branch-coverage-auth.test.ts/i.
+{"numFailedTestSuites":1,"numFailedTests":2,"numPassedTestSuites":0,"numPassedTests":36,"numPendingTestSuites":0,"numPendingTests":0,"numRuntimeErrorTestSuites":0,"numTodoTests":0,"numTotalTestSuites":1,"numTotalTests":38,"openHandles":[],"snapshot":{"added":0,"didUpdate":false,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0},"startTime":1774546208706,"success":false,"testResults":[{"assertionResults":[{"ancestorTitles":["redeemOperatorAccessKey ÔÇö transaction branches"],"duration":27,"failureDetails":[],"failureMessages":[],"fullName":"redeemOperatorAccessKey ÔÇö transaction branches wirft not-found wenn keyDoc im Transaction nicht existiert (line 220)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft not-found wenn keyDoc im Transaction nicht existiert (line 220)"},{"ancestorTitles":["redeemOperatorAccessKey ÔÇö transaction branches"],"duration":10,"failureDetails":[],"failureMessages":[],"fullName":"redeemOperatorAccessKey ÔÇö transaction branches wirft internal bei ung├╝ltiger Rolle im Schl├╝ssel (line 229)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft internal bei ung├╝ltiger Rolle im Schl├╝ssel (line 229)"},{"ancestorTitles":["setUserRole ÔÇö error branches"],"duration":15,"failureDetails":[],"failureMessages":[],"fullName":"setUserRole ÔÇö error branches wirft bei setCustomUserClaims-Fehler einen internen Fehler (catch wrap)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei setCustomUserClaims-Fehler einen internen Fehler (catch wrap)"},{"ancestorTitles":["setUserRole ÔÇö error branches"],"duration":6,"failureDetails":[],"failureMessages":[],"fullName":"setUserRole ÔÇö error branches wirft HttpsError durch ohne Wrapping (catch re-throw)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft HttpsError durch ohne Wrapping (catch re-throw)"},{"ancestorTitles":["setUserRole ÔÇö error branches"],"duration":3,"failureDetails":[],"failureMessages":[],"fullName":"setUserRole ÔÇö error branches wirft bei ung├╝ltiger Rolle","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei ung├╝ltiger Rolle"},{"ancestorTitles":["resetOperatorAccounts ÔÇö branch coverage"],"duration":2,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö branch coverage wirft failed-precondition wenn resetEnabled=false (line 350)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft failed-precondition wenn resetEnabled=false (line 350)"},{"ancestorTitles":["resetOperatorAccounts ÔÇö branch coverage"],"duration":9,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö branch coverage loggt Warnung bei non-admin Caller (line 364)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"loggt Warnung bei non-admin Caller (line 364)"},{"ancestorTitles":["resetOperatorAccounts ÔÇö branch coverage"],"duration":7,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö branch coverage behandelt accessKey-Cleanup-Fehler (line 397)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"behandelt accessKey-Cleanup-Fehler (line 397)"},{"ancestorTitles":["resetOperatorAccounts ÔÇö branch coverage"],"duration":7,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö branch coverage erfasst failedUids bei deleteUser-Fehler (line 400)","invocations":1,"location":null,"numPassingAsserts":3,"retryReasons":[],"status":"passed","title":"erfasst failedUids bei deleteUser-Fehler (line 400)"},{"ancestorTitles":["resetOperatorAccounts ÔÇö branch coverage"],"duration":4,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö branch coverage wirft HttpsError im outer catch durch (line 434)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft HttpsError im outer catch durch (line 434)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":3,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage erlaubt Zugang per Recovery-Token ohne Auth (line 463, 476)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"erlaubt Zugang per Recovery-Token ohne Auth (line 463, 476)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":15,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage behandelt accessKey-Cleanup-Fehler (line 523)","invocations":1,"location":null,"numPassingAsserts":2,"retryReasons":[],"status":"passed","title":"behandelt accessKey-Cleanup-Fehler (line 523)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":8,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage verarbeitet leere Benutzerliste korrekt","invocations":1,"location":null,"numPassingAsserts":3,"retryReasons":[],"status":"passed","title":"verarbeitet leere Benutzerliste korrekt"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":13,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage behandelt outer catch mit generic Error (line 586-611)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"behandelt outer catch mit generic Error (line 586-611)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":18,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage wirft HttpsError im outer catch durch (line 586)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft HttpsError im outer catch durch (line 586)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":11,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage behandelt deleteUser-Fehler f├╝r einzelne User","invocations":1,"location":null,"numPassingAsserts":3,"retryReasons":[],"status":"passed","title":"behandelt deleteUser-Fehler f├╝r einzelne User"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":8,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage skippt aktuellen Caller bei includeCurrentSessionUser=false","invocations":1,"location":null,"numPassingAsserts":2,"retryReasons":[],"status":"passed","title":"skippt aktuellen Caller bei includeCurrentSessionUser=false"},{"ancestorTitles":["resetAllAuthUsers ÔÇö branch coverage"],"duration":8,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö branch coverage l├Âscht aktuellen Caller bei includeCurrentSessionUser=true","invocations":1,"location":null,"numPassingAsserts":2,"retryReasons":[],"status":"passed","title":"l├Âscht aktuellen Caller bei includeCurrentSessionUser=true"},{"ancestorTitles":["resetAllAuthUsersHealth ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsersHealth ÔÇö branches gibt Health-Status mit recoveryTokenConfigured=false zur├╝ck","invocations":1,"location":null,"numPassingAsserts":3,"retryReasons":[],"status":"passed","title":"gibt Health-Status mit recoveryTokenConfigured=false zur├╝ck"},{"ancestorTitles":["resetAllAuthUsersHealth ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsersHealth ÔÇö branches gibt callerRole zur├╝ck f├╝r non-admin","invocations":1,"location":null,"numPassingAsserts":3,"retryReasons":[],"status":"passed","title":"gibt callerRole zur├╝ck f├╝r non-admin"},{"ancestorTitles":["resetAllAuthUsersHealth ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsersHealth ÔÇö branches akzeptiert requestId Parameter","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"akzeptiert requestId Parameter"},{"ancestorTitles":["generateCustomToken ÔÇö branches"],"duration":2,"failureDetails":[],"failureMessages":[],"fullName":"generateCustomToken ÔÇö branches generiert Token f├╝r authentifizierten User","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"generiert Token f├╝r authentifizierten User"},{"ancestorTitles":["generateCustomToken ÔÇö branches"],"duration":6,"failureDetails":[],"failureMessages":[],"fullName":"generateCustomToken ÔÇö branches generiert Token via Legacy IMEI/secretKey","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"generiert Token via Legacy IMEI/secretKey"},{"ancestorTitles":["generateCustomToken ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"generateCustomToken ÔÇö branches wirft bei ung├╝ltigem masterImei/secretKey","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei ung├╝ltigem masterImei/secretKey"},{"ancestorTitles":["generateCustomToken ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"generateCustomToken ÔÇö branches wirft bei fehlendem masterImei ohne auth","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei fehlendem masterImei ohne auth"},{"ancestorTitles":["generateCustomToken ÔÇö branches"],"duration":8,"failureDetails":[],"failureMessages":[],"fullName":"generateCustomToken ÔÇö branches wirft bei getUser-Fehler internal error","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei getUser-Fehler internal error"},{"ancestorTitles":["registerMasterDevice ÔÇö branches"],"duration":3,"failureDetails":[],"failureMessages":[],"fullName":"registerMasterDevice ÔÇö branches registriert neues Ger├ñt mit Auth","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"registriert neues Ger├ñt mit Auth"},{"ancestorTitles":["registerMasterDevice ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"registerMasterDevice ÔÇö branches wirft bei fehlendem imei Parameter","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei fehlendem imei Parameter"},{"ancestorTitles":["registerMasterDevice ÔÇö branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"registerMasterDevice ÔÇö branches wirft bei authenticated uid !== imei mismatch","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft bei authenticated uid !== imei mismatch"},{"ancestorTitles":["registerMasterDevice ÔÇö branches"],"duration":6,"failureDetails":[],"failureMessages":[],"fullName":"registerMasterDevice ÔÇö branches registriert via Legacy IMEI ohne Auth","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"registriert via Legacy IMEI ohne Auth"},{"ancestorTitles":["resetOperatorAccounts ÔÇö additional branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö additional branches wirft unauthenticated ohne Auth (line 305)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft unauthenticated ohne Auth (line 305)"},{"ancestorTitles":["resetOperatorAccounts ÔÇö additional branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö additional branches wirft invalid-argument bei falschem confirmText (line 335)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft invalid-argument bei falschem confirmText (line 335)"},{"ancestorTitles":["resetOperatorAccounts ÔÇö additional branches"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"resetOperatorAccounts ÔÇö additional branches wirft invalid-argument bei leerem confirmText","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft invalid-argument bei leerem confirmText"},{"ancestorTitles":["resetAllAuthUsers ÔÇö additional branches"],"duration":2,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö additional branches wirft invalid-argument bei falschem confirmText (line 476)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"wirft invalid-argument bei falschem confirmText (line 476)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö additional branches"],"duration":1,"failureDetails":[{}],"failureMessages":["TypeError: Cannot set property config of [object Object] which has only a getter\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:654:21)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"],"fullName":"resetAllAuthUsers ÔÇö additional branches behandelt functions.config()-Fehler im IIFE (lines 434-437)","invocations":1,"location":null,"numPassingAsserts":0,"retryReasons":[],"status":"failed","title":"behandelt functions.config()-Fehler im IIFE (lines 434-437)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö additional branches"],"duration":16,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö additional branches behandelt AuditLogger.logSuccess-Fehler (lines 566-567)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"behandelt AuditLogger.logSuccess-Fehler (lines 566-567)"},{"ancestorTitles":["resetAllAuthUsers ÔÇö additional branches"],"duration":15,"failureDetails":[],"failureMessages":[],"fullName":"resetAllAuthUsers ÔÇö additional branches behandelt AuditLogger.logFailure-Fehler im outer catch (line 604)","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"behandelt AuditLogger.logFailure-Fehler im outer catch (line 604)"},{"ancestorTitles":["resetAllAuthUsersHealth ÔÇö config throw (lines 645-648)"],"duration":1,"failureDetails":[{}],"failureMessages":["TypeError: Cannot set property config of [object Object] which has only a getter\n    at Object.<anonymous> (D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts:697:21)\n    at Promise.then.completed (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at _runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\Tools\\MiniMaster\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\Tools\\MiniMaster\\node_modules\\jest-runner\\build\\runTest.js:444:34)"],"fullName":"resetAllAuthUsersHealth ÔÇö config throw (lines 645-648) behandelt functions.config()-Fehler gracefully","invocations":1,"location":null,"numPassingAsserts":0,"retryReasons":[],"status":"failed","title":"behandelt functions.config()-Fehler gracefully"}],"endTime":1774546210354,"message":"  ÔùÅ resetAllAuthUsers ÔÇö additional branches ÔÇ║ behandelt functions.config()-Fehler im IIFE (lines 434-437)\n\n    TypeError: Cannot set property config of [object Object] which has only a getter\n\n    \u001b[0m \u001b[90m 652 |\u001b[39m     \u001b[36mconst\u001b[39m functions \u001b[33m=\u001b[39m require(\u001b[32m\"firebase-functions/v1\"\u001b[39m)\u001b[33m;\u001b[39m\n     \u001b[90m 653 |\u001b[39m     \u001b[36mconst\u001b[39m origConfig \u001b[33m=\u001b[39m functions\u001b[33m.\u001b[39mconfig\u001b[33m;\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 654 |\u001b[39m     functions\u001b[33m.\u001b[39mconfig \u001b[33m=\u001b[39m () \u001b[33m=>\u001b[39m { \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m\"Config unavailable\"\u001b[39m)\u001b[33m;\u001b[39m }\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                     \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 655 |\u001b[39m     \u001b[36mtry\u001b[39m {\n     \u001b[90m 656 |\u001b[39m       \u001b[36mconst\u001b[39m wrapped \u001b[33m=\u001b[39m testEnv\u001b[33m.\u001b[39mwrap(fns\u001b[33m.\u001b[39mresetAllAuthUsers)\u001b[33m;\u001b[39m\n     \u001b[90m 657 |\u001b[39m       \u001b[90m// Even with config throw, resetEnabled via FUNCTIONS_EMULATOR still works\u001b[39m\u001b[0m\n\n      at Object.<anonymous> (test/branch-coverage-auth.test.ts:654:21)\n\n  ÔùÅ resetAllAuthUsersHealth ÔÇö config throw (lines 645-648) ÔÇ║ behandelt functions.config()-Fehler gracefully\n\n    TypeError: Cannot set property config of [object Object] which has only a getter\n\n    \u001b[0m \u001b[90m 695 |\u001b[39m     \u001b[36mconst\u001b[39m functions \u001b[33m=\u001b[39m require(\u001b[32m\"firebase-functions/v1\"\u001b[39m)\u001b[33m;\u001b[39m\n     \u001b[90m 696 |\u001b[39m     \u001b[36mconst\u001b[39m origConfig \u001b[33m=\u001b[39m functions\u001b[33m.\u001b[39mconfig\u001b[33m;\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 697 |\u001b[39m     functions\u001b[33m.\u001b[39mconfig \u001b[33m=\u001b[39m () \u001b[33m=>\u001b[39m { \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m\"Config unavailable\"\u001b[39m)\u001b[33m;\u001b[39m }\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                     \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 698 |\u001b[39m     \u001b[36mtry\u001b[39m {\n     \u001b[90m 699 |\u001b[39m       \u001b[36mconst\u001b[39m wrapped \u001b[33m=\u001b[39m testEnv\u001b[33m.\u001b[39mwrap(fns\u001b[33m.\u001b[39mresetAllAuthUsersHealth)\u001b[33m;\u001b[39m\n     \u001b[90m 700 |\u001b[39m       \u001b[36mconst\u001b[39m res \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m wrapped({}\u001b[33m,\u001b[39m asAdmin)\u001b[33m;\u001b[39m\u001b[0m\n\n      at Object.<anonymous> (test/branch-coverage-auth.test.ts:697:21)\n","name":"D:\\Tools\\MiniMaster\\test\\branch-coverage-auth.test.ts","startTime":1774546208935,"status":"failed","summary":""}],"wasInterrupted":false}

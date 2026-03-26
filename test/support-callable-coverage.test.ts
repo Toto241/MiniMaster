@@ -490,6 +490,30 @@ describe("analyzeWithDebugData", () => {
     const res = await wrapped({ ticketId: "ticket-open", userMessage: "Zusätzliche Info" }, asMaster);
     expect(res.success).toBe(true);
   });
+
+  it("collectDebugSnapshot ohne Kinder — Fallback auf leeres Objekt", async () => {
+    // Ticket with a masterImei that has no children in state
+    state.supportTickets["ticket-no-children"] = {
+      masterImei: "no-children-master",
+      status: "analyzing",
+      problemDescription: "Test ohne Kinder",
+      conversationStatus: "analyzing",
+      conversationRound: 0,
+      aiAttemptFailures: 0,
+      accessGranted: true,
+      debugAccessGrantId: "grant-active",
+    };
+    // Ensure no children exist for this master
+    const origChildren = { ...state.children };
+    state.children = {};
+    try {
+      const wrapped = testEnv.wrap(fns.analyzeWithDebugData);
+      const res = await wrapped({ ticketId: "ticket-no-children" }, asAdmin);
+      expect(res.success).toBe(true);
+    } finally {
+      state.children = origChildren;
+    }
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -640,5 +664,146 @@ describe("onSupportTicketUpdated", () => {
     const change = { before, after };
     await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
     expect(state.supportTickets["ticket-1"].lastFollowUpEmailStatus).toBe("skipped_invalid_reply_to");
+  });
+
+  it("behandelt undefined adminResponse in before (typeof falsy)", async () => {
+    const wrapped = testEnv.wrap(fns.onSupportTicketUpdated);
+    const afterRef = {
+      update: jest.fn((upd: any) => {
+        Object.assign(state.supportTickets["ticket-1"], upd);
+        return Promise.resolve();
+      }),
+    };
+    const before = { data: () => ({ masterImei: "m1", problemDescription: "Keine Email" }) };
+    const after = {
+      data: () => ({ adminResponse: "Neue Antwort", masterImei: "m1", problemDescription: "Keine Email" }),
+      ref: afterRef,
+    };
+    const change = { before, after };
+    await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
+    expect(afterRef.update).toHaveBeenCalledWith(expect.objectContaining({ lastFollowUpEmailStatus: "skipped_invalid_reply_to" }));
+  });
+
+  it("behandelt undefined adminResponse in after (typeof falsy → early return)", async () => {
+    const wrapped = testEnv.wrap(fns.onSupportTicketUpdated);
+    const before = { data: () => ({ adminResponse: "Alt", masterImei: "m1", problemDescription: "test" }) };
+    const after = { data: () => ({ masterImei: "m1", problemDescription: "test" }) };
+    const change = { before, after };
+    // adminResponseAfter = "" → function returns early
+    await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
+  });
+
+  it("setzt failed bei fehlendem SUPPORT_FROM_EMAIL (RESEND_API_KEY vorhanden)", async () => {
+    const origResend = process.env.RESEND_API_KEY;
+    const origFrom = process.env.SUPPORT_FROM_EMAIL;
+    process.env.RESEND_API_KEY = "test-resend-key";
+    delete process.env.SUPPORT_FROM_EMAIL;
+    try {
+      const wrapped = testEnv.wrap(fns.onSupportTicketUpdated);
+      const afterRef = {
+        update: jest.fn((upd: any) => {
+          Object.assign(state.supportTickets["ticket-1"], upd);
+          return Promise.resolve();
+        }),
+      };
+      const before = { data: () => ({ adminResponse: "", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }) };
+      const after = {
+        data: () => ({ adminResponse: "Neue Antwort", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }),
+        ref: afterRef,
+      };
+      const change = { before, after };
+      await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
+      expect(afterRef.update).toHaveBeenCalledWith(expect.objectContaining({ lastFollowUpEmailStatus: "failed" }));
+    } finally {
+      if (origResend !== undefined) process.env.RESEND_API_KEY = origResend; else delete process.env.RESEND_API_KEY;
+      if (origFrom !== undefined) process.env.SUPPORT_FROM_EMAIL = origFrom; else delete process.env.SUPPORT_FROM_EMAIL;
+    }
+  });
+
+  it("setzt failed bei fehlendem RESEND_API_KEY (SUPPORT_FROM_EMAIL vorhanden)", async () => {
+    const origResend = process.env.RESEND_API_KEY;
+    const origFrom = process.env.SUPPORT_FROM_EMAIL;
+    delete process.env.RESEND_API_KEY;
+    process.env.SUPPORT_FROM_EMAIL = "noreply@minimaster.de";
+    try {
+      const wrapped = testEnv.wrap(fns.onSupportTicketUpdated);
+      const afterRef = {
+        update: jest.fn((upd: any) => {
+          Object.assign(state.supportTickets["ticket-1"], upd);
+          return Promise.resolve();
+        }),
+      };
+      const before = { data: () => ({ adminResponse: "", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }) };
+      const after = {
+        data: () => ({ adminResponse: "Neue Antwort", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }),
+        ref: afterRef,
+      };
+      const change = { before, after };
+      await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
+      expect(afterRef.update).toHaveBeenCalledWith(expect.objectContaining({ lastFollowUpEmailStatus: "failed" }));
+    } finally {
+      if (origResend !== undefined) process.env.RESEND_API_KEY = origResend; else delete process.env.RESEND_API_KEY;
+      if (origFrom !== undefined) process.env.SUPPORT_FROM_EMAIL = origFrom; else delete process.env.SUPPORT_FROM_EMAIL;
+    }
+  });
+
+  it("sendet Email erfolgreich ohne Sender/SourcePanel", async () => {
+    const origResend = process.env.RESEND_API_KEY;
+    const origFrom = process.env.SUPPORT_FROM_EMAIL;
+    const origFetch = global.fetch;
+    process.env.RESEND_API_KEY = "test-resend-key";
+    process.env.SUPPORT_FROM_EMAIL = "noreply@minimaster.de";
+    (global as any).fetch = jest.fn().mockResolvedValue({ ok: true });
+    try {
+      const wrapped = testEnv.wrap(fns.onSupportTicketUpdated);
+      const afterRef = {
+        update: jest.fn((upd: any) => {
+          Object.assign(state.supportTickets["ticket-1"], upd);
+          return Promise.resolve();
+        }),
+      };
+      const before = { data: () => ({ adminResponse: "", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }) };
+      const after = {
+        data: () => ({ adminResponse: "Neue Antwort", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }),
+        ref: afterRef,
+      };
+      const change = { before, after };
+      await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
+      expect(afterRef.update).toHaveBeenCalledWith(expect.objectContaining({ lastFollowUpEmailStatus: "sent" }));
+    } finally {
+      if (origResend !== undefined) process.env.RESEND_API_KEY = origResend; else delete process.env.RESEND_API_KEY;
+      if (origFrom !== undefined) process.env.SUPPORT_FROM_EMAIL = origFrom; else delete process.env.SUPPORT_FROM_EMAIL;
+      global.fetch = origFetch;
+    }
+  });
+
+  it("sendet Email — fetch wirft non-Error Objekt", async () => {
+    const origResend = process.env.RESEND_API_KEY;
+    const origFrom = process.env.SUPPORT_FROM_EMAIL;
+    const origFetch = global.fetch;
+    process.env.RESEND_API_KEY = "test-resend-key";
+    process.env.SUPPORT_FROM_EMAIL = "noreply@minimaster.de";
+    (global as any).fetch = jest.fn().mockRejectedValue("string-error");
+    try {
+      const wrapped = testEnv.wrap(fns.onSupportTicketUpdated);
+      const afterRef = {
+        update: jest.fn((upd: any) => {
+          Object.assign(state.supportTickets["ticket-1"], upd);
+          return Promise.resolve();
+        }),
+      };
+      const before = { data: () => ({ adminResponse: "", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }) };
+      const after = {
+        data: () => ({ adminResponse: "Neue Antwort", masterImei: "m1", problemDescription: "[ReplyTo] user@example.com" }),
+        ref: afterRef,
+      };
+      const change = { before, after };
+      await wrapped(change as any, { params: { ticketId: "ticket-1" } } as any);
+      expect(afterRef.update).toHaveBeenCalledWith(expect.objectContaining({ lastFollowUpEmailStatus: "failed" }));
+    } finally {
+      if (origResend !== undefined) process.env.RESEND_API_KEY = origResend; else delete process.env.RESEND_API_KEY;
+      if (origFrom !== undefined) process.env.SUPPORT_FROM_EMAIL = origFrom; else delete process.env.SUPPORT_FROM_EMAIL;
+      global.fetch = origFetch;
+    }
   });
 });

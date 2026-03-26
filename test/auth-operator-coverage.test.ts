@@ -378,3 +378,253 @@ describe("redeemOperatorAccessKey", () => {
     await expect(wrapped({ key: TEST_RAW_KEY }, asUser)).rejects.toThrow(/abgelaufen/);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// createOperatorAccessKey — falsy input branches (lines 137-140)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("createOperatorAccessKey — falsy input defaults (lines 137-140)", () => {
+  it("verwendet Standardwerte wenn role/ttlMinutes/label fehlen", async () => {
+    // Only keyHash provided — role defaults to "admin", ttlMinutes to 60, label to ""
+    const wrapped = testEnv.wrap(fns.createOperatorAccessKey);
+    const res = await wrapped({ keyHash: TEST_KEY_HASH }, asAdmin);
+    expect(res.keyId).toBeDefined();
+    expect(res.role).toBe("admin");
+    expect(res.expiresAtMs).toBeDefined();
+  });
+
+  it("verwendet Standardwerte mit numerischen/boolean Feldern statt strings", async () => {
+    const wrapped = testEnv.wrap(fns.createOperatorAccessKey);
+    const res = await wrapped({
+      keyHash: TEST_KEY_HASH,
+      role: 123, // not a string → default "admin"
+      ttlMinutes: "invalid" as any, // not a finite number → default 60
+      label: 456 as any, // not a string → default ""
+    }, asAdmin);
+    expect(res.keyId).toBeDefined();
+    expect(res.role).toBe("admin"); // default
+  });
+
+  it("wirft invalid-argument bei null data — deckt ?. Nullish-Chains (blocks 12-22)", async () => {
+    const wrapped = testEnv.wrap(fns.createOperatorAccessKey);
+    await expect(wrapped(null as any, asAdmin)).rejects.toThrow(/SHA-256/);
+  });
+
+  it("verwendet Fallback-callerRole wenn token.role kein String ist (block 28 br1)", async () => {
+    // token.role is undefined → callerRole defaults to "" → non-admin → needs bootstrap
+    const asNoRole = { auth: { uid: "u-norole", token: {} } };
+    const wrapped = testEnv.wrap(fns.createOperatorAccessKey);
+    // Without admin, tries bootstrap: if no admin users exist, allows admin key creation
+    (mockAuth.listUsers as jest.Mock).mockReset();
+    (mockAuth.listUsers as jest.Mock).mockResolvedValue({ users: [], pageToken: undefined });
+    const res = await wrapped({ keyHash: TEST_KEY_HASH }, asNoRole);
+    expect(res.keyId).toBeDefined();
+    expect(res.role).toBe("admin");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// redeemOperatorAccessKey — null data branches (blocks 33-34)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("redeemOperatorAccessKey — null data (blocks 33-34)", () => {
+  it("wirft invalid-argument bei null data — deckt data?.key Nullish-Chain", async () => {
+    const wrapped = testEnv.wrap(fns.redeemOperatorAccessKey);
+    await expect(wrapped(null as any, asUser)).rejects.toThrow(/Schlüssel/);
+  });
+
+  it("wirft invalid-argument bei numerischem key — deckt typeof data?.key !== string", async () => {
+    const wrapped = testEnv.wrap(fns.redeemOperatorAccessKey);
+    await expect(wrapped({ key: 12345 } as any, asUser)).rejects.toThrow(/Schlüssel/);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// resetOperatorAccounts — mockConfig truthy branches (lines 309-406)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("resetOperatorAccounts — with mockConfig (truthy ?.minimaster paths)", () => {
+  beforeEach(() => {
+    testEnv.mockConfig({
+      minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "recovery-123" },
+    });
+  });
+  afterEach(() => { testEnv.mockConfig({}); });
+
+  it("löscht Operator-Benutzer mit mockConfig (lines 309-406)", async () => {
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({
+      users: [
+        { uid: "op1", customClaims: { role: "support" } },
+        { uid: "op2", customClaims: { role: "auditor" } },
+      ],
+      pageToken: undefined,
+    });
+
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.deletedUsers).toBe(2);
+    expect(res.matchedUsers).toBe(2);
+  });
+
+  it("nich-admin Aufrufer wird gewarnt (line 329)", async () => {
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const asNonAdmin = { auth: { uid: "u1", token: { role: "support" } } };
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNonAdmin);
+    expect(res.success).toBe(true);
+  });
+
+  it("callerRole Fallback bei fehlendem token.role (line 315 blk67 br1)", async () => {
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const asNoRole = { auth: { uid: "u-norole", token: {} } };
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNoRole);
+    expect(res.success).toBe(true);
+  });
+
+  it("confirmText Fallback bei null data (line 333 blk72 br0)", async () => {
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    await expect(wrapped(null as any, asAdmin)).rejects.toThrow(/confirmText/);
+  });
+
+  it("verarbeitet deleteUser-Fehler und outer catch (lines 379, 397-406)", async () => {
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({
+      users: [{ uid: "fail-user", customClaims: { role: "admin" } }],
+      pageToken: undefined,
+    });
+    mockAuth.deleteUser.mockRejectedValueOnce(new Error("Delete failed"));
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin);
+    expect(res.failedUsers).toContain("fail-user");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// resetAllAuthUsers — mockConfig truthy branches (lines 440-589)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("resetAllAuthUsers — with mockConfig (truthy paths)", () => {
+  beforeEach(() => {
+    testEnv.mockConfig({
+      minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "recovery-token-abc" },
+    });
+  });
+  afterEach(() => { testEnv.mockConfig({}); });
+
+  it("löscht Benutzer mit Paginierung und mockConfig (lines 483-499,536)", async () => {
+    mockAuth.listUsers.mockReset();
+    let callNum = 0;
+    mockAuth.listUsers.mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) return Promise.resolve({ users: [
+        { uid: "a", customClaims: { role: "master" } },
+        { uid: "b", customClaims: {} },
+      ], pageToken: "more" });
+      return Promise.resolve({ users: [{ uid: "c", customClaims: {} }], pageToken: undefined });
+    });
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS", includeCurrentSessionUser: true }, asAdmin);
+    expect(res.success).toBe(true);
+    expect(res.deletedUsers).toBe(3);
+  });
+
+  it("überspringt aktuellen Caller (line 499)", async () => {
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({
+      users: [
+        { uid: "admin1", customClaims: { role: "admin" } },
+        { uid: "other", customClaims: {} },
+      ],
+      pageToken: undefined,
+    });
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asAdmin);
+    expect(res.deletedUsers).toBe(1);
+    expect(res.skippedCurrentSessionUsers).toContain("admin1");
+  });
+
+  it("akzeptiert Recovery-Token ohne Auth (lines 446-472)", async () => {
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const res = await wrapped({
+      confirmText: "RESET_ALL_AUTH_USERS",
+      recoveryToken: "recovery-token-abc",
+      requestId: "req-123",
+    }, { auth: undefined } as any);
+    expect(res.success).toBe(true);
+    expect(res.requestId).toBe("req-123");
+  });
+
+  it("wirft bei fehlendem Auth und ungültigem Recovery-Token (line 469)", async () => {
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    await expect(wrapped({
+      confirmText: "RESET_ALL_AUTH_USERS", recoveryToken: "wrong",
+    }, { auth: undefined } as any)).rejects.toThrow(/angemeldet|Recovery/i);
+  });
+
+  it("callerRole Fallback bei token.role nicht-String (blk 81+ callerRole)", async () => {
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const asNoRole = { auth: { uid: "nr1", token: {} } };
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asNoRole);
+    expect(res.success).toBe(true);
+  });
+
+  it("fängt config()-Fehler via K_CONFIGURATION (blk81 br1)", async () => {
+    const oldK = process.env.K_CONFIGURATION;
+    process.env.K_CONFIGURATION = "test";
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+      const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asAdmin);
+      expect(res.success).toBe(true);
+    } finally {
+      if (oldK !== undefined) process.env.K_CONFIGURATION = oldK;
+      else delete process.env.K_CONFIGURATION;
+    }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// resetAllAuthUsersHealth — mockConfig truthy branches (lines 637-658)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("resetAllAuthUsersHealth — mockConfig truthy (lines 637-658)", () => {
+  it("zeigt alle Felder mit vollständiger Config", async () => {
+    testEnv.mockConfig({
+      minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "token-xyz" },
+    });
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+      const res = await wrapped({ requestId: "health-1" }, asAdmin);
+      expect(res.reachable).toBe(true);
+      expect(res.requestId).toBe("health-1");
+      expect(res.resetEnabled).toBe(true);
+      expect(res.recoveryTokenConfigured).toBe(true);
+      expect(res.callerRole).toBe("admin");
+    } finally {
+      testEnv.mockConfig({});
+    }
+  });
+
+  it("zeigt recoveryTokenConfigured=false ohne Config-Token", async () => {
+    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "false" } });
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+      const res = await wrapped({}, asAdmin);
+      expect(res.recoveryTokenConfigured).toBe(false);
+    } finally {
+      testEnv.mockConfig({});
+    }
+  });
+});

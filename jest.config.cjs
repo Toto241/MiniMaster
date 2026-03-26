@@ -18,7 +18,7 @@ const config = {
   detectOpenHandles: true,
   collectCoverage: false,  // Disable coverage by default to save memory
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'cobertura'],
+  coverageReporters: ['text', 'lcov', 'cobertura', 'json'],
   coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
   coverageThreshold: {
     global: {

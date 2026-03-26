@@ -949,3 +949,160 @@ describe("resetAllAuthUsersHealth", () => {
     await expect(wrapped({}, {} as any)).rejects.toThrow(/angemeldet/i);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// mockConfig-basierte Tests: ?.minimaster truthy Branches (auth.ts lines 309,440,637-658)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("resetOperatorAccounts — mockConfig truthy ?.minimaster (lines 309-406)", () => {
+  beforeEach(() => {
+    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "recovery-abc" } });
+  });
+  afterEach(() => { testEnv.mockConfig({}); });
+
+  it("löscht via mockConfig runtimeFlag (line 309 ?.minimaster truthy)", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+
+    (mockAuth.listUsers as jest.Mock).mockReset();
+    (mockAuth.listUsers as jest.Mock).mockResolvedValue({
+      users: [{ uid: "op1", customClaims: { role: "support" } }],
+      pageToken: undefined,
+    });
+
+    try {
+      const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+      const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin);
+      expect(res.success).toBe(true);
+      expect(res.deletedUsers).toBe(1);
+    } finally {
+      if (oldEnable !== undefined) process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+    }
+  });
+
+  it("fängt deleteUser Fehler auf (lines 366-370)", async () => {
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+
+    (mockAuth.listUsers as jest.Mock).mockReset();
+    (mockAuth.listUsers as jest.Mock).mockResolvedValue({
+      users: [{ uid: "fail-op", customClaims: { role: "admin" } }],
+      pageToken: undefined,
+    });
+    (mockAuth.deleteUser as jest.Mock).mockRejectedValueOnce(new Error("Delete refused"));
+
+    const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin);
+    expect(res.failedUsers).toContain("fail-op");
+    expect(res.success).toBe(false);
+  });
+});
+
+describe("resetAllAuthUsers — mockConfig truthy ?.minimaster (lines 440-589)", () => {
+  beforeEach(() => {
+    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "recovery-abc" } });
+  });
+  afterEach(() => { testEnv.mockConfig({}); });
+
+  it("akzeptiert Recovery-Token ohne Auth via mockConfig (lines 446-472)", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+
+    (mockAuth.listUsers as jest.Mock).mockReset();
+    (mockAuth.listUsers as jest.Mock).mockResolvedValue({ users: [], pageToken: undefined });
+
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+      const res = await wrapped({
+        confirmText: "RESET_ALL_AUTH_USERS",
+        recoveryToken: "recovery-abc",
+        requestId: "req-rt-1",
+      }, { auth: undefined } as any);
+      expect(res.success).toBe(true);
+      expect(res.requestId).toBe("req-rt-1");
+    } finally {
+      if (oldEnable !== undefined) process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+    }
+  });
+
+  it("wirft bei ungültigem Recovery-Token ohne Auth (line 469)", async () => {
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+      await expect(wrapped({
+        confirmText: "RESET_ALL_AUTH_USERS",
+        recoveryToken: "wrong-token",
+      }, { auth: undefined } as any)).rejects.toThrow(/angemeldet|Recovery/i);
+    } finally {
+      if (oldEnable !== undefined) process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+    }
+  });
+
+  it("löscht mit Paginierung und includeCurrentSessionUser (lines 499,536)", async () => {
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    (mockAuth.listUsers as jest.Mock).mockReset();
+    let callCount = 0;
+    (mockAuth.listUsers as jest.Mock).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve({
+        users: [{ uid: "u1", customClaims: {} }, { uid: "u2", customClaims: {} }],
+        pageToken: "more",
+      });
+      return Promise.resolve({ users: [{ uid: "u3", customClaims: {} }], pageToken: undefined });
+    });
+
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const res = await wrapped({
+      confirmText: "RESET_ALL_AUTH_USERS",
+      includeCurrentSessionUser: true,
+    }, asAdmin);
+    expect(res.deletedUsers).toBe(3);
+  });
+
+  it("fängt deleteUser Fehler auf (line 521)", async () => {
+    process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    (mockAuth.listUsers as jest.Mock).mockReset();
+    (mockAuth.listUsers as jest.Mock).mockResolvedValue({
+      users: [{ uid: "bad-u", customClaims: {} }],
+      pageToken: undefined,
+    });
+    (mockAuth.deleteUser as jest.Mock).mockRejectedValueOnce(new Error("Auth delete error"));
+
+    const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+    const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asAdmin);
+    expect(res.failedUsers).toContain("bad-u");
+  });
+});
+
+describe("resetAllAuthUsersHealth — mockConfig truthy (lines 637-658)", () => {
+  it("zeigt Config-Werte mit vollständiger mockConfig (lines 637-658)", async () => {
+    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "tok123" } });
+    const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
+
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+      const res = await wrapped({ requestId: "health-cfg" }, asAdmin);
+      expect(res.reachable).toBe(true);
+      expect(res.requestId).toBe("health-cfg");
+      expect(res.resetEnabled).toBe(true);
+      expect(res.recoveryTokenConfigured).toBe(true);
+      expect(res.callerRole).toBe("admin");
+    } finally {
+      testEnv.mockConfig({});
+      if (oldEnable !== undefined) process.env.ENABLE_OPERATOR_ACCOUNT_RESET = oldEnable;
+    }
+  });
+
+  it("recoveryTokenConfigured false ohne Config-Token", async () => {
+    testEnv.mockConfig({ minimaster: {} });
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
+      const res = await wrapped({}, asAdmin);
+      expect(res.recoveryTokenConfigured).toBe(false);
+    } finally {
+      testEnv.mockConfig({});
+    }
+  });
+});
