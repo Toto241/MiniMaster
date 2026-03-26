@@ -88,6 +88,25 @@ Phased approach recommended: (1) Introduce families collection w/ deny rules lif
 - DSAR export and account deletion must cover compliance side-data in addition to the core profile domain, especially `masterLegalConsents`, `supportTickets`, `supportAccessGrants`, and user-scoped observability collections.
 - Audit and error logs are prepared for Firestore TTL rollout via per-document `ttl` timestamps; `performance_metrics` remains the next observability collection to align.
 
+## 5.1. Backend Module Overview
+
+The Cloud Functions backend is split into domain modules under `src/`:
+
+| Module | File | Purpose | Key Exports |
+|--------|------|---------|-------------|
+| **Auth** | `src/auth.ts` | Registration, token generation, operator key management, account reset | `registerMasterDevice`, `generateCustomToken`, `createOperatorAccessKey`, `redeemOperatorAccessKey`, `resetOperatorAccounts`, `resetAllAuthUsers` |
+| **Pairing** | `src/pairing.ts` | Master-child pairing via codes and tokens | `createPairingCode`, `validatePairingCode`, `generatePairingLink`, `validatePairingToken` |
+| **Rules** | `src/rules.ts` | Device lock, app blacklist, usage rules, heartbeat, FCM registration | `setDeviceLocked`, `updateAppBlacklist`, `setUsageRules`, `getRulesForChild`, `recordHeartbeat`, `registerFcmToken` |
+| **Tasks** | `src/tasks.ts` | Task CRUD and photo proof lifecycle | `createTask`, `completeTask`, `approveTask`, `rejectTask` |
+| **Subscription** | `src/subscription.ts` | Play Store purchase verification, subscription status, scheduled expiry | `verifyPurchase`, `getSubscriptionStatus`, `revokeSubscription`, `checkExpiredSubscriptions` |
+| **Support** | `src/support.ts` | AI-assisted tickets, debug access, email follow-up, scheduled grant cleanup | `createSupportTicket`, `grantDebugAccess`, `skipDebugMode`, `processUserReplyMessage`, `analyzeWithDebugData`, `getDebugInfo`, `onTicketCreated`, `onSupportTicketUpdated` |
+| **Legal** | `src/legal.ts` | GDPR consent, legal policy publishing, re-consent enforcement | `getActiveLegalPolicies`, `needsLegalReconsent`, `recordLegalConsent`, `publishLegalPolicy`, `markLegalReconsentRequired` |
+| **Admin** | `src/admin.ts` | Health check, error analysis, auto-fix, knowledge base, FCM testing | `adminHealthCheck`, `analyzeSystemErrors`, `executeAutoFix`, `getKnowledgeBase`, `updateKnowledgeBase`, `sendTestFcmMessage` |
+| **Triggers** | `src/triggers.ts` | Firestore-triggered FCM diff push, task photo analysis | `onChildDeviceUpdateV2`, `analyzeTaskPhoto`, `onTaskStatusChange` |
+| **Shared** | `src/shared.ts` | `requireAdmin()`, `AuditLogger`, role types | Internal utilities used by all modules |
+| **Entrypoint** | `index.ts` | Re-exports all callable functions + triggers | — |
+| **Init** | `firebase.ts` | Singleton Firebase Admin SDK (lazy getters: `db()`, `auth()`, `storage()`) | `db`, `auth`, `storage` |
+
 ## 6. Gaps & Future Work
 
 - Hardening of enforcement engine (OEM-specific behavior, bypass resistance, battery optimization handling)

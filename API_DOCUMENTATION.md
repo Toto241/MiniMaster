@@ -116,52 +116,17 @@ Registers a new master (parent) device in the system.
 }
 ```
 
-### 4. updateMasterDevice
+### 4. updateMasterDevice *(DEPRECATED — not exported)*
 
-Updates master device information including FCM token.
+> ⚠️ This function is no longer exported. Master device updates are handled via `registerMasterDevice` (upsert) and dedicated field-update functions.
 
-**Function Type**: `httpsCallable`
+### 5. registerChildDevice *(DEPRECATED — not exported)*
 
-**Parameters**:
-```typescript
-{
-  imei: string,           // Required: Master device IMEI
-  deviceName?: string,    // Optional: Updated device name
-  fcmToken?: string       // Optional: Updated FCM token
-}
-```
+> ⚠️ Child devices are registered via the pairing flow (`createPairingCode`/`validatePairingCode`/`validatePairingToken`).
 
-### 5. registerChildDevice
+### 6. updateChildDevice *(DEPRECATED — not exported)*
 
-Registers a new child device in the system.
-
-**Function Type**: `httpsCallable`
-
-**Parameters**:
-```typescript
-{
-  imei: string,           // Required: Child device IMEI
-  deviceName?: string,    // Optional: Human-readable device name
-  fcmToken?: string       // Optional: FCM token for push notifications
-}
-```
-
-### 6. updateChildDevice
-
-Updates child device information and settings.
-
-**Function Type**: `httpsCallable`
-
-**Parameters**:
-```typescript
-{
-  imei: string,           // Required: Child device IMEI
-  deviceName?: string,    // Optional: Updated device name
-  fcmToken?: string,      // Optional: Updated FCM token
-  isLocked?: boolean,     // Optional: Device lock status
-  allowedApps?: string[]  // Optional: Array of allowed app package names
-}
-```
+> ⚠️ Child device fields are updated via dedicated functions (`setDeviceLocked`, `updateAppBlacklist`, `setUsageRules`).
 
 ### 7. setDeviceLocked
 
@@ -482,6 +447,24 @@ Master rejects a submitted task. Transitions status from `pending_approval` → 
 
 ### generatePairingLink
 
+Generates a secure pairing link with a one-time token (5-minute validity).
+
+### validatePairingCode
+
+Validates a 6-digit pairing code and establishes the master-child relationship.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ code: string }` (6-digit numeric code)
+
+**Response**: `{ childId: string }` (legacy: returns masterImei as childId)
+
+**Errors**:
+- `invalid-argument`: Missing or non-6-digit code
+- `not-found`: No matching pairing code
+- `deadline-exceeded`: Code expired (>24h)
+- `resource-exhausted`: Free tier child limit reached
+
 Generates a UUID-based pairing token with 5-minute expiry.
 
 **Function Type**: `httpsCallable`
@@ -587,6 +570,93 @@ Revokes all refresh tokens for a user (security incident response).
 **Function Type**: `httpsCallable`
 
 **Parameters**: `{ uid: string }`
+
+### generateCustomToken
+
+Generates a Firebase custom token for authenticated session establishment.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ masterImei?: string, secretKey?: string }` (legacy) or authenticated context
+
+**Response**: `{ customToken: string }`
+
+**Errors**:
+- `unauthenticated`: No auth context and invalid/missing masterImei+secretKey
+- `failed-precondition`: Legacy login disabled (`DISABLE_LEGACY_SECRETKEY_AUTH=true`)
+- `internal`: Token generation failure
+
+### createOperatorAccessKey (Admin)
+
+Creates a one-time operator access key (SHA-256 hash stored). Non-admin callers may bootstrap if no admin exists.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  keyHash: string,         // Required: SHA-256 hex hash of the key (64 chars)
+  role?: string,           // Optional: "admin" | "support" | "auditor" (default: "admin")
+  ttlMinutes?: number,     // Optional: 1–10080 (default: 60)
+  label?: string           // Optional: Key label (max 120 chars)
+}
+```
+
+**Response**: `{ keyId: string, role: string, expiresAtMs: number }`
+
+**Errors**:
+- `unauthenticated`: No auth context
+- `invalid-argument`: Invalid keyHash format, role, or ttlMinutes
+- `permission-denied`: Non-admin caller when admin already exists
+
+### redeemOperatorAccessKey
+
+Redeems a one-time operator access key and sets the role claim on the authenticated user.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ key: string }` (raw key, min 43 chars)
+
+**Response**: `{ success: boolean, role: string, message: string }`
+
+**Errors**:
+- `unauthenticated`: No auth context
+- `invalid-argument`: Key too short
+- `permission-denied`: Unknown key hash
+- `failed-precondition`: Key already redeemed
+- `deadline-exceeded`: Key expired
+
+### resetOperatorAccounts (Admin)
+
+Resets all operator accounts (admin/support/auditor). Requires explicit confirmation and runtime flag.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ confirmText: "RESET_OPERATOR_ACCOUNTS" }`
+
+**Preconditions**: `ENABLE_OPERATOR_ACCOUNT_RESET=true` or emulator mode
+
+**Response**: `{ success: boolean, matchedUsers: number, deletedUsers: number, failedUsers: string[], accessKeysDeleted: number }`
+
+### resetAllAuthUsers (Admin)
+
+Emergency reset: deletes all Firebase Auth users except caller. Requires admin or recovery token.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ confirmText: "RESET_ALL_AUTH_USERS", requestId?: string, recoveryToken?: string }`
+
+**Response**: `{ success: boolean, requestId: string, matchedUsers: number, deletedUsers: number, failedUsers: string[], accessKeysDeleted: number }`
+
+### resetAllAuthUsersHealth (Admin)
+
+Health-check variant: reports how many users would be affected without deleting any.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ requestId?: string }`
+
+**Response**: `{ requestId: string, status: string, totalAuthUsers: number, operatorUsers: number, flags: object }`
 
 ## Support Functions
 
@@ -716,6 +786,14 @@ Returns the current debug snapshot for a ticket (requires active debug grant).
 ### onSupportTicketUpdated (Firestore Trigger)
 
 Wird bei Ticket-Updates ausgelöst und sendet bei geänderter `adminResponse` automatisch eine Rückfrage-/Antwort-E-Mail an die im Ticket enthaltene ReplyTo-Adresse.
+
+### onTicketCreated (Firestore Trigger)
+
+**Trigger**: `onCreate` auf `supportTickets/{ticketId}`
+
+**Purpose**: Initializes the AI support flow when a ticket is created. Runs an initial AI analysis, sets the ticket to `awaiting_debug_consent` state, and sends an FCM notification to the master if an FCM token is available.
+
+**Ticket fields set**: `aiGeneratedSolution`, `aiConfidenceScore`, `aiSolutionStatus`, `conversationStatus`, `aiModel`, `status`
 
 **Trigger**: `onUpdate` auf `supportTickets/{ticketId}`
 
@@ -920,9 +998,39 @@ Read/write the AI support knowledge base. Firestore-first, file fallback.
 
 Send test FCM push to a token or child device. **Parameters**: `{ token?: string, childId?: string }`
 
+### testGeminiConnection (Admin)
+
+Tests connectivity to the Gemini API. Returns model info and a test completion result.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: None
+
+**Response**: `{ success: boolean, provider: string, model: string, testResponse?: string }`
+
 ### triggerScheduledJob
 
 Manually trigger scheduled jobs: `checkExpiredSubscriptions`, `cleanupExpiredGrants`, `sendDailyErrorReport`.
+
+## Scheduled Functions
+
+### checkExpiredSubscriptions
+
+**Schedule**: Pubsub (`every 24 hours`)
+
+Checks all subscriptions and expires those past their `expiresAt` timestamp. Updates subscription status and logs results.
+
+### cleanupExpiredGrants
+
+**Schedule**: Pubsub (`every 1 hours`)
+
+Revokes expired support access grants. Updates grant status to `expired` and logs cleanup activity.
+
+### sendDailyErrorReport
+
+**Schedule**: Pubsub (`every 24 hours`)
+
+Aggregates system errors from the last 24h and sends a summary report to admin.
 
 ---
 
