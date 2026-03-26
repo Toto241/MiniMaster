@@ -101,6 +101,32 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildFirebaseRecoveryCommands,",
     "  buildFirebaseRecoveryScript,",
     "  isRetryableFirebaseQueueConflict,",
+    "  buildPlausibilityFindings,",
+    "  computeGoLiveStatusFromData,",
+    "  renderCallableDebugInfo,",
+    "  getWizardState,",
+    "  saveWizardState,",
+    "  getPlatformReadiness,",
+    "  updatePlatformReadiness,",
+    "  getPlayStoreReadinessState,",
+    "  setPlayStoreReadinessState,",
+    "  getCommissioningAttestations,",
+    "  buildPythonEvidenceFilterToolbar,",
+    "  platformReadinessItems,",
+    "  buildCommandCatalog,",
+    "  buildRolloutBundleScript,",
+    "  buildPrioritizedActionPlanFromData,",
+    "  getP0BlockCompletion,",
+    "  getP0BlockerCockpitState,",
+    "  setP0BlockerCockpitState,",
+    "  autoSyncP0FromExistingSignals,",
+    "  loadCommandBuilderConfig,",
+    "  getPythonAutomationTestStatus,",
+    "  getLatestPythonAutomationEvidence,",
+    "  findPythonAutomationTestById,",
+    "  setPythonAutomationEvidenceCache,",
+    "  commissioningAttestationItems,",
+    "  defaultCommandBuilderConfig,",
     "};",
   ].join("\n");
 
@@ -565,5 +591,626 @@ describe("admin-panel helper functions", () => {
     expect(exports.isRetryableFirebaseQueueConflict("firebase deploy", "HTTP Error: 409", 0)).toBe(false);
     expect(exports.isRetryableFirebaseQueueConflict("npm install", "HTTP Error: 409", 1)).toBe(false);
     expect(exports.isRetryableFirebaseQueueConflict("firebase deploy", "Success", 1)).toBe(false);
+  });
+
+  // ── renderCallableDebugInfo ──
+  it("renders callable debug info HTML with error details", () => {
+    const { exports } = loadAdminPanelTestExports();
+    // escapeHtml uses DOM textContent→innerHTML which is a no-op in mock,
+    // so we verify structure rather than escaped content
+    const html = exports.renderCallableDebugInfo(
+      { code: "functions/not-found", message: "Doc missing", details: { docId: "abc" } },
+      { functionName: "getChild", requestId: "req-123" },
+    );
+    expect(html).toContain("Debug-Info");
+    expect(html).toContain("Funktion:");
+    expect(html).toContain("Request-ID:");
+    expect(html).toContain("Fehlercode (normalisiert):");
+    expect(html).toContain("Server-Details");
+
+    const minimal = exports.renderCallableDebugInfo({});
+    expect(minimal).toContain("Debug-Info");
+    expect(minimal).not.toContain("Server-Details");
+  });
+
+  // ── buildPlausibilityFindings ──
+  it("detects cross-platform plausibility inconsistencies", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    // lock/unlock without accessibility → error
+    const findings1 = exports.buildPlausibilityFindings(
+      {},
+      { "ma-lock-unlock": true },
+      {},
+      {},
+    );
+    expect(findings1.some((f: any) => f.severity === "error" && f.text.includes("AccessibilityService"))).toBe(true);
+
+    // app-blocking without overlay security → error
+    const findings2 = exports.buildPlausibilityFindings(
+      {},
+      { "ca-app-blocking-effective": true },
+      {},
+      {},
+    );
+    expect(findings2.some((f: any) => f.severity === "error" && f.text.includes("Overlay"))).toBe(true);
+    expect(findings2.some((f: any) => f.severity === "error" && f.text.includes("Deinstallationsschutz"))).toBe(true);
+
+    // accessibility without settings protection → error
+    const findings3 = exports.buildPlausibilityFindings(
+      {},
+      { "ca-accessibility-active": true },
+      {},
+      {},
+    );
+    expect(findings3.some((f: any) => f.severity === "error" && f.text.includes("Settings-Schutz"))).toBe(true);
+
+    // auto-update without code-signing → error
+    const findings4 = exports.buildPlausibilityFindings(
+      {},
+      { "dt-auto-update": true },
+      {},
+      {},
+    );
+    expect(findings4.some((f: any) => f.severity === "error" && f.text.includes("Code-Signing"))).toBe(true);
+
+    // AI provider without keyRef → warning
+    const findings5 = exports.buildPlausibilityFindings(
+      {},
+      {},
+      { ai: { provider: "gemini" } },
+      {},
+    );
+    expect(findings5.some((f: any) => f.severity === "warn" && f.text.includes("Secret-Referenz"))).toBe(true);
+
+    // all consistent → ok
+    const findings6 = exports.buildPlausibilityFindings({}, {}, {}, {});
+    expect(findings6).toHaveLength(1);
+    expect(findings6[0].severity).toBe("ok");
+  });
+
+  it("detects attestation vs platform state mismatches", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const findings = exports.buildPlausibilityFindings(
+      {
+        "android-master-registered": true,
+        "android-child-registered": true,
+        "parent-panel-verified": true,
+        "device-sync-verified": true,
+      },
+      {},
+      {},
+      {},
+    );
+    expect(findings.filter((f: any) => f.severity === "warn").length).toBeGreaterThanOrEqual(4);
+    expect(findings.some((f: any) => f.text.includes("Registrierungs-Flow"))).toBe(true);
+    expect(findings.some((f: any) => f.text.includes("Pairing-Flow"))).toBe(true);
+    expect(findings.some((f: any) => f.text.includes("Desktop-Login"))).toBe(true);
+    expect(findings.some((f: any) => f.text.includes("FCM-Sync"))).toBe(true);
+  });
+
+  it("detects FCM chain break and subscription enforcement gap", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const findings = exports.buildPlausibilityFindings(
+      {},
+      { "ma-fcm-working": true, "ma-subscription-check": true },
+      {},
+      {},
+    );
+    expect(findings.some((f: any) => f.severity === "error" && f.text.includes("Push-Kette"))).toBe(true);
+    expect(findings.some((f: any) => f.severity === "warn" && f.text.includes("Free-Tier-Limit"))).toBe(true);
+  });
+
+  it("detects desktop credential security gap", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const findings = exports.buildPlausibilityFindings(
+      {},
+      { "dt-parent-panel-login": true },
+      {},
+      {},
+    );
+    expect(findings.some((f: any) => f.severity === "error" && f.text.includes("Credentials unsicher"))).toBe(true);
+  });
+
+  // ── computeGoLiveStatusFromData ──
+  it("returns red ampel when backend validation is missing", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const result = exports.computeGoLiveStatusFromData(
+      ["Missing item"],
+      {},
+      { checks: {}, privacyUrl: "", supportEmail: "" },
+      null,
+    );
+    expect(result.ampel).toBe("red");
+    expect(result.backendReady).toBe(false);
+    expect(result.allAttestationsOk).toBe(false);
+  });
+
+  it("returns red ampel when critical platform items are open", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const validation = {
+      errorCount: 0,
+      checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true },
+    };
+    const result = exports.computeGoLiveStatusFromData(
+      [],
+      {}, // no platform items done
+      { checks: {}, privacyUrl: "", supportEmail: "" },
+      validation,
+    );
+    expect(result.ampel).toBe("red");
+    expect(result.backendReady).toBe(true);
+    expect(result.ampelDescription).toContain("kritische");
+  });
+
+  it("returns yellow ampel when backend + critical OK but high items open", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const validation = {
+      errorCount: 0,
+      checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true },
+    };
+    // mark all critical platform items as done, but leave high/medium undone
+    const platformState: Record<string, boolean> = {};
+    for (const platform of Object.values(exports.platformReadinessItems)) {
+      for (const item of (platform as any).items) {
+        if (item.severity === "critical") {
+          platformState[item.key] = true;
+        }
+      }
+    }
+    const playStore = {
+      checks: { dataSafety: true, iarc: true, listing: true, privacyUrlLinked: true, permissionsDeclaration: true, appAccessGuide: true, securityRotationDone: true, goNoGoSignedOff: true },
+      privacyUrl: "https://example.com/privacy",
+      supportEmail: "support@example.com",
+    };
+    const result = exports.computeGoLiveStatusFromData([], platformState, playStore, validation);
+    expect(result.ampel).toBe("yellow");
+    expect(result.ampelLabel).toBe("Teilweise bereit");
+  });
+
+  it("returns green ampel when everything is complete", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const validation = {
+      errorCount: 0,
+      checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true },
+    };
+    const platformState: Record<string, boolean> = {};
+    for (const platform of Object.values(exports.platformReadinessItems)) {
+      for (const item of (platform as any).items) {
+        platformState[item.key] = true;
+      }
+    }
+    const playStore = {
+      checks: { dataSafety: true, iarc: true, listing: true, privacyUrlLinked: true, permissionsDeclaration: true, appAccessGuide: true, securityRotationDone: true, goNoGoSignedOff: true },
+      privacyUrl: "https://example.com/privacy",
+      supportEmail: "support@example.com",
+    };
+    const result = exports.computeGoLiveStatusFromData([], platformState, playStore, validation);
+    expect(result.ampel).toBe("green");
+    expect(result.ampelLabel).toBe("Go-Live freigegeben");
+    expect(result.playStoreReady).toBe(true);
+    expect(result.totals.doneAll).toBe(result.totals.totalAll);
+  });
+
+  it("returns yellow with play store hint when play store not ready", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const validation = {
+      errorCount: 0,
+      checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true },
+    };
+    const platformState: Record<string, boolean> = {};
+    for (const platform of Object.values(exports.platformReadinessItems)) {
+      for (const item of (platform as any).items) {
+        platformState[item.key] = true;
+      }
+    }
+    const playStore = {
+      checks: { dataSafety: true },
+      privacyUrl: "",
+      supportEmail: "",
+    };
+    const result = exports.computeGoLiveStatusFromData([], platformState, playStore, validation);
+    expect(result.ampel).toBe("yellow");
+    expect(result.playStoreReady).toBe(false);
+    expect(result.ampelDescription).toContain("Play-Store");
+  });
+
+  // ── Wizard State (localStorage-basiert) ──
+  it("manages wizard state through localStorage", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const initial = exports.getWizardState("masterApp");
+    expect(initial).toEqual({ currentStep: 0, completed: {} });
+
+    exports.saveWizardState("masterApp", { currentStep: 2, completed: { 0: true, 1: true } });
+    const saved = exports.getWizardState("masterApp");
+    expect(saved.currentStep).toBe(2);
+    expect(saved.completed[0]).toBe(true);
+    expect(saved.completed[1]).toBe(true);
+
+    const other = exports.getWizardState("childApp");
+    expect(other).toEqual({ currentStep: 0, completed: {} });
+  });
+
+  // ── Platform readiness state ──
+  it("manages platform readiness through localStorage", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const initial = exports.getPlatformReadiness();
+    expect(initial).toEqual({});
+
+    exports.updatePlatformReadiness({ "ma-registration-flow": true, "ma-pairing-works": true });
+    const updated = exports.getPlatformReadiness();
+    expect(updated["ma-registration-flow"]).toBe(true);
+    expect(updated["ma-pairing-works"]).toBe(true);
+  });
+
+  // ── PlayStore readiness state ──
+  it("manages Play Store readiness state through localStorage", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const initial = exports.getPlayStoreReadinessState();
+    expect(initial.checks.dataSafety).toBe(false);
+    expect(initial.privacyUrl).toBe("");
+
+    exports.setPlayStoreReadinessState({
+      checks: { dataSafety: true, iarc: false, listing: false, privacyUrlLinked: false, permissionsDeclaration: false, appAccessGuide: false, securityRotationDone: false, goNoGoSignedOff: false },
+      privacyUrl: "https://example.com/privacy",
+      supportEmail: "test@example.com",
+      listingUrl: "",
+      releaseNotes: "",
+      updatedAt: null,
+    });
+    const updated = exports.getPlayStoreReadinessState();
+    expect(updated.checks.dataSafety).toBe(true);
+    expect(updated.privacyUrl).toBe("https://example.com/privacy");
+  });
+
+  // ── buildPythonEvidenceFilterToolbar ──
+  it("builds evidence filter toolbar HTML from entries", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const entries = [
+      { testId: "test-1", testTitle: "Prüffall A" },
+      { testId: "test-2", testTitle: "Prüffall B" },
+      { testId: "test-1", testTitle: "Prüffall A" }, // duplicate
+      { testId: null },
+    ];
+    const html = exports.buildPythonEvidenceFilterToolbar(entries);
+    expect(html).toContain("python-evidence-filter-bar");
+    expect(html).toContain("Alle");
+    expect(html).toContain("Pass");
+    expect(html).toContain("Fail");
+
+    const emptyHtml = exports.buildPythonEvidenceFilterToolbar([]);
+    expect(emptyHtml).toContain("python-evidence-filter-bar");
+
+    const nullHtml = exports.buildPythonEvidenceFilterToolbar(null);
+    expect(nullHtml).toContain("python-evidence-filter-bar");
+  });
+
+  // ── computeGoLiveStatus platform totals verification ──
+  it("correctly counts platform items by severity", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const result = exports.computeGoLiveStatusFromData(
+      [],
+      {},
+      { checks: {}, privacyUrl: "", supportEmail: "" },
+      null,
+    );
+    // Verify platform status has all 3 platforms
+    expect(result.platformStatus.masterApp).toBeDefined();
+    expect(result.platformStatus.childApp).toBeDefined();
+    expect(result.platformStatus.desktop).toBeDefined();
+
+    // All percents should be 0% since no items done
+    expect(result.platformStatus.masterApp.percent).toBe(0);
+    expect(result.platformStatus.childApp.percent).toBe(0);
+    expect(result.platformStatus.desktop.percent).toBe(0);
+
+    // Totals should be > 0
+    expect(result.totals.totalAll).toBeGreaterThan(40);
+    expect(result.totals.totalCritical).toBeGreaterThan(10);
+    expect(result.totals.doneAll).toBe(0);
+  });
+
+  // ── buildCommandCatalog ──
+  it("generates command catalog with sanitized parameters", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const commands = exports.buildCommandCatalog("my-project");
+    expect(Array.isArray(commands)).toBe(true);
+    expect(commands.length).toBeGreaterThan(30);
+
+    // Every entry must have required fields
+    for (const cmd of commands) {
+      expect(cmd.id).toBeDefined();
+      expect(cmd.label).toBeDefined();
+      expect(cmd.command).toBeDefined();
+    }
+
+    // Project suffix should appear in deploy commands
+    const deployFull = commands.find((c: any) => c.id === "firebase-deploy-full");
+    expect(deployFull).toBeDefined();
+    expect(deployFull.command).toContain("my-project");
+
+    // ADB commands should exist
+    const adbDevices = commands.find((c: any) => c.id === "android-adb-devices");
+    expect(adbDevices).toBeDefined();
+    expect(adbDevices.command).toContain("adb devices");
+
+    // Preflight installs
+    const preflight = commands.find((c: any) => c.id === "preflight-install");
+    expect(preflight.command).toContain("npm install");
+    expect(preflight.command).toContain("npm test");
+  });
+
+  it("generates command catalog with fallback project from firebaseConfig", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const commands = exports.buildCommandCatalog("");
+    const deployFunctions = commands.find((c: any) => c.id === "firebase-deploy-functions");
+    expect(deployFunctions).toBeDefined();
+    // Falls back to firebaseConfig.projectId ("your-project-id")
+    expect(deployFunctions.command).toContain("your-project-id");
+  });
+
+  // ── buildRolloutBundleScript ──
+  it("builds rollout bundle script with header and command blocks", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const script = exports.buildRolloutBundleScript("test-proj");
+    expect(script).toContain("$ErrorActionPreference");
+    expect(script).toContain("MiniMaster Rollout Bundle");
+    expect(script).toContain("Set-Location");
+    // Should contain command blocks from the catalog
+    expect(script).toContain("Projekt vorbereiten");
+    expect(script).toContain("Firebase CLI");
+  });
+
+  // ── buildPrioritizedActionPlanFromData ──
+  it("generates empty action plan when everything is complete", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const validation = {
+      checks: {
+        adminAuthOk: true,
+        functionsReachable: true,
+        firestoreAccessOk: true,
+        storageHealthOk: true,
+        webControlConfigReady: true,
+      },
+    };
+    const platformState: Record<string, boolean> = {};
+    for (const platform of Object.values(exports.platformReadinessItems)) {
+      for (const item of (platform as any).items) {
+        platformState[item.key] = true;
+      }
+    }
+    const playStore = {
+      checks: { dataSafety: true, iarc: true, listing: true, privacyUrlLinked: true, permissionsDeclaration: true, appAccessGuide: true, securityRotationDone: true, goNoGoSignedOff: true },
+      privacyUrl: "https://example.com/privacy",
+      supportEmail: "test@example.com",
+    };
+    const plan = exports.buildPrioritizedActionPlanFromData(validation, platformState, playStore, []);
+    expect(plan).toHaveLength(0);
+  });
+
+  it("generates prioritized steps sorted by severity", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const plan = exports.buildPrioritizedActionPlanFromData(
+      null, // no validation → critical step
+      {},   // no platform items → many steps
+      { checks: {}, privacyUrl: "", supportEmail: "" }, // play store incomplete
+      [{ key: "test-att", label: "Test Attestation" }], // one missing attestation
+    );
+    expect(plan.length).toBeGreaterThan(10);
+
+    // First step must be critical (highest severity)
+    expect(plan[0].severity).toBe("critical");
+    expect(plan[0].order).toBe(1);
+
+    // Must contain backend validation missing step
+    expect(plan.some((s: any) => s.id === "backend-validation-missing")).toBe(true);
+
+    // Must be deduplicated and ordered
+    const ids = plan.map((s: any) => s.id);
+    expect(ids.length).toBe(new Set(ids).size);
+
+    // Verify severity ordering: critical before high before medium
+    let lastWeight = Infinity;
+    for (const step of plan) {
+      const w = exports.getPriorityWeight(step.severity);
+      expect(w).toBeLessThanOrEqual(lastWeight);
+      if (w < lastWeight) lastWeight = w;
+    }
+  });
+
+  it("action plan includes play store steps when checks missing", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const validation = {
+      checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true, storageHealthOk: true, webControlConfigReady: true },
+    };
+    const platformState: Record<string, boolean> = {};
+    for (const platform of Object.values(exports.platformReadinessItems)) {
+      for (const item of (platform as any).items) {
+        platformState[item.key] = true;
+      }
+    }
+    const plan = exports.buildPrioritizedActionPlanFromData(
+      validation,
+      platformState,
+      { checks: { dataSafety: false }, privacyUrl: "", supportEmail: "" },
+      [],
+    );
+    expect(plan.some((s: any) => s.id === "playstore-dataSafety")).toBe(true);
+    expect(plan.some((s: any) => s.id === "playstore-privacy-url-value")).toBe(true);
+    expect(plan.some((s: any) => s.id === "playstore-support-email-value")).toBe(true);
+  });
+
+  // ── getP0BlockCompletion ──
+  it("computes P0 blocker completion from state checks", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const empty = exports.getP0BlockCompletion({ checks: {} });
+    expect(empty.completedBlocks).toBe(0);
+    expect(empty.totalBlocks).toBe(4);
+    expect(empty.allDone).toBe(false);
+    expect(empty.blocks.security).toBe(false);
+
+    const partial = exports.getP0BlockCompletion({
+      checks: {
+        keyRotationDone: true,
+        keyRestrictionsDone: true,
+        rosterAssigned: true,
+      },
+    });
+    expect(partial.blocks.security).toBe(true);
+    expect(partial.blocks.roster).toBe(true);
+    expect(partial.blocks.playConsole).toBe(false);
+    expect(partial.completedBlocks).toBe(2);
+
+    const full = exports.getP0BlockCompletion({
+      checks: {
+        keyRotationDone: true, keyRestrictionsDone: true,
+        playDataSafety: true, playIarc: true, playListing: true, playPermissions: true, playAppAccess: true,
+        commissioningAndroid: true, commissioningAi: true, commissioningSupport: true, commissioningCompliance: true,
+        rosterAssigned: true,
+      },
+    });
+    expect(full.allDone).toBe(true);
+    expect(full.completedBlocks).toBe(4);
+  });
+
+  // ── P0 Blocker Cockpit State (localStorage) ──
+  it("manages P0 blocker cockpit state through localStorage", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const initial = exports.getP0BlockerCockpitState();
+    expect(initial.checks.keyRotationDone).toBe(false);
+    expect(initial.checks.rosterAssigned).toBe(false);
+    expect(initial.notes).toBe("");
+
+    exports.setP0BlockerCockpitState({
+      checks: { ...initial.checks, keyRotationDone: true, rosterAssigned: true },
+      keyEvidence: "Rotiert am 2026-03-20",
+      notes: "Test",
+      updatedAt: "2026-03-20T10:00:00Z",
+    });
+    const updated = exports.getP0BlockerCockpitState();
+    expect(updated.checks.keyRotationDone).toBe(true);
+    expect(updated.checks.rosterAssigned).toBe(true);
+    expect(updated.keyEvidence).toBe("Rotiert am 2026-03-20");
+    expect(updated.notes).toBe("Test");
+  });
+
+  // ── autoSyncP0FromExistingSignals ──
+  it("syncs P0 blocker checks from Play Store and attestation signals", () => {
+    const { exports } = loadAdminPanelTestExports();
+    // Set up Play Store with some checks done
+    exports.setPlayStoreReadinessState({
+      checks: { dataSafety: true, iarc: true, listing: false, privacyUrlLinked: false, permissionsDeclaration: true, appAccessGuide: true, securityRotationDone: true, goNoGoSignedOff: false },
+      privacyUrl: "https://example.com/p",
+      supportEmail: "s@e.com",
+    });
+
+    const synced = exports.autoSyncP0FromExistingSignals();
+    expect(synced.checks.playDataSafety).toBe(true);
+    expect(synced.checks.playIarc).toBe(true);
+    expect(synced.checks.playPermissions).toBe(true);
+    expect(synced.checks.playAppAccess).toBe(true);
+    expect(synced.checks.keyRotationDone).toBe(true);
+    // listing was false → should not sync
+    expect(synced.checks.playListing).toBe(false);
+  });
+
+  // ── loadCommandBuilderConfig ──
+  it("loads command builder config with defaults from localStorage", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const config = exports.loadCommandBuilderConfig();
+    expect(config.workspacePath).toBe(exports.defaultCommandBuilderConfig.workspacePath);
+    expect(config.masterApkPath).toContain("masterApp");
+    expect(config.childApkPath).toContain("childApp");
+  });
+
+  it("merges stored command builder config with defaults", () => {
+    const { exports } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({ workspacePath: "D:\\Custom\\Path", firstAdminEmail: "admin@test.de" }),
+    });
+    const config = exports.loadCommandBuilderConfig();
+    expect(config.workspacePath).toBe("D:\\Custom\\Path");
+    expect(config.firstAdminEmail).toBe("admin@test.de");
+    // Defaults should still fill in the rest
+    expect(config.masterApkPath).toContain("masterApp");
+  });
+
+  // ── getPythonAutomationTestStatus ──
+  it("returns mapped status when run index has entry", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const runIndex = new Map([["test-1", { status: "pass", details: "OK", source: "evaluation" }]]);
+    const result = exports.getPythonAutomationTestStatus({ id: "test-1" }, {}, runIndex);
+    expect(result.status).toBe("pass");
+    expect(result.source).toBe("evaluation");
+  });
+
+  it("returns evidence status when no run index but evidence exists", () => {
+    const { exports } = loadAdminPanelTestExports();
+    exports.setPythonAutomationEvidenceCache({
+      entries: [{ testId: "ev-1", status: "pass", details: "Manueller Nachweis" }],
+      latestByTestId: { "ev-1": { testId: "ev-1", status: "pass", details: "Manueller Nachweis", createdAt: "2026-03-20" } },
+    });
+    const runIndex = new Map();
+    const result = exports.getPythonAutomationTestStatus({ id: "ev-1" }, null, runIndex);
+    expect(result.status).toBe("pass");
+    expect(result.source).toBe("evidence");
+    expect(result.evidence).toBeDefined();
+  });
+
+  it("returns not_run for documented tests without evidence", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const runIndex = new Map();
+    const result = exports.getPythonAutomationTestStatus(
+      { id: "undocumented-1", automationType: "documented", source: "manual" },
+      null,
+      runIndex,
+    );
+    expect(result.status).toBe("not_run");
+    expect(result.details).toContain("Dokumentierter Testplan");
+  });
+
+  it("returns not_run for command tests when commands not executed", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const runIndex = new Map();
+    const run = { commands: { executed: false }, finishedAt: "2026-03-20" };
+    const result = exports.getPythonAutomationTestStatus(
+      { id: "cmd-1", automationType: "command", source: "cli" },
+      run,
+      runIndex,
+    );
+    expect(result.status).toBe("not_run");
+    expect(result.details).toContain("deaktiviert");
+  });
+
+  it("returns not_run with fallback for command tests when executed but not reached", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const runIndex = new Map();
+    const run = { commands: { executed: true }, finishedAt: "2026-03-20" };
+    const result = exports.getPythonAutomationTestStatus(
+      { id: "cmd-2", automationType: "command", source: "cli" },
+      run,
+      runIndex,
+    );
+    expect(result.status).toBe("not_run");
+    expect(result.details).toContain("Fail-Fast");
+  });
+
+  // ── findPythonAutomationTestById ──
+  it("returns null for missing test id or empty catalog", () => {
+    const { exports } = loadAdminPanelTestExports();
+    expect(exports.findPythonAutomationTestById(null)).toBeNull();
+    expect(exports.findPythonAutomationTestById("nonexistent")).toBeNull();
+  });
+
+  // ── commissioningAttestationItems constant ──
+  it("has commissioning attestation items with required fields", () => {
+    const { exports } = loadAdminPanelTestExports();
+    expect(Array.isArray(exports.commissioningAttestationItems)).toBe(true);
+    expect(exports.commissioningAttestationItems.length).toBeGreaterThan(5);
+    for (const item of exports.commissioningAttestationItems) {
+      expect(item.key).toBeDefined();
+      expect(item.label).toBeDefined();
+      expect(typeof item.key).toBe("string");
+      expect(typeof item.label).toBe("string");
+    }
   });
 });
