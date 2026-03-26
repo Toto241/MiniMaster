@@ -1955,12 +1955,8 @@ function getPriorityWeight(severity) {
     return 50;
 }
 
-function buildPrioritizedActionPlan() {
-    const validation = commissioningSummary?.validationSummary || null;
+function buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, missingAttestations) {
     const validationChecks = validation?.checks || {};
-    const platformState = getPlatformReadiness();
-    const playStoreState = getPlayStoreReadinessState();
-    const missingAttestations = commissioningAttestationItems.filter(item => !getCommissioningAttestations()[item.key]);
     const steps = [];
 
     const playStoreChecks = [
@@ -2130,6 +2126,14 @@ function buildPrioritizedActionPlan() {
     }));
 }
 
+function buildPrioritizedActionPlan() {
+    const validation = commissioningSummary?.validationSummary || null;
+    const platformState = getPlatformReadiness();
+    const playStoreState = getPlayStoreReadinessState();
+    const missingAttestations = commissioningAttestationItems.filter(item => !getCommissioningAttestations()[item.key]);
+    return buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, missingAttestations);
+}
+
 function renderPrioritizedActionPlan() {
     const container = document.getElementById("prioritized-action-plan");
     if (!container) return;
@@ -2250,13 +2254,7 @@ const platformReadinessItems = {
     },
 };
 
-function computeGoLiveStatus() {
-    const attestations = getCommissioningAttestations();
-    const missingAttestations = getMissingAttestations();
-    const platformState = getPlatformReadiness();
-    const playStoreState = getPlayStoreReadinessState();
-    const validation = commissioningSummary?.validationSummary || null;
-
+function computeGoLiveStatusFromData(missingAttestations, platformState, playStoreState, validation) {
     const backendReady = validation
         ? (validation.errorCount === 0 && validation.checks.adminAuthOk && validation.checks.functionsReachable && validation.checks.firestoreAccessOk)
         : false;
@@ -2328,6 +2326,14 @@ function computeGoLiveStatus() {
         platformStatus,
         totals: { totalAll, doneAll, totalCritical, doneCritical, totalHigh, doneHigh, playChecksTotal, playChecksDone },
     };
+}
+
+function computeGoLiveStatus() {
+    const missingAttestations = getMissingAttestations();
+    const platformState = getPlatformReadiness();
+    const playStoreState = getPlayStoreReadinessState();
+    const validation = commissioningSummary?.validationSummary || null;
+    return computeGoLiveStatusFromData(missingAttestations, platformState, playStoreState, validation);
 }
 
 function renderGoLiveAmpel() {
@@ -2461,14 +2467,8 @@ function renderAllPlatformSections() {
 
 // ==================== PLAUSIBILITÄTSPRÜFUNG ====================
 
-function runPlausibilityCheck() {
-    const container = document.getElementById("plausibility-results");
-    if (!container) return;
-
+function buildPlausibilityFindings(attestations, platformState, config, validationChecks) {
     const findings = [];
-    const attestations = getCommissioningAttestations();
-    const platformState = getPlatformReadiness();
-    const config = typeof getOperatorConfigFormValues === "function" ? getOperatorConfigFormValues() : {};
 
     // Cross-Platform-Plausibilität
     if (attestations["android-master-registered"] && !platformState["ma-registration-flow"]) {
@@ -2538,7 +2538,6 @@ function runPlausibilityCheck() {
     }
 
     // Backend ↔ App-Konsistenz
-    const validationChecks = commissioningSummary?.validationSummary?.checks || {};
     if (validationChecks.functionsReachable && !platformState["ma-pairing-works"]) {
         findings.push({ severity: "info", text: "Backend-Functions erreichbar, aber MasterApp-Pairing noch nicht getestet." });
     }
@@ -2550,6 +2549,19 @@ function runPlausibilityCheck() {
         findings.push({ severity: "ok", text: "Keine Plausibilitäts-Widersprüche erkannt. Alle Angaben sind konsistent." });
     }
 
+    return findings;
+}
+
+function runPlausibilityCheck() {
+    const container = document.getElementById("plausibility-results");
+    if (!container) return;
+
+    const attestations = getCommissioningAttestations();
+    const platformState = getPlatformReadiness();
+    const config = typeof getOperatorConfigFormValues === "function" ? getOperatorConfigFormValues() : {};
+    const validationChecks = commissioningSummary?.validationSummary?.checks || {};
+
+    const findings = buildPlausibilityFindings(attestations, platformState, config, validationChecks);
     const html = findings.map(f => {
         const icon = f.severity === "error" ? "🔴" : f.severity === "warn" ? "🟡" : f.severity === "info" ? "🔵" : "🟢";
         return `<div class="plausibility-item plausibility-${f.severity}">${icon} ${escapeHtml(f.text)}</div>`;
