@@ -420,8 +420,23 @@ export const resetOperatorAccounts = functions.https.onCall(
 export const resetAllAuthUsers = functions.https.onCall(
   async (data: { confirmText?: string; requestId?: string; includeCurrentSessionUser?: boolean; recoveryToken?: string }, context: CallableContext) => {
     const startTime = Date.now();
+    functions.logger.info("resetAllAuthUsers ENTRY — function invoked.", {
+      hasAuth: !!context.auth,
+      callerUid: context.auth?.uid || "none",
+      dataKeys: data ? Object.keys(data) : [],
+      timestamp: new Date().toISOString(),
+    });
 
-    const runtimeConfig = functions.config();
+    const runtimeConfig = (() => {
+      try {
+        return functions.config();
+      } catch (configError) {
+        functions.logger.warn("resetAllAuthUsers runtime config unavailable, using defaults.", {
+          message: (configError as Error).message,
+        });
+        return {} as Record<string, unknown>;
+      }
+    })();
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
     const resetEnabled =
       process.env.FUNCTIONS_EMULATOR === "true" ||
@@ -623,7 +638,16 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
         ? (data as { requestId?: string }).requestId!.trim().slice(0, 80)
         : `srv-health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const runtimeConfig = functions.config();
+    const runtimeConfig = (() => {
+      try {
+        return functions.config();
+      } catch (configError) {
+        functions.logger.warn("resetAllAuthUsersHealth runtime config unavailable, using defaults.", {
+          message: (configError as Error).message,
+        });
+        return {} as Record<string, unknown>;
+      }
+    })();
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
     const resetEnabled =
       process.env.FUNCTIONS_EMULATOR === "true" ||
