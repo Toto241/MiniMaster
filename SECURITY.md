@@ -51,11 +51,71 @@ Please report any security vulnerabilities to `security@minimaster.app`. We will
 
 | Area | Current State | Desired Future |
 |------|---------------|----------------|
-| Auth Model | IMEI + static secret | Rotatable, scoped tokens + roles |
+| Auth Model | IMEI + static secret (frozen, see below) | Rotatable, scoped tokens + roles |
 | Firestore Rules | Auth present = allow (logic in functions) | Principle-of-least-privilege + claim checks |
 | Least Privilege | No separation of duties | Parent/Child roles + limited child operations |
 | Transport of Secret | Stored locally; not rotated | Add expiration + rotation flow |
 | Subscription Integrity | Single verification call | Scheduled renewal + revocation listener |
+
+---
+
+## v2.2.0 Security Hardening (implemented)
+
+### Legacy Auth Freeze
+
+New policy (`LEGACY_AUTH_INVENTORY.md`): No new Cloud Functions may use `secretKey`/IMEI-based authentication. All new endpoints **must** use `context.auth` (Firebase Authentication). Existing legacy endpoints are inventoried and scheduled for phased migration.
+
+The environment variable `DISABLE_LEGACY_SECRETKEY_AUTH=true` can be set to reject all legacy login attempts at runtime, forcing callers through Firebase Auth.
+
+### Session Timeout
+
+Both web panels (admin-panel and web-control) enforce a **30-minute inactivity timeout**. The session timer resets on user interaction. On expiry, the user is logged out and redirected to the login screen. Implementation: client-side `setTimeout` + `firebase.auth().signOut()`.
+
+### Content Security Policy (CSP)
+
+CSP headers are configured in `firebase.json` for all hosting targets:
+- `default-src 'self'`
+- `script-src 'self'` (no inline scripts unless `'unsafe-inline'` required for legacy)
+- `connect-src` whitelisted to Firebase APIs, Resend API
+- `frame-ancestors 'none'` (equivalent to X-Frame-Options: DENY)
+
+Additional headers enforced: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security` (HSTS).
+
+### Photo URL SSRF Prevention
+
+`completeTask` validates that `photoUrl`:
+- Matches the Firebase Storage URL pattern (`https://firebasestorage.googleapis.com/...`)
+- Does not exceed 2048 characters
+- Rejects arbitrary URLs to prevent Server-Side Request Forgery (SSRF) in downstream AI analysis (`analyzeTaskPhoto`)
+
+### Operator Access Key System
+
+Operator role assignment uses SHA-256 hashed one-time keys (`createOperatorAccessKey` / `redeemOperatorAccessKey`) with:
+- Configurable TTL (1–10080 minutes)
+- Single-use enforcement (transaction-based redemption)
+- Bootstrap exception: first admin key creatable without existing admin
+- Keys never stored in plaintext (only SHA-256 hash persisted)
+
+### Firebase App Check
+
+App Check integration prepared in admin-panel (`appcheck-init.js`). Requires a valid reCAPTCHA v3 site key in production. The placeholder key is guarded and will not activate App Check until configured.
+
+### Audit Logging
+
+All security-relevant operations (role changes, account resets, support access grants/revocations, legal consent, data export/deletion) are logged via `AuditLogger` to the `audit_logs` Firestore collection with:
+- Caller UID, role, IP (where available)
+- Action name, target resource, timestamp
+- Duration and operation-specific metadata
+
+### CodeQL Automated Scanning
+
+GitHub CodeQL runs on every push/PR to `main` and weekly, scanning TypeScript and Java/Kotlin for:
+- Injection vulnerabilities (SQL, XSS, SSRF)
+- Insecure crypto usage
+- Credential exposure
+- Custom queries in `codeql-custom-queries-actions/`
+
+---
 
 > This document reflects prototype security; do not treat current measures as production-grade without implementing the listed future improvements.
 
