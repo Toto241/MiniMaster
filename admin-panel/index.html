@@ -74,13 +74,22 @@
                     Compliance
                 </button>
                 <button class="nav-tab" onclick="switchTab('setup', event)">
-                    Einrichtung &amp; Assistent
+                    ⚙️ Einrichtung
+                </button>
+                <button class="nav-tab" onclick="switchTab('platforms', event)">
+                    📱 Plattformen
+                </button>
+                <button class="nav-tab" onclick="switchTab('qa', event)">
+                    🧪 Qualitätssicherung
+                </button>
+                <button class="nav-tab" onclick="switchTab('admin', event)">
+                    👤 Administration
                 </button>
                 <button class="nav-tab" onclick="switchTab('firebase', event)">
                     Firebase
                 </button>
-                <button class="nav-tab" onclick="switchTab('aimonitor', event)">
-                    🤖 KI-Monitor
+                <button class="nav-tab" onclick="switchTab('ai', event)">
+                    🤖 KI-Assistent
                 </button>
                 <button class="nav-tab" onclick="switchTab('legal', event)">
                     📜 Recht &amp; Datenschutz
@@ -824,13 +833,9 @@
                         </div>
                     </div>
 
-                    <!-- Tab: Setup Assistant -->
-                    <div
-                        id="tab-setup"
-                        class="tab-content"
-                        style="display: none"
-                    >
-                        <h2>Cloud-Integration &amp; Operator-Assistent</h2>
+                    <!-- ==================== TAB: EINRICHTUNG ==================== -->
+                    <div id="tab-setup" class="tab-content" style="display: none">
+                        <h2>⚙️ Einrichtung &amp; Inbetriebnahme</h2>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Inbetriebnahme-Assistent</h3>
@@ -860,6 +865,228 @@
                             <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
                                 <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
                             </div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Voraussetzungen &amp; Freigaben</h3>
+                            <p>
+                                Diese Nachweise decken Punkte ab, die browserseitig nicht zuverlässig automatisch
+                                geprüft werden können, aber für die produktive Inbetriebnahme verpflichtend sind.
+                            </p>
+                            <div id="commissioning-attestations" class="setup-checklist"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Go-Live Ampel</h3>
+                            <p>
+                                Gesamtstatus der Produktionsbereitschaft. Die Ampel aggregiert Backend-Validierung,
+                                manuelle Freigaben und den Plattform-Reifegrad aller drei Zielplattformen.
+                            </p>
+                            <div id="golive-ampel"></div>
+                            <div id="golive-final-gate" style="margin-block-start: 12px"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Priorisierte Nächste Schritte</h3>
+                            <p>
+                                Automatisch priorisierte Reihenfolge der noch fehlenden Funktionen und Go-Live-Punkte.
+                                Erst die CRITICAL-Themen schließen, danach HIGH und anschließend MEDIUM.
+                            </p>
+                            <div id="prioritized-action-plan" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="setup-card"
+                            style="margin-block-start: 20px"
+                        >
+                            <h3>Laufzeitkonfiguration (Cloud + KI)</h3>
+                            <p>
+                                Zentrale Betreiber-Konfiguration für
+                                Cloud-Dienste und KI-Verhalten. Änderungen
+                                werden in Firestore gespeichert und können vom
+                                Betriebsteam versioniert/freigegeben werden.
+                            </p>
+
+                            <div class="setup-grid" style="margin-block-start: 10px">
+                                <div>
+                                    <h4>Cloud Services</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 10px">
+                                        <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" />
+                                        <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" />
+                                        <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" />
+                                        <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4>KI / Support-Automation</h4>
+                                    <div class="dsar-form" style="display: grid; gap: 10px">
+                                        <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" />
+                                        <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gemini-3.0-flash)" />
+                                        <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" />
+                                        <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" />
+                                        <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" />
+                                        <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="setup-actions" style="margin-block-start: 12px">
+                                <button onclick="loadOperatorConfig()" class="btn btn-secondary">Konfiguration laden</button>
+                                <button onclick="saveOperatorConfig()" class="btn btn-primary">Konfiguration speichern</button>
+                                <button onclick="testAiConfiguration()" class="btn btn-secondary">Test KI-Konfiguration</button>
+                            </div>
+                            <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
+                                <div class="info">Noch keine Konfiguration geladen.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ==================== TAB: PLATTFORMEN ==================== -->
+                    <div id="tab-platforms" class="tab-content" style="display: none">
+                        <h2>📱 Plattformen &amp; Bereitschaft</h2>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>P0 Blocker Cockpit (Go-Live)</h3>
+                            <p>
+                                Zentrale Abarbeitung der noch offenen Go-Live-Punkte. Teilschritte mit CLI/PowerShell
+                                sind als Ablaufdokumentation enthalten. Alle Angaben werden lokal gespeichert und
+                                als JSON exportierbar gemacht.
+                            </p>
+
+                            <div id="p0-blocker-summary" class="data-list" style="margin-block-end: 12px"></div>
+
+                            <div class="p0-grid">
+                                <div class="p0-card">
+                                    <h4>1) Firebase Key Rotation + Restriktionen</h4>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-key-rotation-done" /> Rotation abgeschlossen</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-key-restrictions-done" /> API-/App-Restriktionen gesetzt</label>
+                                    <input type="text" id="p0-key-evidence" placeholder="Nachweis-Link/Screenshot-Referenz" />
+                                </div>
+
+                                <div class="p0-card">
+                                    <h4>2) Play Console Paket</h4>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-data-safety" /> Data Safety eingereicht</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-iarc" /> IARC abgeschlossen</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-listing" /> Store Listing final</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-permissions" /> Permissions Declaration eingereicht</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-app-access" /> App Access Guide hinterlegt</label>
+                                    <input type="text" id="p0-play-evidence" placeholder="Play Console Nachweis-Link" />
+                                </div>
+
+                                <div class="p0-card">
+                                    <h4>3) Physische Commissioning-Abnahme</h4>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-android" /> Android Apps (Pairing + Sync) geprüft</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-ai" /> AI-Konfiguration + AI-Flow geprüft</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-support" /> Support-Workflow vollständig getestet</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-compliance" /> Compliance-Flow (DSAR/Audit/Consent) geprüft</label>
+                                    <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" />
+                                </div>
+
+                                <div class="p0-card">
+                                    <h4>4) On-Call / Eskalations-Roster</h4>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-roster-assigned" /> Roster verbindlich benannt</label>
+                                    <input type="text" id="p0-roster-primary" placeholder="Primary On-Call (Name/Kontakt)" />
+                                    <input type="text" id="p0-roster-secondary" placeholder="Secondary On-Call (Name/Kontakt)" />
+                                    <input type="text" id="p0-roster-security" placeholder="Security/Compliance Kontakt" />
+                                    <input type="text" id="p0-roster-evidence" placeholder="Roster-Link/Runbook-Referenz" />
+                                </div>
+                            </div>
+
+                            <textarea id="p0-notes" rows="3" placeholder="Freitext / Rest-Risiken / offene Maßnahmen"></textarea>
+
+                            <div class="setup-actions" style="margin-block-start: 12px">
+                                <button onclick="saveP0BlockerCockpit()" class="btn btn-primary">P0-Cockpit speichern</button>
+                                <button onclick="exportP0BlockerCockpit()" class="btn btn-secondary">P0-Status exportieren</button>
+                                <button onclick="resetP0BlockerCockpit()" class="btn btn-danger">P0-Status zurücksetzen</button>
+                            </div>
+
+                            <div id="p0-blocker-result" class="data-list" style="margin-block-start: 12px"></div>
+
+                            <details class="phase-help" style="margin-block-start: 16px">
+                                <summary>Ablaufdokumentation: Was ist automatisierbar (PowerShell/CLI)?</summary>
+                                <div class="phase-help-content">
+                                    <p><strong>Teilautomatisierbar</strong>: Build/Lint/Test, Artefakt-Exports, Manifest-/Permission-Checks, Evidence-Reports.</p>
+                                    <pre class="code-block"># Lokale Qualitätsgates
+npm run build
+npm run lint
+npm test -- --runInBand
+
+# Optional: Release-Artefakt via Admin-Panel exportieren
+# (Button: "Release-Artefakt exportieren")</pre>
+
+                                    <p><strong>Manuell erforderlich</strong>: Firebase Console Key-Rotation/-Restriktionen, Play Console Data Safety/IARC/Permissions/App Access,
+                                    reale Device-Commissioning-Checks.</p>
+
+                                    <p><strong>Empfohlene Reihenfolge</strong>:</p>
+                                    <ol>
+                                        <li>Firebase Key Rotation + Restriktionen abschließen und Nachweis erfassen</li>
+                                        <li>Play Console Paket komplett einreichen und Nachweise verlinken</li>
+                                        <li>Physische Commissioning-Checks mit Evidenz abschließen</li>
+                                        <li>On-Call-Roster finalisieren und im Runbook referenzieren</li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Plattform-Bereitschaft: MasterApp (Eltern-Android)</h3>
+                            <p>
+                                Checkliste der offenen Punkte f&uuml;r die Eltern-App auf Android-Mobiltelefonen.
+                                Umfasst Sicherheit, Navigation, Abonnement-Pr&uuml;fung und UX-Vollst&auml;ndigkeit.
+                            </p>
+                            <div id="platform-masterApp" class="setup-checklist"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Plattform-Bereitschaft: ChildApp (Kind-Android)</h3>
+                            <p>
+                                Checkliste der offenen Punkte f&uuml;r die Kind-App auf Android-Mobiltelefonen.
+                                Umfasst App-Blocking, Overlay-Sicherheit, Device-Admin und Manipulationsschutz.
+                            </p>
+                            <div id="platform-childApp" class="setup-checklist"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Plattform-Bereitschaft: Desktop-App (Heim-PC)</h3>
+                            <p>
+                                Checkliste der offenen Punkte f&uuml;r die Electron-Desktop-App auf dem Heim-PC
+                                der Eltern. Umfasst Sicherheit (CSP, SRI), Build-System und Benachrichtigungen.
+                            </p>
+                            <div id="platform-desktop" class="setup-checklist"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Plausibilit&auml;tspr&uuml;fung</h3>
+                            <p>
+                                Pr&uuml;ft alle Angaben auf Widerspr&uuml;che und Inkonsistenzen zwischen Plattformen,
+                                Backend und Freigaben. Optional kann Gemini gefundene Probleme erkl&auml;ren.
+                            </p>
+                            <div class="setup-actions">
+                                <button onclick="runPlausibilityWithAiOption()" class="btn btn-primary">Plausibilit&auml;t pr&uuml;fen</button>
+                            </div>
+                            <div id="plausibility-results" class="data-list" style="margin-block-start: 12px"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Einrichtungsassistent: Eltern- &amp; Kind-App</h3>
+                            <p>
+                                Schritt-f&uuml;r-Schritt-Anleitung f&uuml;r die Ersteinrichtung der Apps auf den
+                                Mobiltelefonen. Jeder Schritt kann &uuml;ber Gemini erkl&auml;rt werden.
+                            </p>
+                            <div class="setup-actions">
+                                <button onclick="startSetupWizard('masterApp')" class="btn btn-primary">Eltern-App einrichten</button>
+                                <button onclick="startSetupWizard('childApp')" class="btn btn-primary">Kind-App einrichten</button>
+                                <button onclick="resetWizard(activeWizard || 'masterApp')" class="btn btn-secondary">Wizard zur&uuml;cksetzen</button>
+                            </div>
+                            <div id="setup-wizard-content" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">W&auml;hlen Sie einen Assistenten, um loszulegen.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ==================== TAB: QUALITÄTSSICHERUNG ==================== -->
+                    <div id="tab-qa" class="tab-content" style="display: none">
+                        <h2>🧪 Qualitätssicherung &amp; Tests</h2>
 
                             <div class="setup-card python-automation-shell" style="margin-block-start: 16px; margin-block-end: 0">
                                 <div class="python-automation-intro">
@@ -1062,190 +1289,6 @@
                                     </section>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Voraussetzungen &amp; Freigaben</h3>
-                            <p>
-                                Diese Nachweise decken Punkte ab, die browserseitig nicht zuverlässig automatisch
-                                geprüft werden können, aber für die produktive Inbetriebnahme verpflichtend sind.
-                            </p>
-                            <div id="commissioning-attestations" class="setup-checklist"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>P0 Blocker Cockpit (Go-Live)</h3>
-                            <p>
-                                Zentrale Abarbeitung der noch offenen Go-Live-Punkte. Teilschritte mit CLI/PowerShell
-                                sind als Ablaufdokumentation enthalten. Alle Angaben werden lokal gespeichert und
-                                als JSON exportierbar gemacht.
-                            </p>
-
-                            <div id="p0-blocker-summary" class="data-list" style="margin-block-end: 12px"></div>
-
-                            <div class="p0-grid">
-                                <div class="p0-card">
-                                    <h4>1) Firebase Key Rotation + Restriktionen</h4>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-key-rotation-done" /> Rotation abgeschlossen</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-key-restrictions-done" /> API-/App-Restriktionen gesetzt</label>
-                                    <input type="text" id="p0-key-evidence" placeholder="Nachweis-Link/Screenshot-Referenz" />
-                                </div>
-
-                                <div class="p0-card">
-                                    <h4>2) Play Console Paket</h4>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-data-safety" /> Data Safety eingereicht</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-iarc" /> IARC abgeschlossen</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-listing" /> Store Listing final</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-permissions" /> Permissions Declaration eingereicht</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-app-access" /> App Access Guide hinterlegt</label>
-                                    <input type="text" id="p0-play-evidence" placeholder="Play Console Nachweis-Link" />
-                                </div>
-
-                                <div class="p0-card">
-                                    <h4>3) Physische Commissioning-Abnahme</h4>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-android" /> Android Apps (Pairing + Sync) geprüft</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-ai" /> AI-Konfiguration + AI-Flow geprüft</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-support" /> Support-Workflow vollständig getestet</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-compliance" /> Compliance-Flow (DSAR/Audit/Consent) geprüft</label>
-                                    <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" />
-                                </div>
-
-                                <div class="p0-card">
-                                    <h4>4) On-Call / Eskalations-Roster</h4>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-roster-assigned" /> Roster verbindlich benannt</label>
-                                    <input type="text" id="p0-roster-primary" placeholder="Primary On-Call (Name/Kontakt)" />
-                                    <input type="text" id="p0-roster-secondary" placeholder="Secondary On-Call (Name/Kontakt)" />
-                                    <input type="text" id="p0-roster-security" placeholder="Security/Compliance Kontakt" />
-                                    <input type="text" id="p0-roster-evidence" placeholder="Roster-Link/Runbook-Referenz" />
-                                </div>
-                            </div>
-
-                            <textarea id="p0-notes" rows="3" placeholder="Freitext / Rest-Risiken / offene Maßnahmen"></textarea>
-
-                            <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="saveP0BlockerCockpit()" class="btn btn-primary">P0-Cockpit speichern</button>
-                                <button onclick="exportP0BlockerCockpit()" class="btn btn-secondary">P0-Status exportieren</button>
-                                <button onclick="resetP0BlockerCockpit()" class="btn btn-danger">P0-Status zurücksetzen</button>
-                            </div>
-
-                            <div id="p0-blocker-result" class="data-list" style="margin-block-start: 12px"></div>
-
-                            <details class="phase-help" style="margin-block-start: 16px">
-                                <summary>Ablaufdokumentation: Was ist automatisierbar (PowerShell/CLI)?</summary>
-                                <div class="phase-help-content">
-                                    <p><strong>Teilautomatisierbar</strong>: Build/Lint/Test, Artefakt-Exports, Manifest-/Permission-Checks, Evidence-Reports.</p>
-                                    <pre class="code-block"># Lokale Qualitätsgates
-npm run build
-npm run lint
-npm test -- --runInBand
-
-# Optional: Release-Artefakt via Admin-Panel exportieren
-# (Button: "Release-Artefakt exportieren")</pre>
-
-                                    <p><strong>Manuell erforderlich</strong>: Firebase Console Key-Rotation/-Restriktionen, Play Console Data Safety/IARC/Permissions/App Access,
-                                    reale Device-Commissioning-Checks.</p>
-
-                                    <p><strong>Empfohlene Reihenfolge</strong>:</p>
-                                    <ol>
-                                        <li>Firebase Key Rotation + Restriktionen abschließen und Nachweis erfassen</li>
-                                        <li>Play Console Paket komplett einreichen und Nachweise verlinken</li>
-                                        <li>Physische Commissioning-Checks mit Evidenz abschließen</li>
-                                        <li>On-Call-Roster finalisieren und im Runbook referenzieren</li>
-                                    </ol>
-                                </div>
-                            </details>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Go-Live Ampel</h3>
-                            <p>
-                                Gesamtstatus der Produktionsbereitschaft. Die Ampel aggregiert Backend-Validierung,
-                                manuelle Freigaben und den Plattform-Reifegrad aller drei Zielplattformen.
-                            </p>
-                            <div id="golive-ampel"></div>
-                            <div id="golive-final-gate" style="margin-block-start: 12px"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Priorisierte Nächste Schritte</h3>
-                            <p>
-                                Automatisch priorisierte Reihenfolge der noch fehlenden Funktionen und Go-Live-Punkte.
-                                Erst die CRITICAL-Themen schließen, danach HIGH und anschließend MEDIUM.
-                            </p>
-                            <div id="prioritized-action-plan" class="data-list" style="margin-block-start: 12px">
-                                <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
-                            </div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Plattform-Bereitschaft: MasterApp (Eltern-Android)</h3>
-                            <p>
-                                Checkliste der offenen Punkte f&uuml;r die Eltern-App auf Android-Mobiltelefonen.
-                                Umfasst Sicherheit, Navigation, Abonnement-Pr&uuml;fung und UX-Vollst&auml;ndigkeit.
-                            </p>
-                            <div id="platform-masterApp" class="setup-checklist"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Plattform-Bereitschaft: ChildApp (Kind-Android)</h3>
-                            <p>
-                                Checkliste der offenen Punkte f&uuml;r die Kind-App auf Android-Mobiltelefonen.
-                                Umfasst App-Blocking, Overlay-Sicherheit, Device-Admin und Manipulationsschutz.
-                            </p>
-                            <div id="platform-childApp" class="setup-checklist"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Plattform-Bereitschaft: Desktop-App (Heim-PC)</h3>
-                            <p>
-                                Checkliste der offenen Punkte f&uuml;r die Electron-Desktop-App auf dem Heim-PC
-                                der Eltern. Umfasst Sicherheit (CSP, SRI), Build-System und Benachrichtigungen.
-                            </p>
-                            <div id="platform-desktop" class="setup-checklist"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Plausibilit&auml;tspr&uuml;fung</h3>
-                            <p>
-                                Pr&uuml;ft alle Angaben auf Widerspr&uuml;che und Inkonsistenzen zwischen Plattformen,
-                                Backend und Freigaben. Optional kann Gemini gefundene Probleme erkl&auml;ren.
-                            </p>
-                            <div class="setup-actions">
-                                <button onclick="runPlausibilityWithAiOption()" class="btn btn-primary">Plausibilit&auml;t pr&uuml;fen</button>
-                            </div>
-                            <div id="plausibility-results" class="data-list" style="margin-block-start: 12px"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Einrichtungsassistent: Eltern- &amp; Kind-App</h3>
-                            <p>
-                                Schritt-f&uuml;r-Schritt-Anleitung f&uuml;r die Ersteinrichtung der Apps auf den
-                                Mobiltelefonen. Jeder Schritt kann &uuml;ber Gemini erkl&auml;rt werden.
-                            </p>
-                            <div class="setup-actions">
-                                <button onclick="startSetupWizard('masterApp')" class="btn btn-primary">Eltern-App einrichten</button>
-                                <button onclick="startSetupWizard('childApp')" class="btn btn-primary">Kind-App einrichten</button>
-                                <button onclick="resetWizard(activeWizard || 'masterApp')" class="btn btn-secondary">Wizard zur&uuml;cksetzen</button>
-                            </div>
-                            <div id="setup-wizard-content" class="data-list" style="margin-block-start: 12px">
-                                <div class="info">W&auml;hlen Sie einen Assistenten, um loszulegen.</div>
-                            </div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>🤖 Gemini KI-Assistent</h3>
-                            <p>
-                                Stellen Sie eine freie Frage zur Einrichtung, Konfiguration oder einem Problem.
-                                Gemini analysiert den Kontext und liefert eine Erkl&auml;rung mit L&ouml;sungsvorschlag.
-                                <strong>Vor jeder Anfrage ist eine Zustimmung erforderlich.</strong>
-                            </p>
-                            <div id="ai-consent-status" style="margin-block-end: 10px"></div>
-                            <div class="dsar-form">
-                                <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..."></textarea>
-                                <button onclick="askGeminiFreiform()" class="btn btn-primary">🤖 Gemini fragen</button>
-                            </div>
-                            <div id="ai-explain-response" class="data-list" style="margin-block-start: 12px"></div>
-                        </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
@@ -1358,8 +1401,11 @@ npm test -- --runInBand
                                 ></div>
                             </div>
                         </div>
+                    </div>
+                    <!-- ==================== TAB: ADMINISTRATION ==================== -->
+                    <div id="tab-admin" class="tab-content" style="display: none">
+                        <h2>👤 Administration &amp; Zugangsverwaltung</h2>
 
-                        <!-- Admin-Konto-Erstellung -->
                         <div class="setup-card admin-only" style="margin-block-start: 20px">
                             <h3>Admin-Konto erstellen / Admin-Claim vergeben</h3>
                             <p>Bestehenden Firebase-Auth-User zum Operator/Admin hochstufen (nur für bereits authentifizierte Admins).</p>
@@ -1370,7 +1416,6 @@ npm test -- --runInBand
                             <div id="admin-claim-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
 
-                        <!-- Rollenverwaltung -->
                         <div class="setup-card admin-only" style="margin-block-start: 20px">
                             <h3>Rollenverwaltung (RBAC)</h3>
                             <p>Operator-Rollen zuweisen: <strong>Admin</strong> (Vollzugriff), <strong>Support</strong> (Tickets + KI-Support, eingeschränkt auf freigegebene Fälle), <strong>Auditor</strong> (Einsicht Audit-Logs + Compliance).</p>
@@ -1402,85 +1447,6 @@ npm test -- --runInBand
                                 <button onclick="resetOperatorAccountsFromAdminPanel()" class="btn btn-danger">Alle Betreiberkonten zurücksetzen</button>
                             </div>
                             <div id="operator-reset-result" class="data-list" style="margin-block-start: 10px"></div>
-                        </div>
-
-                        <div
-                            class="setup-card"
-                            style="margin-block-start: 20px"
-                        >
-                            <h3>Laufzeitkonfiguration (Cloud + KI)</h3>
-                            <p>
-                                Zentrale Betreiber-Konfiguration für
-                                Cloud-Dienste und KI-Verhalten. Änderungen
-                                werden in Firestore gespeichert und können vom
-                                Betriebsteam versioniert/freigegeben werden.
-                            </p>
-
-                            <div class="setup-grid" style="margin-block-start: 10px">
-                                <div>
-                                    <h4>Cloud Services</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 10px">
-                                        <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" />
-                                        <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" />
-                                        <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" />
-                                        <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h4>KI / Support-Automation</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 10px">
-                                        <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" />
-                                        <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gemini-3.0-flash)" />
-                                        <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" />
-                                        <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" />
-                                        <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" />
-                                        <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent"></textarea>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="loadOperatorConfig()" class="btn btn-secondary">Konfiguration laden</button>
-                                <button onclick="saveOperatorConfig()" class="btn btn-primary">Konfiguration speichern</button>
-                                <button onclick="testAiConfiguration()" class="btn btn-secondary">Test KI-Konfiguration</button>
-                            </div>
-                            <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
-                                <div class="info">Noch keine Konfiguration geladen.</div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="setup-card"
-                            style="margin-block-start: 20px"
-                        >
-                            <h3>Operator-Assistent</h3>
-                            <p>
-                                Fragen zur Integration, Deployment, Rollen und
-                                Troubleshooting direkt im Panel klären.
-                            </p>
-                            <div class="assistant-box">
-                                <div id="assistant-chat" class="assistant-chat">
-                                    <div class="assistant-msg assistant">
-                                        Hallo! Ich helfe bei Setup,
-                                        Cloud-Integration, KI-Konfiguration und
-                                        Betreiber-Workflows. Stelle eine Frage
-                                        wie: "Wie prüfe ich Admin-Rechte?"
-                                    </div>
-                                </div>
-                                <div class="assistant-input-row">
-                                    <input
-                                        type="text"
-                                        id="assistant-input"
-                                        placeholder="Frage eingeben..."
-                                    />
-                                    <button
-                                        onclick="askOperatorAssistant()"
-                                        class="btn btn-primary"
-                                    >
-                                        Fragen
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </section>
@@ -1584,9 +1550,61 @@ npm test -- --runInBand
                 </div>
             </div>
 
-            <!-- ==================== AI MONITOR TAB ==================== -->
-            <div id="tab-aimonitor" class="tab-content" style="display: none">
-                <h2>🤖 KI-Fehlerüberwachung</h2>
+            <!-- ==================== TAB: KI-ASSISTENT ==================== -->
+            <div id="tab-ai" class="tab-content" style="display: none">
+                <h2>🤖 KI-Assistent &amp; Fehlerüberwachung</h2>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>🤖 Gemini KI-Assistent</h3>
+                            <p>
+                                Stellen Sie eine freie Frage zur Einrichtung, Konfiguration oder einem Problem.
+                                Gemini analysiert den Kontext und liefert eine Erkl&auml;rung mit L&ouml;sungsvorschlag.
+                                <strong>Vor jeder Anfrage ist eine Zustimmung erforderlich.</strong>
+                            </p>
+                            <div id="ai-consent-status" style="margin-block-end: 10px"></div>
+                            <div class="dsar-form">
+                                <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..."></textarea>
+                                <button onclick="askGeminiFreiform()" class="btn btn-primary">🤖 Gemini fragen</button>
+                            </div>
+                            <div id="ai-explain-response" class="data-list" style="margin-block-start: 12px"></div>
+                        </div>
+
+                        <div
+                            class="setup-card"
+                            style="margin-block-start: 20px"
+                        >
+                            <h3>Operator-Assistent</h3>
+                            <p>
+                                Fragen zur Integration, Deployment, Rollen und
+                                Troubleshooting direkt im Panel klären.
+                            </p>
+                            <div class="assistant-box">
+                                <div id="assistant-chat" class="assistant-chat">
+                                    <div class="assistant-msg assistant">
+                                        Hallo! Ich helfe bei Setup,
+                                        Cloud-Integration, KI-Konfiguration und
+                                        Betreiber-Workflows. Stelle eine Frage
+                                        wie: "Wie prüfe ich Admin-Rechte?"
+                                    </div>
+                                </div>
+                                <div class="assistant-input-row">
+                                    <input
+                                        type="text"
+                                        id="assistant-input"
+                                        placeholder="Frage eingeben..."
+                                    />
+                                    <button
+                                        onclick="askOperatorAssistant()"
+                                        class="btn btn-primary"
+                                    >
+                                        Fragen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                <div class="setup-card" style="margin-block-start: 20px">
+                <h3>🔍 KI-Fehlerüberwachung</h3>
                 <p class="section-description">
                     Systemfehler werden mit Google Gemini analysiert. Die KI erstellt Diagnosen, schlägt Lösungen vor
                     und kann bestimmte Probleme automatisch beheben.
@@ -1626,6 +1644,7 @@ npm test -- --runInBand
                 <div id="ai-fix-history" class="ai-fix-history" style="display: none">
                     <h3>Protokoll: KI-Analysen &amp; Auto-Fixes</h3>
                     <div id="ai-fix-history-list"></div>
+                </div>
                 </div>
             </div>
 
