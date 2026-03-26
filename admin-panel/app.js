@@ -4076,7 +4076,11 @@ document.addEventListener("DOMContentLoaded", async function() {
                 });
             } else {
                 currentUserRole = null;
-                showOnboarding();
+                if (!window._resetBlocksPhaseChange) {
+                    showOnboarding();
+                } else {
+                    console.log("[RESET] Phase change blocked — reset in progress.");
+                }
             }
         });
 
@@ -4432,6 +4436,7 @@ function renderAdminActivationContent(user) {
             </div>
             <div id="reset-all-users-health" class="phase-status" style="margin-block-start: 8px"></div>
             <div id="reset-all-users-status" class="phase-status" style="margin-block-start: 8px"></div>
+            <div id="reset-debug-log" style="margin-block-start: 10px; background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; max-height: 300px; overflow-y: auto; display: none; white-space: pre-wrap;"></div>
         </div>
 
         <div class="admin-info-box" style="background: #f8fafc; border-color: #e2e8f0;">
@@ -4825,39 +4830,93 @@ async function bootstrapFirstAdminAction() {
 async function resetAllUsersFromOnboarding() {
     const btn = document.getElementById("btn-reset-all-users-onboarding");
     const statusEl = document.getElementById("reset-all-users-status");
+    const debugLog = document.getElementById("reset-debug-log");
     const requestId = `ui-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+    function dbg(msg) {
+        const ts = new Date().toISOString().slice(11, 23);
+        const line = `[${ts}] ${msg}`;
+        console.log("[RESET-DEBUG]", msg);
+        if (debugLog) {
+            debugLog.style.display = "block";
+            debugLog.textContent += line + "\n";
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+    }
+
+    window._resetBlocksPhaseChange = true;
+    dbg("resetAllUsersFromOnboarding() gestartet. RequestID: " + requestId);
+    dbg("Firebase Functions initialisiert: " + !!functions);
+    if (statusEl) statusEl.innerHTML = "<div class='info'>🔍 Debug: Reset-Funktion gestartet...</div>";
+
+    if (!functions) {
+        dbg("❌ ABBRUCH: Firebase Functions ist NICHT initialisiert!");
+        if (statusEl) statusEl.innerHTML = "<div class='error'>❌ Firebase Functions ist nicht initialisiert. Seite neu laden.</div>";
+        window._resetBlocksPhaseChange = false;
+        return;
+    }
+
+    const currentUser = auth?.currentUser;
+    dbg("Aktueller User: " + (currentUser ? "uid=" + currentUser.uid + " email=" + currentUser.email : "KEIN USER EINGELOGGT"));
+    if (!currentUser) {
+        dbg("❌ ABBRUCH: Kein User eingeloggt.");
+        if (statusEl) statusEl.innerHTML = "<div class='error'>❌ Kein User eingeloggt. Bitte zuerst anmelden.</div>";
+        window._resetBlocksPhaseChange = false;
+        return;
+    }
+
+    dbg("Zeige ersten Bestätigungsdialog...");
     const firstConfirm = window.confirm(
         "ACHTUNG: Alle bisherigen Nutzerkonten wirklich löschen?\n\n" +
         "Dies ist nur für die Entwicklung gedacht und löscht ALLE Auth-Nutzer."
     );
-    if (!firstConfirm) return;
-
-    const secondConfirm = window.prompt("Zur Bestätigung exakt eingeben: RESET_ALL_AUTH_USERS");
-    if ((secondConfirm || "").trim() !== "RESET_ALL_AUTH_USERS") {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein.</div>";
+    dbg("Erster Confirm: " + (firstConfirm ? "JA" : "ABGEBROCHEN"));
+    if (!firstConfirm) {
+        if (statusEl) statusEl.innerHTML = "<div class='info'>Erster Bestätigungsdialog abgebrochen.</div>";
+        window._resetBlocksPhaseChange = false;
         return;
     }
+
+    dbg("Zeige Texteingabe-Dialog (RESET_ALL_AUTH_USERS)...");
+    const secondConfirm = window.prompt("Zur Bestätigung exakt eingeben: RESET_ALL_AUTH_USERS");
+    dbg("Zweiter Confirm Eingabe: " + JSON.stringify(secondConfirm));
+    if ((secondConfirm || "").trim() !== "RESET_ALL_AUTH_USERS") {
+        dbg("❌ ABBRUCH: Text stimmt nicht überein.");
+        if (statusEl) statusEl.innerHTML = `<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein. Eingabe war: <code>${escapeHtml(String(secondConfirm || "(leer)"))}</code></div>`;
+        window._resetBlocksPhaseChange = false;
+        return;
+    }
+
+    dbg("Zeige Recovery-Token-Dialog...");
     const recoveryToken = (window.prompt(
         "Optional: Recovery-Token eingeben (nur nötig, wenn Sie kein Admin sind oder Zugangsdaten verloren wurden)."
     ) || "").trim();
+    dbg("Recovery-Token Länge: " + recoveryToken.length);
 
     if (btn) {
         btn.disabled = true;
         btn.textContent = "⏳ Lösche alle Nutzer...";
     }
     if (statusEl) {
-        statusEl.innerHTML = `<div class='loading'>Reset wird ausgeführt...</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(requestId)}</code></div>`;
+        statusEl.innerHTML = `<div class='loading'>Reset wird ausgeführt... Callable wird jetzt aufgerufen.</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(requestId)}</code></div>`;
     }
 
     try {
+        dbg("Erstelle httpsCallable('resetAllAuthUsers')...");
         const resetFn = functions.httpsCallable("resetAllAuthUsers");
+        dbg("Callable erstellt. Sende Request...");
+        dbg("  confirmText: RESET_ALL_AUTH_USERS");
+        dbg("  requestId: " + requestId);
+        dbg("  includeCurrentSessionUser: true");
+        dbg("  recoveryToken: " + (recoveryToken.length > 0 ? "(gesetzt, " + recoveryToken.length + " Zeichen)" : "(leer)"));
         const result = await resetFn({
             confirmText: "RESET_ALL_AUTH_USERS",
             requestId,
-            includeCurrentSessionUser: false,
+            includeCurrentSessionUser: true,
             recoveryToken,
         });
+        dbg("✅ Callable Antwort erhalten!");
+        dbg("  result.data = " + JSON.stringify(result?.data));
         const deletedUsers = Number(result?.data?.deletedUsers || 0);
         const backendRequestId = String(result?.data?.requestId || requestId);
         const skippedCurrentSessionUsers = Array.isArray(result?.data?.skippedCurrentSessionUsers)
@@ -4868,15 +4927,15 @@ async function resetAllUsersFromOnboarding() {
             const skippedHint = skippedCurrentSessionUsers > 0
                 ? `<div class='info' style='margin-block-start:6px'>Aktive Sitzung wurde aus Stabilitätsgründen übersprungen: <strong>${escapeHtml(String(skippedCurrentSessionUsers))}</strong>.</div>`
                 : "";
-            statusEl.innerHTML = `<div class='success-box'>✅ Reset abgeschlossen. Gelöschte Nutzer: <strong>${escapeHtml(String(deletedUsers))}</strong>.</div>${skippedHint}<div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(backendRequestId)}</code></div>`;
+            statusEl.innerHTML = `<div class='success-box'>✅ Reset abgeschlossen. Gelöschte Nutzer: <strong>${escapeHtml(String(deletedUsers))}</strong>.</div>${skippedHint}<div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(backendRequestId)}</code></div><div style='margin-block-start:10px'><button class='btn btn-primary' onclick='window._resetBlocksPhaseChange=false;auth.signOut().then(function(){window.location.reload()})'>Weiter zur Anmeldung →</button></div>`;
         }
         showNotification(`Reset abgeschlossen: ${deletedUsers} Nutzer gelöscht. [${backendRequestId}]`, "success");
-
-        await auth.signOut();
-        setTimeout(() => {
-            window.location.reload();
-        }, 800);
+        dbg("Klicken Sie 'Weiter zur Anmeldung' um fortzufahren.");
     } catch (error) {
+        dbg("❌ FEHLER beim Callable-Aufruf!");
+        dbg("  error.code: " + (error?.code || "n/a"));
+        dbg("  error.message: " + (error?.message || "n/a"));
+        dbg("  error.details: " + JSON.stringify(error?.details || null));
         let msg = error?.message || "Reset fehlgeschlagen.";
         const code = normalizeAuthErrorCode(error);
         if (code === "failed-precondition") {
@@ -4892,7 +4951,11 @@ async function resetAllUsersFromOnboarding() {
             } else if (raw.includes("all-user reset failed:")) {
                 msg = error.message;
             } else {
-                msg = "Serverfehler beim All-User-Reset. Bitte Functions-Logs prüfen und danach erneut versuchen.";
+                msg = "Reset fehlgeschlagen (Fehlercode: internal). Mögliche Ursachen:\n" +
+                    "• Ihre Rolle reicht nicht aus (aktuell: keine Admin-Rolle).\n" +
+                    "• Kein Recovery-Token konfiguriert/angegeben.\n" +
+                    "• Reset ist serverseitig deaktiviert.\n" +
+                    "Bitte zuerst 'Verfügbarkeit prüfen' klicken und die Hinweise beachten.";
             }
         }
         if (statusEl) {
@@ -4903,6 +4966,7 @@ async function resetAllUsersFromOnboarding() {
             btn.disabled = false;
             btn.textContent = "🧨 Alle Nutzer zurücksetzen";
         }
+        window._resetBlocksPhaseChange = false;
     }
 }
 
@@ -4932,10 +4996,20 @@ async function checkResetAllUsersHealth() {
             ? "Recovery-Token ist konfiguriert."
             : "Kein Recovery-Token konfiguriert.";
 
+        const resetBtn = document.getElementById("btn-reset-all-users-onboarding");
+        // Backend erlaubt jeden authentifizierten User wenn resetEnabled=true.
+        // Health-Endpoint selbst erfordert Auth → wenn wir hier sind, ist User eingeloggt.
+        const canReset = resetEnabled;
+
         if (resetEnabled) {
             statusEl.innerHTML = `<div class='success-box'>✅ resetAllAuthUsers ist erreichbar. Reset aktiv. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>${escapeHtml(recoveryHint)}</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
         } else {
             statusEl.innerHTML = `<div class='info'>🟡 resetAllAuthUsers ist erreichbar, aber Reset ist deaktiviert. Rolle: <strong>${callerRole}</strong>.</div><div class='info' style='margin-block-start:6px'>${escapeHtml(recoveryHint)}</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${backendRequestId}</code></div>`;
+        }
+        if (resetBtn) {
+            resetBtn.disabled = !canReset;
+            if (!canReset) resetBtn.title = "Reset blockiert: Reset ist serverseitig deaktiviert.";
+            else resetBtn.title = "";
         }
         return;
     } catch (error) {
