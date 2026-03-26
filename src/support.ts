@@ -76,7 +76,7 @@ function shouldEscalateAfterAttempts(
   return !solved && nextRound >= MAX_CONVERSATION_ROUNDS && nextFailures >= MAX_CONVERSATION_ROUNDS;
 }
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.0-flash";
 const OPENAI_FALLBACK_ENABLED = process.env.OPENAI_FALLBACK_ENABLED === "true";
 
 let openaiClient: OpenAI | null = null;

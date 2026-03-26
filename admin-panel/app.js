@@ -138,7 +138,7 @@ const setupChecklistItems = [
     { key: "functions-access", label: "Alle Callable Functions erreichbar" },
     { key: "appcheck-active", label: "App Check konfiguriert und aktiv" },
     { key: "android-apps", label: "Android-Apps registriert (Master + Child)" },
-    { key: "ai-config", label: "KI-Provider konfiguriert (Gemini/OpenAI)" },
+    { key: "ai-config", label: "KI-Provider konfiguriert (Google Gemini 3.0)" },
     { key: "support-workflow", label: "Support-Ticket-Workflow getestet" },
     { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" },
     { key: "deploy-verified", label: "Deploy erfolgreich und Functions live" }
@@ -170,8 +170,8 @@ const defaultOperatorConfig = {
         releaseChannel: "prod"
     },
     ai: {
-        provider: "openai",
-        model: "gpt-5-mini",
+        provider: "gemini",
+        model: "gemini-3.0-flash",
         temperature: 0.3,
         endpoint: "",
         keyRef: "",
@@ -5739,10 +5739,10 @@ async function runFullSetupValidation() {
 
         setupValidationResults.push({
             check: "AI Secret Configuration",
-            status: (ai.geminiConfigured || ai.openAiConfigured) ? "ok" : "warn",
-            message: (ai.geminiConfigured || ai.openAiConfigured)
-                ? `Backend-KI konfiguriert (Gemini: ${Boolean(ai.geminiConfigured)}, OpenAI: ${Boolean(ai.openAiConfigured)}).`
-                : "Keine produktiven KI-Secrets im Backend erkannt."
+            status: ai.geminiConfigured ? "ok" : "warn",
+            message: ai.geminiConfigured
+                ? `Backend-KI konfiguriert (Gemini 3.0: ${Boolean(ai.geminiConfigured)}).`
+                : "Keine produktiven KI-Secrets im Backend erkannt (GEMINI_API_KEY fehlt)."
         });
     } catch (error) {
         setupValidationResults.push({
@@ -7612,8 +7612,7 @@ async function loadFunctionsStatus() {
         html += `<p><strong>Zeitstempel:</strong> ${escapeHtml(data.timestamp || "-")}</p>`;
         html += `<p><strong>Projekt-ID:</strong> ${escapeHtml(env.projectId || "-")}</p>`;
         html += `<p><strong>Storage:</strong> <span class="${String(prereqs.storage).startsWith("ok") ? "status-ok" : "status-error"}">${escapeHtml(String(prereqs.storage))}</span> (Bucket: ${escapeHtml(prereqs.storageBucket || "-")})</p>`;
-        html += `<p><strong>Gemini API:</strong> <span class="${ai.geminiConfigured ? "status-ok" : "status-error"}">${ai.geminiConfigured ? "Konfiguriert" : "Nicht konfiguriert"}</span> (Modell: ${escapeHtml(ai.geminiModel || "-")})</p>`;
-        html += `<p><strong>OpenAI API:</strong> <span class="${ai.openAiConfigured ? "status-ok" : "status-warn"}">${ai.openAiConfigured ? "Konfiguriert" : "Nicht konfiguriert"}</span></p>`;
+        html += `<p><strong>Gemini API:</strong> <span class="${ai.geminiConfigured ? "status-ok" : "status-error"}">${ai.geminiConfigured ? "Konfiguriert" : "Nicht konfiguriert"}</span> (Modell: ${escapeHtml(ai.geminiModel || "gemini-3.0-flash")})</p>`;
         html += `</div>`;
 
         html += `<h4>Firestore Collections</h4><table class="data-table"><thead><tr><th>Collection</th><th>Status</th></tr></thead><tbody>`;
@@ -8162,7 +8161,7 @@ function renderAiSummary(data) {
         '<span class="summary-stat">🔬 <strong>' + escapeHtml(String(analyzed)) + '</strong> analysiert</span>',
         '<span class="summary-stat">🔧 <strong>' + escapeHtml(String(fixable)) + '</strong> Auto-Fix möglich</span>',
         critical > 0 ? '<span class="summary-stat">🔴 <strong>' + escapeHtml(String(critical)) + '</strong> kritisch</span>' : '',
-        '<span class="summary-stat" style="opacity:0.7">Modell: ' + escapeHtml(data.model || "gemini-2.0-flash") + '</span>',
+        '<span class="summary-stat" style="opacity:0.7">Modell: ' + escapeHtml(data.model || "gemini-3.0-flash") + '</span>',
     ].join("");
 }
 
