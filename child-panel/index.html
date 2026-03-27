@@ -171,9 +171,9 @@
         Pruefpunkte). Es trennt den Child-Flow klar vom Eltern-Flow.
       </p>
       <div class="actions">
-        <a class="btn btn-primary" href="../docs/CHILDAPP_LOCK_LOGIC.md">Child-Logik ansehen</a>
-        <a class="btn btn-secondary" href="../docs/DEBUG_INTERFACE_GUIDE.md">USB-Debug Child-Flow</a>
-        <a class="btn btn-ghost" href="../start.html">Zur Startseite</a>
+        <a class="btn btn-primary" href="../docs/CHILDAPP_LOCK_LOGIC.md" title="Dokumentation zur Sperr- und Freigabelogik auf dem Kindergerät anzeigen">Child-Logik ansehen</a>
+        <a class="btn btn-secondary" href="../docs/DEBUG_INTERFACE_GUIDE.md" title="Anleitung zum USB-Debugging des Kind-Geräts öffnen">USB-Debug Child-Flow</a>
+        <a class="btn btn-ghost" href="../start.html" title="Zurück zur MiniMaster Startseite">Zur Startseite</a>
       </div>
     </section>
 
@@ -190,8 +190,8 @@
     <section class="card">
       <h2>Verknuepfte Panels</h2>
       <div class="actions">
-        <a class="btn btn-secondary" href="../parent-panel/index.html">Zum Eltern-Panel</a>
-        <a class="btn btn-ghost" href="../admin-panel/index.html">Zum Operator-Dashboard</a>
+        <a class="btn btn-secondary" href="../parent-panel/index.html" title="Wechsel zum Eltern-Panel für die Kindgeräte-Steuerung">Zum Eltern-Panel</a>
+        <a class="btn btn-ghost" href="../admin-panel/index.html" title="Wechsel zum Operator-Dashboard für Administration und Monitoring">Zum Operator-Dashboard</a>
       </div>
     </section>
 
@@ -207,31 +207,31 @@
       <div class="form-grid">
         <div>
           <label for="ticket-master-imei">Master IMEI / Eltern-Benutzer-ID</label>
-          <input id="ticket-master-imei" type="text" placeholder="z. B. 123456789012345" />
+          <input id="ticket-master-imei" type="text" placeholder="z. B. 123456789012345" title="Die IMEI oder Benutzer-ID des registrierten Elterngeräts eingeben" />
         </div>
         <div>
           <label for="ticket-secret-key">Secret Key (Elternkonto)</label>
-          <input id="ticket-secret-key" type="password" placeholder="Secret Key" />
+          <input id="ticket-secret-key" type="password" placeholder="Secret Key" title="Den geheimen Schlüssel des Elternkontos eingeben" />
         </div>
       </div>
 
       <div class="inline">
-        <button class="btn btn-secondary" type="button" onclick="authenticateForTickets()">Authentifizieren</button>
-        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()">Meine Tickets laden</button>
+        <button class="btn btn-secondary" type="button" onclick="authenticateForTickets()" title="Mit Master IMEI und Secret Key beim System anmelden">Authentifizieren</button>
+        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
       </div>
 
       <div class="form-grid">
         <div>
           <label for="ticket-sender-name">Absender Name</label>
-          <input id="ticket-sender-name" type="text" placeholder="Name des Meldenden" />
+          <input id="ticket-sender-name" type="text" placeholder="Name des Meldenden" title="Name der Person, die das Ticket einreicht" />
         </div>
         <div>
           <label for="ticket-sender-email">Rueckfrage E-Mail</label>
-          <input id="ticket-sender-email" type="email" placeholder="name@example.com" />
+          <input id="ticket-sender-email" type="email" placeholder="name@example.com" title="E-Mail-Adresse für Rückfragen durch den Support" />
         </div>
         <div>
           <label for="ticket-sender-role">Absender Rolle</label>
-          <select id="ticket-sender-role">
+          <select id="ticket-sender-role" title="Rolle des Absenders auswählen (Kind, Elternteil, Betreuungsperson)">
             <option value="child" selected>Kind</option>
             <option value="parent">Elternteil</option>
             <option value="caregiver">Betreuungsperson</option>
@@ -241,12 +241,12 @@
 
       <div>
         <label for="ticket-problem">Fehler / Frage</label>
-        <textarea id="ticket-problem" placeholder="Bitte Problem, Zeitpunkt und betroffene Funktion beschreiben."></textarea>
+        <textarea id="ticket-problem" placeholder="Bitte Problem, Zeitpunkt und betroffene Funktion beschreiben." title="Beschreibung des Problems, der Störung oder der Frage"></textarea>
       </div>
 
       <div class="inline">
-        <label><input type="radio" name="ticket-support-access" value="yes" /> Support-Zugriff fuer 48h erlauben</label>
-        <label><input type="radio" name="ticket-support-access" value="no" checked /> Kein zusaetzlicher Zugriff</label>
+        <label title="Dem Support temporär Zugriff auf Kontodaten erlauben (max. 48 Stunden)"><input type="radio" name="ticket-support-access" value="yes" /> Support-Zugriff fuer 48h erlauben</label>
+        <label title="Support bearbeitet das Ticket ohne zusätzlichen Kontozugriff"><input type="radio" name="ticket-support-access" value="no" checked /> Kein zusaetzlicher Zugriff</label>
       </div>
 
       <p class="help">
@@ -254,7 +254,7 @@
       </p>
 
       <div class="inline">
-        <button class="btn btn-primary" type="button" onclick="submitSupportTicket()">Ticket erstellen</button>
+        <button class="btn btn-primary" type="button" onclick="submitSupportTicket()" title="Support-Ticket einreichen und an den Anbieter senden">Ticket erstellen</button>
       </div>
 
       <div id="ticket-submit-status" class="status">Noch kein Ticket gesendet.</div>

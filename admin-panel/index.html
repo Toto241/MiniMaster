@@ -32,6 +32,7 @@
                         id="logout-btn"
                         onclick="logout()"
                         style="display: none"
+                        title="Vom Operator-Dashboard abmelden"
                     >
                         Abmelden
                     </button>
@@ -43,55 +44,58 @@
                 <button
                     class="nav-tab active"
                     onclick="switchTab('overview', event)"
+                    title="KPI-Dashboard mit Statistiken, Diagrammen und Systemgesundheit"
                 >
                     Übersicht
                 </button>
-                <button class="nav-tab" onclick="switchTab('users', event)">
+                <button class="nav-tab" onclick="switchTab('users', event)" title="Benutzer suchen, anzeigen und verwalten">
                     Benutzer
                 </button>
-                <button class="nav-tab" onclick="switchTab('devices', event)">
+                <button class="nav-tab" onclick="switchTab('devices', event)" title="Gekoppelte Kindergeräte suchen und verwalten">
                     Geräte
                 </button>
                 <button
                     class="nav-tab"
                     onclick="switchTab('subscriptions', event)"
+                    title="Abonnements überwachen und nach Status filtern"
                 >
                     Abonnements
                 </button>
-                <button class="nav-tab" onclick="switchTab('pairing', event)">
+                <button class="nav-tab" onclick="switchTab('pairing', event)" title="Pairing-Codes und -Tokens überwachen">
                     Kopplung
                 </button>
-                <button class="nav-tab" onclick="switchTab('support', event)">
+                <button class="nav-tab" onclick="switchTab('support', event)" title="Support-Tickets verwalten und filtern">
                     Support
                 </button>
-                <button class="nav-tab" onclick="switchTab('errorlogs', event)">
+                <button class="nav-tab" onclick="switchTab('errorlogs', event)" title="Fehlerprotokolle durchsuchen und analysieren">
                     Fehlerprotokoll
                 </button>
                 <button
                     class="nav-tab"
                     onclick="switchTab('compliance', event)"
+                    title="DSGVO-Datenauskunft, Kontolöschung, Audit-Export und Legacy-Auth-Monitor"
                 >
                     Compliance
                 </button>
-                <button class="nav-tab" onclick="switchTab('setup', event)">
+                <button class="nav-tab" onclick="switchTab('setup', event)" title="Inbetriebnahme-Assistent und Laufzeitkonfiguration">
                     ⚙️ Einrichtung
                 </button>
-                <button class="nav-tab" onclick="switchTab('platforms', event)">
+                <button class="nav-tab" onclick="switchTab('platforms', event)" title="Plattform-Bereitschaft, P0-Blocker und Einrichtungsassistenten">
                     📱 Plattformen
                 </button>
-                <button class="nav-tab" onclick="switchTab('qa', event)">
+                <button class="nav-tab" onclick="switchTab('qa', event)" title="Qualitätssicherung: Testläufe, USB-Tests und Befehlszentrale">
                     🧪 Qualitätssicherung
                 </button>
-                <button class="nav-tab" onclick="switchTab('admin', event)">
+                <button class="nav-tab" onclick="switchTab('admin', event)" title="Admin-Claims, RBAC-Rollenverwaltung und Entwickler-Reset">
                     👤 Administration
                 </button>
-                <button class="nav-tab" onclick="switchTab('firebase', event)">
+                <button class="nav-tab" onclick="switchTab('firebase', event)" title="Firebase Functions-Status, Gemini-Test, Knowledge Base und FCM">
                     Firebase
                 </button>
-                <button class="nav-tab" onclick="switchTab('ai', event)">
+                <button class="nav-tab" onclick="switchTab('ai', event)" title="KI-Assistent für Fragen, Operator-Hilfe und Fehlerüberwachung">
                     🤖 KI-Assistent
                 </button>
-                <button class="nav-tab" onclick="switchTab('legal', event)">
+                <button class="nav-tab" onclick="switchTab('legal', event)" title="Richtlinien, Einwilligungen, Reconsent und Play Store Readiness">
                     📜 Recht &amp; Datenschutz
                 </button>
             </nav>
@@ -152,27 +156,27 @@
                             <div class="firebase-config-form">
                                 <div class="config-field">
                                     <label for="bootstrap-api-key">API Key</label>
-                                    <input type="text" id="bootstrap-api-key" placeholder="AIzaSy..." />
+                                    <input type="text" id="bootstrap-api-key" placeholder="AIzaSy..." title="Firebase API-Schlüssel aus den Projekteinstellungen" />
                                 </div>
                                 <div class="config-field">
                                     <label for="bootstrap-auth-domain">Auth Domain</label>
-                                    <input type="text" id="bootstrap-auth-domain" placeholder="minimaster-app.firebaseapp.com" />
+                                    <input type="text" id="bootstrap-auth-domain" placeholder="minimaster-app.firebaseapp.com" title="Firebase Auth-Domain für die Authentifizierung" />
                                 </div>
                                 <div class="config-field">
                                     <label for="bootstrap-project-id">Project ID</label>
-                                    <input type="text" id="bootstrap-project-id" placeholder="minimaster-app" />
+                                    <input type="text" id="bootstrap-project-id" placeholder="minimaster-app" title="Eindeutige Firebase-Projekt-ID" />
                                 </div>
                                 <div class="config-field">
                                     <label for="bootstrap-storage-bucket">Storage Bucket</label>
-                                    <input type="text" id="bootstrap-storage-bucket" placeholder="minimaster-app.firebasestorage.app" />
+                                    <input type="text" id="bootstrap-storage-bucket" placeholder="minimaster-app.firebasestorage.app" title="Firebase Storage-Bucket für Dateispeicherung" />
                                 </div>
                                 <div class="config-field">
                                     <label for="bootstrap-messaging-sender-id">Messaging Sender ID</label>
-                                    <input type="text" id="bootstrap-messaging-sender-id" placeholder="123456789012" />
+                                    <input type="text" id="bootstrap-messaging-sender-id" placeholder="123456789012" title="Firebase Cloud Messaging Sender-ID" />
                                 </div>
                                 <div class="config-field">
                                     <label for="bootstrap-app-id">App ID</label>
-                                    <input type="text" id="bootstrap-app-id" placeholder="1:123456789:web:abc123" />
+                                    <input type="text" id="bootstrap-app-id" placeholder="1:123456789:web:abc123" title="Firebase Web-App-ID" />
                                 </div>
                             </div>
 
@@ -189,7 +193,7 @@
                                         class="form-input"
                                         placeholder="https://example.com/firebase-config.json"
                                     />
-                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromUrl()">
+                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromUrl()" title="Firebase-Konfiguration aus einer externen URL laden">
                                         Aus URL laden
                                     </button>
                                 </div>
@@ -200,7 +204,7 @@
                                         class="form-input"
                                         accept=".json,application/json"
                                     />
-                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromFile()">
+                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromFile()" title="Firebase-Konfiguration aus einer lokalen JSON-Datei importieren">
                                         JSON-Datei importieren
                                     </button>
                                 </div>
@@ -214,8 +218,8 @@
                             <div id="bootstrap-config-status" class="phase-status"></div>
 
                             <div class="phase-actions">
-                                <button onclick="saveBootstrapFirebaseConfig()" class="btn btn-secondary">Lokal speichern</button>
-                                <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary">Speichern &amp; verbinden</button>
+                                <button onclick="saveBootstrapFirebaseConfig()" class="btn btn-secondary" title="Firebase-Konfiguration nur lokal im Browser speichern">Lokal speichern</button>
+                                <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary" title="Konfiguration speichern und Verbindung zum Firebase-Projekt herstellen">Speichern &amp; verbinden</button>
                             </div>
 
                             <div class="firebase-import-box" style="margin-block-start: 14px; border-color: #fed7aa; background: #fff7ed;">
@@ -225,9 +229,9 @@
                                     Danach wird automatisch in die Kontoeinrichtung gewechselt.
                                 </p>
                                 <div class="phase-actions" style="margin-block-start: 10px;">
-                                    <button type="button" class="btn btn-secondary" onclick="copyFirebaseRecoveryScript()">Recovery-Skript kopieren</button>
-                                    <button type="button" class="btn btn-primary" onclick="runFirebaseRecoveryAutopilot()">Recovery jetzt ausführen</button>
-                                    <button type="button" class="btn btn-danger" onclick="runStartFromScratchAutopilot()">Start bei Null (Cloud + Panel)</button>
+                                    <button type="button" class="btn btn-secondary" onclick="copyFirebaseRecoveryScript()" title="Recovery-Skript in die Zwischenablage kopieren">Recovery-Skript kopieren</button>
+                                    <button type="button" class="btn btn-primary" onclick="runFirebaseRecoveryAutopilot()" title="Automatische Wiederherstellung von Firestore, Functions und Storage starten">Recovery jetzt ausführen</button>
+                                    <button type="button" class="btn btn-danger" onclick="runStartFromScratchAutopilot()" title="Kompletter Neustart: Cloud-Daten und lokale Einstellungen zurücksetzen">Start bei Null (Cloud + Panel)</button>
                                 </div>
                                 <div id="bootstrap-recovery-progress" class="recovery-progress" aria-live="polite">
                                     <div class="recovery-progress-step" data-step="validate">
@@ -295,10 +299,10 @@
 
                             <!-- Tab Toggle: Registrieren / Einloggen -->
                             <div class="auth-toggle">
-                                <button class="auth-toggle-btn active" id="toggle-register" onclick="showAuthMode('register')">
+                                <button class="auth-toggle-btn active" id="toggle-register" onclick="showAuthMode('register')" title="Neues Operator-Konto in Firebase erstellen">
                                     Neues Konto erstellen
                                 </button>
-                                <button class="auth-toggle-btn" id="toggle-login" onclick="showAuthMode('login')">
+                                <button class="auth-toggle-btn" id="toggle-login" onclick="showAuthMode('login')" title="Mit einem bestehenden Operator-Konto anmelden">
                                     Bestehendes Konto nutzen
                                 </button>
                             </div>
@@ -309,13 +313,13 @@
                                     <p>Ein Reset-Link kann jederzeit an die hinterlegte Operator-E-Mail gesendet werden.</p>
                                 </div>
                                 <div class="auth-reset-card-actions">
-                                    <button type="button" class="btn btn-secondary" onclick="openPasswordResetFlow()">
+                                    <button type="button" class="btn btn-secondary" onclick="openPasswordResetFlow()" title="Link zum Zurücksetzen des Passworts an die E-Mail senden">
                                         Passwort zurücksetzen
                                     </button>
-                                    <button type="button" class="btn btn-outline" onclick="handlePrepareCloudReset()">
+                                    <button type="button" class="btn btn-outline" onclick="handlePrepareCloudReset()" title="Cloud-Reset der Firebase-Konfiguration vorbereiten">
                                         Cloud-Reset vorbereiten
                                     </button>
-                                    <button type="button" class="btn btn-danger" onclick="handleFullAdminPanelReset()">
+                                    <button type="button" class="btn btn-danger" onclick="handleFullAdminPanelReset()" title="Alle lokalen Panel-Daten und Konfigurationen komplett zurücksetzen">
                                         Panel vollständig zurücksetzen
                                     </button>
                                 </div>
@@ -325,17 +329,17 @@
                             <form id="register-form" class="auth-form">
                                 <div class="form-group">
                                     <label for="register-email">E-Mail-Adresse</label>
-                                    <input type="email" id="register-email" placeholder="operator@example.com" required />
+                                    <input type="email" id="register-email" placeholder="operator@example.com" required title="E-Mail-Adresse für das neue Operator-Konto" />
                                 </div>
                                 <div class="form-group">
                                     <label for="register-password">Passwort</label>
-                                    <input type="password" id="register-password" placeholder="Mindestens 8 Zeichen" minlength="8" required />
+                                    <input type="password" id="register-password" placeholder="Mindestens 8 Zeichen" minlength="8" required title="Sicheres Passwort mit mindestens 8 Zeichen festlegen" />
                                 </div>
                                 <div class="form-group">
                                     <label for="register-password-confirm">Passwort bestätigen</label>
-                                    <input type="password" id="register-password-confirm" placeholder="Passwort wiederholen" minlength="8" required />
+                                    <input type="password" id="register-password-confirm" placeholder="Passwort wiederholen" minlength="8" required title="Passwort zur Bestätigung erneut eingeben" />
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-full" id="register-submit-btn">
+                                <button type="submit" class="btn btn-primary btn-full" id="register-submit-btn" title="Neues Operator-Konto in Firebase erstellen">
                                     Konto erstellen
                                 </button>
                                 <div id="register-status" class="phase-status"></div>
@@ -345,27 +349,27 @@
                             <form id="login-form" class="auth-form" style="display: none">
                                 <div class="form-group">
                                     <label for="login-email">E-Mail-Adresse</label>
-                                    <input type="email" id="login-email" placeholder="operator@example.com" required />
+                                    <input type="email" id="login-email" placeholder="operator@example.com" required title="E-Mail-Adresse des bestehenden Operator-Kontos" />
                                 </div>
                                 <div class="form-group">
                                     <label for="login-password">Passwort</label>
-                                    <input type="password" id="login-password" placeholder="Passwort" required />
+                                    <input type="password" id="login-password" placeholder="Passwort" required title="Passwort des Operator-Kontos eingeben" />
                                 </div>
                                 <div class="auth-inline-actions">
-                                    <button type="button" class="auth-link-btn" id="forgot-password-btn">
+                                    <button type="button" class="auth-link-btn" id="forgot-password-btn" title="Link zum Zurücksetzen des Passworts an die angegebene E-Mail senden">
                                         Passwort vergessen? Reset-Link senden
                                     </button>
                                     <p class="auth-help-text">
                                         Ein Zurücksetzungs-Link wird an die angegebene E-Mail-Adresse gesendet.
                                     </p>
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-full">
+                                <button type="submit" class="btn btn-primary btn-full" title="Am Operator-Dashboard anmelden">
                                     Anmelden
                                 </button>
-                                <button type="button" class="btn btn-secondary btn-full" id="forgot-password-prominent-btn">
+                                <button type="button" class="btn btn-secondary btn-full" id="forgot-password-prominent-btn" title="Passwort-Reset-Link per E-Mail anfordern">
                                     Passwort vergessen? Jetzt Reset-Link anfordern
                                 </button>
-                                <button type="button" class="btn btn-outline btn-full" id="check-provider-btn">
+                                <button type="button" class="btn btn-outline btn-full" id="check-provider-btn" title="Prüft, welche Anmeldemethode für diese E-Mail-Adresse konfiguriert ist">
                                     Anmeldeart für E-Mail prüfen
                                 </button>
                                 <div id="login-status" class="phase-status"></div>
@@ -455,11 +459,13 @@
                                     text-decoration: none;
                                     margin-inline-end: 10px;
                                 "
-                                >Audit-Logs anzeigen</a
+                                title="Detaillierte Audit-Log-Ansicht mit Filtern und Paginierung öffnen"
+                                >Audit-Logs anzeigen</aa
                             >
                             <button
                                 onclick="refreshAllStats()"
                                 class="btn btn-secondary"
+                                title="Alle KPI-Statistiken, Diagramme und Systemdaten neu laden"
                             >
                                 Statistiken aktualisieren
                             </button>
@@ -579,16 +585,19 @@
                                 type="text"
                                 id="user-search-input"
                                 placeholder="Suche nach E-Mail oder Master-ID"
+                                title="E-Mail-Adresse oder Master-ID eingeben, um Benutzer zu finden"
                             />
                             <button
                                 onclick="searchUsers()"
                                 class="btn btn-secondary"
+                                title="Benutzer nach dem eingegebenen Suchbegriff filtern"
                             >
                                 Suchen
                             </button>
                             <button
                                 onclick="loadUsers()"
                                 class="btn btn-secondary"
+                                title="Alle registrierten Benutzer laden und anzeigen"
                             >
                                 Alle anzeigen
                             </button>
@@ -603,9 +612,9 @@
                     <div id="tab-devices" class="tab-content" style="display: none">
                         <h2>Geräte (Kinder-Geräte)</h2>
                         <div class="user-search">
-                            <input type="text" id="device-search-input" placeholder="Suche nach Child-ID oder Master-ID" />
-                            <button onclick="searchDevices()" class="btn btn-secondary">Suchen</button>
-                            <button onclick="loadDevices()" class="btn btn-secondary">Alle anzeigen</button>
+                            <input type="text" id="device-search-input" placeholder="Suche nach Child-ID oder Master-ID" title="Child-ID oder zugehörige Master-ID eingeben, um Geräte zu finden" />
+                            <button onclick="searchDevices()" class="btn btn-secondary" title="Geräte nach dem eingegebenen Suchbegriff filtern">Suchen</button>
+                            <button onclick="loadDevices()" class="btn btn-secondary" title="Alle registrierten Kindergeräte laden und anzeigen">Alle anzeigen</button>
                         </div>
                         <div id="device-list" class="data-list"></div>
                         <div id="device-pagination" class="pagination"></div>
@@ -622,18 +631,21 @@
                             <button
                                 onclick="filterSubscriptions('all')"
                                 class="btn btn-secondary"
+                                title="Alle Abonnements anzeigen (aktiv und abgelaufen)"
                             >
                                 Alle
                             </button>
                             <button
                                 onclick="filterSubscriptions('active')"
                                 class="btn btn-secondary"
+                                title="Nur aktive Abonnements anzeigen"
                             >
                                 Aktiv
                             </button>
                             <button
                                 onclick="filterSubscriptions('expired')"
                                 class="btn btn-secondary"
+                                title="Nur abgelaufene Abonnements anzeigen"
                             >
                                 Abgelaufen
                             </button>
@@ -648,9 +660,9 @@
                     <div id="tab-pairing" class="tab-content" style="display: none">
                         <h2>Pairing-Codes &amp; Tokens</h2>
                         <div class="sub-filters">
-                            <button onclick="loadPairingOverview('codes')" class="btn btn-secondary">Pairing Codes (6-stellig)</button>
-                            <button onclick="loadPairingOverview('tokens')" class="btn btn-secondary">Pairing Tokens (UUID)</button>
-                            <button onclick="loadPairingOverview('all')" class="btn btn-primary">Alle laden</button>
+                            <button onclick="loadPairingOverview('codes')" class="btn btn-secondary" title="Nur 6-stellige Pairing-Codes laden (24h gültig)">Pairing Codes (6-stellig)</button>
+                            <button onclick="loadPairingOverview('tokens')" class="btn btn-secondary" title="Nur UUID-basierte Pairing-Tokens laden (5 Min. gültig)">Pairing Tokens (UUID)</button>
+                            <button onclick="loadPairingOverview('all')" class="btn btn-primary" title="Alle Pairing-Codes und -Tokens gemeinsam laden">Alle laden</button>
                         </div>
                         <div class="stats-grid" style="margin-block-end: 15px">
                             <div class="stat-card"><h3>Aktive Codes</h3><p id="pairing-active-codes">--</p></div>
@@ -672,12 +684,14 @@
                             <button
                                 onclick="filterTickets('all')"
                                 class="btn btn-secondary"
+                                title="Alle Support-Tickets anzeigen"
                             >
                                 Alle
                             </button>
                             <button
                                 onclick="filterTickets('open')"
                                 class="btn btn-secondary"
+                                title="Nur offene Tickets anzeigen"
                             >
                                 Offen
                             </button>
@@ -686,24 +700,28 @@
                                     filterTickets('awaiting_user_feedback')
                                 "
                                 class="btn btn-secondary"
+                                title="Tickets anzeigen, die auf Rückmeldung vom Nutzer warten"
                             >
                                 Wartet auf Feedback
                             </button>
                             <button
                                 onclick="filterTickets('escalated')"
                                 class="btn btn-secondary"
+                                title="Eskalierte Tickets anzeigen, die manuelle Bearbeitung erfordern"
                             >
                                 Eskaliert
                             </button>
                             <button
                                 onclick="filterTickets('in_progress')"
                                 class="btn btn-secondary"
+                                title="Tickets anzeigen, die aktuell in Bearbeitung sind"
                             >
                                 In Bearbeitung
                             </button>
                             <button
                                 onclick="filterTickets('closed')"
                                 class="btn btn-secondary"
+                                title="Bereits geschlossene Tickets anzeigen"
                             >
                                 Geschlossen
                             </button>
@@ -718,10 +736,10 @@
                     <div id="tab-errorlogs" class="tab-content" style="display: none">
                         <h2>Fehlerprotokoll (durchsuchbar)</h2>
                         <div class="user-search">
-                            <input type="text" id="errorlog-search-input" placeholder="Suche nach Funktionsname oder Fehlermeldung" />
-                            <input type="date" id="errorlog-date-filter" />
-                            <button onclick="searchErrorLogs()" class="btn btn-secondary">Suchen</button>
-                            <button onclick="loadErrorLogs()" class="btn btn-primary">Alle laden</button>
+                            <input type="text" id="errorlog-search-input" placeholder="Suche nach Funktionsname oder Fehlermeldung" title="Funktionsname oder Fehlernachricht eingeben" />
+                            <input type="date" id="errorlog-date-filter" title="Fehler ab diesem Datum filtern" />
+                            <button onclick="searchErrorLogs()" class="btn btn-secondary" title="Fehlerprotokolle nach den eingegebenen Kriterien durchsuchen">Suchen</button>
+                            <button onclick="loadErrorLogs()" class="btn btn-primary" title="Alle verfügbaren Fehlerprotokolle laden">Alle laden</button>
                         </div>
                         <div id="errorlog-list" class="data-list"></div>
                         <div id="errorlog-pagination" class="pagination"></div>
@@ -745,10 +763,12 @@
                                     type="text"
                                     id="dsar-master-id"
                                     placeholder="Master-ID eingeben"
+                                    title="Master-ID des Benutzers für den DSGVO-Datenexport"
                                 />
                                 <button
                                     onclick="triggerDsarExport()"
                                     class="btn btn-primary"
+                                    title="Alle Daten dieses Benutzers gemäß DSGVO exportieren"
                                 >
                                     Benutzerdaten exportieren
                                 </button>
@@ -774,10 +794,12 @@
                                     type="text"
                                     id="delete-master-id"
                                     placeholder="Master-ID eingeben"
+                                    title="Master-ID des Benutzers, dessen Konto permanent gelöscht werden soll"
                                 />
                                 <button
                                     onclick="triggerAccountDeletion()"
                                     class="btn btn-danger"
+                                    title="Alle Daten dieses Nutzers unwiderruflich löschen (DSGVO Art. 17)"
                                 >
                                     Benutzerkonto löschen
                                 </button>
@@ -792,11 +814,12 @@
                             <h3>Audit-Log Export</h3>
                             <p>Exportieren Sie Audit-Logs für einen bestimmten Zeitraum.</p>
                             <div class="dsar-form">
-                                <input type="date" id="audit-start-date" />
-                                <input type="date" id="audit-end-date" />
+                                <input type="date" id="audit-start-date" title="Startdatum für den Audit-Log-Export" />
+                                <input type="date" id="audit-end-date" title="Enddatum für den Audit-Log-Export" />
                                 <button
                                     onclick="exportAuditLogs()"
                                     class="btn btn-primary"
+                                    title="Audit-Logs für den gewählten Zeitraum exportieren"
                                 >
                                     Audit-Logs exportieren
                                 </button>
@@ -821,6 +844,7 @@
                                 <button
                                     onclick="loadLegacyAuthUsage()"
                                     class="btn btn-primary"
+                                    title="Aktuelle Nutzung der veralteten secretKey/IMEI-Authentifizierung anzeigen"
                                 >
                                     Legacy-Auth Nutzung laden
                                 </button>
@@ -847,8 +871,8 @@
                             <div class="wizard-step">
                                 <h4>1. Firebase-Projekt und Zusatzrollen</h4>
                                 <div class="commissioning-grid">
-                                    <input type="text" id="commissioning-support-uid" placeholder="Optional: Support Agent UID" />
-                                    <input type="text" id="commissioning-auditor-uid" placeholder="Optional: Auditor UID" />
+                                    <input type="text" id="commissioning-support-uid" placeholder="Optional: Support Agent UID" title="UID eines Support-Benutzers für automatische Rollenvergabe (optional)" />
+                                    <input type="text" id="commissioning-auditor-uid" placeholder="Optional: Auditor UID" title="UID eines Auditor-Benutzers für automatische Rollenvergabe (optional)" />
                                 </div>
                                 <p class="muted-note">
                                     Die eigentliche Firebase-Webkonfiguration erfolgt im Bootstrap-Block vor dem Login,
@@ -857,9 +881,9 @@
                             </div>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="runCommissioningAssistant()" class="btn btn-primary">Assistent ausführen</button>
-                                <button onclick="refreshCommissioningReport()" class="btn btn-secondary">Bericht aktualisieren</button>
-                                <button onclick="exportReleaseArtefact()" class="btn btn-secondary">Release-Artefakt exportieren</button>
+                                <button onclick="runCommissioningAssistant()" class="btn btn-primary" title="Automatische Inbetriebnahme starten: Firebase-Bootstrap, Rollen und Validierung">Assistent ausführen</button>
+                                <button onclick="refreshCommissioningReport()" class="btn btn-secondary" title="Aktuellen Inbetriebnahmebericht neu generieren">Bericht aktualisieren</button>
+                                <button onclick="exportReleaseArtefact()" class="btn btn-secondary" title="Zusammenfassung als Release-Artefakt für den produktiven Einsatz exportieren">Release-Artefakt exportieren</button>
                             </div>
 
                             <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
@@ -913,29 +937,29 @@
                                 <div>
                                     <h4>Cloud Services</h4>
                                     <div class="dsar-form" style="display: grid; gap: 10px">
-                                        <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" />
-                                        <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" />
-                                        <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" />
-                                        <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" />
+                                        <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" title="Firebase-Projekt-ID für die Cloud-Anbindung" />
+                                        <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" title="Google Cloud-Region für die Cloud Functions" />
+                                        <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" title="App-Check-Modus: enforced (blockiert unautorisierte Anfragen) oder monitor" />
+                                        <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" title="Zielumgebung: prod für Produktion, staging für Tests" />
                                     </div>
                                 </div>
                                 <div>
                                     <h4>KI / Support-Automation</h4>
                                     <div class="dsar-form" style="display: grid; gap: 10px">
-                                        <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" />
-                                        <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gemini-3.0-flash)" />
-                                        <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" />
-                                        <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" />
-                                        <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" />
-                                        <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent"></textarea>
+                                        <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" title="KI-Anbieter für den Support-Assistenten" />
+                                        <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gemini-3.0-flash)" title="Modellname des KI-Anbieters" />
+                                        <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" title="Kreativität der KI-Antworten: 0.0 = deterministisch, 2.0 = sehr kreativ" />
+                                        <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" title="Optionaler benutzerdefinierter API-Endpunkt" />
+                                        <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" title="Referenz auf den API-Schlüssel (z.B. Secret Manager Pfad, NICHT den Schlüssel selbst)" />
+                                        <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent" title="Systemanweisung, die das Verhalten des KI-Assistenten steuert"></textarea>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="loadOperatorConfig()" class="btn btn-secondary">Konfiguration laden</button>
-                                <button onclick="saveOperatorConfig()" class="btn btn-primary">Konfiguration speichern</button>
-                                <button onclick="testAiConfiguration()" class="btn btn-secondary">Test KI-Konfiguration</button>
+                                <button onclick="loadOperatorConfig()" class="btn btn-secondary" title="Aktuelle Betreiber-Konfiguration aus Firestore laden">Konfiguration laden</button>
+                                <button onclick="saveOperatorConfig()" class="btn btn-primary" title="Änderungen an der Betreiber-Konfiguration in Firestore speichern">Konfiguration speichern</button>
+                                <button onclick="testAiConfiguration()" class="btn btn-secondary" title="Verbindung zum KI-Anbieter mit den aktuellen Einstellungen testen">Test KI-Konfiguration</button>
                             </div>
                             <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
                                 <div class="info">Noch keine Konfiguration geladen.</div>
@@ -961,7 +985,7 @@
                                     <h4>1) Firebase Key Rotation + Restriktionen</h4>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-key-rotation-done" /> Rotation abgeschlossen</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-key-restrictions-done" /> API-/App-Restriktionen gesetzt</label>
-                                    <input type="text" id="p0-key-evidence" placeholder="Nachweis-Link/Screenshot-Referenz" />
+                                    <input type="text" id="p0-key-evidence" placeholder="Nachweis-Link/Screenshot-Referenz" title="Link oder Referenz zum Nachweis der Key-Rotation/-Restriktion" />
                                 </div>
 
                                 <div class="p0-card">
@@ -971,7 +995,7 @@
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-play-listing" /> Store Listing final</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-play-permissions" /> Permissions Declaration eingereicht</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-play-app-access" /> App Access Guide hinterlegt</label>
-                                    <input type="text" id="p0-play-evidence" placeholder="Play Console Nachweis-Link" />
+                                    <input type="text" id="p0-play-evidence" placeholder="Play Console Nachweis-Link" title="Link zur Play Console als Nachweis" />
                                 </div>
 
                                 <div class="p0-card">
@@ -980,25 +1004,25 @@
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-ai" /> AI-Konfiguration + AI-Flow geprüft</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-support" /> Support-Workflow vollständig getestet</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-compliance" /> Compliance-Flow (DSAR/Audit/Consent) geprüft</label>
-                                    <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" />
+                                    <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" title="Referenz zum Abnahmeprotokoll oder Checklist-Artefakt" />
                                 </div>
 
                                 <div class="p0-card">
                                     <h4>4) On-Call / Eskalations-Roster</h4>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-roster-assigned" /> Roster verbindlich benannt</label>
-                                    <input type="text" id="p0-roster-primary" placeholder="Primary On-Call (Name/Kontakt)" />
-                                    <input type="text" id="p0-roster-secondary" placeholder="Secondary On-Call (Name/Kontakt)" />
-                                    <input type="text" id="p0-roster-security" placeholder="Security/Compliance Kontakt" />
-                                    <input type="text" id="p0-roster-evidence" placeholder="Roster-Link/Runbook-Referenz" />
+                                    <input type="text" id="p0-roster-primary" placeholder="Primary On-Call (Name/Kontakt)" title="Primäre Bereitschaftsperson mit Kontaktdaten" />
+                                    <input type="text" id="p0-roster-secondary" placeholder="Secondary On-Call (Name/Kontakt)" title="Sekundäre Bereitschaftsperson als Backup" />
+                                    <input type="text" id="p0-roster-security" placeholder="Security/Compliance Kontakt" title="Ansprechperson für Sicherheits- und Compliance-Fragen" />
+                                    <input type="text" id="p0-roster-evidence" placeholder="Roster-Link/Runbook-Referenz" title="Link zum Bereitschaftsplan oder Runbook" />
                                 </div>
                             </div>
 
-                            <textarea id="p0-notes" rows="3" placeholder="Freitext / Rest-Risiken / offene Maßnahmen"></textarea>
+                            <textarea id="p0-notes" rows="3" placeholder="Freitext / Rest-Risiken / offene Maßnahmen" title="Freitext für zusätzliche Anmerkungen, Restrisiken oder offene Maßnahmen"></textarea>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="saveP0BlockerCockpit()" class="btn btn-primary">P0-Cockpit speichern</button>
-                                <button onclick="exportP0BlockerCockpit()" class="btn btn-secondary">P0-Status exportieren</button>
-                                <button onclick="resetP0BlockerCockpit()" class="btn btn-danger">P0-Status zurücksetzen</button>
+                                <button onclick="saveP0BlockerCockpit()" class="btn btn-primary" title="P0-Blocker-Status und alle Eingaben lokal speichern">P0-Cockpit speichern</button>
+                                <button onclick="exportP0BlockerCockpit()" class="btn btn-secondary" title="P0-Status als JSON-Nachweis exportieren">P0-Status exportieren</button>
+                                <button onclick="resetP0BlockerCockpit()" class="btn btn-danger" title="Alle P0-Blocker-Eingaben zurücksetzen">P0-Status zurücksetzen</button>
                             </div>
 
                             <div id="p0-blocker-result" class="data-list" style="margin-block-start: 12px"></div>
@@ -1063,7 +1087,7 @@ npm test -- --runInBand
                                 Backend und Freigaben. Optional kann Gemini gefundene Probleme erkl&auml;ren.
                             </p>
                             <div class="setup-actions">
-                                <button onclick="runPlausibilityWithAiOption()" class="btn btn-primary">Plausibilit&auml;t pr&uuml;fen</button>
+                                <button onclick="runPlausibilityWithAiOption()" class="btn btn-primary" title="Alle Angaben auf Widersprüche und Inkonsistenzen prüfen">Plausibilit&auml;t pr&uuml;fen</button>
                             </div>
                             <div id="plausibility-results" class="data-list" style="margin-block-start: 12px"></div>
                         </div>
@@ -1075,9 +1099,9 @@ npm test -- --runInBand
                                 Mobiltelefonen. Jeder Schritt kann &uuml;ber Gemini erkl&auml;rt werden.
                             </p>
                             <div class="setup-actions">
-                                <button onclick="startSetupWizard('masterApp')" class="btn btn-primary">Eltern-App einrichten</button>
-                                <button onclick="startSetupWizard('childApp')" class="btn btn-primary">Kind-App einrichten</button>
-                                <button onclick="resetWizard(activeWizard || 'masterApp')" class="btn btn-secondary">Wizard zur&uuml;cksetzen</button>
+                                <button onclick="startSetupWizard('masterApp')" class="btn btn-primary" title="Schritt-für-Schritt-Einrichtung der Eltern-App starten">Eltern-App einrichten</button>
+                                <button onclick="startSetupWizard('childApp')" class="btn btn-primary" title="Schritt-für-Schritt-Einrichtung der Kind-App starten">Kind-App einrichten</button>
+                                <button onclick="resetWizard(activeWizard || 'masterApp')" class="btn btn-secondary" title="Einrichtungsassistenten auf den Anfang zurücksetzen">Wizard zur&uuml;cksetzen</button>
                             </div>
                             <div id="setup-wizard-content" class="data-list" style="margin-block-start: 12px">
                                 <div class="info">W&auml;hlen Sie einen Assistenten, um loszulegen.</div>
@@ -1124,8 +1148,9 @@ npm test -- --runInBand
                                                 type="text"
                                                 id="python-automation-catalog-search"
                                                 placeholder="Testfälle filtern (Name, ID, Quelle)"
+                                                title="Testfallkatalog nach Name, ID oder Quelle durchsuchen"
                                             />
-                                            <select id="python-automation-catalog-filter">
+                                            <select id="python-automation-catalog-filter" title="Testfälle nach Automationsart filtern">
                                                 <option value="all">Alle Testfälle</option>
                                                 <option value="open">Nur offene Testfälle</option>
                                                 <option value="automatic">Nur automatische Prüffälle</option>
@@ -1174,9 +1199,9 @@ npm test -- --runInBand
                                             />
                                         </div>
                                         <div class="setup-actions" style="margin-block-start: 10px">
-                                            <button onclick="runPythonAutomationSuite()" class="btn btn-primary">Python-Testlauf starten</button>
-                                            <button onclick="loadPythonAutomationCatalog()" class="btn btn-secondary">Testfallkatalog neu laden</button>
-                                            <button onclick="exportLatestPythonAutomationRun()" class="btn btn-secondary">Letzten Lauf exportieren</button>
+                                            <button onclick="runPythonAutomationSuite()" class="btn btn-primary" title="Alle ausgewählten Testfälle automatisch bewerten und protokollieren">Python-Testlauf starten</button>
+                                            <button onclick="loadPythonAutomationCatalog()" class="btn btn-secondary" title="Testfallkatalog aus der Konfiguration neu laden">Testfallkatalog neu laden</button>
+                                            <button onclick="exportLatestPythonAutomationRun()" class="btn btn-secondary" title="Ergebnis des letzten Testlaufs als Datei exportieren">Letzten Lauf exportieren</button>
                                         </div>
                                     </section>
                                 </div>
@@ -1206,13 +1231,14 @@ npm test -- --runInBand
                                             </div>
                                         </div>
                                         <div class="setup-actions" style="margin-block-end: 8px">
-                                            <button onclick="loadPythonAutomationHistory()" class="btn btn-secondary">Historie laden</button>
+                                            <button onclick="loadPythonAutomationHistory()" class="btn btn-secondary" title="Vergangene Testläufe laden und als Nachweis einsehen">Historie laden</button>
                                         </div>
                                         <div class="python-automation-toolbar">
                                             <input
                                                 type="text"
                                                 id="python-automation-history-search"
                                                 placeholder="Historie filtern (Run-ID, Status, Zeit)"
+                                                title="Laufhistorie nach Run-ID, Status oder Zeitpunkt durchsuchen"
                                             />
                                             <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="python-automation-history-open-only" />
@@ -1266,8 +1292,8 @@ npm test -- --runInBand
                                             </label>
                                         </div>
                                         <div class="setup-actions" style="margin-block-start: 10px">
-                                            <button onclick="savePythonAutomationEvidence()" class="btn btn-primary">Nachweis speichern</button>
-                                            <button onclick="renderPythonAutomationProtocolEditor()" class="btn btn-secondary">Formular auf letzten Nachweis setzen</button>
+                                            <button onclick="savePythonAutomationEvidence()" class="btn btn-primary" title="Manuellen Nachweis für den ausgewählten Testfall speichern">Nachweis speichern</button>
+                                            <button onclick="renderPythonAutomationProtocolEditor()" class="btn btn-secondary" title="Formularfelder mit dem letzten gespeicherten Nachweis vorausfüllen">Formular auf letzten Nachweis setzen</button>
                                         </div>
                                     </section>
 
@@ -1281,7 +1307,7 @@ npm test -- --runInBand
                                             </div>
                                         </div>
                                         <div class="setup-actions" style="margin-block-end: 8px">
-                                            <button onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary">Nachweise laden</button>
+                                            <button onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary" title="Alle gespeicherten manuellen Nachweise laden und anzeigen">Nachweise laden</button>
                                         </div>
                                         <div id="python-automation-protocol-history" class="data-list" style="margin-block-start: 12px">
                                             <div class="info">Noch keine manuellen Nachweise geladen.</div>
@@ -1307,7 +1333,7 @@ npm test -- --runInBand
                                         </div>
                                     </div>
                                     <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadSuiteDeviceStatus()" class="btn btn-secondary">Ger&auml;te aktualisieren</button>
+                                        <button onclick="loadSuiteDeviceStatus()" class="btn btn-secondary" title="ADB-Status der angeschlossenen Android-Geräte aktualisieren">Ger&auml;te aktualisieren</button>
                                     </div>
                                     <div id="suite-device-status" class="data-list">
                                         <div class="info">Noch nicht geladen.</div>
@@ -1335,7 +1361,7 @@ npm test -- --runInBand
                                         </label>
                                     </div>
                                     <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadSuiteCatalog()" class="btn btn-secondary">Katalog laden</button>
+                                        <button onclick="loadSuiteCatalog()" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
                                     </div>
                                     <div id="suite-catalog" class="data-list">
                                         <div class="info">Noch nicht geladen.</div>
@@ -1391,7 +1417,7 @@ npm test -- --runInBand
                                         </div>
                                     </div>
                                     <div class="setup-actions" style="margin-block-start: 10px">
-                                        <button onclick="startUsbTestRun()" class="btn btn-primary">USB-Testlauf starten</button>
+                                        <button onclick="startUsbTestRun()" class="btn btn-primary" title="USB-Testlauf für das ausgewählte Gerät und die Suite starten">USB-Testlauf starten</button>
                                     </div>
                                 </section>
 
@@ -1403,7 +1429,7 @@ npm test -- --runInBand
                                         </div>
                                     </div>
                                     <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadSuiteRunHistory()" class="btn btn-secondary">Historie laden</button>
+                                        <button onclick="loadSuiteRunHistory()" class="btn btn-secondary" title="Verlauf laufender und vergangener Suite-Ausführungen laden">Historie laden</button>
                                     </div>
                                     <div id="suite-active-runs" class="data-list">
                                         <div class="info">Noch keine Testl&auml;ufe.</div>
@@ -1433,11 +1459,11 @@ npm test -- --runInBand
                                     <h4>Basisdaten</h4>
                                     <div class="dsar-form" style="display: grid; gap: 8px">
                                         <label for="cmd-workspace-path">Arbeitsverzeichnis</label>
-                                        <input type="text" id="cmd-workspace-path" placeholder="z. B. D:/Tools/MiniMaster" />
+                                        <input type="text" id="cmd-workspace-path" placeholder="z. B. D:/Tools/MiniMaster" title="Pfad zum MiniMaster-Arbeitsverzeichnis" />
                                         <label for="cmd-first-admin-email">Erstadmin E-Mail (optional)</label>
-                                        <input type="email" id="cmd-first-admin-email" placeholder="optional: admin@example.com" />
+                                        <input type="email" id="cmd-first-admin-email" placeholder="optional: admin@example.com" title="E-Mail für den automatisch anzulegenden Erstadmin" />
                                         <label for="cmd-first-admin-password">Erstadmin Passwort (optional)</label>
-                                        <input type="text" id="cmd-first-admin-password" placeholder="optional: Erstadmin Passwort" />
+                                        <input type="text" id="cmd-first-admin-password" placeholder="optional: Erstadmin Passwort" title="Passwort für den automatisch anzulegenden Erstadmin" />
                                     </div>
                                 </div>
 
@@ -1465,10 +1491,10 @@ npm test -- --runInBand
                             </div>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="refreshCommandBuilderCommands()" class="btn btn-primary">Befehle generieren</button>
-                                <button onclick="saveCommandBuilderConfig()" class="btn btn-secondary">Vorgaben speichern</button>
-                                <button onclick="copyRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-secondary">Rollout-PS kopieren</button>
-                                <button onclick="downloadRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-primary">Rollout-PS herunterladen</button>
+                                <button onclick="refreshCommandBuilderCommands()" class="btn btn-primary" title="Lauffähige Betriebsbefehle aus den Basisdaten generieren">Befehle generieren</button>
+                                <button onclick="saveCommandBuilderConfig()" class="btn btn-secondary" title="Aktuelle Eingaben lokal speichern">Vorgaben speichern</button>
+                                <button onclick="copyRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-secondary" title="Rollout-PowerShell-Skript in die Zwischenablage kopieren">Rollout-PS kopieren</button>
+                                <button onclick="downloadRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-primary" title="Rollout-PowerShell-Skript als Datei herunterladen">Rollout-PS herunterladen</button>
                             </div>
 
                             <div id="command-builder-status" class="data-list" style="margin-block-start: 15px">
@@ -1489,12 +1515,14 @@ npm test -- --runInBand
                                     <button
                                         onclick="runFullSetupValidation()"
                                         class="btn btn-primary"
+                                        title="Alle Cloud Functions, Sammlungen und Anbindungen vollständig validieren"
                                     >
                                         Vollständige Validierung starten
                                     </button>
                                     <button
                                         onclick="exportSetupReport()"
                                         class="btn btn-secondary"
+                                        title="Validierungsbericht als Datei exportieren"
                                     >
                                         Bericht exportieren
                                     </button>
@@ -1532,8 +1560,8 @@ npm test -- --runInBand
                             <h3>Admin-Konto erstellen / Admin-Claim vergeben</h3>
                             <p>Bestehenden Firebase-Auth-User zum Operator/Admin hochstufen (nur für bereits authentifizierte Admins).</p>
                             <div class="dsar-form">
-                                <input type="text" id="admin-target-uid" placeholder="User UID des neuen Admins" />
-                                <button onclick="grantAdminClaim()" class="btn btn-primary">Admin-Claim setzen</button>
+                                <input type="text" id="admin-target-uid" placeholder="User UID des neuen Admins" title="Firebase Auth UID des Benutzers, der Admin-Rechte erhalten soll" />
+                                <button onclick="grantAdminClaim()" class="btn btn-primary" title="Dem angegebenen Benutzer die Admin-Berechtigung erteilen">Admin-Claim setzen</button>
                             </div>
                             <div id="admin-claim-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
@@ -1542,14 +1570,14 @@ npm test -- --runInBand
                             <h3>Rollenverwaltung (RBAC)</h3>
                             <p>Operator-Rollen zuweisen: <strong>Admin</strong> (Vollzugriff), <strong>Support</strong> (Tickets + KI-Support, eingeschränkt auf freigegebene Fälle), <strong>Auditor</strong> (Einsicht Audit-Logs + Compliance).</p>
                             <div class="dsar-form">
-                                <input type="text" id="role-uid" placeholder="User UID" />
-                                <select id="role-select">
+                                <input type="text" id="role-uid" placeholder="User UID" title="Firebase Auth UID des Benutzers für die Rollenzuweisung" />
+                                <select id="role-select" title="Operator-Rolle auswählen: Admin, Support oder Auditor">
                                     <option value="">-- Rolle wählen --</option>
                                     <option value="admin">Admin (Vollzugriff)</option>
                                     <option value="support">Support Agent</option>
                                     <option value="auditor">Read-Only Auditor</option>
                                 </select>
-                                <button onclick="assignUserRole()" class="btn btn-primary">Rolle zuweisen</button>
+                                <button onclick="assignUserRole()" class="btn btn-primary" title="Dem Benutzer die ausgewählte Rolle zuweisen">Rolle zuweisen</button>
                             </div>
                             <div id="role-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
@@ -1566,7 +1594,7 @@ npm test -- --runInBand
                                 oder Emulator-Betrieb.
                             </p>
                             <div class="setup-actions">
-                                <button onclick="resetOperatorAccountsFromAdminPanel()" class="btn btn-danger">Alle Betreiberkonten zurücksetzen</button>
+                                <button onclick="resetOperatorAccountsFromAdminPanel()" class="btn btn-danger" title="ACHTUNG: Alle Betreiberkonten (Admin/Support/Auditor) unwiderruflich zurücksetzen">Alle Betreiberkonten zurücksetzen</button>
                             </div>
                             <div id="operator-reset-result" class="data-list" style="margin-block-start: 10px"></div>
                         </div>
@@ -1581,7 +1609,7 @@ npm test -- --runInBand
                 <div class="firebase-section">
                     <h3>Cloud Functions Status</h3>
                     <p>Systemstatus und Health-Check aller Cloud Functions.</p>
-                    <button onclick="loadFunctionsStatus()" class="btn btn-primary">Status laden</button>
+                    <button onclick="loadFunctionsStatus()" class="btn btn-primary" title="Health-Check aller Cloud Functions durchführen und Status anzeigen">Status laden</button>
                     <div id="functions-status-result" class="firebase-result"></div>
                 </div>
 
@@ -1591,9 +1619,9 @@ npm test -- --runInBand
                     <p>Teste die Verbindung zur Gemini AI API.</p>
                     <div class="form-group">
                         <label for="gemini-test-prompt">Test-Prompt (optional):</label>
-                        <input type="text" id="gemini-test-prompt" placeholder="Antworte kurz: Was ist MiniMaster?" class="form-input" />
+                        <input type="text" id="gemini-test-prompt" placeholder="Antworte kurz: Was ist MiniMaster?" class="form-input" title="Test-Prompt für die Gemini-API-Verbindungsprüfung" />
                     </div>
-                    <button onclick="testGeminiApi()" class="btn btn-primary">Gemini testen</button>
+                    <button onclick="testGeminiApi()" class="btn btn-primary" title="Verbindung zur Gemini KI-API testen und Antwort anzeigen">Gemini testen</button>
                     <div id="gemini-test-result" class="firebase-result"></div>
                 </div>
 
@@ -1601,12 +1629,12 @@ npm test -- --runInBand
                 <div class="firebase-section">
                     <h3>Knowledge Base Editor</h3>
                     <p>Bearbeite die Wissensbasis für den KI-Support-Agenten.</p>
-                    <button onclick="loadKnowledgeBase()" class="btn btn-secondary">Knowledge Base laden</button>
+                    <button onclick="loadKnowledgeBase()" class="btn btn-secondary" title="Aktuelle Wissensbasis für den KI-Support laden">Knowledge Base laden</button>
                     <div class="form-group" style="margin-block-start: 10px">
-                        <textarea id="knowledge-base-editor" rows="15" class="form-input" placeholder="Knowledge Base wird geladen..."></textarea>
+                        <textarea id="knowledge-base-editor" rows="15" class="form-input" placeholder="Knowledge Base wird geladen..." title="Wissensbasis-Inhalte bearbeiten, die der KI-Agent als Kontext nutzt"></textarea>
                     </div>
                     <div class="inline-actions">
-                        <button onclick="saveKnowledgeBase()" class="btn btn-primary">Speichern</button>
+                        <button onclick="saveKnowledgeBase()" class="btn btn-primary" title="Änderungen an der Wissensbasis speichern">Speichern</button>
                         <span id="kb-source-info" class="text-muted"></span>
                     </div>
                     <div id="kb-save-result" class="firebase-result"></div>
@@ -1617,7 +1645,7 @@ npm test -- --runInBand
                     <h3>Live Audit-Log Viewer</h3>
                     <p>Durchsuche die Audit-Logs in Echtzeit.</p>
                     <div class="sub-filters">
-                        <select id="audit-action-filter" class="form-input" style="inline-size: auto; display: inline-block">
+                        <select id="audit-action-filter" class="form-input" style="inline-size: auto; display: inline-block" title="Audit-Logs nach bestimmter Aktion filtern">
                             <option value="">Alle Aktionen</option>
                             <option value="auth.login">auth.login</option>
                             <option value="auth.register">auth.register</option>
@@ -1631,8 +1659,8 @@ npm test -- --runInBand
                             <option value="support.ticket">support.ticket</option>
                             <option value="admin.role">admin.role</option>
                         </select>
-                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="inline-size: 80px; display: inline-block" />
-                        <button onclick="loadAuditLogs()" class="btn btn-primary">Laden</button>
+                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="inline-size: 80px; display: inline-block" title="Maximale Anzahl der anzuzeigenden Audit-Log-Einträge" />
+                        <button onclick="loadAuditLogs()" class="btn btn-primary" title="Audit-Logs mit den gewählten Filtern laden">Laden</button>
                     </div>
                     <div id="audit-log-list" class="data-list"></div>
                 </div>
@@ -1643,13 +1671,13 @@ npm test -- --runInBand
                     <p>Sende eine Test-Nachricht an ein Gerät.</p>
                     <div class="form-group">
                         <label for="fcm-child-id">Kind-ID:</label>
-                        <input type="text" id="fcm-child-id" placeholder="z.B. 123456789012345" class="form-input" />
+                        <input type="text" id="fcm-child-id" placeholder="z.B. 123456789012345" class="form-input" title="ID des Kindergeräts, an das die Test-Nachricht gesendet werden soll" />
                     </div>
                     <div class="form-group">
                         <label for="fcm-token-direct">Oder direkt FCM-Token:</label>
-                        <input type="text" id="fcm-token-direct" placeholder="FCM Token (optional, überschreibt Kind-ID)" class="form-input" />
+                        <input type="text" id="fcm-token-direct" placeholder="FCM Token (optional, überschreibt Kind-ID)" class="form-input" title="Alternativ: Direktes FCM-Token eingeben (hat Vorrang vor Kind-ID)" />
                     </div>
-                    <button onclick="sendTestFcm()" class="btn btn-primary">Test-Push senden</button>
+                    <button onclick="sendTestFcm()" class="btn btn-primary" title="Test-Push-Nachricht an das angegebene Gerät senden">Test-Push senden</button>
                     <div id="fcm-test-result" class="firebase-result"></div>
                 </div>
 
@@ -1658,13 +1686,13 @@ npm test -- --runInBand
                     <h3>Geplante Jobs manuell ausführen</h3>
                     <p>Starte geplante Hintergrundjobs sofort.</p>
                     <div class="job-buttons">
-                        <button onclick="triggerJob('checkExpiredSubscriptions')" class="btn btn-secondary">
+                        <button onclick="triggerJob('checkExpiredSubscriptions')" class="btn btn-secondary" title="Prüft alle Abonnements auf Ablauf und markiert abgelaufene">
                             Abgelaufene Abos prüfen
                         </button>
-                        <button onclick="triggerJob('cleanupExpiredGrants')" class="btn btn-secondary">
+                        <button onclick="triggerJob('cleanupExpiredGrants')" class="btn btn-secondary" title="Räumt abgelaufene Support-Zugriffsfreigaben auf">
                             Abgelaufene Zugänge aufräumen
                         </button>
-                        <button onclick="triggerJob('sendDailyErrorReport')" class="btn btn-secondary">
+                        <button onclick="triggerJob('sendDailyErrorReport')" class="btn btn-secondary" title="Täglichen Fehlerreport sofort erstellen und versenden">
                             Fehlerreport erstellen
                         </button>
                     </div>
@@ -1685,8 +1713,8 @@ npm test -- --runInBand
                             </p>
                             <div id="ai-consent-status" style="margin-block-end: 10px"></div>
                             <div class="dsar-form">
-                                <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..."></textarea>
-                                <button onclick="askGeminiFreiform()" class="btn btn-primary">🤖 Gemini fragen</button>
+                                <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..." title="Freie Frage an Gemini zu Einrichtung, Konfiguration oder Problemen"></textarea>
+                                <button onclick="askGeminiFreiform()" class="btn btn-primary" title="Frage an Gemini senden und KI-gestützte Antwort erhalten">🤖 Gemini fragen</button>
                             </div>
                             <div id="ai-explain-response" class="data-list" style="margin-block-start: 12px"></div>
                         </div>
@@ -1714,10 +1742,12 @@ npm test -- --runInBand
                                         type="text"
                                         id="assistant-input"
                                         placeholder="Frage eingeben..."
+                                        title="Frage zu Integration, Deployment, Rollen oder Troubleshooting eingeben"
                                     />
                                     <button
                                         onclick="askOperatorAssistant()"
                                         class="btn btn-primary"
+                                        title="Frage an den Operator-Assistenten senden"
                                     >
                                         Fragen
                                     </button>
@@ -1736,17 +1766,17 @@ npm test -- --runInBand
                 <div class="ai-scan-controls">
                     <div class="scan-row">
                         <label for="ai-scan-hours">Zeitraum:</label>
-                        <select id="ai-scan-hours">
+                        <select id="ai-scan-hours" title="Zeitraum für die Fehleranalyse auswählen">
                             <option value="1">Letzte Stunde</option>
                             <option value="6">Letzte 6 Stunden</option>
                             <option value="24" selected>Letzte 24 Stunden</option>
                             <option value="72">Letzte 3 Tage</option>
                             <option value="168">Letzte 7 Tage</option>
                         </select>
-                        <button id="btn-ai-scan" class="btn btn-primary" onclick="startAiErrorScan()">
+                        <button id="btn-ai-scan" class="btn btn-primary" onclick="startAiErrorScan()" title="Gemini analysiert Systemfehler im gewählten Zeitraum">
                             🔍 Fehleranalyse starten
                         </button>
-                        <button class="btn btn-secondary" onclick="loadAiFixHistory()">
+                        <button class="btn btn-secondary" onclick="loadAiFixHistory()" title="Protokoll aller bisherigen KI-Analysen und Auto-Fixes laden">
                             📋 Fix-Historie laden
                         </button>
                     </div>
@@ -1779,9 +1809,9 @@ npm test -- --runInBand
                     <h3>Aktive Richtlinien abfragen</h3>
                     <p>Zeigt die aktuell aktiven AGB- und Datenschutz-Richtlinien für ein Land/Locale.</p>
                     <div class="dsar-form">
-                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
-                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
-                        <button onclick="loadActiveLegalPolicies()" class="btn btn-primary">
+                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Zweistelliger Ländercode (ISO 3166-1)" />
+                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die gewünschte Sprachversion" />
+                        <button onclick="loadActiveLegalPolicies()" class="btn btn-primary" title="Aktuell aktive AGB- und Datenschutz-Richtlinien für das gewählte Land laden">
                             Richtlinien laden
                         </button>
                     </div>
@@ -1793,9 +1823,9 @@ npm test -- --runInBand
                     <h3>Einwilligungsstatus prüfen</h3>
                     <p>Prüft, ob ein bestimmter Nutzer den aktuellen Richtlinien zugestimmt hat (Reconsent nötig?).</p>
                     <div class="dsar-form">
-                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
-                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
-                        <button onclick="checkLegalReconsentStatus()" class="btn btn-primary">
+                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Einwilligungsprüfung" />
+                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Einwilligungsprüfung" />
+                        <button onclick="checkLegalReconsentStatus()" class="btn btn-primary" title="Prüfen, ob der Nutzer den aktuellen Richtlinien zugestimmt hat">
                             Status prüfen
                         </button>
                     </div>
@@ -1808,17 +1838,17 @@ npm test -- --runInBand
                     <p>Erstellt oder aktualisiert eine AGB- oder Datenschutz-Richtlinie für ein bestimmtes Land/Locale.</p>
                     <div class="dsar-form" style="flex-direction: column; gap: 10px; align-items: stretch">
                         <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                            <select id="legal-publish-type" style="inline-size: 140px">
+                            <select id="legal-publish-type" style="inline-size: 140px" title="Art der Richtlinie: AGB oder Datenschutz">
                                 <option value="terms">AGB (terms)</option>
                                 <option value="privacy">Datenschutz (privacy)</option>
                             </select>
-                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
-                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
-                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="inline-size: 180px" />
+                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Richtlinie" />
+                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Richtlinie" />
+                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="inline-size: 180px" title="Versionsnummer der Richtlinie" />
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="flex: 1; min-inline-size: 250px" />
-                            <select id="legal-publish-status" style="inline-size: 120px">
+                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="flex: 1; min-inline-size: 250px" title="URL zum vollständigen Richtlinien-Dokument" />
+                            <select id="legal-publish-status" style="inline-size: 120px" title="Veröffentlichungsstatus der Richtlinie">
                                 <option value="active">Aktiv</option>
                                 <option value="draft">Entwurf</option>
                                 <option value="approved">Freigegeben</option>
@@ -1829,7 +1859,7 @@ npm test -- --runInBand
                             </label>
                         </div>
                         <div>
-                            <button onclick="publishLegalPolicy()" class="btn btn-primary">
+                            <button onclick="publishLegalPolicy()" class="btn btn-primary" title="Richtlinie mit den angegebenen Daten veröffentlichen">
                                 Richtlinie veröffentlichen
                             </button>
                         </div>
@@ -1845,10 +1875,10 @@ npm test -- --runInBand
                         Nutzer (Master-ID) oder für alle Nutzer eines Landes/Locale.
                     </p>
                     <div class="dsar-form">
-                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" />
-                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" />
-                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="inline-size: 220px" />
-                        <button onclick="triggerLegalReconsent()" class="btn btn-danger">
+                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für den Reconsent" />
+                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für den Reconsent" />
+                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="inline-size: 220px" title="Einzelne Master-ID oder leer lassen für alle Nutzer des Landes" />
+                        <button onclick="triggerLegalReconsent()" class="btn btn-danger" title="Nutzer als 'Erneute Zustimmung erforderlich' markieren">
                             Reconsent erzwingen
                         </button>
                     </div>
@@ -1877,17 +1907,17 @@ npm test -- --runInBand
                     </div>
 
                     <div class="dsar-form" style="display: grid; gap: 10px; margin-block-start: 12px">
-                        <input type="url" id="ps-privacy-url" placeholder="Privacy Policy URL (https://...)" />
-                        <input type="email" id="ps-support-email" placeholder="Support-/Privacy-E-Mail" />
-                        <input type="url" id="ps-listing-url" placeholder="Play Console Listing URL (optional)" />
-                        <textarea id="ps-release-notes" rows="4" placeholder="Release-Notizen / Reviewer-Hinweise"></textarea>
+                        <input type="url" id="ps-privacy-url" placeholder="Privacy Policy URL (https://...)" title="Öffentliche URL der Datenschutzerklärung" />
+                        <input type="email" id="ps-support-email" placeholder="Support-/Privacy-E-Mail" title="Kontakt-E-Mail für Support und Datenschutzanfragen" />
+                        <input type="url" id="ps-listing-url" placeholder="Play Console Listing URL (optional)" title="Link zum Store-Listing in der Google Play Console" />
+                        <textarea id="ps-release-notes" rows="4" placeholder="Release-Notizen / Reviewer-Hinweise" title="Hinweise für den Google Play Reviewer und Release-Notizen"></textarea>
                     </div>
 
                     <div class="dsar-form" style="margin-block-start: 12px">
-                        <button onclick="savePlayStoreReadiness()" class="btn btn-primary">Readiness speichern</button>
-                        <button onclick="exportPlayStoreReadiness()" class="btn btn-secondary">JSON exportieren</button>
-                        <button onclick="generateReviewerGuide()" class="btn btn-secondary">Reviewer-Anleitung generieren</button>
-                        <button onclick="resetPlayStoreReadiness()" class="btn btn-danger">Zurücksetzen</button>
+                        <button onclick="savePlayStoreReadiness()" class="btn btn-primary" title="Play Store Readiness-Status lokal speichern">Readiness speichern</button>
+                        <button onclick="exportPlayStoreReadiness()" class="btn btn-secondary" title="Readiness-Status als JSON-Nachweis exportieren">JSON exportieren</button>
+                        <button onclick="generateReviewerGuide()" class="btn btn-secondary" title="Anleitung für den Google Play Reviewer automatisch generieren">Reviewer-Anleitung generieren</button>
+                        <button onclick="resetPlayStoreReadiness()" class="btn btn-danger" title="Alle Readiness-Eingaben zurücksetzen">Zurücksetzen</button>
                     </div>
 
                     <div id="playstore-readiness-result" class="data-list" style="margin-block-start: 15px"></div>
@@ -1907,7 +1937,7 @@ npm test -- --runInBand
         <!-- User Details Modal -->
         <div id="user-details-modal" class="modal" style="display: none">
             <div class="modal-content modal-large">
-                <span class="close" onclick="closeUserDetailsModal()"
+                <span class="close" onclick="closeUserDetailsModal()" title="Dialog schließen"
                     >&times;</span
                 >
                 <div id="user-details-content">
@@ -1919,7 +1949,7 @@ npm test -- --runInBand
         <!-- Device Details Modal -->
         <div id="device-details-modal" class="modal" style="display: none">
             <div class="modal-content modal-large">
-                <span class="close" onclick="closeDeviceDetailsModal()">&times;</span>
+                <span class="close" onclick="closeDeviceDetailsModal()" title="Dialog schließen">&times;</span>
                 <div id="device-details-content"></div>
             </div>
         </div>
@@ -1927,7 +1957,7 @@ npm test -- --runInBand
         <!-- Ticket Details Modal -->
         <div id="ticket-details-modal" class="modal" style="display: none">
             <div class="modal-content modal-large">
-                <span class="close" onclick="closeTicketDetailsModal()"
+                <span class="close" onclick="closeTicketDetailsModal()" title="Dialog schließen"
                     >&times;</span
                 >
                 <div id="ticket-details-content">
