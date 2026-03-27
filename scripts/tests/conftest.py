@@ -1,0 +1,39 @@
+"""Gemeinsame Fixtures für MiniMaster Python-Tests."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+
+@pytest.fixture()
+def tmp_repo(tmp_path: Path) -> Path:
+    """Erstellt ein temporäres Repo-Verzeichnis mit minimaler Struktur."""
+    (tmp_path / "local.properties").write_text(
+        "sdk.dir=C\\:\\\\Android\\\\sdk\n"
+        "debug.session.secret.master=abc123secret456master789abcdef01234567890abcdef012345678901234567\n"
+        "debug.session.secret.child=child_secret_abcdef01234567890abcdef01234567890abcdef01234567890ab\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "masterApp" / "build" / "outputs" / "apk" / "debug").mkdir(parents=True)
+    (tmp_path / "childApp" / "build" / "outputs" / "apk" / "debug").mkdir(parents=True)
+    return tmp_path
+
+
+@pytest.fixture()
+def mock_subprocess(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Mockt subprocess.run global."""
+    mock_run = MagicMock()
+    mock_run.return_value = MagicMock(
+        returncode=0,
+        stdout="",
+        stderr="",
+    )
+    monkeypatch.setattr("subprocess.run", mock_run)
+    return mock_run
