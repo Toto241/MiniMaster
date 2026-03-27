@@ -187,6 +187,7 @@
                                     die ein <code>firebaseConfig</code>-Objekt enthält.
                                 </p>
                                 <div class="firebase-import-row">
+                                    <label class="field-label" for="bootstrap-config-url">Konfigurations-URL</label>
                                     <input
                                         type="url"
                                         id="bootstrap-config-url"
@@ -737,6 +738,7 @@
                         <h2>Fehlerprotokoll (durchsuchbar)</h2>
                         <div class="user-search">
                             <input type="text" id="errorlog-search-input" placeholder="Suche nach Funktionsname oder Fehlermeldung" title="Funktionsname oder Fehlernachricht eingeben" />
+                            <label class="field-label" for="errorlog-date-filter">Datum ab</label>
                             <input type="date" id="errorlog-date-filter" title="Fehler ab diesem Datum filtern" />
                             <button onclick="searchErrorLogs()" class="btn btn-secondary" title="Fehlerprotokolle nach den eingegebenen Kriterien durchsuchen">Suchen</button>
                             <button onclick="loadErrorLogs()" class="btn btn-primary" title="Alle verfügbaren Fehlerprotokolle laden">Alle laden</button>
@@ -872,66 +874,6 @@
                     <!-- ==================== TAB: EINRICHTUNG ==================== -->
                     <div id="tab-setup" class="tab-content" style="display: none">
                         <h2>⚙️ Einrichtung &amp; Inbetriebnahme</h2>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Inbetriebnahme-Assistent</h3>
-                            <p>
-                                Dieses Werkzeug bündelt die produktive Inbetriebnahme: Firebase-Bootstrap,
-                                Runtime-Konfiguration, optionale Rollenvergabe und Validierung mit Abschlussbericht.
-                            </p>
-
-                            <div class="wizard-step">
-                                <h4>1. Firebase-Projekt und Zusatzrollen</h4>
-                                <div class="commissioning-grid">
-                                    <input type="text" id="commissioning-support-uid" placeholder="Optional: Support Agent UID" title="UID eines Support-Benutzers für automatische Rollenvergabe (optional)" />
-                                    <input type="text" id="commissioning-auditor-uid" placeholder="Optional: Auditor UID" title="UID eines Auditor-Benutzers für automatische Rollenvergabe (optional)" />
-                                </div>
-                                <p class="muted-note">
-                                    Die eigentliche Firebase-Webkonfiguration erfolgt im Bootstrap-Block vor dem Login,
-                                    die Cloud-/KI-Runtime-Konfiguration im Block darunter.
-                                </p>
-                            </div>
-
-                            <div class="setup-actions" style="margin-block-start: 12px">
-                                <button onclick="runCommissioningAssistant()" class="btn btn-primary" title="Automatische Inbetriebnahme starten: Firebase-Bootstrap, Rollen und Validierung">Assistent ausführen</button>
-                                <button onclick="refreshCommissioningReport()" class="btn btn-secondary" title="Aktuellen Inbetriebnahmebericht neu generieren">Bericht aktualisieren</button>
-                                <button onclick="exportReleaseArtefact()" class="btn btn-secondary" title="Zusammenfassung als Release-Artefakt für den produktiven Einsatz exportieren">Release-Artefakt exportieren</button>
-                            </div>
-
-                            <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
-                                <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
-                            </div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Voraussetzungen &amp; Freigaben</h3>
-                            <p>
-                                Diese Nachweise decken Punkte ab, die browserseitig nicht zuverlässig automatisch
-                                geprüft werden können, aber für die produktive Inbetriebnahme verpflichtend sind.
-                            </p>
-                            <div id="commissioning-attestations" class="setup-checklist"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Go-Live Ampel</h3>
-                            <p>
-                                Gesamtstatus der Produktionsbereitschaft. Die Ampel aggregiert Backend-Validierung,
-                                manuelle Freigaben und den Plattform-Reifegrad aller drei Zielplattformen.
-                            </p>
-                            <div id="golive-ampel"></div>
-                            <div id="golive-final-gate" style="margin-block-start: 12px"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Priorisierte Nächste Schritte</h3>
-                            <p>
-                                Automatisch priorisierte Reihenfolge der noch fehlenden Funktionen und Go-Live-Punkte.
-                                Erst die CRITICAL-Themen schließen, danach HIGH und anschließend MEDIUM.
-                            </p>
-                            <div id="prioritized-action-plan" class="data-list" style="margin-block-start: 12px">
-                                <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
-                            </div>
-                        </div>
 
                         <div
                             class="setup-card"
@@ -1161,6 +1103,68 @@ npm test -- --runInBand
                     <!-- ==================== TAB: QUALITÄTSSICHERUNG ==================== -->
                     <div id="tab-qa" class="tab-content" style="display: none">
                         <h2>🧪 Qualitätssicherung &amp; Tests</h2>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Inbetriebnahme-Assistent</h3>
+                            <p>
+                                Dieses Werkzeug bündelt die produktive Inbetriebnahme: Firebase-Bootstrap,
+                                Runtime-Konfiguration, optionale Rollenvergabe und Validierung mit Abschlussbericht.
+                            </p>
+
+                            <div class="wizard-step">
+                                <h4>1. Firebase-Projekt und Zusatzrollen</h4>
+                                <div class="commissioning-grid">
+                                    <label class="field-label" for="commissioning-support-uid">Support Agent UID (optional)</label>
+                                    <input type="text" id="commissioning-support-uid" placeholder="Optional: Support Agent UID" title="UID eines Support-Benutzers für automatische Rollenvergabe (optional)" />
+                                    <label class="field-label" for="commissioning-auditor-uid">Auditor UID (optional)</label>
+                                    <input type="text" id="commissioning-auditor-uid" placeholder="Optional: Auditor UID" title="UID eines Auditor-Benutzers für automatische Rollenvergabe (optional)" />
+                                </div>
+                                <p class="muted-note">
+                                    Die eigentliche Firebase-Webkonfiguration erfolgt im Bootstrap-Block vor dem Login,
+                                    die Cloud-/KI-Runtime-Konfiguration im Block darunter.
+                                </p>
+                            </div>
+
+                            <div class="setup-actions" style="margin-block-start: 12px">
+                                <button onclick="runCommissioningAssistant()" class="btn btn-primary" title="Automatische Inbetriebnahme starten: Firebase-Bootstrap, Rollen und Validierung">Assistent ausführen</button>
+                                <button onclick="refreshCommissioningReport()" class="btn btn-secondary" title="Aktuellen Inbetriebnahmebericht neu generieren">Bericht aktualisieren</button>
+                                <button onclick="exportReleaseArtefact()" class="btn btn-secondary" title="Zusammenfassung als Release-Artefakt für den produktiven Einsatz exportieren">Release-Artefakt exportieren</button>
+                            </div>
+
+                            <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
+                                <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
+                            </div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Voraussetzungen &amp; Freigaben</h3>
+                            <p>
+                                Diese Nachweise decken Punkte ab, die browserseitig nicht zuverlässig automatisch
+                                geprüft werden können, aber für die produktive Inbetriebnahme verpflichtend sind.
+                            </p>
+                            <div id="commissioning-attestations" class="setup-checklist"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Go-Live Ampel</h3>
+                            <p>
+                                Gesamtstatus der Produktionsbereitschaft. Die Ampel aggregiert Backend-Validierung,
+                                manuelle Freigaben und den Plattform-Reifegrad aller drei Zielplattformen.
+                            </p>
+                            <div id="golive-ampel"></div>
+                            <div id="golive-final-gate" style="margin-block-start: 12px"></div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Priorisierte Nächste Schritte</h3>
+                            <p>
+                                Automatisch priorisierte Reihenfolge der noch fehlenden Funktionen und Go-Live-Punkte.
+                                Erst die CRITICAL-Themen schließen, danach HIGH und anschließend MEDIUM.
+                            </p>
+                            <div id="prioritized-action-plan" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
+                            </div>
+                        </div>
 
                             <div class="setup-card python-automation-shell" style="margin-block-start: 16px; margin-block-end: 0">
                                 <div class="python-automation-intro">
@@ -1610,6 +1614,7 @@ npm test -- --runInBand
                             <h3>Admin-Konto erstellen / Admin-Claim vergeben</h3>
                             <p>Bestehenden Firebase-Auth-User zum Operator/Admin hochstufen (nur für bereits authentifizierte Admins).</p>
                             <div class="dsar-form">
+                                <label class="field-label" for="admin-target-uid">User UID</label>
                                 <input type="text" id="admin-target-uid" placeholder="User UID des neuen Admins" title="Firebase Auth UID des Benutzers, der Admin-Rechte erhalten soll" />
                                 <button onclick="grantAdminClaim()" class="btn btn-primary" title="Dem angegebenen Benutzer die Admin-Berechtigung erteilen">Admin-Claim setzen</button>
                             </div>
@@ -1620,7 +1625,9 @@ npm test -- --runInBand
                             <h3>Rollenverwaltung (RBAC)</h3>
                             <p>Operator-Rollen zuweisen: <strong>Admin</strong> (Vollzugriff), <strong>Support</strong> (Tickets + KI-Support, eingeschränkt auf freigegebene Fälle), <strong>Auditor</strong> (Einsicht Audit-Logs + Compliance).</p>
                             <div class="dsar-form">
+                                <label class="field-label" for="role-uid">User UID</label>
                                 <input type="text" id="role-uid" placeholder="User UID" title="Firebase Auth UID des Benutzers für die Rollenzuweisung" />
+                                <label class="field-label" for="role-select">Rolle</label>
                                 <select id="role-select" title="Operator-Rolle auswählen: Admin, Support oder Auditor">
                                     <option value="">-- Rolle wählen --</option>
                                     <option value="admin">Admin (Vollzugriff)</option>
@@ -1681,6 +1688,7 @@ npm test -- --runInBand
                     <p>Bearbeite die Wissensbasis für den KI-Support-Agenten.</p>
                     <button onclick="loadKnowledgeBase()" class="btn btn-secondary" title="Aktuelle Wissensbasis für den KI-Support laden">Knowledge Base laden</button>
                     <div class="form-group" style="margin-block-start: 10px">
+                        <label class="field-label" for="knowledge-base-editor">Wissensbasis-Inhalt</label>
                         <textarea id="knowledge-base-editor" rows="15" class="form-input" placeholder="Knowledge Base wird geladen..." title="Wissensbasis-Inhalte bearbeiten, die der KI-Agent als Kontext nutzt"></textarea>
                     </div>
                     <div class="inline-actions">
@@ -1695,6 +1703,7 @@ npm test -- --runInBand
                     <h3>Live Audit-Log Viewer</h3>
                     <p>Durchsuche die Audit-Logs in Echtzeit.</p>
                     <div class="sub-filters">
+                        <label class="field-label" for="audit-action-filter">Aktion</label>
                         <select id="audit-action-filter" class="form-input" style="inline-size: auto; display: inline-block" title="Audit-Logs nach bestimmter Aktion filtern">
                             <option value="">Alle Aktionen</option>
                             <option value="auth.login">auth.login</option>
@@ -1709,6 +1718,7 @@ npm test -- --runInBand
                             <option value="support.ticket">support.ticket</option>
                             <option value="admin.role">admin.role</option>
                         </select>
+                        <label class="field-label" for="audit-limit">Max. Einträge</label>
                         <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="inline-size: 80px; display: inline-block" title="Maximale Anzahl der anzuzeigenden Audit-Log-Einträge" />
                         <button onclick="loadAuditLogs()" class="btn btn-primary" title="Audit-Logs mit den gewählten Filtern laden">Laden</button>
                     </div>
@@ -1763,6 +1773,7 @@ npm test -- --runInBand
                             </p>
                             <div id="ai-consent-status" style="margin-block-end: 10px"></div>
                             <div class="dsar-form">
+                                <label class="field-label" for="ai-freeform-input">Ihre Frage an Gemini</label>
                                 <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..." title="Freie Frage an Gemini zu Einrichtung, Konfiguration oder Problemen"></textarea>
                                 <button onclick="askGeminiFreiform()" class="btn btn-primary" title="Frage an Gemini senden und KI-gestützte Antwort erhalten">🤖 Gemini fragen</button>
                             </div>
@@ -1859,7 +1870,9 @@ npm test -- --runInBand
                     <h3>Aktive Richtlinien abfragen</h3>
                     <p>Zeigt die aktuell aktiven AGB- und Datenschutz-Richtlinien für ein Land/Locale.</p>
                     <div class="dsar-form">
+                        <label class="field-label" for="legal-policy-country">Land</label>
                         <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Zweistelliger Ländercode (ISO 3166-1)" />
+                        <label class="field-label" for="legal-policy-locale">Locale</label>
                         <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die gewünschte Sprachversion" />
                         <button onclick="loadActiveLegalPolicies()" class="btn btn-primary" title="Aktuell aktive AGB- und Datenschutz-Richtlinien für das gewählte Land laden">
                             Richtlinien laden
@@ -1873,7 +1886,9 @@ npm test -- --runInBand
                     <h3>Einwilligungsstatus prüfen</h3>
                     <p>Prüft, ob ein bestimmter Nutzer den aktuellen Richtlinien zugestimmt hat (Reconsent nötig?).</p>
                     <div class="dsar-form">
+                        <label class="field-label" for="legal-consent-country">Land</label>
                         <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Einwilligungsprüfung" />
+                        <label class="field-label" for="legal-consent-locale">Locale</label>
                         <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Einwilligungsprüfung" />
                         <button onclick="checkLegalReconsentStatus()" class="btn btn-primary" title="Prüfen, ob der Nutzer den aktuellen Richtlinien zugestimmt hat">
                             Status prüfen
@@ -1888,22 +1903,28 @@ npm test -- --runInBand
                     <p>Erstellt oder aktualisiert eine AGB- oder Datenschutz-Richtlinie für ein bestimmtes Land/Locale.</p>
                     <div class="dsar-form" style="flex-direction: column; gap: 10px; align-items: stretch">
                         <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                            <div><label class="field-label" for="legal-publish-type">Richtlinien-Typ</label>
                             <select id="legal-publish-type" style="inline-size: 140px" title="Art der Richtlinie: AGB oder Datenschutz">
                                 <option value="terms">AGB (terms)</option>
                                 <option value="privacy">Datenschutz (privacy)</option>
-                            </select>
-                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Richtlinie" />
-                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Richtlinie" />
-                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="inline-size: 180px" title="Versionsnummer der Richtlinie" />
+                            </select></div>
+                            <div><label class="field-label" for="legal-publish-country">Land</label>
+                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Richtlinie" /></div>
+                            <div><label class="field-label" for="legal-publish-locale">Locale</label>
+                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Richtlinie" /></div>
+                            <div><label class="field-label" for="legal-publish-version">Version</label>
+                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="inline-size: 180px" title="Versionsnummer der Richtlinie" /></div>
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="flex: 1; min-inline-size: 250px" title="URL zum vollständigen Richtlinien-Dokument" />
+                            <div style="flex: 1; min-inline-size: 250px"><label class="field-label" for="legal-publish-url">Content-URL</label>
+                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="inline-size: 100%" title="URL zum vollständigen Richtlinien-Dokument" /></div>
+                            <div><label class="field-label" for="legal-publish-status">Status</label>
                             <select id="legal-publish-status" style="inline-size: 120px" title="Veröffentlichungsstatus der Richtlinie">
                                 <option value="active">Aktiv</option>
                                 <option value="draft">Entwurf</option>
                                 <option value="approved">Freigegeben</option>
                                 <option value="retired">Zurückgezogen</option>
-                            </select>
+                            </select></div>
                             <label style="display: flex; align-items: center; gap: 5px">
                                 <input type="checkbox" id="legal-publish-major" /> Major Change
                             </label>
@@ -1925,8 +1946,11 @@ npm test -- --runInBand
                         Nutzer (Master-ID) oder für alle Nutzer eines Landes/Locale.
                     </p>
                     <div class="dsar-form">
+                        <label class="field-label" for="legal-reconsent-country">Land</label>
                         <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für den Reconsent" />
+                        <label class="field-label" for="legal-reconsent-locale">Locale</label>
                         <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für den Reconsent" />
+                        <label class="field-label" for="legal-reconsent-master">Master-ID (optional)</label>
                         <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="inline-size: 220px" title="Einzelne Master-ID oder leer lassen für alle Nutzer des Landes" />
                         <button onclick="triggerLegalReconsent()" class="btn btn-danger" title="Nutzer als 'Erneute Zustimmung erforderlich' markieren">
                             Reconsent erzwingen
@@ -1946,20 +1970,24 @@ npm test -- --runInBand
                     <div id="playstore-readiness-summary" class="data-list" style="margin-block-end: 10px"></div>
 
                     <div class="dsar-form" style="display: grid; gap: 8px; align-items: start">
-                        <label><input type="checkbox" id="ps-check-data-safety" /> Data-Safety-Formular in Play Console vollständig und geprüft</label>
-                        <label><input type="checkbox" id="ps-check-iarc" /> IARC-Altersfreigabe abgeschlossen</label>
-                        <label><input type="checkbox" id="ps-check-listing" /> Store Listing vollständig (Beschreibung, Screenshots, Kontakt)</label>
-                        <label><input type="checkbox" id="ps-check-privacy-url" /> Öffentliche Privacy-Policy-URL in Store und App verlinkt</label>
-                        <label><input type="checkbox" id="ps-check-permissions" /> Permissions Declaration (Accessibility/Usage/Overlay) eingereicht und konsistent</label>
-                        <label><input type="checkbox" id="ps-check-app-access" /> App-Access-Anleitung für Reviewer hinterlegt</label>
-                        <label><input type="checkbox" id="ps-check-security" /> Schlüsselrotation/-restriktion nach Bereinigung durchgeführt</label>
-                        <label><input type="checkbox" id="ps-check-signoff" /> Interne Go/No-Go-Freigabe dokumentiert</label>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-data-safety" /> Data-Safety-Formular in Play Console vollständig und geprüft</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-iarc" /> IARC-Altersfreigabe abgeschlossen</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-listing" /> Store Listing vollständig (Beschreibung, Screenshots, Kontakt)</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-privacy-url" /> Öffentliche Privacy-Policy-URL in Store und App verlinkt</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-permissions" /> Permissions Declaration (Accessibility/Usage/Overlay) eingereicht und konsistent</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-app-access" /> App-Access-Anleitung für Reviewer hinterlegt</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-security" /> Schlüsselrotation/-restriktion nach Bereinigung durchgeführt</label></div>
+                        <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-signoff" /> Interne Go/No-Go-Freigabe dokumentiert</label></div>
                     </div>
 
                     <div class="dsar-form" style="display: grid; gap: 10px; margin-block-start: 12px">
+                        <label class="field-label" for="ps-privacy-url">Privacy-Policy-URL</label>
                         <input type="url" id="ps-privacy-url" placeholder="Privacy Policy URL (https://...)" title="Öffentliche URL der Datenschutzerklärung" />
+                        <label class="field-label" for="ps-support-email">Support-/Privacy-E-Mail</label>
                         <input type="email" id="ps-support-email" placeholder="Support-/Privacy-E-Mail" title="Kontakt-E-Mail für Support und Datenschutzanfragen" />
+                        <label class="field-label" for="ps-listing-url">Play Console Listing URL (optional)</label>
                         <input type="url" id="ps-listing-url" placeholder="Play Console Listing URL (optional)" title="Link zum Store-Listing in der Google Play Console" />
+                        <label class="field-label" for="ps-release-notes">Release-Notizen / Reviewer-Hinweise</label>
                         <textarea id="ps-release-notes" rows="4" placeholder="Release-Notizen / Reviewer-Hinweise" title="Hinweise für den Google Play Reviewer und Release-Notizen"></textarea>
                     </div>
 

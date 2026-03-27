@@ -354,6 +354,7 @@ SUITES: tuple[Suite, ...] = (
     Suite("android-usb-child", "childApp USB commissioning", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "child", "--suite", "commissioning"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_child"), timeout_sec=7200),
     Suite("android-e2e-shell", "Cross-app E2E shell flow", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "master", "--suite", "default"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=7200),
     Suite("release-revalidate", "Release gate revalidation", "release", [npm_command(), "run", "ci:revalidate"], ("npm", "node_modules"), timeout_sec=3600),
+    Suite("static-readiness", "Static platform readiness checks", "release", [sys.executable, str(REPO_ROOT / "scripts" / "static_readiness_checks.py")], tuple()),
 )
 
 

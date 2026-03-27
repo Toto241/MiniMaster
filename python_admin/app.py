@@ -25,6 +25,7 @@ from adb_client import AdbClient, adb_available  # noqa: E402
 from test_automation import SUITES as TA_SUITES, SuiteResult, run_suite as ta_run_suite, check_prereqs as ta_check_prereqs  # noqa: E402
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
+from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
@@ -407,13 +408,312 @@ COMMISSIONING_TEST_GROUPS = (
             },
         ),
     },
+    {
+        "id": "p0-blocker-security",
+        "title": "P0: Firebase Key Rotation & Restriktionen",
+        "description": "Sicherheitskritische Key-Rotation und API-Restriktionen vor Go-Live.",
+        "tests": (
+            {
+                "id": "p0-key-rotation-done",
+                "title": "Firebase API Key Rotation abgeschlossen",
+                "description": "Alle kompromittierten oder oeffentlich exponierten API-Keys wurden rotiert.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Key-Rotation in Firebase Console durchgefuehrt und dokumentiert.",
+            },
+            {
+                "id": "p0-key-restrictions-done",
+                "title": "API-/App-Restriktionen gesetzt",
+                "description": "API-Keys sind auf die benoetigten APIs und App-Bundles eingeschraenkt.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Restriktionen in Google Cloud Console konfiguriert und dokumentiert.",
+            },
+        ),
+    },
+    {
+        "id": "p0-blocker-play",
+        "title": "P0: Play Console Paket",
+        "description": "Play Store Release-Voraussetzungen: Data Safety, IARC, Listing, Permissions, App Access.",
+        "tests": (
+            {
+                "id": "p0-play-data-safety",
+                "title": "Data Safety Formular eingereicht",
+                "description": "Das Data-Safety-Formular in der Play Console ist vollstaendig ausgefuellt.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Data Safety Section in Play Console ist als eingereicht markiert.",
+            },
+            {
+                "id": "p0-play-iarc",
+                "title": "IARC-Altersfreigabe abgeschlossen",
+                "description": "Altersfreigabe-Rating ueber IARC beantragt und erhalten.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "IARC-Rating ist in der Play Console sichtbar.",
+            },
+            {
+                "id": "p0-play-listing",
+                "title": "Store Listing final",
+                "description": "Beschreibung, Screenshots, Kontaktdaten und Feature-Grafik sind vollstaendig.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Store Listing ist in der Play Console als vollstaendig markiert.",
+            },
+            {
+                "id": "p0-play-permissions",
+                "title": "Permissions Declaration eingereicht",
+                "description": "Accessibility/Usage/Overlay-Begruendungen sind eingereicht.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Permissions Declaration ist eingereicht und consistent mit App-Verhalten.",
+            },
+            {
+                "id": "p0-play-app-access",
+                "title": "App Access Guide hinterlegt",
+                "description": "Reviewer-Anleitung mit Test-Credentials ist in der Play Console hinterlegt.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "App Access Guide ist hochgeladen und aktuell.",
+            },
+        ),
+    },
+    {
+        "id": "p0-blocker-commissioning",
+        "title": "P0: Physische Commissioning-Abnahme",
+        "description": "Physische Device-Tests fuer Android-Pairing, AI-Flow, Support und Compliance.",
+        "tests": (
+            {
+                "id": "p0-commissioning-android",
+                "title": "Android Apps (Pairing + Sync) geprueft",
+                "description": "Pairing und Daten-Sync zwischen MasterApp und ChildApp auf echten Geraeten getestet.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Pairing + FCM-Sync auf physischen Geraeten erfolgreich dokumentiert.",
+            },
+            {
+                "id": "p0-commissioning-ai",
+                "title": "AI-Konfiguration + AI-Flow geprueft",
+                "description": "Gemini-Integration und AI-Support-Flow funktionieren end-to-end.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "AI-Anfrage und -Antwort im Admin-Panel erfolgreich getestet.",
+            },
+            {
+                "id": "p0-commissioning-support",
+                "title": "Support-Workflow vollstaendig getestet",
+                "description": "Ticket-Erstellung, -Bearbeitung und -Abschluss funktionieren.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Support-Workflow end-to-end durchlaufen und protokolliert.",
+            },
+            {
+                "id": "p0-commissioning-compliance",
+                "title": "Compliance-Flow (DSAR/Audit/Consent) geprueft",
+                "description": "DSAR-Anfragen, Audit-Log und Consent-Status funktionieren korrekt.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "DSAR + Audit + Consent-Flow end-to-end getestet.",
+            },
+        ),
+    },
+    {
+        "id": "p0-blocker-roster",
+        "title": "P0: On-Call / Eskalations-Roster",
+        "description": "Bereitschaftsplan und Eskalationskontakte fuer den Produktivbetrieb.",
+        "tests": (
+            {
+                "id": "p0-roster-assigned",
+                "title": "Roster verbindlich benannt",
+                "description": "On-Call-Roster mit primaeren und sekundaeren Kontakten ist definiert.",
+                "automationType": "manual",
+                "source": "p0-blocker",
+                "successCriteria": "Roster ist dokumentiert und allen Beteiligten bekannt.",
+            },
+        ),
+    },
+    {
+        "id": "static-readiness-masterapp",
+        "title": "Statische Analyse: MasterApp (Eltern-Android)",
+        "description": "Automatische Quellcode- und Build-Konfigurationsanalyse der Eltern-App.",
+        "tests": (
+            {
+                "id": "static-ma-proguard-enabled",
+                "title": "ProGuard/R8 in Release-Build aktiviert",
+                "description": "Prueft, ob minifyEnabled=true im Release-Block von masterApp/build.gradle gesetzt ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "minifyEnabled=true im Release-Block.",
+            },
+            {
+                "id": "static-ma-credentials-encrypted",
+                "title": "EncryptedSharedPreferences verwendet",
+                "description": "Prueft, ob IMEI/SecretKey via EncryptedSharedPreferences verschluesselt gespeichert werden.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "EncryptedSharedPreferences in mindestens einer Kotlin-Datei.",
+            },
+            {
+                "id": "static-ma-imei-fallback",
+                "title": "IMEI-Fallback fuer Android 10+ implementiert",
+                "description": "Prueft auf SDK_INT >= 29 / ANDROID_ID-Fallback in der Codebasis.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "SDK-Version-Guard oder ANDROID_ID-Nutzung vorhanden.",
+            },
+            {
+                "id": "static-ma-debug-hidden",
+                "title": "Debug-Infos in Release ausgeblendet",
+                "description": "Prueft auf BuildConfig.DEBUG-Guards in der MasterApp.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "BuildConfig.DEBUG-Check in mindestens einer Datei.",
+            },
+            {
+                "id": "static-ma-billing",
+                "title": "BillingClient/Abo-Pruefung vorhanden",
+                "description": "Prueft, ob BillingClient oder queryPurchases in der MasterApp implementiert ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "BillingClient in mindestens einer Kotlin-Datei.",
+            },
+            {
+                "id": "static-ma-fcm",
+                "title": "FCM Push-Empfang implementiert",
+                "description": "Prueft, ob ein FirebaseMessagingService in der MasterApp vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "FCM-Service in mindestens einer Kotlin-Datei.",
+            },
+            {
+                "id": "static-ma-appcheck",
+                "title": "Firebase App Check implementiert",
+                "description": "Prueft, ob FirebaseAppCheck in der MasterApp konfiguriert ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "App Check Provider in mindestens einer Kotlin-Datei.",
+            },
+        ),
+    },
+    {
+        "id": "static-readiness-childapp",
+        "title": "Statische Analyse: ChildApp (Kind-Android)",
+        "description": "Automatische Quellcode- und Manifest-Analyse der Kind-App.",
+        "tests": (
+            {
+                "id": "static-ca-accessibility",
+                "title": "AccessibilityService deklariert",
+                "description": "Prueft, ob der AccessibilityService im AndroidManifest.xml deklariert ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "AccessibilityService im Manifest vorhanden.",
+            },
+            {
+                "id": "static-ca-boot-receiver",
+                "title": "BootReceiver registriert",
+                "description": "Prueft, ob BOOT_COMPLETED-Receiver im AndroidManifest.xml deklariert ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "RECEIVE_BOOT_COMPLETED im Manifest.",
+            },
+            {
+                "id": "static-ca-device-admin",
+                "title": "DevicePolicyManager implementiert",
+                "description": "Prueft Manifest-Deklaration UND Kotlin-Code fuer DevicePolicyManager.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "Manifest-Deklaration + DevicePolicyManager-Aufruf im Code.",
+            },
+            {
+                "id": "static-ca-heartbeat",
+                "title": "HeartbeatWorker (WorkManager) implementiert",
+                "description": "Prueft, ob PeriodicWorkRequest/HeartbeatWorker in der ChildApp vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "WorkManager/HeartbeatWorker in mindestens einer Datei.",
+            },
+            {
+                "id": "static-ca-fcm-sync",
+                "title": "FCM-Regelempfang implementiert",
+                "description": "Prueft, ob ein FCM-Receiver/RuleSyncService in der ChildApp vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "FCM-Receiver in mindestens einer Kotlin-Datei.",
+            },
+            {
+                "id": "static-ca-uninstall-prevention",
+                "title": "Deinstallationsschutz implementiert",
+                "description": "Prueft, ob setUninstallBlocked im ChildApp-Code aufgerufen wird.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "setUninstallBlocked in mindestens einer Kotlin-Datei.",
+            },
+            {
+                "id": "static-ca-overlay",
+                "title": "BlockingOverlay implementiert",
+                "description": "Prueft, ob BlockingOverlay/SYSTEM_ALERT_WINDOW-Code vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "Overlay-Code in mindestens einer Kotlin-Datei.",
+            },
+            {
+                "id": "static-ca-tamper-detection",
+                "title": "Manipulationserkennung implementiert",
+                "description": "Prueft, ob Tamper-Detection-Code in der ChildApp vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "Tamper-Detection in mindestens einer Kotlin-Datei.",
+            },
+        ),
+    },
+    {
+        "id": "static-readiness-desktop",
+        "title": "Statische Analyse: Desktop-App (Electron)",
+        "description": "Automatische Analyse der Electron-Desktop-App auf Sicherheit und Build-Konfiguration.",
+        "tests": (
+            {
+                "id": "static-dt-csp",
+                "title": "Content Security Policy gesetzt",
+                "description": "Prueft, ob ein CSP-Meta-Tag in den Desktop-HTML-Dateien vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "Content-Security-Policy Meta-Tag in desktop/*.html.",
+            },
+            {
+                "id": "static-dt-sri",
+                "title": "SRI-Hashes fuer CDN-Scripts",
+                "description": "Prueft, ob integrity-Attribute an externen Script-Tags vorhanden sind.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "integrity='sha...' in mindestens einem Script-Tag.",
+            },
+            {
+                "id": "static-dt-electron-builder",
+                "title": "electron-builder konfiguriert",
+                "description": "Prueft, ob desktop/package.json mit electron-builder-Konfiguration existiert.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "electron-builder Konfiguration in package.json vorhanden.",
+            },
+            {
+                "id": "static-dt-credential-security",
+                "title": "Credentials sicher gespeichert",
+                "description": "Prueft, ob keytar/safeStorage fuer Credential-Speicherung verwendet wird.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "keytar oder electron.safeStorage in Desktop-JS-Code.",
+            },
+            {
+                "id": "static-dt-session-timeout",
+                "title": "Session-Timeout implementiert",
+                "description": "Prueft, ob Auto-Logout nach Inaktivitaet im Desktop-Code vorhanden ist.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "Session-Timeout-Logik in Desktop-JavaScript.",
+            },
+        ),
+    },
 )
-
-
-@dataclass(frozen=True)
-class CommandRequest:
-    command: str
-    cwd: Path
 
 
 def sanitize_cwd(raw_cwd: str | None) -> Path:
@@ -1439,6 +1739,9 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             self.path = "/admin-panel/"
 
         # ── Testsuite-API (GET) ──────────────────────────────────────────
+        if parsed.path == "/api/readiness/static":
+            return self._write_json(HTTPStatus.OK, static_readiness_summary())
+
         if parsed.path == "/api/suites":
             return self._write_json(HTTPStatus.OK, get_suite_catalog())
 
