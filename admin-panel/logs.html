@@ -243,7 +243,7 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="nav-link">← Back to Admin Panel</a>
+        <a href="index.html" class="nav-link" title="Zurück zum Operator-Dashboard">← Back to Admin Panel</a>
 
         <h1>🔍 Audit Logs</h1>
 
@@ -254,15 +254,15 @@
         <div class="filters">
             <div class="filter-group">
                 <label for="startDate">Start Date</label>
-                <input type="date" id="startDate" />
+                <input type="date" id="startDate" title="Startdatum für den Filterzeitraum" />
             </div>
             <div class="filter-group">
                 <label for="endDate">End Date</label>
-                <input type="date" id="endDate" />
+                <input type="date" id="endDate" title="Enddatum für den Filterzeitraum" />
             </div>
             <div class="filter-group">
                 <label for="actionFilter">Action</label>
-                <select id="actionFilter">
+                <select id="actionFilter" title="Audit-Logs nach bestimmter Aktion filtern">
                     <option value="">All Actions</option>
                     <option value="device.lock">Device Lock</option>
                     <option value="device.unlock">Device Unlock</option>
@@ -283,7 +283,7 @@
             </div>
             <div class="filter-group">
                 <label for="statusFilter">Status</label>
-                <select id="statusFilter">
+                <select id="statusFilter" title="Audit-Logs nach Ergebnisstatus filtern">
                     <option value="">All Status</option>
                     <option value="success">Success</option>
                     <option value="failure">Failure</option>
@@ -292,10 +292,10 @@
             </div>
             <div class="filter-group">
                 <label for="userFilter">User ID</label>
-                <input type="text" id="userFilter" placeholder="Filter by user ID..." />
+                <input type="text" id="userFilter" placeholder="Filter by user ID..." title="Audit-Logs nach bestimmter Benutzer-ID filtern" />
             </div>
             <div class="filter-group">
-                <button onclick="loadLogs()">Apply Filters</button>
+                <button onclick="loadLogs()" title="Ausgewählte Filter auf die Audit-Logs anwenden">Apply Filters</button>
             </div>
         </div>
 

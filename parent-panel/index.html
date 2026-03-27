@@ -178,8 +178,8 @@
         (Sperren, Aufgaben, Regeln) geht es von hier direkt in das Web-Control.
       </p>
       <div class="actions">
-        <a class="btn btn-primary" href="../web-control/index.html">Eltern-Steuerung starten</a>
-        <a class="btn btn-ghost" href="../start.html">Zur Startseite</a>
+        <a class="btn btn-primary" href="../web-control/index.html" title="Web-Control öffnen: Geräte sperren, Aufgaben vergeben, Regeln setzen">Eltern-Steuerung starten</a>
+        <a class="btn btn-ghost" href="../start.html" title="Zurück zur MiniMaster Startseite">Zur Startseite</a>
       </div>
     </section>
 
@@ -204,9 +204,9 @@
     <section class="card">
       <h2>Weiterfuehrende Bereiche</h2>
       <ul>
-        <li><a href="../admin-panel/index.html">Operator-Dashboard (Admin/Support)</a></li>
-        <li><a href="../child-panel/index.html">Kinder-Panel (separater Bereich)</a></li>
-        <li><a href="../docs/DEBUG_INTERFACE_GUIDE.md">USB-Debug Interface Guide</a></li>
+        <li><a href="../admin-panel/index.html" title="Zum Operator-Dashboard für Administration und Support">Operator-Dashboard (Admin/Support)</a></li>
+        <li><a href="../child-panel/index.html" title="Zum Kinder-Panel für den separaten Kind-Geräte-Bereich">Kinder-Panel (separater Bereich)</a></li>
+        <li><a href="../docs/DEBUG_INTERFACE_GUIDE.md" title="Anleitung zum USB-Debugging der Geräte öffnen">USB-Debug Interface Guide</a></li>
       </ul>
     </section>
 
@@ -222,31 +222,31 @@
       <div class="form-grid">
         <div>
           <label for="ticket-master-imei">Master IMEI / Benutzer-ID</label>
-          <input id="ticket-master-imei" type="text" placeholder="z. B. 123456789012345" />
+          <input id="ticket-master-imei" type="text" placeholder="z. B. 123456789012345" title="Die IMEI oder Benutzer-ID des registrierten Elterngeräts eingeben" />
         </div>
         <div>
           <label for="ticket-secret-key">Secret Key</label>
-          <input id="ticket-secret-key" type="password" placeholder="Secret Key" />
+          <input id="ticket-secret-key" type="password" placeholder="Secret Key" title="Den geheimen Schlüssel des Elternkontos eingeben" />
         </div>
       </div>
 
       <div class="inline">
-        <button class="btn btn-primary" type="button" onclick="authenticateForTickets()">Authentifizieren</button>
-        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()">Meine Tickets laden</button>
+        <button class="btn btn-primary" type="button" onclick="authenticateForTickets()" title="Mit Master IMEI und Secret Key beim System anmelden">Authentifizieren</button>
+        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
       </div>
 
       <div class="form-grid">
         <div>
           <label for="ticket-sender-name">Absender Name</label>
-          <input id="ticket-sender-name" type="text" placeholder="Ihr Name" />
+          <input id="ticket-sender-name" type="text" placeholder="Ihr Name" title="Name der Person, die das Ticket einreicht" />
         </div>
         <div>
           <label for="ticket-sender-email">Rueckfrage E-Mail</label>
-          <input id="ticket-sender-email" type="email" placeholder="name@example.com" />
+          <input id="ticket-sender-email" type="email" placeholder="name@example.com" title="E-Mail-Adresse für Rückfragen durch den Support" />
         </div>
         <div>
           <label for="ticket-sender-role">Absender Rolle</label>
-          <select id="ticket-sender-role">
+          <select id="ticket-sender-role" title="Rolle des Absenders auswählen (Elternteil, Erziehungsberechtigte Person, Sonstiges)">
             <option value="parent" selected>Elternteil</option>
             <option value="guardian">Erziehungsberechtigte Person</option>
             <option value="other">Sonstiges</option>
@@ -256,12 +256,12 @@
 
       <div>
         <label for="ticket-problem">Fehler / Frage</label>
-        <textarea id="ticket-problem" placeholder="Bitte Problem, betroffene Funktion und gewuenschtes Ergebnis beschreiben."></textarea>
+        <textarea id="ticket-problem" placeholder="Bitte Problem, betroffene Funktion und gewuenschtes Ergebnis beschreiben." title="Beschreibung des Problems, der Störung oder der Frage"></textarea>
       </div>
 
       <div class="inline">
-        <label><input type="radio" name="ticket-support-access" value="yes" /> Support-Zugriff fuer 48h erlauben</label>
-        <label><input type="radio" name="ticket-support-access" value="no" checked /> Kein zusaetzlicher Zugriff</label>
+        <label title="Dem Support temporär Zugriff auf Kontodaten erlauben (max. 48 Stunden)"><input type="radio" name="ticket-support-access" value="yes" /> Support-Zugriff fuer 48h erlauben</label>
+        <label title="Support bearbeitet das Ticket ohne zusätzlichen Kontozugriff"><input type="radio" name="ticket-support-access" value="no" checked /> Kein zusaetzlicher Zugriff</label>
       </div>
 
       <p class="help">
@@ -270,7 +270,7 @@
       </p>
 
       <div class="inline">
-        <button class="btn btn-green" type="button" onclick="submitSupportTicket()">Ticket erstellen</button>
+        <button class="btn btn-green" type="button" onclick="submitSupportTicket()" title="Support-Ticket einreichen und an den Anbieter senden">Ticket erstellen</button>
       </div>
 
       <div id="ticket-submit-status" class="status">Noch kein Ticket gesendet.</div>
