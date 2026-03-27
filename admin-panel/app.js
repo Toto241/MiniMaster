@@ -130,6 +130,7 @@ let pythonCommissioningEvidenceIndex = new Map();
 let pythonCommissioningSelectedTestId = null;
 let pythonEvidenceFilterStatus = "";
 let pythonEvidenceFilterTestId = "";
+let pythonAutomationRunStartedAtMs = null;
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -494,6 +495,37 @@ function formatPythonAutomationTimestamp(value) {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return String(value);
     return parsed.toLocaleString("de-DE");
+}
+
+function updatePythonAutomationRunState({ isRunning, message, detail }) {
+    const stateEl = document.getElementById("python-automation-run-state");
+    const runButton = document.getElementById("python-automation-run-btn");
+    if (!stateEl) return;
+
+    const safeMessage = escapeHtml(message || (isRunning ? "Automatischer Testlauf läuft…" : "Kein automatischer Testlauf aktiv."));
+    const safeDetail = escapeHtml(detail || "");
+    stateEl.className = `python-run-state ${isRunning ? "python-run-state-running" : "python-run-state-idle"}`;
+    stateEl.innerHTML = `
+        <span class="python-run-state-dot" aria-hidden="true"></span>
+        <div>
+            <strong>${safeMessage}</strong>
+            ${safeDetail ? `<div class="python-muted-caption">${safeDetail}</div>` : ""}
+        </div>
+    `;
+
+    if (runButton) {
+        runButton.disabled = Boolean(isRunning);
+        runButton.textContent = isRunning ? "Python-Testlauf läuft…" : "Python-Testlauf starten";
+    }
+}
+
+function getPythonRunElapsedText() {
+    if (!pythonAutomationRunStartedAtMs) return "";
+    const elapsedSec = Math.max(0, Math.round((Date.now() - pythonAutomationRunStartedAtMs) / 1000));
+    if (elapsedSec < 60) return `${elapsedSec} Sekunden`;
+    const minutes = Math.floor(elapsedSec / 60);
+    const seconds = elapsedSec % 60;
+    return `${minutes} Min ${seconds.toString().padStart(2, "0")} Sek`;
 }
 
 function formatPythonAutomationEvidenceDetails(entry) {
@@ -1130,6 +1162,11 @@ async function runPythonAutomationSuite() {
     if (!resultEl) return;
 
     if (!isPythonOperator) {
+        updatePythonAutomationRunState({
+            isRunning: false,
+            message: "Python-Operator nicht aktiv.",
+            detail: "Automatische Läufe sind nur über den lokalen Python-Operator verfügbar.",
+        });
         resultEl.innerHTML = `
             <div class='warning-box'>
                 <strong>⚙️ Python-Server nicht erkannt</strong><br />
@@ -1145,6 +1182,12 @@ async function runPythonAutomationSuite() {
         return;
     }
 
+    pythonAutomationRunStartedAtMs = Date.now();
+    updatePythonAutomationRunState({
+        isRunning: true,
+        message: "Automatischer Testlauf läuft gerade.",
+        detail: `Lauf gestartet – sichtbare Laufzeit: ${getPythonRunElapsedText()}.`,
+    });
     resultEl.innerHTML = "<div class='loading'>Starte Python-Automationslauf...</div>";
 
     const runCommands = Boolean(document.getElementById("python-automation-run-commands")?.checked);
@@ -1154,11 +1197,21 @@ async function runPythonAutomationSuite() {
 
     try {
         if (refreshValidation) {
+            updatePythonAutomationRunState({
+                isRunning: true,
+                message: "Automatischer Testlauf läuft gerade.",
+                detail: `Phase: Full Validation wird aktualisiert (${getPythonRunElapsedText()}).`,
+            });
             resultEl.innerHTML = "<div class='loading'>Aktualisiere Full Validation vor dem Python-Lauf...</div>";
             await runFullSetupValidation();
             refreshCommissioningReport();
         }
 
+        updatePythonAutomationRunState({
+            isRunning: true,
+            message: "Automatischer Testlauf läuft gerade.",
+            detail: `Phase: Python-Kommissionierung wird bewertet (${getPythonRunElapsedText()}).`,
+        });
         const response = await fetch("/api/commissioning/run", {
             method: "POST",
             headers: {
@@ -1188,8 +1241,20 @@ async function runPythonAutomationSuite() {
         await loadPythonAutomationHistory();
 
         const level = payload.overall === "pass" ? "success" : "warning";
+        updatePythonAutomationRunState({
+            isRunning: false,
+            message: "Automatischer Testlauf abgeschlossen.",
+            detail: `Ergebnis ${formatPythonAutomationStatus(payload.overall)} · Laufzeit ${getPythonRunElapsedText()}.`,
+        });
+        pythonAutomationRunStartedAtMs = null;
         showNotification("Python-Automationslauf abgeschlossen: " + formatPythonAutomationStatus(payload.overall), level);
     } catch (error) {
+        updatePythonAutomationRunState({
+            isRunning: false,
+            message: "Automatischer Testlauf fehlgeschlagen.",
+            detail: `${error.message || "Unbekannter Fehler"} · Laufzeit ${getPythonRunElapsedText()}.`,
+        });
+        pythonAutomationRunStartedAtMs = null;
         resultEl.innerHTML = `<div class='error'>Python-Automationslauf fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
         showNotification("Python-Automationslauf fehlgeschlagen: " + error.message, "error");
     }
