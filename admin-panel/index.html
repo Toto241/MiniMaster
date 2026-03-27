@@ -1197,6 +1197,9 @@ npm test -- --runInBand
                                                 </p>
                                             </div>
                                         </div>
+                                        <div class="python-automation-separation-hint">
+                                            <strong>Sortierlogik:</strong> Automatisiert = automatisch bewertet + lokale Gate-Kommandos. Manuell = manueller Nachweis + dokumentierter Testplan.
+                                        </div>
                                         <div class="python-automation-toolbar">
                                             <input
                                                 type="text"
@@ -1211,6 +1214,11 @@ npm test -- --runInBand
                                                 <option value="manual">Nur manuelle Nachweise</option>
                                                 <option value="documented">Nur dokumentierte Testpläne</option>
                                                 <option value="command">Nur lokale Gate-Kommandos</option>
+                                            </select>
+                                            <select id="python-automation-catalog-sort" title="Sortierung im Testkatalog wählen">
+                                                <option value="byType">Sortierung: Automatisiert vs Manuell</option>
+                                                <option value="byGroup">Sortierung: Fachgruppe</option>
+                                                <option value="byStatus">Sortierung: Status (offen zuerst)</option>
                                             </select>
                                             <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="python-automation-show-open-only" />
