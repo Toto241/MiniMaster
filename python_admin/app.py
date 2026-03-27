@@ -7,8 +7,9 @@ import os
 import shlex
 import subprocess
 import sys
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -17,6 +18,13 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Importiere zentrale Test-Module
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from adb_client import AdbClient, adb_available  # noqa: E402
+from test_automation import SUITES as TA_SUITES, SuiteResult, run_suite as ta_run_suite, check_prereqs as ta_check_prereqs  # noqa: E402
+from usb_test_runner import run_usb_test  # noqa: E402
+from dual_device_runner import run_dual_device  # noqa: E402
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
@@ -1163,6 +1171,207 @@ def run_command(request: CommandRequest, timeout_sec: int | None = None) -> dict
     }
 
 
+# ── Testsuite-API-Infrastruktur ──────────────────────────────────────────────
+
+_active_suite_runs: dict[str, dict[str, object]] = {}
+_active_suite_lock = threading.Lock()
+SUITE_RUN_LOG_FILE = LOG_DIR / "suite_runs.jsonl"
+
+
+def get_suite_catalog() -> dict[str, object]:
+    """Gibt den vollständigen Suite-Katalog als JSON-Struktur zurück."""
+    suites_list: list[dict[str, object]] = []
+    for suite in TA_SUITES:
+        ok, reason = ta_check_prereqs(suite.required_prereqs)
+        suites_list.append({
+            "suiteId": suite.suite_id,
+            "title": suite.title,
+            "group": suite.group,
+            "command": " ".join(suite.command),
+            "prereqs": list(suite.required_prereqs),
+            "prereqsMet": ok,
+            "prereqReason": reason,
+            "timeoutSec": suite.timeout_sec,
+        })
+
+    groups: dict[str, list[dict[str, object]]] = {}
+    for s in suites_list:
+        g = str(s["group"])
+        if g not in groups:
+            groups[g] = []
+        groups[g].append(s)
+
+    return {
+        "suites": suites_list,
+        "groups": groups,
+        "summary": {
+            "total": len(suites_list),
+            "ready": sum(1 for s in suites_list if s["prereqsMet"]),
+            "notReady": sum(1 for s in suites_list if not s["prereqsMet"]),
+            "byGroup": {g: len(items) for g, items in groups.items()},
+        },
+    }
+
+
+def get_device_status() -> dict[str, object]:
+    """Gibt den Status angeschlossener ADB-Geräte zurück."""
+    if not adb_available():
+        return {"adbAvailable": False, "devices": [], "count": 0}
+
+    devices = AdbClient.list_devices()
+    device_list: list[dict[str, object]] = []
+    for dev in devices:
+        info: dict[str, object] = {
+            "serial": dev.serial,
+            "state": dev.state,
+            "ready": dev.is_ready,
+        }
+        if dev.is_ready:
+            client = AdbClient(serial=dev.serial)
+            info["model"] = client.get_device_model()
+            info["androidVersion"] = client.get_android_version()
+        device_list.append(info)
+
+    return {
+        "adbAvailable": True,
+        "devices": device_list,
+        "count": len(device_list),
+        "readyCount": sum(1 for d in device_list if d.get("ready")),
+    }
+
+
+def _run_suite_background(run_id: str, suite_id: str, strict_skips: bool) -> None:
+    """Führt eine Suite im Hintergrund-Thread aus."""
+    suite_map = {s.suite_id: s for s in TA_SUITES}
+    suite = suite_map.get(suite_id)
+    if suite is None:
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "error"
+            _active_suite_runs[run_id]["error"] = f"Suite nicht gefunden: {suite_id}"
+        return
+
+    with _active_suite_lock:
+        _active_suite_runs[run_id]["status"] = "running"
+        _active_suite_runs[run_id]["startedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    result = ta_run_suite(suite, strict_skips=strict_skips)
+
+    with _active_suite_lock:
+        _active_suite_runs[run_id]["status"] = "finished"
+        _active_suite_runs[run_id]["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _active_suite_runs[run_id]["result"] = asdict(result)
+
+    # Log speichern
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_entry = {
+        "runId": run_id,
+        "suiteId": suite_id,
+        "result": asdict(result),
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    with SUITE_RUN_LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+
+def start_suite_run(suite_id: str, strict_skips: bool = False) -> dict[str, object]:
+    """Startet eine Suite asynchron und gibt die Run-ID zurück."""
+    run_id = f"suite-{uuid4().hex[:12]}"
+    with _active_suite_lock:
+        _active_suite_runs[run_id] = {
+            "runId": run_id,
+            "suiteId": suite_id,
+            "status": "queued",
+            "startedAt": None,
+            "finishedAt": None,
+            "result": None,
+            "error": None,
+        }
+
+    thread = threading.Thread(
+        target=_run_suite_background,
+        args=(run_id, suite_id, strict_skips),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"runId": run_id, "suiteId": suite_id, "status": "queued"}
+
+
+def get_suite_run_status(run_id: str) -> dict[str, object] | None:
+    """Gibt den Status eines Suite-Laufs zurück."""
+    with _active_suite_lock:
+        run = _active_suite_runs.get(run_id)
+        if run is None:
+            return None
+        return dict(run)
+
+
+def load_suite_run_history(limit: int = 25) -> list[dict[str, object]]:
+    """Lädt die letzten Suite-Laufergebnisse."""
+    if not SUITE_RUN_LOG_FILE.exists():
+        return []
+    lines = SUITE_RUN_LOG_FILE.read_text(encoding="utf-8").splitlines()
+    history: list[dict[str, object]] = []
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            history.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+        if len(history) >= limit:
+            break
+    return history
+
+
+def _run_usb_test_background(run_id: str, kwargs: dict[str, object]) -> None:
+    """Führt einen USB-Testlauf im Hintergrund-Thread aus."""
+    with _active_suite_lock:
+        _active_suite_runs[run_id]["status"] = "running"
+        _active_suite_runs[run_id]["startedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    try:
+        result = run_usb_test(**kwargs, verbose=False)
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "finished"
+            _active_suite_runs[run_id]["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            _active_suite_runs[run_id]["result"] = result.to_dict()
+    except Exception as exc:
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "error"
+            _active_suite_runs[run_id]["error"] = str(exc)
+
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with _active_suite_lock:
+        log_entry = dict(_active_suite_runs[run_id])
+    with SUITE_RUN_LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+
+def _run_dual_device_background(run_id: str, kwargs: dict[str, object]) -> None:
+    """Führt einen Dual-Device-Lauf im Hintergrund-Thread aus."""
+    with _active_suite_lock:
+        _active_suite_runs[run_id]["status"] = "running"
+        _active_suite_runs[run_id]["startedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    try:
+        result = run_dual_device(**kwargs, verbose=False)
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "finished"
+            _active_suite_runs[run_id]["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            _active_suite_runs[run_id]["result"] = result.to_dict()
+    except Exception as exc:
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "error"
+            _active_suite_runs[run_id]["error"] = str(exc)
+
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with _active_suite_lock:
+        log_entry = dict(_active_suite_runs[run_id])
+    with SUITE_RUN_LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+
 class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(REPO_ROOT), **kwargs)
@@ -1228,6 +1437,31 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/admin-panel":
             self.path = "/admin-panel/"
+
+        # ── Testsuite-API (GET) ──────────────────────────────────────────
+        if parsed.path == "/api/suites":
+            return self._write_json(HTTPStatus.OK, get_suite_catalog())
+
+        if parsed.path == "/api/suites/devices":
+            return self._write_json(HTTPStatus.OK, get_device_status())
+
+        if parsed.path == "/api/suites/history":
+            query = parse_qs(parsed.query)
+            limit = parse_int(
+                query.get("limit", [25])[0], 25, min_value=1, max_value=200,
+            )
+            return self._write_json(HTTPStatus.OK, {
+                "runs": load_suite_run_history(limit),
+                "count": limit,
+            })
+
+        if parsed.path.startswith("/api/suites/status/"):
+            run_id = parsed.path.split("/api/suites/status/", 1)[1].strip("/")
+            status = get_suite_run_status(run_id)
+            if status is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, status)
+
         return super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
@@ -1238,6 +1472,15 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_run_commissioning()
         if parsed.path == "/api/commissioning/evidence":
             return self._handle_save_commissioning_evidence()
+
+        # ── Testsuite-API (POST) ─────────────────────────────────────────
+        if parsed.path == "/api/suites/run":
+            return self._handle_run_suite()
+        if parsed.path == "/api/suites/usb-test":
+            return self._handle_usb_test()
+        if parsed.path == "/api/suites/dual-device":
+            return self._handle_dual_device_test()
+
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden."})
 
     def _handle_run_command(self) -> None:
@@ -1291,6 +1534,105 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
         return self._write_json(HTTPStatus.OK, entry)
+
+    def _handle_run_suite(self) -> None:
+        try:
+            payload = self._read_json_body()
+            suite_id = str(payload.get("suiteId") or "").strip()
+            if not suite_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "suiteId fehlt."})
+            strict_skips = bool_from_payload(payload.get("strictSkips"), default=False)
+            result = start_suite_run(suite_id, strict_skips=strict_skips)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_usb_test(self) -> None:
+        try:
+            payload = self._read_json_body()
+            app_id = str(payload.get("appId") or "").strip()
+            if app_id not in ("master", "child"):
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "appId muss 'master' oder 'child' sein."})
+
+            run_id = f"usb-{uuid4().hex[:12]}"
+            kwargs = {
+                "app_id": app_id,
+                "serial": str(payload.get("serial") or "auto").strip(),
+                "suite": str(payload.get("suite") or "commissioning").strip(),
+                "test_filter": str(payload.get("testFilter") or "").strip(),
+                "skip_activation": bool_from_payload(payload.get("skipActivation"), default=False),
+                "install_apk": bool_from_payload(payload.get("installApk"), default=False),
+                "apk_path": str(payload.get("apkPath") or "").strip(),
+                "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
+                "timeout_sec": parse_int(payload.get("timeoutSec"), default=3600, min_value=60, max_value=7200),
+            }
+
+            with _active_suite_lock:
+                _active_suite_runs[run_id] = {
+                    "runId": run_id,
+                    "type": "usb-test",
+                    "appId": app_id,
+                    "status": "queued",
+                    "startedAt": None,
+                    "finishedAt": None,
+                    "result": None,
+                    "error": None,
+                }
+
+            thread = threading.Thread(
+                target=_run_usb_test_background, args=(run_id, kwargs), daemon=True,
+            )
+            thread.start()
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, {"runId": run_id, "status": "queued"})
+
+    def _handle_dual_device_test(self) -> None:
+        try:
+            payload = self._read_json_body()
+            master_serial = str(payload.get("masterSerial") or "").strip()
+            child_serial = str(payload.get("childSerial") or "").strip()
+            if not master_serial or not child_serial:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {
+                    "error": "masterSerial und childSerial sind erforderlich."
+                })
+
+            run_id = f"dual-{uuid4().hex[:12]}"
+            kwargs = {
+                "master_serial": master_serial,
+                "child_serial": child_serial,
+                "install_apk": bool_from_payload(payload.get("installApk"), default=False),
+                "master_apk_path": str(payload.get("masterApkPath") or "").strip(),
+                "child_apk_path": str(payload.get("childApkPath") or "").strip(),
+                "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
+                "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
+                "parallel": bool_from_payload(payload.get("parallel"), default=False),
+            }
+
+            with _active_suite_lock:
+                _active_suite_runs[run_id] = {
+                    "runId": run_id,
+                    "type": "dual-device",
+                    "status": "queued",
+                    "startedAt": None,
+                    "finishedAt": None,
+                    "result": None,
+                    "error": None,
+                }
+
+            thread = threading.Thread(
+                target=_run_dual_device_background, args=(run_id, kwargs), daemon=True,
+            )
+            thread.start()
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, {"runId": run_id, "status": "queued"})
 
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))
