@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, asdict
 from collections import defaultdict
+from datetime import datetime, timezone
 import re
 
 # ==================== CONFIGURATION ====================
@@ -166,7 +167,7 @@ def run_jest_tests() -> Dict:
     
     test_summary = {
         'return_code': returncode,
-        'pass': 'PASS' in output,
+        'pass': returncode == 0,
         'summary': 'unknown',
         'test_suites': 0,
         'tests_passed': 0,
@@ -174,28 +175,48 @@ def run_jest_tests() -> Dict:
         'tests_total': 0
     }
     
-    # Parse JSON output wenn möglich
-    try:
-        # Versuche JSON zu extrahieren
-        json_start = output.find('{')
-        if json_start > 0:
-            json_str = output[json_start:]
-            json_data = json.loads(json_str)
-            if 'numPassedTestSuites' in json_data:
-                test_summary['test_suites'] = json_data.get('numPassedTestSuites', 0) + json_data.get('numFailedTestSuites', 0)
+    # Parse JSON output wenn möglich (auch bei zusätzlichem NPM-Noise vor/nach JSON)
+    decoder = json.JSONDecoder()
+    for idx, char in enumerate(output):
+        if char != "{":
+            continue
+        try:
+            json_data, _ = decoder.raw_decode(output[idx:])
+            if isinstance(json_data, dict) and 'numTotalTests' in json_data:
+                test_summary['test_suites'] = (
+                    json_data.get('numPassedTestSuites', 0) +
+                    json_data.get('numFailedTestSuites', 0) +
+                    json_data.get('numPendingTestSuites', 0) +
+                    json_data.get('numRuntimeErrorTestSuites', 0)
+                )
                 test_summary['tests_passed'] = json_data.get('numPassedTests', 0)
-                test_summary['tests_failed'] = json_data.get('numFailedTests', 0)
+                test_summary['tests_failed'] = (
+                    json_data.get('numFailedTests', 0) +
+                    json_data.get('numRuntimeErrorTestSuites', 0)
+                )
                 test_summary['tests_total'] = json_data.get('numTotalTests', 0)
-    except:
-        pass
+                test_summary['pass'] = test_summary['tests_failed'] == 0 and returncode == 0
+                break
+        except json.JSONDecodeError:
+            continue
     
     # Fallback: Text-basierte Parser
     if test_summary['tests_total'] == 0:
-        passed_match = re.search(r'(\d+) passed', output)
-        failed_match = re.search(r'(\d+) failed', output)
+        tests_line = re.search(r'Tests:\s*(.*)', output)
+        suites_line = re.search(r'Test Suites:\s*(.*)', output)
+        line_to_parse = tests_line.group(1) if tests_line else output
+        suites_to_parse = suites_line.group(1) if suites_line else output
+
+        passed_match = re.search(r'(\d+)\s+passed', line_to_parse)
+        failed_match = re.search(r'(\d+)\s+failed', line_to_parse)
+        total_match = re.search(r'(\d+)\s+total', line_to_parse)
+        suites_total_match = re.search(r'(\d+)\s+total', suites_to_parse)
+
         test_summary['tests_passed'] = int(passed_match.group(1)) if passed_match else 0
         test_summary['tests_failed'] = int(failed_match.group(1)) if failed_match else 0
-        test_summary['tests_total'] = test_summary['tests_passed'] + test_summary['tests_failed']
+        test_summary['tests_total'] = int(total_match.group(1)) if total_match else (test_summary['tests_passed'] + test_summary['tests_failed'])
+        test_summary['test_suites'] = int(suites_total_match.group(1)) if suites_total_match else 0
+        test_summary['pass'] = test_summary['tests_failed'] == 0 and returncode == 0
     
     return test_summary
 
@@ -300,7 +321,7 @@ def analyze_repository() -> dict:
     print("=" * 80)
     
     analysis = {
-        'timestamp': str(Path.cwd()),
+        'timestamp': datetime.now(timezone.utc).isoformat(),
         'backend': analyze_typescript_files(),
         'android': analyze_android_components(),
         'firestore': analyze_firestore_rules(),
