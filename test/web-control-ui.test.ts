@@ -295,6 +295,14 @@ describe("web-control browser flows", () => {
   it("createSupportTicket submits consent-aware payload and resets the form on success", async () => {
     const { context, elements, callableFactory, documentMock } = loadWebControl();
     context.__webControlTestExports.setFunctionsForTesting({ httpsCallable: callableFactory });
+    context.__webControlTestExports.setCurrentMasterImeiForTesting("master-1");
+    context.__webControlTestExports.setDbForTesting({
+      collection: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        get: jest.fn().mockResolvedValue({ empty: true, forEach: jest.fn() }),
+      })),
+    });
     elements.get("problem-description")!.value = "Kind kann Aufgaben nicht synchronisieren";
 
     const checkedConsent = { value: "yes", checked: true };
