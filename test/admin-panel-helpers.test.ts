@@ -361,7 +361,7 @@ describe("admin-panel helper functions", () => {
   it("maps Python automation status codes to labels", () => {
     const { exports } = loadAdminPanelTestExports();
     expect(exports.formatPythonAutomationStatus("pass")).toBe("✅ PASS");
-    expect(exports.formatPythonAutomationStatus("manual_required")).toBe("🟡 MANUELL");
+    expect(exports.formatPythonAutomationStatus("manual_required")).toBe("🟡 NACHWEIS OFFEN");
     expect(exports.formatPythonAutomationStatus("fail")).toBe("❌ FAIL");
     expect(exports.formatPythonAutomationStatus("not_run")).toBe("⏸ NOCH NICHT GELAUFEN");
     expect(exports.formatPythonAutomationStatus("unknown")).toBe("ℹ️ UNBEKANNT");
@@ -376,7 +376,7 @@ describe("admin-panel helper functions", () => {
     expect(pass.cardClass).toBe("status-pass");
 
     const manual = exports.getPythonAutomationStatusMeta("manual_required");
-    expect(manual.label).toBe("MANUELL");
+  expect(manual.label).toBe("NACHWEIS OFFEN");
 
     const fail = exports.getPythonAutomationStatusMeta("fail");
     expect(fail.label).toBe("FAIL");

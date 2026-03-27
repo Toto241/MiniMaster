@@ -387,7 +387,7 @@ function collectCommissioningAutomationContext() {
 
 function formatPythonAutomationStatus(status) {
     if (status === "pass") return "✅ PASS";
-    if (status === "manual_required") return "🟡 MANUELL";
+    if (status === "manual_required") return "🟡 NACHWEIS OFFEN";
     if (status === "fail") return "❌ FAIL";
     if (status === "not_run") return "⏸ NOCH NICHT GELAUFEN";
     return "ℹ️ UNBEKANNT";
@@ -398,7 +398,7 @@ function getPythonAutomationStatusMeta(status) {
         return { label: "PASS", className: "python-status-pass", cardClass: "status-pass" };
     }
     if (status === "manual_required") {
-        return { label: "MANUELL", className: "python-status-manual_required", cardClass: "status-manual_required" };
+        return { label: "NACHWEIS OFFEN", className: "python-status-manual_required", cardClass: "status-manual_required" };
     }
     if (status === "fail") {
         return { label: "FAIL", className: "python-status-fail", cardClass: "status-fail" };
@@ -428,7 +428,27 @@ function getPythonAutomationCatalogFilters() {
     return {
         search: (document.getElementById("python-automation-catalog-search")?.value || "").trim().toLowerCase(),
         mode: document.getElementById("python-automation-catalog-filter")?.value || "all",
+        sort: document.getElementById("python-automation-catalog-sort")?.value || "byType",
     };
+}
+
+function getPythonAutomationModeHint(type) {
+    if (type === "command") return "Automatisiertes CLI/PowerShell-Gate";
+    if (type === "documented") return "Manueller Nachweis anhand dokumentierter Schrittfolge";
+    if (type === "manual") return "Manuelle Prüfung mit Operator-Nachweis";
+    return "Automatische Bewertung im Python-Lauf";
+}
+
+function isManualAutomationType(type) {
+    return type === "manual" || type === "documented";
+}
+
+function getCatalogStatusPriority(status) {
+    if (status === "fail") return 0;
+    if (status === "manual_required") return 1;
+    if (status === "not_run") return 2;
+    if (status === "pass") return 3;
+    return 4;
 }
 
 function rerenderPythonAutomationCatalogFromCache() {
@@ -711,8 +731,9 @@ function renderPythonAutomationCatalog(catalog, run) {
     const runIndex = buildPythonAutomationRunIndex(run);
     const showOpenOnly = shouldShowOnlyOpenAutomationChecks();
 
-    const renderedGroups = catalog.groups.map(group => {
-        const tests = (group.tests || []).filter(test => {
+    const visibleTests = [];
+    (catalog.groups || []).forEach((group, groupIndex) => {
+        (group.tests || []).forEach((test, testIndex) => {
             const resolved = getPythonAutomationTestStatus(test, run, runIndex);
             const status = resolved.status || "not_run";
             const haystack = [
@@ -724,87 +745,165 @@ function renderPythonAutomationCatalog(catalog, run) {
             ].join(" ").toLowerCase();
 
             if (showOpenOnly && !(status === "fail" || status === "manual_required" || status === "not_run")) {
-                return false;
+                return;
             }
 
             if (filters.mode === "open" && !(status === "fail" || status === "manual_required" || status === "not_run")) {
-                return false;
+                return;
             }
 
             if (filters.mode !== "all" && filters.mode !== "open" && test.automationType !== filters.mode) {
-                return false;
+                return;
             }
 
             if (filters.search && !haystack.includes(filters.search)) {
-                return false;
+                return;
             }
 
-            return true;
+            visibleTests.push({
+                group,
+                test,
+                resolved,
+                status,
+                groupIndex,
+                testIndex,
+            });
         });
+    });
 
-        if (tests.length === 0) {
-            return "";
-        }
-
-        const cards = tests.map(test => {
-            const resolved = getPythonAutomationTestStatus(test, run, runIndex);
-            const statusMeta = getPythonAutomationStatusMeta(resolved.status);
-            const extraCardClass = test.automationType === "documented" ? " status-documented" : "";
-            const evaluatedAt = resolved.evaluatedAt
-                ? new Date(resolved.evaluatedAt).toLocaleString("de-DE")
-                : "noch nicht protokolliert";
-            const evidence = getLatestPythonAutomationEvidence(test.id);
-            const documentationHtml = test.documentation
-                ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(test.documentation)}</div>`
-                : "";
-            const evidenceHtml = evidence
-                ? `<div class='python-test-detail'><strong>Manueller Nachweis:</strong> ${escapeHtml(formatPythonAutomationEvidenceDetails(evidence) || "Nachweis protokolliert.")}</div>`
-                : "";
-            const encodedTestId = encodeURIComponent(String(test.id || ""));
-
-            return `
-                <article class='python-test-card ${statusMeta.cardClass}${extraCardClass}'>
-                    <div class='python-test-card-header'>
-                        <div>
-                            <h6>${escapeHtml(test.title || test.id || "Prüffall")}</h6>
-                            <p class='python-muted-caption'>ID: ${escapeHtml(test.id || "-")} · Quelle: ${escapeHtml(test.source || "-")}</p>
-                        </div>
-                        <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
-                    </div>
-                    <div class='python-test-meta'>
-                        <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType)}'>${escapeHtml(formatPythonAutomationType(test.automationType))}</span>
-                    </div>
-                    <p>${escapeHtml(test.description || "")}</p>
-                    <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
-                    ${test.command ? `<div class='python-test-detail'><strong>Kommando:</strong> ${escapeHtml(test.command)}</div>` : ""}
-                    ${documentationHtml}
-                    ${evidenceHtml}
-                    <div class='python-test-detail'><strong>Letzte Bewertung:</strong> ${escapeHtml(resolved.details || "Kein Detail verfügbar.")}</div>
-                    <div class='python-muted-caption'>Zuletzt bewertet: ${escapeHtml(evaluatedAt)}</div>
-                    <div class='python-test-actions'>
-                        <button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTestId}')">Bewerten &amp; protokollieren</button>
-                    </div>
-                </article>
-            `;
-        }).join("");
-
-        return `
-            <section class='python-automation-group'>
-                <h6>${escapeHtml(group.title || "Testgruppe")}</h6>
-                <p>${escapeHtml(group.description || "")}</p>
-                <div class='python-automation-card-grid'>
-                    ${cards}
-                </div>
-            </section>
-        `;
-    }).filter(Boolean);
-
-    if (renderedGroups.length === 0) {
+    if (visibleTests.length === 0) {
         catalogEl.innerHTML = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
         return;
     }
 
-    catalogEl.innerHTML = renderedGroups.join("");
+    const renderTestCard = entry => {
+        const { group, test, resolved, status } = entry;
+        const statusMeta = getPythonAutomationStatusMeta(status);
+        const extraCardClass = test.automationType === "documented" ? " status-documented" : "";
+        const evaluatedAt = resolved.evaluatedAt
+            ? new Date(resolved.evaluatedAt).toLocaleString("de-DE")
+            : "noch nicht protokolliert";
+        const evidence = getLatestPythonAutomationEvidence(test.id);
+        const documentationHtml = test.documentation
+            ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(test.documentation)}</div>`
+            : "";
+        const evidenceHtml = evidence
+            ? `<div class='python-test-detail'><strong>Manueller Nachweis:</strong> ${escapeHtml(formatPythonAutomationEvidenceDetails(evidence) || "Nachweis protokolliert.")}</div>`
+            : "";
+        const encodedTestId = encodeURIComponent(String(test.id || ""));
+
+        return `
+            <article class='python-test-card ${statusMeta.cardClass}${extraCardClass}'>
+                <div class='python-test-card-header'>
+                    <div>
+                        <h6>${escapeHtml(test.title || test.id || "Prüffall")}</h6>
+                        <p class='python-muted-caption'>ID: ${escapeHtml(test.id || "-")} · Quelle: ${escapeHtml(test.source || "-")} · Gruppe: ${escapeHtml(group.title || "-")}</p>
+                    </div>
+                    <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
+                </div>
+                <div class='python-test-meta'>
+                    <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType)}'>${escapeHtml(formatPythonAutomationType(test.automationType))}</span>
+                </div>
+                <div class='python-test-detail'><strong>Bewertungsmodus:</strong> ${escapeHtml(getPythonAutomationModeHint(test.automationType))}</div>
+                <p>${escapeHtml(test.description || "")}</p>
+                <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
+                ${test.command ? `<div class='python-test-detail'><strong>Kommando:</strong> ${escapeHtml(test.command)}</div>` : ""}
+                ${documentationHtml}
+                ${evidenceHtml}
+                <div class='python-test-detail'><strong>Letzte Bewertung:</strong> ${escapeHtml(resolved.details || "Kein Detail verfügbar.")}</div>
+                <div class='python-muted-caption'>Zuletzt bewertet: ${escapeHtml(evaluatedAt)}</div>
+                <div class='python-test-actions'>
+                    <button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTestId}')">Bewerten &amp; protokollieren</button>
+                </div>
+            </article>
+        `;
+    };
+
+    const byType = { automated: [], manual: [] };
+    visibleTests.forEach(entry => {
+        if (isManualAutomationType(entry.test.automationType)) byType.manual.push(entry);
+        else byType.automated.push(entry);
+    });
+
+    const renderGroupSection = entries => {
+        const grouped = new Map();
+        entries.forEach(entry => {
+            const key = entry.group.title || "Testgruppe";
+            if (!grouped.has(key)) {
+                grouped.set(key, {
+                    title: entry.group.title || "Testgruppe",
+                    description: entry.group.description || "",
+                    items: [],
+                });
+            }
+            grouped.get(key).items.push(entry);
+        });
+
+        return Array.from(grouped.values()).map(groupData => `
+            <section class='python-automation-group'>
+                <h6>${escapeHtml(groupData.title)}</h6>
+                <p>${escapeHtml(groupData.description)}</p>
+                <div class='python-automation-card-grid'>
+                    ${groupData.items.map(renderTestCard).join("")}
+                </div>
+            </section>
+        `).join("");
+    };
+
+    let contentHtml = "";
+    if (filters.sort === "byGroup") {
+        contentHtml = renderGroupSection(
+            visibleTests.sort((a, b) => (a.groupIndex - b.groupIndex) || (a.testIndex - b.testIndex))
+        );
+    } else if (filters.sort === "byStatus") {
+        const sorted = visibleTests.sort((a, b) => {
+            const statusCmp = getCatalogStatusPriority(a.status) - getCatalogStatusPriority(b.status);
+            if (statusCmp !== 0) return statusCmp;
+            const typeCmp = String(a.test.automationType || "").localeCompare(String(b.test.automationType || ""));
+            if (typeCmp !== 0) return typeCmp;
+            return (a.groupIndex - b.groupIndex) || (a.testIndex - b.testIndex);
+        });
+        contentHtml = `
+            <section class='python-automation-group'>
+                <h6>Status-Priorität (Fail → Nachweis offen → Nicht gelaufen → Pass)</h6>
+                <p>Diese Sicht hilft, zuerst die blockierenden Punkte zu beheben.</p>
+                <div class='python-automation-card-grid'>
+                    ${sorted.map(renderTestCard).join("")}
+                </div>
+            </section>
+        `;
+    } else {
+        const automatedHtml = byType.automated.length > 0
+            ? renderGroupSection(byType.automated.sort((a, b) => (a.groupIndex - b.groupIndex) || (a.testIndex - b.testIndex)))
+            : "<div class='info'>Keine automatisierten Testfälle in der aktuellen Filterung.</div>";
+        const manualHtml = byType.manual.length > 0
+            ? renderGroupSection(byType.manual.sort((a, b) => (a.groupIndex - b.groupIndex) || (a.testIndex - b.testIndex)))
+            : "<div class='info'>Keine manuellen Testfälle in der aktuellen Filterung.</div>";
+
+        contentHtml = `
+            <section class='python-automation-bucket'>
+                <div class='python-automation-bucket-header'>
+                    <h6>Automatisierte Tests</h6>
+                    <span class='python-bucket-count'>${escapeHtml(String(byType.automated.length))} sichtbar</span>
+                </div>
+                ${automatedHtml}
+            </section>
+            <section class='python-automation-bucket'>
+                <div class='python-automation-bucket-header'>
+                    <h6>Manuelle Tests & Nachweise</h6>
+                    <span class='python-bucket-count'>${escapeHtml(String(byType.manual.length))} sichtbar</span>
+                </div>
+                ${manualHtml}
+            </section>
+        `;
+    }
+
+    catalogEl.innerHTML = `
+        <div class='info' style='margin-block-end: 8px'>
+            Sichtbare Testfälle: ${escapeHtml(String(visibleTests.length))} · Automatisiert: ${escapeHtml(String(byType.automated.length))} · Manuell: ${escapeHtml(String(byType.manual.length))}
+        </div>
+        ${contentHtml}
+    `;
 }
 
 async function loadPythonAutomationCatalog() {
@@ -1157,7 +1256,7 @@ function renderPythonAutomationHistory(runs) {
                 <th>Run-ID</th>
                 <th>Start</th>
                 <th>Status</th>
-                <th>Checks (Pass/Fail/Manuell)</th>
+                <th>Checks (Pass/Fail/Nachweis offen)</th>
                 <th>Kommandos (Pass/Fail)</th>
                 <th>Details</th>
             </tr>
@@ -4265,6 +4364,11 @@ document.addEventListener("DOMContentLoaded", async function() {
     const catalogFilterEl = document.getElementById("python-automation-catalog-filter");
     if (catalogFilterEl) {
         catalogFilterEl.addEventListener("change", rerenderPythonAutomationCatalogFromCache);
+    }
+
+    const catalogSortEl = document.getElementById("python-automation-catalog-sort");
+    if (catalogSortEl) {
+        catalogSortEl.addEventListener("change", rerenderPythonAutomationCatalogFromCache);
     }
 
     const historySearchEl = document.getElementById("python-automation-history-search");

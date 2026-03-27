@@ -1472,6 +1472,16 @@ input:focus, select:focus, textarea:focus {
     align-items: center;
 }
 
+.python-automation-separation-hint {
+    border: 1px solid #dbeafe;
+    background: #eff6ff;
+    border-radius: 10px;
+    color: #1e3a8a;
+    padding: 10px 12px;
+    font-size: 0.86rem;
+    margin-block-end: 10px;
+}
+
 .python-automation-toolbar input,
 .python-automation-toolbar select {
     border: 1px solid #cbd5e1;
@@ -1502,6 +1512,35 @@ input:focus, select:focus, textarea:focus {
     margin: 0 0 4px;
     font-size: 1rem;
     color: #0f172a;
+}
+
+.python-automation-bucket + .python-automation-bucket {
+    margin-block-start: 14px;
+}
+
+.python-automation-bucket-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-block-end: 6px;
+}
+
+.python-automation-bucket-header h6 {
+    margin: 0;
+    font-size: 1rem;
+    color: #0f172a;
+}
+
+.python-bucket-count {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #334155;
 }
 
 .python-automation-group p {
