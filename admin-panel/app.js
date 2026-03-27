@@ -8887,6 +8887,10 @@ function autoSyncP0FromExistingSignals() {
     syncIfTrue("commissioningAi", setupState["ai-config"]);
     syncIfTrue("commissioningSupport", setupState["support-workflow"] || att["support-flow-verified"]);
     syncIfTrue("commissioningCompliance", setupState["compliance-flow"] || att["compliance-flow-verified"]);
+    syncIfTrue("legacyAuthSnapshot", Boolean(state.legacyAuthSnapshotRef));
+    syncIfTrue("codeqlLinked", Boolean(state.codeqlRunUrl && /^https?:\/\//i.test(state.codeqlRunUrl)));
+    syncIfTrue("androidCiLinked", Boolean(state.androidCiRunUrl && /^https?:\/\//i.test(state.androidCiRunUrl)));
+    syncIfTrue("deploymentReference", Boolean(state.deploymentRef && state.deploymentRef.trim().length > 0));
 
     if (changed) {
         state.checks = checks;
@@ -8902,15 +8906,16 @@ function getP0BlockCompletion(state) {
     const blocks = {
         security: Boolean(checks.keyRotationDone && checks.keyRestrictionsDone),
         playConsole: Boolean(checks.playDataSafety && checks.playIarc && checks.playListing && checks.playPermissions && checks.playAppAccess),
-        commissioning: Boolean(checks.commissioningAndroid && checks.commissioningAi && checks.commissioningSupport && checks.commissioningCompliance),
+        commissioning: Boolean(checks.commissioningAndroid && checks.commissioningAi && checks.commissioningSupport && checks.commissioningCompliance && checks.oemDeviceTests),
         roster: Boolean(checks.rosterAssigned),
+        releaseEvidence: Boolean(checks.legacyAuthSnapshot && checks.codeqlLinked && checks.androidCiLinked && checks.deploymentReference),
     };
     const completedBlocks = Object.values(blocks).filter(Boolean).length;
     return {
         blocks,
         completedBlocks,
-        totalBlocks: 4,
-        allDone: completedBlocks === 4,
+        totalBlocks: 5,
+        allDone: completedBlocks === 5,
     };
 }
 
@@ -8928,7 +8933,12 @@ function getP0BlockerCockpitState() {
             commissioningAi: false,
             commissioningSupport: false,
             commissioningCompliance: false,
+            oemDeviceTests: false,
             rosterAssigned: false,
+            legacyAuthSnapshot: false,
+            codeqlLinked: false,
+            androidCiLinked: false,
+            deploymentReference: false,
         },
         keyEvidence: "",
         playEvidence: "",
@@ -8937,6 +8947,11 @@ function getP0BlockerCockpitState() {
         rosterSecondary: "",
         rosterSecurity: "",
         rosterEvidence: "",
+        legacyAuthSnapshotRef: "",
+        codeqlRunUrl: "",
+        androidCiRunUrl: "",
+        deploymentRef: "",
+        releaseEvidence: "",
         notes: "",
         updatedAt: null,
     };
@@ -8954,6 +8969,11 @@ function getP0BlockerCockpitState() {
             rosterSecondary: parsed.rosterSecondary || "",
             rosterSecurity: parsed.rosterSecurity || "",
             rosterEvidence: parsed.rosterEvidence || "",
+            legacyAuthSnapshotRef: parsed.legacyAuthSnapshotRef || "",
+            codeqlRunUrl: parsed.codeqlRunUrl || "",
+            androidCiRunUrl: parsed.androidCiRunUrl || "",
+            deploymentRef: parsed.deploymentRef || "",
+            releaseEvidence: parsed.releaseEvidence || "",
             notes: parsed.notes || "",
             updatedAt: parsed.updatedAt || null,
         };
@@ -8981,7 +9001,12 @@ function renderP0BlockerCockpit() {
         "p0-commissioning-ai": "commissioningAi",
         "p0-commissioning-support": "commissioningSupport",
         "p0-commissioning-compliance": "commissioningCompliance",
+        "p0-oem-device-tests": "oemDeviceTests",
         "p0-roster-assigned": "rosterAssigned",
+        "p0-legacy-auth-snapshot": "legacyAuthSnapshot",
+        "p0-codeql-linked": "codeqlLinked",
+        "p0-android-ci-linked": "androidCiLinked",
+        "p0-deployment-reference": "deploymentReference",
     };
 
     Object.entries(checkboxMap).forEach(([id, key]) => {
@@ -8997,6 +9022,7 @@ function renderP0BlockerCockpit() {
         "p0-roster-secondary": state.rosterSecondary,
         "p0-roster-security": state.rosterSecurity,
         "p0-roster-evidence": state.rosterEvidence,
+        "p0-release-evidence": state.releaseEvidence,
         "p0-notes": state.notes,
     };
 
@@ -9017,7 +9043,7 @@ function renderP0BlockerCockpit() {
             "<div class='" + (blockStatus.allDone ? "success-box" : "error") + "'>" +
             "<p><strong>P0 Status:</strong> " + (blockStatus.allDone ? "✅ Alle P0-Blocker abgeschlossen" : "⚠️ P0-Blocker offen") + "</p>" +
             "<p><strong>Erledigt:</strong> " + done + "/" + total + " (" + donePercent + "%)</p>" +
-            "<p><strong>Block-Abschluss:</strong> " + blockStatus.completedBlocks + "/" + blockStatus.totalBlocks + " (Security " + (blockStatus.blocks.security ? "✅" : "⚠️") + ", Play " + (blockStatus.blocks.playConsole ? "✅" : "⚠️") + ", Commissioning " + (blockStatus.blocks.commissioning ? "✅" : "⚠️") + ", Roster " + (blockStatus.blocks.roster ? "✅" : "⚠️") + ")</p>" +
+            "<p><strong>Block-Abschluss:</strong> " + blockStatus.completedBlocks + "/" + blockStatus.totalBlocks + " (Security " + (blockStatus.blocks.security ? "✅" : "⚠️") + ", Play " + (blockStatus.blocks.playConsole ? "✅" : "⚠️") + ", Commissioning " + (blockStatus.blocks.commissioning ? "✅" : "⚠️") + ", Roster " + (blockStatus.blocks.roster ? "✅" : "⚠️") + ", Release-Evidence " + (blockStatus.blocks.releaseEvidence ? "✅" : "⚠️") + ")</p>" +
             "<p><strong>Aktualisiert:</strong> " + escapeHtml(ts) + "</p>" +
             "</div>";
     }
@@ -9037,7 +9063,12 @@ function collectP0BlockerCockpitFromUi() {
             commissioningAi: Boolean(document.getElementById("p0-commissioning-ai")?.checked),
             commissioningSupport: Boolean(document.getElementById("p0-commissioning-support")?.checked),
             commissioningCompliance: Boolean(document.getElementById("p0-commissioning-compliance")?.checked),
+            oemDeviceTests: Boolean(document.getElementById("p0-oem-device-tests")?.checked),
             rosterAssigned: Boolean(document.getElementById("p0-roster-assigned")?.checked),
+            legacyAuthSnapshot: Boolean(document.getElementById("p0-legacy-auth-snapshot")?.checked),
+            codeqlLinked: Boolean(document.getElementById("p0-codeql-linked")?.checked),
+            androidCiLinked: Boolean(document.getElementById("p0-android-ci-linked")?.checked),
+            deploymentReference: Boolean(document.getElementById("p0-deployment-reference")?.checked),
         },
         keyEvidence: (document.getElementById("p0-key-evidence")?.value || "").trim(),
         playEvidence: (document.getElementById("p0-play-evidence")?.value || "").trim(),
@@ -9046,6 +9077,11 @@ function collectP0BlockerCockpitFromUi() {
         rosterSecondary: (document.getElementById("p0-roster-secondary")?.value || "").trim(),
         rosterSecurity: (document.getElementById("p0-roster-security")?.value || "").trim(),
         rosterEvidence: (document.getElementById("p0-roster-evidence")?.value || "").trim(),
+        legacyAuthSnapshotRef: (document.getElementById("p0-legacy-auth-snapshot")?.checked ? (document.getElementById("p0-release-evidence")?.value || "").trim() : ""),
+        codeqlRunUrl: (document.getElementById("p0-codeql-linked")?.checked ? (document.getElementById("p0-release-evidence")?.value || "").trim() : ""),
+        androidCiRunUrl: (document.getElementById("p0-android-ci-linked")?.checked ? (document.getElementById("p0-release-evidence")?.value || "").trim() : ""),
+        deploymentRef: (document.getElementById("p0-deployment-reference")?.checked ? (document.getElementById("p0-release-evidence")?.value || "").trim() : ""),
+        releaseEvidence: (document.getElementById("p0-release-evidence")?.value || "").trim(),
         notes: (document.getElementById("p0-notes")?.value || "").trim(),
         updatedAt: new Date().toISOString(),
     };
