@@ -1045,7 +1045,7 @@ describe("admin-panel helper functions", () => {
     const { exports } = loadAdminPanelTestExports();
     const empty = exports.getP0BlockCompletion({ checks: {} });
     expect(empty.completedBlocks).toBe(0);
-    expect(empty.totalBlocks).toBe(4);
+    expect(empty.totalBlocks).toBe(5);
     expect(empty.allDone).toBe(false);
     expect(empty.blocks.security).toBe(false);
 
@@ -1059,18 +1059,20 @@ describe("admin-panel helper functions", () => {
     expect(partial.blocks.security).toBe(true);
     expect(partial.blocks.roster).toBe(true);
     expect(partial.blocks.playConsole).toBe(false);
+    expect(partial.blocks.releaseEvidence).toBe(false);
     expect(partial.completedBlocks).toBe(2);
 
     const full = exports.getP0BlockCompletion({
       checks: {
         keyRotationDone: true, keyRestrictionsDone: true,
         playDataSafety: true, playIarc: true, playListing: true, playPermissions: true, playAppAccess: true,
-        commissioningAndroid: true, commissioningAi: true, commissioningSupport: true, commissioningCompliance: true,
+        commissioningAndroid: true, commissioningAi: true, commissioningSupport: true, commissioningCompliance: true, oemDeviceTests: true,
         rosterAssigned: true,
+        legacyAuthSnapshot: true, codeqlLinked: true, androidCiLinked: true, deploymentReference: true,
       },
     });
     expect(full.allDone).toBe(true);
-    expect(full.completedBlocks).toBe(4);
+    expect(full.completedBlocks).toBe(5);
   });
 
   // ── P0 Blocker Cockpit State (localStorage) ──

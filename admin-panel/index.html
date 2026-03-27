@@ -990,6 +990,7 @@
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-ai" /> AI-Konfiguration + AI-Flow geprüft</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-support" /> Support-Workflow vollständig getestet</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-compliance" /> Compliance-Flow (DSAR/Audit/Consent) geprüft</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-oem-device-tests" /> OEM-Tests (Pixel + Samsung) abgeschlossen</label>
                                     <label for="p0-commissioning-evidence" class="field-label">Checklist / Artefakt-Referenz</label>
                                     <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" title="Referenz zum Abnahmeprotokoll oder Checklist-Artefakt" />
                                 </div>
@@ -1005,6 +1006,16 @@
                                     <input type="text" id="p0-roster-security" placeholder="Security/Compliance Kontakt" title="Ansprechperson für Sicherheits- und Compliance-Fragen" />
                                     <label for="p0-roster-evidence" class="field-label">Roster-Link / Runbook-Referenz</label>
                                     <input type="text" id="p0-roster-evidence" placeholder="Roster-Link/Runbook-Referenz" title="Link zum Bereitschaftsplan oder Runbook" />
+                                </div>
+
+                                <div class="p0-card">
+                                    <h4>5) Release-Evidence (CI + Snapshot)</h4>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-legacy-auth-snapshot" /> Legacy-Auth-Dashboard-Snapshot archiviert</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-codeql-linked" /> CodeQL-Run verlinkt (erfolgreich)</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-android-ci-linked" /> Android-CI-Run verlinkt (erfolgreich)</label>
+                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-deployment-reference" /> Deployment-Referenz dokumentiert</label>
+                                    <label for="p0-release-evidence" class="field-label">Release-Evidence-Link / Artefakt-Referenz</label>
+                                    <input type="text" id="p0-release-evidence" placeholder="Release-Evidence-Link/Artefakt-Referenz" title="Link auf Evidence Register, CI-Runs oder Deployment-Artefakt" />
                                 </div>
                             </div>
 
