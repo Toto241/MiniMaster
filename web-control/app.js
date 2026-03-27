@@ -825,6 +825,13 @@ async function createSupportTicket(event) {
 
 async function loadSupportTickets() {
     const ticketsContainer = document.getElementById('support-tickets');
+    if (!ticketsContainer) return;
+
+    if (!db || !currentMasterImei) {
+        ticketsContainer.innerHTML = '<p>No support tickets found.</p>';
+        return;
+    }
+
     ticketsContainer.innerHTML = '<div class="loading">Loading tickets...</div>';
 
     try {
