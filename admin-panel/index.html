@@ -1290,6 +1290,128 @@ npm test -- --runInBand
                                 </div>
                             </div>
 
+                        <!-- ==================== TESTSUITE-ZENTRALE ==================== -->
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>🔬 Test-Suiten &amp; USB-Automatisierung</h3>
+                            <p>
+                                Alle Testsuiten (Backend, Android, USB-Device) aus der Python-Testzentrale.
+                                Suiten werden asynchron ausgef&uuml;hrt &ndash; Ergebnisse k&ouml;nnen per Polling abgerufen werden.
+                            </p>
+
+                            <div class="python-automation-layout" style="margin-block-start: 14px">
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Angeschlossene Ger&auml;te</h5>
+                                            <p>ADB-Status der angeschlossenen Android-Ger&auml;te.</p>
+                                        </div>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="loadSuiteDeviceStatus()" class="btn btn-secondary">Ger&auml;te aktualisieren</button>
+                                    </div>
+                                    <div id="suite-device-status" class="data-list">
+                                        <div class="info">Noch nicht geladen.</div>
+                                    </div>
+                                </section>
+
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Suite-Katalog</h5>
+                                            <p>Alle verf&uuml;gbaren Testsuiten mit Voraussetzungs-Status.</p>
+                                        </div>
+                                    </div>
+                                    <div class="python-automation-toolbar">
+                                        <select id="suite-group-filter">
+                                            <option value="all">Alle Gruppen</option>
+                                            <option value="backend">Backend</option>
+                                            <option value="android">Android</option>
+                                            <option value="device">Device/USB</option>
+                                            <option value="release">Release</option>
+                                        </select>
+                                        <label class="setup-checklist-item python-inline-check">
+                                            <input type="checkbox" id="suite-ready-only" />
+                                            Nur lauff&auml;hige anzeigen
+                                        </label>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="loadSuiteCatalog()" class="btn btn-secondary">Katalog laden</button>
+                                    </div>
+                                    <div id="suite-catalog" class="data-list">
+                                        <div class="info">Noch nicht geladen.</div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            <div class="python-automation-layout" style="margin-block-start: 14px">
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>USB-Testlauf starten</h5>
+                                            <p>Einzelger&auml;t oder Dual-Device Commissioning &uuml;ber Python.</p>
+                                        </div>
+                                    </div>
+                                    <div class="dsar-form" style="display: grid; gap: 8px; margin-block-start: 8px">
+                                        <label>
+                                            <span>Testtyp</span>
+                                            <select id="suite-usb-test-type">
+                                                <option value="single-master">Einzelger&auml;t: Master-App</option>
+                                                <option value="single-child">Einzelger&auml;t: Kind-App</option>
+                                                <option value="dual-device">Dual-Device Commissioning</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span>Master-Serial</span>
+                                            <input type="text" id="suite-usb-master-serial" placeholder="auto oder Serial (z.B. R58M12345)" value="auto" />
+                                        </label>
+                                        <label id="suite-usb-child-serial-row">
+                                            <span>Child-Serial</span>
+                                            <input type="text" id="suite-usb-child-serial" placeholder="Serial des Kind-Ger&auml;ts" />
+                                        </label>
+                                        <label>
+                                            <span>Suite</span>
+                                            <select id="suite-usb-suite">
+                                                <option value="commissioning" selected>Commissioning</option>
+                                                <option value="default">Alle Tests</option>
+                                            </select>
+                                        </label>
+                                        <div class="setup-actions" style="gap: 8px; flex-wrap: wrap">
+                                            <label class="setup-checklist-item python-inline-check">
+                                                <input type="checkbox" id="suite-usb-install-apk" />
+                                                APK installieren
+                                            </label>
+                                            <label class="setup-checklist-item python-inline-check">
+                                                <input type="checkbox" id="suite-usb-skip-activation" />
+                                                Aktivierung &uuml;berspringen
+                                            </label>
+                                            <label class="setup-checklist-item python-inline-check">
+                                                <input type="checkbox" id="suite-usb-parallel" />
+                                                Parallel (Dual-Device)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-start: 10px">
+                                        <button onclick="startUsbTestRun()" class="btn btn-primary">USB-Testlauf starten</button>
+                                    </div>
+                                </section>
+
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Aktive &amp; abgeschlossene L&auml;ufe</h5>
+                                            <p>Status laufender und vergangener Suite-Ausf&uuml;hrungen.</p>
+                                        </div>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="loadSuiteRunHistory()" class="btn btn-secondary">Historie laden</button>
+                                    </div>
+                                    <div id="suite-active-runs" class="data-list">
+                                        <div class="info">Noch keine Testl&auml;ufe.</div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
                             <p>

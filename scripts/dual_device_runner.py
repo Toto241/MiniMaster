@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""
+Python Dual-Device Commissioning-Runner für MiniMaster.
+
+Ersetzt `run-dual-device-commissioning.ps1` vollständig.
+Orchestriert Commissioning-Testsuiten auf zwei physischen Geräten
+(Master + Child) mit optionaler Parallelisierung.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from usb_test_runner import UsbTestRunResult, run_usb_test  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_JSON_OUT = REPO_ROOT / "build" / "test-automation" / "dual-device-latest.json"
+
+
+@dataclass
+class DualDeviceResult:
+    master_serial: str
+    child_serial: str
+    master_result: UsbTestRunResult | None = None
+    child_result: UsbTestRunResult | None = None
+    overall_status: str = "not_started"
+    duration_sec: float = 0.0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "masterSerial": self.master_serial,
+            "childSerial": self.child_serial,
+            "masterResult": self.master_result.to_dict() if self.master_result else None,
+            "childResult": self.child_result.to_dict() if self.child_result else None,
+            "overallStatus": self.overall_status,
+            "durationSec": self.duration_sec,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+
+
+def run_dual_device(
+    master_serial: str,
+    child_serial: str,
+    install_apk: bool = False,
+    master_apk_path: str = "",
+    child_apk_path: str = "",
+    uninstall_first: bool = False,
+    timeout_sec: int = 7200,
+    parallel: bool = False,
+    verbose: bool = True,
+) -> DualDeviceResult:
+    """
+    Führt Commissioning-Tests auf zwei Geräten aus.
+
+    Args:
+        master_serial: Serial des Master-Geräts
+        child_serial: Serial des Child-Geräts
+        install_apk: APKs installieren
+        master_apk_path: Expliziter APK-Pfad für Master
+        child_apk_path: Expliziter APK-Pfad für Child
+        uninstall_first: Apps vor Install deinstallieren
+        timeout_sec: Timeout pro Gerät
+        parallel: Beide Geräte parallel testen
+        verbose: Console-Ausgabe
+
+    Returns: DualDeviceResult
+    """
+    started = time.perf_counter()
+    result = DualDeviceResult(master_serial=master_serial, child_serial=child_serial)
+
+    def _print(msg: str) -> None:
+        if verbose:
+            print(msg)
+
+    _print("")
+    _print("=" * 48)
+    _print("  MINIMASTER DUAL-DEVICE COMMISSIONING (Python)")
+    _print("=" * 48)
+    _print(f"  Master-Gerät: {master_serial}")
+    _print(f"  Child-Gerät:  {child_serial}")
+    _print(f"  Modus:        {'Parallel' if parallel else 'Sequentiell'}")
+    _print("")
+
+    def _run_master() -> UsbTestRunResult:
+        return run_usb_test(
+            app_id="master",
+            serial=master_serial,
+            suite="commissioning",
+            install_apk=install_apk,
+            apk_path=master_apk_path,
+            uninstall_first=uninstall_first,
+            timeout_sec=timeout_sec,
+            verbose=verbose and not parallel,
+        )
+
+    def _run_child() -> UsbTestRunResult:
+        return run_usb_test(
+            app_id="child",
+            serial=child_serial,
+            suite="commissioning",
+            install_apk=install_apk,
+            apk_path=child_apk_path,
+            uninstall_first=uninstall_first,
+            timeout_sec=timeout_sec,
+            verbose=verbose and not parallel,
+        )
+
+    if parallel:
+        _print("[Parallel] Starte beide Commissioning-Suiten gleichzeitig...")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_master = executor.submit(_run_master)
+            future_child = executor.submit(_run_child)
+
+            for future in as_completed([future_master, future_child]):
+                try:
+                    future.result()
+                except Exception as exc:
+                    _print(f"✘  Ein Testlauf ist fehlgeschlagen: {exc}")
+
+            result.master_result = future_master.result()
+            result.child_result = future_child.result()
+    else:
+        _print("[1/2] Master Commissioning-Suite")
+        result.master_result = _run_master()
+
+        _print("")
+        _print("[2/2] Child Commissioning-Suite")
+        result.child_result = _run_child()
+
+    # ── Gesamtergebnis ────────────────────────────────────────────────────
+    result.duration_sec = round(time.perf_counter() - started, 2)
+
+    master_ok = result.master_result and result.master_result.overall_status == "passed"
+    child_ok = result.child_result and result.child_result.overall_status == "passed"
+
+    if master_ok and child_ok:
+        result.overall_status = "passed"
+    else:
+        result.overall_status = "failed"
+
+    _print("")
+    _print("=" * 48)
+    _print("  GESAMTERGEBNIS")
+    _print("=" * 48)
+    if result.overall_status == "passed":
+        _print("  BESTANDEN: Beide Commissioning-Suiten erfolgreich.")
+    else:
+        _print("  FEHLGESCHLAGEN: Mindestens eine Suite fehlgeschlagen.")
+        if result.master_result:
+            _print(f"  Master: {result.master_result.overall_status}")
+        if result.child_result:
+            _print(f"  Child:  {result.child_result.overall_status}")
+    _print(f"  Dauer: {result.duration_sec:.1f}s")
+    _print("=" * 48)
+    _print("")
+
+    return result
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="MiniMaster Dual-Device Commissioning (Python)")
+    parser.add_argument("--master-serial", required=True, help="Serial des Master-Geräts")
+    parser.add_argument("--child-serial", required=True, help="Serial des Child-Geräts")
+    parser.add_argument("--install-apk", action="store_true", help="APKs installieren")
+    parser.add_argument("--master-apk-path", default="", help="APK-Pfad für Master")
+    parser.add_argument("--child-apk-path", default="", help="APK-Pfad für Child")
+    parser.add_argument("--uninstall-first", action="store_true", help="Apps vor Install deinstallieren")
+    parser.add_argument("--timeout", type=int, default=7200, help="Timeout pro Gerät (Sekunden)")
+    parser.add_argument("--parallel", action="store_true", help="Beide Geräte parallel testen")
+    parser.add_argument("--json-out", type=Path, default=DEFAULT_JSON_OUT, help="JSON-Ergebnis speichern")
+    args = parser.parse_args()
+
+    result = run_dual_device(
+        master_serial=args.master_serial,
+        child_serial=args.child_serial,
+        install_apk=args.install_apk,
+        master_apk_path=args.master_apk_path,
+        child_apk_path=args.child_apk_path,
+        uninstall_first=args.uninstall_first,
+        timeout_sec=args.timeout,
+        parallel=args.parallel,
+    )
+
+    args.json_out.parent.mkdir(parents=True, exist_ok=True)
+    args.json_out.write_text(json.dumps(result.to_dict(), indent=2), encoding="utf-8")
+    print(f"JSON-Ergebnis: {args.json_out}")
+
+    return 0 if result.overall_status == "passed" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

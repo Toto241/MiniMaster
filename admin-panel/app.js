@@ -1415,6 +1415,265 @@ function exportLatestPythonAutomationRun() {
     showNotification("Python-Automationslauf exportiert.", "success");
 }
 
+// ===================== TEST-SUITEN-ZENTRALE =====================
+
+let _suiteActivePollers = {};
+
+async function loadSuiteDeviceStatus() {
+    const el = document.getElementById("suite-device-status");
+    if (!el) return;
+    if (!isPythonOperator) {
+        el.innerHTML = "<div class='info'>Geraetestatus ist nur im Python-Operator verfuegbar.</div>";
+        return;
+    }
+    el.innerHTML = "<div class='loading'>Lade Geraetestatus...</div>";
+    try {
+        const res = await fetch("/api/suites/devices");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
+        if (!data.adb_available) {
+            el.innerHTML = "<div class='error'>ADB ist nicht verfuegbar. Bitte Android SDK installieren.</div>";
+            return;
+        }
+        if (!data.devices || data.devices.length === 0) {
+            el.innerHTML = "<div class='info'>Keine Geraete angeschlossen.</div>";
+            return;
+        }
+        el.innerHTML = data.devices.map(d => `
+            <div class="data-row" style="display:flex;gap:12px;align-items:center">
+                <span class="badge ${d.state === 'device' ? 'pass' : 'fail'}">${escapeHtml(d.state)}</span>
+                <strong>${escapeHtml(d.serial)}</strong>
+                <span>${escapeHtml(d.model || '')} &middot; Android ${escapeHtml(d.android_version || '?')}</span>
+            </div>
+        `).join("");
+    } catch (err) {
+        el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+    }
+}
+
+async function loadSuiteCatalog() {
+    const el = document.getElementById("suite-catalog");
+    if (!el) return;
+    if (!isPythonOperator) {
+        el.innerHTML = "<div class='info'>Suite-Katalog ist nur im Python-Operator verfuegbar.</div>";
+        return;
+    }
+    el.innerHTML = "<div class='loading'>Lade Katalog...</div>";
+    try {
+        const res = await fetch("/api/suites");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
+        renderSuiteCatalog(data.suites || []);
+    } catch (err) {
+        el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+    }
+}
+
+function renderSuiteCatalog(suites) {
+    const el = document.getElementById("suite-catalog");
+    if (!el) return;
+    const groupFilter = document.getElementById("suite-group-filter")?.value || "all";
+    const readyOnly = document.getElementById("suite-ready-only")?.checked || false;
+
+    let filtered = suites;
+    if (groupFilter !== "all") filtered = filtered.filter(s => s.group === groupFilter);
+    if (readyOnly) filtered = filtered.filter(s => s.prereqs_met);
+
+    if (filtered.length === 0) {
+        el.innerHTML = "<div class='info'>Keine Suiten gefunden.</div>";
+        return;
+    }
+
+    const groupMap = {};
+    for (const s of filtered) {
+        const g = s.group || "sonstige";
+        if (!groupMap[g]) groupMap[g] = [];
+        groupMap[g].push(s);
+    }
+
+    const groupLabels = { backend: "Backend", android: "Android", device: "Device/USB", release: "Release", sonstige: "Sonstige" };
+
+    el.innerHTML = Object.entries(groupMap).map(([group, items]) => `
+        <div style="margin-block-end: 12px">
+            <h6 style="margin:0 0 4px">${escapeHtml(groupLabels[group] || group)}</h6>
+            <table class="data-table" style="width:100%">
+                <thead><tr>
+                    <th>Suite</th><th>Beschreibung</th><th>Voraussetzungen</th><th></th>
+                </tr></thead>
+                <tbody>${items.map(s => `
+                    <tr>
+                        <td><code>${escapeHtml(s.id)}</code></td>
+                        <td>${escapeHtml(s.description || '')}</td>
+                        <td><span class="badge ${s.prereqs_met ? 'pass' : 'fail'}">${s.prereqs_met ? 'OK' : (s.missing_prereqs || []).join(', ')}</span></td>
+                        <td><button onclick="startSuiteRun('${escapeHtml(s.id)}')" class="btn btn-secondary btn-sm" ${s.prereqs_met ? '' : 'disabled'}>Starten</button></td>
+                    </tr>`).join("")}
+                </tbody>
+            </table>
+        </div>
+    `).join("");
+}
+
+async function startSuiteRun(suiteId) {
+    if (!isPythonOperator) return;
+    try {
+        const res = await fetch("/api/suites/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ suite_id: suiteId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Suite konnte nicht gestartet werden.");
+        showNotification(`Suite '${suiteId}' gestartet (Run-ID: ${data.run_id}).`, "success");
+        pollSuiteRunStatus(data.run_id);
+        appendSuiteActiveRun(data.run_id, suiteId);
+    } catch (err) {
+        showNotification("Suite-Start fehlgeschlagen: " + err.message, "error");
+    }
+}
+
+async function startUsbTestRun() {
+    if (!isPythonOperator) return;
+    const testType = document.getElementById("suite-usb-test-type")?.value || "single-master";
+    const masterSerial = (document.getElementById("suite-usb-master-serial")?.value || "auto").trim();
+    const childSerial = (document.getElementById("suite-usb-child-serial")?.value || "").trim();
+    const suite = document.getElementById("suite-usb-suite")?.value || "commissioning";
+    const installApk = document.getElementById("suite-usb-install-apk")?.checked || false;
+    const skipActivation = document.getElementById("suite-usb-skip-activation")?.checked || false;
+    const parallel = document.getElementById("suite-usb-parallel")?.checked || false;
+
+    try {
+        let res, data;
+        if (testType === "dual-device") {
+            if (!childSerial) {
+                showNotification("Bitte Child-Serial angeben fuer Dual-Device-Test.", "error");
+                return;
+            }
+            res = await fetch("/api/suites/dual-device", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    master_serial: masterSerial === "auto" ? null : masterSerial,
+                    child_serial: childSerial,
+                    parallel: parallel,
+                }),
+            });
+        } else {
+            const appId = testType === "single-child" ? "child" : "master";
+            res = await fetch("/api/suites/usb-test", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    app_id: appId,
+                    serial: masterSerial === "auto" ? null : masterSerial,
+                    suite: suite,
+                    install_apk: installApk,
+                    skip_activation: skipActivation,
+                }),
+            });
+        }
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "USB-Test konnte nicht gestartet werden.");
+        showNotification(`USB-Testlauf gestartet (Run-ID: ${data.run_id}).`, "success");
+        pollSuiteRunStatus(data.run_id);
+        appendSuiteActiveRun(data.run_id, testType);
+    } catch (err) {
+        showNotification("USB-Test fehlgeschlagen: " + err.message, "error");
+    }
+}
+
+function appendSuiteActiveRun(runId, label) {
+    const el = document.getElementById("suite-active-runs");
+    if (!el) return;
+    if (el.querySelector(".info")) el.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "data-row";
+    row.id = `suite-run-${runId}`;
+    row.innerHTML = `
+        <span class="badge running">laufend</span>
+        <strong>${escapeHtml(label)}</strong>
+        <code style="font-size:0.8em">${escapeHtml(runId)}</code>
+        <span class="suite-run-detail">...</span>
+    `;
+    el.prepend(row);
+}
+
+function pollSuiteRunStatus(runId) {
+    if (_suiteActivePollers[runId]) return;
+    const poll = async () => {
+        try {
+            const res = await fetch(`/api/suites/status/${encodeURIComponent(runId)}`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { clearInterval(_suiteActivePollers[runId]); delete _suiteActivePollers[runId]; return; }
+            const row = document.getElementById(`suite-run-${runId}`);
+            if (row) {
+                const badge = row.querySelector(".badge");
+                const detail = row.querySelector(".suite-run-detail");
+                if (data.status === "running") {
+                    badge.className = "badge running";
+                    badge.textContent = "laufend";
+                    if (detail) detail.textContent = data.elapsed ? `${Math.round(data.elapsed)}s` : "...";
+                } else {
+                    badge.className = `badge ${data.status === "done" ? "pass" : "fail"}`;
+                    badge.textContent = data.status === "done" ? "fertig" : data.status;
+                    if (detail) detail.textContent = data.summary || "";
+                    clearInterval(_suiteActivePollers[runId]);
+                    delete _suiteActivePollers[runId];
+                }
+            }
+        } catch { /* ignore */ }
+    };
+    poll();
+    _suiteActivePollers[runId] = setInterval(poll, 3000);
+}
+
+async function loadSuiteRunHistory() {
+    const el = document.getElementById("suite-active-runs");
+    if (!el) return;
+    if (!isPythonOperator) {
+        el.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfuegbar.</div>";
+        return;
+    }
+    el.innerHTML = "<div class='loading'>Lade Historie...</div>";
+    try {
+        const res = await fetch("/api/suites/history");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
+        const runs = data.runs || [];
+        if (runs.length === 0) {
+            el.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
+            return;
+        }
+        el.innerHTML = runs.slice(0, 50).map(r => `
+            <div class="data-row" style="display:flex;gap:8px;align-items:center">
+                <span class="badge ${r.status === 'done' ? 'pass' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status)}</span>
+                <strong>${escapeHtml(r.suite_id || r.type || '?')}</strong>
+                <code style="font-size:0.75em">${escapeHtml(r.run_id || '')}</code>
+                <span style="margin-inline-start:auto;font-size:0.85em">${escapeHtml(r.started_at || '')}</span>
+            </div>
+        `).join("");
+    } catch (err) {
+        el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+    }
+}
+
+// Dual-Device: Child-Serial-Zeile nur bei Dual-Device anzeigen
+document.addEventListener("DOMContentLoaded", () => {
+    const typeSelect = document.getElementById("suite-usb-test-type");
+    const childRow = document.getElementById("suite-usb-child-serial-row");
+    const parallelCb = document.getElementById("suite-usb-parallel");
+    if (typeSelect && childRow) {
+        const toggle = () => {
+            const isDual = typeSelect.value === "dual-device";
+            childRow.style.display = isDual ? "" : "none";
+            if (parallelCb) parallelCb.closest("label").style.display = isDual ? "" : "none";
+        };
+        typeSelect.addEventListener("change", toggle);
+        toggle();
+    }
+});
+
+// ===================== ENDE TEST-SUITEN-ZENTRALE =====================
+
 async function executeCommandDirect(payload) {
     if (!canExecuteCommandsDirectly()) {
         showNotification("Direkte CLI-/PowerShell-Ausführung ist nur im Operator-Desktop-Modus oder in der Python-Webanwendung verfügbar.", "error");
