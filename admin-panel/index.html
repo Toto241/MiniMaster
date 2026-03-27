@@ -1211,6 +1211,11 @@ npm test -- --runInBand
                                         <div class="python-automation-separation-hint">
                                             <strong>Sortierlogik:</strong> Automatisiert = automatisch bewertet + lokale Gate-Kommandos. Manuell = manueller Nachweis + dokumentierter Testplan.
                                         </div>
+                                        <div class="python-automation-clarity-box">
+                                            <strong>Vollständigkeit &amp; Trennung auf einen Blick:</strong>
+                                            Jede Karte zeigt klar den <em>Bewertungsmodus</em> (Automatisch, Gate-Kommando, Manueller Nachweis, Dokumentierter Testplan) und den aktuellen Status.
+                                            Offene Punkte müssen entweder im automatischen Lauf auf <strong>PASS</strong> gehen oder mit belastbarer Evidenz manuell protokolliert werden.
+                                        </div>
                                         <div class="python-automation-toolbar">
                                             <input
                                                 type="text"
@@ -1271,8 +1276,15 @@ npm test -- --runInBand
                                                 style="max-inline-size: 220px"
                                             />
                                         </div>
+                                        <div id="python-automation-run-state" class="python-run-state python-run-state-idle" role="status" aria-live="polite">
+                                            <span class="python-run-state-dot" aria-hidden="true"></span>
+                                            <div>
+                                                <strong>Kein automatischer Testlauf aktiv.</strong>
+                                                <div class="python-muted-caption">Sobald ein Lauf gestartet wird, erscheint hier sofort der Live-Status inkl. Laufzeit.</div>
+                                            </div>
+                                        </div>
                                         <div class="setup-actions" style="margin-block-start: 10px">
-                                            <button onclick="runPythonAutomationSuite()" class="btn btn-primary" title="Alle ausgewählten Testfälle automatisch bewerten und protokollieren">Python-Testlauf starten</button>
+                                            <button id="python-automation-run-btn" onclick="runPythonAutomationSuite()" class="btn btn-primary" title="Alle ausgewählten Testfälle automatisch bewerten und protokollieren">Python-Testlauf starten</button>
                                             <button onclick="loadPythonAutomationCatalog()" class="btn btn-secondary" title="Testfallkatalog aus der Konfiguration neu laden">Testfallkatalog neu laden</button>
                                             <button onclick="exportLatestPythonAutomationRun()" class="btn btn-secondary" title="Ergebnis des letzten Testlaufs als Datei exportieren">Letzten Lauf exportieren</button>
                                         </div>
