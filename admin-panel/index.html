@@ -759,12 +759,15 @@
                                 gemäß DSGVO-Anforderungen.
                             </p>
                             <div class="dsar-form">
-                                <input
-                                    type="text"
-                                    id="dsar-master-id"
-                                    placeholder="Master-ID eingeben"
-                                    title="Master-ID des Benutzers für den DSGVO-Datenexport"
-                                />
+                                <div class="form-group" style="flex: 1; min-inline-size: 200px">
+                                    <label for="dsar-master-id" class="field-label">Master-ID</label>
+                                    <input
+                                        type="text"
+                                        id="dsar-master-id"
+                                        placeholder="Master-ID eingeben"
+                                        title="Master-ID des Benutzers für den DSGVO-Datenexport"
+                                    />
+                                </div>
                                 <button
                                     onclick="triggerDsarExport()"
                                     class="btn btn-primary"
@@ -790,12 +793,15 @@
                                 <code>deleteUserAccount</code> auf. Löscht Master, Children, Tasks, Subscriptions.
                             </p>
                             <div class="dsar-form">
-                                <input
-                                    type="text"
-                                    id="delete-master-id"
-                                    placeholder="Master-ID eingeben"
-                                    title="Master-ID des Benutzers, dessen Konto permanent gelöscht werden soll"
-                                />
+                                <div class="form-group" style="flex: 1; min-inline-size: 200px">
+                                    <label for="delete-master-id" class="field-label">Master-ID</label>
+                                    <input
+                                        type="text"
+                                        id="delete-master-id"
+                                        placeholder="Master-ID eingeben"
+                                        title="Master-ID des Benutzers, dessen Konto permanent gelöscht werden soll"
+                                    />
+                                </div>
                                 <button
                                     onclick="triggerAccountDeletion()"
                                     class="btn btn-danger"
@@ -814,8 +820,14 @@
                             <h3>Audit-Log Export</h3>
                             <p>Exportieren Sie Audit-Logs für einen bestimmten Zeitraum.</p>
                             <div class="dsar-form">
-                                <input type="date" id="audit-start-date" title="Startdatum für den Audit-Log-Export" />
-                                <input type="date" id="audit-end-date" title="Enddatum für den Audit-Log-Export" />
+                                <div class="form-group">
+                                    <label for="audit-start-date" class="field-label">Startdatum</label>
+                                    <input type="date" id="audit-start-date" title="Startdatum für den Audit-Log-Export" />
+                                </div>
+                                <div class="form-group">
+                                    <label for="audit-end-date" class="field-label">Enddatum</label>
+                                    <input type="date" id="audit-end-date" title="Enddatum für den Audit-Log-Export" />
+                                </div>
                                 <button
                                     onclick="exportAuditLogs()"
                                     class="btn btn-primary"
@@ -937,21 +949,51 @@
                                 <div>
                                     <h4>Cloud Services</h4>
                                     <div class="dsar-form" style="display: grid; gap: 10px">
-                                        <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" title="Firebase-Projekt-ID für die Cloud-Anbindung" />
-                                        <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" title="Google Cloud-Region für die Cloud Functions" />
-                                        <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" title="App-Check-Modus: enforced (blockiert unautorisierte Anfragen) oder monitor" />
-                                        <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" title="Zielumgebung: prod für Produktion, staging für Tests" />
+                                        <div class="form-group">
+                                            <label for="cfg-cloud-project-id" class="field-label">Firebase Project ID</label>
+                                            <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" title="Firebase-Projekt-ID für die Cloud-Anbindung" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-cloud-region" class="field-label">Functions Region</label>
+                                            <input type="text" id="cfg-cloud-region" placeholder="Functions Region (z.B. europe-west1)" title="Google Cloud-Region für die Cloud Functions" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-cloud-appcheck" class="field-label">App Check Mode</label>
+                                            <input type="text" id="cfg-cloud-appcheck" placeholder="App Check Mode (enforced / monitor)" title="App-Check-Modus: enforced (blockiert unautorisierte Anfragen) oder monitor" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-cloud-release-channel" class="field-label">Release Channel</label>
+                                            <input type="text" id="cfg-cloud-release-channel" placeholder="Release Channel (prod / staging)" title="Zielumgebung: prod für Produktion, staging für Tests" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
                                     <h4>KI / Support-Automation</h4>
                                     <div class="dsar-form" style="display: grid; gap: 10px">
-                                        <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" title="KI-Anbieter für den Support-Assistenten" />
-                                        <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gemini-3.0-flash)" title="Modellname des KI-Anbieters" />
-                                        <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" title="Kreativität der KI-Antworten: 0.0 = deterministisch, 2.0 = sehr kreativ" />
-                                        <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" title="Optionaler benutzerdefinierter API-Endpunkt" />
-                                        <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" title="Referenz auf den API-Schlüssel (z.B. Secret Manager Pfad, NICHT den Schlüssel selbst)" />
-                                        <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent" title="Systemanweisung, die das Verhalten des KI-Assistenten steuert"></textarea>
+                                        <div class="form-group">
+                                            <label for="cfg-ai-provider" class="field-label">KI-Anbieter</label>
+                                            <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" title="KI-Anbieter für den Support-Assistenten" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-ai-model" class="field-label">Modellname</label>
+                                            <input type="text" id="cfg-ai-model" placeholder="Model (z.B. gemini-3.0-flash)" title="Modellname des KI-Anbieters" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-ai-temperature" class="field-label">Temperatur</label>
+                                            <input type="number" step="0.1" min="0" max="2" id="cfg-ai-temperature" placeholder="Temperature (0.0 - 2.0)" title="Kreativität der KI-Antworten: 0.0 = deterministisch, 2.0 = sehr kreativ" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-ai-endpoint" class="field-label">Endpunkt (optional)</label>
+                                            <input type="text" id="cfg-ai-endpoint" placeholder="Endpoint (optional)" title="Optionaler benutzerdefinierter API-Endpunkt" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-ai-key-ref" class="field-label">Secret/Key Referenz</label>
+                                            <input type="text" id="cfg-ai-key-ref" placeholder="Secret/Key Referenz (nicht den Klartext-Key speichern)" title="Referenz auf den API-Schlüssel (z.B. Secret Manager Pfad, NICHT den Schlüssel selbst)" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cfg-ai-system-prompt" class="field-label">System Prompt</label>
+                                            <textarea id="cfg-ai-system-prompt" rows="4" placeholder="System Prompt für Support-Assistent" title="Systemanweisung, die das Verhalten des KI-Assistenten steuert"></textarea>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -985,6 +1027,7 @@
                                     <h4>1) Firebase Key Rotation + Restriktionen</h4>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-key-rotation-done" /> Rotation abgeschlossen</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-key-restrictions-done" /> API-/App-Restriktionen gesetzt</label>
+                                    <label for="p0-key-evidence" class="field-label">Nachweis-Link / Screenshot-Referenz</label>
                                     <input type="text" id="p0-key-evidence" placeholder="Nachweis-Link/Screenshot-Referenz" title="Link oder Referenz zum Nachweis der Key-Rotation/-Restriktion" />
                                 </div>
 
@@ -995,6 +1038,7 @@
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-play-listing" /> Store Listing final</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-play-permissions" /> Permissions Declaration eingereicht</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-play-app-access" /> App Access Guide hinterlegt</label>
+                                    <label for="p0-play-evidence" class="field-label">Play Console Nachweis-Link</label>
                                     <input type="text" id="p0-play-evidence" placeholder="Play Console Nachweis-Link" title="Link zur Play Console als Nachweis" />
                                 </div>
 
@@ -1004,19 +1048,25 @@
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-ai" /> AI-Konfiguration + AI-Flow geprüft</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-support" /> Support-Workflow vollständig getestet</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-compliance" /> Compliance-Flow (DSAR/Audit/Consent) geprüft</label>
+                                    <label for="p0-commissioning-evidence" class="field-label">Checklist / Artefakt-Referenz</label>
                                     <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" title="Referenz zum Abnahmeprotokoll oder Checklist-Artefakt" />
                                 </div>
 
                                 <div class="p0-card">
                                     <h4>4) On-Call / Eskalations-Roster</h4>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-roster-assigned" /> Roster verbindlich benannt</label>
+                                    <label for="p0-roster-primary" class="field-label">Primärer On-Call-Kontakt</label>
                                     <input type="text" id="p0-roster-primary" placeholder="Primary On-Call (Name/Kontakt)" title="Primäre Bereitschaftsperson mit Kontaktdaten" />
+                                    <label for="p0-roster-secondary" class="field-label">Sekundärer On-Call-Kontakt</label>
                                     <input type="text" id="p0-roster-secondary" placeholder="Secondary On-Call (Name/Kontakt)" title="Sekundäre Bereitschaftsperson als Backup" />
+                                    <label for="p0-roster-security" class="field-label">Security/Compliance Kontakt</label>
                                     <input type="text" id="p0-roster-security" placeholder="Security/Compliance Kontakt" title="Ansprechperson für Sicherheits- und Compliance-Fragen" />
+                                    <label for="p0-roster-evidence" class="field-label">Roster-Link / Runbook-Referenz</label>
                                     <input type="text" id="p0-roster-evidence" placeholder="Roster-Link/Runbook-Referenz" title="Link zum Bereitschaftsplan oder Runbook" />
                                 </div>
                             </div>
 
+                            <label for="p0-notes" class="field-label">Freitext / Rest-Risiken / offene Maßnahmen</label>
                             <textarea id="p0-notes" rows="3" placeholder="Freitext / Rest-Risiken / offene Maßnahmen" title="Freitext für zusätzliche Anmerkungen, Restrisiken oder offene Maßnahmen"></textarea>
 
                             <div class="setup-actions" style="margin-block-start: 12px">
