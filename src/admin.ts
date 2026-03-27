@@ -144,8 +144,6 @@ export const adminHealthCheck = functions.runWith({ secrets: ["GEMINI_API_KEY"] 
         ai: {
           geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
           geminiModel: process.env.GEMINI_MODEL || "gemini-2.0-flash",
-          openAiConfigured: Boolean(process.env.OPENAI_API_KEY),
-          openAiFallbackEnabled: process.env.OPENAI_FALLBACK_ENABLED === "true",
         },
         environment: {
           projectId: process.env.GCLOUD_PROJECT || process.env.FIREBASE_CONFIG || null,

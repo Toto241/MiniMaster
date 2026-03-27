@@ -265,7 +265,6 @@ const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
 const asChild = { auth: { uid: "c1", token: {} } };
 
 beforeAll(() => {
-  process.env.OPENAI_API_KEY = "test-key";
   fns = require("../index");
 });
 

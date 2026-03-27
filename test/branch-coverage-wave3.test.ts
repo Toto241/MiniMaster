@@ -126,7 +126,6 @@ function resetState() {
 }
 
 beforeAll(() => {
-  process.env.OPENAI_API_KEY = "test-key";
   fns = require("../index");
   db = getDb();
 });

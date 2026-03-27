@@ -13,17 +13,6 @@ import fft from "firebase-functions-test";
 import { db as getDb } from "../firebase";
 import * as shared from "../src/shared";
 
-const mockOpenAiCreate = jest.fn();
-jest.mock("openai", () => ({
-  OpenAI: jest.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: mockOpenAiCreate,
-      },
-    },
-  })),
-}));
-
 const mockSend = jest.fn().mockResolvedValue("mock-msg-id");
 jest.mock("firebase-admin/messaging", () => ({
   getMessaging: jest.fn(() => ({ send: mockSend })),
@@ -142,8 +131,6 @@ function resetState() {
 }
 
 beforeAll(() => {
-  process.env.OPENAI_API_KEY = "test-key";
-  process.env.OPENAI_FALLBACK_ENABLED = "true";
   process.env.GEMINI_API_KEY = "test-gemini-key";
   fns = require("../index");
   db = getDb();
@@ -894,28 +881,6 @@ describe("legal targetMaster empty-string fallback", () => {
 });
 
 describe("support provider branch coverage", () => {
-  it("onTicketCreated uses OpenAI fallback when Gemini key is missing", async () => {
-    const prevNode = process.env.NODE_ENV;
-    const prevGemini = process.env.GEMINI_API_KEY;
-    try {
-      process.env.NODE_ENV = "production";
-      process.env.GEMINI_API_KEY = "";
-      mockOpenAiCreate.mockResolvedValueOnce({ choices: [] }); // force rawResponse fallback ""
-
-      state.supportTickets["ticket-openai"] = {
-        masterImei: "m1",
-        problemDescription: "OpenAI fallback scenario for support.",
-      };
-      state.masters["m1"] = { imei: "m1" };
-
-      const wrapped = testEnv.wrap(fns.onTicketCreated);
-      await wrapped({ data: () => state.supportTickets["ticket-openai"] }, { params: { ticketId: "ticket-openai" } } as any);
-    } finally {
-      process.env.NODE_ENV = prevNode;
-      process.env.GEMINI_API_KEY = prevGemini;
-    }
-  });
-
   it("onTicketCreated bleibt im Consent-Flow bei Gemini non-ok Setup", async () => {
     const prevNode = process.env.NODE_ENV;
     const prevGemini = process.env.GEMINI_API_KEY;
@@ -967,11 +932,9 @@ describe("support provider branch coverage", () => {
   it("onTicketCreated bleibt im Consent-Flow ohne konfigurierten Provider", async () => {
     const prevNode = process.env.NODE_ENV;
     const prevGemini = process.env.GEMINI_API_KEY;
-    const prevOpenAi = process.env.OPENAI_API_KEY;
     try {
       process.env.NODE_ENV = "production";
       process.env.GEMINI_API_KEY = "";
-      process.env.OPENAI_API_KEY = "";
 
       state.supportTickets["ticket-no-provider"] = {
         masterImei: "m1",
@@ -985,7 +948,6 @@ describe("support provider branch coverage", () => {
     } finally {
       process.env.NODE_ENV = prevNode;
       process.env.GEMINI_API_KEY = prevGemini;
-      process.env.OPENAI_API_KEY = prevOpenAi;
     }
   });
 });

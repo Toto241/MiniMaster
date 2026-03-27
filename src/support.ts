@@ -6,7 +6,6 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { getMessaging } from "firebase-admin/messaging";
-import { OpenAI } from "openai";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
@@ -20,7 +19,7 @@ type AiTicketResponse = {
 };
 
 type AiGenerationResult = {
-  provider: "gemini" | "openai" | "test-stub";
+  provider: "gemini" | "test-stub";
   rawResponse: string;
 };
 
@@ -77,17 +76,6 @@ function shouldEscalateAfterAttempts(
 }
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.0-flash";
-const OPENAI_FALLBACK_ENABLED = process.env.OPENAI_FALLBACK_ENABLED === "true";
-
-let openaiClient: OpenAI | null = null;
-function getOpenAIClient(): OpenAI {
-  if (!openaiClient) {
-    openaiClient = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  return openaiClient;
-}
 
 async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -151,23 +139,6 @@ async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
   };
 }
 
-async function generateWithOpenAI(prompt: string): Promise<AiGenerationResult> {
-  const response = await getOpenAIClient().chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: "You are a technical support agent for the MiniMaster parental control application." },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.7,
-    max_tokens: 1000,
-  });
-
-  return {
-    provider: "openai",
-    rawResponse: response.choices[0]?.message?.content || "",
-  };
-}
-
 async function generateAiCompletion(prompt: string): Promise<AiGenerationResult> {
   // Keep tests deterministic and isolated from external model providers.
   if (process.env.NODE_ENV === "test") {
@@ -180,20 +151,12 @@ async function generateAiCompletion(prompt: string): Promise<AiGenerationResult>
     };
   }
 
-  if (process.env.GEMINI_API_KEY) {
-    functions.logger.info(`Calling Gemini API with model ${GEMINI_MODEL}...`);
-    return generateWithGemini(prompt);
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("No AI provider configured. Set GEMINI_API_KEY to enable AI support.");
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    if (!OPENAI_FALLBACK_ENABLED) {
-      throw new Error("OPENAI_API_KEY is set but OpenAI fallback is disabled. Set OPENAI_FALLBACK_ENABLED=true to allow fallback.");
-    }
-    functions.logger.warn("GEMINI_API_KEY missing. Falling back to OpenAI.");
-    return generateWithOpenAI(prompt);
-  }
-
-  throw new Error("No AI provider configured. Set GEMINI_API_KEY (preferred) or OPENAI_API_KEY.");
+  functions.logger.info(`Calling Gemini API with model ${GEMINI_MODEL}...`);
+  return generateWithGemini(prompt);
 }
 
 function parseAiTicketResponse(rawResponse: string): AiTicketResponse {
@@ -689,7 +652,7 @@ Antworte NUR als JSON mit:
     aiConfidenceScore: parsed.confidence,
     aiSolutionStatus: solved ? "accepted" : "generated",
     aiProvider: generation.provider,
-    aiModel: generation.provider === "gemini" ? GEMINI_MODEL : (generation.provider === "openai" ? "gpt-4o" : "test-stub"),
+    aiModel: generation.provider === "gemini" ? GEMINI_MODEL : "test-stub",
     status: status === "closed" ? "closed_by_ai" : (status === "escalated" ? "escalated" : "awaiting_user_feedback"),
     conversationStatus: status,
     conversationRound: nextRound,
@@ -1399,7 +1362,7 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
       functions.logger.error("Error in aiExplainProblem:", error);
       throw new functions.https.HttpsError(
         "internal",
-        "KI-Analyse fehlgeschlagen. Bitte prüfen Sie die KI-Konfiguration (GEMINI_API_KEY / OPENAI_API_KEY)."
+        "KI-Analyse fehlgeschlagen. Bitte prüfen Sie die KI-Konfiguration (GEMINI_API_KEY)."
       );
     }
   }
@@ -1408,7 +1371,6 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
 export const __supportTestables = {
   parseAiTicketResponse,
   generateWithGemini,
-  generateWithOpenAI,
   resolveImpersonationRole,
   resolveExplainRole,
   shouldEscalateAfterAttempts,
