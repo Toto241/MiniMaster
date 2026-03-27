@@ -1,15 +1,3 @@
-const mockOpenAiCreate = jest.fn().mockResolvedValue({ choices: [] });
-
-jest.mock("openai", () => ({
-  OpenAI: jest.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: mockOpenAiCreate,
-      },
-    },
-  })),
-}));
-
 import { __supportTestables } from "../src/support";
 
 describe("support testable helpers", () => {
@@ -18,8 +6,6 @@ describe("support testable helpers", () => {
   afterEach(() => {
     global.fetch = originalFetch;
     delete process.env.GEMINI_API_KEY;
-    mockOpenAiCreate.mockReset();
-    mockOpenAiCreate.mockResolvedValue({ choices: [] });
   });
 
   it("parseAiTicketResponse handles valid and invalid payloads", () => {
@@ -100,21 +86,5 @@ describe("support testable helpers", () => {
 
     const res = await __supportTestables.generateWithGemini("hello");
     expect(res.rawResponse).toBe("");
-  });
-
-  it("generateWithOpenAI falls back to empty message content", async () => {
-    mockOpenAiCreate.mockResolvedValueOnce({ choices: [] });
-    const res = await __supportTestables.generateWithOpenAI("hello");
-    expect(res.provider).toBe("openai");
-    expect(res.rawResponse).toBe("");
-  });
-
-  it("generateWithOpenAI uses non-empty assistant content", async () => {
-    mockOpenAiCreate.mockResolvedValueOnce({
-      choices: [{ message: { content: "resolved" } }],
-    });
-
-    const res = await __supportTestables.generateWithOpenAI("hello");
-    expect(res.rawResponse).toBe("resolved");
   });
 });

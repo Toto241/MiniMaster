@@ -128,7 +128,6 @@ function resetState() {
 }
 
 beforeAll(() => {
-  process.env.OPENAI_API_KEY = "test-key";
   process.env.GEMINI_API_KEY = "test-gemini-key";
   fns = require("../index");
   db = getDb();
