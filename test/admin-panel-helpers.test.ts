@@ -204,7 +204,7 @@ describe("admin-panel helper functions", () => {
   // ── escapePowerShellString ──
   it("escapes backticks and double quotes for PowerShell", () => {
     const { exports } = loadAdminPanelTestExports();
-    expect(exports.escapePowerShellString('hello "world"')).toBe('hello `"world`"');
+    expect(exports.escapePowerShellString("hello \"world\"")).toBe("hello `\"world`\"");
     expect(exports.escapePowerShellString("back`tick")).toBe("back``tick");
     expect(exports.escapePowerShellString("")).toBe("");
     expect(exports.escapePowerShellString(null)).toBe("");
@@ -497,8 +497,8 @@ describe("admin-panel helper functions", () => {
   // ── safeDebugStringify ──
   it("safely stringifies values with fallback", () => {
     const { exports } = loadAdminPanelTestExports();
-    expect(exports.safeDebugStringify({ a: 1 })).toBe('{\n  "a": 1\n}');
-    expect(exports.safeDebugStringify("text")).toBe('"text"');
+    expect(exports.safeDebugStringify({ a: 1 })).toBe("{\n  \"a\": 1\n}");
+    expect(exports.safeDebugStringify("text")).toBe("\"text\"");
 
     const circular: any = {};
     circular.self = circular;
