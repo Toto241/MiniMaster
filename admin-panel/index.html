@@ -1177,6 +1177,51 @@ npm test -- --runInBand
                             </div>
                         </div>
 
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Gesamt-Testregister</h3>
+                            <p>
+                                Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle: automatische Suites,
+                                lokale Gates, statische Checks, manuelle Nachweise und dokumentierte Abnahmen.
+                                Hier ist auch ersichtlich, <strong>wo</strong> Ergebnisse gespeichert werden.
+                            </p>
+                            <div class="info" style="margin-block-start: 12px">
+                                <strong>Bedienlogik:</strong><br />
+                                Automatische Ergebnisse entstehen über <em>Suite starten</em> oder <em>Python-Testlauf starten</em>.<br />
+                                Manuelle und dokumentierte Prüfungen werden über <em>Nachweis protokollieren</em> im Protokollformular eingetragen.
+                            </div>
+                            <div id="testing-register-overview" class="python-automation-overview" style="margin-block-start: 12px">
+                                <div class="info">Noch kein Testregister geladen.</div>
+                            </div>
+                            <div id="testing-register-storage" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Speicherorte werden nach dem Laden des Registers angezeigt.</div>
+                            </div>
+                            <div class="python-automation-toolbar" style="margin-block-start: 12px">
+                                <input
+                                    type="text"
+                                    id="testing-register-search"
+                                    placeholder="Testregister filtern (Name, ID, Gruppe, Quelle)"
+                                    title="Gesamtes Testregister nach Name, ID, Gruppe oder Quelle durchsuchen"
+                                />
+                                <select id="testing-register-type-filter" title="Testregister nach Testart filtern">
+                                    <option value="all">Alle Tests</option>
+                                    <option value="open">Nur offene Punkte</option>
+                                    <option value="automatic">Nur automatische Tests</option>
+                                    <option value="manual">Nur manuelle / dokumentierte Tests</option>
+                                    <option value="suite">Nur Testsuiten</option>
+                                    <option value="commissioning">Nur Commissioning-/Freigabetests</option>
+                                </select>
+                                <select id="testing-register-sort" title="Sortierung im Testregister wählen">
+                                    <option value="status">Sortierung: Status / offen zuerst</option>
+                                    <option value="group">Sortierung: Gruppe</option>
+                                    <option value="updated">Sortierung: Letztes Update</option>
+                                </select>
+                                <button onclick="loadTestingRegister()" class="btn btn-secondary" title="Vollständiges Testregister neu laden">Testregister laden</button>
+                            </div>
+                            <div id="testing-register-list" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Noch kein Testregister geladen.</div>
+                            </div>
+                        </div>
+
                             <div class="setup-card python-automation-shell" style="margin-block-start: 16px; margin-block-end: 0">
                                 <div class="python-automation-intro">
                                     <div>
