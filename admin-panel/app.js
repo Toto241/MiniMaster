@@ -131,6 +131,7 @@ let pythonCommissioningSelectedTestId = null;
 let pythonEvidenceFilterStatus = "";
 let pythonEvidenceFilterTestId = "";
 let pythonAutomationRunStartedAtMs = null;
+let testingRegisterPayload = null;
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -1239,6 +1240,7 @@ async function runPythonAutomationSuite() {
             await loadPythonAutomationCatalog();
         }
         await loadPythonAutomationHistory();
+        await loadTestingRegister();
 
         const level = payload.overall === "pass" ? "success" : "warning";
         updatePythonAutomationRunState({
@@ -1256,6 +1258,7 @@ async function runPythonAutomationSuite() {
         });
         pythonAutomationRunStartedAtMs = null;
         resultEl.innerHTML = `<div class='error'>Python-Automationslauf fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        loadTestingRegister();
         showNotification("Python-Automationslauf fehlgeschlagen: " + error.message, "error");
     }
 }
@@ -1502,6 +1505,7 @@ async function loadPythonAutomationEvidenceHistory() {
         renderPythonAutomationCatalog(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
         renderPythonAutomationProtocolEditor();
+        rerenderTestingRegisterFromCache();
     } catch (error) {
         historyEl.innerHTML = `<div class='error'>Nachweis-Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
     }
@@ -1557,6 +1561,7 @@ async function savePythonAutomationEvidence() {
         } else {
             rerenderPythonAutomationCatalogFromCache();
         }
+        await loadTestingRegister();
         showNotification(`Nachweis gespeichert fuer ${selected.test.title || selected.test.id}.`, "success");
     } catch (error) {
         showNotification("Nachweis konnte nicht gespeichert werden: " + error.message, "error");
@@ -1579,6 +1584,230 @@ function exportLatestPythonAutomationRun() {
     showNotification("Python-Automationslauf exportiert.", "success");
 }
 
+function getTestingRegisterFilters() {
+    return {
+        search: (document.getElementById("testing-register-search")?.value || "").trim().toLowerCase(),
+        type: document.getElementById("testing-register-type-filter")?.value || "all",
+        sort: document.getElementById("testing-register-sort")?.value || "status",
+    };
+}
+
+function getTestingRegisterStatusPriority(status) {
+    if (status === "fail") return 0;
+    if (status === "manual_required") return 1;
+    if (status === "not_run") return 2;
+    if (status === "pass") return 3;
+    return 4;
+}
+
+function rerenderTestingRegisterFromCache() {
+    renderTestingRegisterOverview(testingRegisterPayload);
+    renderTestingRegisterStorage(testingRegisterPayload?.storage || null);
+    renderTestingRegisterList(testingRegisterPayload);
+}
+
+function renderTestingRegisterOverview(payload) {
+    const overviewEl = document.getElementById("testing-register-overview");
+    if (!overviewEl) return;
+
+    const summary = payload?.summary;
+    if (!summary) {
+        overviewEl.innerHTML = "<div class='info'>Noch kein Testregister geladen.</div>";
+        return;
+    }
+
+    overviewEl.innerHTML = `
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.total || 0))}</strong>
+            <span>Gesamte Testfälle</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.automatic || 0))}</strong>
+            <span>Automatisierbar</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.manual || 0))}</strong>
+            <span>Manuell / dokumentiert</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.pass || 0))}</strong>
+            <span>Bestanden</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.fail || 0))}</strong>
+            <span>Fehlgeschlagen</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.manualRequired || 0))}</strong>
+            <span>Nachweis offen</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.notRun || 0))}</strong>
+            <span>Noch nicht gelaufen</span>
+        </div>
+    `;
+}
+
+function renderTestingRegisterStorage(storage) {
+    const storageEl = document.getElementById("testing-register-storage");
+    if (!storageEl) return;
+
+    if (!storage) {
+        storageEl.innerHTML = "<div class='info'>Speicherorte werden nach dem Laden des Registers angezeigt.</div>";
+        return;
+    }
+
+    storageEl.innerHTML = `
+        <div class='python-clarity-box'>
+            <strong>Protokollspeicher:</strong><br />
+            Automatische Commissioning-Läufe: ${escapeHtml(storage.commissioningRuns || "-")}<br />
+            Manuelle Nachweise: ${escapeHtml(storage.commissioningEvidence || "-")}<br />
+            Testsuiten / USB-Läufe: ${escapeHtml(storage.suiteRuns || "-")}<br />
+            Letzte Runner-Zusammenfassung: ${escapeHtml(storage.latestSummary || "-")}
+        </div>
+    `;
+}
+
+function buildTestingRegisterAction(item) {
+    if (item.action === "suite-run") {
+        const disabled = item.prereqsMet === false ? "disabled" : "";
+        const title = item.prereqsMet === false
+            ? ` title="${escapeHtml(item.prereqReason || "Voraussetzungen nicht erfüllt")}"`
+            : "";
+        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${encodeURIComponent(String(item.id || ""))}')" ${disabled}${title}>Suite starten</button>`;
+    }
+    if (item.action === "protocol") {
+        return `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.id || ""))}')">Nachweis protokollieren</button>`;
+    }
+    return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()">Python-Testlauf starten</button>`;
+}
+
+function renderTestingRegisterList(payload) {
+    const listEl = document.getElementById("testing-register-list");
+    if (!listEl) return;
+
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    if (items.length === 0) {
+        listEl.innerHTML = "<div class='info'>Noch kein Testregister geladen.</div>";
+        return;
+    }
+
+    const filters = getTestingRegisterFilters();
+    let visibleItems = items.filter(item => {
+        const status = String(item.status || "not_run");
+        const automationType = String(item.automationType || "automatic");
+        const entryKind = String(item.entryKind || "commissioning");
+        const haystack = [
+            String(item.id || ""),
+            String(item.title || ""),
+            String(item.groupTitle || ""),
+            String(item.source || ""),
+            String(item.details || ""),
+        ].join(" ").toLowerCase();
+
+        if (filters.type === "open" && !(status === "fail" || status === "manual_required" || status === "not_run")) {
+            return false;
+        }
+        if (filters.type === "automatic" && !(automationType === "automatic" || automationType === "command")) {
+            return false;
+        }
+        if (filters.type === "manual" && !(automationType === "manual" || automationType === "documented")) {
+            return false;
+        }
+        if (filters.type === "suite" && entryKind !== "suite") {
+            return false;
+        }
+        if (filters.type === "commissioning" && entryKind !== "commissioning") {
+            return false;
+        }
+        if (filters.search && !haystack.includes(filters.search)) {
+            return false;
+        }
+        return true;
+    });
+
+    visibleItems = visibleItems.sort((left, right) => {
+        if (filters.sort === "group") {
+            return String(left.groupTitle || "").localeCompare(String(right.groupTitle || ""), "de");
+        }
+        if (filters.sort === "updated") {
+            return String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""), "de");
+        }
+        return getTestingRegisterStatusPriority(String(left.status || "")) - getTestingRegisterStatusPriority(String(right.status || ""));
+    });
+
+    if (visibleItems.length === 0) {
+        listEl.innerHTML = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
+        return;
+    }
+
+    const rows = visibleItems.map(item => {
+        const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
+        const updatedAt = item.updatedAt ? formatPythonAutomationTimestamp(item.updatedAt) : "noch nicht protokolliert";
+        const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"));
+        return `
+            <tr>
+                <td><strong>${escapeHtml(item.title || item.id || "-")}</strong><div class='python-muted-caption'>${escapeHtml(item.id || "-")}</div></td>
+                <td>${escapeHtml(item.groupTitle || "-")}</td>
+                <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"))}'>${escapeHtml(typeLabel)}</span></td>
+                <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
+                <td>${escapeHtml(String(item.details || "-")).slice(0, 220)}</td>
+                <td>${escapeHtml(updatedAt)}</td>
+                <td><div class='python-muted-caption'>${escapeHtml(item.storage || "-")}</div></td>
+                <td>${buildTestingRegisterAction(item)}</td>
+            </tr>
+        `;
+    }).join("");
+
+    listEl.innerHTML = `
+        <div class='info' style='margin-block-end: 8px'>${escapeHtml(String(visibleItems.length))} von ${escapeHtml(String(items.length))} Testfällen sichtbar.</div>
+        <table>
+            <tr>
+                <th>Testfall</th>
+                <th>Gruppe</th>
+                <th>Typ</th>
+                <th>Status</th>
+                <th>Letztes Detail</th>
+                <th>Letztes Update</th>
+                <th>Protokoll</th>
+                <th>Aktion</th>
+            </tr>
+            ${rows}
+        </table>
+    `;
+}
+
+async function loadTestingRegister() {
+    const listEl = document.getElementById("testing-register-list");
+    if (!listEl) return;
+
+    if (!isPythonOperator) {
+        testingRegisterPayload = null;
+        renderTestingRegisterOverview(null);
+        renderTestingRegisterStorage(null);
+        listEl.innerHTML = "<div class='info'>Das Testregister ist nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    listEl.innerHTML = "<div class='loading'>Lade Gesamt-Testregister...</div>";
+    try {
+        const response = await fetch("/api/testing/register", {
+            headers: { "Accept": "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Testregister konnte nicht geladen werden.");
+        }
+        testingRegisterPayload = payload;
+        rerenderTestingRegisterFromCache();
+    } catch (error) {
+        testingRegisterPayload = null;
+        renderTestingRegisterOverview(null);
+        renderTestingRegisterStorage(null);
+        listEl.innerHTML = `<div class='error'>Testregister konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
 // ===================== TEST-SUITEN-ZENTRALE =====================
 
 let _suiteActivePollers = {};
@@ -1595,7 +1824,7 @@ async function loadSuiteDeviceStatus() {
         const res = await fetch("/api/suites/devices");
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
-        if (!data.adb_available) {
+        if (!data.adbAvailable) {
             el.innerHTML = "<div class='error'>ADB ist nicht verfuegbar. Bitte Android SDK installieren.</div>";
             return;
         }
@@ -1607,12 +1836,26 @@ async function loadSuiteDeviceStatus() {
             <div class="data-row" style="display:flex;gap:12px;align-items:center">
                 <span class="badge ${d.state === 'device' ? 'pass' : 'fail'}">${escapeHtml(d.state)}</span>
                 <strong>${escapeHtml(d.serial)}</strong>
-                <span>${escapeHtml(d.model || '')} &middot; Android ${escapeHtml(d.android_version || '?')}</span>
+                <span>${escapeHtml(d.model || '')} &middot; Android ${escapeHtml(d.androidVersion || '?')}</span>
             </div>
         `).join("");
     } catch (err) {
         el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
     }
+}
+
+function getSuiteCatalogItemId(item) {
+    return String(item?.suiteId || item?.id || "");
+}
+
+function getSuiteCatalogItemReady(item) {
+    if (typeof item?.prereqsMet === "boolean") return item.prereqsMet;
+    if (typeof item?.prereqs_met === "boolean") return item.prereqs_met;
+    return false;
+}
+
+function getSuiteCatalogItemReason(item) {
+    return String(item?.prereqReason || item?.missing_prereqs || "");
 }
 
 async function loadSuiteCatalog() {
@@ -1641,7 +1884,7 @@ function renderSuiteCatalog(suites) {
 
     let filtered = suites;
     if (groupFilter !== "all") filtered = filtered.filter(s => s.group === groupFilter);
-    if (readyOnly) filtered = filtered.filter(s => s.prereqs_met);
+    if (readyOnly) filtered = filtered.filter(s => getSuiteCatalogItemReady(s));
 
     if (filtered.length === 0) {
         el.innerHTML = "<div class='info'>Keine Suiten gefunden.</div>";
@@ -1660,16 +1903,16 @@ function renderSuiteCatalog(suites) {
     el.innerHTML = Object.entries(groupMap).map(([group, items]) => `
         <div style="margin-block-end: 12px">
             <h6 style="margin:0 0 4px">${escapeHtml(groupLabels[group] || group)}</h6>
-            <table class="data-table" style="width:100%">
+            <table class="data-table" style="inline-size:100%">
                 <thead><tr>
                     <th>Suite</th><th>Beschreibung</th><th>Voraussetzungen</th><th></th>
                 </tr></thead>
                 <tbody>${items.map(s => `
                     <tr>
-                        <td><code>${escapeHtml(s.id)}</code></td>
-                        <td>${escapeHtml(s.description || '')}</td>
-                        <td><span class="badge ${s.prereqs_met ? 'pass' : 'fail'}">${s.prereqs_met ? 'OK' : (s.missing_prereqs || []).join(', ')}</span></td>
-                        <td><button onclick="startSuiteRun('${escapeHtml(s.id)}')" class="btn btn-secondary btn-sm" ${s.prereqs_met ? '' : 'disabled'}>Starten</button></td>
+                        <td><strong>${escapeHtml(getSuiteCatalogItemId(s))}</strong><div class='python-muted-caption'>${escapeHtml(s.title || '')}</div></td>
+                        <td>${escapeHtml(s.command || s.description || '')}</td>
+                        <td><span class="badge ${getSuiteCatalogItemReady(s) ? 'pass' : 'fail'}">${getSuiteCatalogItemReady(s) ? 'OK' : escapeHtml(getSuiteCatalogItemReason(s) || 'Nicht bereit')}</span></td>
+                        <td><button onclick="startSuiteRun('${encodeURIComponent(getSuiteCatalogItemId(s))}')" class="btn btn-secondary btn-sm" ${getSuiteCatalogItemReady(s) ? '' : 'disabled'}>Starten</button></td>
                     </tr>`).join("")}
                 </tbody>
             </table>
@@ -1680,16 +1923,17 @@ function renderSuiteCatalog(suites) {
 async function startSuiteRun(suiteId) {
     if (!isPythonOperator) return;
     try {
+        const decodedSuiteId = decodeURIComponent(String(suiteId || ""));
         const res = await fetch("/api/suites/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ suite_id: suiteId }),
+            body: JSON.stringify({ suiteId: decodedSuiteId }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Suite konnte nicht gestartet werden.");
-        showNotification(`Suite '${suiteId}' gestartet (Run-ID: ${data.run_id}).`, "success");
-        pollSuiteRunStatus(data.run_id);
-        appendSuiteActiveRun(data.run_id, suiteId);
+        showNotification(`Suite '${decodedSuiteId}' gestartet (Run-ID: ${data.runId}).`, "success");
+        pollSuiteRunStatus(data.runId);
+        appendSuiteActiveRun(data.runId, decodedSuiteId);
     } catch (err) {
         showNotification("Suite-Start fehlgeschlagen: " + err.message, "error");
     }
@@ -1716,8 +1960,8 @@ async function startUsbTestRun() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    master_serial: masterSerial === "auto" ? null : masterSerial,
-                    child_serial: childSerial,
+                    masterSerial: masterSerial === "auto" ? "" : masterSerial,
+                    childSerial: childSerial,
                     parallel: parallel,
                 }),
             });
@@ -1727,19 +1971,19 @@ async function startUsbTestRun() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    app_id: appId,
-                    serial: masterSerial === "auto" ? null : masterSerial,
+                    appId: appId,
+                    serial: masterSerial === "auto" ? "auto" : masterSerial,
                     suite: suite,
-                    install_apk: installApk,
-                    skip_activation: skipActivation,
+                    installApk: installApk,
+                    skipActivation: skipActivation,
                 }),
             });
         }
         data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "USB-Test konnte nicht gestartet werden.");
-        showNotification(`USB-Testlauf gestartet (Run-ID: ${data.run_id}).`, "success");
-        pollSuiteRunStatus(data.run_id);
-        appendSuiteActiveRun(data.run_id, testType);
+        showNotification(`USB-Testlauf gestartet (Run-ID: ${data.runId}).`, "success");
+        pollSuiteRunStatus(data.runId);
+        appendSuiteActiveRun(data.runId, testType);
     } catch (err) {
         showNotification("USB-Test fehlgeschlagen: " + err.message, "error");
     }
@@ -1775,13 +2019,16 @@ function pollSuiteRunStatus(runId) {
                 if (data.status === "running") {
                     badge.className = "badge running";
                     badge.textContent = "laufend";
-                    if (detail) detail.textContent = data.elapsed ? `${Math.round(data.elapsed)}s` : "...";
+                    if (detail) detail.textContent = data.startedAt || "...";
                 } else {
-                    badge.className = `badge ${data.status === "done" ? "pass" : "fail"}`;
-                    badge.textContent = data.status === "done" ? "fertig" : data.status;
-                    if (detail) detail.textContent = data.summary || "";
+                    const resultStatus = data.result?.status;
+                    const isPass = data.status === "finished" && resultStatus === "passed";
+                    badge.className = `badge ${isPass ? "pass" : data.status === "finished" ? "fail" : "fail"}`;
+                    badge.textContent = data.status === "finished" ? (isPass ? "fertig" : "fehlgeschlagen") : data.status;
+                    if (detail) detail.textContent = data.result?.reason || data.error || resultStatus || "";
                     clearInterval(_suiteActivePollers[runId]);
                     delete _suiteActivePollers[runId];
+                    loadTestingRegister();
                 }
             }
         } catch { /* ignore */ }
@@ -1809,12 +2056,13 @@ async function loadSuiteRunHistory() {
         }
         el.innerHTML = runs.slice(0, 50).map(r => `
             <div class="data-row" style="display:flex;gap:8px;align-items:center">
-                <span class="badge ${r.status === 'done' ? 'pass' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status)}</span>
-                <strong>${escapeHtml(r.suite_id || r.type || '?')}</strong>
-                <code style="font-size:0.75em">${escapeHtml(r.run_id || '')}</code>
-                <span style="margin-inline-start:auto;font-size:0.85em">${escapeHtml(r.started_at || '')}</span>
+                <span class="badge ${r.status === 'finished' && r.result?.status === 'passed' ? 'pass' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status)}</span>
+                <strong>${escapeHtml(r.suiteId || r.suite_id || r.type || '?')}</strong>
+                <code style="font-size:0.75em">${escapeHtml(r.runId || r.run_id || '')}</code>
+                <span style="margin-inline-start:auto;font-size:0.85em">${escapeHtml(r.startedAt || r.started_at || r.timestamp || '')}</span>
             </div>
         `).join("");
+        loadTestingRegister();
     } catch (err) {
         el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
     }
@@ -4446,6 +4694,31 @@ document.addEventListener("DOMContentLoaded", async function() {
         historyOpenOnlyEl.addEventListener("change", rerenderPythonAutomationHistoryFromCache);
     }
 
+    const testingRegisterSearchEl = document.getElementById("testing-register-search");
+    if (testingRegisterSearchEl) {
+        testingRegisterSearchEl.addEventListener("input", rerenderTestingRegisterFromCache);
+    }
+
+    const testingRegisterTypeEl = document.getElementById("testing-register-type-filter");
+    if (testingRegisterTypeEl) {
+        testingRegisterTypeEl.addEventListener("change", rerenderTestingRegisterFromCache);
+    }
+
+    const testingRegisterSortEl = document.getElementById("testing-register-sort");
+    if (testingRegisterSortEl) {
+        testingRegisterSortEl.addEventListener("change", rerenderTestingRegisterFromCache);
+    }
+
+    const suiteGroupFilterEl = document.getElementById("suite-group-filter");
+    if (suiteGroupFilterEl) {
+        suiteGroupFilterEl.addEventListener("change", () => loadSuiteCatalog());
+    }
+
+    const suiteReadyOnlyEl = document.getElementById("suite-ready-only");
+    if (suiteReadyOnlyEl) {
+        suiteReadyOnlyEl.addEventListener("change", () => loadSuiteCatalog());
+    }
+
     // Operator-Laufzeit-Badge anzeigen
     if (canExecuteCommandsDirectly()) {
         const badge = document.getElementById("electron-operator-badge");
@@ -4456,6 +4729,7 @@ document.addEventListener("DOMContentLoaded", async function() {
                 loadPythonAutomationCatalog();
                 loadPythonAutomationHistory();
                 loadPythonAutomationEvidenceHistory();
+                loadTestingRegister();
             }
         }
     }
@@ -5910,6 +6184,10 @@ function switchTab(tabName, evt) {
     // Set active button
     if (evt && evt.target) {
         evt.target.classList.add("active");
+    }
+
+    if (tabName === "qa" && isPythonOperator) {
+        loadTestingRegister();
     }
 }
 

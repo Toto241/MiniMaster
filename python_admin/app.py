@@ -715,6 +715,35 @@ COMMISSIONING_TEST_GROUPS = (
     },
 )
 
+STATIC_ANALYSIS_RESULT_ALIASES = {
+    "static-ma-proguard-enabled": "static-ma-proguard-enabled",
+    "static-ma-credentials-encrypted": "static-ma-credentials-encrypted",
+    "static-ma-imei-fallback": "static-ma-imei-fallback",
+    "static-ma-debug-hidden": "static-ma-debug-hidden",
+    "static-ma-billing": "static-ma-subscription-check",
+    "static-ma-fcm": "static-ma-fcm-working",
+    "static-ma-appcheck": "static-ma-firebase-appcheck",
+    "static-ca-accessibility": "static-ca-accessibility-active",
+    "static-ca-boot-receiver": "static-ca-boot-receiver",
+    "static-ca-device-admin": "static-ca-device-admin-code",
+    "static-ca-heartbeat": "static-ca-heartbeat",
+    "static-ca-fcm-sync": "static-ca-fcm-sync",
+    "static-ca-uninstall-prevention": "static-ca-uninstall-prevention",
+    "static-ca-overlay": "static-ca-overlay-secure",
+    "static-ca-tamper-detection": "static-ca-tamper-detection",
+    "static-dt-csp": "static-dt-csp-headers",
+    "static-dt-sri": "static-dt-sri-hashes",
+    "static-dt-electron-builder": "static-dt-electron-builder",
+    "static-dt-credential-security": "static-dt-credential-security",
+    "static-dt-session-timeout": "static-dt-session-timeout",
+}
+
+
+@dataclass(frozen=True)
+class CommandRequest:
+    command: str
+    cwd: Path
+
 
 def sanitize_cwd(raw_cwd: str | None) -> Path:
     if not raw_cwd:
@@ -953,10 +982,14 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
         )
     )
 
+    return summarize_commissioning_checks(checks)
+
+
+def summarize_commissioning_checks(checks: list[dict[str, object]]) -> dict[str, object]:
     status_counts = {
-        "pass": sum(1 for item in checks if item["status"] == "pass"),
-        "fail": sum(1 for item in checks if item["status"] == "fail"),
-        "manual_required": sum(1 for item in checks if item["status"] == "manual_required"),
+        "pass": sum(1 for item in checks if item.get("status") == "pass"),
+        "fail": sum(1 for item in checks if item.get("status") == "fail"),
+        "manual_required": sum(1 for item in checks if item.get("status") == "manual_required"),
     }
     overall = "pass"
     if status_counts["fail"] > 0:
@@ -966,12 +999,13 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
 
     pending = [
         {
-            "title": item["title"],
-            "status": item["status"],
-            "details": item["details"],
+            "title": str(item.get("title") or "Offener Punkt"),
+            "status": str(item.get("status") or "not_run"),
+            "details": str(item.get("details") or ""),
+            "source": str(item.get("source") or ""),
         }
         for item in checks
-        if item["status"] != "pass"
+        if item.get("status") != "pass"
     ]
 
     return {
@@ -1154,6 +1188,48 @@ def load_latest_commissioning_evidence() -> dict[str, dict[str, object]]:
     return latest
 
 
+def collect_static_analysis_checks() -> list[dict[str, object]]:
+    static_results = {
+        f"static-{str(item.get('id') or '').strip()}": item
+        for item in run_static_readiness_checks()
+        if str(item.get("id") or "").strip()
+    }
+    collected: list[dict[str, object]] = []
+
+    for _group, test in iter_commissioning_tests():
+        automation_type = str(test.get("automationType") or "automatic")
+        source = str(test.get("source") or "")
+        if automation_type != "automatic" or source != "static-analysis":
+            continue
+
+        test_id = str(test.get("id") or "")
+        lookup_id = STATIC_ANALYSIS_RESULT_ALIASES.get(test_id, test_id)
+        static_result = static_results.get(lookup_id)
+        if static_result is None:
+            collected.append(
+                make_check(
+                    test_id,
+                    str(test.get("title") or test_id),
+                    False,
+                    "Kein statisches Analyseergebnis verfügbar.",
+                    source="static-analysis",
+                )
+            )
+            continue
+
+        collected.append(
+            {
+                "id": test_id,
+                "title": str(test.get("title") or static_result.get("title") or test_id),
+                "status": str(static_result.get("status") or "fail"),
+                "details": str(static_result.get("details") or ""),
+                "source": "static-analysis",
+            }
+        )
+
+    return collected
+
+
 def run_commissioning_commands(run_commands: bool, timeout_sec: int) -> list[dict[str, object]]:
     if not run_commands:
         return []
@@ -1303,6 +1379,9 @@ def run_commissioning_suite(
     run_id = f"run-{uuid4().hex[:12]}"
 
     evaluation = evaluate_commissioning_context(context)
+    evaluation_checks = list(cast(list[dict[str, object]], evaluation.get("checks", [])))
+    evaluation_checks.extend(collect_static_analysis_checks())
+    evaluation = summarize_commissioning_checks(evaluation_checks)
     command_results = run_commissioning_commands(run_commands, timeout_sec)
     evidence_index = load_latest_commissioning_evidence()
     evidence_coverage = evaluate_evidence_coverage(evidence_index)
@@ -1371,6 +1450,198 @@ def run_commissioning_suite(
 
     append_commissioning_log(result)
     return result
+
+
+def build_commissioning_run_index(run: dict[str, object] | None) -> dict[str, dict[str, object]]:
+    index: dict[str, dict[str, object]] = {}
+    if not run:
+        return index
+
+    evaluation = as_dict(run.get("evaluation"))
+    for item in cast(list[dict[str, object]], evaluation.get("checks") or []):
+        item_id = str(item.get("id") or "").strip()
+        if not item_id:
+            continue
+        index[item_id] = {
+            "status": str(item.get("status") or "not_run"),
+            "details": str(item.get("details") or ""),
+            "updatedAt": str(run.get("finishedAt") or run.get("startedAt") or ""),
+            "storage": str(COMMISSIONING_LOG_FILE),
+            "origin": "commissioning-run",
+        }
+
+    commands = as_dict(run.get("commands"))
+    for item in cast(list[dict[str, object]], commands.get("results") or []):
+        item_id = str(item.get("id") or "").strip()
+        if not item_id:
+            continue
+        index[item_id] = {
+            "status": str(item.get("status") or "not_run"),
+            "details": str(item.get("output") or item.get("details") or ""),
+            "updatedAt": str(run.get("finishedAt") or run.get("startedAt") or ""),
+            "storage": str(COMMISSIONING_LOG_FILE),
+            "origin": "commissioning-command",
+        }
+
+    return index
+
+
+def suite_result_to_register_state(entry: dict[str, object]) -> dict[str, object]:
+    result = as_dict(entry.get("result"))
+    result_status = str(result.get("status") or "").strip().lower()
+    run_status = str(entry.get("status") or "").strip().lower()
+
+    if run_status == "running":
+        return {
+            "status": "not_run",
+            "details": "Suite läuft gerade.",
+        }
+    if run_status == "error":
+        return {
+            "status": "fail",
+            "details": str(entry.get("error") or "Suite-Lauf mit Fehler beendet."),
+        }
+    if result_status == "passed":
+        return {
+            "status": "pass",
+            "details": f"Suite erfolgreich beendet (Exit-Code {result.get('returncode', 0)}).",
+        }
+    if result_status == "failed":
+        return {
+            "status": "fail",
+            "details": str(result.get("reason") or result.get("stderr") or "Suite fehlgeschlagen."),
+        }
+    if result_status == "skipped":
+        return {
+            "status": "not_run",
+            "details": str(result.get("reason") or "Suite wurde übersprungen."),
+        }
+    return {
+        "status": "not_run",
+        "details": "Noch kein Suite-Ergebnis protokolliert.",
+    }
+
+
+def load_latest_suite_results() -> dict[str, dict[str, object]]:
+    latest: dict[str, dict[str, object]] = {}
+    for entry in load_suite_run_history(limit=MAX_HISTORY_LIMIT):
+        suite_id = str(entry.get("suiteId") or entry.get("suite_id") or "").strip()
+        if not suite_id or suite_id in latest:
+            continue
+        latest[suite_id] = entry
+    return latest
+
+
+def build_testing_register() -> dict[str, object]:
+    commissioning_catalog = get_commissioning_test_catalog()
+    latest_commissioning_run = load_commissioning_history(1)
+    latest_commissioning = latest_commissioning_run[0] if latest_commissioning_run else None
+    commissioning_index = build_commissioning_run_index(latest_commissioning)
+    evidence_index = load_latest_commissioning_evidence()
+    suite_catalog = get_suite_catalog()
+    latest_suite_results = load_latest_suite_results()
+
+    items: list[dict[str, object]] = []
+
+    for group in cast(list[dict[str, object]], commissioning_catalog.get("groups") or []):
+        for test in cast(list[dict[str, object]], group.get("tests") or []):
+            test_id = str(test.get("id") or "")
+            automation_type = str(test.get("automationType") or "automatic")
+            register_state = commissioning_index.get(test_id)
+            evidence_entry = evidence_index.get(test_id)
+
+            if register_state is None and evidence_entry is not None:
+                register_state = {
+                    "status": str(evidence_entry.get("status") or "not_run"),
+                    "details": str(evidence_entry.get("details") or ""),
+                    "updatedAt": str(evidence_entry.get("createdAt") or ""),
+                    "storage": str(COMMISSIONING_EVIDENCE_LOG_FILE),
+                    "origin": "commissioning-evidence",
+                }
+
+            if register_state is None:
+                if automation_type in {"manual", "documented"}:
+                    register_state = {
+                        "status": "manual_required",
+                        "details": "Noch kein manueller Nachweis gespeichert.",
+                        "updatedAt": "",
+                        "storage": str(COMMISSIONING_EVIDENCE_LOG_FILE),
+                        "origin": "commissioning-evidence",
+                    }
+                else:
+                    register_state = {
+                        "status": "not_run",
+                        "details": "Noch kein automatischer Lauf protokolliert.",
+                        "updatedAt": "",
+                        "storage": str(COMMISSIONING_LOG_FILE),
+                        "origin": "commissioning-run",
+                    }
+
+            items.append(
+                {
+                    "id": test_id,
+                    "entryKind": "commissioning",
+                    "title": str(test.get("title") or test_id),
+                    "groupId": str(group.get("id") or ""),
+                    "groupTitle": str(group.get("title") or ""),
+                    "automationType": automation_type,
+                    "source": str(test.get("source") or ""),
+                    "status": str(register_state.get("status") or "not_run"),
+                    "details": str(register_state.get("details") or ""),
+                    "updatedAt": str(register_state.get("updatedAt") or ""),
+                    "storage": str(register_state.get("storage") or COMMISSIONING_LOG_FILE),
+                    "origin": str(register_state.get("origin") or "commissioning"),
+                    "documentation": str(test.get("documentation") or ""),
+                    "successCriteria": str(test.get("successCriteria") or ""),
+                    "action": "protocol" if automation_type in {"manual", "documented"} else "commissioning-run",
+                }
+            )
+
+    for suite in cast(list[dict[str, object]], suite_catalog.get("suites") or []):
+        suite_id = str(suite.get("suiteId") or "")
+        latest_suite = latest_suite_results.get(suite_id, {})
+        register_state = suite_result_to_register_state(latest_suite)
+        items.append(
+            {
+                "id": suite_id,
+                "entryKind": "suite",
+                "title": str(suite.get("title") or suite_id),
+                "groupId": str(suite.get("group") or ""),
+                "groupTitle": f"Testsuite: {str(suite.get('group') or 'sonstige')}",
+                "automationType": "automatic",
+                "source": "suite",
+                "status": str(register_state.get("status") or "not_run"),
+                "details": str(register_state.get("details") or suite.get("prereqReason") or ""),
+                "updatedAt": str(latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
+                "storage": str(SUITE_RUN_LOG_FILE),
+                "origin": "suite-run",
+                "command": str(suite.get("command") or ""),
+                "prereqsMet": bool(suite.get("prereqsMet")),
+                "prereqReason": str(suite.get("prereqReason") or ""),
+                "action": "suite-run",
+            }
+        )
+
+    summary = {
+        "total": len(items),
+        "pass": sum(1 for item in items if item["status"] == "pass"),
+        "fail": sum(1 for item in items if item["status"] == "fail"),
+        "manualRequired": sum(1 for item in items if item["status"] == "manual_required"),
+        "notRun": sum(1 for item in items if item["status"] == "not_run"),
+        "automatic": sum(1 for item in items if item["automationType"] in {"automatic", "command"}),
+        "manual": sum(1 for item in items if item["automationType"] in {"manual", "documented"}),
+    }
+
+    return {
+        "items": items,
+        "summary": summary,
+        "storage": {
+            "commissioningRuns": str(COMMISSIONING_LOG_FILE),
+            "commissioningEvidence": str(COMMISSIONING_EVIDENCE_LOG_FILE),
+            "suiteRuns": str(SUITE_RUN_LOG_FILE),
+            "latestSummary": str(REPO_ROOT / "build" / "test-automation" / "latest-summary.json"),
+        },
+    }
 
 
 
@@ -1716,6 +1987,9 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/commissioning/catalog":
             return self._write_json(HTTPStatus.OK, get_commissioning_test_catalog())
+
+        if parsed.path == "/api/testing/register":
+            return self._write_json(HTTPStatus.OK, build_testing_register())
 
         if parsed.path == "/api/commissioning/evidence":
             query = parse_qs(parsed.query)

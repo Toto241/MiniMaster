@@ -4291,11 +4291,6 @@ onetime@^5.1.2:
   dependencies:
     mimic-fn "^2.1.0"
 
-openai@^6.10.0:
-  version "6.14.0"
-  resolved "https://registry.npmjs.org/openai/-/openai-6.14.0.tgz"
-  integrity sha512-ZPD9MG5/sPpyGZ0idRoDK0P5MWEMuXe0Max/S55vuvoxqyEVkN94m9jSpE3YgNgz3WoESFvozs57dxWqAco31w==
-
 optionator@^0.9.3:
   version "0.9.4"
   resolved "https://registry.npmjs.org/optionator/-/optionator-0.9.4.tgz"
