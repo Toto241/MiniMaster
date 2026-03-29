@@ -31,7 +31,7 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -52,7 +52,9 @@ android {
     testOptions {
         animationsDisabled = true
         unitTests.returnDefaultValues = true
-        execution 'ANDROIDX_TEST_ORCHESTRATOR'
+        // Orchestrator is useful in CI, but can fail on restricted devices during local commissioning.
+        def useOrchestrator = project.findProperty('useAndroidTestOrchestrator')?.toString()?.toBoolean() ?: true
+        execution useOrchestrator ? 'ANDROIDX_TEST_ORCHESTRATOR' : 'HOST'
     }
 
     lint {
@@ -126,5 +128,7 @@ dependencies {
     androidTestImplementation "androidx.compose.ui:ui-test-junit4"
     debugImplementation "androidx.compose.ui:ui-test-manifest"
     androidTestImplementation "org.mockito:mockito-android:5.14.2"
-    androidTestUtil 'androidx.test:orchestrator:1.5.1'
+    if ((project.findProperty('useAndroidTestOrchestrator')?.toString()?.toBoolean() ?: true)) {
+        androidTestUtil 'androidx.test:orchestrator:1.5.1'
+    }
 }
