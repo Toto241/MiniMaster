@@ -217,3 +217,21 @@ After running these scripts:
 3. Run security tests:
 
     - Follow the test scenarios in `docs/TEST_SCENARIOS_SECURITY.md`
+
+## Release Evidence Sync
+
+Nach einem Revalidation-Lauf kann der aktuelle Stand automatisch in die Release-Dokumente geschrieben werden:
+
+```bash
+pwsh -File scripts/finalize-release-evidence.ps1
+```
+
+Das Skript liest:
+
+- `build/test-automation/latest-summary.json`
+- `docs/CI_REVALIDATION_LATEST.md`
+
+und synchronisiert zentrale Statuszeilen in:
+
+- `docs/RELEASE_EVIDENCE_REGISTER.md`
+- `docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md`
