@@ -1,9 +1,13 @@
 package com.minimaster.masterapp
 
+import android.content.Context
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -18,7 +22,10 @@ import javax.inject.Singleton
  * @property dataStore The [DataStore] instance for accessing preferences, injected by Hilt.
  */
 @Singleton
-class MasterCredentialsRepository @Inject constructor(private val dataStore: DataStore<Preferences>) {
+class MasterCredentialsRepository @Inject constructor(
+    private val dataStore: DataStore<Preferences>,
+    @ApplicationContext private val context: Context
+) {
 
     /**
      * A private object to hold the keys for the values stored in DataStore.
@@ -26,6 +33,20 @@ class MasterCredentialsRepository @Inject constructor(private val dataStore: Dat
     private object PreferencesKeys {
         val MASTER_IMEI = stringPreferencesKey("master_imei")
         val SECRET_KEY = stringPreferencesKey("secret_key")
+    }
+
+    private val encryptedPrefs by lazy {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        EncryptedSharedPreferences.create(
+            context,
+            "master_secure_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
     }
 
     /**
@@ -36,7 +57,9 @@ class MasterCredentialsRepository @Inject constructor(private val dataStore: Dat
     val getCredentials: Flow<Pair<String?, String?>> = dataStore.data
         .map { preferences ->
             val imei = preferences[PreferencesKeys.MASTER_IMEI]
+                ?: encryptedPrefs.getString("master_imei", null)
             val secret = preferences[PreferencesKeys.SECRET_KEY]
+                ?: encryptedPrefs.getString("secret_key", null)
             imei to secret
         }
 
@@ -47,6 +70,11 @@ class MasterCredentialsRepository @Inject constructor(private val dataStore: Dat
      * @param secretKey The secret key associated with the master device.
      */
     suspend fun saveCredentials(imei: String, secretKey: String) {
+        encryptedPrefs.edit()
+            .putString("master_imei", imei)
+            .putString("secret_key", secretKey)
+            .apply()
+
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.MASTER_IMEI] = imei
             preferences[PreferencesKeys.SECRET_KEY] = secretKey

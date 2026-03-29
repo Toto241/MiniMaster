@@ -1,8 +1,11 @@
 package com.google.pairing
 
 import android.app.admin.DeviceAdminReceiver
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import com.google.firebase.functions.FirebaseFunctions
@@ -24,6 +27,7 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
         super.onEnabled(context, intent)
         Log.d(TAG, "Device Admin Enabled")
         Toast.makeText(context, "MiniMaster protection enabled", Toast.LENGTH_SHORT).show()
+        applyUninstallProtection(context)
         reportAdminEvent(context, "device_admin_enabled")
     }
 
@@ -38,6 +42,31 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
         Log.w(TAG, "Device Admin disable requested — potential tamper attempt")
         reportAdminEvent(context, "device_admin_disable_requested")
         return "Disabling this will remove parental controls. Your parents will be notified."
+    }
+
+    private fun applyUninstallProtection(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return
+        }
+
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
+        val admin = ComponentName(context, MiniMasterDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(admin)) {
+            return
+        }
+
+        try {
+            val packageName = context.packageName
+            val wasBlocked = dpm.isUninstallBlocked(admin, packageName)
+            if (!wasBlocked) {
+                dpm.setUninstallBlocked(admin, packageName, true)
+                Log.i(TAG, "Uninstall protection enabled via DevicePolicyManager")
+            }
+        } catch (security: SecurityException) {
+            Log.w(TAG, "setUninstallBlocked requires device owner/profile owner; skipping", security)
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to apply uninstall protection", error)
+        }
     }
 
     /**

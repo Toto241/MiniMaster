@@ -24,7 +24,7 @@ Status: working decision record for the current candidate.
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test/Coverage lokal gruen (40/40 Suites, 1500/1500 Tests am 2026-03-22); CodeQL- und Android-CI-Reruns wurden am 2026-03-22 ausgefuehrt und erneut mit Billing/Spending-Limit Fehler beendet (externer Admin-Blocker) |
+| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test lokal gruen (52/52 Suites, 1867/1867 Tests) inkl. static-readiness; Device-Commissioning aktuell mangels verbundenem ADB-Device als skipped dokumentiert; CodeQL- und Android-CI-Reruns bleiben durch Billing/Spending-Limit extern blockiert. |
 | Functional Commissioning | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Mehrere commissioning checks offen |
 | Security and Identity | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Firebase key rotation/restrictions offen |
 | Compliance | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Dokumentierte Compliance-Evidenz vorhanden |
@@ -49,8 +49,8 @@ Status: working decision record for the current candidate.
 | Store listing finalized | Open | Product/Ops | offen | No |
 | Permissions declaration | In progress - operative Vorlage vorhanden (`docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`), finale Play-Console-Einreichung offen | Compliance Owner | offen | No |
 | App access guide attached | In progress - reviewer guide draft vorhanden (`docs/APP_ACCESS_REVIEWER_GUIDE.md`), Play Console Verlinkung offen | Product/Ops | offen | No |
-| CodeQL result linked | Open - Run [23401992153](https://github.com/Toto241/MiniMaster/actions/runs/23401992153) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |
-| Android CI build evidence linked | Open - Run [23401992162](https://github.com/Toto241/MiniMaster/actions/runs/23401992162) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |
+| CodeQL result linked | Open - Run [23688038163](https://github.com/Toto241/MiniMaster/actions/runs/23688038163) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |
+| Android CI build evidence linked | Open - Run [23545055477](https://github.com/Toto241/MiniMaster/actions/runs/23545055477) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |
 | Physical commissioning executed | Open | QA/Operations | offen | No |
 | On-call roster assigned | In progress - roster template vorhanden (`docs/ONCALL_ESCALATION_ROSTER.md`), Kontakte/Sign-off offen | Operations Lead | offen | No |
 
@@ -82,8 +82,8 @@ Reason: Mandatory gates are not passed and multiple before-go-live blockers are 
 | Item | Owner | Priority | Due Date |
 | ----- | ----- | ----- | ----- |
 | GitHub Billing/Spending-Limit fuer Actions bereinigen | Repo Owner | P0 | offen |
-| CodeQL nach Billing-Fix erneut ausfuehren und verlinken (letzter Fehl-Run: 23401992153) | Engineering | P0 | offen |
-| Android CI nach Billing-Fix erneut ausfuehren und verlinken (letzter Fehl-Run: 23401992162) | Engineering | P0 | offen |
+| CodeQL nach Billing-Fix erneut ausfuehren und verlinken (letzter Fehl-Run: 23688038163) | Engineering | P0 | offen |
+| Android CI nach Billing-Fix erneut ausfuehren und verlinken (letzter Fehl-Run: 23545055477) | Engineering | P0 | offen |
 | Operative Restpunkte aus Evidence Register schliessen | Product/Ops + Security + QA | P0 | offen |
 
 ## Next 24h Decision Path
@@ -108,4 +108,5 @@ Reason: Mandatory gates are not passed and multiple before-go-live blockers are 
 5. Re-Decision und Sign-off in diesem Dokument aktualisieren.
 
 Expected result:
+
 - Technisches Gate von Fail auf Pass umschaltbar, sofern keine weiteren offenen technischen P0-Punkte bestehen.

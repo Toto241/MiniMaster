@@ -348,8 +348,8 @@ SUITES: tuple[Suite, ...] = (
     Suite("android-unit-child", "childApp unit tests", "android", [str(gradle_wrapper()), ":childApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-instrumentation-build-master", "masterApp instrumentation build", "android", [str(gradle_wrapper()), ":masterApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-instrumentation-build-child", "childApp instrumentation build", "android", [str(gradle_wrapper()), ":childApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
-    Suite("android-connected-master", "masterApp connected test", "device", [str(gradle_wrapper()), ":masterApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
-    Suite("android-connected-child", "childApp connected test", "device", [str(gradle_wrapper()), ":childApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
+    Suite("android-connected-master", "masterApp connected test", "device", [str(gradle_wrapper()), ":masterApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest", "-PuseAndroidTestOrchestrator=false"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
+    Suite("android-connected-child", "childApp connected test", "device", [str(gradle_wrapper()), ":childApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest", "-PuseAndroidTestOrchestrator=false"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
     Suite("android-usb-master", "masterApp USB commissioning", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "master", "--suite", "commissioning"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_master"), timeout_sec=7200),
     Suite("android-usb-child", "childApp USB commissioning", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "child", "--suite", "commissioning"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_child"), timeout_sec=7200),
     Suite("android-e2e-shell", "Cross-app E2E shell flow", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "master", "--suite", "default"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=7200),
@@ -424,7 +424,7 @@ def run_suite(suite: Suite, strict_skips: bool) -> SuiteResult:
         check=False,
     )
     duration = time.perf_counter() - started
-    return SuiteResult(
+    result = SuiteResult(
         suite_id=suite.suite_id,
         title=suite.title,
         group=suite.group,
@@ -435,6 +435,32 @@ def run_suite(suite: Suite, strict_skips: bool) -> SuiteResult:
         stdout=truncate_output(completed.stdout),
         stderr=truncate_output(completed.stderr),
     )
+    return normalize_known_external_blockers(result, strict_skips)
+
+
+def normalize_known_external_blockers(result: SuiteResult, strict_skips: bool) -> SuiteResult:
+    if result.status != "failed" or strict_skips:
+        return result
+
+    combined = f"{result.stdout}\n{result.stderr}".upper()
+    if result.group == "device" and "INSTALL_FAILED_USER_RESTRICTED" in combined:
+        return SuiteResult(
+            suite_id=result.suite_id,
+            title=result.title,
+            group=result.group,
+            status="skipped",
+            duration_sec=result.duration_sec,
+            returncode=result.returncode,
+            command=result.command,
+            reason=(
+                "Connected device blocked APK install (INSTALL_FAILED_USER_RESTRICTED). "
+                "Unlock device and allow installs via USB/device policy, then rerun device suites."
+            ),
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
+
+    return result
 
 
 def print_inventory() -> None:
