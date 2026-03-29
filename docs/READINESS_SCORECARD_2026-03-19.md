@@ -1,8 +1,8 @@
 # Readiness Scorecard (2026-03-19)
 
-Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared, subscription, legal, subscription branch-hardening, admin fallback branch-hardening, auth branch-hardening waves **+ Play-Store-Readiness-Modul, deploy.yml Bugfix, .env.example Dokumentation (2026-03-21) + lokale Gate-Revalidierung 2026-03-22: 40/40 Suites, 1500/1500 Tests gruen**.
+Status: **UPDATED** — scoring snapshot after enforcement automation, compliance evidence collection and the auth/pairing, triggers/tasks, admin, support, shared, subscription, legal, subscription branch-hardening, admin fallback branch-hardening, auth branch-hardening waves **+ Play-Store-Readiness-Modul, deploy.yml Bugfix, .env.example Dokumentation (2026-03-21) + lokale Gate-Revalidierung 2026-03-29: 52/52 Suites, 1867/1867 Tests gruen + static readiness 20/20**.
 
-## Scoring Date: 2026-03-22 (Update #11)
+## Scoring Date: 2026-03-29 (Update #12)
 
 Hinweis zur Evidenzbasis: Der Dateiname bleibt aus historischen Gründen auf `2026-03-19`. Der inhaltliche Score-Stand wurde mit Update #10 auf 2026-03-21 fortgeschrieben. Der aktuelle Freigabestatus wird parallel im `docs/RELEASE_EVIDENCE_REGISTER.md` geführt.
 
@@ -14,7 +14,7 @@ Hinweis zur Evidenzbasis: Der Dateiname bleibt aus historischen Gründen auf `20
 | ----------- | ------- | ----- | ---------- |
 | Build gate green | 5 | 5 | `npm run build` passes (0 errors) |
 | Lint gate green | 5 | 5 | `npm run lint` passes (0 errors) |
-| Test gate green | 5 | 5 | 1500/1500 tests pass (40 suites) — revalidiert 2026-03-22 |
+| Test gate green | 5 | 5 | 1867/1867 tests pass (52 suites) — revalidiert 2026-03-29 |
 | Coverage > 75% | 5 | 5 | Stmts 94.85%, Branch 82.12%, Funcs 94.30%, Lines 95.58% |
 | CI artifact archiving | 4 | 5 | CI Runbook + CI Gate Stabilization Proof (5 konsekutive Runs) |
 
@@ -80,7 +80,7 @@ Hinweis zur Evidenzbasis: Der Dateiname bleibt aus historischen Gründen auf `20
 | Criterion | Status | Notes |
 | ----------- | -------- | ------- |
 | Total >= 90 points | ✅ **Erreicht (94/100)** | Ziel übertroffen |
-| Open P0 count = 0 | ✅ Zero | Keine offenen P0-Issues |
+| Open P0 count = 0 | ❌ Nicht erreicht | Externe P0-Blocker bleiben (Billing/Store/Key Rotation/Commissioning) |
 | Max 1 open P1 with risk acceptance | ✅ Met | Store-Listing-Artefakte (P1) — fällig vor Veröffentlichung |
 
 ---
@@ -125,4 +125,4 @@ Hinweis zur Evidenzbasis: Der Dateiname bleibt aus historischen Gründen auf `20
 
 ## Empfehlung
 
-**GO (mit operativen Vorbehalten)** — Score 94/100 übertrifft das 90%-Ziel deutlich. Lokaler Nachweisstand: 1500/1500 Tests (40 Suites), 99.56% / 96.65% / 98.52% / 99.65% Coverage — revalidiert 2026-03-22. Verbleibende 6 Punkte sind operative Aufgaben (Billing-Fix → CI grün, Play Console, Key Rotation, Commissioning, On-Call) nach `docs/RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md`.
+**NO-GO (weiterhin, nur externe Blocker)** — Score 94/100 bleibt oberhalb des 90%-Ziels; technischer Lokalnachweis wurde auf 52/52 Suites und 1867/1867 Tests sowie static readiness 20/20 angehoben (revalidiert 2026-03-29). Freigabe bleibt durch externe/operative Restpunkte blockiert (Billing-Fix → CI grün, Play Console, Key Rotation, physisches Commissioning, On-Call) nach `docs/RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md`.

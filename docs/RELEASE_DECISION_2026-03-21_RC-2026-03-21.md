@@ -24,7 +24,7 @@ Status: working decision record for the current candidate.
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test lokal gruen (52/52 Suites, 1867/1867 Tests) inkl. static-readiness 20/20; Device-Commissioning aktuell mangels verbundenem ADB-Device nur als skipped nachweisbar; CodeQL- und Android-CI-Reruns wurden am 2026-03-29 erneut mit Billing/Spending-Limit Fehler beendet (externer Admin-Blocker) |
+| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test lokal gruen (52/52 Suites, 1867/1867 Tests) inkl. static-readiness; Device-Commissioning aktuell mangels verbundenem ADB-Device als skipped dokumentiert; CodeQL- und Android-CI-Reruns bleiben durch Billing/Spending-Limit extern blockiert. |
 | Functional Commissioning | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Mehrere commissioning checks offen |
 | Security and Identity | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Firebase key rotation/restrictions offen |
 | Compliance | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Dokumentierte Compliance-Evidenz vorhanden |

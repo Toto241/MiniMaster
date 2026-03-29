@@ -21,13 +21,13 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 | Evidence Item | Link/Reference | Status | Verified By | Date |
 | --------------- | --------------- | -------- | ------------- | ------ |
-| Build artifact (`npm run build`) | Local build successful (`tsc -p tsconfig.json`) | ✅ | Automated | 2026-03-29 |
-| Lint result (`npm run lint`) | 0 errors, 0 warnings | ✅ | Automated | 2026-03-29 |
-| Test result (`npm run test:ci`) | 52 suites, 1867/1867 passed | ✅ | Automated | 2026-03-29 |
+| Build artifact (npm run build) | Local build successful (tsc -p tsconfig.json) | ✅ | Automated | 2026-03-29 |
+| Lint result (npm run lint) | 0 errors, 0 warnings | ✅ | Automated | 2026-03-29 |
+| Test result (npm run test:ci) | 52 suites, 1867/1867 passed | ✅ | Automated | 2026-03-29 |
 | Coverage report (`npm test -- --coverage --runInBand`) | Stmts 99.56%, Branch 96.65%, Funcs 98.52%, Lines 99.65% | ✅ | Automated | 2026-03-21 |
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
-| Static readiness checks | `scripts/static_readiness_checks.py`: 20/20 checks passed (`python scripts/test_automation.py --suite static-readiness`) | ✅ | Automated | 2026-03-29 |
+| Static readiness checks | scripts/static_readiness_checks.py: 20/20 checks passed (100%) (python scripts/test_automation.py --suite static-readiness) | ✅ | Automated | 2026-03-29 |
 | CodeQL security scan (0 high/critical) | Run [23688038163](https://github.com/Toto241/MiniMaster/actions/runs/23688038163): completed/failure; Annotation: "job was not started because recent account payments have failed or your spending limit needs to be increased"; letzter erfolgreicher Referenz-Run: [23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965) | ⬜ | Engineering (blocked by repo billing) | 2026-03-29 |
 | Android build (if applicable) | Run [23545055477](https://github.com/Toto241/MiniMaster/actions/runs/23545055477): completed/failure; Annotation: "job was not started because recent account payments have failed or your spending limit needs to be increased"; letzter erfolgreicher Referenz-Run: none in inspected history | ⬜ | Engineering (blocked by repo billing) | 2026-03-29 |
 | Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
@@ -36,7 +36,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 | Checklist Key | Result | Evidence Link | Tester | Date |
 | --------------- | -------- | --------------- | -------- | ------ |
-| `android-apps` (pairing + sync) | ⬜ | build/test-automation/latest-summary.json (`android-connected-master`/`android-connected-child` skipped: No connected Android device or emulator detected via adb.) | Automated + Device Owner pending | 2026-03-29 |
+| android-apps (pairing + sync) | ⬜ | build/test-automation/latest-summary.json (android-connected-master/android-connected-child skipped: No connected Android device or emulator detected via adb.) | Automated + Device Owner pending | 2026-03-29 |
 | `ai-config` (AI setup + generation) | ⬜ | | | |
 | `support-workflow` (ticket lifecycle) | ✅ | build/test-automation/latest-summary.json (`backend-jest` inkl. e2e-ticket-lifecycle) | Automated | 2026-03-29 |
 | `compliance-flow` (DSAR + audit) | ✅ | test/enforcement-automation.test.ts | Automated | 2026-03-19 |
