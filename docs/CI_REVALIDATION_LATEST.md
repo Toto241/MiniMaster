@@ -1,29 +1,29 @@
 # CI Revalidation Report
 
-Generated: 2026-03-25 10:54:27 +01:00
+Generated: 2026-03-29 15:00:24 +02:00
 Repository: Toto241/MiniMaster
 Rerun requested for latest failures: false
 
 ## CodeQL Security Analysis
 
-- Latest run: [23512691725](https://github.com/Toto241/MiniMaster/actions/runs/23512691725)
+- Latest run: [23688038163](https://github.com/Toto241/MiniMaster/actions/runs/23688038163)
 - Latest status: completed / failure
-- Head SHA: f1a033ad01a5380d22e5900f52682dc90ae23145
-- Updated at: 03/24/2026 21:18:10
+- Head SHA: 5c9428fe536167fda3444e3e6ea35aff66dcdb1c
+- Updated at: 03/29/2026 11:30:52
 - Latest success: none in inspected history
 
 ### Latest Failure Annotations
-- [Analyze Code (java)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
 - [Analyze Code (javascript)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
+- [Analyze Code (java)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
 
 Billing blocker detected: yes
 
 ## Android CI
 
-- Latest run: [23510333684](https://github.com/Toto241/MiniMaster/actions/runs/23510333684)
+- Latest run: [23545055477](https://github.com/Toto241/MiniMaster/actions/runs/23545055477)
 - Latest status: completed / failure
-- Head SHA: 396ba886e9fec83941fd379367f43092c9fbd98d
-- Updated at: 03/24/2026 20:19:28
+- Head SHA: 52e365f825dc39c43d8ac63f9148cd7e4ac1d3d4
+- Updated at: 03/29/2026 11:30:54
 - Latest success: none in inspected history
 
 ### Latest Failure Annotations

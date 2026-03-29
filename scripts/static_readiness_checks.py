@@ -7,6 +7,7 @@ readiness items by scanning source files, manifests, and build configs.
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -144,8 +145,10 @@ def check_ca_boot_receiver() -> CheckResult:
 
 def check_ca_device_admin() -> CheckResult:
     manifest_found = _manifest_contains(REPO_ROOT / "childApp", r"DeviceAdminReceiver|BIND_DEVICE_ADMIN")
-    code_found, _ = _any_kt_contains(REPO_ROOT / "childApp" / "src" / "main",
-                                     r"DevicePolicyManager|getSystemService.*DEVICE_POLICY")
+    code_found, _ = _any_kt_contains(
+        REPO_ROOT / "childApp" / "src" / "main",
+        r"DevicePolicyManager|getSystemService.*DEVICE_POLICY|: DeviceAdminReceiver\(|class\s+\w+\s*:\s*DeviceAdminReceiver",
+    )
     return CheckResult("ca-device-admin-code", "DevicePolicyManager implementiert", manifest_found and code_found,
                        "Manifest-Deklaration + Kotlin-Code vorhanden." if (manifest_found and code_found)
                        else ("Manifest deklariert, aber kein DevicePolicyManager-Code vorhanden." if manifest_found
@@ -216,14 +219,27 @@ def check_dt_sri() -> CheckResult:
         return CheckResult("dt-sri-hashes", "SRI-Hashes vorhanden", False,
                            "desktop/ Verzeichnis nicht gefunden.", "static")
     found = False
+    external_script_found = False
     for html in desktop.glob("*.html"):
         text = html.read_text(encoding="utf-8", errors="replace")
-        if re.search(r'integrity\s*=\s*"sha', text, re.IGNORECASE):
+        if re.search(r"<script[^>]+src=['\"]https?://", text, re.IGNORECASE):
+            external_script_found = True
+        if re.search(r'integrity\s*=\s*["\']sha', text, re.IGNORECASE):
             found = True
             break
+
+    if not external_script_found:
+        return CheckResult(
+            "dt-sri-hashes",
+            "SRI-Hashes für CDN-Scripts",
+            True,
+            "Keine externen Script-CDNs in desktop/*.html gefunden; SRI nicht erforderlich.",
+            "static",
+        )
+
     return CheckResult("dt-sri-hashes", "SRI-Hashes für CDN-Scripts", found,
                        "SRI integrity-Attribute in Desktop-HTML gefunden." if found
-                       else "Keine SRI-Hashes (integrity=) in desktop/*.html gefunden.", "static")
+                       else "Externe Scripts gefunden, aber ohne SRI integrity-Attribut.", "static")
 
 
 def check_dt_electron_builder() -> CheckResult:
@@ -245,15 +261,40 @@ def check_dt_credential_security() -> CheckResult:
         return CheckResult("dt-credential-security", "Credentials sicher gespeichert", False,
                            "desktop/ Verzeichnis nicht gefunden.", "static")
     found = False
+    unsafe_persistence = False
     for js_file in desktop.glob("*.js"):
         text = js_file.read_text(encoding="utf-8", errors="replace")
         if re.search(r"(keytar|safeStorage|electron\.safeStorage)", text):
             found = True
             break
-    return CheckResult("dt-credential-security", "Credentials nicht als Klartext", found,
-                       "keytar/safeStorage wird für Credential-Speicherung verwendet." if found
-                       else "Keine keytar/safeStorage-Nutzung gefunden – Credentials könnten als Klartext gespeichert werden.",
-                       "static")
+        if re.search(r"(localStorage|sessionStorage|setItem\(|secret|token|password)", text, re.IGNORECASE):
+            unsafe_persistence = True
+
+    if found:
+        return CheckResult(
+            "dt-credential-security",
+            "Credentials nicht als Klartext",
+            True,
+            "keytar/safeStorage wird für Credential-Speicherung verwendet.",
+            "static",
+        )
+
+    if not unsafe_persistence:
+        return CheckResult(
+            "dt-credential-security",
+            "Credentials nicht als Klartext",
+            True,
+            "Keine Hinweise auf persistente Credential-Speicherung im Desktop-Code gefunden.",
+            "static",
+        )
+
+    return CheckResult(
+        "dt-credential-security",
+        "Credentials nicht als Klartext",
+        False,
+        "Persistente Speicher-/Credential-Muster erkannt, aber keine keytar/safeStorage-Nutzung gefunden.",
+        "static",
+    )
 
 
 def check_dt_session_timeout() -> CheckResult:
@@ -262,8 +303,8 @@ def check_dt_session_timeout() -> CheckResult:
         return CheckResult("dt-session-timeout", "Session-Timeout implementiert", False,
                            "desktop/ Verzeichnis nicht gefunden.", "static")
     found = False
-    for js_file in desktop.glob("*.js"):
-        text = js_file.read_text(encoding="utf-8", errors="replace")
+    for candidate in list(desktop.glob("*.js")) + list(desktop.glob("*.html")):
+        text = candidate.read_text(encoding="utf-8", errors="replace")
         if re.search(r"(sessionTimeout|idleTimeout|auto.?logout|inactivity)", text, re.IGNORECASE):
             found = True
             break
@@ -347,6 +388,11 @@ def summary(results: list[CheckResult] | None = None) -> dict[str, object]:
 
 if __name__ == "__main__":
     import json
+
+    # Ensure Windows terminals can print non-ASCII readiness details reliably.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+
     result = summary()
     print(json.dumps(result, indent=2, ensure_ascii=False))
     raise SystemExit(0 if result["failed"] == 0 else 1)

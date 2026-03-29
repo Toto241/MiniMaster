@@ -1,0 +1,20 @@
+{
+  "name": "minimaster-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MiniMaster desktop launcher packaging config",
+  "main": "main.js",
+  "build": {
+    "appId": "com.minimaster.desktop",
+    "productName": "MiniMaster Desktop",
+    "files": [
+      "main.js",
+      "preload.js",
+      "operator-preload.js",
+      "launcher.html"
+    ]
+  },
+  "devDependencies": {
+    "electron-builder": "^24.13.3"
+  }
+}
