@@ -2,6 +2,38 @@
 
 Häufig verwendete Befehle für MiniMaster iOS-Apps.
 
+## Windows + VS Code (wichtiger Hinweis)
+
+Wenn du mit VS Code auf Windows arbeitest, gilt:
+
+- VS Code ist vollkommen OK als Editor.
+- Für Swift-Linking werden trotzdem Microsoft C++ Build Tools benötigt (MSVC).
+- iOS-UI-Code mit `SwiftUI` kann auf Windows nicht lokal gebaut werden.
+- Echte iOS-Builds laufen über macOS (lokal auf Mac oder via GitHub Actions auf `macos-14`).
+
+### Lokale Toolchain-Prüfung unter Windows
+
+```powershell
+# 1) Prüfen, ob MSVC-Lib vorhanden ist
+Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\lib\x64\msvcrt.lib" -ErrorAction SilentlyContinue
+
+# 2) Minimalen Swift-Compile prüfen
+$tmp = Join-Path $env:TEMP 'swift_hello.swift'
+@'
+print("ok")
+'@ | Set-Content -Path $tmp -Encoding ascii
+
+& 'C:\Users\torst\AppData\Local\Programs\Swift\Toolchains\6.3.0+Asserts\usr\bin\swiftc.exe' $tmp -o (Join-Path $env:TEMP 'swift_hello.exe')
+& (Join-Path $env:TEMP 'swift_hello.exe')
+```
+
+Erwartung:
+
+- `msvcrt.lib` wird gefunden
+- Konsolen-Programm gibt `ok` aus
+
+Wenn diese Checks grün sind, ist die Windows-Toolchain korrekt. Für iOS/SwiftUI weiterhin macOS nutzen.
+
 ## Lokal Bauen & Testen
 
 ### Parent App starten
