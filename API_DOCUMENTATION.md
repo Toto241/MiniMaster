@@ -998,6 +998,206 @@ Read/write the AI support knowledge base. Firestore-first, file fallback.
 
 Send test FCM push to a token or child device. **Parameters**: `{ token?: string, childId?: string }`
 
+---
+
+## Control-Plane Functions (Bidirectional Android/iOS)
+
+These functions implement the platform-agnostic command/acknowledge channel introduced in `src/device-sync.ts`.
+FCM/APNs push is used only as a wake-up hint; authoritative state is always in Firestore.
+
+### registerDeviceEndpoint
+
+Registers or refreshes a push endpoint for a child device. Supports both Android (FCM) and iOS (APNs).
+Backward-compatible: also writes the legacy `fcmToken` field for FCM registrations.
+
+**Function Type**: `httpsCallable`
+
+**Caller**: Child device itself OR its master
+
+**Parameters**:
+```typescript
+{
+  childId: string,          // Required: Child device ID
+  platform: "android"|"ios",// Required
+  provider: "fcm"|"apns",   // Required
+  token: string,            // Required: FCM registration token or APNs device token
+  appVersion: string,       // Required: e.g. "2.1.0"
+  capabilities?: string[]   // Optional: ["lock","appBlacklist","usageRules","screenTime","tamperDetection","heartbeat","taskProof"]
+}
+```
+
+**Response**:
+```typescript
+{
+  endpointId: string,        // UUID assigned to this endpoint
+  acceptedCapabilities: string[]  // Filtered subset of known capabilities
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing or invalid `childId`, `platform`, `provider`, `token`, or `appVersion`
+- `not-found`: Child device not found
+- `permission-denied`: Caller is neither the child itself nor its master
+- `unauthenticated`: No auth context
+
+**Notes**: Deduplicates tokens (same token replaces its own entry). Maximum 5 endpoints per device.
+
+---
+
+### publishDeviceEvent
+
+Child device reports an event to the backend (e.g. usage report, tamper event, heartbeat).
+Idempotent: a second call with the same `idempotencyKey` returns the existing event.
+
+**Function Type**: `httpsCallable`
+
+**Caller**: Child device only
+
+**Parameters**:
+```typescript
+{
+  childId: string,            // Required: Child device ID (must match auth uid)
+  eventType: "usage_report"|"tamper_event"|"command_ack"|"heartbeat"|"policy_applied",
+  payload: Record<string, unknown>, // Required: Event-specific payload
+  idempotencyKey: string      // Required: Unique key to deduplicate retries
+}
+```
+
+**Response**:
+```typescript
+{
+  eventId: string,            // UUID of the stored event
+  receivedAt: Timestamp
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing `childId`, `eventType`, `idempotencyKey`, or non-object payload
+- `not-found`: Child device document not found
+- `permission-denied`: Caller is not the child device itself
+- `unauthenticated`: No auth context
+
+---
+
+### fetchPendingCommands
+
+Pull mechanism: child device (or its master) retrieves pending commands that have not yet been applied or expired.
+
+**Function Type**: `httpsCallable`
+
+**Caller**: Child device or its master
+
+**Parameters**:
+```typescript
+{
+  childId: string,            // Required: Child device ID
+  sinceCursor?: string,       // Optional: commandId of last known command (pagination)
+  maxItems?: number           // Optional: 1–50 (default: 20)
+}
+```
+
+**Response**:
+```typescript
+{
+  commands: DeviceCommand[],  // Pending non-expired commands
+  nextCursor: string | null,  // commandId for the next page, or null if last page
+  policyVersion: number       // Current server policyVersion
+}
+```
+
+**DeviceCommand shape**:
+```typescript
+{
+  commandId: string,
+  type: "policy_update"|"lock_state"|"app_blacklist"|"usage_rules"|"screen_time",
+  payload: Record<string, unknown>,
+  status: "pending",
+  schemaVersion: number,      // Currently 1
+  policyVersion: number,
+  createdAt: Timestamp,
+  expiresAt: Timestamp        // 48h TTL from creation
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing `childId` or `maxItems > 50`
+- `not-found`: Child device not found
+- `permission-denied`: Caller is neither the child itself nor its master
+- `unauthenticated`: No auth context
+
+---
+
+### acknowledgeCommand
+
+Child device confirms that a command has been applied or failed. Updates `lastPolicyVersion` on success.
+Idempotent: already-acknowledged commands return `{ success: true }` immediately.
+
+**Function Type**: `httpsCallable`
+
+**Caller**: Child device only
+
+**Parameters**:
+```typescript
+{
+  childId: string,            // Required: Child device ID (must match auth uid)
+  commandId: string,          // Required: Command UUID to acknowledge
+  status: "applied"|"failed", // Required: Outcome
+  appliedAt: number,          // Required: Epoch-ms timestamp of application
+  errorCode?: string          // Optional: Error detail when status === "failed"
+}
+```
+
+**Response**:
+```typescript
+{ success: true }
+```
+
+**Errors**:
+- `invalid-argument`: Missing fields or invalid `status`
+- `not-found`: Command document not found
+- `permission-denied`: Caller is not the child device itself
+- `unauthenticated`: No auth context
+
+---
+
+### syncPolicySnapshot
+
+Full policy pull for app startup and offline recovery. Returns the complete current policy plus any open critical commands (lock_state, policy_update).
+
+**Function Type**: `httpsCallable`
+
+**Caller**: Child device or its master
+
+**Parameters**:
+```typescript
+{
+  childId: string,              // Required: Child device ID
+  knownPolicyVersion?: number   // Optional: Device's currently applied version (default: 0)
+}
+```
+
+**Response**:
+```typescript
+{
+  fullPolicy: {
+    isLocked: boolean,
+    appBlacklist: string[],
+    usageRules: Record<string, unknown>,
+    platform: "android"|"ios",
+    capabilities: string[]
+  },
+  policyVersion: number,                // Current server version
+  pendingCriticalCommands: DeviceCommand[], // Open lock_state / policy_update commands
+  upToDate: boolean                     // true if knownPolicyVersion === policyVersion
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing `childId`
+- `not-found`: Child device not found
+- `permission-denied`: Caller is neither the child itself nor its master
+- `unauthenticated`: No auth context
+
 ### testGeminiConnection (Admin)
 
 Tests connectivity to the Gemini API. Returns model info and a test completion result.

@@ -65,7 +65,7 @@ describe("onChildDeviceUpdateV2", () => {
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith({
       token: "test-token",
-      data: { isLocked: "true" },
+      data: { isLocked: "true", policyVersion: "0" },
       notification: {
         title: "Device Settings Updated",
         body: "Your device settings have been updated by your parent.",
@@ -89,7 +89,7 @@ describe("onChildDeviceUpdateV2", () => {
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith({
       token: "test-token",
-      data: { appBlacklist: JSON.stringify(["app1", "app2"]) },
+      data: { appBlacklist: JSON.stringify(["app1", "app2"]), policyVersion: "0" },
       notification: {
         title: "Device Settings Updated",
         body: "Your device settings have been updated by your parent.",
@@ -113,7 +113,7 @@ describe("onChildDeviceUpdateV2", () => {
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith({
       token: "test-token",
-      data: { usageRules: JSON.stringify({ time: "3h" }) },
+      data: { usageRules: JSON.stringify({ time: "3h" }), policyVersion: "0" },
       notification: {
         title: "Device Settings Updated",
         body: "Your device settings have been updated by your parent.",

@@ -211,6 +211,62 @@ service cloud.firestore {
       allow write: if false; // Only Cloud Functions can write
     }
 
+    // --- COMMANDS COLLECTION (nested under children) ---
+    // Stores master→child policy commands for bidirectional Android/iOS control-plane.
+    // Commands are created only by Cloud Functions (Admin SDK) and acknowledged by
+    // the child device itself. The owning master can read commands for diagnostics.
+    match /children/{childId}/commands/{commandId} {
+      function getChildForCmd() {
+        return get(/databases/$(database)/documents/children/$(childId));
+      }
+
+      // Master or child device can read; admin for support
+      allow read: if isSignedIn() && (
+        getChildForCmd().data.masterImei == request.auth.uid ||
+        childId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Commands are created exclusively by Cloud Functions (Admin SDK)
+      allow create: if false;
+
+      // Only the child device itself may update status (ack)
+      allow update: if isSignedIn()
+        && childId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'ackedAt', 'errorCode']);
+
+      allow delete: if false;
+    }
+
+    // --- EVENTS COLLECTION (nested under children) ---
+    // Stores child→master events (usage_report, tamper_event, command_ack, etc.).
+    // Events are immutable once created; master reads them for monitoring.
+    match /children/{childId}/events/{eventId} {
+      function getChildForEvent() {
+        return get(/databases/$(database)/documents/children/$(childId));
+      }
+
+      // Master or admin can read events
+      allow read: if isSignedIn() && (
+        getChildForEvent().data.masterImei == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Only the child device itself may publish events
+      allow create: if isSignedIn()
+        && childId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+            'eventId', 'eventType', 'payload', 'idempotencyKey',
+            'senderPlatform', 'createdAt'
+          ])
+        && request.resource.data.eventType is string
+        && request.resource.data.idempotencyKey is string
+        && request.resource.data.senderPlatform in ['android', 'ios'];
+
+      allow update, delete: if false; // Events are immutable
+    }
+
     // --- DENY OLD NESTED FAMILY STRUCTURE ---
     // Prevent confusion by explicitly denying access to the old data model.
     match /families/{familyId} {

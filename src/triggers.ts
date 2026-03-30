@@ -7,6 +7,7 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { getMessaging, Message } from "firebase-admin/messaging";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
+import { writeCommand, incrementPolicyVersion } from "./device-sync";
 
 /**
  * Sends an FCM message with exponential backoff retry (max 3 attempts).
@@ -56,15 +57,17 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
 
   const payload: { [key: string]: string } = {};
 
-  if (newData.isLocked !== oldData.isLocked) {
+  const lockChanged = newData.isLocked !== oldData.isLocked;
+  const blacklistChanged = JSON.stringify(newData.appBlacklist) !== JSON.stringify(oldData.appBlacklist);
+  const usageChanged = JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules);
+
+  if (lockChanged) {
     payload.isLocked = String(newData.isLocked);
   }
-
-  if (JSON.stringify(newData.appBlacklist) !== JSON.stringify(oldData.appBlacklist)) {
+  if (blacklistChanged) {
     payload.appBlacklist = JSON.stringify(newData.appBlacklist);
   }
-
-  if (JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules)) {
+  if (usageChanged) {
     payload.usageRules = JSON.stringify(newData.usageRules);
   }
 
@@ -73,9 +76,32 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
     return;
   }
 
+  // --- Control-Plane: versionierte Commands erzeugen (Android + iOS) ---
+  // Jede Policy-Änderung wird als Command in Firestore gespeichert, damit Geräte
+  // sie auch ohne Push via fetchPendingCommands / syncPolicySnapshot abholen können.
+  let policyVersion = 0;
+  try {
+    policyVersion = await incrementPolicyVersion(childId);
+
+    if (lockChanged) {
+      await writeCommand(childId, "lock_state", { isLocked: newData.isLocked }, policyVersion);
+    }
+    if (blacklistChanged) {
+      await writeCommand(childId, "app_blacklist", { appBlacklist: newData.appBlacklist || [] }, policyVersion);
+    }
+    if (usageChanged) {
+      await writeCommand(childId, "usage_rules", { usageRules: newData.usageRules || {} }, policyVersion);
+    }
+    functions.logger.info(`Commands written for child ${childId}, policyVersion=${policyVersion}`);
+  } catch (cmdError) {
+    // Command-Erzeugung schlägt den FCM-Push nicht fehl; nur loggen
+    functions.logger.error(`Failed to write commands for child ${childId}:`, cmdError);
+  }
+
+  // --- Legacy FCM-Diff-Push (Wake-up/Hint für verbundene Geräte) ---
   const message = {
     token: fcmToken,
-    data: payload,
+    data: { ...payload, policyVersion: String(policyVersion) },
     notification: {
       title: "Device Settings Updated",
       body: "Your device settings have been updated by your parent.",

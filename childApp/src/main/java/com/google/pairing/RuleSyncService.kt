@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import android.content.pm.PackageManager
 
 /**
  * A service that extends [FirebaseMessagingService] to handle incoming FCM messages.
@@ -30,6 +31,8 @@ class RuleSyncService : FirebaseMessagingService() {
     lateinit var functions: FirebaseFunctions
     @Inject
     lateinit var childIdRepository: ChildIdRepository
+    @Inject
+    lateinit var commandSyncRepository: CommandSyncRepository
 
     private val TAG = "RuleSyncService"
 
@@ -48,7 +51,16 @@ class RuleSyncService : FirebaseMessagingService() {
         if (remoteMessage.data.isNotEmpty()) {
             Log.d(TAG, "Message data payload: " + remoteMessage.data)
 
-            // Handle payload-only messages (from onChildDeviceUpdateV2)
+            // If the payload contains a policyVersion hint, fetch the authoritative commands
+            // from Firestore instead of trusting the FCM payload directly.
+            val serverPolicyVersion = remoteMessage.data["policyVersion"]?.toIntOrNull()
+            if (serverPolicyVersion != null) {
+                Log.d(TAG, "Received policyVersion hint: $serverPolicyVersion – pulling commands")
+                handleCommandSync()
+                return
+            }
+
+            // Legacy: Handle payload-only messages (from onChildDeviceUpdateV2 without policyVersion)
             if (remoteMessage.data.containsKey("isLocked")) {
                 handleDeviceLockMessage(remoteMessage.data)
             }
@@ -67,7 +79,8 @@ class RuleSyncService : FirebaseMessagingService() {
                 }
                 else -> {
                     // Log warning only if no known keys were processed
-                    if (!remoteMessage.data.containsKey("isLocked") &&
+                    if (serverPolicyVersion == null &&
+                        !remoteMessage.data.containsKey("isLocked") &&
                         !remoteMessage.data.containsKey("appBlacklist") &&
                         !remoteMessage.data.containsKey("blocked_apps") &&
                         !remoteMessage.data.containsKey("usageRules")) {
@@ -164,6 +177,23 @@ class RuleSyncService : FirebaseMessagingService() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error during sync request", e)
+            }
+        }
+    }
+
+    /**
+     * Pulls and applies all pending commands via the Control-Plane.
+     * Called when the FCM wake-up payload contains a [policyVersion] hint.
+     */
+    private fun handleCommandSync() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val childId = childIdRepository.getChildId().first()
+                if (!childId.isNullOrEmpty()) {
+                    commandSyncRepository.fetchAndApplyPendingCommands(childId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during command sync", e)
             }
         }
     }
@@ -277,16 +307,39 @@ class RuleSyncService : FirebaseMessagingService() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val childId = childIdRepository.getChildId().first()
-                if (!childId.isNullOrEmpty()) {
-                    val data = hashMapOf(
-                        "childImei" to childId,
-                        "token" to token
-                    )
-                    functions.getHttpsCallable("registerFcmToken").call(data).await()
-                    Log.d(TAG, "FCM token updated for child: $childId")
+                if (childId.isNullOrEmpty()) return@launch
+
+                // Legacy: keep sending to registerFcmToken for backward compat
+                val legacyData = hashMapOf("childImei" to childId, "token" to token)
+                try {
+                    functions.getHttpsCallable("registerFcmToken").call(legacyData).await()
+                    Log.d(TAG, "Legacy FCM token updated for child: $childId")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Legacy registerFcmToken failed (non-fatal)", e)
                 }
+
+                // New Control-Plane: register full endpoint with capabilities
+                val appVersion = runCatching {
+                    applicationContext.packageManager
+                        .getPackageInfo(applicationContext.packageName, 0)
+                        .versionName ?: "unknown"
+                }.getOrDefault("unknown")
+
+                val endpointData = hashMapOf(
+                    "childId" to childId,
+                    "platform" to "android",
+                    "provider" to "fcm",
+                    "token" to token,
+                    "appVersion" to appVersion,
+                    "capabilities" to listOf(
+                        "lock", "appBlacklist", "usageRules",
+                        "tamperDetection", "heartbeat", "taskProof"
+                    )
+                )
+                functions.getHttpsCallable("registerDeviceEndpoint").call(endpointData).await()
+                Log.d(TAG, "Registered device endpoint for child: $childId (v$appVersion)")
             } catch (e: Exception) {
-                Log.e(TAG, "Error updating FCM token", e)
+                Log.e(TAG, "Error in onNewToken", e)
             }
         }
     }

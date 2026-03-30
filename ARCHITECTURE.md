@@ -44,8 +44,10 @@ A context diagram should be placed here, showing the main components and their i
 
 - **Server-Authoritative Logic:** All mutations gated by callable functions (argument validation + secretKey checks). Clients remain thin.
 - **FCM Diff Strategy:** `onChildDeviceUpdateV2` computes *minimal* changed fields (lock, blacklist, usage rules) → reduces payload & avoids redundant updates.
-- **Flat Firestore Schema (Interim):** Active collections: `masters`, `children`, nested `children/{id}/tasks`, `pairingCodes`, `pairingTokens`. Legacy/in-progress hierarchical `families/*` path intentionally disabled in `firestore.rules`.
-- **Strict Expiry Semantics:** Pairing tokens (5 min) vs 6-digit codes (24 h); expired or malformed docs deleted proactively.
+- **Bidirectional Control-Plane (new):** `src/device-sync.ts` introduces a platform-agnostic command/ack channel: state changes are written as versioned `commands` documents in Firestore; FCM/APNs push serves only as a wake-up hint. Devices pull authoritative commands via `fetchPendingCommands` and confirm application via `acknowledgeCommand`. This pattern guarantees delivery even during extended offline periods and works identically for Android and iOS.
+- **Policy Versioning:** A monotonically increasing `policyVersion` counter (transaction-guaranteed) on `children/{childId}` is carried in every command and FCM data payload. Devices track `lastPolicyVersion` to detect missed updates and trigger `syncPolicySnapshot` on reconnect.
+- **Flat Firestore Schema (Interim):** Active collections: `masters`, `children`, nested `children/{id}/tasks`, `pairingCodes`, `pairingTokens`, `children/{id}/commands`, `children/{id}/events`. Legacy/in-progress hierarchical `families/*` path intentionally disabled in `firestore.rules`.
+- **Strict Expiry Semantics:** Pairing tokens (5 min) vs 6-digit codes (24 h); commands expire after 48 h; expired or malformed docs deleted proactively.
 - **MVVM + Hilt:** ViewModels isolate UI; injection used but not security-critical.
 
 ## 4. Data Model (Firestore – Current vs Planned)
@@ -59,7 +61,13 @@ children/{childImei}/tasks/{taskId}
 pairingTokens/{uuid}
 pairingCodes/{6digit}
 ```
-Child document fields (selected): `masterImei`, `isLocked`, `appBlacklist` (array), `usageRules` (object), `fcmToken`, `lastSeen`.
+Child document fields (selected): `masterImei`, `isLocked`, `appBlacklist` (array), `usageRules` (object), `fcmToken`, `lastSeen`, `platform` (`android`|`ios`), `capabilities` (string[]), `pushEndpoints` (array), `policyVersion` (number), `lastPolicyVersion` (number).
+
+**Control-Plane Subcollections (New)**:
+```text
+children/{childId}/commands/{commandId}   — Master→Child versioned commands (lock_state, app_blacklist, …)
+children/{childId}/events/{eventId}       — Child→Master events (usage_report, tamper_event, heartbeat, …)
+```
 
 ### Planned (Not Implemented Yet)
 
@@ -103,6 +111,7 @@ The Cloud Functions backend is split into domain modules under `src/`:
 | **Legal** | `src/legal.ts` | GDPR consent, legal policy publishing, re-consent enforcement | `getActiveLegalPolicies`, `needsLegalReconsent`, `recordLegalConsent`, `publishLegalPolicy`, `markLegalReconsentRequired` |
 | **Admin** | `src/admin.ts` | Health check, error analysis, auto-fix, knowledge base, FCM testing | `adminHealthCheck`, `analyzeSystemErrors`, `executeAutoFix`, `getKnowledgeBase`, `updateKnowledgeBase`, `sendTestFcmMessage` |
 | **Triggers** | `src/triggers.ts` | Firestore-triggered FCM diff push, task photo analysis | `onChildDeviceUpdateV2`, `analyzeTaskPhoto`, `onTaskStatusChange` |
+| **Device Sync** | `src/device-sync.ts` | Bidirectional Control-Plane for Android & iOS; versioned commands, device events, policy snapshots | `registerDeviceEndpoint`, `publishDeviceEvent`, `fetchPendingCommands`, `acknowledgeCommand`, `syncPolicySnapshot` |
 | **Shared** | `src/shared.ts` | `requireAdmin()`, `AuditLogger`, role types | Internal utilities used by all modules |
 | **Entrypoint** | `index.ts` | Re-exports all callable functions + triggers | — |
 | **Init** | `firebase.ts` | Singleton Firebase Admin SDK (lazy getters: `db()`, `auth()`, `storage()`) | `db`, `auth`, `storage` |

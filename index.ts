@@ -30,6 +30,15 @@ export {
   reportTamperEvent,
 } from "./src/device";
 
+// Cross-Platform Control-Plane (Android + iOS bidirectional interface)
+export {
+  registerDeviceEndpoint,
+  publishDeviceEvent,
+  fetchPendingCommands,
+  acknowledgeCommand,
+  syncPolicySnapshot,
+} from "./src/device-sync";
+
 // Tasks
 export { createTask, completeTask, approveTask, rejectTask } from "./src/tasks";
 

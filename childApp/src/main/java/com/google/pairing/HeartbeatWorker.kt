@@ -29,7 +29,8 @@ class HeartbeatWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val functions: FirebaseFunctions,
-    private val childIdRepository: ChildIdRepository
+    private val childIdRepository: ChildIdRepository,
+    private val commandSyncRepository: CommandSyncRepository
 ) : CoroutineWorker(appContext, workerParams) {
 
     private val TAG = "HeartbeatWorker"
@@ -46,7 +47,6 @@ class HeartbeatWorker @AssistedInject constructor(
             val childId = childIdRepository.getChildId().first()
             if (childId.isNullOrEmpty()) {
                 Log.w(TAG, "Heartbeat failed: Child ID not available. Worker will retry.")
-                // The device might not be paired yet. Retrying is the correct approach.
                 return Result.retry()
             }
 
@@ -55,12 +55,16 @@ class HeartbeatWorker @AssistedInject constructor(
                 .getHttpsCallable("recordHeartbeat")
                 .call(data)
                 .await()
-
             Log.d(TAG, "Heartbeat successful for child $childId.")
+
+            // After each heartbeat: check if local policy is in sync with the server.
+            // Uses knownPolicyVersion=0 here so the server always answers;
+            // the snapshot is only applied when upToDate==false.
+            commandSyncRepository.syncPolicySnapshot(childId, knownPolicyVersion = 0)
+
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Heartbeat failed with exception. Retrying...", e)
-            // For network errors or other transient issues, retrying is appropriate.
             Result.retry()
         }
     }
