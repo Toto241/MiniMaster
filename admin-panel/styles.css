@@ -1452,6 +1452,14 @@ input:focus, select:focus, textarea:focus {
     padding: 16px;
 }
 
+.testing-register-panels .python-automation-panel {
+    min-inline-size: 0;
+}
+
+.testing-register-panels table {
+    font-size: 0.84rem;
+}
+
 .python-automation-panel-header {
     display: flex;
     justify-content: space-between;

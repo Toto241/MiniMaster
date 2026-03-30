@@ -1217,8 +1217,37 @@ npm test -- --runInBand
                                 </select>
                                 <button onclick="loadTestingRegister()" class="btn btn-secondary" title="Vollständiges Testregister neu laden">Testregister laden</button>
                             </div>
-                            <div id="testing-register-list" class="data-list" style="margin-block-start: 12px">
-                                <div class="info">Noch kein Testregister geladen.</div>
+                            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+                                <button onclick="runPythonAutomationSuite()" class="btn btn-primary" title="Automatische Commissioning-Pruefungen als Python-Lauf starten">
+                                    Automatische Commissioning-Pruefung starten
+                                </button>
+                                <button onclick="loadSuiteCatalog()" class="btn btn-secondary" title="Testsuiten-Katalog neu laden, um Suite-Laeufe direkt zu starten">
+                                    Suite-Katalog aktualisieren
+                                </button>
+                            </div>
+                            <div class="python-automation-layout testing-register-panels" style="margin-block-start: 12px">
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Automatische Tests</h5>
+                                            <p>Python-Automation, lokale Gate-Kommandos und Suite-Checks.</p>
+                                        </div>
+                                    </div>
+                                    <div id="testing-register-list-automatic" class="data-list">
+                                        <div class="info">Noch kein Testregister geladen.</div>
+                                    </div>
+                                </section>
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Manuelle Tests &amp; dokumentierte Nachweise</h5>
+                                            <p>Manuelle Freigaben, dokumentierte Testplaene und Evidenzprotokolle.</p>
+                                        </div>
+                                    </div>
+                                    <div id="testing-register-list-manual" class="data-list">
+                                        <div class="info">Noch kein Testregister geladen.</div>
+                                    </div>
+                                </section>
                             </div>
                         </div>
 
