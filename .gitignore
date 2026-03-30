@@ -41,3 +41,12 @@ Thumbs.db
 *.tmp
 .tmp_*
 tmp_*
+
+# Swift / Xcode build artefacts
+**/.build/
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
