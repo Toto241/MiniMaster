@@ -1682,13 +1682,61 @@ function buildTestingRegisterAction(item) {
     return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()">Python-Testlauf starten</button>`;
 }
 
-function renderTestingRegisterList(payload) {
-    const listEl = document.getElementById("testing-register-list");
+function renderTestingRegisterPanelRows(items) {
+    return items.map(item => {
+        const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
+        const updatedAt = item.updatedAt ? formatPythonAutomationTimestamp(item.updatedAt) : "noch nicht protokolliert";
+        const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"));
+        return `
+            <tr>
+                <td><strong>${escapeHtml(item.title || item.id || "-")}</strong><div class='python-muted-caption'>${escapeHtml(item.id || "-")}</div></td>
+                <td>${escapeHtml(item.groupTitle || "-")}</td>
+                <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"))}'>${escapeHtml(typeLabel)}</span></td>
+                <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
+                <td>${escapeHtml(String(item.details || "-")).slice(0, 220)}</td>
+                <td>${escapeHtml(updatedAt)}</td>
+                <td><div class='python-muted-caption'>${escapeHtml(item.storage || "-")}</div></td>
+                <td>${buildTestingRegisterAction(item)}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function renderTestingRegisterPanel(listEl, panelItems, visibleCount, totalCount, emptyLabel) {
     if (!listEl) return;
+    if (panelItems.length === 0) {
+        listEl.innerHTML = `<div class='info'>${escapeHtml(emptyLabel)}</div>`;
+        return;
+    }
+
+    listEl.innerHTML = `
+        <div class='info' style='margin-block-end: 8px'>${escapeHtml(String(panelItems.length))} sichtbar (${escapeHtml(String(visibleCount))} gefiltert / ${escapeHtml(String(totalCount))} gesamt).</div>
+        <table>
+            <tr>
+                <th>Testfall</th>
+                <th>Gruppe</th>
+                <th>Typ</th>
+                <th>Status</th>
+                <th>Letztes Detail</th>
+                <th>Letztes Update</th>
+                <th>Protokoll</th>
+                <th>Aktion</th>
+            </tr>
+            ${renderTestingRegisterPanelRows(panelItems)}
+        </table>
+    `;
+}
+
+function renderTestingRegisterList(payload) {
+    const automaticListEl = document.getElementById("testing-register-list-automatic");
+    const manualListEl = document.getElementById("testing-register-list-manual");
+    if (!automaticListEl || !manualListEl) return;
 
     const items = Array.isArray(payload?.items) ? payload.items : [];
     if (items.length === 0) {
-        listEl.innerHTML = "<div class='info'>Noch kein Testregister geladen.</div>";
+        const emptyHtml = "<div class='info'>Noch kein Testregister geladen.</div>";
+        automaticListEl.innerHTML = emptyHtml;
+        manualListEl.innerHTML = emptyHtml;
         return;
     }
 
@@ -1737,59 +1785,55 @@ function renderTestingRegisterList(payload) {
     });
 
     if (visibleItems.length === 0) {
-        listEl.innerHTML = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
+        const emptyFilterHtml = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
+        automaticListEl.innerHTML = emptyFilterHtml;
+        manualListEl.innerHTML = emptyFilterHtml;
         return;
     }
 
-    const rows = visibleItems.map(item => {
-        const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
-        const updatedAt = item.updatedAt ? formatPythonAutomationTimestamp(item.updatedAt) : "noch nicht protokolliert";
-        const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"));
-        return `
-            <tr>
-                <td><strong>${escapeHtml(item.title || item.id || "-")}</strong><div class='python-muted-caption'>${escapeHtml(item.id || "-")}</div></td>
-                <td>${escapeHtml(item.groupTitle || "-")}</td>
-                <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"))}'>${escapeHtml(typeLabel)}</span></td>
-                <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
-                <td>${escapeHtml(String(item.details || "-")).slice(0, 220)}</td>
-                <td>${escapeHtml(updatedAt)}</td>
-                <td><div class='python-muted-caption'>${escapeHtml(item.storage || "-")}</div></td>
-                <td>${buildTestingRegisterAction(item)}</td>
-            </tr>
-        `;
-    }).join("");
+    const automaticItems = visibleItems.filter(item => {
+        const type = String(item.automationType || "automatic");
+        return type === "automatic" || type === "command";
+    });
+    const manualItems = visibleItems.filter(item => {
+        const type = String(item.automationType || "automatic");
+        return type === "manual" || type === "documented";
+    });
 
-    listEl.innerHTML = `
-        <div class='info' style='margin-block-end: 8px'>${escapeHtml(String(visibleItems.length))} von ${escapeHtml(String(items.length))} Testfällen sichtbar.</div>
-        <table>
-            <tr>
-                <th>Testfall</th>
-                <th>Gruppe</th>
-                <th>Typ</th>
-                <th>Status</th>
-                <th>Letztes Detail</th>
-                <th>Letztes Update</th>
-                <th>Protokoll</th>
-                <th>Aktion</th>
-            </tr>
-            ${rows}
-        </table>
-    `;
+    renderTestingRegisterPanel(
+        automaticListEl,
+        automaticItems,
+        visibleItems.length,
+        items.length,
+        "Keine automatischen Tests passen auf die aktuellen Filter."
+    );
+    renderTestingRegisterPanel(
+        manualListEl,
+        manualItems,
+        visibleItems.length,
+        items.length,
+        "Keine manuellen/dokumentierten Tests passen auf die aktuellen Filter."
+    );
 }
 
 async function loadTestingRegister() {
-    const listEl = document.getElementById("testing-register-list");
-    if (!listEl) return;
+    const automaticListEl = document.getElementById("testing-register-list-automatic");
+    const manualListEl = document.getElementById("testing-register-list-manual");
+    if (!automaticListEl || !manualListEl) return;
 
     if (!isPythonOperator) {
         testingRegisterPayload = null;
         renderTestingRegisterOverview(null);
         renderTestingRegisterStorage(null);
-        listEl.innerHTML = "<div class='info'>Das Testregister ist nur im Python-Operator verfügbar.</div>";
+        const infoHtml = "<div class='info'>Das Testregister ist nur im Python-Operator verfügbar.</div>";
+        automaticListEl.innerHTML = infoHtml;
+        manualListEl.innerHTML = infoHtml;
         return;
     }
 
-    listEl.innerHTML = "<div class='loading'>Lade Gesamt-Testregister...</div>";
+    const loadingHtml = "<div class='loading'>Lade Gesamt-Testregister...</div>";
+    automaticListEl.innerHTML = loadingHtml;
+    manualListEl.innerHTML = loadingHtml;
     try {
         const response = await fetch("/api/testing/register", {
             headers: { "Accept": "application/json" },
@@ -1804,7 +1848,9 @@ async function loadTestingRegister() {
         testingRegisterPayload = null;
         renderTestingRegisterOverview(null);
         renderTestingRegisterStorage(null);
-        listEl.innerHTML = `<div class='error'>Testregister konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        const errorHtml = `<div class='error'>Testregister konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        automaticListEl.innerHTML = errorHtml;
+        manualListEl.innerHTML = errorHtml;
     }
 }
 
