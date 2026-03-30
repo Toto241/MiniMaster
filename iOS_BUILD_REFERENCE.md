@@ -260,23 +260,37 @@ FIRESTORE_EMULATOR_HOST=localhost:8080 xcodebuild test ...
 ## CI/CD GitHub Actions
 
 ```bash
-# .github/workflows/ios-build.yml
-name: iOS Build
+# .github/workflows/ios-ci.yml
+name: iOS CI
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - 'iosMasterApp/**'
+      - 'iosChildApp/**'
+      - '.github/workflows/ios-ci.yml'
+  pull_request:
+    paths:
+      - 'iosMasterApp/**'
+      - 'iosChildApp/**'
+      - '.github/workflows/ios-ci.yml'
 
 jobs:
-  build:
-    runs-on: macos-latest
+  ios-structure-validate:
+    runs-on: macos-14
     steps:
-      - uses: actions/checkout@v3
-      - name: Build Parent App
+      - uses: actions/checkout@v4
+      - name: Validate package manifests
         run: |
-          cd iosMasterApp
-          xcodebuild archive \
-            -scheme MiniMasterParent \
-            -configuration Release
+          swift package --package-path iosMasterApp describe
+          swift package --package-path iosChildApp describe
 ```
+
+Aktueller Stand dieses Repos:
+
+- GitHub Actions validiert derzeit bewusst nur Manifest- und Struktur-Konsistenz.
+- Ein vollständiger iOS-Build in CI ist erst sinnvoll, wenn Xcode-Projekt/Workspace-Dateien oder eine vollständige SPM-Abbildung der Firebase-Abhängigkeiten im Repo vorliegen.
+- Für echte UI-Builds und Device-/Simulator-Tests bleibt macOS mit Xcode erforderlich.
 
 ## Alternative: Development via Remote Mac
 
