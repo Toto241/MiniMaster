@@ -1,0 +1,28 @@
+// Common build settings for MiniMaster iOS apps
+
+#include? "Pods/Target Support Files/Pods-MiniMaster/Pods-MiniMaster.debug.xcconfig"
+
+// Deployment target
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+
+// Code sign identity
+CODE_SIGN_IDENTITY = iPhone Developer
+
+// Team ID (replace with your actual Team ID)
+DEVELOPMENT_TEAM = XXXXXXXXXX
+
+// AppStore Team ID for distribution
+APPSTORE_TEAM_ID = XXXXXXXXXX
+
+// Firebase Configuration
+FIREBASE_PROJECT_ID = minimaster-28fbd
+FIREBASE_DATABASE_URL = https://minimaster-28fbd-default-rtdb.firebaseio.com
+FIREBASE_STORAGE_BUCKET = minimaster-28fbd.firebasestorage.app
+
+// Feature flags
+ENABLE_FAMILY_CONTROLS = YES
+ENABLE_DEVICE_ACTIVITY = YES
+ENABLE_MANAGED_SETTINGS = YES
+
+// Swift version
+SWIFT_VERSION = 5.9
