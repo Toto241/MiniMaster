@@ -142,6 +142,13 @@ async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
 async function generateAiCompletion(prompt: string): Promise<AiGenerationResult> {
   // Keep tests deterministic and isolated from external model providers.
   if (process.env.NODE_ENV === "test") {
+    // Security guard: test-stub should never be used in production
+    if (process.env.FIREBASE_CONFIG) {
+      functions.logger.warn(
+        "WARNING: TEST_STUB mode detected with FIREBASE_CONFIG set. AI will return stub responses. " +
+        "Ensure NODE_ENV is not 'test' in production environments."
+      );
+    }
     return {
       provider: "test-stub",
       rawResponse: JSON.stringify({
