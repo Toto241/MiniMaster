@@ -216,7 +216,7 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
 In Xcode:
 
-```
+```text
 File → Packages → Reset Package Caches
 ```
 
@@ -327,6 +327,7 @@ open vnc://user@mac-ip
 ---
 
 **Tipps:**
+
 - Kommt dir ein Build unterbrochen vor? → `xcodebuild clean` + Xcode neu starten
 - Provisioning kann "stuck" sein → Xcode → Settings → Manage Certificates aktualisieren
 - Device offline? → Lightning-Kabel raus/rein
