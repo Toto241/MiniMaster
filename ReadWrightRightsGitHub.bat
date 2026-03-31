@@ -1,0 +1,1 @@
+powershell -ExecutionPolicy Bypass -File .\check-minimaster-github-rights.ps1 -RepositoryFullName "Toto241/MiniMaster"
