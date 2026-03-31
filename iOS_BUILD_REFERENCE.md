@@ -155,9 +155,11 @@ fastlane init ios
 fastlane build       # Build + Archive
 fastlane test        # Unit Tests laufen
 fastlane release     # Zu TestFlight pushen
+
 ```
 
 **Minimale Fastfile:**
+
 ```ruby
 # iosMasterApp/fastlane/Fastfile
 default_platform(:ios)
@@ -213,11 +215,13 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/*
 ### SPM Cache löschen
 
 In Xcode:
+
 ```
 File → Packages → Reset Package Caches
 ```
 
 Oder:
+
 ```bash
 rm -rf ~/.swiftpm
 ```

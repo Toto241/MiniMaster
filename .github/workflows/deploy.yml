@@ -43,7 +43,7 @@ on:
         - hosting
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   # Must match .firebaserc default project
   FIREBASE_PROJECT_ID: 'minimaster-28fbd'
 
