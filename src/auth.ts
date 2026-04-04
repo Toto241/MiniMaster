@@ -13,6 +13,39 @@ import type { OperatorRole } from "./shared";
 
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
 
+type MiniMasterRuntimeConfig = {
+  minimaster?: {
+    enable_operator_account_reset?: string | boolean;
+    admin_recovery_token?: string;
+  };
+};
+
+function getRuntimeConfigSafe(logContext: string): MiniMasterRuntimeConfig {
+  const rawConfig = process.env.CLOUD_RUNTIME_CONFIG;
+  if (rawConfig && rawConfig.trim()) {
+    try {
+      return JSON.parse(rawConfig) as MiniMasterRuntimeConfig;
+    } catch (error) {
+      functions.logger.warn(`${logContext} CLOUD_RUNTIME_CONFIG could not be parsed, using defaults.`, {
+        message: (error as Error).message,
+      });
+    }
+  }
+
+  const configFn = (functions as unknown as { config?: () => MiniMasterRuntimeConfig }).config;
+  if (typeof configFn === "function") {
+    try {
+      return configFn();
+    } catch (error) {
+      functions.logger.warn(`${logContext} runtime config unavailable, using defaults.`, {
+        message: (error as Error).message,
+      });
+    }
+  }
+
+  return {};
+}
+
 async function logLegacyAuthUsage(endpoint: string, mode: "secretKey" | "imei_registration", identifier: string): Promise<void> {
   try {
     await db().collection("legacyAuthUsage").add({
@@ -305,7 +338,7 @@ export const resetOperatorAccounts = functions.https.onCall(
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
 
-    const runtimeConfig = functions.config();
+    const runtimeConfig = getRuntimeConfigSafe("resetOperatorAccounts");
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
     const resetEnabled =
       process.env.FUNCTIONS_EMULATOR === "true" ||
@@ -427,16 +460,7 @@ export const resetAllAuthUsers = functions.https.onCall(
       timestamp: new Date().toISOString(),
     });
 
-    const runtimeConfig = (() => {
-      try {
-        return functions.config();
-      } catch (configError) {
-        functions.logger.warn("resetAllAuthUsers runtime config unavailable, using defaults.", {
-          message: (configError as Error).message,
-        });
-        return {} as Record<string, unknown>;
-      }
-    })();
+    const runtimeConfig = getRuntimeConfigSafe("resetAllAuthUsers");
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
     const resetEnabled =
       process.env.FUNCTIONS_EMULATOR === "true" ||
@@ -638,16 +662,7 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
         ? (data as { requestId?: string }).requestId!.trim().slice(0, 80)
         : `srv-health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const runtimeConfig = (() => {
-      try {
-        return functions.config();
-      } catch (configError) {
-        functions.logger.warn("resetAllAuthUsersHealth runtime config unavailable, using defaults.", {
-          message: (configError as Error).message,
-        });
-        return {} as Record<string, unknown>;
-      }
-    })();
+    const runtimeConfig = getRuntimeConfigSafe("resetAllAuthUsersHealth");
     const runtimeFlag = String(runtimeConfig?.minimaster?.enable_operator_account_reset || "").toLowerCase() === "true";
     const resetEnabled =
       process.env.FUNCTIONS_EMULATOR === "true" ||
