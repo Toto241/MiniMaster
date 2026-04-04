@@ -148,20 +148,33 @@ const setupChecklistItems = [
 
 const commissioningAttestationItems = [
     { key: "firebase-auth-enabled", label: "Firebase Authentication aktiviert" },
-    { key: "firestore-enabled", label: "Firestore aktiviert" },
-    { key: "storage-enabled", label: "Firebase Storage aktiviert" },
-    { key: "functions-enabled", label: "Cloud Functions aktiviert" },
     { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt" },
     { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert" },
     { key: "android-child-registered", label: "Android-App com.google.pairing registriert" },
-    { key: "firebase-project-bound", label: "firebase use --add lokal durchgeführt" },
-    { key: "service-account-ready", label: "serviceAccountKey.json lokal für setup-admin verfügbar" },
     { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft" },
     { key: "device-sync-verified", label: "Device-Sync zwischen Parent Panel und Child geprüft" },
     { key: "support-flow-verified", label: "Support-Ticket-Flow geprüft" },
     { key: "compliance-flow-verified", label: "DSAR- und Audit-Flow geprüft" },
     { key: "storage-rules-verified", label: "Storage Rules aktiv und geprüft" }
 ];
+
+const commissioningQaRegisterIds = [
+    "firebase-auth-enabled",
+    "firestore-enabled",
+    "storage-enabled",
+    "functions-enabled",
+    "messaging-enabled",
+    "android-master-registered",
+    "android-child-registered",
+    "firebase-project-bound",
+    "service-account-ready",
+    "parent-panel-verified",
+    "device-sync-verified",
+    "support-flow-verified",
+    "compliance-flow-verified",
+    "storage-rules-verified",
+];
+const commissioningQaRegisterIdSet = new Set(commissioningQaRegisterIds);
 
 
 const defaultOperatorConfig = {
@@ -472,6 +485,12 @@ function rerenderPythonAutomationHistoryFromCache() {
 function setPythonAutomationEvidenceCache(payload) {
     pythonCommissioningEvidenceHistory = Array.isArray(payload?.entries) ? payload.entries : [];
     pythonCommissioningEvidenceIndex = new Map(Object.entries(payload?.latestByTestId || {}));
+    renderCommissioningAttestations();
+    if (document.getElementById("commissioning-report")) {
+        refreshCommissioningReport();
+        renderGoLiveAmpel();
+        renderPrioritizedActionPlan();
+    }
 }
 
 function getLatestPythonAutomationEvidence(testId) {
@@ -1694,6 +1713,12 @@ function rerenderTestingRegisterFromCache() {
     renderTestingRegisterOverview(testingRegisterPayload);
     renderTestingRegisterStorage(testingRegisterPayload?.storage || null);
     renderTestingRegisterList(testingRegisterPayload);
+    renderCommissioningAttestations();
+    if (document.getElementById("commissioning-report")) {
+        refreshCommissioningReport();
+        renderGoLiveAmpel();
+        renderPrioritizedActionPlan();
+    }
 }
 
 function renderTestingRegisterOverview(payload) {
@@ -1900,6 +1925,9 @@ function renderTestingRegisterList(payload) {
             return false;
         }
         if (filters.type === "commissioning" && entryKind !== "commissioning") {
+            return false;
+        }
+        if (filters.type === "approvals" && String(item.groupId || "") !== "service-approvals") {
             return false;
         }
         if (filters.search && !haystack.includes(filters.search)) {
@@ -2768,11 +2796,21 @@ function updateSetupChecklistState(partialState) {
 }
 
 function getCommissioningAttestations() {
+    let savedState = {};
     try {
-        return JSON.parse(localStorage.getItem(COMMISSIONING_ATTESTATION_STORAGE_KEY) || "{}");
+        savedState = JSON.parse(localStorage.getItem(COMMISSIONING_ATTESTATION_STORAGE_KEY) || "{}");
     } catch {
-        return {};
+        savedState = {};
     }
+
+    const mergedState = { ...savedState };
+    commissioningAttestationItems.forEach(item => {
+        const latestEvidence = getLatestPythonAutomationEvidence(item.key);
+        if (!latestEvidence) return;
+        mergedState[item.key] = latestEvidence.status === "pass";
+    });
+
+    return mergedState;
 }
 
 function updateCommissioningAttestations(partialState) {
@@ -2780,29 +2818,95 @@ function updateCommissioningAttestations(partialState) {
     localStorage.setItem(COMMISSIONING_ATTESTATION_STORAGE_KEY, JSON.stringify({ ...savedState, ...partialState }));
 }
 
+function hasPassingCommissioningQaCheck(testId) {
+    const registerItem = Array.isArray(testingRegisterPayload?.items)
+        ? testingRegisterPayload.items.find(item => String(item.id || "") === String(testId || ""))
+        : null;
+    if (registerItem) {
+        return String(registerItem.status || "") === "pass";
+    }
+
+    const attestations = getCommissioningAttestations();
+    return Boolean(attestations[testId]);
+}
+
 function renderCommissioningAttestations() {
     const container = document.getElementById("commissioning-attestations");
     if (!container) return;
 
-    const savedState = getCommissioningAttestations();
-    container.innerHTML = "";
-
-    commissioningAttestationItems.forEach(item => {
-        const wrapper = document.createElement("div");
-        wrapper.className = "setup-checklist-item";
-        wrapper.innerHTML = `
-            <input type="checkbox" id="attestation-${item.key}" ${savedState[item.key] ? "checked" : ""}>
-            <label for="attestation-${item.key}">${item.label}</label>
-        `;
-
-        const checkbox = wrapper.querySelector("input");
-        checkbox.addEventListener("change", (e) => {
-            updateCommissioningAttestations({ [item.key]: e.target.checked });
-            refreshCommissioningReport();
-        });
-
-        container.appendChild(wrapper);
+    const qaItems = Array.isArray(testingRegisterPayload?.items)
+        ? testingRegisterPayload.items.filter(item => commissioningQaRegisterIdSet.has(String(item.id || "")))
+        : [];
+    const openQaItems = qaItems.filter(item => {
+        const status = String(item.status || "not_run");
+        return status === "fail" || status === "manual_required" || status === "not_run";
     });
+    const automaticCount = qaItems.filter(item => {
+        const type = String(item.automationType || "automatic");
+        return type === "automatic" || type === "command";
+    }).length;
+    const manualCount = qaItems.filter(item => {
+        const type = String(item.automationType || "automatic");
+        return type === "manual" || type === "documented";
+    }).length;
+    const leadingItems = openQaItems.slice().sort((left, right) => {
+        const severityCmp = getTestingRegisterSeverityPriority(String(left.severity || "")) - getTestingRegisterSeverityPriority(String(right.severity || ""));
+        if (severityCmp !== 0) return severityCmp;
+        return getTestingRegisterStatusPriority(String(left.status || "")) - getTestingRegisterStatusPriority(String(right.status || ""));
+    }).slice(0, 6);
+
+    const listHtml = leadingItems.length > 0
+        ? `<ul>${leadingItems.map(item => `<li><strong>${escapeHtml(item.title || item.id || "-")}</strong> <span class="python-muted-caption">(${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))})</span></li>`).join("")}</ul>`
+        : "<p>Keine offenen Voraussetzungen oder Freigaben im QA-Register.</p>";
+
+    if (qaItems.length === 0) {
+        container.innerHTML = `
+            <div class="info">
+                Diese Voraussetzungen und Freigaben werden zentral im Panel <strong>Qualitätssicherung</strong> gepflegt.
+                Dort erscheinen sie nach dem Laden des QA-Registers getrennt nach automatischen und manuellen Prüfungen.
+            </div>
+            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+                <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln und die Voraussetzungen & Freigaben öffnen">Zur Qualitätssicherung wechseln</button>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="python-clarity-box">
+            <strong>QA ist die führende Quelle für diese Freigaben.</strong><br />
+            ${escapeHtml(String(qaItems.length))} QA-Einträge, davon ${escapeHtml(String(automaticCount))} automatisch und ${escapeHtml(String(manualCount))} manuell/dokumentiert.<br />
+            Offene Punkte: ${escapeHtml(String(openQaItems.length))}.
+        </div>
+        <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+            <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln und direkt die Voraussetzungen & Freigaben filtern">Zur Qualitätssicherung wechseln</button>
+            <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register neu laden, um den Freigabestatus zu aktualisieren">QA-Status aktualisieren</button>
+        </div>
+        <div class="info" style="margin-block-start: 12px">
+            <strong>Pflegeweg:</strong><br />
+            Automatische Punkte werden im QA-Register durch den Python-Lauf bewertet.<br />
+            Manuelle Punkte werden dort über <em>Nachweis protokollieren</em> dokumentiert.
+        </div>
+        <div class="data-list" style="margin-block-start: 12px">${listHtml}</div>
+    `;
+}
+
+function openCommissioningQaView() {
+    const qaButton = Array.from(document.querySelectorAll(".nav-tab")).find(button => String(button.textContent || "").includes("Qualitätssicherung"));
+    switchTab("qa", qaButton ? { target: qaButton } : null);
+
+    const typeEl = document.getElementById("testing-register-type-filter");
+    if (typeEl) typeEl.value = "approvals";
+    const sortEl = document.getElementById("testing-register-sort");
+    if (sortEl) sortEl.value = "severity";
+    const searchEl = document.getElementById("testing-register-search");
+    if (searchEl) searchEl.value = "";
+
+    if (testingRegisterPayload) {
+        rerenderTestingRegisterFromCache();
+    } else if (isPythonOperator) {
+        loadTestingRegister();
+    }
 }
 
 function getMissingAttestations() {
@@ -2948,7 +3052,7 @@ function buildPrioritizedActionPlanFromData(validation, platformState, playStore
             severity: "high",
             title: item.label,
             why: "Diese manuelle Freigabe ist Teil des Go-Live-Gates und kann browserseitig nicht verlässlich automatisiert geprüft werden.",
-            action: "Nachweis prüfen, dokumentieren und anschließend im Setup-Tab als erledigt markieren.",
+            action: "Nachweis prüfen, im Panel Qualitätssicherung protokollieren und anschließend den QA-Status erneut laden.",
         });
     });
 
@@ -4594,7 +4698,13 @@ function syncCommissioningChecklist(validationSummary) {
         "compliance-flow": Boolean(attestations["compliance-flow-verified"]),
     };
 
-    if (validationSummary?.errorCount === 0 && attestations["firebase-project-bound"] && attestations["parent-panel-verified"] && attestations["device-sync-verified"] && attestations["storage-rules-verified"]) {
+    if (
+        validationSummary?.errorCount === 0
+        && hasPassingCommissioningQaCheck("firebase-project-bound")
+        && hasPassingCommissioningQaCheck("parent-panel-verified")
+        && hasPassingCommissioningQaCheck("device-sync-verified")
+        && hasPassingCommissioningQaCheck("storage-rules-verified")
+    ) {
         updates["deploy-verified"] = true;
     }
 
@@ -4760,7 +4870,7 @@ async function runCommissioningAssistant() {
         }
 
         getMissingAttestations().forEach(item => {
-            pending.push(`Manuelle Freigabe offen: ${item}`);
+            pending.push(`QA-Nachweis offen: ${item}`);
         });
 
         const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
@@ -4808,7 +4918,7 @@ function refreshCommissioningReport() {
     if (commissioningSummary?.validationSummary?.checks && !commissioningSummary.validationSummary.checks.webControlConfigReady) {
         pending.push("Gemeinsame Konfiguration für web-control fehlt.");
     }
-    missingAttestations.forEach(item => pending.push(`Manuelle Freigabe offen: ${item}`));
+    missingAttestations.forEach(item => pending.push(`QA-Nachweis offen: ${item}`));
 
     const playStoreState = getPlayStoreReadinessState();
     const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);

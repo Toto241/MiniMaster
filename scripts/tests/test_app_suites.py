@@ -123,6 +123,84 @@ class TestBuildTestingRegister:
             else:
                 assert item.get("linkedSuite") == item.get("suiteRef", "")
 
+    def test_register_contains_split_platform_qa_checks(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+        ids = {item["id"] for item in result["items"]}
+        automation_types = {item["id"]: item["automationType"] for item in result["items"]}
+
+        expected_manual = {
+            "firebase-auth-enabled",
+            "messaging-enabled",
+            "android-master-registered",
+            "android-child-registered",
+            "parent-panel-verified",
+            "device-sync-verified",
+            "support-flow-verified",
+            "compliance-flow-verified",
+            "storage-rules-verified",
+        }
+        expected_automatic = {
+            "cloud-project-id",
+            "ai-runtime-config",
+            "firestore-enabled",
+            "storage-enabled",
+            "functions-enabled",
+            "firebase-project-bound",
+            "service-account-ready",
+            "play-store-required-checks-complete",
+            "play-store-privacy-url-valid",
+            "play-store-support-email-valid",
+        }
+
+        assert expected_manual.issubset(ids)
+        assert expected_automatic.issubset(ids)
+        for test_id in expected_manual:
+            assert automation_types[test_id] == "manual"
+        for test_id in expected_automatic:
+            assert automation_types[test_id] == "automatic"
+
+    def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_local_firebase_binding_status", lambda project_id: (True, f"bound:{project_id or 'default'}"))
+        monkeypatch.setattr(app, "load_local_service_account_status", lambda: (True, "service-account-ready"))
+
+        result = app.evaluate_commissioning_context(
+            {
+                "runtimeConfig": {
+                    "cloud": {
+                        "projectId": "minimaster-28fbd",
+                        "appCheckMode": "enforced",
+                    },
+                    "ai": {
+                        "provider": "gemini",
+                        "model": "gemini-3.0-flash",
+                        "keyRef": "projects/demo/secrets/key",
+                        "systemPrompt": "Assist.",
+                    },
+                },
+                "validationSummary": {
+                    "errorCount": 0,
+                    "checks": {
+                        "firestoreAccessOk": True,
+                        "storageHealthOk": True,
+                        "functionsReachable": True,
+                    },
+                },
+                "attestations": {},
+                "playStoreState": {"checks": {}},
+            }
+        )
+
+        checks = {item["id"]: item for item in result["checks"]}
+        assert checks["firestore-enabled"]["status"] == "pass"
+        assert checks["storage-enabled"]["status"] == "pass"
+        assert checks["functions-enabled"]["status"] == "pass"
+        assert checks["firebase-project-bound"]["status"] == "pass"
+        assert checks["service-account-ready"]["status"] == "pass"
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  get_device_status

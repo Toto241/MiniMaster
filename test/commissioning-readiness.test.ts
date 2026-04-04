@@ -3,7 +3,7 @@
  *
  * Covers:
  * - Cloud Project ID / KI-Runtime-Konfiguration validation
- * - Commissioning attestation tracking (14 manual sign-offs)
+ * - Commissioning attestation tracking (9 manual QA sign-offs)
  * - Play-Store-Readiness checks, Privacy-Policy-URL, Support-E-Mail
  * - Go-Live Ampel computation (red / yellow / green)
  * - Prioritized action plan generation
@@ -188,22 +188,17 @@ describe("Commissioning & Readiness – automated checks", () => {
   });
 
   /* -------------------------------------------------------------- */
-  /*  3) Manuelle Freigaben (14 attestation items)                   */
+  /*  3) Manuelle Freigaben (9 QA evidence items)                    */
   /* -------------------------------------------------------------- */
-  describe("Commissioning attestations (14 manual sign-offs)", () => {
-    it("lists all 14 attestations as missing when none are confirmed", () => {
+  describe("Commissioning attestations (9 manual QA sign-offs)", () => {
+    it("lists all 9 manual attestations as missing when none are confirmed", () => {
       const { exports } = loadTestExports();
       const missing = exports.getMissingAttestations() as string[];
-      expect(missing).toHaveLength(14);
+      expect(missing).toHaveLength(9);
       expect(missing).toContain("Firebase Authentication aktiviert");
-      expect(missing).toContain("Firestore aktiviert");
-      expect(missing).toContain("Firebase Storage aktiviert");
-      expect(missing).toContain("Cloud Functions aktiviert");
       expect(missing).toContain("Cloud Messaging aktiviert oder bewusst nicht benötigt");
       expect(missing).toContain("Android-App com.minimaster.masterapp registriert");
       expect(missing).toContain("Android-App com.google.pairing registriert");
-      expect(missing).toContain("firebase use --add lokal durchgeführt");
-      expect(missing).toContain("serviceAccountKey.json lokal für setup-admin verfügbar");
       expect(missing).toContain("Parent Web Panel Login geprüft");
       expect(missing).toContain("Device-Sync zwischen Parent Panel und Child geprüft");
       expect(missing).toContain("Support-Ticket-Flow geprüft");
@@ -215,29 +210,22 @@ describe("Commissioning & Readiness – automated checks", () => {
       const { exports } = loadTestExports();
       exports.updateCommissioningAttestations({
         "firebase-auth-enabled": true,
-        "firestore-enabled": true,
-        "storage-enabled": true,
-        "functions-enabled": true,
         "messaging-enabled": true,
       });
       const missing = exports.getMissingAttestations() as string[];
-      expect(missing).toHaveLength(9);
+      expect(missing).toHaveLength(7);
       expect(missing).not.toContain("Firebase Authentication aktiviert");
-      expect(missing).not.toContain("Firestore aktiviert");
-      expect(missing).not.toContain("Firebase Storage aktiviert");
-      expect(missing).not.toContain("Cloud Functions aktiviert");
       expect(missing).not.toContain("Cloud Messaging aktiviert oder bewusst nicht benötigt");
       // Still missing:
       expect(missing).toContain("Android-App com.minimaster.masterapp registriert");
       expect(missing).toContain("DSAR- und Audit-Flow geprüft");
     });
 
-    it("returns empty list when ALL 14 attestations are confirmed", () => {
+    it("returns empty list when all 9 manual attestations are confirmed", () => {
       const allKeys: Record<string, boolean> = {};
       const items = [
-        "firebase-auth-enabled", "firestore-enabled", "storage-enabled", "functions-enabled",
-        "messaging-enabled", "android-master-registered", "android-child-registered",
-        "firebase-project-bound", "service-account-ready", "parent-panel-verified",
+        "firebase-auth-enabled", "messaging-enabled", "android-master-registered", "android-child-registered",
+        "parent-panel-verified",
         "device-sync-verified", "support-flow-verified", "compliance-flow-verified",
         "storage-rules-verified",
       ];
@@ -262,13 +250,15 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(fresh["parent-panel-verified"]).toBe(true);
     });
 
-    it("matches exactly the 14 items defined in commissioningAttestationItems", () => {
+    it("matches exactly the 9 manual items defined in commissioningAttestationItems", () => {
       const { exports } = loadTestExports();
       const items = exports.commissioningAttestationItems as Array<{ key: string; label: string }>;
-      expect(items).toHaveLength(14);
+      expect(items).toHaveLength(9);
       const keys = items.map((i: any) => i.key);
       expect(keys).toContain("firebase-auth-enabled");
       expect(keys).toContain("storage-rules-verified");
+      expect(keys).not.toContain("firestore-enabled");
+      expect(keys).not.toContain("service-account-ready");
     });
   });
 
@@ -514,7 +504,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       const { exports } = loadTestExports();
       const missingAttestations = [
         { key: "firebase-auth-enabled", label: "Firebase Authentication aktiviert" },
-        { key: "firestore-enabled", label: "Firestore aktiviert" },
+        { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft" },
       ];
       const plan = exports.buildPrioritizedActionPlanFromData(
         { errorCount: 0, checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true, storageHealthOk: true, webControlConfigReady: true } },
@@ -526,7 +516,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       const attestationSteps = plan.filter((s: any) => s.category === "Compliance");
       expect(attestationSteps).toHaveLength(2);
       expect(attestationSteps[0].title).toBe("Firebase Authentication aktiviert");
-      expect(attestationSteps[1].title).toBe("Firestore aktiviert");
+      expect(attestationSteps[1].title).toBe("Parent Web Panel Login geprüft");
     });
 
     it("generates backend validation step when validation is null", () => {
@@ -694,8 +684,8 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(pending).toContain("KI-Runtime-Konfiguration vervollständigen.");
 
       // Attestations
-      missing.forEach(item => pending.push(`Manuelle Freigabe offen: ${item}`));
-      expect(pending.filter(p => p.startsWith("Manuelle Freigabe offen:"))).toHaveLength(14);
+      missing.forEach(item => pending.push(`QA-Nachweis offen: ${item}`));
+      expect(pending.filter(p => p.startsWith("QA-Nachweis offen:"))).toHaveLength(9);
 
       // Play Store
       const openPlayChecks = Object.entries(playState.checks).filter(([, v]) => !v);
@@ -718,9 +708,8 @@ describe("Commissioning & Readiness – automated checks", () => {
     it("clears all pending items when fully configured", () => {
       const allAttestKeys: Record<string, boolean> = {};
       [
-        "firebase-auth-enabled", "firestore-enabled", "storage-enabled", "functions-enabled",
-        "messaging-enabled", "android-master-registered", "android-child-registered",
-        "firebase-project-bound", "service-account-ready", "parent-panel-verified",
+        "firebase-auth-enabled", "messaging-enabled", "android-master-registered", "android-child-registered",
+        "parent-panel-verified",
         "device-sync-verified", "support-flow-verified", "compliance-flow-verified",
         "storage-rules-verified",
       ].forEach(k => { allAttestKeys[k] = true; });
@@ -759,7 +748,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       if (!config.ai.provider || !config.ai.model || !config.ai.keyRef || !config.ai.systemPrompt) {
         pending.push("KI-Runtime-Konfiguration vervollständigen.");
       }
-      missing.forEach(item => pending.push(`Manuelle Freigabe offen: ${item}`));
+      missing.forEach(item => pending.push(`QA-Nachweis offen: ${item}`));
       const openPlayChecks = Object.entries(playState.checks).filter(([, v]) => !v);
       if (openPlayChecks.length > 0) pending.push(`Play-Store-Readiness: ${openPlayChecks.length} Pflicht-Check(s) offen.`);
       if (!playState.privacyUrl || !/^https:\/\//i.test(playState.privacyUrl)) {
@@ -784,7 +773,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       const attestations = exports.getCommissioningAttestations();
       expect(attestations).toEqual({});
       const missing = exports.getMissingAttestations();
-      expect(missing).toHaveLength(14);
+      expect(missing).toHaveLength(9);
     });
 
     it("handles corrupted localStorage for play-store state gracefully", () => {
