@@ -2840,7 +2840,7 @@ function getCommissioningQaApprovalItems(report = null) {
         return payloadItems;
     }
 
-    const validationSummary = report?.validationSummary || commissioningSummary?.validationSummary || null;
+    const validationSummary = getEffectiveValidationSummary(report?.validationSummary || null);
     const validationChecks = validationSummary?.checks || {};
     const attestations = getCommissioningAttestations();
 
@@ -2881,6 +2881,44 @@ function buildCommissioningQaApprovalSummary(report = null) {
         confirmedCount: confirmed.length,
         openCount: open.length,
     };
+}
+
+function buildValidationSummaryFromResults(results = setupValidationResults) {
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    let ok = 0;
+    let warn = 0;
+    let errorCount = 0;
+    results.forEach(result => {
+        if (result.status === "ok") ok++;
+        if (result.status === "warn") warn++;
+        if (result.status === "error") errorCount++;
+    });
+
+    return {
+        ok,
+        warn,
+        errorCount,
+        checks: {
+            adminAuthOk: results.some(result => result.check === "Admin Authentication" && result.status === "ok"),
+            firestoreAccessOk: results.filter(result => result.check.startsWith("Firestore Collection")).every(result => result.status === "ok"),
+            functionsReachable: results.filter(result => result.check.startsWith("Function (")).every(result => result.status === "ok" || result.status === "warn"),
+            storageHealthOk: results.some(result => result.check === "Backend Storage Health" && result.status === "ok"),
+            aiConfigured: results.some(result => result.check === "AI Secret Configuration" && result.status === "ok"),
+            webControlConfigReady: results.some(result => result.check === "Shared Web-Control Firebase Config" && result.status === "ok"),
+        },
+    };
+}
+
+function getEffectiveValidationSummary(preferredValidationSummary = null) {
+    if (preferredValidationSummary) return preferredValidationSummary;
+
+    const derivedValidationSummary = buildValidationSummaryFromResults();
+    if (derivedValidationSummary) {
+        return derivedValidationSummary;
+    }
+
+    return commissioningSummary?.validationSummary || null;
 }
 
 function renderCommissioningQaApprovalList(items, emptyMessage) {
@@ -3203,7 +3241,7 @@ function buildPlatformQaActionPlanEntries(payload = testingRegisterPayload) {
 }
 
 function buildPrioritizedActionPlan() {
-    const validation = commissioningSummary?.validationSummary || null;
+    const validation = getEffectiveValidationSummary();
     const playStoreState = getPlayStoreReadinessState();
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: validation });
     const openApprovals = qaApprovalSummary.open.map(item => ({
@@ -5061,6 +5099,53 @@ function renderCommissioningReport(report) {
     `;
 }
 
+function buildCurrentCommissioningSummary(options = {}) {
+    const runtimeConfig = getOperatorConfigFormValues();
+    const validationSummary = getEffectiveValidationSummary(options.validationSummary || null);
+    const pending = [];
+
+    if (isPlaceholderFirebaseConfig(firebaseConfig)) pending.push("Firebase-Webkonfiguration lokal speichern.");
+    if (!runtimeConfig.cloud.projectId) pending.push("Cloud Project ID setzen.");
+    if (!runtimeConfig.ai.provider || !runtimeConfig.ai.model || !runtimeConfig.ai.keyRef || !runtimeConfig.ai.systemPrompt) {
+        pending.push("KI-Runtime-Konfiguration vervollständigen.");
+    }
+    if (validationSummary?.checks && !validationSummary.checks.storageHealthOk) {
+        pending.push("Storage Health im Backend prüfen.");
+    }
+    if (validationSummary?.checks && !validationSummary.checks.webControlConfigReady) {
+        pending.push("Gemeinsame Konfiguration für web-control fehlt.");
+    }
+
+    const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary });
+    const playStoreState = getPlayStoreReadinessState();
+    const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);
+    if (openPlayChecks.length > 0) {
+        pending.push(`Play-Store-Readiness: ${openPlayChecks.length} Pflicht-Check(s) offen.`);
+    }
+    if (!playStoreState.privacyUrl || !/^https:\/\//i.test(playStoreState.privacyUrl)) {
+        pending.push("Play-Store-Readiness: gültige Privacy-Policy-URL (https://) fehlt.");
+    }
+    if (!playStoreState.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail)) {
+        pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
+    }
+    const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
+    const playStoreReady = openPlayChecks.length === 0 && playMetaReady;
+
+    return {
+        projectId: runtimeConfig.cloud.projectId || firebaseConfig.projectId,
+        firebaseConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
+        webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
+        runtimeConfigured: Boolean(runtimeConfig.cloud.projectId && runtimeConfig.ai.provider && runtimeConfig.ai.model),
+        playStoreReady,
+        validationSummary,
+        deployCommand: buildDeployCommand(runtimeConfig.cloud.projectId || firebaseConfig.projectId),
+        roleAssignments: Array.isArray(options.roleAssignments) ? options.roleAssignments : (commissioningSummary?.roleAssignments || []),
+        attestations: getCommissioningAttestations(),
+        qaApprovals: qaApprovalSummary.items,
+        pending: filterVisibleCommissioningPendingItems(pending),
+    };
+}
+
 async function setUserRoleInternal(uid, role) {
     const setRoleFunc = functions.httpsCallable("setUserRole");
     await setRoleFunc({ uid, role });
@@ -5134,23 +5219,10 @@ async function runCommissioningAssistant() {
             pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
         }
 
-        const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary });
-
-        const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
-        const playStoreReady = openPlayChecks.length === 0 && playMetaReady;
-
         commissioningSummary = {
+            ...buildCurrentCommissioningSummary({ validationSummary, roleAssignments }),
             projectId: bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId,
             firebaseConfigured: !isPlaceholderFirebaseConfig(bootstrapConfig),
-            webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
-            runtimeConfigured: Boolean(mergedRuntimeConfig.cloud.projectId && mergedRuntimeConfig.ai.provider && mergedRuntimeConfig.ai.model),
-            playStoreReady,
-            validationSummary,
-            deployCommand: buildDeployCommand(bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId),
-            roleAssignments,
-            attestations: getCommissioningAttestations(),
-            qaApprovals: qaApprovalSummary.items,
-            pending: filterVisibleCommissioningPendingItems(pending),
         };
 
         renderCommissioningReport(commissioningSummary);
@@ -5169,49 +5241,7 @@ async function runCommissioningAssistant() {
 }
 
 function refreshCommissioningReport() {
-    const runtimeConfig = getOperatorConfigFormValues();
-    const pending = [];
-    const missingAttestations = getMissingAttestations();
-    if (isPlaceholderFirebaseConfig(firebaseConfig)) pending.push("Firebase-Webkonfiguration lokal speichern.");
-    if (!runtimeConfig.cloud.projectId) pending.push("Cloud Project ID setzen.");
-    if (!runtimeConfig.ai.provider || !runtimeConfig.ai.model || !runtimeConfig.ai.keyRef || !runtimeConfig.ai.systemPrompt) {
-        pending.push("KI-Runtime-Konfiguration vervollständigen.");
-    }
-    if (commissioningSummary?.validationSummary?.checks && !commissioningSummary.validationSummary.checks.storageHealthOk) {
-        pending.push("Storage Health im Backend prüfen.");
-    }
-    if (commissioningSummary?.validationSummary?.checks && !commissioningSummary.validationSummary.checks.webControlConfigReady) {
-        pending.push("Gemeinsame Konfiguration für web-control fehlt.");
-    }
-    const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: commissioningSummary?.validationSummary || null });
-
-    const playStoreState = getPlayStoreReadinessState();
-    const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);
-    if (openPlayChecks.length > 0) {
-        pending.push(`Play-Store-Readiness: ${openPlayChecks.length} Pflicht-Check(s) offen.`);
-    }
-    if (!playStoreState.privacyUrl || !/^https:\/\//i.test(playStoreState.privacyUrl)) {
-        pending.push("Play-Store-Readiness: gültige Privacy-Policy-URL (https://) fehlt.");
-    }
-    if (!playStoreState.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail)) {
-        pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
-    }
-    const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
-    const playStoreReady = openPlayChecks.length === 0 && playMetaReady;
-
-    commissioningSummary = {
-        projectId: runtimeConfig.cloud.projectId || firebaseConfig.projectId,
-        firebaseConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
-        webControlConfigured: !isPlaceholderFirebaseConfig(firebaseConfig),
-        runtimeConfigured: Boolean(runtimeConfig.cloud.projectId && runtimeConfig.ai.provider && runtimeConfig.ai.model),
-        playStoreReady,
-        validationSummary: commissioningSummary?.validationSummary || null,
-        deployCommand: buildDeployCommand(runtimeConfig.cloud.projectId || firebaseConfig.projectId),
-        roleAssignments: commissioningSummary?.roleAssignments || [],
-        attestations: getCommissioningAttestations(),
-        qaApprovals: qaApprovalSummary.items,
-        pending: filterVisibleCommissioningPendingItems(pending),
-    };
+    commissioningSummary = buildCurrentCommissioningSummary();
 
     renderCommissioningReport(commissioningSummary);
     renderCommandCatalog(commissioningSummary.projectId);
@@ -7083,19 +7113,12 @@ async function runFullSetupValidation() {
     html += `<div style="margin-block-start: 10px;"><strong>Summary:</strong> ${ok} OK, ${warn} WARN, ${errorCount} ERROR</div>`;
 
     resultEl.innerHTML = html;
-    const summary = {
-        ok,
-        warn,
-        errorCount,
-        checks: {
-            adminAuthOk: setupValidationResults.some(result => result.check === "Admin Authentication" && result.status === "ok"),
-            firestoreAccessOk: setupValidationResults.filter(result => result.check.startsWith("Firestore Collection")).every(result => result.status === "ok"),
-            functionsReachable: setupValidationResults.filter(result => result.check.startsWith("Function (")).every(result => result.status === "ok" || result.status === "warn"),
-            storageHealthOk: setupValidationResults.some(result => result.check === "Backend Storage Health" && result.status === "ok"),
-            aiConfigured: setupValidationResults.some(result => result.check === "AI Secret Configuration" && result.status === "ok"),
-            webControlConfigReady: setupValidationResults.some(result => result.check === "Shared Web-Control Firebase Config" && result.status === "ok"),
-        },
-    };
+    const summary = buildValidationSummaryFromResults(setupValidationResults);
+    commissioningSummary = buildCurrentCommissioningSummary({ validationSummary: summary });
+    renderCommissioningReport(commissioningSummary);
+    renderCommandCatalog(commissioningSummary.projectId);
+    renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
     syncCommissioningChecklist(summary);
     showNotification("Validierung abgeschlossen.", errorCount > 0 ? "error" : "success");
     return summary;
@@ -7103,6 +7126,7 @@ async function runFullSetupValidation() {
 
 function exportSetupReport() {
     const checklistState = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
+    const effectiveCommissioningSummary = buildCurrentCommissioningSummary();
     const report = {
         generatedAt: new Date().toISOString(),
         environment: {
@@ -7112,7 +7136,7 @@ function exportSetupReport() {
         checklist: checklistState,
         attestations: getCommissioningAttestations(),
         validationResults: setupValidationResults,
-        commissioningSummary,
+        commissioningSummary: effectiveCommissioningSummary,
     };
 
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });

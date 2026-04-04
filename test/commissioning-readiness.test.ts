@@ -1,3 +1,6 @@
+/// <reference types="jest" />
+/// <reference types="node" />
+
 /**
  * Automated tests for the Operator Dashboard commissioning & readiness checks.
  *
