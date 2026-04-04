@@ -110,6 +110,7 @@ function loadTestExports(
     "  getOperatorConfigFormValues,",
     "  buildPrioritizedActionPlanFromData,",
     "  computeGoLiveStatusFromData,",
+    "  filterVisibleCommissioningPendingItems,",
     "  platformReadinessItems,",
     "  getPriorityWeight,",
     "};",
@@ -675,7 +676,7 @@ describe("Commissioning & Readiness – automated checks", () => {
   /*  7) Pending-Items aggregation (refreshCommissioningReport logic)*/
   /* -------------------------------------------------------------- */
   describe("Pending items aggregation", () => {
-    it("collects all pending items when nothing is configured", () => {
+    it("hides pending items that are already tracked in dedicated QA/runtime/play-store UI", () => {
       const { exports } = loadTestExports();
       const config = exports.getOperatorConfigFormValues();
       const playState = exports.getPlayStoreReadinessState();
@@ -712,7 +713,9 @@ describe("Commissioning & Readiness – automated checks", () => {
       if (!playState.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playState.supportEmail)) {
         pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
       }
-      expect(pending).toContain("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
+
+      const visiblePending = exports.filterVisibleCommissioningPendingItems(pending);
+      expect(visiblePending).toEqual([]);
     });
 
     it("clears all pending items when fully configured", () => {
@@ -768,7 +771,8 @@ describe("Commissioning & Readiness – automated checks", () => {
         pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
       }
 
-      expect(pending).toHaveLength(0);
+      const visiblePending = exports.filterVisibleCommissioningPendingItems(pending);
+      expect(visiblePending).toHaveLength(0);
     });
   });
 

@@ -4961,10 +4961,30 @@ function buildDeployCommand(projectId) {
     return trimmedProjectId ? `${base} --project ${trimmedProjectId}` : base;
 }
 
+function isCoveredCommissioningPendingItem(item) {
+    const text = String(item || "").trim();
+    if (!text) return false;
+
+    if (text === "Cloud Project ID setzen.") return true;
+    if (text === "KI-Runtime-Konfiguration vervollständigen.") return true;
+    if (text.startsWith("KI-Konfiguration im Runtime-Block vollständig ausfüllen")) return true;
+    if (text.startsWith("QA-Freigabe offen:")) return true;
+    if (text.startsWith("QA-Nachweis offen:")) return true;
+    if (text.startsWith("Play-Store-Readiness:")) return true;
+
+    return false;
+}
+
+function filterVisibleCommissioningPendingItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items.filter(item => !isCoveredCommissioningPendingItem(item));
+}
+
 function buildCommissioningSnapshot(report) {
     const validationSummary = report?.validationSummary || null;
     const approvalSummary = buildCommissioningQaApprovalSummary(report);
-    const pendingCount = Array.isArray(report?.pending) ? report.pending.length : 0;
+    const visiblePending = filterVisibleCommissioningPendingItems(report?.pending || []);
+    const pendingCount = visiblePending.length;
     const validationState = !validationSummary
         ? "Validation ausstehend"
         : validationSummary.errorCount > 0
@@ -4997,8 +5017,9 @@ function renderCommissioningReport(report) {
         "Noch keine Freigaben bestätigt."
     );
 
-    const pendingHtml = report.pending.length > 0
-        ? `<ul>${report.pending.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    const visiblePending = filterVisibleCommissioningPendingItems(report?.pending || []);
+    const pendingHtml = visiblePending.length > 0
+        ? `<ul>${visiblePending.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
         : "<p>Keine offenen Inbetriebnahme-Punkte erkannt.</p>";
     const snapshot = buildCommissioningSnapshot(report);
 
@@ -5114,9 +5135,6 @@ async function runCommissioningAssistant() {
         }
 
         const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary });
-        qaApprovalSummary.open.forEach(item => {
-            pending.push(`QA-Freigabe offen: ${item.title}`);
-        });
 
         const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
         const playStoreReady = openPlayChecks.length === 0 && playMetaReady;
@@ -5132,7 +5150,7 @@ async function runCommissioningAssistant() {
             roleAssignments,
             attestations: getCommissioningAttestations(),
             qaApprovals: qaApprovalSummary.items,
-            pending,
+            pending: filterVisibleCommissioningPendingItems(pending),
         };
 
         renderCommissioningReport(commissioningSummary);
@@ -5140,7 +5158,8 @@ async function runCommissioningAssistant() {
         syncCommissioningChecklist(validationSummary);
         renderGoLiveAmpel();
         renderPrioritizedActionPlan();
-        showNotification(pending.length === 0 ? "Inbetriebnahme-Assistent erfolgreich abgeschlossen." : "Inbetriebnahme-Assistent ausgeführt. Offene Punkte im Bericht prüfen.", pending.length === 0 ? "success" : "info");
+        const visiblePending = filterVisibleCommissioningPendingItems(pending);
+        showNotification(visiblePending.length === 0 ? "Inbetriebnahme-Assistent erfolgreich abgeschlossen." : "Inbetriebnahme-Assistent ausgeführt. Offene Punkte im Bericht prüfen.", visiblePending.length === 0 ? "success" : "info");
     } catch (error) {
         if (reportEl) {
             reportEl.innerHTML = `<div class='error'>Inbetriebnahme fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
@@ -5165,7 +5184,6 @@ function refreshCommissioningReport() {
         pending.push("Gemeinsame Konfiguration für web-control fehlt.");
     }
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: commissioningSummary?.validationSummary || null });
-    qaApprovalSummary.open.forEach(item => pending.push(`QA-Freigabe offen: ${item.title}`));
 
     const playStoreState = getPlayStoreReadinessState();
     const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);
@@ -5192,7 +5210,7 @@ function refreshCommissioningReport() {
         roleAssignments: commissioningSummary?.roleAssignments || [],
         attestations: getCommissioningAttestations(),
         qaApprovals: qaApprovalSummary.items,
-        pending,
+        pending: filterVisibleCommissioningPendingItems(pending),
     };
 
     renderCommissioningReport(commissioningSummary);
@@ -5688,7 +5706,7 @@ function renderAdminActivationContent(user) {
             </p>
             <p style="margin-block-start: 6px;">
                 Optionaler Recovery-Pfad: Setzen Sie serverseitig
-                <code>minimaster.admin_recovery_token</code>, damit auch ohne Admin-Rolle
+                <code>ADMIN_RECOVERY_TOKEN</code> oder <code>MINIMASTER_ADMIN_RECOVERY_TOKEN</code>, damit auch ohne Admin-Rolle
                 ein kontrollierter Reset möglich ist.
             </p>
             <div class="phase-actions" style="margin-block-start: 12px">
@@ -6204,7 +6222,7 @@ async function resetAllUsersFromOnboarding() {
         let msg = error?.message || "Reset fehlgeschlagen.";
         const code = normalizeAuthErrorCode(error);
         if (code === "failed-precondition") {
-            msg = "Reset ist deaktiviert. Aktivieren Sie ENABLE_OPERATOR_ACCOUNT_RESET oder den Emulator-Modus.";
+            msg = "Reset ist deaktiviert. Aktivieren Sie ENABLE_OPERATOR_ACCOUNT_RESET, MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET oder den Emulator-Modus.";
         } else if (code === "permission-denied") {
             msg = "Keine Berechtigung für All-User-Reset. Als Nicht-Admin bitte gültigen Recovery-Token verwenden.";
         } else if (code === "unauthenticated") {

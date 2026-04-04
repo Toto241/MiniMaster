@@ -440,18 +440,20 @@ describe("redeemOperatorAccessKey — null data (blocks 33-34)", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// resetOperatorAccounts — mockConfig truthy branches (lines 309-406)
+// resetOperatorAccounts — env-based reset configuration (lines 309-406)
 // ══════════════════════════════════════════════════════════════════════════
 
-describe("resetOperatorAccounts — with mockConfig (truthy ?.minimaster paths)", () => {
+describe("resetOperatorAccounts — with env config", () => {
   beforeEach(() => {
-    testEnv.mockConfig({
-      minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "recovery-123" },
-    });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    process.env.ADMIN_RECOVERY_TOKEN = "recovery-123";
   });
-  afterEach(() => { testEnv.mockConfig({}); });
+  afterEach(() => {
+    delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ADMIN_RECOVERY_TOKEN;
+  });
 
-  it("löscht Operator-Benutzer mit mockConfig (lines 309-406)", async () => {
+  it("löscht Operator-Benutzer mit env config (lines 309-406)", async () => {
     mockAuth.listUsers.mockReset();
     mockAuth.listUsers.mockResolvedValue({
       users: [
@@ -505,18 +507,20 @@ describe("resetOperatorAccounts — with mockConfig (truthy ?.minimaster paths)"
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// resetAllAuthUsers — mockConfig truthy branches (lines 440-589)
+// resetAllAuthUsers — env-based reset configuration (lines 440-589)
 // ══════════════════════════════════════════════════════════════════════════
 
-describe("resetAllAuthUsers — with mockConfig (truthy paths)", () => {
+describe("resetAllAuthUsers — with env config", () => {
   beforeEach(() => {
-    testEnv.mockConfig({
-      minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "recovery-token-abc" },
-    });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    process.env.ADMIN_RECOVERY_TOKEN = "recovery-token-abc";
   });
-  afterEach(() => { testEnv.mockConfig({}); });
+  afterEach(() => {
+    delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ADMIN_RECOVERY_TOKEN;
+  });
 
-  it("löscht Benutzer mit Paginierung und mockConfig (lines 483-499,536)", async () => {
+  it("löscht Benutzer mit Paginierung und env config (lines 483-499,536)", async () => {
     mockAuth.listUsers.mockReset();
     let callNum = 0;
     mockAuth.listUsers.mockImplementation(() => {
@@ -578,7 +582,7 @@ describe("resetAllAuthUsers — with mockConfig (truthy paths)", () => {
     expect(res.success).toBe(true);
   });
 
-  it("fängt config()-Fehler via K_CONFIGURATION (blk81 br1)", async () => {
+  it("ignoriert K_CONFIGURATION ohne Legacy-Config-Zugriff", async () => {
     const oldK = process.env.K_CONFIGURATION;
     process.env.K_CONFIGURATION = "test";
     process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
@@ -596,14 +600,13 @@ describe("resetAllAuthUsers — with mockConfig (truthy paths)", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// resetAllAuthUsersHealth — mockConfig truthy branches (lines 637-658)
+// resetAllAuthUsersHealth — env-based reset configuration (lines 637-658)
 // ══════════════════════════════════════════════════════════════════════════
 
-describe("resetAllAuthUsersHealth — mockConfig truthy (lines 637-658)", () => {
+describe("resetAllAuthUsersHealth — env config (lines 637-658)", () => {
   it("zeigt alle Felder mit vollständiger Config", async () => {
-    testEnv.mockConfig({
-      minimaster: { enable_operator_account_reset: "true", admin_recovery_token: "token-xyz" },
-    });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    process.env.ADMIN_RECOVERY_TOKEN = "token-xyz";
     try {
       const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
       const res = await wrapped({ requestId: "health-1" }, asAdmin);
@@ -613,18 +616,19 @@ describe("resetAllAuthUsersHealth — mockConfig truthy (lines 637-658)", () => 
       expect(res.recoveryTokenConfigured).toBe(true);
       expect(res.callerRole).toBe("admin");
     } finally {
-      testEnv.mockConfig({});
+      delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
+      delete process.env.ADMIN_RECOVERY_TOKEN;
     }
   });
 
   it("zeigt recoveryTokenConfigured=false ohne Config-Token", async () => {
-    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "false" } });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "false";
     try {
       const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
       const res = await wrapped({}, asAdmin);
       expect(res.recoveryTokenConfigured).toBe(false);
     } finally {
-      testEnv.mockConfig({});
+      delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
     }
   });
 });
