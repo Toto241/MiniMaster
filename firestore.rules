@@ -33,15 +33,6 @@ service cloud.firestore {
       return isAdmin() || isSupport();
     }
 
-    // Helper function to check if an active support grant exists for a given master.
-    // Since Firestore rules don't support collection queries, support agents access
-    // user data exclusively through the getTicketUserData Cloud Function which
-    // validates grants server-side. Direct Firestore reads for masters/children
-    // are restricted to admin role only.
-    function hasActiveSupportGrant(masterImei) {
-      return isAdmin();
-    }
-
     // --- SUPPORT TICKETS COLLECTION ---
     // Users can create and read their own tickets
     // Admins and support agents can read all tickets and update their status

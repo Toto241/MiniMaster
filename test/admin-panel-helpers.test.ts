@@ -71,6 +71,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildDeployCommand,",
     "  buildCommissioningSnapshot,",
     "  renderCommissioningReport,",
+    "  filterVisibleCommissioningPendingItems,",
     "  getMissingAttestations,",
     "  updateCommissioningAttestations,",
     "  escapePowerShellString,",
@@ -232,12 +233,13 @@ describe("admin-panel helper functions", () => {
     expect(snapshot.confirmedAttestations).toBe(2);
     expect(snapshot.totalApprovals).toBe(3);
     expect(snapshot.openApprovals).toBe(1);
-    expect(snapshot.pendingCount).toBe(1);
+    expect(snapshot.pendingCount).toBe(0);
     expect(snapshot.validationState).toContain("Warnungen");
     expect(reportEl.innerHTML).toContain("Bestätigte Freigaben:");
     expect(reportEl.innerHTML).toContain("2 / 3");
     expect(reportEl.innerHTML).toContain("Aktualisiert:");
     expect(reportEl.innerHTML).toContain("demo-project");
+    expect(reportEl.innerHTML).toContain("Keine offenen Inbetriebnahme-Punkte erkannt.");
   });
 
   // ── escapePowerShellString ──

@@ -407,9 +407,6 @@ describe("resetOperatorAccounts — branch coverage", () => {
 
 describe("resetAllAuthUsers — branch coverage", () => {
   it("erlaubt Zugang per Recovery-Token ohne Auth (line 463, 476)", async () => {
-    // Mock functions.config() to return recovery token
-    // We need the runtimeConfig to return a recovery token
-    // Since functions.config() is mocked globally, we manipulate env vars
     const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
     // Without auth, without recovery token → should throw unauthenticated
     await expect(wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, {}))
@@ -648,14 +645,12 @@ describe("resetAllAuthUsers — additional branches", () => {
       .rejects.toThrow(/RESET_ALL_AUTH_USERS/);
   });
 
-  it("behandelt functions.config()-Fehler im IIFE (lines 434-437)", async () => {
+  it("ignoriert K_CONFIGURATION ohne Legacy-Config-Pfad (lines 434-437)", async () => {
     const functions = require("firebase-functions/v1");
-    // K_CONFIGURATION makes functions.config() throw ("no longer available in v2")
     if (typeof functions.resetCache === "function") functions.resetCache();
     process.env.K_CONFIGURATION = "force-v2-error";
     try {
       const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
-      // The IIFE catches config error and returns {} — FUNCTIONS_EMULATOR still enables resets
       await expect(wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asAdmin))
         .resolves.toBeDefined();
     } finally {
@@ -691,10 +686,9 @@ describe("resetAllAuthUsers — additional branches", () => {
   });
 });
 
-describe("resetAllAuthUsersHealth — config throw (lines 645-648)", () => {
-  it("behandelt functions.config()-Fehler gracefully", async () => {
+describe("resetAllAuthUsersHealth — no legacy config dependency (lines 645-648)", () => {
+  it("ignoriert K_CONFIGURATION ohne Legacy-Config-Pfad", async () => {
     const functions = require("firebase-functions/v1");
-    // K_CONFIGURATION makes functions.config() throw ("no longer available in v2")
     if (typeof functions.resetCache === "function") functions.resetCache();
     process.env.K_CONFIGURATION = "force-v2-error";
     try {
@@ -710,22 +704,18 @@ describe("resetAllAuthUsersHealth — config throw (lines 645-648)", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// ROUND 3 — mockConfig truthy branches for ?.minimaster?.X || "" patterns
+// ROUND 3 — env config truthy branches for reset gating and recovery token
 // ══════════════════════════════════════════════════════════════════════════
 
-describe("resetOperatorAccounts — happy path with mockConfig & operators", () => {
+describe("resetOperatorAccounts — happy path with env config & operators", () => {
   beforeEach(() => {
-    // Provide minimaster config so ?.minimaster?.enable_operator_account_reset is truthy
-    testEnv.mockConfig({
-      minimaster: {
-        enable_operator_account_reset: "true",
-        admin_recovery_token: "secret-recovery-token-123",
-      },
-    });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    process.env.ADMIN_RECOVERY_TOKEN = "secret-recovery-token-123";
   });
 
   afterEach(() => {
-    testEnv.mockConfig({});
+    delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ADMIN_RECOVERY_TOKEN;
   });
 
   it("löscht Operator-Benutzer erfolgreich (lines 350-406)", async () => {
@@ -768,18 +758,15 @@ describe("resetOperatorAccounts — happy path with mockConfig & operators", () 
   });
 });
 
-describe("resetAllAuthUsers — happy path with mockConfig & users", () => {
+describe("resetAllAuthUsers — happy path with env config & users", () => {
   beforeEach(() => {
-    testEnv.mockConfig({
-      minimaster: {
-        enable_operator_account_reset: "true",
-        admin_recovery_token: "secret-token-456",
-      },
-    });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    process.env.ADMIN_RECOVERY_TOKEN = "secret-token-456";
   });
 
   afterEach(() => {
-    testEnv.mockConfig({});
+    delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
+    delete process.env.ADMIN_RECOVERY_TOKEN;
   });
 
   it("löscht Benutzer mit Paginierung (lines 483-499)", async () => {
@@ -874,14 +861,10 @@ describe("resetAllAuthUsers — happy path with mockConfig & users", () => {
   });
 });
 
-describe("resetAllAuthUsersHealth — mockConfig branches (lines 637-658)", () => {
+describe("resetAllAuthUsersHealth — env config branches (lines 637-658)", () => {
   it("zeigt resetEnabled und recoveryTokenConfigured mit Config", async () => {
-    testEnv.mockConfig({
-      minimaster: {
-        enable_operator_account_reset: "true",
-        admin_recovery_token: "configured-token",
-      },
-    });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
+    process.env.ADMIN_RECOVERY_TOKEN = "configured-token";
     try {
       const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
       const res = await wrapped({ requestId: "health-check-1" }, asAdmin);
@@ -891,26 +874,26 @@ describe("resetAllAuthUsersHealth — mockConfig branches (lines 637-658)", () =
       expect(res.recoveryTokenConfigured).toBe(true);
       expect(res.callerRole).toBe("admin");
     } finally {
-      testEnv.mockConfig({});
+      delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
+      delete process.env.ADMIN_RECOVERY_TOKEN;
     }
   });
 
   it("zeigt recoveryTokenConfigured=false ohne Token", async () => {
-    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "false" } });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "false";
     try {
       const wrapped = testEnv.wrap(fns.resetAllAuthUsersHealth);
       const res = await wrapped({}, asAdmin);
       expect(res.recoveryTokenConfigured).toBe(false);
     } finally {
-      testEnv.mockConfig({});
+      delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
     }
   });
 });
 
 describe("listOperatorUsers — customClaims branches (line 88)", () => {
   it("erkennt operator-Rollen in customClaims", async () => {
-    // Need FUNCTIONS_EMULATOR=true or mockConfig to enable resetOperatorAccounts
-    testEnv.mockConfig({ minimaster: { enable_operator_account_reset: "true" } });
+    process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
     mockAuth.listUsers.mockReset();
     mockAuth.listUsers.mockResolvedValue({
       users: [
@@ -928,7 +911,7 @@ describe("listOperatorUsers — customClaims branches (line 88)", () => {
       // Only u1 has an operator role
       expect(res.matchedUsers).toBe(1);
     } finally {
-      testEnv.mockConfig({});
+      delete process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET;
     }
   });
 });
