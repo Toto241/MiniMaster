@@ -103,6 +103,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  isRetryableFirebaseQueueConflict,",
     "  buildPlausibilityFindings,",
     "  computeGoLiveStatusFromData,",
+    "  buildPlatformQaReadinessSummary,",
     "  renderCallableDebugInfo,",
     "  getWizardState,",
     "  saveWizardState,",
@@ -852,6 +853,31 @@ describe("admin-panel helper functions", () => {
     expect(result.ampel).toBe("yellow");
     expect(result.playStoreReady).toBe(false);
     expect(result.ampelDescription).toContain("Play-Store");
+  });
+
+  it("builds platform QA readiness summary from testing register items", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const summary = exports.buildPlatformQaReadinessSummary({
+      items: [
+        { id: "static-ma-proguard-enabled", groupId: "static-readiness-masterapp", severity: "critical", status: "pass" },
+        { id: "ma-task-create", groupId: "functional-readiness-masterapp", severity: "high", status: "not_run" },
+        { id: "ca-fcm-sync", groupId: "functional-readiness-childapp", severity: "critical", status: "manual_required" },
+        { id: "static-dt-csp", groupId: "static-readiness-desktop", severity: "critical", status: "pass" },
+      ],
+    });
+
+    expect(summary.hasData).toBe(true);
+    expect(summary.platformStatus.masterApp.total).toBe(2);
+    expect(summary.platformStatus.masterApp.done).toBe(1);
+    expect(summary.platformStatus.masterApp.critical).toBe(1);
+    expect(summary.platformStatus.masterApp.high).toBe(1);
+    expect(summary.platformStatus.childApp.total).toBe(1);
+    expect(summary.platformStatus.childApp.done).toBe(0);
+    expect(summary.platformStatus.desktop.total).toBe(1);
+    expect(summary.totals.totalAll).toBe(4);
+    expect(summary.totals.doneAll).toBe(2);
+    expect(summary.totals.totalCritical).toBe(3);
+    expect(summary.totals.doneCritical).toBe(2);
   });
 
   // ── Wizard State (localStorage-basiert) ──

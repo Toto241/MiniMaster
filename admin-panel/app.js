@@ -1709,6 +1709,7 @@ function rerenderTestingRegisterFromCache() {
     renderTestingRegisterStorage(testingRegisterPayload?.storage || null);
     renderTestingRegisterList(testingRegisterPayload);
     renderCommissioningAttestations();
+    renderAllPlatformSections();
     if (document.getElementById("commissioning-report")) {
         refreshCommissioningReport();
         renderGoLiveAmpel();
@@ -3294,7 +3295,95 @@ const platformReadinessItems = {
     },
 };
 
-function computeGoLiveStatusFromData(openApprovals, platformState, playStoreState, validation) {
+const platformQaRegisterGroups = {
+    masterApp: {
+        label: "MasterApp (Eltern-Android)",
+        groupIds: ["functional-readiness-masterapp", "static-readiness-masterapp"],
+    },
+    childApp: {
+        label: "ChildApp (Kind-Android)",
+        groupIds: ["functional-readiness-childapp", "static-readiness-childapp"],
+    },
+    desktop: {
+        label: "Desktop-App (Heim-PC)",
+        groupIds: ["functional-readiness-desktop", "static-readiness-desktop"],
+    },
+};
+
+function buildPlatformQaReadinessSummary(payload = testingRegisterPayload) {
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const platformStatus = {};
+    let totalCritical = 0;
+    let doneCritical = 0;
+    let totalHigh = 0;
+    let doneHigh = 0;
+    let totalAll = 0;
+    let doneAll = 0;
+
+    for (const [platformKey, config] of Object.entries(platformQaRegisterGroups)) {
+        const relevantItems = items.filter(item => config.groupIds.includes(String(item.groupId || "")));
+        let pCritical = 0;
+        let pCriticalDone = 0;
+        let pHigh = 0;
+        let pHighDone = 0;
+        let pTotal = 0;
+        let pDone = 0;
+
+        relevantItems.forEach(item => {
+            const severity = String(item.severity || "");
+            const isPass = String(item.status || "") === "pass";
+            pTotal++;
+            totalAll++;
+            if (severity === "critical") {
+                pCritical++;
+                totalCritical++;
+            }
+            if (severity === "high") {
+                pHigh++;
+                totalHigh++;
+            }
+            if (isPass) {
+                pDone++;
+                doneAll++;
+                if (severity === "critical") {
+                    pCriticalDone++;
+                    doneCritical++;
+                }
+                if (severity === "high") {
+                    pHighDone++;
+                    doneHigh++;
+                }
+            }
+        });
+
+        platformStatus[platformKey] = {
+            label: config.label,
+            total: pTotal,
+            done: pDone,
+            critical: pCritical,
+            criticalDone: pCriticalDone,
+            high: pHigh,
+            highDone: pHighDone,
+            percent: pTotal > 0 ? Math.round((pDone / pTotal) * 100) : 0,
+            source: "qa-register",
+        };
+    }
+
+    return {
+        platformStatus,
+        totals: {
+            totalAll,
+            doneAll,
+            totalCritical,
+            doneCritical,
+            totalHigh,
+            doneHigh,
+        },
+        hasData: totalAll > 0,
+    };
+}
+
+function computeGoLiveStatusFromData(openApprovals, platformState, playStoreState, validation, platformQaSummary = null) {
     const backendReady = validation
         ? (validation.errorCount === 0 && validation.checks.adminAuthOk && validation.checks.functionsReachable && validation.checks.firestoreAccessOk)
         : false;
@@ -3302,7 +3391,7 @@ function computeGoLiveStatusFromData(openApprovals, platformState, playStoreStat
     const approvalItems = Array.isArray(openApprovals) ? openApprovals : [];
     const allApprovalsOk = approvalItems.length === 0;
 
-    const platformStatus = {};
+    let platformStatus = {};
     let totalCritical = 0;
     let doneCritical = 0;
     let totalHigh = 0;
@@ -3313,27 +3402,37 @@ function computeGoLiveStatusFromData(openApprovals, platformState, playStoreStat
     const approvalOpen = approvalItems.length;
     const approvalDone = Math.max(approvalTotal - approvalOpen, 0);
 
-    for (const [platformKey, platform] of Object.entries(platformReadinessItems)) {
-        let pCritical = 0, pCriticalDone = 0, pHigh = 0, pHighDone = 0, pTotal = 0, pDone = 0;
-        for (const item of platform.items) {
-            pTotal++;
-            totalAll++;
-            if (item.severity === "critical") { pCritical++; totalCritical++; }
-            if (item.severity === "high") { pHigh++; totalHigh++; }
-            if (platformState[item.key]) {
-                pDone++;
-                doneAll++;
-                if (item.severity === "critical") { pCriticalDone++; doneCritical++; }
-                if (item.severity === "high") { pHighDone++; doneHigh++; }
+    if (platformQaSummary?.hasData) {
+        platformStatus = platformQaSummary.platformStatus || {};
+        totalCritical = Number(platformQaSummary.totals?.totalCritical || 0);
+        doneCritical = Number(platformQaSummary.totals?.doneCritical || 0);
+        totalHigh = Number(platformQaSummary.totals?.totalHigh || 0);
+        doneHigh = Number(platformQaSummary.totals?.doneHigh || 0);
+        totalAll = Number(platformQaSummary.totals?.totalAll || 0);
+        doneAll = Number(platformQaSummary.totals?.doneAll || 0);
+    } else {
+        for (const [platformKey, platform] of Object.entries(platformReadinessItems)) {
+            let pCritical = 0, pCriticalDone = 0, pHigh = 0, pHighDone = 0, pTotal = 0, pDone = 0;
+            for (const item of platform.items) {
+                pTotal++;
+                totalAll++;
+                if (item.severity === "critical") { pCritical++; totalCritical++; }
+                if (item.severity === "high") { pHigh++; totalHigh++; }
+                if (platformState[item.key]) {
+                    pDone++;
+                    doneAll++;
+                    if (item.severity === "critical") { pCriticalDone++; doneCritical++; }
+                    if (item.severity === "high") { pHighDone++; doneHigh++; }
+                }
             }
+            platformStatus[platformKey] = {
+                label: platform.label,
+                total: pTotal, done: pDone,
+                critical: pCritical, criticalDone: pCriticalDone,
+                high: pHigh, highDone: pHighDone,
+                percent: pTotal > 0 ? Math.round((pDone / pTotal) * 100) : 0,
+            };
         }
-        platformStatus[platformKey] = {
-            label: platform.label,
-            total: pTotal, done: pDone,
-            critical: pCritical, criticalDone: pCriticalDone,
-            high: pHigh, highDone: pHighDone,
-            percent: pTotal > 0 ? Math.round((pDone / pTotal) * 100) : 0,
-        };
     }
 
     const allCriticalDone = doneCritical === totalCritical;
@@ -3359,8 +3458,8 @@ function computeGoLiveStatusFromData(openApprovals, platformState, playStoreStat
         ampel = "red";
         ampelLabel = "Go-Live blockiert";
         ampelDescription = backendReady
-            ? `${totalCritical - doneCritical} kritische Plattform-Punkte offen.`
-            : "Backend-Validierung fehlt oder fehlerhaft. Kritische Plattform-Punkte offen.";
+            ? `${totalCritical - doneCritical} kritische QA-/Plattform-Punkte offen.`
+            : "Backend-Validierung fehlt oder fehlerhaft. Kritische QA-/Plattform-Punkte offen.";
     }
 
     return {
@@ -3374,10 +3473,11 @@ function computeGoLiveStatusFromData(openApprovals, platformState, playStoreStat
 
 function computeGoLiveStatus() {
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: commissioningSummary?.validationSummary || null });
-    const platformState = getPlatformReadiness();
+    const platformQaSummary = buildPlatformQaReadinessSummary(testingRegisterPayload);
+    const platformState = platformQaSummary.hasData ? {} : getPlatformReadiness();
     const playStoreState = getPlayStoreReadinessState();
     const validation = commissioningSummary?.validationSummary || null;
-    return computeGoLiveStatusFromData(qaApprovalSummary.open, platformState, playStoreState, validation);
+    return computeGoLiveStatusFromData(qaApprovalSummary.open, platformState, playStoreState, validation, platformQaSummary);
 }
 
 function renderGoLiveAmpel() {
@@ -3473,6 +3573,41 @@ function renderPlatformReadinessSection(platformKey) {
     if (!container) return;
     const platform = platformReadinessItems[platformKey];
     if (!platform) return;
+
+    const qaSummary = buildPlatformQaReadinessSummary(testingRegisterPayload);
+    const qaStatus = qaSummary.platformStatus?.[platformKey];
+
+    if (qaSummary.hasData && qaStatus) {
+        const openCount = Math.max(Number(qaStatus.total || 0) - Number(qaStatus.done || 0), 0);
+        const criticalOpen = Math.max(Number(qaStatus.critical || 0) - Number(qaStatus.criticalDone || 0), 0);
+        const highOpen = Math.max(Number(qaStatus.high || 0) - Number(qaStatus.highDone || 0), 0);
+        container.innerHTML = `
+            <div class="python-clarity-box">
+                <strong>Diese Plattform-Checks werden jetzt zentral im QA-Register gepflegt.</strong><br />
+                ${escapeHtml(String(qaStatus.done || 0))}/${escapeHtml(String(qaStatus.total || 0))} Tests bestanden (${escapeHtml(String(qaStatus.percent || 0))}%).<br />
+                Offen: ${escapeHtml(String(openCount))} insgesamt, davon ${escapeHtml(String(criticalOpen))} kritisch und ${escapeHtml(String(highOpen))} hoch.
+            </div>
+            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+                <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln">Zur Qualitätssicherung wechseln</button>
+                <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register neu laden">QA-Status aktualisieren</button>
+            </div>
+        `;
+        return;
+    }
+
+    if (isPythonOperator) {
+        container.innerHTML = `
+            <div class="info">
+                Diese Plattform-Checks werden zentral im Panel <strong>Qualitätssicherung</strong> gepflegt.
+                Lade das QA-Register, um den aktuellen Status zu sehen.
+            </div>
+            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+                <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln">Zur Qualitätssicherung wechseln</button>
+                <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register jetzt laden">QA-Register laden</button>
+            </div>
+        `;
+        return;
+    }
 
     const savedState = getPlatformReadiness();
     container.innerHTML = "";
