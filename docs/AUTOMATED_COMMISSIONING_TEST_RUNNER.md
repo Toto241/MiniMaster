@@ -80,3 +80,21 @@ pwsh -File scripts/run-dual-device-commissioning.ps1 \
 
 Hinweis: Die automatisierte Suite deckt reproduzierbare UI- und Kontrollpfade ab. Fuer die finale
 Abnahme auf echten Geraeten bleiben weiterhin manuelle Endabnahmen nach Checkliste empfohlen.
+
+## Fehlerbild: INSTALL_FAILED_USER_RESTRICTED
+
+Wenn ein USB-Lauf beim APK-Install mit `INSTALL_FAILED_USER_RESTRICTED` abbricht, liegt der Blocker typischerweise auf dem Geraet und nicht im Repo:
+
+- Geraet entsperren und Display waehrend des Laufs aktiv lassen
+- USB-Debugging bestaetigen und die RSA-Freigabe dauerhaft erlauben
+- In den Entwickleroptionen `Install via USB` / `USB-Installation` aktivieren, falls der Hersteller das getrennt absichert
+- Geraete- oder Familienrichtlinien pruefen, die seitliches Installieren blockieren
+
+Schneller Gegencheck:
+
+```powershell
+adb install -r masterApp/build/outputs/apk/debug/masterApp-debug.apk
+adb install -r childApp/build/outputs/apk/debug/childApp-debug.apk
+```
+
+Scheitert bereits dieser manuelle Install mit demselben Fehler, sollte zuerst die Geraetekonfiguration behoben werden. Der Runner selbst kann diesen Blocker nicht umgehen.

@@ -282,6 +282,26 @@ Im Admin-Panel → **Befehlskatalog** sind folgende Gruppen verfügbar:
 
 → `adb devices` prüfen. USB-Debugging im Entwicklermenü aktivieren. Bei Emulator: `adb connect localhost:5554`.
 
+### `INSTALL_FAILED_USER_RESTRICTED`
+
+→ Das ist in der Regel **kein Repo- oder Runner-Fehler**, sondern ein Geräte- oder Policy-Blocker beim Paketinstaller.
+
+Prüfschritte auf dem Android-Gerät:
+
+- Gerät vollständig entsperren und Display aktiv lassen
+- RSA-Abfrage für USB-Debugging mit "Immer zulassen" bestätigen
+- In den Entwickleroptionen nach "Install via USB" / "USB-Installation" suchen und aktivieren
+- Falls eine Geräteverwaltungs-, Familien- oder Enterprise-Policy APK-Installationen blockiert, diese für den Testlauf temporär freigeben
+
+Manueller Gegencheck per ADB:
+
+```powershell
+adb install -r masterApp/build/outputs/apk/debug/masterApp-debug.apk
+adb install -r childApp/build/outputs/apk/debug/childApp-debug.apk
+```
+
+Wenn schon der manuelle `adb install` mit `INSTALL_FAILED_USER_RESTRICTED` scheitert, ist der USB-Commissioning-Runner nicht die Ursache. Erst nach erfolgreichem manuellen Install lohnt sich ein erneuter Testlauf.
+
 ---
 
 ## Sicherheitshinweise
