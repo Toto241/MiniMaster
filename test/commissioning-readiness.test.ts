@@ -500,11 +500,12 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(playStoreSteps.length).toBe(10);
     });
 
-    it("generates steps for missing attestations", () => {
+    it("generates steps for open QA approvals", () => {
       const { exports } = loadTestExports();
       const missingAttestations = [
         { key: "firebase-auth-enabled", label: "Firebase Authentication aktiviert" },
         { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft" },
+        { key: "functions-enabled", label: "Cloud Functions aktiviert", automationType: "automatic", status: "fail" },
       ];
       const plan = exports.buildPrioritizedActionPlanFromData(
         { errorCount: 0, checks: { adminAuthOk: true, functionsReachable: true, firestoreAccessOk: true, storageHealthOk: true, webControlConfigReady: true } },
@@ -514,9 +515,13 @@ describe("Commissioning & Readiness – automated checks", () => {
         missingAttestations,
       );
       const attestationSteps = plan.filter((s: any) => s.category === "Compliance");
+      const automationSteps = plan.filter((s: any) => s.category === "QA-Automation");
       expect(attestationSteps).toHaveLength(2);
+      expect(automationSteps).toHaveLength(1);
       expect(attestationSteps[0].title).toBe("Firebase Authentication aktiviert");
       expect(attestationSteps[1].title).toBe("Parent Web Panel Login geprüft");
+      expect(automationSteps[0].title).toBe("Cloud Functions aktiviert");
+      expect(automationSteps[0].severity).toBe("critical");
     });
 
     it("generates backend validation step when validation is null", () => {
