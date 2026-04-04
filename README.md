@@ -96,6 +96,21 @@ Set environment variables for ticket automation:
 - Optional model override: `GEMINI_MODEL` (default: `gemini-2.0-flash`)
 - Fallback provider: `OPENAI_API_KEY`
 
+### Development-Only Reset Flags
+
+For local development and controlled operator recovery, the reset Cloud Functions can be enabled via environment variables.
+
+- `ENABLE_OPERATOR_ACCOUNT_RESET=true`: Enables reset endpoints for the current runtime.
+- `MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET=true`: Project-scoped alternative for the same reset gate.
+- `ADMIN_RECOVERY_TOKEN=<secret>`: Allows `resetAllAuthUsers` to be called without an authenticated admin session.
+- `MINIMASTER_ADMIN_RECOVERY_TOKEN=<secret>`: Project-scoped alternative for the recovery token.
+
+Notes:
+
+- These flags are intended for development or controlled recovery only.
+- Emulator mode (`FUNCTIONS_EMULATOR=true`) also enables the reset gate.
+- Legacy Firebase Runtime Config (`functions.config()` / `minimaster.*`) is no longer used for these reset flows.
+
 ### Android Apps Setup
 
 1.  Place the downloaded `google-services.json` files in `masterApp/` and `childApp/`. These files are git-ignored and must not be committed. Use the `.template.json` files as a reference.
