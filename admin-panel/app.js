@@ -1616,24 +1616,67 @@ function formatTestingRegisterGroupTitle(item) {
     return title;
 }
 
+function escapeTestingRegisterText(text) {
+    return String(text || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function buildTestingRegisterTooltipAttr(text, ariaLabel) {
+    const value = escapeTestingRegisterText(text);
+    const aria = escapeTestingRegisterText(ariaLabel || text || "");
+    return `title="${value}" aria-label="${aria}"`;
+}
+
 function buildTestingRegisterMetaBadges(item) {
     const badges = [];
     if (item.severity) {
-        badges.push(`<span class='python-automation-chip python-automation-chip-command'>${escapeHtml(String(item.severity).toUpperCase())}</span>`);
+        badges.push(`<span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr(`Prioritaet: ${String(item.severity)}`, `Prioritaet ${String(item.severity)}`)}>${escapeTestingRegisterText(String(item.severity).toUpperCase())}</span>`);
     }
     if (item.owner) {
-        badges.push(`<span class='python-automation-chip python-automation-chip-documented'>${escapeHtml(String(item.owner))}</span>`);
+        badges.push(`<span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr(`Verantwortlich: ${String(item.owner)}`, `Verantwortlich ${String(item.owner)}`)}>${escapeTestingRegisterText(String(item.owner))}</span>`);
     }
     if (item.blockingForRelease) {
-        badges.push("<span class='python-automation-chip python-automation-chip-manual'>Release-Blocker</span>");
+        badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zur bestaetigten Freigabe.", "Release-Blocker")}>Release-Blocker</span>`);
     }
     if (item.staleEvidence) {
-        badges.push("<span class='python-automation-chip python-automation-chip-manual'>Nachweis veraltet</span>");
+        badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Der letzte Nachweis ist aelter als das definierte Stale-Fenster.", "Nachweis veraltet")}>Nachweis veraltet</span>`);
     }
     if (String(item.groupId || "") === "repo-tests-unsupported") {
-        badges.push("<span class='python-automation-chip python-automation-chip-manual'>Unsupported</span>");
+        badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Dieser Test ist inventarisiert, aber aktuell keiner ausfuehrbaren Suite zugeordnet.", "Unsupported")}>Unsupported</span>`);
     }
     return badges.join(" ");
+}
+
+function buildTestingRegisterLegend() {
+    return `
+        <div class='python-muted-caption' style='margin-block-start: 10px'>
+            Register-Legende:
+            <span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr("Prioritaet des Testfalls", "Prioritaet")}>CRITICAL/HIGH</span>
+            <span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr("Fachlich oder technisch verantwortliche Rolle", "Owner")}>Owner</span>
+            <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Release darf ohne Abschluss nicht freigegeben werden", "Release-Blocker")}>Release-Blocker</span>
+            <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Inventarisiert, aber noch nicht an eine Suite gekoppelt", "Unsupported")}>Unsupported</span>
+        </div>
+    `;
+}
+
+function buildTestingRegisterActionTooltip(item) {
+    if (item.action === "suite-run") {
+        if (item.prereqsMet === false) {
+            return `Suite kann aktuell nicht gestartet werden: ${String(item.prereqReason || "Voraussetzungen nicht erfuellt")}`;
+        }
+        if (item.linkedCommand) {
+            return `Verknuepfte Suite starten. Kommando: ${String(item.linkedCommand)}`;
+        }
+        return `Verknuepfte Suite ${String(item.suiteRef || item.id || "") } starten`;
+    }
+    if (item.action === "protocol") {
+        return "Manuellen oder dokumentierten Nachweis fuer diesen Testfall protokollieren";
+    }
+    return "Automatischen Python-Testlauf fuer diesen Registereintrag starten";
 }
 
 function buildTestingRegisterDetailText(item) {
@@ -1712,6 +1755,7 @@ function renderTestingRegisterOverview(payload) {
             <strong>${escapeHtml(String(summary.unsupported || 0))}</strong>
             <span>Unsupported</span>
         </div>
+        ${buildTestingRegisterLegend()}
     `;
 }
 
@@ -1736,18 +1780,16 @@ function renderTestingRegisterStorage(storage) {
 }
 
 function buildTestingRegisterAction(item) {
+    const tooltip = buildTestingRegisterTooltipAttr(buildTestingRegisterActionTooltip(item), buildTestingRegisterActionTooltip(item));
     if (item.action === "suite-run") {
         const suiteId = encodeURIComponent(String(item.suiteRef || item.id || ""));
         const disabled = item.prereqsMet === false ? "disabled" : "";
-        const title = item.prereqsMet === false
-            ? ` title="${escapeHtml(item.prereqReason || "Voraussetzungen nicht erfüllt")}"`
-            : "";
-        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled}${title}>Suite starten</button>`;
+        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled} ${tooltip}>Suite starten</button>`;
     }
     if (item.action === "protocol") {
-        return `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.id || ""))}')">Nachweis protokollieren</button>`;
+        return `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.id || ""))}')" ${tooltip}>Nachweis protokollieren</button>`;
     }
-    return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()">Python-Testlauf starten</button>`;
+    return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()" ${tooltip}>Python-Testlauf starten</button>`;
 }
 
 function renderTestingRegisterPanelRows(items) {
