@@ -1600,6 +1600,53 @@ function getTestingRegisterStatusPriority(status) {
     return 4;
 }
 
+function getTestingRegisterSeverityPriority(severity) {
+    if (severity === "critical") return 0;
+    if (severity === "high") return 1;
+    if (severity === "medium") return 2;
+    if (severity === "low") return 3;
+    return 4;
+}
+
+function formatTestingRegisterGroupTitle(item) {
+    const title = String(item.groupTitle || "-");
+    const groupId = String(item.groupId || "");
+    if (groupId === "repo-tests-unsupported") return `Unsupported: ${title}`;
+    if (item.blockingForRelease) return `Release: ${title}`;
+    return title;
+}
+
+function buildTestingRegisterMetaBadges(item) {
+    const badges = [];
+    if (item.severity) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-command'>${escapeHtml(String(item.severity).toUpperCase())}</span>`);
+    }
+    if (item.owner) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-documented'>${escapeHtml(String(item.owner))}</span>`);
+    }
+    if (item.blockingForRelease) {
+        badges.push("<span class='python-automation-chip python-automation-chip-manual'>Release-Blocker</span>");
+    }
+    if (item.staleEvidence) {
+        badges.push("<span class='python-automation-chip python-automation-chip-manual'>Nachweis veraltet</span>");
+    }
+    if (String(item.groupId || "") === "repo-tests-unsupported") {
+        badges.push("<span class='python-automation-chip python-automation-chip-manual'>Unsupported</span>");
+    }
+    return badges.join(" ");
+}
+
+function buildTestingRegisterDetailText(item) {
+    const parts = [];
+    if (item.details) parts.push(String(item.details));
+    if (item.environment) parts.push(`Umgebung: ${item.environment}`);
+    if (item.linkedSuite) parts.push(`Suite: ${item.linkedSuite}`);
+    if (item.linkedCommand) parts.push(`Kommando: ${item.linkedCommand}`);
+    if (item.evidenceRequired) parts.push("Evidenz erforderlich");
+    if (item.knownConstraints) parts.push(`Hinweis: ${item.knownConstraints}`);
+    return parts.join(" · ");
+}
+
 function rerenderTestingRegisterFromCache() {
     renderTestingRegisterOverview(testingRegisterPayload);
     renderTestingRegisterStorage(testingRegisterPayload?.storage || null);
@@ -1645,6 +1692,26 @@ function renderTestingRegisterOverview(payload) {
             <strong>${escapeHtml(String(summary.notRun || 0))}</strong>
             <span>Noch nicht gelaufen</span>
         </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.critical || 0))}</strong>
+            <span>Kritisch</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.blocking || 0))}</strong>
+            <span>Release-Blocker</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.stale || 0))}</strong>
+            <span>Veraltete Nachweise</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.withoutSuccess || 0))}</strong>
+            <span>Ohne Erfolgslauf</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(summary.unsupported || 0))}</strong>
+            <span>Unsupported</span>
+        </div>
     `;
 }
 
@@ -1670,11 +1737,12 @@ function renderTestingRegisterStorage(storage) {
 
 function buildTestingRegisterAction(item) {
     if (item.action === "suite-run") {
+        const suiteId = encodeURIComponent(String(item.suiteRef || item.id || ""));
         const disabled = item.prereqsMet === false ? "disabled" : "";
         const title = item.prereqsMet === false
             ? ` title="${escapeHtml(item.prereqReason || "Voraussetzungen nicht erfüllt")}"`
             : "";
-        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${encodeURIComponent(String(item.id || ""))}')" ${disabled}${title}>Suite starten</button>`;
+        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled}${title}>Suite starten</button>`;
     }
     if (item.action === "protocol") {
         return `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.id || ""))}')">Nachweis protokollieren</button>`;
@@ -1687,13 +1755,15 @@ function renderTestingRegisterPanelRows(items) {
         const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
         const updatedAt = item.updatedAt ? formatPythonAutomationTimestamp(item.updatedAt) : "noch nicht protokolliert";
         const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"));
+        const detailText = buildTestingRegisterDetailText(item);
         return `
             <tr>
                 <td><strong>${escapeHtml(item.title || item.id || "-")}</strong><div class='python-muted-caption'>${escapeHtml(item.id || "-")}</div></td>
-                <td>${escapeHtml(item.groupTitle || "-")}</td>
+                <td>${escapeHtml(formatTestingRegisterGroupTitle(item))}</td>
                 <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"))}'>${escapeHtml(typeLabel)}</span></td>
+                <td>${buildTestingRegisterMetaBadges(item) || "-"}</td>
                 <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
-                <td>${escapeHtml(String(item.details || "-")).slice(0, 220)}</td>
+                <td>${escapeHtml(String(detailText || "-")).slice(0, 260)}</td>
                 <td>${escapeHtml(updatedAt)}</td>
                 <td><div class='python-muted-caption'>${escapeHtml(item.storage || "-")}</div></td>
                 <td>${buildTestingRegisterAction(item)}</td>
@@ -1716,6 +1786,7 @@ function renderTestingRegisterPanel(listEl, panelItems, visibleCount, totalCount
                 <th>Testfall</th>
                 <th>Gruppe</th>
                 <th>Typ</th>
+                <th>Priorität / Owner</th>
                 <th>Status</th>
                 <th>Letztes Detail</th>
                 <th>Letztes Update</th>
@@ -1745,15 +1816,36 @@ function renderTestingRegisterList(payload) {
         const status = String(item.status || "not_run");
         const automationType = String(item.automationType || "automatic");
         const entryKind = String(item.entryKind || "commissioning");
+        const severity = String(item.severity || "");
         const haystack = [
             String(item.id || ""),
             String(item.title || ""),
             String(item.groupTitle || ""),
             String(item.source || ""),
             String(item.details || ""),
+            String(item.owner || ""),
+            String(item.environment || ""),
+            String(item.linkedSuite || ""),
+            String(item.linkedCommand || ""),
+            String(item.knownConstraints || ""),
         ].join(" ").toLowerCase();
 
         if (filters.type === "open" && !(status === "fail" || status === "manual_required" || status === "not_run")) {
+            return false;
+        }
+        if (filters.type === "critical" && severity !== "critical") {
+            return false;
+        }
+        if (filters.type === "blocking" && !item.blockingForRelease) {
+            return false;
+        }
+        if (filters.type === "stale" && !item.staleEvidence) {
+            return false;
+        }
+        if (filters.type === "withoutSuccess" && item.hasSuccessfulRun) {
+            return false;
+        }
+        if (filters.type === "unsupported" && String(item.groupId || "") !== "repo-tests-unsupported") {
             return false;
         }
         if (filters.type === "automatic" && !(automationType === "automatic" || automationType === "command")) {
@@ -1775,6 +1867,20 @@ function renderTestingRegisterList(payload) {
     });
 
     visibleItems = visibleItems.sort((left, right) => {
+        if (filters.sort === "severity") {
+            const severityCmp = getTestingRegisterSeverityPriority(String(left.severity || "")) - getTestingRegisterSeverityPriority(String(right.severity || ""));
+            if (severityCmp !== 0) {
+                return severityCmp;
+            }
+            return getTestingRegisterStatusPriority(String(left.status || "")) - getTestingRegisterStatusPriority(String(right.status || ""));
+        }
+        if (filters.sort === "owner") {
+            const ownerCmp = String(left.owner || "").localeCompare(String(right.owner || ""), "de");
+            if (ownerCmp !== 0) {
+                return ownerCmp;
+            }
+            return getTestingRegisterSeverityPriority(String(left.severity || "")) - getTestingRegisterSeverityPriority(String(right.severity || ""));
+        }
         if (filters.sort === "group") {
             return String(left.groupTitle || "").localeCompare(String(right.groupTitle || ""), "de");
         }

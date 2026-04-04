@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -68,6 +69,138 @@ COMMISSIONING_COMMANDS = (
         "cwd": REPO_ROOT,
     },
 )
+
+
+def make_documented_test(
+    test_id: str,
+    title: str,
+    description: str,
+    documentation: str,
+    *,
+    success_criteria: str,
+    source: str = "docs",
+) -> dict[str, object]:
+    return {
+        "id": test_id,
+        "title": title,
+        "description": description,
+        "automationType": "documented",
+        "source": source,
+        "successCriteria": success_criteria,
+        "documentation": documentation,
+    }
+
+
+TEST_REGISTER_STALE_DAYS = 30
+
+
+def parse_iso_timestamp(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def is_stale_timestamp(value: object, *, stale_days: int = TEST_REGISTER_STALE_DAYS) -> bool:
+    parsed = parse_iso_timestamp(value)
+    if parsed is None:
+        return False
+    return datetime.now(timezone.utc) - parsed > timedelta(days=stale_days)
+
+
+def severity_rank(value: str) -> int:
+    order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+    return order.get(value, 9)
+
+
+def infer_register_metadata(
+    *,
+    entry_kind: str,
+    automation_type: str,
+    group_id: str,
+    group_title: str,
+    source: str,
+    suite_ref: str = "",
+    updated_at: str = "",
+    status: str = "not_run",
+    documentation: str = "",
+    command: str = "",
+    prereq_reason: str = "",
+) -> dict[str, object]:
+    owner = "Engineering"
+    severity = "medium"
+    blocking_for_release = False
+    evidence_required = automation_type in {"manual", "documented"}
+    environment = "local"
+    known_constraints = ""
+
+    group_key = f"{group_id} {group_title} {source}".lower()
+    if any(token in group_key for token in ("security", "rules", "compliance", "legal", "audit")):
+        owner = "Security/Compliance"
+        severity = "critical"
+        blocking_for_release = True
+    elif any(token in group_key for token in ("play", "release", "p0", "commissioning", "reviewer", "acceptance", "governance")):
+        owner = "Product/Ops"
+        severity = "critical"
+        blocking_for_release = True
+    elif any(token in group_key for token in ("android", "device", "desktop", "runtime", "backend", "support", "integration", "system", "operator", "web")):
+        owner = "Engineering"
+        severity = "high"
+        blocking_for_release = True
+    elif "python qa" in group_key:
+        owner = "QA Automation"
+        severity = "medium"
+
+    if entry_kind == "suite":
+        environment = "ci/local"
+    if entry_kind == "repo-test":
+        environment = "repo"
+    if entry_kind == "commissioning" and automation_type in {"manual", "documented"}:
+        environment = "manual"
+    if automation_type == "command":
+        environment = "local-cli"
+    elif suite_ref.startswith("android-"):
+        environment = "android"
+    elif suite_ref.startswith("backend-"):
+        environment = "backend"
+    elif suite_ref.startswith("python-"):
+        environment = "python"
+    elif suite_ref.startswith("release-"):
+        environment = "release"
+
+    if suite_ref in {"android-connected-master", "android-connected-child", "android-usb-master", "android-usb-child", "android-e2e-shell", "android-e2e-shell-script"}:
+        known_constraints = "Erfordert verbundenes Android-Geraet oder Emulator via adb."
+    elif suite_ref == "backend-rules-emulator":
+        known_constraints = "Erfordert laufenden Firestore-Emulator bzw. firebase-tools."
+    elif suite_ref.startswith("python-tests-"):
+        known_constraints = "Erfordert pytest in der lokalen Python-Umgebung."
+    elif prereq_reason:
+        known_constraints = prereq_reason
+
+    stale = evidence_required and is_stale_timestamp(updated_at)
+    return {
+        "owner": owner,
+        "severity": severity,
+        "severityRank": severity_rank(severity),
+        "blockingForRelease": blocking_for_release,
+        "evidenceRequired": evidence_required,
+        "environment": environment,
+        "knownConstraints": known_constraints,
+        "lastVerifiedAt": updated_at or "",
+        "lastSuccessfulAt": updated_at if status == "pass" else "",
+        "hasSuccessfulRun": status == "pass",
+        "staleEvidence": stale,
+        "sourceOfTruth": documentation or command or suite_ref or source,
+        "linkedSuite": suite_ref,
+        "linkedCommand": command,
+    }
 
 COMMISSIONING_TEST_GROUPS = (
     {
@@ -406,6 +539,125 @@ COMMISSIONING_TEST_GROUPS = (
                 "successCriteria": "Szenario gemaess docs/PC_ADMIN_AI_SUPPORT_WORKFLOW.md erfolgreich nachgestellt und protokolliert.",
                 "documentation": "docs/PC_ADMIN_AI_SUPPORT_WORKFLOW.md#empfohlene-reihenfolge-fur-go-live",
             },
+        ),
+    },
+    {
+        "id": "documented-reviewer-access",
+        "title": "Dokumentierte Reviewer- und App-Access-Szenarien",
+        "description": "Erfasst dokumentierte Testablaeufe fuer Play-Review, Test-Credentials und Submission-Checks.",
+        "tests": (
+            make_documented_test(
+                "doc-reviewer-test-credentials",
+                "Reviewer-Test-Credentials verifizieren",
+                "Prueft, ob die dokumentierten Reviewer-Credentials und Testprofile vollstaendig gepflegt sind.",
+                "docs/APP_ACCESS_REVIEWER_GUIDE.md#2-test-credentials",
+                success_criteria="Die hinterlegten Reviewer-Credentials und Testprofile sind verfuegbar und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-reviewer-minimal-scenario",
+                "Minimalen Reviewer-Testablauf durchlaufen",
+                "Spiegelt das dokumentierte Minimal-Szenario fuer den App-Review wider.",
+                "docs/APP_ACCESS_REVIEWER_GUIDE.md#6-minimal-reviewer-test-scenario",
+                success_criteria="Das Minimal-Szenario wurde gemaess Reviewer-Guide erfolgreich nachgestellt und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-reviewer-password-reset-post-review",
+                "Reviewer-Passwort-Reset nach Abschluss pruefen",
+                "Stellt sicher, dass Post-Review-Massnahmen fuer QA-/Reviewer-Accounts beachtet werden.",
+                "docs/APP_ACCESS_REVIEWER_GUIDE.md#8-post-review-clean-up",
+                success_criteria="Die dokumentierten Reset- und Cleanup-Schritte wurden nach Reviewabschluss bestaetigt.",
+            ),
+            make_documented_test(
+                "doc-reviewer-submission-checklist",
+                "Submission-Checklist fuer Reviewer-Access abgleichen",
+                "Spiegelt die dokumentierte Submission-Checklist fuer den App-Review wider.",
+                "docs/APP_ACCESS_REVIEWER_GUIDE.md#9-submission-checklist",
+                success_criteria="Alle Submission-Punkte aus dem Reviewer-Guide wurden abgeglichen und dokumentiert.",
+            ),
+        ),
+    },
+    {
+        "id": "documented-security-release-governance",
+        "title": "Dokumentierte Security-, Governance- und Release-Gates",
+        "description": "Erfasst dokumentierte Governance- und Release-Unterlagen, die ausserhalb automatischer Laeufe abgezeichnet werden.",
+        "tests": (
+            make_documented_test(
+                "doc-security-baseline-operator-surfaces",
+                "Security Baseline fuer Operator-Oberflaechen abgleichen",
+                "Vergleicht die Operator-/Web-Sicherheitsbasis mit der dokumentierten Checkliste.",
+                "docs/SECURITY_BASELINE_CHECKLIST.md#2-web-panel-admin-panel-operator-dashboard",
+                success_criteria="Die Security-Baseline-Checkliste wurde fuer Operator-Oberflaechen durchlaufen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-complete-acceptance-process",
+                "Complete Acceptance Process abarbeiten",
+                "Spiegelt den dokumentierten Gesamtprozess fuer Quality Gate und funktionale Abnahme wider.",
+                "docs/COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md#stage-3-functional-commissioning-gate",
+                success_criteria="Die dokumentierten Acceptance-Stages wurden abgearbeitet und protokolliert.",
+            ),
+            make_documented_test(
+                "doc-ci-runbook-gates",
+                "CI-Runbook-Gates verifizieren",
+                "Prueft, ob die dokumentierten CI- und Test-Gates nachvollzogen wurden.",
+                "docs/CI_RUNBOOK.md#2-quality-gates",
+                success_criteria="Alle relevanten CI-Runbook-Gates wurden nachvollzogen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-release-evidence-register",
+                "Release-Evidence-Register abgleichen",
+                "Stellt sicher, dass Release-Evidenz und offene Restpunkte im Register gepflegt sind.",
+                "docs/RELEASE_EVIDENCE_REGISTER.md",
+                success_criteria="Das Evidence Register wurde auf Vollstaendigkeit geprueft und mit aktuellen Artefakten verknuepft.",
+            ),
+        ),
+    },
+    {
+        "id": "documented-enforcement-matrix",
+        "title": "Dokumentierte Enforcement-Matrix",
+        "description": "Spiegelt die Child-Enforcement-Matrix als dokumentierte Testgruppe wider.",
+        "tests": (
+            make_documented_test(
+                "doc-enforcement-app-blocking",
+                "Enforcement-Matrix: App-Blocking",
+                "Dokumentierte App-Blocking-Szenarien aus der Enforcement-Matrix.",
+                "docs/CHILD_ENFORCEMENT_TEST_MATRIX.md#3-test-scenarios",
+                success_criteria="Die App-Blocking-Szenarien der Matrix wurden durchlaufen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-enforcement-device-lock",
+                "Enforcement-Matrix: Geraetesperre",
+                "Dokumentierte Szenarien zur Geraetesperre aus der Enforcement-Matrix.",
+                "docs/CHILD_ENFORCEMENT_TEST_MATRIX.md#3-test-scenarios",
+                success_criteria="Die Lock-Szenarien der Matrix wurden durchlaufen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-enforcement-usage-rules",
+                "Enforcement-Matrix: Nutzungsregeln",
+                "Dokumentierte Nutzungsregel-Szenarien aus der Enforcement-Matrix.",
+                "docs/CHILD_ENFORCEMENT_TEST_MATRIX.md#3-test-scenarios",
+                success_criteria="Die Nutzungsregel-Szenarien der Matrix wurden durchlaufen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-enforcement-anti-tamper",
+                "Enforcement-Matrix: Anti-Tamper",
+                "Dokumentierte Anti-Tamper-Szenarien aus der Enforcement-Matrix.",
+                "docs/CHILD_ENFORCEMENT_TEST_MATRIX.md#3-test-scenarios",
+                success_criteria="Die Anti-Tamper-Szenarien der Matrix wurden durchlaufen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-enforcement-offline-resilience",
+                "Enforcement-Matrix: Offline-Resilienz",
+                "Dokumentierte Offline-Resilienz-Szenarien aus der Enforcement-Matrix.",
+                "docs/CHILD_ENFORCEMENT_TEST_MATRIX.md#3-test-scenarios",
+                success_criteria="Die Offline-Resilienz-Szenarien der Matrix wurden durchlaufen und dokumentiert.",
+            ),
+            make_documented_test(
+                "doc-enforcement-fcm-sync",
+                "Enforcement-Matrix: FCM-Sync",
+                "Dokumentierte FCM-Sync-Szenarien aus der Enforcement-Matrix.",
+                "docs/CHILD_ENFORCEMENT_TEST_MATRIX.md#3-test-scenarios",
+                success_criteria="Die FCM-Sync-Szenarien der Matrix wurden durchlaufen und dokumentiert.",
+            ),
         ),
     },
     {
@@ -1532,6 +1784,177 @@ def load_latest_suite_results() -> dict[str, dict[str, object]]:
     return latest
 
 
+def repo_relative_path(path: Path) -> str:
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def normalize_repo_test_id(relative_path: str) -> str:
+    return "repo-" + relative_path.replace("/", "-").replace(".", "-").replace("_", "-")
+
+
+def repo_test_suite_ref(relative_path: str) -> str | None:
+    if relative_path == "test/firestore-rules.test.ts":
+        return "backend-rules-structural"
+    if relative_path == "test/firestore-rules.emulator.test.ts":
+        return "backend-rules-emulator"
+    if relative_path.startswith("test/"):
+        return "backend-jest"
+    if relative_path.startswith("masterApp/src/test/java/"):
+        return "android-unit-master"
+    if relative_path.startswith("childApp/src/test/java/"):
+        return "android-unit-child"
+    if relative_path.startswith("masterApp/src/androidTest/java/"):
+        return "android-usb-master"
+    if relative_path.startswith("childApp/src/androidTest/java/"):
+        return "android-usb-child"
+    if relative_path == "scripts/tests/test_app_suites.py":
+        return "python-tests-app-suites"
+    if relative_path == "scripts/tests/test_adb_client.py":
+        return "python-tests-adb-client"
+    if relative_path == "scripts/tests/test_debug_token.py":
+        return "python-tests-debug-token"
+    if relative_path == "scripts/tests/test_dual_device_runner.py":
+        return "python-tests-dual-device-runner"
+    if relative_path == "scripts/tests/test_integration.py":
+        return "python-tests-integration"
+    if relative_path == "scripts/tests/test_usb_test_runner.py":
+        return "python-tests-usb-runner"
+    return None
+
+
+def repo_test_group_title(relative_path: str) -> str:
+    if relative_path.startswith("test/integration/"):
+        return "Repo-Tests: Integration"
+    if relative_path.startswith("test/system/"):
+        return "Repo-Tests: System"
+    if relative_path.startswith("test/module/"):
+        return "Repo-Tests: Module & Hilfsfunktionen"
+    if relative_path in {
+        "test/admin-panel-helpers.test.ts",
+        "test/commissioning-readiness.test.ts",
+        "test/web-control-ui.test.ts",
+        "test/start-page.test.ts",
+    }:
+        return "Repo-Tests: Operator- & Web-Panel"
+    if relative_path.startswith("test/firestore-rules"):
+        return "Repo-Tests: Firestore Rules & Security"
+    if relative_path.startswith("test/branch-coverage") or relative_path in {
+        "test/coverage-high-impact.test.ts",
+        "test/deep-coverage-gaps.test.ts",
+        "test/new-coverage.test.ts",
+    }:
+        return "Repo-Tests: Coverage & Regression"
+    if relative_path.startswith("test/") and any(token in relative_path for token in ("support", "legal", "audit")):
+        return "Repo-Tests: Support, Legal & Audit"
+    if relative_path.startswith("test/"):
+        return "Repo-Tests: Backend & Flows"
+    if relative_path.startswith("masterApp/src/test/java/"):
+        return "Repo-Tests: Android Unit MasterApp"
+    if relative_path.startswith("childApp/src/test/java/"):
+        return "Repo-Tests: Android Unit ChildApp"
+    if relative_path.startswith("masterApp/src/androidTest/java/"):
+        return "Repo-Tests: Android Device MasterApp"
+    if relative_path.startswith("childApp/src/androidTest/java/"):
+        return "Repo-Tests: Android Device ChildApp"
+    if relative_path.startswith("scripts/tests/"):
+        return "Repo-Tests: Python QA-Infrastruktur"
+    return "Repo-Tests: Unsupported / Not Yet Mapped"
+
+
+def repo_test_description(relative_path: str) -> str:
+    if relative_path.startswith("scripts/tests/"):
+        return "Automatischer Python-QA-Test aus der lokalen Testinfrastruktur."
+    if "/androidTest/" in relative_path:
+        return "Automatischer Android-Instrumentation-/Device-Test aus der Codebasis."
+    if "/src/test/" in relative_path:
+        return "Automatischer Android-Unit-Test aus der Codebasis."
+    return "Automatischer Repo-Test aus der Codebasis."
+
+
+def iter_repo_test_inventory_paths() -> list[Path]:
+    discovered: list[Path] = []
+    for pattern in ("test/**/*.test.ts", "masterApp/src/test/java/**/*.kt", "childApp/src/test/java/**/*.kt", "masterApp/src/androidTest/java/**/*Test.kt", "childApp/src/androidTest/java/**/*Test.kt", "scripts/tests/test_*.py"):
+        for path in REPO_ROOT.glob(pattern):
+            if path.is_file():
+                discovered.append(path)
+    return sorted(set(discovered), key=lambda item: repo_relative_path(item))
+
+
+def suite_state_for_register_test(
+    suite_ref: str | None,
+    suite_catalog_index: dict[str, dict[str, object]],
+    latest_suite_results: dict[str, dict[str, object]],
+) -> tuple[dict[str, object], dict[str, object]]:
+    suite_meta = suite_catalog_index.get(suite_ref or "", {}) if suite_ref else {}
+    latest_suite = latest_suite_results.get(suite_ref or "", {}) if suite_ref else {}
+    if latest_suite:
+        state = suite_result_to_register_state(latest_suite)
+    elif suite_ref:
+        detail = str(suite_meta.get("prereqReason") or "Noch kein Suite-Ergebnis protokolliert.")
+        state = {
+            "status": "not_run",
+            "details": detail,
+        }
+    else:
+        state = {
+            "status": "not_run",
+            "details": "Noch keine Zuordnung zu einer ausführbaren Suite vorhanden.",
+        }
+    return state, suite_meta
+
+
+def build_repo_test_inventory_entries(
+    suite_catalog_index: dict[str, dict[str, object]],
+    latest_suite_results: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    for path in iter_repo_test_inventory_paths():
+        relative_path = repo_relative_path(path)
+        suite_ref = repo_test_suite_ref(relative_path)
+        register_state, suite_meta = suite_state_for_register_test(suite_ref, suite_catalog_index, latest_suite_results)
+        unsupported = not suite_ref
+        group_title = "Repo-Tests: Unsupported / Not Yet Mapped" if unsupported else repo_test_group_title(relative_path)
+        group_id = "repo-tests-unsupported" if unsupported else group_title.lower().replace(" ", "-").replace(":", "")
+        items.append(
+            {
+                "id": normalize_repo_test_id(relative_path),
+                "entryKind": "repo-test",
+                "title": relative_path,
+                "groupId": group_id,
+                "groupTitle": group_title,
+                "automationType": "automatic",
+                "source": "repo-inventory",
+                "status": str(register_state.get("status") or "not_run"),
+                "details": str(register_state.get("details") or ""),
+                "updatedAt": str(latest_suite_results.get(suite_ref or "", {}).get("timestamp") or latest_suite_results.get(suite_ref or "", {}).get("finishedAt") or ""),
+                "storage": str(SUITE_RUN_LOG_FILE if suite_ref else REPO_ROOT / relative_path),
+                "origin": "suite-run" if suite_ref else "repo-inventory",
+                "documentation": relative_path,
+                "successCriteria": f"Die zugeordnete Suite {suite_ref} laeuft fehlerfrei durch." if suite_ref else "Der Test ist im QA-Register inventarisiert und muss separat ausgeführt werden.",
+                "description": repo_test_description(relative_path),
+                "action": "suite-run" if suite_ref else "commissioning-run",
+                "suiteRef": suite_ref or "",
+                "command": str(suite_meta.get("command") or ""),
+                "prereqsMet": suite_meta.get("prereqsMet") if suite_ref else None,
+                "prereqReason": str(suite_meta.get("prereqReason") or "") if suite_ref else "",
+                **infer_register_metadata(
+                    entry_kind="repo-test",
+                    automation_type="automatic",
+                    group_id=group_id,
+                    group_title=group_title,
+                    source="repo-inventory",
+                    suite_ref=suite_ref or "",
+                    updated_at=str(latest_suite_results.get(suite_ref or "", {}).get("timestamp") or latest_suite_results.get(suite_ref or "", {}).get("finishedAt") or ""),
+                    status=str(register_state.get("status") or "not_run"),
+                    documentation=relative_path,
+                    command=str(suite_meta.get("command") or ""),
+                    prereq_reason=str(suite_meta.get("prereqReason") or ""),
+                ),
+            }
+        )
+    return items
+
+
 def build_testing_register() -> dict[str, object]:
     commissioning_catalog = get_commissioning_test_catalog()
     latest_commissioning_run = load_commissioning_history(1)
@@ -1540,6 +1963,11 @@ def build_testing_register() -> dict[str, object]:
     evidence_index = load_latest_commissioning_evidence()
     suite_catalog = get_suite_catalog()
     latest_suite_results = load_latest_suite_results()
+    suite_catalog_index = {
+        str(item.get("suiteId") or ""): item
+        for item in cast(list[dict[str, object]], suite_catalog.get("suites") or [])
+        if str(item.get("suiteId") or "")
+    }
 
     items: list[dict[str, object]] = []
 
@@ -1594,6 +2022,17 @@ def build_testing_register() -> dict[str, object]:
                     "documentation": str(test.get("documentation") or ""),
                     "successCriteria": str(test.get("successCriteria") or ""),
                     "action": "protocol" if automation_type in {"manual", "documented"} else "commissioning-run",
+                    **infer_register_metadata(
+                        entry_kind="commissioning",
+                        automation_type=automation_type,
+                        group_id=str(group.get("id") or ""),
+                        group_title=str(group.get("title") or ""),
+                        source=str(test.get("source") or ""),
+                        updated_at=str(register_state.get("updatedAt") or ""),
+                        status=str(register_state.get("status") or "not_run"),
+                        documentation=str(test.get("documentation") or ""),
+                        command=str(test.get("command") or ""),
+                    ),
                 }
             )
 
@@ -1619,8 +2058,22 @@ def build_testing_register() -> dict[str, object]:
                 "prereqsMet": bool(suite.get("prereqsMet")),
                 "prereqReason": str(suite.get("prereqReason") or ""),
                 "action": "suite-run",
+                **infer_register_metadata(
+                    entry_kind="suite",
+                    automation_type="automatic",
+                    group_id=str(suite.get("group") or ""),
+                    group_title=f"Testsuite: {str(suite.get('group') or 'sonstige')}",
+                    source="suite",
+                    suite_ref=suite_id,
+                    updated_at=str(latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
+                    status=str(register_state.get("status") or "not_run"),
+                    command=str(suite.get("command") or ""),
+                    prereq_reason=str(suite.get("prereqReason") or ""),
+                ),
             }
         )
+
+    items.extend(build_repo_test_inventory_entries(suite_catalog_index, latest_suite_results))
 
     summary = {
         "total": len(items),
@@ -1630,6 +2083,12 @@ def build_testing_register() -> dict[str, object]:
         "notRun": sum(1 for item in items if item["status"] == "not_run"),
         "automatic": sum(1 for item in items if item["automationType"] in {"automatic", "command"}),
         "manual": sum(1 for item in items if item["automationType"] in {"manual", "documented"}),
+        "critical": sum(1 for item in items if item.get("severity") == "critical"),
+        "high": sum(1 for item in items if item.get("severity") == "high"),
+        "blocking": sum(1 for item in items if item.get("blockingForRelease")),
+        "stale": sum(1 for item in items if item.get("staleEvidence")),
+        "withoutSuccess": sum(1 for item in items if not item.get("hasSuccessfulRun")),
+        "unsupported": sum(1 for item in items if item.get("groupId") == "repo-tests-unsupported"),
     }
 
     return {

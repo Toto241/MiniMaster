@@ -62,6 +62,19 @@ def java_available() -> bool:
     return shutil.which("java") is not None
 
 
+def python_module_available(module_name: str) -> bool:
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {module_name}"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def java_version_for_home(java_home: Path) -> int | None:
     java_binary = java_home / "bin" / ("java.exe" if IS_WINDOWS else "java")
     if not java_binary.exists():
@@ -308,6 +321,7 @@ PREREQ_CHECKS: dict[str, Callable[[], tuple[bool, str | None]]] = {
     "npm": lambda: (command_exists(npm_command()), f"{npm_command()} not found in PATH."),
     "pwsh": lambda: (command_exists("pwsh"), "pwsh not found in PATH."),
     "bash": lambda: (command_exists("bash"), "bash not found in PATH."),
+    "python_pytest": lambda: (python_module_available("pytest"), f"pytest is not available in {sys.executable}."),
     "node_modules": lambda: ((REPO_ROOT / "node_modules").exists(), "node_modules is missing. Run npm install first."),
     "local_properties": lambda: ((REPO_ROOT / "local.properties").exists(), "local.properties is missing."),
     "debug_secret_master": lambda: (
@@ -353,6 +367,13 @@ SUITES: tuple[Suite, ...] = (
     Suite("android-usb-master", "masterApp USB commissioning", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "master", "--suite", "commissioning"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_master"), timeout_sec=7200),
     Suite("android-usb-child", "childApp USB commissioning", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "child", "--suite", "commissioning"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_child"), timeout_sec=7200),
     Suite("android-e2e-shell", "Cross-app E2E shell flow", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "master", "--suite", "default"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=7200),
+    Suite("android-e2e-shell-script", "Cross-app E2E shell script", "device", ["bash", str(REPO_ROOT / "run_e2e_test.sh")], ("bash", "gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=7200),
+    Suite("python-tests-app-suites", "Python suite API tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_app_suites.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("python-tests-adb-client", "Python adb client tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_adb_client.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("python-tests-debug-token", "Python debug token tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_debug_token.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("python-tests-dual-device-runner", "Python dual-device runner tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_dual_device_runner.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("python-tests-integration", "Python integration tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_integration.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("python-tests-usb-runner", "Python USB runner tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_usb_test_runner.py")], ("python_pytest",), timeout_sec=1800),
     Suite("release-revalidate", "Release gate revalidation", "release", [npm_command(), "run", "ci:revalidate"], ("npm", "node_modules"), timeout_sec=3600),
     Suite("static-readiness", "Static platform readiness checks", "release", [sys.executable, str(REPO_ROOT / "scripts" / "static_readiness_checks.py")], tuple()),
 )
