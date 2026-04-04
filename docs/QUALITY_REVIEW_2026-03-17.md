@@ -1,4 +1,12 @@
-# Quality Review & Documentation Update (2026-03-18)
+# Quality Review & Documentation Update (2026-04-04)
+
+This document was refreshed on 2026-04-04.
+
+Current note:
+
+- The repository state at the time of this refresh is aligned with `main`.
+- The Jest-based quality evidence below has been updated to the latest verified run.
+- Android emulator and connected-device statements remain historical evidence from the original review unless explicitly rerun.
 
 This report consolidates the requested full pass over:
 
@@ -22,21 +30,21 @@ Reviewed repository areas:
 |---|---|---|
 | TypeScript compile | `npm run build` | ✅ Passed |
 | Linting | `npm run lint` | ✅ Passed |
-| Backend test suite | `npm test -- --runInBand` | ✅ 17/17 suites, 240/240 tests passed |
+| Backend and integration test suite | `npm run test:ci` | ✅ 41/41 suites, 1506/1506 tests passed |
 | Android manifest validation | `./validate_manifests.sh` | ✅ Passed |
 | Android lint (blocking on error) | `./gradlew lint` | ✅ Passed |
 | Android unit tests (Gradle) | `./gradlew :masterApp:testDebugUnitTest :childApp:testDebugUnitTest` | ✅ Passed |
 | Android instrumentation build | `./gradlew :masterApp:assembleDebugAndroidTest :childApp:assembleDebugAndroidTest` | ✅ Passed |
-| Selected connected tests (Master) | `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest` | ✅ Passed on AVD |
-| Selected connected tests (Child) | `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest` | ✅ Passed on AVD |
-| GUI smoke check | Manual browser smoke check – pages served via local HTTP and verified in browser for `web-control` and `admin-panel` | ✅ Both entry UIs load and render |
+| Selected connected tests (Master) | `./gradlew :masterApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest` | ✅ Historical evidence from original review |
+| Selected connected tests (Child) | `./gradlew :childApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest` | ✅ Historical evidence from original review |
+| GUI smoke / UI regression evidence | Automated Jest UI coverage via `test/admin-panel-helpers.test.ts`, `test/web-control-ui.test.ts`, `test/start-page.test.ts` | ✅ Covered in current 41/41 suite run |
 
 ## Code Analysis & Review Notes
 
 ### Backend quality state
 
 - The backend compiles and lint checks pass without required code changes.
-- The Jest suite completes successfully with broad functional coverage (auth, tasks, device lifecycle, rules, system/integration coverage).
+- The Jest suite completes successfully with broad functional coverage (auth, tasks, device lifecycle, rules, system/integration coverage, admin panel helpers, start page and web-control UI flows).
 - During tests, expected error-path logs are produced (e.g. simulated auth/audit failures) while assertions still pass; this indicates explicit negative-path testing rather than uncontrolled runtime failures.
 
 ### Configuration review
@@ -48,12 +56,12 @@ Reviewed repository areas:
 
 ## GUI / Usability Review
 
-A non-invasive browser smoke check was executed against the static UIs:
+A current automated UI validation is covered against the static UIs:
 
 - `web-control/index.html`
 - `admin-panel/index.html`
 
-Both pages and their dependent static assets load successfully over local HTTP serving. This confirms baseline operability of the browser-facing surfaces in this environment.
+The latest verified Jest run includes dedicated coverage for the browser-facing surfaces (`web-control`, `admin-panel`, start page) and passed fully. Historical manual smoke-check evidence from the original review remains valid, but the primary current evidence basis is the automated UI test coverage.
 
 ## Recommended Follow-up
 
@@ -63,4 +71,4 @@ Both pages and their dependent static assets load successfully over local HTTP s
 
 ## Conclusion
 
-The repository is currently in a healthy cross-stack quality state. Backend build/lint/tests pass, Android lint and unit tests pass, selected connected Android tests run successfully on emulator, and web UIs load correctly in smoke checks. Remaining work is focused on continuous automation hardening (CI device tests and proactive dependency modernization), not on functional blockers.
+The repository is currently in a healthy cross-stack quality state. The latest verified Jest quality gate is green with 41/41 suites and 1506/1506 tests, including the browser-facing UI surfaces. Historical Android lint, unit and selected connected-test evidence remains documented from the earlier review. Remaining work is focused on continuous automation hardening (CI device tests and proactive dependency modernization), not on currently evidenced functional blockers.
