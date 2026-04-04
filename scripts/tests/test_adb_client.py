@@ -518,3 +518,18 @@ class TestResolveLatestApk:
         result = resolve_latest_apk("child", repo_root=tmp_repo)
         assert result is not None
         assert result.name == "child.apk"
+
+    def test_prefers_app_apk_over_androidtest_artifact(self, tmp_repo: Path):
+        import time as _t
+
+        app_apk = tmp_repo / "childApp" / "build" / "outputs" / "apk" / "debug" / "childApp-debug.apk"
+        app_apk.write_bytes(b"app_binary")
+        _t.sleep(0.05)
+        android_test_apk = tmp_repo / "childApp" / "build" / "outputs" / "apk" / "androidTest" / "debug" / "childApp-debug-androidTest.apk"
+        android_test_apk.parent.mkdir(parents=True, exist_ok=True)
+        android_test_apk.write_bytes(b"test_binary")
+
+        result = resolve_latest_apk("child", repo_root=tmp_repo)
+
+        assert result is not None
+        assert result.name == "childApp-debug.apk"
