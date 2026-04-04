@@ -384,7 +384,7 @@ function collectCommissioningAutomationContext() {
     const runtimeConfig = getOperatorConfigFormValues();
     const attestationState = getCommissioningAttestations();
     const playStoreState = getPlayStoreReadinessState();
-    const validationSummary = commissioningSummary?.validationSummary || null;
+    const validationSummary = getEffectiveValidationSummary();
 
     return {
         runtimeConfig,

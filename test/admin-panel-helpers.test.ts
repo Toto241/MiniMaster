@@ -69,6 +69,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  sanitizeApkPath,",
     "  buildPowerShellScript,",
     "  buildDeployCommand,",
+    "  collectCommissioningAutomationContext,",
     "  buildValidationSummaryFromResults,",
     "  buildCommissioningSnapshot,",
     "  buildCurrentCommissioningSummary,",
@@ -310,6 +311,39 @@ describe("admin-panel helper functions", () => {
     expect(firestore.status).toBe("pass");
     expect(storage.status).toBe("pass");
     expect(functions.status).toBe("pass");
+  });
+
+  it("uses fresh validation summary for python commissioning context", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    exports.setCommissioningSummaryForTests({
+      validationSummary: {
+        ok: 0,
+        warn: 0,
+        errorCount: 2,
+        checks: {
+          firestoreAccessOk: false,
+          storageHealthOk: false,
+          functionsReachable: false,
+        },
+      },
+    });
+
+    exports.setSetupValidationResultsForTests([
+      { check: "Admin Authentication", status: "ok", message: "ok" },
+      { check: "Firestore Collection (masters)", status: "ok", message: "ok" },
+      { check: "Firestore Collection (children)", status: "ok", message: "ok" },
+      { check: "Function (getSubscriptionStatus)", status: "warn", message: "warn" },
+      { check: "Backend Storage Health", status: "ok", message: "ok" },
+      { check: "Shared Web-Control Firebase Config", status: "ok", message: "ok" },
+    ]);
+
+    const commissioningContext = exports.collectCommissioningAutomationContext();
+
+    expect(commissioningContext.validationSummary.errorCount).toBe(0);
+    expect(commissioningContext.validationSummary.checks.firestoreAccessOk).toBe(true);
+    expect(commissioningContext.validationSummary.checks.storageHealthOk).toBe(true);
+    expect(commissioningContext.validationSummary.checks.functionsReachable).toBe(true);
   });
 
   // ── escapePowerShellString ──
