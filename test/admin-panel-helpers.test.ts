@@ -69,8 +69,11 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  sanitizeApkPath,",
     "  buildPowerShellScript,",
     "  buildDeployCommand,",
+    "  buildValidationSummaryFromResults,",
     "  buildCommissioningSnapshot,",
+    "  buildCurrentCommissioningSummary,",
     "  renderCommissioningReport,",
+    "  getCommissioningQaApprovalItems,",
     "  filterVisibleCommissioningPendingItems,",
     "  getMissingAttestations,",
     "  updateCommissioningAttestations,",
@@ -128,6 +131,8 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  setPythonAutomationEvidenceCache,",
     "  getTestingRegisterStatusPriority,",
     "  getTestingRegisterSeverityPriority,",
+    "  setSetupValidationResultsForTests: (results) => { setupValidationResults = results; },",
+    "  setCommissioningSummaryForTests: (summary) => { commissioningSummary = summary; },",
     "  formatTestingRegisterGroupTitle,",
     "  buildTestingRegisterTooltipAttr,",
     "  buildTestingRegisterMetaBadges,",
@@ -240,6 +245,71 @@ describe("admin-panel helper functions", () => {
     expect(reportEl.innerHTML).toContain("Aktualisiert:");
     expect(reportEl.innerHTML).toContain("demo-project");
     expect(reportEl.innerHTML).toContain("Keine offenen Inbetriebnahme-Punkte erkannt.");
+  });
+
+  it("derives validation summary flags from setup validation results", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const summary = exports.buildValidationSummaryFromResults([
+      { check: "Admin Authentication", status: "ok", message: "ok" },
+      { check: "Firestore Collection (masters)", status: "ok", message: "ok" },
+      { check: "Firestore Collection (children)", status: "ok", message: "ok" },
+      { check: "Function (getSubscriptionStatus)", status: "warn", message: "warn" },
+      { check: "Backend Storage Health", status: "ok", message: "ok" },
+      { check: "AI Secret Configuration", status: "ok", message: "ok" },
+      { check: "Shared Web-Control Firebase Config", status: "ok", message: "ok" },
+    ]);
+
+    expect(summary.ok).toBe(6);
+    expect(summary.warn).toBe(1);
+    expect(summary.errorCount).toBe(0);
+    expect(summary.checks.adminAuthOk).toBe(true);
+    expect(summary.checks.firestoreAccessOk).toBe(true);
+    expect(summary.checks.functionsReachable).toBe(true);
+    expect(summary.checks.storageHealthOk).toBe(true);
+    expect(summary.checks.aiConfigured).toBe(true);
+    expect(summary.checks.webControlConfigReady).toBe(true);
+  });
+
+  it("prefers fresh setup validation over stale commissioning summary for service approvals", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    exports.setCommissioningSummaryForTests({
+      validationSummary: {
+        ok: 0,
+        warn: 0,
+        errorCount: 3,
+        checks: {
+          firestoreAccessOk: false,
+          storageHealthOk: false,
+          functionsReachable: false,
+        },
+      },
+      qaApprovals: [],
+      roleAssignments: [],
+    });
+
+    exports.setSetupValidationResultsForTests([
+      { check: "Admin Authentication", status: "ok", message: "ok" },
+      { check: "Firestore Collection (masters)", status: "ok", message: "ok" },
+      { check: "Firestore Collection (children)", status: "ok", message: "ok" },
+      { check: "Firestore Collection (supportTickets)", status: "ok", message: "ok" },
+      { check: "Firestore Collection (audit_logs)", status: "ok", message: "ok" },
+      { check: "Function (getSubscriptionStatus)", status: "warn", message: "warn" },
+      { check: "Function (validatePairingCode)", status: "warn", message: "warn" },
+      { check: "Function (exportUserData)", status: "warn", message: "warn" },
+      { check: "Backend Storage Health", status: "ok", message: "ok" },
+      { check: "Shared Web-Control Firebase Config", status: "ok", message: "ok" },
+    ]);
+
+    const approvals = exports.getCommissioningQaApprovalItems();
+    const firestore = approvals.find((item: any) => item.id === "firestore-enabled");
+    const storage = approvals.find((item: any) => item.id === "storage-enabled");
+    const functions = approvals.find((item: any) => item.id === "functions-enabled");
+
+    expect(firestore.status).toBe("pass");
+    expect(storage.status).toBe("pass");
+    expect(functions.status).toBe("pass");
   });
 
   // ── escapePowerShellString ──
