@@ -83,6 +83,47 @@ class TestGetSuiteCatalog:
         assert summary["ready"] + summary["notReady"] == summary["total"]
 
 
+class TestBuildTestingRegister:
+    def test_register_exposes_extended_summary_and_metadata(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+
+        assert "summary" in result
+        for key in ("critical", "blocking", "stale", "withoutSuccess", "unsupported"):
+            assert key in result["summary"]
+
+        items = result["items"]
+        assert items
+        sample = items[0]
+        for key in (
+            "owner",
+            "severity",
+            "blockingForRelease",
+            "evidenceRequired",
+            "environment",
+            "hasSuccessfulRun",
+            "staleEvidence",
+            "sourceOfTruth",
+            "linkedSuite",
+            "linkedCommand",
+        ):
+            assert key in sample
+
+    def test_register_contains_repo_suite_links_or_unsupported_bucket(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+        repo_items = [item for item in result["items"] if item.get("entryKind") == "repo-test"]
+        assert repo_items
+
+        for item in repo_items:
+            if item.get("groupId") == "repo-tests-unsupported":
+                assert item.get("groupTitle") == "Repo-Tests: Unsupported / Not Yet Mapped"
+            else:
+                assert item.get("linkedSuite") == item.get("suiteRef", "")
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  get_device_status
 # ═══════════════════════════════════════════════════════════════════

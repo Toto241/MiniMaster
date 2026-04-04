@@ -125,6 +125,10 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  getLatestPythonAutomationEvidence,",
     "  findPythonAutomationTestById,",
     "  setPythonAutomationEvidenceCache,",
+    "  getTestingRegisterStatusPriority,",
+    "  getTestingRegisterSeverityPriority,",
+    "  formatTestingRegisterGroupTitle,",
+    "  buildTestingRegisterDetailText,",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
     "};",
@@ -1194,6 +1198,39 @@ describe("admin-panel helper functions", () => {
     );
     expect(result.status).toBe("not_run");
     expect(result.details).toContain("Fail-Fast");
+  });
+
+  it("prioritizes testing register statuses and severities", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.getTestingRegisterStatusPriority("fail")).toBeLessThan(exports.getTestingRegisterStatusPriority("pass"));
+    expect(exports.getTestingRegisterSeverityPriority("critical")).toBeLessThan(exports.getTestingRegisterSeverityPriority("medium"));
+  });
+
+  it("formats testing register metadata for group and detail display", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(
+      exports.formatTestingRegisterGroupTitle({
+        groupTitle: "Repo-Tests: Unsupported / Not Yet Mapped",
+        groupId: "repo-tests-unsupported",
+      }),
+    ).toContain("Unsupported");
+
+    const detail = exports.buildTestingRegisterDetailText({
+      details: "Letzter Lauf fehlgeschlagen",
+      environment: "android",
+      linkedSuite: "android-usb-master",
+      linkedCommand: "./gradlew :masterApp:connectedDebugAndroidTest",
+      evidenceRequired: true,
+      knownConstraints: "ADB erforderlich",
+    });
+
+    expect(detail).toContain("Umgebung: android");
+    expect(detail).toContain("Suite: android-usb-master");
+    expect(detail).toContain("Kommando");
+    expect(detail).toContain("Evidenz erforderlich");
+    expect(detail).toContain("ADB erforderlich");
   });
 
   // ── findPythonAutomationTestById ──
