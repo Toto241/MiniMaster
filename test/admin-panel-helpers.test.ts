@@ -109,6 +109,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  saveWizardState,",
     "  getPlatformReadiness,",
     "  updatePlatformReadiness,",
+    "  buildEffectivePlatformState,",
     "  getPlayStoreReadinessState,",
     "  setPlayStoreReadinessState,",
     "  getCommissioningAttestations,",
@@ -906,6 +907,25 @@ describe("admin-panel helper functions", () => {
     const updated = exports.getPlatformReadiness();
     expect(updated["ma-registration-flow"]).toBe(true);
     expect(updated["ma-pairing-works"]).toBe(true);
+  });
+
+  it("merges QA register PASS entries into effective platform state", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const effective = exports.buildEffectivePlatformState(
+      { "ma-registration-flow": true },
+      {
+        items: [
+          { id: "static-ma-proguard-enabled", status: "pass" },
+          { id: "ca-pairing-flow", status: "pass" },
+          { id: "static-dt-csp", status: "fail" },
+        ],
+      },
+    );
+
+    expect(effective["ma-registration-flow"]).toBe(true);
+    expect(effective["ma-proguard-enabled"]).toBe(true);
+    expect(effective["ca-pairing-flow"]).toBe(true);
+    expect(Boolean(effective["dt-csp-headers"])).toBe(false);
   });
 
   // ── PlayStore readiness state ──
