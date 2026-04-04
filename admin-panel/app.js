@@ -3294,12 +3294,13 @@ const platformReadinessItems = {
     },
 };
 
-function computeGoLiveStatusFromData(missingAttestations, platformState, playStoreState, validation) {
+function computeGoLiveStatusFromData(openApprovals, platformState, playStoreState, validation) {
     const backendReady = validation
         ? (validation.errorCount === 0 && validation.checks.adminAuthOk && validation.checks.functionsReachable && validation.checks.firestoreAccessOk)
         : false;
 
-    const allAttestationsOk = missingAttestations.length === 0;
+    const approvalItems = Array.isArray(openApprovals) ? openApprovals : [];
+    const allApprovalsOk = approvalItems.length === 0;
 
     const platformStatus = {};
     let totalCritical = 0;
@@ -3308,6 +3309,9 @@ function computeGoLiveStatusFromData(missingAttestations, platformState, playSto
     let doneHigh = 0;
     let totalAll = 0;
     let doneAll = 0;
+    const approvalTotal = commissioningQaRegisterIds.length;
+    const approvalOpen = approvalItems.length;
+    const approvalDone = Math.max(approvalTotal - approvalOpen, 0);
 
     for (const [platformKey, platform] of Object.entries(platformReadinessItems)) {
         let pCritical = 0, pCriticalDone = 0, pHigh = 0, pHighDone = 0, pTotal = 0, pDone = 0;
@@ -3341,15 +3345,15 @@ function computeGoLiveStatusFromData(missingAttestations, platformState, playSto
     const playStoreReady = playChecksDone === playChecksTotal && playMetaReady;
 
     let ampel, ampelLabel, ampelDescription;
-    if (backendReady && allAttestationsOk && allCriticalDone && allHighDone && doneAll === totalAll && playStoreReady) {
+    if (backendReady && allApprovalsOk && allCriticalDone && allHighDone && doneAll === totalAll && playStoreReady) {
         ampel = "green";
         ampelLabel = "Go-Live freigegeben";
-        ampelDescription = "Backend, manuelle Freigaben, Plattform-Checks und Play-Store-Gates sind produktionsbereit.";
+        ampelDescription = "Backend, QA-Freigaben, Plattform-Checks und Play-Store-Gates sind produktionsbereit.";
     } else if (backendReady && allCriticalDone) {
         ampel = "yellow";
         ampelLabel = "Teilweise bereit";
         ampelDescription = playStoreReady
-            ? "Backend und kritische Punkte OK. Offene Freigaben oder HIGH-Punkte verhindern Vollfreigabe."
+            ? "Backend und kritische Punkte OK. Offene QA-Freigaben oder HIGH-Punkte verhindern Vollfreigabe."
             : "Backend und kritische Punkte OK. Offene Play-Store-Pflichten verhindern Vollfreigabe.";
     } else {
         ampel = "red";
@@ -3361,19 +3365,19 @@ function computeGoLiveStatusFromData(missingAttestations, platformState, playSto
 
     return {
         ampel, ampelLabel, ampelDescription,
-        backendReady, allAttestationsOk,
+        backendReady, allApprovalsOk, allAttestationsOk: allApprovalsOk,
         playStoreReady,
         platformStatus,
-        totals: { totalAll, doneAll, totalCritical, doneCritical, totalHigh, doneHigh, playChecksTotal, playChecksDone },
+        totals: { totalAll, doneAll, totalCritical, doneCritical, totalHigh, doneHigh, playChecksTotal, playChecksDone, approvalTotal, approvalDone, approvalOpen },
     };
 }
 
 function computeGoLiveStatus() {
-    const missingAttestations = getMissingAttestations();
+    const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: commissioningSummary?.validationSummary || null });
     const platformState = getPlatformReadiness();
     const playStoreState = getPlayStoreReadinessState();
     const validation = commissioningSummary?.validationSummary || null;
-    return computeGoLiveStatusFromData(missingAttestations, platformState, playStoreState, validation);
+    return computeGoLiveStatusFromData(qaApprovalSummary.open, platformState, playStoreState, validation);
 }
 
 function renderGoLiveAmpel() {
@@ -3413,7 +3417,7 @@ function renderGoLiveAmpel() {
                 <div class="ampel-stat"><strong>${status.totals.doneHigh}/${status.totals.totalHigh}</strong><span>Hoch</span></div>
                 <div class="ampel-stat"><strong>${status.totals.doneAll}/${status.totals.totalAll}</strong><span>Gesamt</span></div>
                 <div class="ampel-stat"><strong>${status.backendReady ? "OK" : "FEHLT"}</strong><span>Backend</span></div>
-                <div class="ampel-stat"><strong>${status.allAttestationsOk ? "OK" : "OFFEN"}</strong><span>Freigaben</span></div>
+                <div class="ampel-stat"><strong>${status.totals.approvalDone}/${status.totals.approvalTotal}</strong><span>QA-Freigaben</span></div>
                 <div class="ampel-stat"><strong>${status.playStoreReady ? "OK" : `${status.totals.playChecksDone}/${status.totals.playChecksTotal}`}</strong><span>Play Store</span></div>
             </div>
             <div class="ampel-platforms">
@@ -3447,10 +3451,11 @@ function renderGoLiveAmpel() {
                 "<button class='btn btn-primary' style='inline-size:100%' onclick='confirmFinalGoLive()'>✅ Finales Go-Live bestätigen</button>";
         } else {
             const openCount = status.totals.totalAll - status.totals.doneAll +
+                status.totals.approvalOpen +
                 (status.playStoreReady ? 0 : (status.totals.playChecksTotal - status.totals.playChecksDone));
             const reasons = [];
             if (!status.backendReady) reasons.push("Backend-Validierung ausstehend");
-            if (!status.allAttestationsOk) reasons.push("Manuelle Freigaben offen");
+            if (!status.allApprovalsOk) reasons.push("QA-Freigaben offen");
             if (!status.playStoreReady) reasons.push("Play-Store-Gates offen");
             if (status.totals.doneCritical < status.totals.totalCritical)
                 reasons.push(`${status.totals.totalCritical - status.totals.doneCritical} kritische Plattform-Punkte offen`);
