@@ -3163,7 +3163,7 @@ function buildPrioritizedActionPlanFromData(validation, platformState, playStore
 
 function buildPrioritizedActionPlan() {
     const validation = commissioningSummary?.validationSummary || null;
-    const platformState = buildEffectivePlatformState(getPlatformReadiness(), testingRegisterPayload);
+    const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
     const playStoreState = getPlayStoreReadinessState();
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: validation });
     const openApprovals = qaApprovalSummary.open.map(item => ({
@@ -3213,20 +3213,6 @@ function renderPrioritizedActionPlan() {
 }
 
 // ==================== GO-LIVE AMPEL & PLATTFORM-TRACKER ====================
-
-const PLATFORM_ATTESTATION_STORAGE_KEY = "operatorPlatformReadiness";
-
-function getPlatformReadiness() {
-    try {
-        return JSON.parse(localStorage.getItem(PLATFORM_ATTESTATION_STORAGE_KEY) || "{}");
-    } catch (_) { return {}; }
-}
-
-function updatePlatformReadiness(partial) {
-    const current = getPlatformReadiness();
-    Object.assign(current, partial);
-    localStorage.setItem(PLATFORM_ATTESTATION_STORAGE_KEY, JSON.stringify(current));
-}
 
 const platformReadinessItems = {
     masterApp: {
@@ -3545,7 +3531,7 @@ function computeGoLiveStatusFromData(openApprovals, platformState, playStoreStat
 function computeGoLiveStatus() {
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: commissioningSummary?.validationSummary || null });
     const platformQaSummary = buildPlatformQaReadinessSummary(testingRegisterPayload);
-    const platformState = platformQaSummary.hasData ? {} : getPlatformReadiness();
+    const platformState = {};
     const playStoreState = getPlayStoreReadinessState();
     const validation = commissioningSummary?.validationSummary || null;
     return computeGoLiveStatusFromData(qaApprovalSummary.open, platformState, playStoreState, validation, platformQaSummary);
@@ -3629,7 +3615,7 @@ function renderGoLiveAmpel() {
             if (!status.allApprovalsOk) reasons.push("QA-Freigaben offen");
             if (!status.playStoreReady) reasons.push("Play-Store-Gates offen");
             if (status.totals.doneCritical < status.totals.totalCritical)
-                reasons.push(`${status.totals.totalCritical - status.totals.doneCritical} kritische Plattform-Punkte offen`);
+                reasons.push(`${status.totals.totalCritical - status.totals.doneCritical} kritische QA-/Plattform-Punkte offen`);
             gateContainer.innerHTML =
                 "<button class='btn btn-primary' disabled style='inline-size:100%;opacity:0.5;cursor:not-allowed'>🔒 Finales Go-Live (gesperrt)</button>" +
                 "<p style='color:#ef4444;font-size:0.85em;margin-block-start:6px'>" +
@@ -3666,46 +3652,16 @@ function renderPlatformReadinessSection(platformKey) {
         return;
     }
 
-    if (isPythonOperator) {
-        container.innerHTML = `
-            <div class="info">
-                Diese Plattform-Checks werden zentral im Panel <strong>Qualitätssicherung</strong> gepflegt.
-                Lade das QA-Register, um den aktuellen Status zu sehen.
-            </div>
-            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
-                <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln">Zur Qualitätssicherung wechseln</button>
-                <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register jetzt laden">QA-Register laden</button>
-            </div>
-        `;
-        return;
-    }
-
-    const savedState = getPlatformReadiness();
-    container.innerHTML = "";
-
-    const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-    const sortedItems = [...platform.items].sort((a, b) => (severityOrder[a.severity] || 9) - (severityOrder[b.severity] || 9));
-
-    sortedItems.forEach(item => {
-        const wrapper = document.createElement("div");
-        wrapper.className = "platform-checklist-item severity-" + item.severity;
-        wrapper.innerHTML = `
-            <input type="checkbox" id="platform-${item.key}" ${savedState[item.key] ? "checked" : ""}>
-            <label for="platform-${item.key}">
-                <span class="severity-badge severity-${item.severity}">${item.severity.toUpperCase()}</span>
-                ${escapeHtml(item.label)}
-            </label>
-        `;
-
-        const checkbox = wrapper.querySelector("input");
-        checkbox.addEventListener("change", (e) => {
-            updatePlatformReadiness({ [item.key]: e.target.checked });
-            renderGoLiveAmpel();
-            renderPrioritizedActionPlan();
-        });
-
-        container.appendChild(wrapper);
-    });
+    container.innerHTML = `
+        <div class="info">
+            Diese Plattform-Checks werden zentral im Panel <strong>Qualitätssicherung</strong> gepflegt.
+            Lade das QA-Register, um den aktuellen Status zu sehen.
+        </div>
+        <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+            <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln">Zur Qualitätssicherung wechseln</button>
+            <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register jetzt laden">QA-Register laden</button>
+        </div>
+    `;
 }
 
 function renderAllPlatformSections() {
@@ -3808,7 +3764,7 @@ function runPlausibilityCheck() {
     if (!container) return;
 
     const attestations = getCommissioningAttestations();
-    const platformState = buildEffectivePlatformState(getPlatformReadiness(), testingRegisterPayload);
+    const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
     const config = typeof getOperatorConfigFormValues === "function" ? getOperatorConfigFormValues() : {};
     const validationChecks = commissioningSummary?.validationSummary?.checks || {};
 
@@ -3849,49 +3805,41 @@ const setupWizards = {
                 title: "1. App installieren",
                 instruction: "Installieren Sie die MasterApp auf dem Eltern-Smartphone. Sie finden sie unter dem Paketnamen <strong>com.minimaster.masterapp</strong>.",
                 detail: "Für Testzwecke: <code>gradlew.bat :masterApp:assembleDebug</code> ausführen und die APK per USB/ADB installieren. Für Produktion: App über den Google Play Store herunterladen.",
-                checkKey: "ma-registration-flow",
             },
             {
                 title: "2. Geräteregistrierung",
                 instruction: "Öffnen Sie die App. Sie werden automatisch zur Registrierung geleitet. Die App fordert <strong>READ_PHONE_STATE</strong> an und registriert das Gerät über <code>registerMasterDevice</code>.",
                 detail: "Nach Registrierung erhalten Sie einen <strong>SecretKey</strong>, der im DataStore gespeichert wird. <em>Wichtig:</em> Auf Android 10+ kann die IMEI nicht direkt gelesen werden – hier wird eine alternative Geräte-ID benötigt.",
-                checkKey: "ma-registration-flow",
             },
             {
                 title: "3. Kind-Gerät koppeln",
                 instruction: "Im Dashboard auf <strong>Pairing-Link generieren</strong> oder einen <strong>6-stelligen Code</strong> erstellen. Den Link/Code an das Kind-Gerät weitergeben.",
                 detail: "Pairing-Links sind 5 Minuten gültig (UUID-Token). Codes sind 24 Stunden gültig. Nach erfolgreichem Pairing erscheint das Kind-Gerät im Dashboard.",
-                checkKey: "ma-pairing-works",
             },
             {
                 title: "4. Gerätesperre testen",
                 instruction: "Im Dashboard den <strong>Lock-Toggle</strong> für das gekoppelte Kind-Gerät aktivieren. Prüfen Sie, ob das Kind-Gerät gesperrt wird.",
                 detail: "Der Lock-Status wird in Echtzeit via Firestore synchronisiert. Das Kind-Gerät empfängt die Änderung über FCM und den AccessibilityService.",
-                checkKey: "ma-lock-unlock",
             },
             {
                 title: "5. Aufgabe erstellen und prüfen",
                 instruction: "Eine Testaufgabe über <strong>Aufgabe erstellen</strong> anlegen. Das Kind schließt die Aufgabe mit Fotobeweis ab. Danach im <strong>Task Review</strong> genehmigen.",
                 detail: "Aufgaben-Flow: pending → pending_approval (Kind schickt Foto) → approved (Eltern genehmigen). Der Reject-Button muss ebenfalls funktionieren.",
-                checkKey: "ma-task-review",
             },
             {
                 title: "6. Nutzungsregeln einrichten",
                 instruction: "Öffnen Sie <strong>Nutzungsregeln</strong> für ein Kind-Gerät. Setzen Sie ein Tageslimit (z.B. 120 Minuten), ein Zeitfenster (z.B. 08:00–20:00) und optional Pro-App-Limits.",
                 detail: "Die Regeln werden über <code>setUsageRules</code> Cloud Function gespeichert und per FCM an das Kind-Gerät übermittelt. Testen Sie, ob die Limits auf dem Kind-Gerät tatsächlich greifen.",
-                checkKey: "ma-usage-rules-nav",
             },
             {
                 title: "7. Push-Benachrichtigungen prüfen",
                 instruction: "Lösen Sie auf dem Kind-Gerät eine Aufgaben-Erledigung aus. Prüfen Sie, ob die Eltern-App eine <strong>Push-Benachrichtigung</strong> empfängt.",
                 detail: "Die MasterApp verwendet zwei Notification-Channels: IMPORTANCE_HIGH (Aufgaben) und IMPORTANCE_DEFAULT (Gerätestatus). FCM-Token wird beim App-Start registriert.",
-                checkKey: "ma-fcm-working",
             },
             {
                 title: "8. Abonnement prüfen",
                 instruction: "Öffnen Sie den <strong>Subscription-Screen</strong>. Prüfen Sie, ob Produkte angezeigt werden und ein Testkauf möglich ist.",
                 detail: "SKUs: single_child_monthly (€1,99), family_monthly (€4,99), single_child_yearly (€19,99), family_yearly (€49,99). Testmodus über Google Play Console aktivieren.",
-                checkKey: "ma-subscription-check",
             },
         ],
     },
@@ -3902,55 +3850,46 @@ const setupWizards = {
                 title: "1. App installieren",
                 instruction: "Installieren Sie die ChildApp auf dem Kind-Smartphone. Paketname: <strong>com.google.pairing</strong> (Legacy-Paketname).",
                 detail: "Für Tests: <code>gradlew.bat :childApp:assembleDebug</code>. Per ADB installieren: <code>adb install childApp/build/outputs/apk/debug/childApp-debug.apk</code>.",
-                checkKey: "ca-pairing-flow",
             },
             {
                 title: "2. Kopplung durchführen",
                 instruction: "Öffnen Sie die ChildApp und geben Sie den <strong>6-stelligen Code</strong> ein oder öffnen Sie den <strong>Pairing-Link</strong> auf dem Kind-Gerät.",
                 detail: "Die App ruft <code>validatePairingCode</code> oder <code>validatePairingToken</code> auf. Nach Erfolg wird ein Child-Dokument in Firestore erstellt und die App wechselt in den überwachten Modus.",
-                checkKey: "ca-pairing-flow",
             },
             {
                 title: "3. Berechtigungen erteilen",
                 instruction: "Erteilen Sie alle erforderlichen Berechtigungen: <strong>Eingabehilfe (Accessibility)</strong>, <strong>Overlay-Berechtigung</strong>, <strong>Nutzungsstatistik-Zugriff</strong>, <strong>Geräteadministrator</strong>.",
                 detail: "Die App leitet durch jeden Berechtigungsschritt. Ohne Accessibility-Berechtigung ist keine App-Überwachung möglich. Die Overlay-Berechtigung wird für die Sperrbildschirm-Anzeige benötigt.",
-                checkKey: "ca-permission-onboarding",
             },
             {
                 title: "4. Eingabehilfe aktivieren",
                 instruction: "Navigieren Sie zu <strong>Einstellungen → Eingabehilfe → MiniMaster</strong> und aktivieren Sie den Dienst. Bestätigen Sie die Warnung.",
                 detail: "Der MiniMasterAccessibilityService überwacht App-Wechsel und blockiert Apps auf der Blacklist. Ohne diesen Service ist die App-Sperrfunktion wirkungslos.",
-                checkKey: "ca-accessibility-active",
             },
             {
                 title: "5. Sperrbildschirm testen",
                 instruction: "Lösen Sie über die Eltern-App eine <strong>Gerätesperre</strong> aus. Das Kind-Gerät sollte sofort einen Sperrbildschirm anzeigen, der nicht umgangen werden kann.",
                 detail: "Die BlockingOverlayService zeigt ein Vollbild-Overlay. Prüfen Sie: Ist das Overlay wirklich nicht wegwischbar? Bedeckt es den gesamten Bildschirm? Überlebt es einen Home-Button-Druck?",
-                checkKey: "ca-overlay-secure",
             },
             {
                 title: "6. App-Blocking testen",
                 instruction: "Fügen Sie über die Eltern-App eine App zur <strong>Blacklist</strong> hinzu (z.B. YouTube). Öffnen Sie diese App auf dem Kind-Gerät.",
                 detail: "Das AccessibilityService erkennt den App-Wechsel und blockiert die App. Aktuell wird GLOBAL_ACTION_BACK verwendet – prüfen Sie, ob das Kind die App trotzdem sofort wieder öffnen kann.",
-                checkKey: "ca-app-blocking-effective",
             },
             {
                 title: "7. Heartbeat prüfen",
                 instruction: "Warten Sie 15 Minuten oder prüfen Sie in der Eltern-App den <strong>Online-Status</strong> (lastSeen-Timestamp). Das Kind-Gerät sollte als 'online' erscheinen.",
                 detail: "Der HeartbeatWorker sendet alle 15 Minuten per WorkManager. Im Dashboard: grüner Punkt = online (lastSeen < 20 Min), grauer Punkt = offline.",
-                checkKey: "ca-heartbeat",
             },
             {
                 title: "8. Aufgaben-Beweis testen",
                 instruction: "Erstellen Sie in der Eltern-App eine Aufgabe. Schließen Sie sie auf dem Kind-Gerät ab und machen Sie ein <strong>Foto als Beweis</strong>.",
                 detail: "Das Foto wird über Firebase Storage hochgeladen. Die Aufgabe wechselt in den Status <code>pending_approval</code>. Die Eltern können das Foto im Task-Review einsehen.",
-                checkKey: "ca-task-proof",
             },
             {
                 title: "9. Neustart-Verhalten prüfen",
                 instruction: "Starten Sie das Kind-Gerät neu. Prüfen Sie, ob alle Dienste (Accessibility, Heartbeat, FCM) <strong>automatisch</strong> wieder laufen.",
                 detail: "Der BootReceiver startet die Services nach dem Boot. Testen Sie: Ist die App-Sperre aktiv? Kommt ein Heartbeat nach dem Neustart?",
-                checkKey: "ca-boot-receiver",
             },
         ],
     },
@@ -4030,14 +3969,8 @@ function toggleWizardStepDone(wizardId, stepIndex, done) {
     state.completed[stepIndex] = done;
     saveWizardState(wizardId, state);
 
-    // Sync with platform readiness
-    const wizard = setupWizards[wizardId];
-    if (wizard?.steps[stepIndex]?.checkKey) {
-        updatePlatformReadiness({ [wizard.steps[stepIndex].checkKey]: done });
-        renderPlatformReadinessSection(wizardId === "masterApp" ? "masterApp" : "childApp");
-        renderGoLiveAmpel();
-        renderPrioritizedActionPlan();
-    }
+    renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
     renderWizardStep(wizardId, stepIndex);
 }
 
@@ -10293,7 +10226,7 @@ function downloadReviewerGuide() {
 function exportReleaseArtefact() {
     const playStoreState = getPlayStoreReadinessState();
     const p0BlockerState = getP0BlockerCockpitState();
-    const platformState = getPlatformReadiness();
+    const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
     const attestations = getCommissioningAttestations();
     const status = computeGoLiveStatus();
 
