@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD029 MD032 -->
 
-Stand: 2026-03-15
+Stand: 2026-04-04
 
 ## Ziel
 Sicherstellen, dass die Nutzeroberflächen auf Mobiltelefonen und PCs verfügbar und nutzbar sind.
@@ -55,4 +55,6 @@ Sicherstellen, dass die Nutzeroberflächen auf Mobiltelefonen und PCs verfügbar
 
 ## Validierung
 - Lint: erfolgreich
-- Tests: 13/13 Suites, 129/129 Tests erfolgreich
+- Aktueller Repo-Stand: Branch identisch zu `main` zum Zeitpunkt dieser Aktualisierung
+- Tests: `npm run test:ci` erfolgreich mit 41/41 Suites und 1506/1506 Tests, inklusive `test/admin-panel-helpers.test.ts`, `test/web-control-ui.test.ts` und `test/start-page.test.ts`
+- Hinweis: Die UI-Verfügbarkeit wird damit aktuell sowohl über den statischen Startpfad als auch über die Web-UI-Testabdeckung abgesichert
