@@ -107,8 +107,6 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  renderCallableDebugInfo,",
     "  getWizardState,",
     "  saveWizardState,",
-    "  getPlatformReadiness,",
-    "  updatePlatformReadiness,",
     "  buildEffectivePlatformState,",
     "  getPlayStoreReadinessState,",
     "  setPlayStoreReadinessState,",
@@ -895,18 +893,6 @@ describe("admin-panel helper functions", () => {
 
     const other = exports.getWizardState("childApp");
     expect(other).toEqual({ currentStep: 0, completed: {} });
-  });
-
-  // ── Platform readiness state ──
-  it("manages platform readiness through localStorage", () => {
-    const { exports } = loadAdminPanelTestExports();
-    const initial = exports.getPlatformReadiness();
-    expect(initial).toEqual({});
-
-    exports.updatePlatformReadiness({ "ma-registration-flow": true, "ma-pairing-works": true });
-    const updated = exports.getPlatformReadiness();
-    expect(updated["ma-registration-flow"]).toBe(true);
-    expect(updated["ma-pairing-works"]).toBe(true);
   });
 
   it("merges QA register PASS entries into effective platform state", () => {
