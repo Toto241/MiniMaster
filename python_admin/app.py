@@ -23,7 +23,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Importiere zentrale Test-Module
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from adb_client import AdbClient, adb_available  # noqa: E402
-from test_automation import SUITES as TA_SUITES, SuiteResult, run_suite as ta_run_suite, check_prereqs as ta_check_prereqs  # noqa: E402
+from test_automation import (  # noqa: E402
+    SUITES as TA_SUITES,
+    SuiteResult,
+    check_prereqs as ta_check_prereqs,
+    check_security_service_account_prereq,
+    run_suite as ta_run_suite,
+)
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
 from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
@@ -113,6 +119,38 @@ def is_stale_timestamp(value: object, *, stale_days: int = TEST_REGISTER_STALE_D
     if parsed is None:
         return False
     return datetime.now(timezone.utc) - parsed > timedelta(days=stale_days)
+
+
+def load_local_firebase_binding_status(target_project_id: str) -> tuple[bool, str]:
+    firebaserc_file = REPO_ROOT / ".firebaserc"
+    if not firebaserc_file.exists():
+        return False, ".firebaserc fehlt; lokale Firebase-Projektbindung wurde noch nicht eingerichtet."
+
+    try:
+        firebaserc = json.loads(firebaserc_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False, ".firebaserc ist nicht lesbar oder enthaelt ungueltiges JSON."
+
+    projects = as_dict(firebaserc.get("projects"))
+    default_project = str_value(projects, "default")
+    if not default_project:
+        return False, ".firebaserc enthaelt kein default-Projekt; firebase use --add wurde lokal noch nicht abgeschlossen."
+
+    normalized_target = target_project_id.strip()
+    if normalized_target and default_project != normalized_target:
+        return (
+            False,
+            f".firebaserc ist auf '{default_project}' gesetzt und weicht von der Runtime Project ID '{normalized_target}' ab.",
+        )
+
+    return True, f".firebaserc ist lokal auf '{default_project}' gebunden."
+
+
+def load_local_service_account_status() -> tuple[bool, str]:
+    available, reason = check_security_service_account_prereq()
+    if available:
+        return True, "serviceAccountKey.json ist lokal fuer setup-admin verfuegbar."
+    return False, str(reason or "serviceAccountKey.json ist lokal nicht verfuegbar.")
 
 
 def severity_rank(value: str) -> int:
@@ -240,36 +278,116 @@ COMMISSIONING_TEST_GROUPS = (
         "description": "Erfasst alle identifizierten manuellen Nachweise, die vor dem Go-Live abgezeichnet sein müssen.",
         "tests": (
             {
-                "id": "firebase-services-approved",
-                "title": "Firebase Service-Freigaben",
-                "description": "Authentication, Firestore, Storage, Functions und Messaging sind aktiviert oder bewusst freigegeben.",
+                "id": "firebase-auth-enabled",
+                "title": "Firebase Authentication aktiviert",
+                "description": "Manueller Nachweis, dass Firebase Authentication im Zielprojekt aktiviert und betriebsbereit ist.",
                 "automationType": "manual",
                 "source": "attestation",
-                "successCriteria": "Alle Pflicht-Freigaben sind im Operator-Panel bestätigt.",
+                "successCriteria": "Firebase Authentication ist im Operator-Panel bestaetigt.",
             },
             {
-                "id": "android-app-registration",
-                "title": "Android App-Registrierung",
-                "description": "MasterApp und ChildApp sind im Projekt registriert und für Tests verwendbar.",
-                "automationType": "manual",
-                "source": "attestation",
-                "successCriteria": "Beide Android-App-Registrierungen sind bestätigt.",
+                "id": "firestore-enabled",
+                "title": "Firestore aktiviert",
+                "description": "Automatisch aus der Backend-Validierung abgeleitet: Firestore ist im Zielprojekt erreichbar.",
+                "automationType": "automatic",
+                "source": "validation",
+                "successCriteria": "Die Full Validation meldet erfolgreichen Firestore-Zugriff auf die Kernsammlungen.",
             },
             {
-                "id": "firebase-project-binding",
-                "title": "Firebase Projekt lokal gebunden",
-                "description": "Das lokale Arbeitsverzeichnis wurde mit dem produktiven Projekt verknüpft.",
+                "id": "storage-enabled",
+                "title": "Firebase Storage aktiviert",
+                "description": "Automatisch aus der Backend-Validierung abgeleitet: Storage ist erreichbar und der Bucket antwortet.",
+                "automationType": "automatic",
+                "source": "validation",
+                "successCriteria": "Die Full Validation meldet Backend Storage Health als OK.",
+            },
+            {
+                "id": "functions-enabled",
+                "title": "Cloud Functions aktiviert",
+                "description": "Automatisch aus der Backend-Validierung abgeleitet: Callable Functions sind erreichbar.",
+                "automationType": "automatic",
+                "source": "validation",
+                "successCriteria": "Die Full Validation meldet alle relevanten Functions als erreichbar.",
+            },
+            {
+                "id": "messaging-enabled",
+                "title": "Cloud Messaging aktiviert oder bewusst nicht benötigt",
+                "description": "Manueller Nachweis fuer FCM-Aktivierung oder bewusstes Nicht-Nutzen im Zielsetup.",
                 "automationType": "manual",
                 "source": "attestation",
-                "successCriteria": "firebase use --add wurde lokal durchgeführt.",
+                "successCriteria": "Cloud Messaging ist bestaetigt oder explizit als nicht benoetigt dokumentiert.",
+            },
+            {
+                "id": "android-master-registered",
+                "title": "Android-App com.minimaster.masterapp registriert",
+                "description": "Manueller Nachweis, dass die Eltern-App im Projekt registriert und testbar ist.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Die Eltern-App com.minimaster.masterapp ist bestaetigt registriert.",
+            },
+            {
+                "id": "android-child-registered",
+                "title": "Android-App com.google.pairing registriert",
+                "description": "Manueller Nachweis, dass die Child-App im Projekt registriert und testbar ist.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Die Child-App com.google.pairing ist bestaetigt registriert.",
+            },
+            {
+                "id": "firebase-project-bound",
+                "title": "firebase use --add lokal durchgeführt",
+                "description": "Automatischer Workspace-Check auf die lokale Firebase-Projektbindung ueber .firebaserc.",
+                "automationType": "automatic",
+                "source": "workspace",
+                "successCriteria": ".firebaserc enthaelt eine default-Projektbindung und passt zur konfigurierten Runtime Project ID.",
             },
             {
                 "id": "service-account-ready",
-                "title": "Service Account für Setup bereit",
-                "description": "Der lokale Setup-Operator kann mit dem vorgesehenen Service Account arbeiten.",
+                "title": "serviceAccountKey.json lokal für setup-admin verfügbar",
+                "description": "Automatischer Local-Environment-Check fuer die Service-Account-Datei des Setup-Admin-Runners.",
+                "automationType": "automatic",
+                "source": "workspace",
+                "successCriteria": "Die konfigurierte Service-Account-Datei oder serviceAccountKey.json ist lokal verfuegbar.",
+            },
+            {
+                "id": "parent-panel-verified",
+                "title": "Parent Web Panel Login geprüft",
+                "description": "Manueller Nachweis fuer den erfolgreichen Login in das Parent Web Panel.",
                 "automationType": "manual",
                 "source": "attestation",
-                "successCriteria": "Der Service-Account-Nachweis ist vorhanden.",
+                "successCriteria": "Der Parent-Panel-Login wurde erfolgreich getestet und bestaetigt.",
+            },
+            {
+                "id": "device-sync-verified",
+                "title": "Device-Sync zwischen Parent Panel und Child geprüft",
+                "description": "Manueller Nachweis fuer die Synchronisation zwischen Parent Panel und Child-Geraet.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Der Device-Sync wurde getestet und bestaetigt.",
+            },
+            {
+                "id": "support-flow-verified",
+                "title": "Support-Ticket-Flow geprüft",
+                "description": "Manueller Nachweis fuer einen erfolgreichen Support-Ticket-Flow.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Der Support-Ticket-Flow wurde end-to-end getestet und bestaetigt.",
+            },
+            {
+                "id": "compliance-flow-verified",
+                "title": "DSAR- und Audit-Flow geprüft",
+                "description": "Manueller Nachweis fuer DSAR- und Audit-Funktionen.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Der DSAR- und Audit-Flow wurde getestet und bestaetigt.",
+            },
+            {
+                "id": "storage-rules-verified",
+                "title": "Storage Rules aktiv und geprüft",
+                "description": "Manueller Nachweis, dass Storage Rules aktiv sind und fachlich geprueft wurden.",
+                "automationType": "manual",
+                "source": "attestation",
+                "successCriteria": "Die Storage Rules sind aktiv und als geprueft bestaetigt.",
             },
         ),
     },
@@ -279,12 +397,28 @@ COMMISSIONING_TEST_GROUPS = (
         "description": "Deckt die bereits identifizierten Go-Live-Blocker rund um Play Store und Gesamtsystem ab.",
         "tests": (
             {
-                "id": "play-store-readiness",
-                "title": "Play Store Readiness",
-                "description": "Alle Play-Store-Pflichtpunkte sowie Privacy-URL und Support-Adresse sind gepflegt.",
-                "automationType": "manual",
+                "id": "play-store-required-checks-complete",
+                "title": "Play-Store-Readiness: Pflicht-Checks vollständig",
+                "description": "Automatisch bewertet, ob alle Play-Store-Pflichtchecks im lokalen Readiness-Block gesetzt sind.",
+                "automationType": "automatic",
                 "source": "playstore",
-                "successCriteria": "Alle Play-Store-Checks sind erfüllt und die Metadaten sind gültig.",
+                "successCriteria": "Alle lokalen Play-Store-Pflichtchecks sind als erledigt markiert.",
+            },
+            {
+                "id": "play-store-privacy-url-valid",
+                "title": "Play-Store-Readiness: Privacy-Policy-URL gültig",
+                "description": "Automatisch bewertet, ob eine gueltige HTTPS-Privacy-Policy-URL gepflegt ist.",
+                "automationType": "automatic",
+                "source": "playstore",
+                "successCriteria": "privacyUrl ist gesetzt und beginnt mit https://.",
+            },
+            {
+                "id": "play-store-support-email-valid",
+                "title": "Play-Store-Readiness: Support-/Privacy-E-Mail gültig",
+                "description": "Automatisch bewertet, ob eine gueltige Support- oder Privacy-E-Mail gepflegt ist.",
+                "automationType": "automatic",
+                "source": "playstore",
+                "successCriteria": "supportEmail ist gesetzt und im gueltigen E-Mail-Format vorhanden.",
             },
             {
                 "id": "full-validation-status",
@@ -1089,6 +1223,7 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
     play_store = as_dict(context.get("playStoreState"))
     play_checks = as_dict(play_store.get("checks"))
     validation = as_dict(context.get("validationSummary"))
+    validation_checks = as_dict(validation.get("checks"))
 
     project_id = str_value(cloud, "projectId")
     ai_provider = str_value(ai, "provider")
@@ -1132,87 +1267,160 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
         )
     )
 
-    firebase_services_ok = all(
-        bool_attestation(attestations, key)
-        for key in [
-            "firebase-auth-enabled",
+    firestore_ok = bool_from_payload(validation_checks.get("firestoreAccessOk"), default=False)
+    checks.append(
+        make_check(
             "firestore-enabled",
+            "Firestore aktiviert",
+            firestore_ok,
+            "Firestore-Zugriff wurde in der Full Validation erfolgreich bestaetigt."
+            if firestore_ok
+            else "Full Validation bestaetigt Firestore-Zugriff noch nicht.",
+            source="validation",
+        )
+    )
+
+    storage_ok = bool_from_payload(validation_checks.get("storageHealthOk"), default=False)
+    checks.append(
+        make_check(
             "storage-enabled",
+            "Firebase Storage aktiviert",
+            storage_ok,
+            "Backend Storage Health ist erfolgreich bestaetigt."
+            if storage_ok
+            else "Backend Storage Health ist noch nicht erfolgreich bestaetigt.",
+            source="validation",
+        )
+    )
+
+    functions_ok = bool_from_payload(validation_checks.get("functionsReachable"), default=False)
+    checks.append(
+        make_check(
             "functions-enabled",
-            "messaging-enabled",
-        ]
-    )
-    checks.append(
-        make_check(
-            "firebase-services-approved",
-            "Firebase Service-Freigaben",
-            firebase_services_ok,
-            "Alle erforderlichen Firebase-Services sind bestaetigt."
-            if firebase_services_ok
-            else "Mindestens eine Service-Freigabe fehlt in den manuellen Nachweisen.",
-            source="attestation",
-            manual_if_failed=True,
+            "Cloud Functions aktiviert",
+            functions_ok,
+            "Callable Functions sind in der Full Validation erreichbar."
+            if functions_ok
+            else "Callable Functions sind in der Full Validation noch nicht erreichbar.",
+            source="validation",
         )
     )
 
-    app_registration_ok = bool_attestation(attestations, "android-master-registered") and bool_attestation(
-        attestations, "android-child-registered"
-    )
+    project_bound_ok, project_bound_detail = load_local_firebase_binding_status(project_id)
     checks.append(
         make_check(
-            "android-app-registration",
-            "Android App-Registrierung",
-            app_registration_ok,
-            "MasterApp und ChildApp sind registriert."
-            if app_registration_ok
-            else "Mindestens eine Android-App-Registrierung ist offen.",
-            source="attestation",
-            manual_if_failed=True,
+            "firebase-project-bound",
+            "firebase use --add lokal durchgeführt",
+            project_bound_ok,
+            project_bound_detail,
+            source="workspace",
         )
     )
 
-    project_binding_ok = bool_attestation(attestations, "firebase-project-bound")
-    checks.append(
-        make_check(
-            "firebase-project-binding",
-            "Firebase Projekt lokal gebunden",
-            project_binding_ok,
-            "firebase use --add wurde bestaetigt."
-            if project_binding_ok
-            else "Lokale Firebase-Projektbindung ist noch nicht bestaetigt.",
-            source="attestation",
-            manual_if_failed=True,
-        )
-    )
-
-    service_account_ok = bool_attestation(attestations, "service-account-ready")
+    service_account_ok, service_account_detail = load_local_service_account_status()
     checks.append(
         make_check(
             "service-account-ready",
-            "Service Account fuer Setup bereit",
+            "serviceAccountKey.json lokal für setup-admin verfügbar",
             service_account_ok,
-            "Service Account Nachweis liegt vor."
-            if service_account_ok
-            else "serviceAccountKey Nachweis fehlt.",
-            source="attestation",
-            manual_if_failed=True,
+            service_account_detail,
+            source="workspace",
         )
     )
+
+    attestation_checks = (
+        (
+            "firebase-auth-enabled",
+            "Firebase Authentication aktiviert",
+            "Firebase Authentication ist bestaetigt." if bool_attestation(attestations, "firebase-auth-enabled") else "Firebase Authentication ist noch nicht bestaetigt.",
+        ),
+        (
+            "messaging-enabled",
+            "Cloud Messaging aktiviert oder bewusst nicht benötigt",
+            "Cloud Messaging ist bestaetigt oder als nicht benoetigt dokumentiert."
+            if bool_attestation(attestations, "messaging-enabled")
+            else "Cloud Messaging ist noch nicht bestaetigt.",
+        ),
+        (
+            "android-master-registered",
+            "Android-App com.minimaster.masterapp registriert",
+            "Die Eltern-App ist registriert." if bool_attestation(attestations, "android-master-registered") else "Die Eltern-App ist noch nicht bestaetigt registriert.",
+        ),
+        (
+            "android-child-registered",
+            "Android-App com.google.pairing registriert",
+            "Die Child-App ist registriert." if bool_attestation(attestations, "android-child-registered") else "Die Child-App ist noch nicht bestaetigt registriert.",
+        ),
+        (
+            "parent-panel-verified",
+            "Parent Web Panel Login geprüft",
+            "Der Parent-Panel-Login ist bestaetigt." if bool_attestation(attestations, "parent-panel-verified") else "Der Parent-Panel-Login ist noch nicht bestaetigt.",
+        ),
+        (
+            "device-sync-verified",
+            "Device-Sync zwischen Parent Panel und Child geprüft",
+            "Der Device-Sync ist bestaetigt." if bool_attestation(attestations, "device-sync-verified") else "Der Device-Sync ist noch nicht bestaetigt.",
+        ),
+        (
+            "support-flow-verified",
+            "Support-Ticket-Flow geprüft",
+            "Der Support-Ticket-Flow ist bestaetigt." if bool_attestation(attestations, "support-flow-verified") else "Der Support-Ticket-Flow ist noch nicht bestaetigt.",
+        ),
+        (
+            "compliance-flow-verified",
+            "DSAR- und Audit-Flow geprüft",
+            "Der DSAR- und Audit-Flow ist bestaetigt." if bool_attestation(attestations, "compliance-flow-verified") else "Der DSAR- und Audit-Flow ist noch nicht bestaetigt.",
+        ),
+        (
+            "storage-rules-verified",
+            "Storage Rules aktiv und geprüft",
+            "Die Storage Rules sind bestaetigt geprueft." if bool_attestation(attestations, "storage-rules-verified") else "Die Storage Rules sind noch nicht bestaetigt geprueft.",
+        ),
+    )
+    for check_id, title, detail in attestation_checks:
+        checks.append(
+            make_check(
+                check_id,
+                title,
+                bool_attestation(attestations, check_id),
+                detail,
+                source="attestation",
+                manual_if_failed=True,
+            )
+        )
 
     play_checks_ok = all(bool_from_payload(value) for value in play_checks.values()) if play_checks else False
     privacy_url = str_value(play_store, "privacyUrl")
     support_email = str_value(play_store, "supportEmail")
-    play_meta_ok = is_https_url(privacy_url) and is_email(support_email)
+    play_privacy_ok = is_https_url(privacy_url)
+    play_support_ok = is_email(support_email)
     checks.append(
         make_check(
-            "play-store-readiness",
-            "Play Store Readiness",
-            play_checks_ok and play_meta_ok,
-            "Play Store Readiness ist vollstaendig."
-            if play_checks_ok and play_meta_ok
-            else "Play-Store Checks, Privacy-URL (https) oder Support-E-Mail sind unvollstaendig.",
+            "play-store-required-checks-complete",
+            "Play-Store-Readiness: Pflicht-Checks vollständig",
+            play_checks_ok,
+            "Alle Play-Store-Pflichtchecks sind erfuellt."
+            if play_checks_ok
+            else "Mindestens ein Play-Store-Pflichtcheck ist noch offen.",
             source="playstore",
-            manual_if_failed=True,
+        )
+    )
+    checks.append(
+        make_check(
+            "play-store-privacy-url-valid",
+            "Play-Store-Readiness: Privacy-Policy-URL gültig",
+            play_privacy_ok,
+            "Privacy-Policy-URL ist gueltig gesetzt." if play_privacy_ok else "Privacy-Policy-URL fehlt oder ist kein https-Link.",
+            source="playstore",
+        )
+    )
+    checks.append(
+        make_check(
+            "play-store-support-email-valid",
+            "Play-Store-Readiness: Support-/Privacy-E-Mail gültig",
+            play_support_ok,
+            "Support-/Privacy-E-Mail ist gueltig gesetzt." if play_support_ok else "Support-/Privacy-E-Mail fehlt oder ist ungueltig.",
+            source="playstore",
         )
     )
 

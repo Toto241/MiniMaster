@@ -1148,12 +1148,13 @@ npm test -- --runInBand
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Voraussetzungen &amp; Freigaben</h3>
+                            <h3>Voraussetzungen &amp; Freigaben jetzt in Qualitätssicherung</h3>
                             <p>
-                                Diese Nachweise decken Punkte ab, die browserseitig nicht zuverlässig automatisch
-                                geprüft werden können, aber für die produktive Inbetriebnahme verpflichtend sind.
+                                Diese Go-Live-Nachweise werden nicht mehr separat im Plattformen-Panel gepflegt.
+                                Sie sind im Panel <strong>Qualitätssicherung</strong> als QA-Register-Einträge
+                                zusammengeführt, dort nach Automatik vs. manuell sortiert und zentral protokollierbar.
                             </p>
-                            <div id="commissioning-attestations" class="setup-checklist"></div>
+                            <div id="commissioning-attestations" class="data-list"></div>
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
@@ -1214,6 +1215,7 @@ npm test -- --runInBand
                                     <option value="manual">Nur manuelle / dokumentierte Tests</option>
                                     <option value="suite">Nur Testsuiten</option>
                                     <option value="commissioning">Nur Commissioning-/Freigabetests</option>
+                                    <option value="approvals">Nur Voraussetzungen &amp; Freigaben</option>
                                 </select>
                                 <select id="testing-register-sort" title="Sortierung im Testregister wählen">
                                     <option value="status">Sortierung: Status / offen zuerst</option>

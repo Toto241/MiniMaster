@@ -168,15 +168,38 @@ describe("admin-panel helper functions", () => {
   it("tracks commissioning attestations and missing checklist items", () => {
     const { exports, storage } = loadAdminPanelTestExports();
 
-    exports.updateCommissioningAttestations({ "firebase-auth-enabled": true, "firestore-enabled": true });
+    exports.updateCommissioningAttestations({ "firebase-auth-enabled": true, "messaging-enabled": true });
     const missing = exports.getMissingAttestations();
 
     expect(JSON.parse(storage.get("operatorCommissioningAttestations") || "{}")).toMatchObject({
       "firebase-auth-enabled": true,
-      "firestore-enabled": true,
+      "messaging-enabled": true,
     });
     expect(missing).not.toContain("Firebase Authentication aktiviert");
-    expect(missing).toContain("Cloud Functions aktiviert");
+    expect(missing).not.toContain("Cloud Messaging aktiviert oder bewusst nicht benötigt");
+    expect(missing).toContain("Parent Web Panel Login geprüft");
+  });
+
+  it("prefers QA evidence over stale local attestation state", () => {
+    const { exports } = loadAdminPanelTestExports({
+      operatorCommissioningAttestations: JSON.stringify({ "parent-panel-verified": true }),
+    });
+
+    exports.setPythonAutomationEvidenceCache({
+      entries: [],
+      latestByTestId: {
+        "parent-panel-verified": {
+          status: "fail",
+          createdAt: "2026-04-04T10:00:00Z",
+        },
+      },
+    });
+
+    const attestations = exports.getCommissioningAttestations();
+    const missing = exports.getMissingAttestations();
+
+    expect(attestations["parent-panel-verified"]).toBe(false);
+    expect(missing).toContain("Parent Web Panel Login geprüft");
   });
 
   it("renders a commissioning snapshot into the report", () => {
@@ -194,7 +217,7 @@ describe("admin-panel helper functions", () => {
       validationSummary: { ok: 8, warn: 1, errorCount: 0 },
       deployCommand: "firebase deploy --only functions --project demo-project",
       roleAssignments: [{ uid: "support-1", role: "support" }],
-      attestations: { "firebase-auth-enabled": true, "firestore-enabled": true },
+      attestations: { "firebase-auth-enabled": true, "messaging-enabled": true },
       pending: ["Storage-Bucket prüfen"],
     };
 
