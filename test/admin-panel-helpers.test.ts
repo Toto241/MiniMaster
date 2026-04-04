@@ -128,6 +128,10 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  getTestingRegisterStatusPriority,",
     "  getTestingRegisterSeverityPriority,",
     "  formatTestingRegisterGroupTitle,",
+    "  buildTestingRegisterTooltipAttr,",
+    "  buildTestingRegisterMetaBadges,",
+    "  buildTestingRegisterLegend,",
+    "  buildTestingRegisterActionTooltip,",
     "  buildTestingRegisterDetailText,",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
@@ -1231,6 +1235,38 @@ describe("admin-panel helper functions", () => {
     expect(detail).toContain("Kommando");
     expect(detail).toContain("Evidenz erforderlich");
     expect(detail).toContain("ADB erforderlich");
+  });
+
+  it("builds testing register tooltip attributes, badges and legend", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const tooltipAttr = exports.buildTestingRegisterTooltipAttr("Verknuepfte Suite starten", "Suite starten");
+    expect(tooltipAttr).toContain("title=");
+    expect(tooltipAttr).toContain("aria-label=");
+
+    const badges = exports.buildTestingRegisterMetaBadges({
+      severity: "critical",
+      owner: "QA Automation",
+      blockingForRelease: true,
+      staleEvidence: true,
+      groupId: "repo-tests-unsupported",
+    });
+    expect(badges).toContain("Prioritaet");
+    expect(badges).toContain("Verantwortlich");
+    expect(badges).toContain("Release-Blocker");
+    expect(badges).toContain("Unsupported");
+
+    const legend = exports.buildTestingRegisterLegend();
+    expect(legend).toContain("Register-Legende");
+    expect(legend).toContain("Owner");
+  });
+
+  it("explains testing register actions via tooltips", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.buildTestingRegisterActionTooltip({ action: "protocol" })).toContain("Nachweis");
+    expect(exports.buildTestingRegisterActionTooltip({ action: "suite-run", prereqsMet: false, prereqReason: "ADB fehlt" })).toContain("ADB fehlt");
+    expect(exports.buildTestingRegisterActionTooltip({ action: "suite-run", linkedCommand: "npm test" })).toContain("npm test");
   });
 
   // ── findPythonAutomationTestById ──
