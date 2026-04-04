@@ -1709,7 +1709,8 @@ function rerenderTestingRegisterFromCache() {
     renderTestingRegisterStorage(testingRegisterPayload?.storage || null);
     renderTestingRegisterList(testingRegisterPayload);
     renderCommissioningAttestations();
-    renderAllPlatformSections();
+    renderGoLiveAmpel();
+    renderPrioritizedActionPlan();
     if (document.getElementById("commissioning-report")) {
         refreshCommissioningReport();
         renderGoLiveAmpel();
@@ -3689,53 +3690,6 @@ function renderGoLiveAmpel() {
     }
 }
 
-function renderPlatformReadinessSection(platformKey) {
-    const container = document.getElementById(`platform-${platformKey}`);
-    if (!container) return;
-    const platform = platformQaRegisterGroups[platformKey];
-    if (!platform) return;
-
-    const qaSummary = buildPlatformQaReadinessSummary(testingRegisterPayload);
-    const qaStatus = qaSummary.platformStatus?.[platformKey];
-
-    if (qaSummary.hasData && qaStatus) {
-        const openCount = Math.max(Number(qaStatus.total || 0) - Number(qaStatus.done || 0), 0);
-        const criticalOpen = Math.max(Number(qaStatus.critical || 0) - Number(qaStatus.criticalDone || 0), 0);
-        const highOpen = Math.max(Number(qaStatus.high || 0) - Number(qaStatus.highDone || 0), 0);
-        container.innerHTML = `
-            <div class="python-clarity-box">
-                <strong>Diese Plattform-Checks werden jetzt zentral im QA-Register gepflegt.</strong><br />
-                ${escapeHtml(String(qaStatus.done || 0))}/${escapeHtml(String(qaStatus.total || 0))} Tests bestanden (${escapeHtml(String(qaStatus.percent || 0))}%).<br />
-                Offen: ${escapeHtml(String(openCount))} insgesamt, davon ${escapeHtml(String(criticalOpen))} kritisch und ${escapeHtml(String(highOpen))} hoch.
-            </div>
-            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
-                <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln">Zur Qualitätssicherung wechseln</button>
-                <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register neu laden">QA-Status aktualisieren</button>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="info">
-            Diese Plattform-Checks werden zentral im Panel <strong>Qualitätssicherung</strong> gepflegt.
-            Lade das QA-Register, um den aktuellen Status zu sehen.
-        </div>
-        <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
-            <button onclick="openCommissioningQaView()" class="btn btn-primary" title="Zum QA-Register wechseln">Zur Qualitätssicherung wechseln</button>
-            <button onclick="loadTestingRegister()" class="btn btn-secondary" title="QA-Register jetzt laden">QA-Register laden</button>
-        </div>
-    `;
-}
-
-function renderAllPlatformSections() {
-    renderPlatformReadinessSection("masterApp");
-    renderPlatformReadinessSection("childApp");
-    renderPlatformReadinessSection("desktop");
-    renderGoLiveAmpel();
-    renderPrioritizedActionPlan();
-}
-
 // ==================== PLAUSIBILITÄTSPRÜFUNG ====================
 
 function hasPlatformQaSignal(state, ...testIds) {
@@ -5253,7 +5207,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     setupBootstrapConfigLiveSync();
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     renderCommandCatalog(firebaseConfig.projectId);
-    renderAllPlatformSections();
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
     renderPlayStoreReadiness();
@@ -6795,7 +6748,6 @@ function initializeSetupAssistant() {
     renderSetupChecklist();
     renderCommissioningAttestations();
     renderP0BlockerCockpit();
-    renderAllPlatformSections();
     renderAiConsentStatus();
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
