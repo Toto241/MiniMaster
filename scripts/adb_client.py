@@ -312,5 +312,18 @@ def resolve_latest_apk(app_id: str, repo_root: Path | None = None) -> Path | Non
     if not apk_dir.exists():
         return None
 
+    # Nur installierbare App-APKs berücksichtigen; androidTest-Artefakte sind keine Ziel-App.
+    preferred_apks = sorted(
+        (
+            apk for apk in apk_dir.rglob("*.apk")
+            if "androidtest" not in apk.name.lower()
+            and "androidtest" not in {part.lower() for part in apk.parts}
+        ),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if preferred_apks:
+        return preferred_apks[0]
+
     apks = sorted(apk_dir.rglob("*.apk"), key=lambda p: p.stat().st_mtime, reverse=True)
     return apks[0] if apks else None
