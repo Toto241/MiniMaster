@@ -218,16 +218,24 @@ describe("admin-panel helper functions", () => {
       deployCommand: "firebase deploy --only functions --project demo-project",
       roleAssignments: [{ uid: "support-1", role: "support" }],
       attestations: { "firebase-auth-enabled": true, "messaging-enabled": true },
-      pending: ["Storage-Bucket prüfen"],
+      qaApprovals: [
+        { id: "firebase-auth-enabled", title: "Firebase Authentication aktiviert", automationType: "manual", status: "pass" },
+        { id: "firestore-enabled", title: "Firestore aktiviert", automationType: "automatic", status: "pass" },
+        { id: "service-account-ready", title: "serviceAccountKey.json lokal für setup-admin verfügbar", automationType: "automatic", status: "not_run" },
+      ],
+      pending: ["QA-Freigabe offen: serviceAccountKey.json lokal für setup-admin verfügbar"],
     };
 
     const snapshot = exports.buildCommissioningSnapshot(report);
     exports.renderCommissioningReport(report);
 
     expect(snapshot.confirmedAttestations).toBe(2);
+    expect(snapshot.totalApprovals).toBe(3);
+    expect(snapshot.openApprovals).toBe(1);
     expect(snapshot.pendingCount).toBe(1);
     expect(snapshot.validationState).toContain("Warnungen");
     expect(reportEl.innerHTML).toContain("Bestätigte Freigaben:");
+    expect(reportEl.innerHTML).toContain("2 / 3");
     expect(reportEl.innerHTML).toContain("Aktualisiert:");
     expect(reportEl.innerHTML).toContain("demo-project");
   });
