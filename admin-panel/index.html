@@ -113,7 +113,9 @@
                             einzurichten und Zugang zu erhalten.
                         </p>
                         <p id="electron-operator-badge" style="display:none; margin-block-start:8px">
-                            <span class="operator-badge">&#9889; Desktop-Operator-Modus</span>
+                                aus dem QA-Register ableiten lassen. Bereits nach Qualitätssicherung migrierte Freigaben wie
+                                Play-Store-Readiness, Android-/Support-/Compliance-Commissioning und AI-Runtime werden nur noch
+                                im Bereich <strong>Qualitätssicherung</strong> gepflegt. Alles hier ist lokal persistiert, im Admin-Panel sichtbar und
                             CLI-Befehle können direkt aus diesem Dashboard ausgeführt werden.
                         </p>
                     </div>
@@ -974,29 +976,18 @@
                                 </div>
 
                                 <div class="p0-card">
-                                    <h4>2) Play Console Paket</h4>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-data-safety" /> Data Safety eingereicht</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-iarc" /> IARC abgeschlossen</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-listing" /> Store Listing final</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-permissions" /> Permissions Declaration eingereicht</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-play-app-access" /> App Access Guide hinterlegt</label>
-                                    <label for="p0-play-evidence" class="field-label">Play Console Nachweis-Link</label>
-                                    <input type="text" id="p0-play-evidence" placeholder="Play Console Nachweis-Link" title="Link zur Play Console als Nachweis" />
-                                </div>
-
-                                <div class="p0-card">
-                                    <h4>3) Physische Commissioning-Abnahme</h4>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-android" /> Android Apps (Pairing + Sync) geprüft</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-ai" /> AI-Konfiguration + AI-Flow geprüft</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-support" /> Support-Workflow vollständig getestet</label>
-                                    <label class="setup-checklist-item"><input type="checkbox" id="p0-commissioning-compliance" /> Compliance-Flow (DSAR/Audit/Consent) geprüft</label>
+                                    <h4>2) Geräteabnahme (verbleibend)</h4>
+                                    <p class="muted" style="margin-block: 0 8px">
+                                        Pairing/Sync, AI-Runtime sowie Support- und Compliance-Freigaben laufen jetzt über Qualitätssicherung.
+                                        Hier bleibt nur die physische OEM-Geräteabnahme als separater P0-Blocker.
+                                    </p>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-oem-device-tests" /> OEM-Tests (Pixel + Samsung) abgeschlossen</label>
                                     <label for="p0-commissioning-evidence" class="field-label">Checklist / Artefakt-Referenz</label>
                                     <input type="text" id="p0-commissioning-evidence" placeholder="Checklist/Artefakt-Referenz" title="Referenz zum Abnahmeprotokoll oder Checklist-Artefakt" />
                                 </div>
 
                                 <div class="p0-card">
-                                    <h4>4) On-Call / Eskalations-Roster</h4>
+                                    <h4>3) On-Call / Eskalations-Roster</h4>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-roster-assigned" /> Roster verbindlich benannt</label>
                                     <label for="p0-roster-primary" class="field-label">Primärer On-Call-Kontakt</label>
                                     <input type="text" id="p0-roster-primary" placeholder="Primary On-Call (Name/Kontakt)" title="Primäre Bereitschaftsperson mit Kontaktdaten" />
@@ -1009,7 +1000,7 @@
                                 </div>
 
                                 <div class="p0-card">
-                                    <h4>5) Release-Evidence (CI + Snapshot)</h4>
+                                    <h4>4) Release-Evidence (CI + Snapshot)</h4>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-legacy-auth-snapshot" /> Legacy-Auth-Dashboard-Snapshot archiviert</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-codeql-linked" /> CodeQL-Run verlinkt (erfolgreich)</label>
                                     <label class="setup-checklist-item"><input type="checkbox" id="p0-android-ci-linked" /> Android-CI-Run verlinkt (erfolgreich)</label>
@@ -1042,15 +1033,15 @@ npm test -- --runInBand
 # Optional: Release-Artefakt via Admin-Panel exportieren
 # (Button: "Release-Artefakt exportieren")</pre>
 
-                                    <p><strong>Manuell erforderlich</strong>: Firebase Console Key-Rotation/-Restriktionen, Play Console Data Safety/IARC/Permissions/App Access,
-                                    reale Device-Commissioning-Checks.</p>
+                                    <p><strong>Manuell erforderlich</strong>: Firebase Console Key-Rotation/-Restriktionen, reale OEM-Device-Checks,
+                                    Bereitschafts-/Eskalations-Roster und Release-Evidence.</p>
 
                                     <p><strong>Empfohlene Reihenfolge</strong>:</p>
                                     <ol>
                                         <li>Firebase Key Rotation + Restriktionen abschließen und Nachweis erfassen</li>
-                                        <li>Play Console Paket komplett einreichen und Nachweise verlinken</li>
-                                        <li>Physische Commissioning-Checks mit Evidenz abschließen</li>
+                                        <li>OEM-Geräteabnahme mit Evidenz abschließen</li>
                                         <li>On-Call-Roster finalisieren und im Runbook referenzieren</li>
+                                        <li>Release-Evidence konsolidieren und verlinken</li>
                                     </ol>
                                 </div>
                             </details>

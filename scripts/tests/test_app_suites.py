@@ -161,6 +161,65 @@ class TestBuildTestingRegister:
         for test_id in expected_automatic:
             assert automation_types[test_id] == "automatic"
 
+    def test_register_contains_remaining_platform_readiness_groups(self):
+        from app import get_commissioning_test_catalog, build_testing_register
+
+        catalog = get_commissioning_test_catalog()
+        group_ids = {group["id"] for group in catalog["groups"]}
+        assert {
+            "functional-readiness-masterapp",
+            "functional-readiness-childapp",
+            "functional-readiness-desktop",
+        }.issubset(group_ids)
+
+        result = build_testing_register()
+        items_by_id = {item["id"]: item for item in result["items"]}
+
+        expected_manual = {
+            "ma-registration-flow",
+            "ma-pairing-works",
+            "ma-lock-unlock",
+            "ma-task-create",
+            "ma-task-review",
+            "ma-task-reject-ui",
+            "ma-usage-rules-nav",
+            "ma-date-picker",
+            "ma-subscription-check",
+            "ma-subscription-enforce",
+            "ma-fcm-working",
+            "ma-firebase-appcheck",
+            "ma-offline-handling",
+            "ma-qr-pairing",
+            "ca-pairing-flow",
+            "ca-fcm-sync",
+            "ca-accessibility-active",
+            "ca-app-blocking-effective",
+            "ca-overlay-secure",
+            "ca-settings-protection",
+            "ca-device-admin-enforced",
+            "ca-usage-limits",
+            "ca-time-windows",
+            "ca-tamper-detection",
+            "ca-task-proof",
+            "ca-factory-reset-protection",
+            "ca-root-detection",
+            "ca-permission-onboarding",
+            "dt-code-signing",
+            "dt-auto-update",
+            "dt-system-tray",
+            "dt-desktop-notifications",
+            "dt-window-persistence",
+            "dt-ipc-messaging",
+            "dt-parent-panel-login",
+            "dt-admin-panel-login",
+            "dt-crash-reporting",
+        }
+
+        assert expected_manual.issubset(items_by_id.keys())
+        for test_id in expected_manual:
+            assert items_by_id[test_id]["automationType"] == "manual"
+            assert items_by_id[test_id]["source"] == "platform-readiness"
+
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
         import app
 

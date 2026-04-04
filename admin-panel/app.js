@@ -9593,8 +9593,6 @@ function autoSyncP0FromExistingSignals() {
     let changed = false;
 
     const playStore = getPlayStoreReadinessState();
-    const setupState = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
-    const att = getCommissioningAttestations();
 
     const syncIfTrue = (targetKey, sourceValue) => {
         if (sourceValue && !checks[targetKey]) {
@@ -9603,18 +9601,8 @@ function autoSyncP0FromExistingSignals() {
         }
     };
 
-    syncIfTrue("playDataSafety", playStore?.checks?.dataSafety);
-    syncIfTrue("playIarc", playStore?.checks?.iarc);
-    syncIfTrue("playListing", playStore?.checks?.listing);
-    syncIfTrue("playPermissions", playStore?.checks?.permissionsDeclaration);
-    syncIfTrue("playAppAccess", playStore?.checks?.appAccessGuide);
     syncIfTrue("keyRotationDone", playStore?.checks?.securityRotationDone);
     syncIfTrue("keyRestrictionsDone", playStore?.checks?.securityRotationDone);
-
-    syncIfTrue("commissioningAndroid", setupState["android-apps"] || (att["android-master-registered"] && att["android-child-registered"] && att["device-sync-verified"]));
-    syncIfTrue("commissioningAi", setupState["ai-config"]);
-    syncIfTrue("commissioningSupport", setupState["support-workflow"] || att["support-flow-verified"]);
-    syncIfTrue("commissioningCompliance", setupState["compliance-flow"] || att["compliance-flow-verified"]);
     syncIfTrue("legacyAuthSnapshot", Boolean(state.legacyAuthSnapshotRef));
     syncIfTrue("codeqlLinked", Boolean(state.codeqlRunUrl && /^https?:\/\//i.test(state.codeqlRunUrl)));
     syncIfTrue("androidCiLinked", Boolean(state.androidCiRunUrl && /^https?:\/\//i.test(state.androidCiRunUrl)));
@@ -9633,8 +9621,7 @@ function getP0BlockCompletion(state) {
     const checks = state.checks || {};
     const blocks = {
         security: Boolean(checks.keyRotationDone && checks.keyRestrictionsDone),
-        playConsole: Boolean(checks.playDataSafety && checks.playIarc && checks.playListing && checks.playPermissions && checks.playAppAccess),
-        commissioning: Boolean(checks.commissioningAndroid && checks.commissioningAi && checks.commissioningSupport && checks.commissioningCompliance && checks.oemDeviceTests),
+        deviceValidation: Boolean(checks.oemDeviceTests),
         roster: Boolean(checks.rosterAssigned),
         releaseEvidence: Boolean(checks.legacyAuthSnapshot && checks.codeqlLinked && checks.androidCiLinked && checks.deploymentReference),
     };
@@ -9642,8 +9629,8 @@ function getP0BlockCompletion(state) {
     return {
         blocks,
         completedBlocks,
-        totalBlocks: 5,
-        allDone: completedBlocks === 5,
+        totalBlocks: 4,
+        allDone: completedBlocks === 4,
     };
 }
 
@@ -9652,15 +9639,6 @@ function getP0BlockerCockpitState() {
         checks: {
             keyRotationDone: false,
             keyRestrictionsDone: false,
-            playDataSafety: false,
-            playIarc: false,
-            playListing: false,
-            playPermissions: false,
-            playAppAccess: false,
-            commissioningAndroid: false,
-            commissioningAi: false,
-            commissioningSupport: false,
-            commissioningCompliance: false,
             oemDeviceTests: false,
             rosterAssigned: false,
             legacyAuthSnapshot: false,
@@ -9691,7 +9669,6 @@ function getP0BlockerCockpitState() {
         return {
             checks: { ...defaults.checks, ...(parsed.checks || {}) },
             keyEvidence: parsed.keyEvidence || "",
-            playEvidence: parsed.playEvidence || "",
             commissioningEvidence: parsed.commissioningEvidence || "",
             rosterPrimary: parsed.rosterPrimary || "",
             rosterSecondary: parsed.rosterSecondary || "",
@@ -9720,15 +9697,6 @@ function renderP0BlockerCockpit() {
     const checkboxMap = {
         "p0-key-rotation-done": "keyRotationDone",
         "p0-key-restrictions-done": "keyRestrictionsDone",
-        "p0-play-data-safety": "playDataSafety",
-        "p0-play-iarc": "playIarc",
-        "p0-play-listing": "playListing",
-        "p0-play-permissions": "playPermissions",
-        "p0-play-app-access": "playAppAccess",
-        "p0-commissioning-android": "commissioningAndroid",
-        "p0-commissioning-ai": "commissioningAi",
-        "p0-commissioning-support": "commissioningSupport",
-        "p0-commissioning-compliance": "commissioningCompliance",
         "p0-oem-device-tests": "oemDeviceTests",
         "p0-roster-assigned": "rosterAssigned",
         "p0-legacy-auth-snapshot": "legacyAuthSnapshot",
@@ -9744,7 +9712,6 @@ function renderP0BlockerCockpit() {
 
     const valueMap = {
         "p0-key-evidence": state.keyEvidence,
-        "p0-play-evidence": state.playEvidence,
         "p0-commissioning-evidence": state.commissioningEvidence,
         "p0-roster-primary": state.rosterPrimary,
         "p0-roster-secondary": state.rosterSecondary,
@@ -9771,7 +9738,7 @@ function renderP0BlockerCockpit() {
             "<div class='" + (blockStatus.allDone ? "success-box" : "error") + "'>" +
             "<p><strong>P0 Status:</strong> " + (blockStatus.allDone ? "✅ Alle P0-Blocker abgeschlossen" : "⚠️ P0-Blocker offen") + "</p>" +
             "<p><strong>Erledigt:</strong> " + done + "/" + total + " (" + donePercent + "%)</p>" +
-            "<p><strong>Block-Abschluss:</strong> " + blockStatus.completedBlocks + "/" + blockStatus.totalBlocks + " (Security " + (blockStatus.blocks.security ? "✅" : "⚠️") + ", Play " + (blockStatus.blocks.playConsole ? "✅" : "⚠️") + ", Commissioning " + (blockStatus.blocks.commissioning ? "✅" : "⚠️") + ", Roster " + (blockStatus.blocks.roster ? "✅" : "⚠️") + ", Release-Evidence " + (blockStatus.blocks.releaseEvidence ? "✅" : "⚠️") + ")</p>" +
+            "<p><strong>Block-Abschluss:</strong> " + blockStatus.completedBlocks + "/" + blockStatus.totalBlocks + " (Security " + (blockStatus.blocks.security ? "✅" : "⚠️") + ", Geräteabnahme " + (blockStatus.blocks.deviceValidation ? "✅" : "⚠️") + ", Roster " + (blockStatus.blocks.roster ? "✅" : "⚠️") + ", Release-Evidence " + (blockStatus.blocks.releaseEvidence ? "✅" : "⚠️") + ")</p>" +
             "<p><strong>Aktualisiert:</strong> " + escapeHtml(ts) + "</p>" +
             "</div>";
     }
@@ -9782,15 +9749,6 @@ function collectP0BlockerCockpitFromUi() {
         checks: {
             keyRotationDone: Boolean(document.getElementById("p0-key-rotation-done")?.checked),
             keyRestrictionsDone: Boolean(document.getElementById("p0-key-restrictions-done")?.checked),
-            playDataSafety: Boolean(document.getElementById("p0-play-data-safety")?.checked),
-            playIarc: Boolean(document.getElementById("p0-play-iarc")?.checked),
-            playListing: Boolean(document.getElementById("p0-play-listing")?.checked),
-            playPermissions: Boolean(document.getElementById("p0-play-permissions")?.checked),
-            playAppAccess: Boolean(document.getElementById("p0-play-app-access")?.checked),
-            commissioningAndroid: Boolean(document.getElementById("p0-commissioning-android")?.checked),
-            commissioningAi: Boolean(document.getElementById("p0-commissioning-ai")?.checked),
-            commissioningSupport: Boolean(document.getElementById("p0-commissioning-support")?.checked),
-            commissioningCompliance: Boolean(document.getElementById("p0-commissioning-compliance")?.checked),
             oemDeviceTests: Boolean(document.getElementById("p0-oem-device-tests")?.checked),
             rosterAssigned: Boolean(document.getElementById("p0-roster-assigned")?.checked),
             legacyAuthSnapshot: Boolean(document.getElementById("p0-legacy-auth-snapshot")?.checked),
@@ -9799,7 +9757,6 @@ function collectP0BlockerCockpitFromUi() {
             deploymentReference: Boolean(document.getElementById("p0-deployment-reference")?.checked),
         },
         keyEvidence: (document.getElementById("p0-key-evidence")?.value || "").trim(),
-        playEvidence: (document.getElementById("p0-play-evidence")?.value || "").trim(),
         commissioningEvidence: (document.getElementById("p0-commissioning-evidence")?.value || "").trim(),
         rosterPrimary: (document.getElementById("p0-roster-primary")?.value || "").trim(),
         rosterSecondary: (document.getElementById("p0-roster-secondary")?.value || "").trim(),

@@ -1084,7 +1084,7 @@ describe("admin-panel helper functions", () => {
     const { exports } = loadAdminPanelTestExports();
     const empty = exports.getP0BlockCompletion({ checks: {} });
     expect(empty.completedBlocks).toBe(0);
-    expect(empty.totalBlocks).toBe(5);
+    expect(empty.totalBlocks).toBe(4);
     expect(empty.allDone).toBe(false);
     expect(empty.blocks.security).toBe(false);
 
@@ -1097,21 +1097,20 @@ describe("admin-panel helper functions", () => {
     });
     expect(partial.blocks.security).toBe(true);
     expect(partial.blocks.roster).toBe(true);
-    expect(partial.blocks.playConsole).toBe(false);
+    expect(partial.blocks.deviceValidation).toBe(false);
     expect(partial.blocks.releaseEvidence).toBe(false);
     expect(partial.completedBlocks).toBe(2);
 
     const full = exports.getP0BlockCompletion({
       checks: {
         keyRotationDone: true, keyRestrictionsDone: true,
-        playDataSafety: true, playIarc: true, playListing: true, playPermissions: true, playAppAccess: true,
-        commissioningAndroid: true, commissioningAi: true, commissioningSupport: true, commissioningCompliance: true, oemDeviceTests: true,
+        oemDeviceTests: true,
         rosterAssigned: true,
         legacyAuthSnapshot: true, codeqlLinked: true, androidCiLinked: true, deploymentReference: true,
       },
     });
     expect(full.allDone).toBe(true);
-    expect(full.completedBlocks).toBe(5);
+    expect(full.completedBlocks).toBe(4);
   });
 
   // ── P0 Blocker Cockpit State (localStorage) ──
@@ -1146,13 +1145,8 @@ describe("admin-panel helper functions", () => {
     });
 
     const synced = exports.autoSyncP0FromExistingSignals();
-    expect(synced.checks.playDataSafety).toBe(true);
-    expect(synced.checks.playIarc).toBe(true);
-    expect(synced.checks.playPermissions).toBe(true);
-    expect(synced.checks.playAppAccess).toBe(true);
     expect(synced.checks.keyRotationDone).toBe(true);
-    // listing was false → should not sync
-    expect(synced.checks.playListing).toBe(false);
+    expect(synced.checks.keyRestrictionsDone).toBe(true);
   });
 
   // ── loadCommandBuilderConfig ──
