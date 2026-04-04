@@ -261,6 +261,32 @@ class TestBuildTestingRegister:
         assert checks["service-account-ready"]["status"] == "pass"
 
 
+class TestRunCommand:
+    def test_uses_utf8_replace_for_subprocess_output(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        import app
+
+        captured_kwargs: dict[str, object] = {}
+
+        class Completed:
+            stdout = "ok"
+            stderr = ""
+            returncode = 0
+
+        def fake_run(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+            return Completed()
+
+        monkeypatch.setattr(app.subprocess, "run", fake_run)
+
+        result = app.run_command(app.CommandRequest(command="npm --version", cwd=tmp_path))
+
+        assert result["code"] == 0
+        assert result["output"].endswith("ok")
+        assert captured_kwargs["text"] is True
+        assert captured_kwargs["encoding"] == "utf-8"
+        assert captured_kwargs["errors"] == "replace"
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  get_device_status
 # ═══════════════════════════════════════════════════════════════════
