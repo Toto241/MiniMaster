@@ -395,6 +395,8 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(status.ampel).toBe("red");
       expect(status.ampelLabel).toBe("Go-Live blockiert");
       expect(status.backendReady).toBe(false);
+      expect(status.allApprovalsOk).toBe(false);
+      expect(status.totals.approvalOpen).toBe(exports.commissioningAttestationItems.length);
     });
 
     it("shows RED when critical platform items are open", () => {
@@ -410,7 +412,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(status.totals.doneCritical).toBe(0);
     });
 
-    it("shows YELLOW when backend + critical done but attestations missing", () => {
+    it("shows YELLOW when backend + critical done but QA approvals missing", () => {
       const { exports } = loadTestExports();
       // Mark all platform critical items done
       const platformState: Record<string, boolean> = {};
@@ -427,6 +429,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       );
       expect(status.ampel).toBe("yellow");
       expect(status.ampelLabel).toBe("Teilweise bereit");
+      expect(status.allApprovalsOk).toBe(false);
     });
 
     it("shows YELLOW when play-store checks incomplete", () => {
@@ -465,8 +468,10 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(status.ampel).toBe("green");
       expect(status.ampelLabel).toBe("Go-Live freigegeben");
       expect(status.backendReady).toBe(true);
+      expect(status.allApprovalsOk).toBe(true);
       expect(status.allAttestationsOk).toBe(true);
       expect(status.playStoreReady).toBe(true);
+      expect(status.totals.approvalDone).toBe(status.totals.approvalTotal);
     });
 
     it("tracks platform completion percentages", () => {
