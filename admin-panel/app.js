@@ -3101,14 +3101,23 @@ function buildPrioritizedActionPlanFromData(validation, platformState, playStore
     }
 
     missingAttestations.forEach(item => {
+        const automationType = String(item.automationType || commissioningQaRegisterDefinitionMap.get(String(item.key || ""))?.automationType || "manual");
+        const status = String(item.status || (automationType === "manual" ? "manual_required" : "not_run"));
+        const isAutomaticApproval = automationType === "automatic" || automationType === "command";
         steps.push({
             id: `attestation-${item.key}`,
-            category: "Compliance",
+            category: isAutomaticApproval ? "QA-Automation" : "Compliance",
             platform: "Operator Setup",
-            severity: "high",
+            severity: isAutomaticApproval ? "critical" : "high",
             title: item.label,
-            why: "Diese manuelle Freigabe ist Teil des Go-Live-Gates und kann browserseitig nicht verlässlich automatisiert geprüft werden.",
-            action: "Nachweis prüfen, im Panel Qualitätssicherung protokollieren und anschließend den QA-Status erneut laden.",
+            why: isAutomaticApproval
+                ? "Diese automatische Freigabe ist Teil des Go-Live-Gates und muss im QA-Register erfolgreich bewertet werden."
+                : "Diese manuelle Freigabe ist Teil des Go-Live-Gates und kann browserseitig nicht verlässlich automatisiert geprüft werden.",
+            action: isAutomaticApproval
+                ? (status === "fail"
+                    ? "Ursache beheben, im Panel Qualitätssicherung den automatischen Check erneut ausführen und auf PASS bringen."
+                    : "Im Panel Qualitätssicherung den automatischen Check ausführen oder aktualisieren, bis er auf PASS steht.")
+                : "Nachweis prüfen, im Panel Qualitätssicherung protokollieren und anschließend den QA-Status erneut laden.",
         });
     });
 
@@ -3155,8 +3164,14 @@ function buildPrioritizedActionPlan() {
     const validation = commissioningSummary?.validationSummary || null;
     const platformState = getPlatformReadiness();
     const playStoreState = getPlayStoreReadinessState();
-    const missingAttestations = commissioningAttestationItems.filter(item => !getCommissioningAttestations()[item.key]);
-    return buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, missingAttestations);
+    const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: validation });
+    const openApprovals = qaApprovalSummary.open.map(item => ({
+        key: String(item.id || ""),
+        label: String(item.title || item.id || ""),
+        automationType: String(item.automationType || commissioningQaRegisterDefinitionMap.get(String(item.id || ""))?.automationType || "manual"),
+        status: String(item.status || "not_run"),
+    }));
+    return buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, openApprovals);
 }
 
 function renderPrioritizedActionPlan() {
