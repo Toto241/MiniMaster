@@ -751,6 +751,17 @@ describe("admin-panel helper functions", () => {
     expect(findings.some((f: any) => f.severity === "error" && f.text.includes("Credentials unsicher"))).toBe(true);
   });
 
+  it("accepts direct QA test ids in plausibility findings", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const findings = exports.buildPlausibilityFindings(
+      {},
+      { "static-ca-accessibility": true },
+      {},
+      {},
+    );
+    expect(findings.some((f: any) => f.severity === "error" && f.text.includes("Settings-Schutz"))).toBe(true);
+  });
+
   // ── computeGoLiveStatusFromData ──
   it("returns red ampel when backend validation is missing", () => {
     const { exports } = loadAdminPanelTestExports();

@@ -3161,9 +3161,48 @@ function buildPrioritizedActionPlanFromData(validation, platformState, playStore
     }));
 }
 
+function buildPlatformQaActionPlanEntries(payload = testingRegisterPayload) {
+    const groups = Array.isArray(payload?.groups) ? payload.groups : [];
+    const entries = [];
+
+    groups.forEach(group => {
+        const groupId = String(group?.id || "");
+        if (!platformQaRegisterGroupIdSet.has(groupId)) return;
+
+        const platformEntry = Object.entries(platformQaRegisterGroups).find(([, config]) =>
+            Array.isArray(config.groupIds) && config.groupIds.includes(groupId)
+        );
+        const platformLabel = platformEntry?.[1]?.label || String(group?.title || groupId || "Plattform");
+        const tests = Array.isArray(group?.tests) ? group.tests : [];
+
+        tests.forEach((test, index) => {
+            const status = String(test?.status || "pending").toLowerCase();
+            if (["pass", "passed", "ok", "done", "approved", "success"].includes(status)) return;
+
+            const severity = normalizeQaSeverity(test?.severity || group?.severity || "medium");
+            entries.push({
+                id: `qa-platform-${String(test?.id || `${groupId}-${index}`)}`,
+                category: platformLabel,
+                platform: platformLabel,
+                severity,
+                title: String(test?.title || test?.name || test?.id || "QA-Prüfung offen"),
+                why: severity === "critical"
+                    ? "Diese QA-Prüfung blockiert die Freigabe der Plattform unmittelbar."
+                    : severity === "high"
+                        ? "Diese QA-Prüfung ist für einen belastbaren Plattform-Rollout wesentlich."
+                        : "Diese QA-Prüfung erhöht die Qualität der Plattform und sollte vor dem Rollout abgeschlossen sein.",
+                action: String(test?.automationType || "manual").toLowerCase() === "manual"
+                    ? "Nachweis erbringen, den manuellen QA-Eintrag dokumentieren und den Status aktualisieren."
+                    : "Automatischen QA-Check ausführen, Fehler beheben und erneut auf PASS bringen.",
+            });
+        });
+    });
+
+    return entries;
+}
+
 function buildPrioritizedActionPlan() {
     const validation = commissioningSummary?.validationSummary || null;
-    const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
     const playStoreState = getPlayStoreReadinessState();
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: validation });
     const openApprovals = qaApprovalSummary.open.map(item => ({
@@ -3172,7 +3211,28 @@ function buildPrioritizedActionPlan() {
         automationType: String(item.automationType || commissioningQaRegisterDefinitionMap.get(String(item.id || ""))?.automationType || "manual"),
         status: String(item.status || "not_run"),
     }));
-    return buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, openApprovals);
+    const baseSteps = buildPrioritizedActionPlanFromData(validation, {}, playStoreState, openApprovals);
+    const qaPlatformSteps = buildPlatformQaActionPlanEntries(testingRegisterPayload);
+    const merged = [...baseSteps, ...qaPlatformSteps];
+
+    const deduped = [];
+    const seen = new Set();
+    for (const step of merged) {
+        if (seen.has(step.id)) continue;
+        seen.add(step.id);
+        deduped.push(step);
+    }
+
+    deduped.sort((a, b) => {
+        const weightDiff = getPriorityWeight(b.severity) - getPriorityWeight(a.severity);
+        if (weightDiff !== 0) return weightDiff;
+        return a.title.localeCompare(b.title, "de");
+    });
+
+    return deduped.map((step, index) => ({
+        ...step,
+        order: index + 1,
+    }));
 }
 
 function renderPrioritizedActionPlan() {
@@ -3295,6 +3355,10 @@ const platformQaRegisterGroups = {
         groupIds: ["functional-readiness-desktop", "static-readiness-desktop"],
     },
 };
+
+const platformQaRegisterGroupIdSet = new Set(
+    Object.values(platformQaRegisterGroups).flatMap(platform => platform.groupIds || [])
+);
 
 const platformQaStateMapping = {
     "ma-registration-flow": ["ma-registration-flow"],
@@ -3628,7 +3692,7 @@ function renderGoLiveAmpel() {
 function renderPlatformReadinessSection(platformKey) {
     const container = document.getElementById(`platform-${platformKey}`);
     if (!container) return;
-    const platform = platformReadinessItems[platformKey];
+    const platform = platformQaRegisterGroups[platformKey];
     if (!platform) return;
 
     const qaSummary = buildPlatformQaReadinessSummary(testingRegisterPayload);
@@ -3674,68 +3738,78 @@ function renderAllPlatformSections() {
 
 // ==================== PLAUSIBILITÄTSPRÜFUNG ====================
 
+function hasPlatformQaSignal(state, ...testIds) {
+    if (!state) return false;
+    const normalized = Array.from(new Set(testIds.flatMap(testId => {
+        const aliases = Array.isArray(platformQaStateMapping?.[testId]) ? platformQaStateMapping[testId] : [];
+        return [testId, ...aliases];
+    }).filter(Boolean)));
+
+    return normalized.some(testId => Boolean(state[testId]));
+}
+
 function buildPlausibilityFindings(attestations, platformState, config, validationChecks) {
     const findings = [];
 
     // Cross-Platform-Plausibilität
-    if (attestations["android-master-registered"] && !platformState["ma-registration-flow"]) {
+    if (attestations["android-master-registered"] && !hasPlatformQaSignal(platformState, "ma-registration-flow")) {
         findings.push({ severity: "warn", text: "MasterApp als registriert markiert, aber Registrierungs-Flow nicht bestätigt." });
     }
-    if (attestations["android-child-registered"] && !platformState["ca-pairing-flow"]) {
+    if (attestations["android-child-registered"] && !hasPlatformQaSignal(platformState, "ca-pairing-flow")) {
         findings.push({ severity: "warn", text: "ChildApp als registriert markiert, aber Pairing-Flow nicht bestätigt." });
     }
-    if (attestations["parent-panel-verified"] && !platformState["dt-parent-panel-login"]) {
+    if (attestations["parent-panel-verified"] && !hasPlatformQaSignal(platformState, "dt-parent-panel-login")) {
         findings.push({ severity: "warn", text: "Parent-Panel als geprüft markiert, aber Desktop-Login nicht bestätigt." });
     }
-    if (attestations["device-sync-verified"] && !platformState["ca-fcm-sync"]) {
+    if (attestations["device-sync-verified"] && !hasPlatformQaSignal(platformState, "ca-fcm-sync", "static-ca-fcm-sync")) {
         findings.push({ severity: "warn", text: "Device-Sync als geprüft markiert, aber FCM-Sync in ChildApp nicht bestätigt." });
     }
-    if (attestations["storage-rules-verified"] && !platformState["ca-task-proof"]) {
+    if (attestations["storage-rules-verified"] && !hasPlatformQaSignal(platformState, "ca-task-proof")) {
         findings.push({ severity: "info", text: "Storage-Rules geprüft, aber Foto-Beweis-Upload noch nicht bestätigt." });
     }
 
     // MasterApp-Plausibilität
-    if (platformState["ma-lock-unlock"] && !platformState["ca-accessibility-active"]) {
+    if (hasPlatformQaSignal(platformState, "ma-lock-unlock") && !hasPlatformQaSignal(platformState, "ca-accessibility-active", "static-ca-accessibility")) {
         findings.push({ severity: "error", text: "MasterApp Lock/Unlock bestätigt, aber ChildApp AccessibilityService nicht aktiv – Sperren wirken nicht." });
     }
-    if (platformState["ma-task-create"] && !platformState["ca-task-proof"]) {
+    if (hasPlatformQaSignal(platformState, "ma-task-create") && !hasPlatformQaSignal(platformState, "ca-task-proof")) {
         findings.push({ severity: "warn", text: "Task-Erstellung bestätigt, aber Foto-Beweis-Upload im Kind-App nicht bestätigt." });
     }
-    if (platformState["ma-task-review"] && !platformState["ma-task-reject-ui"]) {
+    if (hasPlatformQaSignal(platformState, "ma-task-review") && !hasPlatformQaSignal(platformState, "ma-task-reject-ui")) {
         findings.push({ severity: "warn", text: "Task-Review bestätigt, aber Reject-Button fehlt noch." });
     }
-    if (platformState["ma-usage-rules-nav"] && !platformState["ca-usage-limits"]) {
+    if (hasPlatformQaSignal(platformState, "ma-usage-rules-nav") && !hasPlatformQaSignal(platformState, "ca-usage-limits")) {
         findings.push({ severity: "warn", text: "UsageRules in MasterApp navigierbar, aber Limits in ChildApp nicht durchgesetzt." });
     }
-    if (platformState["ma-fcm-working"] && !platformState["ca-fcm-sync"]) {
+    if (hasPlatformQaSignal(platformState, "ma-fcm-working") && !hasPlatformQaSignal(platformState, "ca-fcm-sync", "static-ca-fcm-sync")) {
         findings.push({ severity: "error", text: "FCM-Empfang in MasterApp bestätigt, aber FCM-Sync in ChildApp nicht – Push-Kette unterbrochen." });
     }
-    if (platformState["ma-subscription-check"] && !platformState["ma-subscription-enforce"]) {
+    if (hasPlatformQaSignal(platformState, "ma-subscription-check") && !hasPlatformQaSignal(platformState, "ma-subscription-enforce")) {
         findings.push({ severity: "warn", text: "Abo-Check bestätigt, aber Free-Tier-Limit wird nicht erzwungen." });
     }
 
     // ChildApp-Plausibilität
-    if (platformState["ca-app-blocking-effective"] && !platformState["ca-overlay-secure"]) {
+    if (hasPlatformQaSignal(platformState, "ca-app-blocking-effective") && !hasPlatformQaSignal(platformState, "ca-overlay-secure", "static-ca-overlay")) {
         findings.push({ severity: "error", text: "App-Blocking als wirksam markiert, aber Overlay-Sicherheit fehlt – Kinder können Overlay wegwischen." });
     }
-    if (platformState["ca-app-blocking-effective"] && !platformState["ca-uninstall-prevention"]) {
+    if (hasPlatformQaSignal(platformState, "ca-app-blocking-effective") && !hasPlatformQaSignal(platformState, "static-ca-uninstall-prevention")) {
         findings.push({ severity: "error", text: "App-Blocking bestätigt, aber Deinstallationsschutz fehlt – Kind kann App einfach deinstallieren." });
     }
-    if (platformState["ca-accessibility-active"] && !platformState["ca-settings-protection"]) {
+    if (hasPlatformQaSignal(platformState, "ca-accessibility-active", "static-ca-accessibility") && !hasPlatformQaSignal(platformState, "ca-settings-protection")) {
         findings.push({ severity: "error", text: "AccessibilityService aktiv, aber Settings-Schutz fehlt – Kind kann Service abschalten." });
     }
-    if (platformState["ca-heartbeat"] && !platformState["ca-boot-receiver"]) {
+    if (hasPlatformQaSignal(platformState, "static-ca-heartbeat") && !hasPlatformQaSignal(platformState, "static-ca-boot-receiver")) {
         findings.push({ severity: "warn", text: "HeartbeatWorker bestätigt, aber BootReceiver fehlt – nach Neustart kein Heartbeat." });
     }
 
     // Desktop-Plausibilität
-    if (platformState["dt-auto-update"] && !platformState["dt-code-signing"]) {
+    if (hasPlatformQaSignal(platformState, "dt-auto-update") && !hasPlatformQaSignal(platformState, "dt-code-signing")) {
         findings.push({ severity: "error", text: "Auto-Update bestätigt, aber Code-Signing fehlt – unsignierte Updates sind ein Sicherheitsrisiko." });
     }
-    if (platformState["dt-desktop-notifications"] && !platformState["dt-ipc-messaging"]) {
+    if (hasPlatformQaSignal(platformState, "dt-desktop-notifications") && !hasPlatformQaSignal(platformState, "dt-ipc-messaging")) {
         findings.push({ severity: "warn", text: "Desktop-Benachrichtigungen bestätigt, aber IPC-Kommunikation fehlt – Benachrichtigungen benötigen IPC." });
     }
-    if (platformState["dt-parent-panel-login"] && !platformState["dt-credential-security"]) {
+    if (hasPlatformQaSignal(platformState, "dt-parent-panel-login") && !hasPlatformQaSignal(platformState, "static-dt-credential-security")) {
         findings.push({ severity: "error", text: "Parent-Panel-Login bestätigt, aber Credentials unsicher gespeichert." });
     }
 
@@ -3745,10 +3819,10 @@ function buildPlausibilityFindings(attestations, platformState, config, validati
     }
 
     // Backend ↔ App-Konsistenz
-    if (validationChecks.functionsReachable && !platformState["ma-pairing-works"]) {
+    if (validationChecks.functionsReachable && !hasPlatformQaSignal(platformState, "ma-pairing-works")) {
         findings.push({ severity: "info", text: "Backend-Functions erreichbar, aber MasterApp-Pairing noch nicht getestet." });
     }
-    if (validationChecks.storageHealthOk && !platformState["ca-task-proof"]) {
+    if (validationChecks.storageHealthOk && !hasPlatformQaSignal(platformState, "ca-task-proof")) {
         findings.push({ severity: "info", text: "Storage-Bucket erreichbar, aber Foto-Upload aus ChildApp noch ungeprüft." });
     }
 
