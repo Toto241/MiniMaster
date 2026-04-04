@@ -146,35 +146,30 @@ const setupChecklistItems = [
     { key: "deploy-verified", label: "Deploy erfolgreich und Functions live" }
 ];
 
-const commissioningAttestationItems = [
-    { key: "firebase-auth-enabled", label: "Firebase Authentication aktiviert" },
-    { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt" },
-    { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert" },
-    { key: "android-child-registered", label: "Android-App com.google.pairing registriert" },
-    { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft" },
-    { key: "device-sync-verified", label: "Device-Sync zwischen Parent Panel und Child geprüft" },
-    { key: "support-flow-verified", label: "Support-Ticket-Flow geprüft" },
-    { key: "compliance-flow-verified", label: "DSAR- und Audit-Flow geprüft" },
-    { key: "storage-rules-verified", label: "Storage Rules aktiv und geprüft" }
+const commissioningQaRegisterDefinitions = [
+    { key: "firebase-auth-enabled", label: "Firebase Authentication aktiviert", automationType: "manual" },
+    { key: "firestore-enabled", label: "Firestore aktiviert", automationType: "automatic" },
+    { key: "storage-enabled", label: "Firebase Storage aktiviert", automationType: "automatic" },
+    { key: "functions-enabled", label: "Cloud Functions aktiviert", automationType: "automatic" },
+    { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt", automationType: "manual" },
+    { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert", automationType: "manual" },
+    { key: "android-child-registered", label: "Android-App com.google.pairing registriert", automationType: "manual" },
+    { key: "firebase-project-bound", label: "firebase use --add lokal durchgeführt", automationType: "automatic" },
+    { key: "service-account-ready", label: "serviceAccountKey.json lokal für setup-admin verfügbar", automationType: "automatic" },
+    { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft", automationType: "manual" },
+    { key: "device-sync-verified", label: "Device-Sync zwischen Parent Panel und Child geprüft", automationType: "manual" },
+    { key: "support-flow-verified", label: "Support-Ticket-Flow geprüft", automationType: "manual" },
+    { key: "compliance-flow-verified", label: "DSAR- und Audit-Flow geprüft", automationType: "manual" },
+    { key: "storage-rules-verified", label: "Storage Rules aktiv und geprüft", automationType: "manual" },
 ];
 
-const commissioningQaRegisterIds = [
-    "firebase-auth-enabled",
-    "firestore-enabled",
-    "storage-enabled",
-    "functions-enabled",
-    "messaging-enabled",
-    "android-master-registered",
-    "android-child-registered",
-    "firebase-project-bound",
-    "service-account-ready",
-    "parent-panel-verified",
-    "device-sync-verified",
-    "support-flow-verified",
-    "compliance-flow-verified",
-    "storage-rules-verified",
-];
+const commissioningAttestationItems = commissioningQaRegisterDefinitions
+    .filter(item => item.automationType === "manual")
+    .map(item => ({ key: item.key, label: item.label }));
+
+const commissioningQaRegisterIds = commissioningQaRegisterDefinitions.map(item => item.key);
 const commissioningQaRegisterIdSet = new Set(commissioningQaRegisterIds);
+const commissioningQaRegisterDefinitionMap = new Map(commissioningQaRegisterDefinitions.map(item => [item.key, item]));
 
 
 const defaultOperatorConfig = {
@@ -2830,16 +2825,85 @@ function hasPassingCommissioningQaCheck(testId) {
     return Boolean(attestations[testId]);
 }
 
+function getCommissioningQaApprovalItems(report = null) {
+    const reportItems = Array.isArray(report?.qaApprovals) ? report.qaApprovals : [];
+    if (reportItems.length > 0) {
+        return reportItems.filter(item => commissioningQaRegisterIdSet.has(String(item.id || "")));
+    }
+
+    const payloadItems = Array.isArray(testingRegisterPayload?.items)
+        ? testingRegisterPayload.items.filter(item => commissioningQaRegisterIdSet.has(String(item.id || "")))
+        : [];
+    if (payloadItems.length > 0) {
+        return payloadItems;
+    }
+
+    const validationSummary = report?.validationSummary || commissioningSummary?.validationSummary || null;
+    const validationChecks = validationSummary?.checks || {};
+    const attestations = getCommissioningAttestations();
+
+    return commissioningQaRegisterDefinitions.map(item => {
+        let status = "not_run";
+        if (item.automationType === "manual") {
+            status = attestations[item.key] ? "pass" : "manual_required";
+        } else if (item.key === "firestore-enabled") {
+            status = !validationSummary ? "not_run" : (validationChecks.firestoreAccessOk ? "pass" : "fail");
+        } else if (item.key === "storage-enabled") {
+            status = !validationSummary ? "not_run" : (validationChecks.storageHealthOk ? "pass" : "fail");
+        } else if (item.key === "functions-enabled") {
+            status = !validationSummary ? "not_run" : (validationChecks.functionsReachable ? "pass" : "fail");
+        } else {
+            status = hasPassingCommissioningQaCheck(item.key) ? "pass" : "not_run";
+        }
+
+        return {
+            id: item.key,
+            title: item.label,
+            automationType: item.automationType,
+            status,
+            groupId: "service-approvals",
+            groupTitle: "Freigaben & Registrierungen",
+        };
+    });
+}
+
+function buildCommissioningQaApprovalSummary(report = null) {
+    const items = getCommissioningQaApprovalItems(report);
+    const confirmed = items.filter(item => String(item.status || "") === "pass");
+    const open = items.filter(item => String(item.status || "") !== "pass");
+    return {
+        items,
+        confirmed,
+        open,
+        totalCount: items.length,
+        confirmedCount: confirmed.length,
+        openCount: open.length,
+    };
+}
+
+function renderCommissioningQaApprovalList(items, emptyMessage) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return `<p>${escapeHtml(emptyMessage)}</p>`;
+    }
+
+    return `<ul>${items.map(item => {
+        const definition = commissioningQaRegisterDefinitionMap.get(String(item.id || ""));
+        const type = formatPythonAutomationType(String(item.automationType || definition?.automationType || "automatic"));
+        const status = formatPythonAutomationStatus(String(item.status || "not_run"));
+        return `<li><strong>${escapeHtml(item.title || definition?.label || item.id || "-")}</strong> <span class="python-muted-caption">(${escapeHtml(type)} · ${escapeHtml(status)})</span></li>`;
+    }).join("")}</ul>`;
+}
+
 function renderCommissioningAttestations() {
     const container = document.getElementById("commissioning-attestations");
     if (!container) return;
 
-    const qaItems = Array.isArray(testingRegisterPayload?.items)
-        ? testingRegisterPayload.items.filter(item => commissioningQaRegisterIdSet.has(String(item.id || "")))
-        : [];
-    const openQaItems = qaItems.filter(item => {
-        const status = String(item.status || "not_run");
-        return status === "fail" || status === "manual_required" || status === "not_run";
+    const approvals = buildCommissioningQaApprovalSummary();
+    const qaItems = approvals.items;
+    const openQaItems = approvals.open.slice().sort((left, right) => {
+        const severityCmp = getTestingRegisterSeverityPriority(String(left.severity || "")) - getTestingRegisterSeverityPriority(String(right.severity || ""));
+        if (severityCmp !== 0) return severityCmp;
+        return getTestingRegisterStatusPriority(String(left.status || "")) - getTestingRegisterStatusPriority(String(right.status || ""));
     });
     const automaticCount = qaItems.filter(item => {
         const type = String(item.automationType || "automatic");
@@ -2849,15 +2913,7 @@ function renderCommissioningAttestations() {
         const type = String(item.automationType || "automatic");
         return type === "manual" || type === "documented";
     }).length;
-    const leadingItems = openQaItems.slice().sort((left, right) => {
-        const severityCmp = getTestingRegisterSeverityPriority(String(left.severity || "")) - getTestingRegisterSeverityPriority(String(right.severity || ""));
-        if (severityCmp !== 0) return severityCmp;
-        return getTestingRegisterStatusPriority(String(left.status || "")) - getTestingRegisterStatusPriority(String(right.status || ""));
-    }).slice(0, 6);
-
-    const listHtml = leadingItems.length > 0
-        ? `<ul>${leadingItems.map(item => `<li><strong>${escapeHtml(item.title || item.id || "-")}</strong> <span class="python-muted-caption">(${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))})</span></li>`).join("")}</ul>`
-        : "<p>Keine offenen Voraussetzungen oder Freigaben im QA-Register.</p>";
+    const listHtml = renderCommissioningQaApprovalList(openQaItems, "Keine offenen Voraussetzungen oder Freigaben im QA-Register.");
 
     if (qaItems.length === 0) {
         container.innerHTML = `
@@ -4720,8 +4776,7 @@ function buildDeployCommand(projectId) {
 
 function buildCommissioningSnapshot(report) {
     const validationSummary = report?.validationSummary || null;
-    const attestations = report?.attestations || {};
-    const confirmedAttestations = Object.values(attestations).filter(Boolean).length;
+    const approvalSummary = buildCommissioningQaApprovalSummary(report);
     const pendingCount = Array.isArray(report?.pending) ? report.pending.length : 0;
     const validationState = !validationSummary
         ? "Validation ausstehend"
@@ -4733,7 +4788,9 @@ function buildCommissioningSnapshot(report) {
 
     return {
         pendingCount,
-        confirmedAttestations,
+        confirmedAttestations: approvalSummary.confirmedCount,
+        totalApprovals: approvalSummary.totalCount,
+        openApprovals: approvalSummary.openCount,
         validationState,
         lastUpdated: new Date().toISOString(),
     };
@@ -4747,11 +4804,11 @@ function renderCommissioningReport(report) {
         ? `<ul>${report.roleAssignments.map(item => `<li>${escapeHtml(item.uid)} → ${escapeHtml(item.role)}</li>`).join("")}</ul>`
         : "<p>Keine zusätzlichen Rollen zugewiesen.</p>";
 
-    const attestationLabels = Object.fromEntries(commissioningAttestationItems.map(item => [item.key, item.label]));
-    const attestationEntries = Object.entries(report.attestations || {}).filter(([, value]) => Boolean(value));
-    const attestationHtml = attestationEntries.length > 0
-        ? `<ul>${attestationEntries.map(([key]) => `<li>${escapeHtml(attestationLabels[key] || key)}</li>`).join("")}</ul>`
-        : "<p>Noch keine Freigaben bestätigt.</p>";
+    const approvalSummary = buildCommissioningQaApprovalSummary(report);
+    const attestationHtml = renderCommissioningQaApprovalList(
+        approvalSummary.confirmed,
+        "Noch keine Freigaben bestätigt."
+    );
 
     const pendingHtml = report.pending.length > 0
         ? `<ul>${report.pending.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
@@ -4762,7 +4819,7 @@ function renderCommissioningReport(report) {
         <div class="commissioning-report ${report.pending.length === 0 ? "commissioning-complete" : ""}">
             <div class="commissioning-snapshot">
                 <div><strong>Status:</strong> ${escapeHtml(snapshot.validationState)}</div>
-                <div><strong>Bestätigte Freigaben:</strong> ${snapshot.confirmedAttestations}</div>
+                <div><strong>Bestätigte Freigaben:</strong> ${snapshot.confirmedAttestations} / ${snapshot.totalApprovals}</div>
                 <div><strong>Offene Punkte:</strong> ${snapshot.pendingCount}</div>
                 <div><strong>Aktualisiert:</strong> ${escapeHtml(new Date(snapshot.lastUpdated).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "medium", timeZone: "UTC" }))} UTC</div>
             </div>
@@ -4869,8 +4926,9 @@ async function runCommissioningAssistant() {
             pending.push("Play-Store-Readiness: gültige Support-/Privacy-E-Mail fehlt.");
         }
 
-        getMissingAttestations().forEach(item => {
-            pending.push(`QA-Nachweis offen: ${item}`);
+        const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary });
+        qaApprovalSummary.open.forEach(item => {
+            pending.push(`QA-Freigabe offen: ${item.title}`);
         });
 
         const playMetaReady = Boolean(playStoreState.privacyUrl && /^https:\/\//i.test(playStoreState.privacyUrl) && playStoreState.supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(playStoreState.supportEmail));
@@ -4886,6 +4944,7 @@ async function runCommissioningAssistant() {
             deployCommand: buildDeployCommand(bootstrapConfig.projectId || mergedRuntimeConfig.cloud.projectId),
             roleAssignments,
             attestations: getCommissioningAttestations(),
+            qaApprovals: qaApprovalSummary.items,
             pending,
         };
 
@@ -4918,7 +4977,8 @@ function refreshCommissioningReport() {
     if (commissioningSummary?.validationSummary?.checks && !commissioningSummary.validationSummary.checks.webControlConfigReady) {
         pending.push("Gemeinsame Konfiguration für web-control fehlt.");
     }
-    missingAttestations.forEach(item => pending.push(`QA-Nachweis offen: ${item}`));
+    const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: commissioningSummary?.validationSummary || null });
+    qaApprovalSummary.open.forEach(item => pending.push(`QA-Freigabe offen: ${item.title}`));
 
     const playStoreState = getPlayStoreReadinessState();
     const openPlayChecks = Object.entries(playStoreState.checks || {}).filter(([, value]) => !value);
@@ -4944,6 +5004,7 @@ function refreshCommissioningReport() {
         deployCommand: buildDeployCommand(runtimeConfig.cloud.projectId || firebaseConfig.projectId),
         roleAssignments: commissioningSummary?.roleAssignments || [],
         attestations: getCommissioningAttestations(),
+        qaApprovals: qaApprovalSummary.items,
         pending,
     };
 
