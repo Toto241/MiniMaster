@@ -3163,7 +3163,7 @@ function buildPrioritizedActionPlanFromData(validation, platformState, playStore
 
 function buildPrioritizedActionPlan() {
     const validation = commissioningSummary?.validationSummary || null;
-    const platformState = getPlatformReadiness();
+    const platformState = buildEffectivePlatformState(getPlatformReadiness(), testingRegisterPayload);
     const playStoreState = getPlayStoreReadinessState();
     const qaApprovalSummary = buildCommissioningQaApprovalSummary({ validationSummary: validation });
     const openApprovals = qaApprovalSummary.open.map(item => ({
@@ -3309,6 +3309,77 @@ const platformQaRegisterGroups = {
         groupIds: ["functional-readiness-desktop", "static-readiness-desktop"],
     },
 };
+
+const platformQaStateMapping = {
+    "ma-registration-flow": ["ma-registration-flow"],
+    "ma-credentials-encrypted": ["static-ma-credentials-encrypted"],
+    "ma-imei-fallback": ["static-ma-imei-fallback"],
+    "ma-proguard-enabled": ["static-ma-proguard-enabled"],
+    "ma-pairing-works": ["ma-pairing-works"],
+    "ma-lock-unlock": ["ma-lock-unlock"],
+    "ma-task-create": ["ma-task-create"],
+    "ma-task-review": ["ma-task-review"],
+    "ma-task-reject-ui": ["ma-task-reject-ui"],
+    "ma-usage-rules-nav": ["ma-usage-rules-nav"],
+    "ma-date-picker": ["ma-date-picker"],
+    "ma-subscription-check": ["ma-subscription-check"],
+    "ma-subscription-enforce": ["ma-subscription-enforce"],
+    "ma-fcm-working": ["ma-fcm-working"],
+    "ma-debug-hidden": ["static-ma-debug-hidden"],
+    "ma-firebase-appcheck": ["ma-firebase-appcheck", "static-ma-appcheck"],
+    "ma-offline-handling": ["ma-offline-handling"],
+    "ma-qr-pairing": ["ma-qr-pairing"],
+    "ca-pairing-flow": ["ca-pairing-flow"],
+    "ca-fcm-sync": ["ca-fcm-sync", "static-ca-fcm-sync"],
+    "ca-heartbeat": ["static-ca-heartbeat"],
+    "ca-accessibility-active": ["ca-accessibility-active", "static-ca-accessibility"],
+    "ca-app-blocking-effective": ["ca-app-blocking-effective"],
+    "ca-overlay-secure": ["ca-overlay-secure", "static-ca-overlay"],
+    "ca-uninstall-prevention": ["static-ca-uninstall-prevention"],
+    "ca-settings-protection": ["ca-settings-protection"],
+    "ca-device-admin-enforced": ["ca-device-admin-enforced", "static-ca-device-admin"],
+    "ca-usage-limits": ["ca-usage-limits"],
+    "ca-time-windows": ["ca-time-windows"],
+    "ca-tamper-detection": ["ca-tamper-detection", "static-ca-tamper-detection"],
+    "ca-task-proof": ["ca-task-proof"],
+    "ca-boot-receiver": ["static-ca-boot-receiver"],
+    "ca-factory-reset-protection": ["ca-factory-reset-protection"],
+    "ca-root-detection": ["ca-root-detection"],
+    "ca-permission-onboarding": ["ca-permission-onboarding"],
+    "dt-csp-headers": ["static-dt-csp"],
+    "dt-sri-hashes": ["static-dt-sri"],
+    "dt-credential-security": ["static-dt-credential-security"],
+    "dt-session-timeout": ["static-dt-session-timeout"],
+    "dt-electron-builder": ["static-dt-electron-builder"],
+    "dt-code-signing": ["dt-code-signing"],
+    "dt-auto-update": ["dt-auto-update"],
+    "dt-system-tray": ["dt-system-tray"],
+    "dt-desktop-notifications": ["dt-desktop-notifications"],
+    "dt-window-persistence": ["dt-window-persistence"],
+    "dt-ipc-messaging": ["dt-ipc-messaging"],
+    "dt-parent-panel-login": ["dt-parent-panel-login"],
+    "dt-admin-panel-login": ["dt-admin-panel-login"],
+    "dt-crash-reporting": ["dt-crash-reporting"],
+};
+
+function buildEffectivePlatformState(platformState = {}, payload = testingRegisterPayload) {
+    const mergedState = { ...(platformState || {}) };
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const passedIds = new Set(
+        items
+            .filter(item => String(item.status || "") === "pass")
+            .map(item => String(item.id || ""))
+    );
+
+    Object.entries(platformQaStateMapping).forEach(([legacyKey, qaIds]) => {
+        if (mergedState[legacyKey]) return;
+        if (qaIds.some(testId => passedIds.has(String(testId)))) {
+            mergedState[legacyKey] = true;
+        }
+    });
+
+    return mergedState;
+}
 
 function buildPlatformQaReadinessSummary(payload = testingRegisterPayload) {
     const items = Array.isArray(payload?.items) ? payload.items : [];
@@ -3737,7 +3808,7 @@ function runPlausibilityCheck() {
     if (!container) return;
 
     const attestations = getCommissioningAttestations();
-    const platformState = getPlatformReadiness();
+    const platformState = buildEffectivePlatformState(getPlatformReadiness(), testingRegisterPayload);
     const config = typeof getOperatorConfigFormValues === "function" ? getOperatorConfigFormValues() : {};
     const validationChecks = commissioningSummary?.validationSummary?.checks || {};
 
