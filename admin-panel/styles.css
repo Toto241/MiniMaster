@@ -1421,6 +1421,86 @@ input:focus, select:focus, textarea:focus {
     gap: 12px;
 }
 
+.qa-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.qa-guide-card {
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff, #f8fbff);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.qa-guide-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.qa-guide-card-header h4 {
+    margin: 0 0 4px;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.qa-guide-card-header p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.88rem;
+}
+
+.qa-guide-group-list,
+.qa-guide-suite-list {
+    display: grid;
+    gap: 8px;
+}
+
+.qa-guide-group-item,
+.qa-guide-suite-item {
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px 12px;
+}
+
+.qa-guide-group-item {
+    display: grid;
+    gap: 3px;
+}
+
+.qa-guide-group-item span {
+    color: #1d4ed8;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.qa-guide-suite-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-block-end: 4px;
+}
+
+.qa-guide-footer {
+    color: #475569;
+    font-size: 0.82rem;
+    padding-block-start: 2px;
+}
+
+.qa-section-highlight {
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.18);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
 .python-automation-metric {
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid #dbeafe;

@@ -169,7 +169,10 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildTestingRegisterMetaBadges,",
     "  buildTestingRegisterLegend,",
     "  buildTestingRegisterActionTooltip,",
+    "  getTestingRegisterActionLabel,",
+    "  buildTestingRegisterExecutionPath,",
     "  buildTestingRegisterDetailText,",
+    "  buildQaExecutionGuideData,",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
     "};",
@@ -1495,6 +1498,64 @@ describe("admin-panel helper functions", () => {
     expect(exports.buildTestingRegisterActionTooltip({ action: "protocol" })).toContain("Nachweis");
     expect(exports.buildTestingRegisterActionTooltip({ action: "suite-run", prereqsMet: false, prereqReason: "ADB fehlt" })).toContain("ADB fehlt");
     expect(exports.buildTestingRegisterActionTooltip({ action: "suite-run", linkedCommand: "npm test" })).toContain("npm test");
+  });
+
+  it("labels register start paths clearly", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.getTestingRegisterActionLabel({ action: "suite-run" })).toBe("Suite-Start");
+    expect(exports.getTestingRegisterActionLabel({ action: "protocol" })).toBe("Nachweis-Protokoll");
+    expect(exports.getTestingRegisterActionLabel({ action: "commissioning-run" })).toBe("Python-Commissioning-Lauf");
+
+    expect(exports.buildTestingRegisterExecutionPath({ action: "suite-run", suiteRef: "android-master" })).toContain("android-master");
+    expect(exports.buildTestingRegisterExecutionPath({ action: "protocol" })).toContain("Nachweisformular");
+    expect(exports.buildTestingRegisterExecutionPath({ action: "commissioning-run" })).toContain("Python-Commissioning-Lauf");
+  });
+
+  it("summarizes QA start scopes for commissioning, suites and manual evidence", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const data = exports.buildQaExecutionGuideData(
+      {
+        groups: [
+          {
+            title: "Freigaben",
+            tests: [
+              { id: "auto-1", title: "Storage Rules", automationType: "automatic" },
+              { id: "cmd-1", title: "Readiness", automationType: "command" },
+              { id: "manual-1", title: "Desk Check", automationType: "manual" },
+            ],
+          },
+          {
+            title: "Geräte",
+            tests: [
+              { id: "doc-1", title: "Field Protocol", automationType: "documented" },
+            ],
+          },
+        ],
+      },
+      {
+        items: [
+          { id: "suite-1", entryKind: "suite", title: "Android Master Suite", status: "pass", command: "npm test" },
+          { id: "repo-1", entryKind: "repo-test", title: "masterApp/src/androidTest/...", suiteRef: "suite-1", status: "pass" },
+        ],
+        storage: {
+          commissioningRuns: "commissioning.jsonl",
+          commissioningEvidence: "evidence.jsonl",
+          suiteRuns: "suite_runs.jsonl",
+        },
+      },
+      [
+        { suiteId: "suite-1", title: "Android Master Suite", command: "npm test" },
+      ],
+    );
+
+    expect(data.commissioningAutomatic.total).toBe(2);
+    expect(data.manualEvidence.total).toBe(2);
+    expect(data.commissioningAutomatic.groups[0].title).toBe("Freigaben");
+    expect(data.suites).toHaveLength(1);
+    expect(data.suites[0].linkedCount).toBe(1);
+    expect(data.storage.suiteRuns).toBe("suite_runs.jsonl");
   });
 
   // ── findPythonAutomationTestById ──

@@ -954,6 +954,17 @@
                         <h2>🧪 Qualitätssicherung &amp; Tests</h2>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <h3>Startwege &amp; enthaltene Testfälle</h3>
+                            <p>
+                                Diese Übersicht zeigt pro Startaktion, <strong>welche Testfälle tatsächlich enthalten sind</strong>,
+                                wohin die Ergebnisse geschrieben werden und in welchen Bereich Sie für Details springen müssen.
+                            </p>
+                            <div id="qa-start-guide" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Lade QA-Startwege...</div>
+                            </div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Inbetriebnahme-Assistent</h3>
                             <p>
                                 Dieses Werkzeug bündelt die produktive Inbetriebnahme: Firebase-Bootstrap,
@@ -1016,7 +1027,7 @@
                             </div>
                         </div>
 
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div id="qa-register-card" class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Gesamt-Testregister</h3>
                             <p>
                                 Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle: automatische Suites,
@@ -1098,7 +1109,7 @@
                             </div>
                         </div>
 
-                            <div class="setup-card python-automation-shell" style="margin-block-start: 16px; margin-block-end: 0">
+                            <div id="qa-python-run-card" class="setup-card python-automation-shell" style="margin-block-start: 16px; margin-block-end: 0">
                                 <div class="python-automation-intro">
                                     <div>
                                         <h4>Python-basierte Testzentrale</h4>
@@ -1170,7 +1181,7 @@
                                     <section class="python-automation-panel">
                                         <div class="python-automation-panel-header">
                                             <div>
-                                                <h5>2. Testlauf ausführen</h5>
+                                                <h5>2. Python-Commissioning-Lauf starten</h5>
                                                 <p>
                                                     Ein Lauf bewertet die Python-Prüffälle, kann die lokalen Gates mit ausführen
                                                     und schreibt das Ergebnis direkt in die Laufhistorie.
@@ -1258,7 +1269,7 @@
                                 </div>
 
                                 <div class="python-automation-layout" style="margin-block-start: 14px">
-                                    <section class="python-automation-panel" id="python-automation-protocol-panel">
+                                    <section class="python-automation-panel" id="qa-protocol-card">
                                         <div class="python-automation-panel-header">
                                             <div>
                                                 <h5>5. Testfall bewerten &amp; protokollieren</h5>
@@ -1323,7 +1334,7 @@
                             </div>
 
                         <!-- ==================== TESTSUITE-ZENTRALE ==================== -->
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div id="qa-suite-card" class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>🔬 Test-Suiten &amp; USB-Automatisierung</h3>
                             <p>
                                 Alle Testsuiten (Backend, Android, USB-Device) aus der Python-Testzentrale.
