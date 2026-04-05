@@ -15,6 +15,7 @@ Das Panel kann jetzt auch als Python-Webanwendung ueber `python_admin/app.py` be
 - Google Play Store Readiness Modul (Pflicht-Checks, Status, JSON-Export)
 - P0 Blocker Cockpit (Go-Live): Security/Play/Commissioning/Operations-Blocker mit Evidenz, Export und Reset
 - Automatisches Markieren von P0-Checks bei erfolgreichen Support-/Compliance-Aktionen und Readiness-Signalen
+- QA-Register mit Risiko-Fokus: Frischegrad der Nachweise, offene Release-Blocker, Unsupported-Test-Mappings und Schnellfilter direkt im Bereich Qualitaetssicherung
 - Befehlszentrale mit USB-Debug/Commissioning-Kommandos inkl. APK-Installations-Schnittstelle (`run-usb-tests.ps1 -InstallApk`, Dual-Runner)
 
 ## Setup
@@ -47,6 +48,15 @@ Dann `http://localhost:8080/admin-panel/` aufrufen.
 - Firebase init Fehler: Platzhalter in `firebaseConfig` wurden nicht ersetzt.
 - Keine Daten sichtbar: Firestore Rules/Collections oder Berechtigungen pruefen.
 - P0-Cockpit aktualisiert sich nicht: Browser-Cache leeren und sicherstellen, dass Aktionen erfolgreich durchlaufen (nur erfolgreiche Flows auto-markieren).
+
+## QA-Register-Regeln
+
+- `Release-Blocker` bedeutet: Der Eintrag ist fuer einen Go-Live fachlich relevant und braucht einen aktuellen bestaetigten PASS.
+- `PASS, aber veraltet` gilt in der Operator-Sicht nicht als sauberer Freigabestatus. Veraltete Nachweise muessen vor einer Freigabe erneuert werden.
+- `Unsupported` bedeutet: Ein Repo-Test ist inventarisiert, aber aktuell keiner ausfuehrbaren Suite oder keinem automatischen Startweg zugeordnet.
+- iOS-XCTest-Dateien werden im QA-Register ebenfalls inventarisiert. Ohne macOS-/Xcode-Suite erscheinen sie derzeit bewusst als offene Automationsluecke statt unsichtbar zu bleiben.
+- `Offene Nachweise` umfasst fehlende, fehlgeschlagene oder veraltete Evidenz fuer manuelle bzw. dokumentierte Checks.
+- Das QA-Register ist die fuehrende Quelle fuer Commissioning-Freigaben, dokumentierte Nachweise und die operative Go-Live-Sicht im Admin-Panel.
 
 ## Python-Webanwendung
 

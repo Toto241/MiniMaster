@@ -566,7 +566,7 @@ function ensurePythonAutomationSelectedTest() {
 function openPythonAutomationProtocol(encodedTestId) {
     pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
     renderPythonAutomationProtocolEditor();
-    document.getElementById("python-automation-protocol-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("qa-protocol-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearPythonAutomationProtocolForm() {
@@ -1780,6 +1780,15 @@ function getTestingRegisterStatusPriority(status) {
     return 4;
 }
 
+function isTestingRegisterReleaseBlockerOpen(item) {
+    if (!item || !item.blockingForRelease) return false;
+
+    const status = String(item.status || "not_run");
+    if (item.staleEvidence) return true;
+    if (!item.hasSuccessfulRun) return true;
+    return status !== "pass";
+}
+
 function getTestingRegisterSeverityPriority(severity) {
     if (severity === "critical") return 0;
     if (severity === "high") return 1;
@@ -1820,7 +1829,7 @@ function buildTestingRegisterMetaBadges(item) {
         badges.push(`<span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr(`Verantwortlich: ${String(item.owner)}`, `Verantwortlich ${String(item.owner)}`)}>${escapeTestingRegisterText(String(item.owner))}</span>`);
     }
     if (item.blockingForRelease) {
-        badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zur bestaetigten Freigabe.", "Release-Blocker")}>Release-Blocker</span>`);
+        badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zu einem aktuellen, bestaetigten PASS. Veraltete Nachweise gelten hier ebenfalls als offen.", "Release-Blocker")}>Release-Blocker</span>`);
     }
     if (item.staleEvidence) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Der letzte Nachweis ist aelter als das definierte Stale-Fenster.", "Nachweis veraltet")}>Nachweis veraltet</span>`);
@@ -1837,10 +1846,131 @@ function buildTestingRegisterLegend() {
             Register-Legende:
             <span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr("Prioritaet des Testfalls", "Prioritaet")}>CRITICAL/HIGH</span>
             <span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr("Fachlich oder technisch verantwortliche Rolle", "Owner")}>Owner</span>
-            <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Release darf ohne Abschluss nicht freigegeben werden", "Release-Blocker")}>Release-Blocker</span>
+            <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Release darf ohne aktuellen PASS nicht freigegeben werden; veraltete Nachweise zählen ebenfalls als offen", "Release-Blocker")}>Release-Blocker</span>
             <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Inventarisiert, aber noch nicht an eine Suite gekoppelt", "Unsupported")}>Unsupported</span>
         </div>
     `;
+}
+
+function parseTestingRegisterTimestamp(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatTestingRegisterAge(value) {
+    const parsed = parseTestingRegisterTimestamp(value);
+    if (!parsed) return "noch kein Zeitstempel";
+
+    const diffMs = Math.max(0, Date.now() - parsed.getTime());
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    if (diffDays <= 0) return "heute aktualisiert";
+    if (diffDays === 1) return "vor 1 Tag aktualisiert";
+    if (diffDays < 30) return `vor ${diffDays} Tagen aktualisiert`;
+
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths === 1) return "vor 1 Monat aktualisiert";
+    return `vor ${diffMonths} Monaten aktualisiert`;
+}
+
+function buildTestingRegisterRiskSummary(payload) {
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const blockingOpen = items.filter(item => isTestingRegisterReleaseBlockerOpen(item));
+    const staleItems = items.filter(item => Boolean(item.staleEvidence));
+    const unsupportedItems = items.filter(item => String(item.groupId || "") === "repo-tests-unsupported");
+    const openEvidenceItems = items.filter(item => Boolean(item.evidenceRequired) && (String(item.status || "not_run") === "manual_required" || String(item.status || "not_run") === "fail" || item.staleEvidence || !item.hasSuccessfulRun));
+
+    const latestTimestamp = items
+        .map(item => parseTestingRegisterTimestamp(item.updatedAt || item.lastVerifiedAt || item.lastSuccessfulAt || ""))
+        .filter(Boolean)
+        .sort((left, right) => right.getTime() - left.getTime())[0] || null;
+
+    const latestIso = latestTimestamp ? latestTimestamp.toISOString() : "";
+    const ageDays = latestTimestamp ? Math.floor((Date.now() - latestTimestamp.getTime()) / (24 * 60 * 60 * 1000)) : null;
+
+    let freshnessTone = "empty";
+    let freshnessLabel = "Noch keine belastbaren QA-Zeitstempel";
+    if (latestTimestamp && ageDays !== null) {
+        if (ageDays > 30) {
+            freshnessTone = "stale";
+            freshnessLabel = `QA-Datenbasis veraltet: ${formatTestingRegisterAge(latestIso)}`;
+        } else if (ageDays > 14) {
+            freshnessTone = "aging";
+            freshnessLabel = `QA-Datenbasis altert: ${formatTestingRegisterAge(latestIso)}`;
+        } else {
+            freshnessTone = "fresh";
+            freshnessLabel = `QA-Datenbasis aktuell: ${formatTestingRegisterAge(latestIso)}`;
+        }
+    }
+
+    const topBlockers = blockingOpen
+        .slice()
+        .sort((left, right) => {
+            const severityCmp = getTestingRegisterSeverityPriority(String(left.severity || "")) - getTestingRegisterSeverityPriority(String(right.severity || ""));
+            if (severityCmp !== 0) return severityCmp;
+            return getTestingRegisterStatusPriority(String(left.status || "not_run")) - getTestingRegisterStatusPriority(String(right.status || "not_run"));
+        })
+        .slice(0, 5);
+
+    const alerts = [];
+    if (blockingOpen.length > 0) {
+        alerts.push({
+            tone: "danger",
+            title: `${blockingOpen.length} Release-Blocker sind noch offen`,
+            detail: "Diese Einträge haben noch keinen aktuellen PASS oder sind trotz PASS-Nachweis bereits veraltet und sollten vor einer Freigabe priorisiert werden.",
+            actionLabel: "Release-Blocker filtern",
+            action: "applyTestingRegisterQuickFilter('blocking')",
+        });
+    }
+    if (staleItems.length > 0) {
+        alerts.push({
+            tone: "warning",
+            title: `${staleItems.length} Nachweise sind veraltet`,
+            detail: "Mindestens ein dokumentierter oder manueller Nachweis liegt außerhalb des Stale-Fensters und sollte erneuert werden.",
+            actionLabel: "Veraltete Nachweise anzeigen",
+            action: "applyTestingRegisterQuickFilter('stale', { sort: 'updated' })",
+        });
+    }
+    if (unsupportedItems.length > 0) {
+        alerts.push({
+            tone: "info",
+            title: `${unsupportedItems.length} Repo-Tests sind noch keiner Suite zugeordnet`,
+            detail: "Inventarisierte Tests ohne Suite-Mapping tauchen im Register auf, laufen aber nicht automatisch in einem Startweg mit.",
+            actionLabel: "Unsupported anzeigen",
+            action: "applyTestingRegisterQuickFilter('unsupported', { sort: 'group' })",
+        });
+    }
+
+    return {
+        latestIso,
+        freshnessTone,
+        freshnessLabel,
+        blockingOpen,
+        staleItems,
+        unsupportedItems,
+        openEvidenceItems,
+        topBlockers,
+        alerts,
+    };
+}
+
+function applyTestingRegisterQuickFilter(type, options = {}) {
+    const typeEl = document.getElementById("testing-register-type-filter");
+    const sortEl = document.getElementById("testing-register-sort");
+    const searchEl = document.getElementById("testing-register-search");
+
+    if (typeEl && type) {
+        typeEl.value = type;
+    }
+    if (sortEl && options.sort) {
+        sortEl.value = options.sort;
+    }
+    if (searchEl && Object.prototype.hasOwnProperty.call(options, "search")) {
+        searchEl.value = options.search || "";
+    }
+
+    renderTestingRegisterList(testingRegisterPayload);
+    document.getElementById("qa-register-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function getTestingRegisterActionLabel(item) {
@@ -2137,6 +2267,39 @@ function renderTestingRegisterOverview(payload) {
         return;
     }
 
+    const riskSummary = buildTestingRegisterRiskSummary(payload);
+    const alertsHtml = riskSummary.alerts.length > 0
+        ? riskSummary.alerts.map(alert => `
+            <article class='qa-register-callout qa-register-callout-${escapeHtml(String(alert.tone || "info"))}'>
+                <div>
+                    <strong>${escapeHtml(alert.title)}</strong>
+                    <p>${escapeHtml(alert.detail)}</p>
+                </div>
+                <button class='btn btn-secondary btn-sm' onclick="${alert.action}">${escapeHtml(alert.actionLabel)}</button>
+            </article>
+        `).join("")
+        : `
+            <article class='qa-register-callout qa-register-callout-success'>
+                <div>
+                    <strong>Keine akuten QA-Blocker aus dem Register ermittelt</strong>
+                    <p>Das Register meldet derzeit weder offene oder veraltete Release-Blocker noch veraltete Nachweise oder Unsupported-Mappings.</p>
+                </div>
+            </article>
+        `;
+
+    const topBlockersHtml = riskSummary.topBlockers.length > 0
+        ? `
+            <div class='qa-register-mini-list'>
+                ${riskSummary.topBlockers.map(item => `
+                    <div class='qa-register-mini-list-item'>
+                        <strong>${escapeHtml(String(item.title || item.id || "Offener Punkt"))}</strong>
+                        <span>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))} · ${escapeHtml(String(item.owner || "Unklar"))}</span>
+                    </div>
+                `).join("")}
+            </div>
+        `
+        : `<p class='python-muted-caption'>Keine offenen Release-Blocker im Register.</p>`;
+
     overviewEl.innerHTML = `
         <div class='python-automation-metric'>
             <strong>${escapeHtml(String(summary.total || 0))}</strong>
@@ -2185,6 +2348,30 @@ function renderTestingRegisterOverview(payload) {
         <div class='python-automation-metric'>
             <strong>${escapeHtml(String(summary.unsupported || 0))}</strong>
             <span>Unsupported</span>
+        </div>
+        <div class='qa-register-insights'>
+            <div class='qa-register-freshness qa-register-freshness-${escapeHtml(riskSummary.freshnessTone)}'>
+                <strong>QA-Datenlage</strong>
+                <span>${escapeHtml(riskSummary.freshnessLabel)}</span>
+                <div class='python-muted-caption'>Offene Nachweise: ${escapeHtml(String(riskSummary.openEvidenceItems.length))} · Unsupported: ${escapeHtml(String(riskSummary.unsupportedItems.length))}</div>
+            </div>
+            <div class='qa-register-inline-actions'>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('blocking')">Release-Blocker</button>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('evidenceOpen', { sort: 'updated' })">Offene Nachweise</button>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('stale', { sort: 'updated' })">Veraltet</button>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('unsupported', { sort: 'group' })">Unsupported</button>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('all', { sort: 'status', search: '' })">Zurücksetzen</button>
+            </div>
+            <div class='qa-register-callout-stack'>
+                ${alertsHtml}
+            </div>
+            <div class='qa-register-top-blockers'>
+                <div class='qa-register-top-blockers-header'>
+                    <strong>Wichtigste offene Go-Live-Punkte</strong>
+                    <span>${escapeHtml(String(riskSummary.blockingOpen.length))} offen</span>
+                </div>
+                ${topBlockersHtml}
+            </div>
         </div>
         ${buildTestingRegisterLegend()}
     `;
@@ -2313,13 +2500,13 @@ function renderTestingRegisterList(payload) {
         if (filters.type === "evidenceOpen" && !hasOpenEvidence) {
             return false;
         }
-        if (filters.type === "playStoreBlocking" && !(playStoreItem && (isOpenTestingRegisterStatus(status) || item.blockingForRelease))) {
+        if (filters.type === "playStoreBlocking" && !(playStoreItem && (isOpenTestingRegisterStatus(status) || isTestingRegisterReleaseBlockerOpen(item)))) {
             return false;
         }
         if (filters.type === "critical" && severity !== "critical") {
             return false;
         }
-        if (filters.type === "blocking" && !item.blockingForRelease) {
+        if (filters.type === "blocking" && !isTestingRegisterReleaseBlockerOpen(item)) {
             return false;
         }
         if (filters.type === "stale" && !item.staleEvidence) {
