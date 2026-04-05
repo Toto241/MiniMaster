@@ -91,7 +91,7 @@ jobs:
           echo "OPENAI_FALLBACK_ENABLED=${OPENAI_FALLBACK_ENABLED:-false}"
           echo "LEGAL_POLICY_BASE_URL=${LEGAL_POLICY_BASE_URL:-https://minimaster.app/legal}"
           echo "PAIRING_LINK_BASE_URL=${PAIRING_LINK_BASE_URL:-https://minimaster.app/pair}"
-          echo "DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-false}"
+          echo "DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-true}"
         } > .env
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

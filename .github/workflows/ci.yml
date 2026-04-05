@@ -189,7 +189,8 @@ jobs:
             echo "✓ Google Maven repository is accessible"
           else
             echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Google Maven repository (dl.google.com) is not accessible from this environment"
+            echo "::error::Google Maven repository (dl.google.com) is not accessible from this environment"
+            exit 1
           fi
 
       - name: Build (fail on deprecations in CI)
@@ -214,15 +215,7 @@ jobs:
 
       - name: Generate Jacoco report
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon || echo "Jacoco not configured, skipping coverage"
-
-      - name: Skip Android tests (Network Restricted)
-        if: steps.network-test.outputs.google-maven-accessible == 'false'
-        run: |
-          echo "::warning::Android tests skipped due to network restrictions"
-          echo "::notice::Google Maven repository (dl.google.com) is not accessible from this CI environment"
-          echo "::notice::This is a known limitation. Android builds work in environments with full network access"
-          echo "::notice::Backend tests have been validated successfully"
+        run: ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon
 
       - name: Upload reports
         if: steps.network-test.outputs.google-maven-accessible == 'true'
@@ -326,6 +319,8 @@ jobs:
             echo "google-maven-accessible=true" >> $GITHUB_OUTPUT
           else
             echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
+            echo "::error::Google Maven repository (dl.google.com) is not accessible from this environment"
+            exit 1
           fi
       - name: Start AVD
         if: steps.network-test.outputs.google-maven-accessible == 'true'
@@ -342,8 +337,3 @@ jobs:
         with:
           name: android-instrumentation-reports
           path: '**/build/reports/androidTests/**'
-      - name: Skip instrumentation tests (Network Restricted)
-        if: steps.network-test.outputs.google-maven-accessible == 'false'
-        run: |
-          echo "::warning::Android instrumentation tests skipped due to network restrictions"
-          echo "::notice::Google Maven repository (dl.google.com) is not accessible from this CI environment"

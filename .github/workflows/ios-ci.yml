@@ -54,20 +54,13 @@ jobs:
 
       - name: CI scope note
         run: |
-          echo 'This workflow validates package manifests and repository structure.'
-          echo 'A full iOS app build requires committed Xcode project/workspace metadata and Firebase package wiring.'
+          echo 'This workflow validates package manifests and repository structure before running package-level builds/tests.'
 
   ios-build-and-test:
-    name: Build and Test iOS Apps
+    name: Build and Test iOS Swift Packages
     runs-on: macos-14
+    needs: ios-structure-validate
     timeout-minutes: 30
-    # Requires: Xcode project committed + provisioning/signing secrets configured
-    # To enable: Commit Xcode project metadata and add following GitHub secrets:
-    #   - APPLE_SIGNING_CERTIFICATE (base64 .p12 certificate)
-    #   - APPLE_SIGNING_CERTIFICATE_PASSWORD (certificate password)
-    #   - APPLE_PROVISIONING_PROFILE_MASTER (base64 provisioning profile)
-    #   - APPLE_PROVISIONING_PROFILE_CHILD (base64 provisioning profile)
-    if: false # Change to true when Xcode project + provisioning profiles are ready
 
     steps:
       - name: Checkout
@@ -78,60 +71,27 @@ jobs:
         with:
           xcode-version: '16.2'
 
-      - name: Install provisioning profiles
-        env:
-          MASTER_PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_MASTER }}
-          CHILD_PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_CHILD }}
+      - name: Build MiniMasterParent package
         run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$MASTER_PROFILE_B64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/master.mobileprovision
-          echo "$CHILD_PROFILE_B64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/child.mobileprovision
+          swift build --package-path iosMasterApp
 
-      - name: Import signing certificate
-        env:
-          CERTIFICATE_B64: ${{ secrets.APPLE_SIGNING_CERTIFICATE }}
-          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_SIGNING_CERTIFICATE_PASSWORD }}
+      - name: Test MiniMasterParent package
         run: |
-          echo "$CERTIFICATE_B64" | base64 -d > /tmp/apple_cert.p12
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security import /tmp/apple_cert.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
-          rm /tmp/apple_cert.p12
+          swift test --package-path iosMasterApp
 
-      - name: Build MiniMasterParent
+      - name: Build MiniMasterChild package
         run: |
-          xcodebuild build \
-            -scheme MiniMasterParent \
-            -configuration Release \
-            -derivedDataPath ./.derived
+          swift build --package-path iosChildApp
 
-      - name: Build MiniMasterChild
+      - name: Test MiniMasterChild package
         run: |
-          xcodebuild build \
-            -scheme MiniMasterChild \
-            -configuration Release \
-            -derivedDataPath ./.derived
+          swift test --package-path iosChildApp
 
-      - name: Run MiniMasterParent tests
-        run: |
-          xcodebuild test \
-            -scheme MiniMasterParent \
-            -configuration Release \
-            -derivedDataPath ./.derived \
-            -enableCodeCoverage YES
-
-      - name: Run MiniMasterChild tests
-        run: |
-          xcodebuild test \
-            -scheme MiniMasterChild \
-            -configuration Release \
-            -derivedDataPath ./.derived \
-            -enableCodeCoverage YES
-
-      - name: Upload coverage reports
+      - name: Upload SwiftPM build artifacts
         if: always()
-        uses: codecov/codecov-action@v4
+        uses: actions/upload-artifact@v4
         with:
-          flags: ios
-          fail_ci_if_error: false
+          name: ios-swiftpm-artifacts
+          path: |
+            iosMasterApp/.build/**
+            iosChildApp/.build/**

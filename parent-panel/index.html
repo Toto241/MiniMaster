@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MiniMaster Eltern-Panel</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
@@ -295,6 +296,29 @@
     let functions = null;
     let auth = null;
     let currentMasterImei = null;
+    let appCheckConfigured = false;
+
+    function getAppCheckSiteKey() {
+      const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
+      return globalSiteKey || localStorage.getItem("minimasterAppCheckSiteKey");
+    }
+
+    function ensureAppCheckConfigured(appInstance, statusElementId) {
+      if (appCheckConfigured) return true;
+      const siteKey = getAppCheckSiteKey();
+      if (!siteKey) {
+        setStatus(statusElementId, "App Check ist nicht konfiguriert. Bitte zuerst im Operator-Dashboard einen reCAPTCHA-Site-Key hinterlegen.", "error");
+        return false;
+      }
+      if (typeof firebase.appCheck !== "function") {
+        setStatus(statusElementId, "Firebase App Check SDK wurde nicht geladen.", "error");
+        return false;
+      }
+
+      firebase.appCheck(appInstance).activate(siteKey, true);
+      appCheckConfigured = true;
+      return true;
+    }
 
     function loadFirebaseConfig() {
       try {
@@ -334,6 +358,9 @@
         return;
       }
       app = firebase.initializeApp(config, "parent-panel-app");
+      if (!ensureAppCheckConfigured(app, "ticket-auth-status")) {
+        return;
+      }
       db = firebase.firestore(app);
       functions = firebase.app("parent-panel-app").functions();
       auth = firebase.app("parent-panel-app").auth();
@@ -351,6 +378,9 @@
       try {
         if (!functions || !auth) {
           setStatus("ticket-auth-status", "Firebase ist nicht initialisiert.", "error");
+          return;
+        }
+        if (!ensureAppCheckConfigured(app, "ticket-auth-status")) {
           return;
         }
         const masterImei = document.getElementById("ticket-master-imei").value.trim();
@@ -372,6 +402,9 @@
       try {
         if (!functions || !currentMasterImei) {
           setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
+          return;
+        }
+        if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {
           return;
         }
         const senderName = document.getElementById("ticket-sender-name").value.trim();
@@ -428,6 +461,9 @@
           setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
           return;
         }
+        if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {
+          return;
+        }
         setStatus("ticket-submit-status", "Verarbeite Debug-Entscheidung...", "");
         const callable = functions.httpsCallable(allowDebug ? "grantDebugAccess" : "skipDebugMode");
         await callable({ ticketId });
@@ -448,6 +484,9 @@
       try {
         if (!functions || !currentMasterImei) {
           setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
+          return;
+        }
+        if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {
           return;
         }
         const textarea = document.getElementById("reply-" + ticketId);
