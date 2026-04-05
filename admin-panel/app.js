@@ -1602,6 +1602,26 @@ function exportLatestPythonAutomationRun() {
     showNotification("Python-Automationslauf exportiert.", "success");
 }
 
+function buildPythonAutomationRunClipboardPayload(run = pythonCommissioningLastRun) {
+    if (!run) return "";
+    return JSON.stringify(run, null, 2);
+}
+
+async function copyLatestPythonAutomationRunToClipboard() {
+    const payload = buildPythonAutomationRunClipboardPayload();
+    if (!payload) {
+        showNotification("Es liegt noch kein Python-Automationslauf zum Kopieren vor.", "info");
+        return;
+    }
+
+    try {
+        await copyTextToClipboard(payload);
+        showNotification("Testergebnisse in die Zwischenablage kopiert.", "success");
+    } catch (error) {
+        showNotification("Testergebnisse konnten nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
 function getTestingRegisterFilters() {
     return {
         search: (document.getElementById("testing-register-search")?.value || "").trim().toLowerCase(),
