@@ -410,6 +410,29 @@ describe("admin-panel helper functions", () => {
     expect(commissioningContext.validationSummary.checks.functionsReachable).toBe(true);
   });
 
+  it("derives runtime and play-store fallbacks for python commissioning context", () => {
+    const { exports } = loadAdminPanelTestExports({
+      operatorFirebaseConfigOverride: JSON.stringify({
+        apiKey: "demo-key",
+        authDomain: "minimaster-28fbd.firebaseapp.com",
+        projectId: "minimaster-28fbd",
+        storageBucket: "minimaster-28fbd.firebasestorage.app",
+        messagingSenderId: "1234567890",
+        appId: "1:1234567890:web:abcdef",
+      }),
+    });
+
+    const commissioningContext = exports.collectCommissioningAutomationContext();
+
+    expect(commissioningContext.runtimeConfig.cloud.projectId).toBe("minimaster-28fbd");
+    expect(commissioningContext.runtimeConfig.ai.provider).toBe("gemini");
+    expect(commissioningContext.runtimeConfig.ai.model).toBe("gemini-3.0-flash");
+    expect(commissioningContext.runtimeConfig.ai.keyRef).toBe("projects/minimaster-28fbd/secrets/gemini-api-key/versions/latest");
+    expect(commissioningContext.runtimeConfig.ai.systemPrompt.length).toBeGreaterThan(0);
+    expect(commissioningContext.playStoreState.privacyUrl).toBe("https://minimaster.app/privacy");
+    expect(commissioningContext.playStoreState.supportEmail).toBe("privacy@minimaster.app");
+  });
+
   // ── escapePowerShellString ──
   it("escapes backticks and double quotes for PowerShell", () => {
     const { exports } = loadAdminPanelTestExports();
