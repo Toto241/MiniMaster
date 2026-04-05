@@ -133,6 +133,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  formatPythonAutomationTimestamp,",
     "  formatPythonAutomationEvidenceDetails,",
     "  buildPythonAutomationRunIndex,",
+    "  buildPythonAutomationRunClipboardPayload,",
     "  buildFirebaseRecoveryCommands,",
     "  buildFirebaseRecoveryScript,",
     "  isRetryableFirebaseQueueConflict,",
@@ -769,6 +770,27 @@ describe("admin-panel helper functions", () => {
     const emptyIndex = exports.buildPythonAutomationRunIndex(null);
     expect(typeof emptyIndex.get).toBe("function");
     expect(emptyIndex.size).toBe(0);
+  });
+
+  it("serialisiert Python-Laufergebnisse fuer die Zwischenablage", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const run = {
+      id: "run-123",
+      status: "pass",
+      evaluation: {
+        checks: [{ id: "check-1", status: "pass" }],
+      },
+    };
+
+    const payload = exports.buildPythonAutomationRunClipboardPayload(run);
+
+    expect(JSON.parse(payload)).toEqual(run);
+  });
+
+  it("liefert leeren Inhalt fuer fehlende Python-Laufergebnisse", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.buildPythonAutomationRunClipboardPayload(null)).toBe("");
   });
 
   // ── buildFirebaseRecoveryCommands / buildFirebaseRecoveryScript ──
