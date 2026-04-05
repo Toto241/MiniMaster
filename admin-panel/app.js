@@ -2663,11 +2663,14 @@ function pollSuiteRunStatus(runId) {
                     badge.textContent = "laufend";
                     if (detail) detail.textContent = data.startedAt || "...";
                 } else {
-                    const resultStatus = data.result?.status;
+                    const resultStatus = data.result?.status || data.result?.overall_status;
                     const isPass = data.status === "finished" && resultStatus === "passed";
-                    badge.className = `badge ${isPass ? "pass" : data.status === "finished" ? "fail" : "fail"}`;
-                    badge.textContent = data.status === "finished" ? (isPass ? "fertig" : "fehlgeschlagen") : data.status;
-                    if (detail) detail.textContent = data.result?.reason || data.error || resultStatus || "";
+                    const isSkipped = data.status === "finished" && resultStatus === "skipped";
+                    badge.className = `badge ${isPass ? "pass" : isSkipped ? "running" : data.status === "finished" ? "fail" : "fail"}`;
+                    badge.textContent = data.status === "finished"
+                        ? (isPass ? "fertig" : isSkipped ? "übersprungen" : "fehlgeschlagen")
+                        : data.status;
+                    if (detail) detail.textContent = data.result?.reason || data.result?.error || data.error || resultStatus || "";
                     clearInterval(_suiteActivePollers[runId]);
                     delete _suiteActivePollers[runId];
                     loadTestingRegister();
@@ -2698,7 +2701,7 @@ async function loadSuiteRunHistory() {
         }
         el.innerHTML = runs.slice(0, 50).map(r => `
             <div class="data-row" style="display:flex;gap:8px;align-items:center">
-                <span class="badge ${r.status === 'finished' && r.result?.status === 'passed' ? 'pass' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status)}</span>
+                <span class="badge ${(r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'passed') ? 'pass' : (r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'skipped') ? 'running' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status === 'finished' ? ((r.result?.status || r.result?.overall_status) || r.status) : r.status)}</span>
                 <strong>${escapeHtml(r.suiteId || r.suite_id || r.type || '?')}</strong>
                 <code style="font-size:0.75em">${escapeHtml(r.runId || r.run_id || '')}</code>
                 <span style="margin-inline-start:auto;font-size:0.85em">${escapeHtml(r.startedAt || r.started_at || r.timestamp || '')}</span>

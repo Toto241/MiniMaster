@@ -3,11 +3,8 @@ from __future__ import annotations
 
 import sys
 import textwrap
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -37,6 +34,7 @@ class TestUsbTestRunResult:
         assert d["app_id"] == "child"
         assert d["serial"] == "Y"
         assert isinstance(d["steps"], list)
+        assert d["status"] == "not_started"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -204,6 +202,38 @@ class TestRunUsbTestNoApk:
         assert result.overall_status == "error"
         assert "Keine APK" in (result.error or "") or "APK" in (result.error or "")
 
+    @patch("usb_test_runner.AdbClient")
+    @patch("usb_test_runner.resolve_latest_apk")
+    def test_install_apk_user_restricted_is_skipped(self, mock_resolve_apk, mock_client_cls, tmp_path: Path):
+        from adb_client import AdbDevice, AdbResult
+
+        apk_path = tmp_path / "master-debug.apk"
+        apk_path.write_text("apk", encoding="utf-8")
+        mock_resolve_apk.return_value = apk_path
+        mock_client_cls.list_devices.return_value = [AdbDevice(serial="DEV1", state="device")]
+
+        mock_client = MagicMock()
+        mock_client.get_device_model.return_value = "Xiaomi"
+        mock_client.get_android_version.return_value = "15"
+        mock_client.install_apk.return_value = AdbResult(
+            returncode=1,
+            stdout="Performing Streamed Install\n",
+            stderr="adb.exe: failed to install app.apk: Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]",
+        )
+        mock_client_cls.return_value = mock_client
+
+        result = run_usb_test(
+            app_id="master",
+            serial="DEV1",
+            install_apk=True,
+            verbose=False,
+        )
+
+        assert result.overall_status == "skipped"
+        assert "INSTALL_FAILED_USER_RESTRICTED" in (result.error or "")
+        assert "Install via USB" in (result.reason or "")
+        assert any(s["id"] == "install-apk" and s["status"] == "skipped" for s in result.steps)
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  run_usb_test — Skip Activation + fehlende Challenge
@@ -231,7 +261,7 @@ class TestRunUsbTestActivation:
             verbose=False,
         )
         # Should proceed past activation steps
-        skipped_steps = [s for s in result.steps if s["status"] == "skipped" and "Challenge" in s["title"]]
+        skipped_steps = [s for s in result.steps if s["status"] == "skipped" and "Challenge" in str(s["title"])]
         assert len(skipped_steps) >= 1
 
     @patch("usb_test_runner.AdbClient")
@@ -241,12 +271,16 @@ class TestRunUsbTestActivation:
         mock_client = MagicMock()
         mock_client.get_device_model.return_value = "Pixel"
         mock_client.get_android_version.return_value = "14"
-        mock_client.request_debug_challenge.return_value = None
+        mock_client.request_debug_challenge_result.return_value = MagicMock(
+            challenge=None,
+            reason="Debug-Interface ist im App-Build deaktiviert.",
+            details="Debug interface is DISABLED",
+        )
         mock_client_cls.return_value = mock_client
 
         result = run_usb_test(app_id="master", serial="DEV1", verbose=False)
         assert result.overall_status == "error"
-        assert "Challenge" in (result.error or "")
+        assert "deaktiviert" in (result.error or "")
 
 
 # ═══════════════════════════════════════════════════════════════════

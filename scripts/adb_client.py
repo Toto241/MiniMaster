@@ -56,6 +56,17 @@ class AdbResult:
 
 
 @dataclass
+class ChallengeRequestResult:
+    challenge: str | None = None
+    reason: str | None = None
+    details: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.challenge is not None
+
+
+@dataclass
 class TestCaseResult:
     classname: str
     name: str
@@ -253,26 +264,63 @@ class AdbClient:
     # ── Hilfsfunktionen für Debug-Session ─────────────────────────────────
 
     def request_debug_challenge(self, package: str) -> str | None:
+        result = self.request_debug_challenge_result(package)
+        return result.challenge
+
+    def request_debug_challenge_result(self, package: str) -> ChallengeRequestResult:
         """
         Fordert eine Challenge vom Gerät an und liest sie aus dem Logcat.
 
-        Returns: Challenge-String oder None bei Fehler.
+        Returns: strukturierte Diagnose mit Challenge oder Fehlergrund.
         """
         challenge_action = f"{package}.DEBUG_GET_CHALLENGE"
         challenge_tag = "MINIMASTER_DEBUG_CHALLENGE"
+        debug_tag = "MINIMASTER_DEBUG"
         if package == "com.google.pairing":
             challenge_tag = "MINIMASTER_DEBUG_CHALLENGE_CHILD"
+            debug_tag = "MINIMASTER_DEBUG_CHILD"
 
-        self.send_broadcast(challenge_action)
-        time.sleep(0.7)
+        self.clear_logcat()
+        broadcast_result = self.send_broadcast(challenge_action)
+        if not broadcast_result.ok:
+            return ChallengeRequestResult(
+                reason="ADB-Broadcast für die Challenge ist fehlgeschlagen.",
+                details=broadcast_result.output,
+            )
 
-        lines = self.read_logcat(challenge_tag, since_seconds=5)
-        for line in reversed(lines):
-            if "CHALLENGE:" in line:
-                parts = line.split("CHALLENGE:", 1)
-                if len(parts) == 2:
-                    return parts[1].strip()
-        return None
+        deadline = time.time() + 3.0
+        last_debug_lines: list[str] = []
+        while time.time() < deadline:
+            challenge_lines = self.read_logcat(challenge_tag, since_seconds=5)
+            for line in reversed(challenge_lines):
+                if "CHALLENGE:" in line:
+                    parts = line.split("CHALLENGE:", 1)
+                    if len(parts) == 2:
+                        return ChallengeRequestResult(challenge=parts[1].strip(), details=line.strip())
+
+            last_debug_lines = self.read_logcat(debug_tag, since_seconds=5)
+            if any("DISABLED" in line for line in last_debug_lines):
+                details = "\n".join(last_debug_lines[-5:])
+                return ChallengeRequestResult(
+                    reason="Debug-Interface ist im App-Build deaktiviert. Secret in local.properties prüfen und die APK neu bauen.",
+                    details=details,
+                )
+
+            time.sleep(0.4)
+
+        details_parts: list[str] = []
+        if broadcast_result.output:
+            details_parts.append(f"Broadcast: {broadcast_result.output}")
+        if last_debug_lines:
+            details_parts.append("Logcat:\n" + "\n".join(last_debug_lines[-5:]))
+
+        return ChallengeRequestResult(
+            reason=(
+                "Challenge nicht aus Logcat lesbar. Die APK ist zwar installiert, aber das Debug-Secret "
+                "ist vermutlich nicht im Build enthalten oder der ADB-Broadcast wurde vom Gerät blockiert."
+            ),
+            details="\n\n".join(details_parts),
+        )
 
     def activate_debug_session(self, package: str, token: str) -> bool:
         """

@@ -4,7 +4,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,6 +14,7 @@ from adb_client import (
     AdbClient,
     AdbDevice,
     AdbResult,
+    ChallengeRequestResult,
     InstrumentedTestSummary,
     TestCaseResult,
     adb_available,
@@ -403,12 +404,14 @@ class TestDebugSession:
     def test_request_debug_challenge_master(self, mock_run, mock_sleep):
         """Challenge-Anforderung für Master-App."""
         mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="", stderr=""),
             MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
             MagicMock(
                 returncode=0,
                 stdout="01-01 00:00:00.000 D/MINIMASTER_DEBUG_CHALLENGE(12345): CHALLENGE:abc123def456\n",
                 stderr="",
             ),
+            MagicMock(returncode=0, stdout="", stderr=""),
         ]
         client = AdbClient(serial="X")
         challenge = client.request_debug_challenge("com.minimaster.masterapp")
@@ -419,27 +422,48 @@ class TestDebugSession:
     def test_request_debug_challenge_child(self, mock_run, mock_sleep):
         """Challenge-Anforderung für Child-App mit anderem Tag."""
         mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="", stderr=""),
             MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
             MagicMock(
                 returncode=0,
                 stdout="D MINIMASTER_DEBUG_CHALLENGE_CHILD: CHALLENGE:child999\n",
                 stderr="",
             ),
+            MagicMock(returncode=0, stdout="", stderr=""),
         ]
         client = AdbClient(serial="X")
         challenge = client.request_debug_challenge("com.google.pairing")
         assert challenge == "child999"
 
     @patch("adb_client.time.sleep")
+    @patch("adb_client.time.time")
     @patch("adb_client.subprocess.run")
-    def test_request_debug_challenge_not_found(self, mock_run, mock_sleep):
+    def test_request_debug_challenge_not_found(self, mock_run, mock_time, mock_sleep):
         """Challenge nicht im Logcat vorhanden."""
+        mock_time.side_effect = [0.0, 0.1, 3.2]
         mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="", stderr=""),
             MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
             MagicMock(returncode=0, stdout="some random log\n", stderr=""),
+            MagicMock(returncode=0, stdout="D/MINIMASTER_DEBUG: nothing useful\n", stderr=""),
         ]
         client = AdbClient(serial="X")
         assert client.request_debug_challenge("com.minimaster.masterapp") is None
+
+    @patch("adb_client.time.sleep")
+    @patch("adb_client.subprocess.run")
+    def test_request_debug_challenge_result_reports_disabled_secret(self, mock_run, mock_sleep):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout="D/MINIMASTER_DEBUG: Debug interface is DISABLED (secret not configured in local.properties).\n", stderr=""),
+        ]
+        client = AdbClient(serial="X")
+        result = client.request_debug_challenge_result("com.minimaster.masterapp")
+        assert isinstance(result, ChallengeRequestResult)
+        assert result.ok is False
+        assert "deaktiviert" in (result.reason or "")
 
     @patch("adb_client.time.sleep")
     @patch("adb_client.subprocess.run")

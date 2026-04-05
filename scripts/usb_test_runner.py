@@ -90,9 +90,11 @@ class UsbTestRunResult:
     overall_status: str = "not_started"  # passed, failed, error, skipped
     duration_sec: float = 0.0
     error: str | None = None
+    reason: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         d = asdict(self)
+        d["status"] = self.overall_status
         return d
 
 
@@ -104,6 +106,18 @@ def _log_step(result: UsbTestRunResult, step_id: str, title: str, status: str, d
         "details": details,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     })
+
+
+def _known_install_blocker_reason(adb_output: str) -> str | None:
+    normalized = adb_output.upper()
+    if "INSTALL_FAILED_USER_RESTRICTED" in normalized or "INSTALL CANCELED BY USER" in normalized:
+        return (
+            "Gerät blockiert die APK-Installation über USB "
+            "(INSTALL_FAILED_USER_RESTRICTED). Gerät entsperren und die Installation "
+            "am Gerät bestätigen; bei OEM-ROMs wie MIUI/HyperOS zusätzlich 'Install via USB' "
+            "bzw. 'USB debugging (Security settings)' aktivieren. Danach den USB-Testlauf erneut starten."
+        )
+    return None
 
 
 def parse_junit_xml(xml_dir: Path) -> InstrumentedTestSummary:
@@ -242,6 +256,17 @@ def run_usb_test(
         _print(f"   Installiere: {resolved_apk}")
         install_result = adb.install_apk(resolved_apk)
         if not install_result.ok:
+            blocker_reason = _known_install_blocker_reason(install_result.output)
+            if blocker_reason:
+                msg = f"{blocker_reason}\nADB-Ausgabe:\n{install_result.output}"
+                _log_step(result, "install-apk", "APK installieren", "skipped", msg)
+                _print(f"⚠  {blocker_reason}")
+                result.error = install_result.output.strip()
+                result.reason = blocker_reason
+                result.overall_status = "skipped"
+                result.duration_sec = round(time.perf_counter() - started, 2)
+                return result
+
             msg = f"APK-Installation fehlgeschlagen: {install_result.output}"
             _log_step(result, "install-apk", "APK installieren", "fail", msg)
             _print(f"✘  {msg}")
@@ -258,12 +283,16 @@ def run_usb_test(
     # ── Schritt 3-5: Challenge → Token → Aktivierung ────────────────────
     if not skip_activation:
         _print(f"\n▶  Schritt 3/8: Challenge anfordern ({app_id})")
-        challenge = adb.request_debug_challenge(package)
+        challenge_result = adb.request_debug_challenge_result(package)
+        challenge = challenge_result.challenge
         if challenge is None:
-            msg = "Challenge nicht aus Logcat lesbar. Secret in local.properties und App installiert?"
+            msg = challenge_result.reason or "Challenge nicht aus Logcat lesbar."
+            if challenge_result.details:
+                msg = f"{msg}\n{challenge_result.details}"
             _log_step(result, "get-challenge", "Challenge anfordern", "fail", msg)
             _print(f"✘  {msg}")
             result.error = msg
+            result.reason = challenge_result.reason or msg
             result.overall_status = "error"
             result.duration_sec = round(time.perf_counter() - started, 2)
             return result
