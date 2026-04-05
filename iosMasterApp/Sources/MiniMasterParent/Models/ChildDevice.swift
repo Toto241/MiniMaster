@@ -28,4 +28,13 @@ struct UsageRules: Codable, Hashable {
 
 enum DevicePlatform: String, Codable, CaseIterable {
     case android, ios
+
+    var supportsBundleIdBlacklistEditing: Bool {
+        self == .android
+    }
+
+    var appBlacklistUnsupportedMessage: String? {
+        guard self == .ios else { return nil }
+        return "Die iOS-Kinder-App kann Bundle-ID-Blacklists derzeit nicht mit Screen-Time-Tokens durchsetzen. Bearbeitung ist bis zur Token-basierten Auswahl deaktiviert."
+    }
 }

@@ -98,7 +98,7 @@ children/{childId}
 ├── masterImei: String
 ├── deviceName: String
 ├── isLocked: Boolean
-├── appBlacklist: [String] (Bundle IDs)
+├── appBlacklist: [String] (Bundle IDs; auf iOS derzeit nur Anzeige, keine enforcebare Bearbeitung ohne Screen-Time-Tokens)
 ├── usageRules: { dailyLimit, bedtime... }
 ├── policyVersion: Int
 ├── lastPolicyVersion: Int
