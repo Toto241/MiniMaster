@@ -30,18 +30,18 @@ Coverage mode: 24/7 during launch window, then business-hours + pager fallback.
 
 Launch window:
 
-- Start: TODO
-- End: TODO
+- Start: EXTERNAL_INPUT_REQUIRED
+- End: EXTERNAL_INPUT_REQUIRED
 
 ## 2. Roles and Contacts
 
 | Role | Primary | Secondary | Contact Channel | Response SLO |
 | --- | --- | --- | --- | --- |
-| Incident Commander | TODO | TODO | Phone + Chat | 15 min |
-| Backend On-call | TODO | TODO | Pager + Chat | 15 min |
-| Android On-call | TODO | TODO | Pager + Chat | 15 min |
-| Security On-call | TODO | TODO | Phone + Chat | 30 min |
-| Product/Ops On-call | TODO | TODO | Phone + Chat | 30 min |
+| Incident Commander | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Phone + Chat | 15 min |
+| Backend On-call | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Pager + Chat | 15 min |
+| Android On-call | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Pager + Chat | 15 min |
+| Security On-call | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Phone + Chat | 30 min |
+| Product/Ops On-call | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Phone + Chat | 30 min |
 
 Reachability check:
 
@@ -91,19 +91,19 @@ Reachability check:
 
 Primary channels:
 
-- Pager: TODO
-- Incident chat room: TODO
-- Executive update channel: TODO
+- Pager: EXTERNAL_INPUT_REQUIRED
+- Incident chat room: EXTERNAL_INPUT_REQUIRED
+- Executive update channel: EXTERNAL_INPUT_REQUIRED
 
 Fallback:
 
-- Phone tree (if pager unavailable): TODO
+- Phone tree (if pager unavailable): EXTERNAL_INPUT_REQUIRED
 
 Release bridge:
 
-- Bridge URL: TODO
-- Bridge owner: TODO
-- Incident note document: TODO
+- Bridge URL: EXTERNAL_INPUT_REQUIRED
+- Bridge owner: EXTERNAL_INPUT_REQUIRED
+- Incident note document: EXTERNAL_INPUT_REQUIRED
 
 ## 6. Release-Day Command Cadence
 
@@ -144,19 +144,19 @@ Before this file can be considered done, collect all of the following:
 
 | Role | Name | Date | Signature |
 | --- | --- | --- | --- |
-| Operations Lead | TODO | TODO | TODO |
-| Engineering Owner | TODO | TODO | TODO |
-| Security Owner | TODO | TODO | TODO |
+| Operations Lead | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED |
+| Engineering Owner | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED |
+| Security Owner | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED |
 
 ## 9. Evidence Capture (for Release Evidence Register)
 
 | Evidence item | Value |
 | --- | --- |
 | Final roster location | docs/ONCALL_ESCALATION_ROSTER.md |
-| Reachability test timestamp | TODO |
-| Pager test result screenshot/log | TODO |
-| Bridge test screenshot/log | TODO |
-| Updated by | TODO |
+| Reachability test timestamp | EXTERNAL_INPUT_REQUIRED |
+| Pager test result screenshot/log | EXTERNAL_INPUT_REQUIRED |
+| Bridge test screenshot/log | EXTERNAL_INPUT_REQUIRED |
+| Updated by | EXTERNAL_INPUT_REQUIRED |
 
 ## 10. Go-Live Readiness Check
 
@@ -168,7 +168,7 @@ Before this file can be considered done, collect all of the following:
 
 ## 11. Assignment Protocol (Operations Lead — Fill-In Guide)
 
-Schritt-fuer-Schritt, um alle TODO-Felder zu schliessen:
+Schritt-fuer-Schritt, um alle Felder mit `EXTERNAL_INPUT_REQUIRED` zu schliessen:
 
 1. **Incident Commander**: Teamlead oder erfahrene Ingenieur-Kontaktperson benennen, Mobilnummer + Chat-Handle eintragen.
 2. **Backend On-call**: Firebase/Functions-verantwortlichen Entwickler eintragen; Pager-ID aus internem Alerting-Tool kopieren.

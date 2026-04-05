@@ -38,8 +38,8 @@ Use dedicated reviewer accounts only.
 
 | Role | Email | Password | Notes |
 | --- | --- | --- | --- |
-| Parent reviewer account | TODO | TODO | Pre-created in Firebase Auth |
-| Child test profile | TODO | TODO | Paired to parent account |
+| Parent reviewer account | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Pre-created in Firebase Auth |
+| Child test profile | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | Paired to parent account |
 
 Security notes:
 
@@ -149,9 +149,9 @@ Expected outcome:
 
 | Function | Contact | Availability |
 | --- | --- | --- |
-| Product/Ops | TODO | Werktags 09:00-18:00 CET, danach Pager |
-| Engineering support | TODO | Werktags 09:00-18:00 CET, danach Pager |
-| Escalation (Incident) | TODO | 24/7 via Incident Bridge |
+| Product/Ops | EXTERNAL_INPUT_REQUIRED | Werktags 09:00-18:00 CET, danach Pager |
+| Engineering support | EXTERNAL_INPUT_REQUIRED | Werktags 09:00-18:00 CET, danach Pager |
+| Escalation (Incident) | EXTERNAL_INPUT_REQUIRED | 24/7 via Incident Bridge |
 
 ### 8.1 Credential Rotation Schedule
 
@@ -162,7 +162,7 @@ Expected outcome:
 
 ### 8.2 Contact Fill-In Guide (Product/Ops)
 
-Fuer jede TODO-Zelle:
+Fuer jede Zelle mit `EXTERNAL_INPUT_REQUIRED`:
 
 - Name + Nachname + Rolle
 - E-Mail-Adresse (intern)
@@ -191,12 +191,12 @@ Before this document can move from draft to done, attach all of the following:
 
 | Evidence item | Value |
 | --- | --- |
-| Play Console app access URL | TODO |
-| Screenshot path (submission page) | TODO |
-| Screenshot path (review credentials page) | TODO |
-| Reviewer guide link entered in console | TODO |
-| Submitted by | TODO |
-| Submission timestamp (local) | TODO |
+| Play Console app access URL | EXTERNAL_INPUT_REQUIRED |
+| Screenshot path (submission page) | EXTERNAL_INPUT_REQUIRED |
+| Screenshot path (review credentials page) | EXTERNAL_INPUT_REQUIRED |
+| Reviewer guide link entered in console | EXTERNAL_INPUT_REQUIRED |
+| Submitted by | EXTERNAL_INPUT_REQUIRED |
+| Submission timestamp (local) | EXTERNAL_INPUT_REQUIRED |
 
 Notes:
 
@@ -207,9 +207,9 @@ Notes:
 
 | Role | Name | Date | Signature |
 | --- | --- | --- | --- |
-| Product/Ops Owner | TODO | TODO | TODO |
-| Compliance Owner | TODO | TODO | TODO |
-| Engineering witness | TODO | TODO | TODO |
+| Product/Ops Owner | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED |
+| Compliance Owner | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED |
+| Engineering witness | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED | EXTERNAL_INPUT_REQUIRED |
 
 Final status:
 

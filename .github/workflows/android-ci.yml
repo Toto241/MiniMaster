@@ -5,9 +5,6 @@ on:
   pull_request:
     paths: ['**/*.kt', '**/build.gradle', 'settings.gradle', 'gradle/**', '.github/workflows/android-ci.yml']
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -17,17 +14,17 @@ jobs:
         # Set working directory to repository root where Gradle files are located
         working-directory: .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v3
-      - uses: actions/setup-java@v4
+        uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
       - name: Show Gradle version
         run: ./scripts/run-android-checks.sh --version
       - name: Prepare Firebase placeholder configs
