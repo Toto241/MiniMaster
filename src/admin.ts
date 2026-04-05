@@ -82,6 +82,7 @@ export const deleteUserAccount = functions.https.onCall(
     const startTime = Date.now();
     const callerId = requireAuth(context);
     const isAdmin = context.auth?.token?.role === "admin";
+    validateAppCheck(context, true);
 
     let masterId = callerId;
     if (isAdmin && data?.masterId && typeof data.masterId === "string") {
@@ -112,6 +113,7 @@ export const deleteUserAccount = functions.https.onCall(
 export const adminHealthCheck = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     const collections = ["masters", "children", "supportTickets", "audit_logs", "operatorConfig"];
     const checks: Record<string, string> = {};
@@ -322,6 +324,7 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 export const testGeminiConnection = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { prompt?: string }, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -366,6 +369,7 @@ export const testGeminiConnection = functions.runWith({ secrets: ["GEMINI_API_KE
 export const getKnowledgeBase = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     // Try Firestore first (runtime edits), fall back to deployed file
     const doc = await db().collection("operatorConfig").doc("knowledgeBase").get();
@@ -386,6 +390,7 @@ export const getKnowledgeBase = functions.https.onCall(
 export const updateKnowledgeBase = functions.https.onCall(
   async (data: { content?: string }, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     if (typeof data?.content !== "string") {
       throw new functions.https.HttpsError("invalid-argument", "content (string) is required.");
@@ -407,6 +412,7 @@ export const updateKnowledgeBase = functions.https.onCall(
 export const sendTestFcmMessage = functions.https.onCall(
   async (data: { token?: string; childId?: string }, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     let fcmToken = data?.token;
 
@@ -449,6 +455,7 @@ export const sendTestFcmMessage = functions.https.onCall(
 export const triggerScheduledJob = functions.https.onCall(
   async (data: { jobName?: string }, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     const jobName = data?.jobName;
     if (!jobName || typeof jobName !== "string") {
@@ -523,6 +530,7 @@ export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY
   async (data: { hours?: number; functionFilter?: string; errorId?: string }, context: CallableContext) => {
     requireAdmin(context);
     const adminId = requireAuth(context);
+    validateAppCheck(context, true);
     checkRateLimit(adminId, "analyzeSystemErrors", 10, 3600000);
 
     const apiKey = process.env.GEMINI_API_KEY;
