@@ -132,6 +132,7 @@ let pythonEvidenceFilterStatus = "";
 let pythonEvidenceFilterTestId = "";
 let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
+let suiteCatalogPayload = [];
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -960,6 +961,7 @@ async function loadPythonAutomationCatalog() {
     if (!isPythonOperator) {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
+        renderQaExecutionGuide(null, testingRegisterPayload, suiteCatalogPayload);
         catalogEl.innerHTML = "<div class='info'>Der Python-Testkatalog ist nur im Python-Operator verfügbar.</div>";
         return;
     }
@@ -977,10 +979,12 @@ async function loadPythonAutomationCatalog() {
         ensurePythonAutomationSelectedTest();
         renderPythonAutomationOverview(payload, pythonCommissioningLastRun);
         renderPythonAutomationCatalog(payload, pythonCommissioningLastRun);
+        renderQaExecutionGuide(payload, testingRegisterPayload, suiteCatalogPayload);
         renderPythonAutomationProtocolEditor();
     } catch (error) {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
+        renderQaExecutionGuide(null, testingRegisterPayload, suiteCatalogPayload);
         catalogEl.innerHTML = `<div class='error'>Testkatalog konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
     }
 }
@@ -1677,6 +1681,248 @@ function buildTestingRegisterLegend() {
     `;
 }
 
+function getTestingRegisterActionLabel(item) {
+    const action = String(item?.action || "commissioning-run");
+    if (action === "suite-run") return "Suite-Start";
+    if (action === "protocol") return "Nachweis-Protokoll";
+    return "Python-Commissioning-Lauf";
+}
+
+function buildTestingRegisterExecutionPath(item) {
+    const actionLabel = getTestingRegisterActionLabel(item);
+    if (String(item?.action || "") === "suite-run") {
+        const suiteRef = String(item?.suiteRef || item?.id || "").trim();
+        return suiteRef ? `${actionLabel}: ${suiteRef}` : actionLabel;
+    }
+    if (String(item?.action || "") === "protocol") {
+        return "Manuell im Nachweisformular abschließen";
+    }
+    return "Im Python-Commissioning-Lauf enthalten";
+}
+
+function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayload) {
+    const allCatalogTests = Array.isArray(catalog?.groups)
+        ? catalog.groups.flatMap(group => (group?.tests || []).map(test => ({ group, test })))
+        : [];
+
+    const groupSummary = entries => {
+        const grouped = new Map();
+        entries.forEach(entry => {
+            const title = String(entry.group?.title || "Testgruppe");
+            if (!grouped.has(title)) {
+                grouped.set(title, {
+                    title,
+                    description: String(entry.group?.description || ""),
+                    count: 0,
+                    samples: [],
+                });
+            }
+            const target = grouped.get(title);
+            target.count += 1;
+            if (target.samples.length < 4) {
+                target.samples.push(String(entry.test?.title || entry.test?.id || "Prüffall"));
+            }
+        });
+        return Array.from(grouped.values());
+    };
+
+    const commissioningAutomatic = allCatalogTests.filter(entry => {
+        const type = String(entry.test?.automationType || "automatic");
+        return type === "automatic" || type === "command";
+    });
+    const manualEvidence = allCatalogTests.filter(entry => {
+        const type = String(entry.test?.automationType || "automatic");
+        return type === "manual" || type === "documented";
+    });
+
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const suiteMap = new Map();
+
+    items.filter(item => String(item?.entryKind || "") === "suite").forEach(item => {
+        const suiteId = String(item.id || "");
+        if (!suiteId) return;
+        suiteMap.set(suiteId, {
+            suiteId,
+            title: String(item.title || suiteId),
+            details: String(item.details || ""),
+            status: String(item.status || "not_run"),
+            prereqsMet: item.prereqsMet,
+            prereqReason: String(item.prereqReason || ""),
+            linkedTests: [],
+            command: String(item.command || ""),
+            storage: String(item.storage || ""),
+        });
+    });
+
+    (Array.isArray(suites) ? suites : []).forEach(item => {
+        const suiteId = String(item?.suiteId || item?.id || "");
+        if (!suiteId || suiteMap.has(suiteId)) return;
+        suiteMap.set(suiteId, {
+            suiteId,
+            title: String(item?.title || suiteId),
+            details: String(item?.description || ""),
+            status: "not_run",
+            prereqsMet: item?.prereqsMet,
+            prereqReason: String(item?.prereqReason || ""),
+            linkedTests: [],
+            command: String(item?.command || ""),
+            storage: String(payload?.storage?.suiteRuns || ""),
+        });
+    });
+
+    items.forEach(item => {
+        const suiteRef = String(item?.suiteRef || item?.linkedSuite || "").trim();
+        if (!suiteRef) return;
+        if (!suiteMap.has(suiteRef)) {
+            suiteMap.set(suiteRef, {
+                suiteId: suiteRef,
+                title: suiteRef,
+                details: "",
+                status: "not_run",
+                prereqsMet: null,
+                prereqReason: "",
+                linkedTests: [],
+                command: "",
+                storage: String(payload?.storage?.suiteRuns || ""),
+            });
+        }
+        const target = suiteMap.get(suiteRef);
+        if (String(item?.entryKind || "") !== "suite") {
+            target.linkedTests.push({
+                id: String(item.id || ""),
+                title: String(item.title || item.id || "Prüffall"),
+                status: String(item.status || "not_run"),
+            });
+        }
+    });
+
+    const suitesSummary = Array.from(suiteMap.values())
+        .map(item => ({
+            ...item,
+            linkedCount: item.linkedTests.length,
+            samples: item.linkedTests.slice(0, 4).map(test => test.title),
+        }))
+        .sort((left, right) => String(left.title || left.suiteId).localeCompare(String(right.title || right.suiteId), "de"));
+
+    return {
+        commissioningAutomatic: {
+            total: commissioningAutomatic.length,
+            groups: groupSummary(commissioningAutomatic),
+        },
+        manualEvidence: {
+            total: manualEvidence.length,
+            groups: groupSummary(manualEvidence),
+        },
+        suites: suitesSummary,
+        storage: payload?.storage || null,
+    };
+}
+
+function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = testingRegisterPayload, suites = suiteCatalogPayload) {
+    const container = document.getElementById("qa-start-guide");
+    if (!container) return;
+
+    const data = buildQaExecutionGuideData(catalog, payload, suites);
+    const hasCatalog = data.commissioningAutomatic.total > 0 || data.manualEvidence.total > 0;
+    const hasSuites = data.suites.length > 0;
+
+    if (!hasCatalog && !hasSuites) {
+        container.innerHTML = `
+            <div class="info">
+                Lade zuerst Testregister und Python-Katalog. Danach wird hier je Startweg sichtbar,
+                welche Testfälle genau enthalten sind und wo das Ergebnis landet.
+            </div>
+        `;
+        return;
+    }
+
+    const renderGroupList = (groups, emptyText) => {
+        if (!Array.isArray(groups) || groups.length === 0) {
+            return `<p class='python-muted-caption'>${escapeHtml(emptyText)}</p>`;
+        }
+        return `
+            <div class='qa-guide-group-list'>
+                ${groups.map(group => `
+                    <div class='qa-guide-group-item'>
+                        <strong>${escapeHtml(group.title)}</strong>
+                        <span>${escapeHtml(String(group.count))} Testfälle</span>
+                        <div class='python-muted-caption'>${escapeHtml(group.samples.join(" · "))}</div>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    };
+
+    const suiteItemsHtml = hasSuites
+        ? `
+            <div class='qa-guide-suite-list'>
+                ${data.suites.map(suite => {
+                    const statusMeta = getPythonAutomationStatusMeta(String(suite.status || "not_run"));
+                    return `
+                        <div class='qa-guide-suite-item'>
+                            <div class='qa-guide-suite-head'>
+                                <strong>${escapeHtml(suite.title || suite.suiteId)}</strong>
+                                <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
+                            </div>
+                            <div class='python-muted-caption'>Suite-ID: ${escapeHtml(suite.suiteId || "-")} · Verknüpfte Testfälle: ${escapeHtml(String(suite.linkedCount || 0))}</div>
+                            <div class='python-muted-caption'>${escapeHtml((suite.samples && suite.samples.length > 0) ? suite.samples.join(" · ") : "Noch keine verknüpften Registereinträge sichtbar.")}</div>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        `
+        : `<p class='python-muted-caption'>Noch keine Suite-Zuordnungen geladen.</p>`;
+
+    container.innerHTML = `
+        <div class='qa-guide-grid'>
+            <article class='qa-guide-card'>
+                <div class='qa-guide-card-header'>
+                    <div>
+                        <h4>1. Python-Commissioning-Lauf</h4>
+                        <p>Dieser Start bewertet die zentralen automatischen QA- und Freigabeprüfungen aus dem Commissioning-Katalog.</p>
+                    </div>
+                    <span class='python-bucket-count'>${escapeHtml(String(data.commissioningAutomatic.total))} enthalten</span>
+                </div>
+                ${renderGroupList(data.commissioningAutomatic.groups, "Noch keine automatisch bewertbaren Commissioning-Prüffälle geladen.")}
+                <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.commissioningRuns || "-"))}</div>
+                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-python-run-card')">Zum Python-Lauf</button>
+            </article>
+            <article class='qa-guide-card'>
+                <div class='qa-guide-card-header'>
+                    <div>
+                        <h4>2. Suite-Start</h4>
+                        <p>Jeder Suite-Start deckt nur die verknüpften Repo-, Device- oder Release-Tests dieser Suite ab.</p>
+                    </div>
+                    <span class='python-bucket-count'>${escapeHtml(String(data.suites.length))} Suiten</span>
+                </div>
+                ${suiteItemsHtml}
+                <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
+                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zum Suite-Hub</button>
+            </article>
+            <article class='qa-guide-card'>
+                <div class='qa-guide-card-header'>
+                    <div>
+                        <h4>3. Nachweis protokollieren</h4>
+                        <p>Diese Startart schließt keine Automatik an, sondern dokumentiert manuelle oder dokumentierte Testfälle gezielt einzeln.</p>
+                    </div>
+                    <span class='python-bucket-count'>${escapeHtml(String(data.manualEvidence.total))} Fälle</span>
+                </div>
+                ${renderGroupList(data.manualEvidence.groups, "Noch keine manuellen oder dokumentierten Prüffälle geladen.")}
+                <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.commissioningEvidence || "-"))}</div>
+                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-protocol-card')">Zum Nachweisformular</button>
+            </article>
+        </div>
+    `;
+}
+
+function scrollQaSection(sectionId) {
+    const target = document.getElementById(sectionId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.classList.add("qa-section-highlight");
+    setTimeout(() => target.classList.remove("qa-section-highlight"), 1800);
+}
+
 function buildTestingRegisterActionTooltip(item) {
     if (item.action === "suite-run") {
         if (item.prereqsMet === false) {
@@ -1708,6 +1954,7 @@ function rerenderTestingRegisterFromCache() {
     renderTestingRegisterOverview(testingRegisterPayload);
     renderTestingRegisterStorage(testingRegisterPayload?.storage || null);
     renderTestingRegisterList(testingRegisterPayload);
+    renderQaExecutionGuide();
     renderCommissioningAttestations();
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
@@ -1811,7 +2058,7 @@ function buildTestingRegisterAction(item) {
     if (item.action === "protocol") {
         return `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.id || ""))}')" ${tooltip}>Nachweis protokollieren</button>`;
     }
-    return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()" ${tooltip}>Python-Testlauf starten</button>`;
+    return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()" ${tooltip}>Commissioning-Lauf starten</button>`;
 }
 
 function renderTestingRegisterPanelRows(items) {
@@ -1827,6 +2074,7 @@ function renderTestingRegisterPanelRows(items) {
                 <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"))}'>${escapeHtml(typeLabel)}</span></td>
                 <td>${buildTestingRegisterMetaBadges(item) || "-"}</td>
                 <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
+                <td>${escapeHtml(buildTestingRegisterExecutionPath(item))}</td>
                 <td>${escapeHtml(String(detailText || "-")).slice(0, 260)}</td>
                 <td>${escapeHtml(updatedAt)}</td>
                 <td><div class='python-muted-caption'>${escapeHtml(item.storage || "-")}</div></td>
@@ -1852,9 +2100,10 @@ function renderTestingRegisterPanel(listEl, panelItems, visibleCount, totalCount
                 <th>Typ</th>
                 <th>Priorität / Owner</th>
                 <th>Status</th>
+                <th>Startweg</th>
                 <th>Letztes Detail</th>
                 <th>Letztes Update</th>
-                <th>Protokoll</th>
+                <th>Ablage</th>
                 <th>Aktion</th>
             </tr>
             ${renderTestingRegisterPanelRows(panelItems)}
@@ -1998,6 +2247,7 @@ async function loadTestingRegister() {
         testingRegisterPayload = null;
         renderTestingRegisterOverview(null);
         renderTestingRegisterStorage(null);
+        renderQaExecutionGuide(pythonCommissioningCatalog, null, suiteCatalogPayload);
         const infoHtml = "<div class='info'>Das Testregister ist nur im Python-Operator verfügbar.</div>";
         automaticListEl.innerHTML = infoHtml;
         manualListEl.innerHTML = infoHtml;
@@ -2021,6 +2271,7 @@ async function loadTestingRegister() {
         testingRegisterPayload = null;
         renderTestingRegisterOverview(null);
         renderTestingRegisterStorage(null);
+        renderQaExecutionGuide(pythonCommissioningCatalog, null, suiteCatalogPayload);
         const errorHtml = `<div class='error'>Testregister konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
         automaticListEl.innerHTML = errorHtml;
         manualListEl.innerHTML = errorHtml;
@@ -2098,6 +2349,8 @@ async function loadSuiteCatalog() {
 function renderSuiteCatalog(suites) {
     const el = document.getElementById("suite-catalog");
     if (!el) return;
+    suiteCatalogPayload = Array.isArray(suites) ? suites : [];
+    renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
     const groupFilter = document.getElementById("suite-group-filter")?.value || "all";
     const readyOnly = document.getElementById("suite-ready-only")?.checked || false;
 
