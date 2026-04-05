@@ -116,10 +116,13 @@ Environment variable alternatives for CI:
 - `SECURITY_TEST_FUNCTIONS_DEPLOYED`
 - `SECURITY_TEST_SERVICE_ACCOUNT`
 
+If `.security-test.env` or `scripts/security-test.env` exists, the runner loads values from there automatically.
+In CI mode, a missing service account no longer hard-fails the runner; Firebase-backed checks are reported as `SKIP` while the remaining non-interactive checks still run.
+
 NPM script aliases:
 
 - `npm run test:security` (interactive)
-- `npm run test:security:ci` (non-interactive, requires CI inputs)
+- `npm run test:security:ci` (non-interactive, requires CI inputs; Firebase checks are skipped if no service account is configured)
 
 ### 5. sync_child_task_translations.py
 

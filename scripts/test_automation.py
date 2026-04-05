@@ -355,7 +355,7 @@ SUITES: tuple[Suite, ...] = (
     Suite("backend-jest", "Jest backend suite", "backend", [npm_command(), "run", "test:ci"], ("npm", "node_modules")),
     Suite("backend-rules-structural", "Firestore rules structural", "backend", [npm_command(), "run", "test:rules:structural"], ("npm", "node_modules")),
     Suite("backend-rules-emulator", "Firestore rules emulator", "backend", [npm_command(), "run", "test:rules:emulator"], ("npm", "node_modules", "java"), timeout_sec=1800),
-    Suite("backend-security", "Security regression script", "backend", [npm_command(), "run", "test:security:ci"], ("npm", "node_modules", "security_ci_inputs", "security_service_account"), timeout_sec=1800),
+    Suite("backend-security", "Security regression script", "backend", [npm_command(), "run", "test:security:ci"], ("npm", "node_modules", "security_ci_inputs"), timeout_sec=1800),
     Suite("android-task-translation-check", "Child task translation completeness", "android", [sys.executable, str(REPO_ROOT / "scripts" / "sync_child_task_translations.py")], tuple()),
     Suite("android-lint", "Android lint", "android", [str(gradle_wrapper()), "lint"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-unit-master", "masterApp unit tests", "android", [str(gradle_wrapper()), ":masterApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
