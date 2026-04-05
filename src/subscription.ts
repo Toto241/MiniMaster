@@ -136,6 +136,7 @@ export const verifyPurchase = functions.https.onCall(
 export const getSubscriptionStatus = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     const masterId = requireAuth(context);
+    validateAppCheck(context, true);
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
     if (!masterDoc.exists) {
@@ -171,6 +172,7 @@ export const revokeSubscription = functions.https.onCall(
 
     try {
       requireAdmin(context);
+      validateAppCheck(context, true);
       const adminUid = context.auth?.uid;
 
       let subscriptionId = data.subscriptionId;

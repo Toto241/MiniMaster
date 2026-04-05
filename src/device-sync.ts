@@ -22,7 +22,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../firebase";
-import { requireAuth, AuditLogger } from "./shared";
+import { requireAuth, validateAppCheck, AuditLogger } from "./shared";
 
 // ------------------------------------------------------------------ Types --
 
@@ -151,6 +151,7 @@ export const registerDeviceEndpoint = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, platform, provider, token, appVersion, capabilities = [] } = data;
 
     if (!childId || typeof childId !== "string") {
@@ -244,6 +245,7 @@ export const publishDeviceEvent = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, eventType, payload, idempotencyKey } = data;
 
     if (!childId || typeof childId !== "string") {
@@ -318,6 +320,7 @@ export const fetchPendingCommands = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, sinceCursor, maxItems = 20 } = data;
 
     if (!childId || typeof childId !== "string") {
@@ -388,6 +391,7 @@ export const acknowledgeCommand = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, commandId, status, appliedAt, errorCode } = data;
 
     if (!childId || typeof childId !== "string") {
@@ -464,6 +468,7 @@ export const syncPolicySnapshot = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, knownPolicyVersion = 0 } = data;
 
     if (!childId || typeof childId !== "string") {
