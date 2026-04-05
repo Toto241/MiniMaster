@@ -89,6 +89,7 @@ let state: Record<string, any> = {};
 const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
 const asUser = { auth: { uid: "user1", token: { role: "master" } } };
 const asSupport = { auth: { uid: "support1", token: { role: "support" } } };
+const withAppCheck = { app: { appId: "test-app" } };
 
 import { createHash } from "crypto";
 const TEST_RAW_KEY = "test-secret-key-that-is-at-least-43-characters-long!!";
@@ -575,6 +576,21 @@ describe("generateCustomToken — branches", () => {
       .rejects.toThrow(/unauthenticated|masterImei/);
   });
 
+  it("blockiert Legacy-Token-Login ohne App Check in Produktionsmodus", async () => {
+    const wrapped = testEnv.wrap(fns.generateCustomToken);
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      await expect(wrapped({ masterImei: "m1", secretKey: "sk-123" }, {}))
+        .rejects.toThrow(/App Check/i);
+      const res = await wrapped({ masterImei: "m1", secretKey: "sk-123" }, withAppCheck);
+      expect(res.customToken).toBe("mock-token");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it("wirft bei getUser-Fehler internal error", async () => {
     mockAuth.getUser.mockRejectedValueOnce(new Error("User not found"));
     const wrapped = testEnv.wrap(fns.generateCustomToken);
@@ -610,6 +626,21 @@ describe("registerMasterDevice — branches", () => {
     const wrapped = testEnv.wrap(fns.registerMasterDevice);
     const res = await wrapped({ imei: "new-device-1" }, {});
     expect(res).toBeDefined();
+  });
+
+  it("blockiert Legacy-Registrierung ohne App Check in Produktionsmodus", async () => {
+    const wrapped = testEnv.wrap(fns.registerMasterDevice);
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      await expect(wrapped({ imei: "new-device-2" }, {}))
+        .rejects.toThrow(/App Check/i);
+      const res = await wrapped({ imei: "new-device-2" }, withAppCheck);
+      expect(res.masterId).toBe("new-device-2");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 });
 

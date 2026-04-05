@@ -18,6 +18,8 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
 - App-Check-Initialisierung im [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an den Web-Control-Betriebsmodus angeglichen
 - App Check auf sensiblen Support-Endpunkten konsistent erzwungen in [src/support.ts](src/support.ts)
 - Operator-Assistent `aiExplainProblem` mit zusätzlichem Rate Limit abgesichert in [src/support.ts](src/support.ts)
+- Un-authentifizierte Legacy-Auth-Zweige mit App Check abgesichert in [src/auth.ts](src/auth.ts)
+- Legacy-Login- und Registrierungszweige mit lokalen Rate Limits begrenzt in [src/auth.ts](src/auth.ts)
 
 ## Offene Lücken nach Priorität
 
@@ -29,6 +31,9 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
 
    Warum hoch:
    Solange `secretKey`-/IMEI-Pfade produktiv mitlaufen, bleibt ein strukturelles Altlast-Risiko bestehen.
+
+   Status:
+   Die un-authentifizierten Altpfade sind jetzt durch App Check und lokale Rate Limits eingeengt. Offen bleibt weiterhin der eigentliche Abbau dieser Pfade aus den Web- und Client-Flows.
 
 2. Reset-Endpunkte betrieblich härten
    Betroffene Stellen:
@@ -106,8 +111,10 @@ Die in dieser Arbeit geänderten Hochrisiko-Pfade wurden mit folgenden Suiten ge
 - [test/branch-coverage-boost.test.ts](test/branch-coverage-boost.test.ts)
 - [test/branch-coverage-wave3.test.ts](test/branch-coverage-wave3.test.ts)
 - [test/branch-coverage-support.test.ts](test/branch-coverage-support.test.ts)
+- [test/branch-coverage-legacy-auth.test.ts](test/branch-coverage-legacy-auth.test.ts)
+- [test/branch-coverage-auth-gaps.test.ts](test/branch-coverage-auth-gaps.test.ts)
 
 Ergebnis zum Zeitpunkt der Analyse:
 
-- 15 gezielte Test-Suiten grün
-- 508 gezielte Tests grün
+- 18 gezielte Test-Suiten grün
+- 610 gezielte Tests grün

@@ -31,6 +31,11 @@ In einer vierten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umges
 1. Sensible Support-Callables in [src/support.ts](src/support.ts) erzwingen jetzt ebenfalls konsistent App Check.
 2. Der Operator-Assistent `aiExplainProblem` wurde zusätzlich mit einem dedizierten Rate Limit versehen.
 
+In einer fünften Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
+
+1. Die un-authentifizierten Legacy-Branches in [src/auth.ts](src/auth.ts) erzwingen jetzt App Check.
+2. Die Legacy-Pfade `generateCustomToken` und `registerMasterDevice` haben zusätzliche Missbrauchsgrenzen über lokale Rate Limits erhalten.
+
 ## Angriffsflächen
 
 ### 1. Administrative Reset-Endpunkte
@@ -159,6 +164,16 @@ Bewertung:
 - Die Freeze-Richtlinie ist sauber dokumentiert.
 - Technisch existieren die Legacy-Pfade aber weiter und müssen bis zum vollständigen Cutover als erhöhtes Risiko bewertet werden.
 
+Umgesetzt:
+
+- Die un-authentifizierten Legacy-Zweige von `generateCustomToken` und `registerMasterDevice` erzwingen jetzt App Check.
+- Beide Legacy-Zweige haben zusätzlich lokale Rate Limits erhalten, um Brute-Force- und Enumerationsdruck zu senken.
+
+Restrisiko:
+
+- Die Rate Limits sind wie an anderer Stelle aktuell in-memory und damit nicht global wirksam.
+- Die Legacy-Pfade bleiben fachlich weiter vorhanden; die Härtung reduziert Missbrauch, ersetzt aber keinen vollständigen Cutover.
+
 ### Flaches Firestore-Modell
 
 Betroffene Stellen:
@@ -215,3 +230,5 @@ Umgesetzt:
 - Angleichung von [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an die operative Site-Key-Konfiguration aus [web-control/appcheck-init.js](web-control/appcheck-init.js)
 - App-Check-Erzwingung für sensible Support-Callables wie `createSupportTicket`, `analyzeWithDebugData`, `grantDebugAccess`, `processUserReplyMessage`, `getTicketUserData` und `aiExplainProblem`
 - Dediziertes Rate Limit für den Operator-Assistenten `aiExplainProblem`
+- App-Check-Erzwingung für die un-authentifizierten Legacy-Zweige von `generateCustomToken` und `registerMasterDevice`
+- Lokale Rate Limits für die Legacy-Pfade `generateCustomToken` und `registerMasterDevice`
