@@ -26,6 +26,11 @@ In einer dritten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umges
 1. Privilegierte Admin- und Operator-Callables in [src/admin.ts](src/admin.ts) erzwingen jetzt konsistent App Check.
 2. Die App-Check-Initialisierung im [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) wurde an den produktionsnäheren Modus aus [web-control/appcheck-init.js](web-control/appcheck-init.js) angeglichen.
 
+In einer vierten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
+
+1. Sensible Support-Callables in [src/support.ts](src/support.ts) erzwingen jetzt ebenfalls konsistent App Check.
+2. Der Operator-Assistent `aiExplainProblem` wurde zusätzlich mit einem dedizierten Rate Limit versehen.
+
 ## Angriffsflächen
 
 ### 1. Administrative Reset-Endpunkte
@@ -82,6 +87,41 @@ Umgesetzt:
 Restrisiko:
 
 - Debug-Snapshots aggregieren weiterhin mehrere Datenquellen. Jede Erweiterung von `collectDebugSnapshot` sollte als eigener Privacy-Review behandelt werden.
+
+### 4. Support- und Ticket-Callables
+
+Betroffene Stellen:
+
+- [src/support.ts](src/support.ts)
+
+Konkrete Pfade:
+
+- `createSupportTicket`
+- `grantSupportAccess`
+- `revokeSupportAccess`
+- `analyzeWithDebugData`
+- `grantDebugAccess`
+- `skipDebugMode`
+- `processUserReplyMessage`
+- `getDebugInfo`
+- `provideSolutionFeedback`
+- `getTicketUserData`
+- `aiExplainProblem`
+
+Bewertung:
+
+- Diese Callables verarbeiten entweder sensible Support- und Diagnosedaten oder triggern externe KI-/Mail-Pfade.
+- Vor der Härtung war die Rollen- und Ownership-Logik weitgehend vorhanden, aber die Herkunft des Aufrufs war nicht über App Check abgesichert.
+- Besonders `createSupportTicket` und `aiExplainProblem` waren dadurch anfälliger für Missbrauch durch automatisierte oder nicht legitimierte Clients.
+
+Umgesetzt:
+
+- App Check wird jetzt auf den sensiblen Support-Callables konsistent erzwungen.
+- `aiExplainProblem` hat zusätzlich ein dediziertes Rate Limit erhalten, um Missbrauch des externen KI-Pfads zu begrenzen.
+
+Restrisiko:
+
+- Rate Limits sind aktuell in-memory und damit instanzlokal. Für harte Missbrauchsgrenzen sollte mittelfristig ein persistenter oder edge-naher Mechanismus ergänzt werden.
 
 ### 3. Externe Provider-Anbindung
 
@@ -173,3 +213,5 @@ Umgesetzt:
 - App-Check-Erzwingung für mutierende Device-Callables wie `updateAppBlacklist`, `setUsageRules`, `recordHeartbeat`, `registerFcmToken`, `updateFCMToken`, `reportDailyUsage` und `reportTamperEvent`
 - App-Check-Erzwingung für privilegierte Admin-Callables wie `deleteUserAccount`, `adminHealthCheck`, `testGeminiConnection`, `getKnowledgeBase`, `updateKnowledgeBase`, `sendTestFcmMessage`, `triggerScheduledJob` und `analyzeSystemErrors`
 - Angleichung von [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an die operative Site-Key-Konfiguration aus [web-control/appcheck-init.js](web-control/appcheck-init.js)
+- App-Check-Erzwingung für sensible Support-Callables wie `createSupportTicket`, `analyzeWithDebugData`, `grantDebugAccess`, `processUserReplyMessage`, `getTicketUserData` und `aiExplainProblem`
+- Dediziertes Rate Limit für den Operator-Assistenten `aiExplainProblem`
