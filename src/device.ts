@@ -251,6 +251,7 @@ export const setUsageRules = functions.https.onCall(
 export const getRulesForChild = functions.https.onCall(
   async (data: { childId: string }, context: CallableContext) => {
     const requesterId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId } = data;
 
     if (!childId || typeof childId !== "string") {
