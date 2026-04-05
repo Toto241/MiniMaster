@@ -42,6 +42,9 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
    Warum hoch:
    Die Code-Härtung ist jetzt besser, aber Environment-Flags und Recovery-Token bleiben operativ kritisch.
 
+   Status:
+   App Check und eine Projekt-Allowlist-Barriere für Deployments sind jetzt eingezogen. Offen bleiben vor allem Recovery-Token-Rotation, klar getrennte Betriebsumgebungen und strengere organisatorische Freigabepfade.
+
 3. Debug-Datensatz minimieren und explizit testen
    Betroffene Stellen:
    [src/support.ts](src/support.ts)
@@ -117,4 +120,4 @@ Die in dieser Arbeit geänderten Hochrisiko-Pfade wurden mit folgenden Suiten ge
 Ergebnis zum Zeitpunkt der Analyse:
 
 - 18 gezielte Test-Suiten grün
-- 610 gezielte Tests grün
+- 612 gezielte Tests grün
