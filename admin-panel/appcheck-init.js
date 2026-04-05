@@ -23,6 +23,14 @@
  */
 
 (function() {
+    const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
+    const siteKey = globalSiteKey || localStorage.getItem("minimasterAppCheckSiteKey");
+
+    if (!siteKey) {
+        console.info("Firebase App Check site key not configured for admin-panel. Skipping activation.");
+        return;
+    }
+
     // Wait for Firebase to be initialized
     if (typeof firebase === "undefined") {
         console.error("Firebase is not loaded. Make sure to include Firebase SDK before App Check.");
@@ -31,16 +39,10 @@
 
     // Initialize App Check
     try {
-        const siteKey = "YOUR_RECAPTCHA_V3_SITE_KEY"; // Replace with your actual reCAPTCHA site key
-        if (siteKey === "YOUR_RECAPTCHA_V3_SITE_KEY") {
-            console.warn("⚠️ App Check skipped: reCAPTCHA site key not configured. See docs/FIREBASE_APP_CHECK_SETUP.md");
-            return;
-        }
-
         const appCheck = firebase.appCheck();
         appCheck.activate(siteKey, true);
-        console.log("✅ Firebase App Check initialized");
+        console.log("Firebase App Check initialized for admin-panel.");
     } catch (error) {
-        console.error("❌ Failed to initialize Firebase App Check:", error);
+        console.error("Failed to initialize Firebase App Check:", error);
     }
 })();

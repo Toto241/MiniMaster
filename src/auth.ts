@@ -6,7 +6,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
 import { requireAdmin, AuditLogger } from "./shared";
 import type { OperatorRole } from "./shared";
@@ -23,6 +23,17 @@ function isOperatorResetEnabled(): boolean {
 
 function getAdminRecoveryToken(): string {
   return String(process.env.ADMIN_RECOVERY_TOKEN || process.env.MINIMASTER_ADMIN_RECOVERY_TOKEN || "").trim();
+}
+
+function safeSecretEquals(expected: string, provided: string): boolean {
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const providedBuffer = Buffer.from(provided, "utf8");
+
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
 async function logLegacyAuthUsage(endpoint: string, mode: "secretKey" | "imei_registration", identifier: string): Promise<void> {
@@ -445,7 +456,7 @@ export const resetAllAuthUsers = functions.https.onCall(
     const recoveryTokenAllowed =
       recoveryTokenConfig.length > 0 &&
       recoveryTokenData.length > 0 &&
-      recoveryTokenData === recoveryTokenConfig;
+      safeSecretEquals(recoveryTokenConfig, recoveryTokenData);
 
     const callerRole = context.auth && typeof context.auth.token.role === "string" ? context.auth.token.role : "";
     if (!resetEnabled) {
@@ -735,7 +746,8 @@ export const generateCustomToken = functions.https.onCall(
       }
 
       const masterDoc = await db().collection("masters").doc(masterImei).get();
-      if (!masterDoc.exists || masterDoc.data()?.secretKey !== secretKey) {
+      const storedSecretKey = masterDoc.data()?.secretKey;
+      if (!masterDoc.exists || typeof storedSecretKey !== "string" || !safeSecretEquals(storedSecretKey, secretKey)) {
         throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
       }
 

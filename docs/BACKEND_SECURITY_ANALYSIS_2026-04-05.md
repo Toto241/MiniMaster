@@ -16,6 +16,16 @@ Die höchsten realen Risiken lagen nicht in den Standard-CRUD-Flows, sondern in 
 
 Diese drei Punkte wurden im Rahmen dieser Arbeit direkt behoben.
 
+In einer zweiten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
+
+1. Recovery- und Legacy-Secret-Vergleiche in [src/auth.ts](src/auth.ts) laufen jetzt über einen konstanten Vergleich statt einfacher String-Gleichheit.
+2. Mehrere mutierende Device-Endpunkte in [src/device.ts](src/device.ts) erzwingen jetzt konsistent App Check.
+
+In einer dritten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
+
+1. Privilegierte Admin- und Operator-Callables in [src/admin.ts](src/admin.ts) erzwingen jetzt konsistent App Check.
+2. Die App-Check-Initialisierung im [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) wurde an den produktionsnäheren Modus aus [web-control/appcheck-init.js](web-control/appcheck-init.js) angeglichen.
+
 ## Angriffsflächen
 
 ### 1. Administrative Reset-Endpunkte
@@ -131,6 +141,11 @@ Bewertung:
 - `exportUserData`, `analyzeSystemErrors` und `executeAutoFix` sind stark privilegierte Operator-Funktionen.
 - Die Zugriffskontrolle ist formal vorhanden, diese Endpunkte sollten aber dauerhaft als besonders sensibel behandelt werden.
 
+Umgesetzt:
+
+- App Check wird jetzt zusätzlich auf privilegierten Admin-Callables wie `deleteUserAccount`, `adminHealthCheck`, `testGeminiConnection`, `getKnowledgeBase`, `updateKnowledgeBase`, `sendTestFcmMessage`, `triggerScheduledJob` und `analyzeSystemErrors` erzwungen.
+- Das Admin-Panel kann denselben lokal konfigurierten Site-Key-Mechanismus wie das Web-Control-Panel verwenden und ist damit nicht mehr auf einen fest einkodierten Platzhalter angewiesen.
+
 ## Priorisierte Empfehlungen
 
 ### P0
@@ -154,3 +169,7 @@ Bewertung:
 - Admin- oder Recovery-Token-Pflicht für `resetAllAuthUsers`
 - Explizite Scope-Pflicht und Grant-Bindung in `getDebugInfo`
 - Header-basierte API-Key-Übergabe in `testGeminiConnection`
+- Konstante Secret-Vergleiche für Recovery-Token und Legacy-`secretKey` in `generateCustomToken`
+- App-Check-Erzwingung für mutierende Device-Callables wie `updateAppBlacklist`, `setUsageRules`, `recordHeartbeat`, `registerFcmToken`, `updateFCMToken`, `reportDailyUsage` und `reportTamperEvent`
+- App-Check-Erzwingung für privilegierte Admin-Callables wie `deleteUserAccount`, `adminHealthCheck`, `testGeminiConnection`, `getKnowledgeBase`, `updateKnowledgeBase`, `sendTestFcmMessage`, `triggerScheduledJob` und `analyzeSystemErrors`
+- Angleichung von [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an die operative Site-Key-Konfiguration aus [web-control/appcheck-init.js](web-control/appcheck-init.js)

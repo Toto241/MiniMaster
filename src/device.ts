@@ -66,6 +66,7 @@ export const updateAppBlacklist = functions.https.onCall(
   async (data: { childId: string; appBlacklist: string[] }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, appBlacklist } = data;
 
     if (!childId || typeof childId !== "string" || !Array.isArray(appBlacklist)) {
@@ -116,6 +117,7 @@ export const setUsageRules = functions.https.onCall(
   async (data: { childId: string; usageRules: object }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, usageRules } = data;
 
     if (!childId || typeof childId !== "string" || typeof usageRules !== "object" || usageRules === null) {
@@ -249,6 +251,7 @@ export const recordHeartbeat = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     const startTime = Date.now();
     const childId = requireAuth(context);
+    validateAppCheck(context, true);
     const childDeviceRef = db().collection("children").doc(childId);
 
     try {
@@ -283,6 +286,7 @@ export const registerFcmToken = functions.https.onCall(
   async (data: { token: string }, context: CallableContext) => {
     const startTime = Date.now();
     const childId = requireAuth(context);
+    validateAppCheck(context, true);
     const { token } = data;
 
     if (!token || typeof token !== "string") {
@@ -322,6 +326,7 @@ export const updateFCMToken = functions.https.onCall(
   async (data: { fcmToken: string }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context, true);
     const { fcmToken } = data;
 
     if (!fcmToken || typeof fcmToken !== "string") {
@@ -363,6 +368,7 @@ export const reportDailyUsage = functions.https.onCall(
   async (data: { date: string; usageMillis: number }, context: CallableContext) => {
     const startTime = Date.now();
     const childId = requireAuth(context);
+    validateAppCheck(context, true);
     const { date, usageMillis } = data;
 
     if (!date || typeof usageMillis !== "number") {
@@ -402,6 +408,7 @@ export const reportDailyUsage = functions.https.onCall(
 export const reportTamperEvent = functions.https.onCall(
   async (data: { childId: string; eventType: string; timestamp: number }, context: CallableContext) => {
     const callerId = requireAuth(context);
+    validateAppCheck(context, true);
     const { childId, eventType, timestamp } = data;
 
     if (!childId || !eventType) {

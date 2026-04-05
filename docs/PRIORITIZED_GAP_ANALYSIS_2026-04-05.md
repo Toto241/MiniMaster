@@ -12,6 +12,10 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
 - Expliziter `diagnostic_logs`-Scope für Debug-Daten erzwungen in [src/support.ts](src/support.ts)
 - Grant/Ticket-Bindung für Debug-Zugriff abgesichert in [src/support.ts](src/support.ts)
 - Gemini-Testcall auf Header-basierte API-Key-Übertragung umgestellt in [src/admin.ts](src/admin.ts)
+- Recovery-Token- und Legacy-Secret-Vergleiche gegen Timing-Angriffe gehärtet in [src/auth.ts](src/auth.ts)
+- App Check auf mutierenden Device-Endpunkten konsistent erzwungen in [src/device.ts](src/device.ts)
+- App Check auf privilegierten Admin-/Operator-Endpunkten konsistent erzwungen in [src/admin.ts](src/admin.ts)
+- App-Check-Initialisierung im [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an den Web-Control-Betriebsmodus angeglichen
 
 ## Offene Lücken nach Priorität
 
@@ -75,6 +79,9 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
    Betroffene Stellen:
    [src/admin.ts](src/admin.ts)
 
+   Status:
+   App Check wird jetzt für die wichtigsten privilegierten Admin-Callables erzwungen. Offen bleiben vor allem weitere betriebliche Grenzen wie feinere Rate Limits, engere Allowlists und klarere Trennung zwischen Lese- und Mutationspfaden.
+
 ## Empfohlene Reihenfolge
 
 1. Legacy Auth aus Client- und Web-Login-Flows herausziehen
@@ -91,8 +98,10 @@ Die in dieser Arbeit geänderten Hochrisiko-Pfade wurden mit folgenden Suiten ge
 - [test/branch-coverage-auth.test.ts](test/branch-coverage-auth.test.ts)
 - [test/legal-admin-support-coverage.test.ts](test/legal-admin-support-coverage.test.ts)
 - [test/branch-coverage-support-gaps.test.ts](test/branch-coverage-support-gaps.test.ts)
+- [test/branch-coverage-boost.test.ts](test/branch-coverage-boost.test.ts)
+- [test/branch-coverage-wave3.test.ts](test/branch-coverage-wave3.test.ts)
 
 Ergebnis zum Zeitpunkt der Analyse:
 
-- 4 Test-Suiten grün
-- 153 Tests grün
+- 12 gezielte Test-Suiten grün
+- 416 gezielte Tests grün
