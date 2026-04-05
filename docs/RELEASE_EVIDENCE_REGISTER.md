@@ -28,8 +28,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
 | Static readiness checks | scripts/static_readiness_checks.py: 20/20 checks passed (100%) (python scripts/test_automation.py --suite static-readiness) | ✅ | Automated | 2026-03-29 |
-| CodeQL security scan (0 high/critical) | Run [23688038163](https://github.com/Toto241/MiniMaster/actions/runs/23688038163): completed/failure; Annotation: "job was not started because recent account payments have failed or your spending limit needs to be increased"; letzter erfolgreicher Referenz-Run: [23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965) | ⬜ | Engineering (blocked by repo billing) | 2026-03-29 |
-| Android build (if applicable) | Run [23545055477](https://github.com/Toto241/MiniMaster/actions/runs/23545055477): completed/failure; Annotation: "job was not started because recent account payments have failed or your spending limit needs to be increased"; letzter erfolgreicher Referenz-Run: none in inspected history | ⬜ | Engineering (blocked by repo billing) | 2026-03-29 |
+| CodeQL security scan (0 high/critical) | Run [23989613589](https://github.com/Toto241/MiniMaster/actions/runs/23989613589): completed/failure; aktueller Blocker: Code scanning im Repository nicht aktiviert und Java-Analyse scheitert noch am Workflow-/Build-Setup; siehe [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | ⬜ | Engineering | 2026-04-05 |
+| Android build (if applicable) | Run [23949514844](https://github.com/Toto241/MiniMaster/actions/runs/23949514844): completed/success; letzter erfolgreicher Referenz-Run identisch, Billing-Blocker laut aktueller Revalidierung nicht mehr aktiv | ✅ | Automated | 2026-04-03 |
 | Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
 
 ### 3.2 Functional Commissioning Gate
@@ -101,9 +101,9 @@ Fuer die externe Umsetzungsstrecke (Billing/Console/Sign-off) siehe: `docs/RELEA
 | Store Listing DE vollständig (Text + Screenshots) | Finaler Store-Listing-Entwurf + Asset-Paket | ⬜ | Product/Ops | offen |
 | Permissions Declaration einreichen (Accessibility/Usage/Overlay) | Arbeitsstand dokumentiert in `docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`; finale Einreichbestaetigung aus Play Console noch offen | ⬜ | Compliance Owner | offen |
 | App-Access-Anleitung in Play Console hinterlegen | Link/Screenshot zur Reviewer-Anleitung (operationalisierter Draft in `docs/APP_ACCESS_REVIEWER_GUIDE.md`; Play Console Verlinkung noch offen) | ⬜ | Product/Ops | offen |
-| GitHub Actions Billing/Spending-Limit bereinigen | Billing-&-Plans-Nachweis; danach CodeQL Job startbar (externe Owner-Aktion erforderlich) | ⬜ | Repo Owner | offen |
-| CodeQL-Ergebnis verlinken | Letzter Run: [23688038163](https://github.com/Toto241/MiniMaster/actions/runs/23688038163) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |
-| Android CI Build-Nachweis verlinken | Letzter Run: [23545055477](https://github.com/Toto241/MiniMaster/actions/runs/23545055477) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |
+| GitHub Actions Billing/Spending-Limit bereinigen | Kein aktiver Billing-Blocker mehr laut [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md); Punkt als erledigt dokumentieren und nicht weiter als Release-Blocker fuehren | ✅ | Repo Owner | 2026-04-05 |
+| CodeQL-Ergebnis verlinken | Letzter Run: [23989613589](https://github.com/Toto241/MiniMaster/actions/runs/23989613589) (completed/failure; aktueller Blocker: Code scanning nicht aktiviert und Java-Workflow noch rot) | ⬜ | Engineering Owner | offen |
+| Android CI Build-Nachweis verlinken | Letzter Run: [23949514844](https://github.com/Toto241/MiniMaster/actions/runs/23949514844) (completed/success; in Abschnitt 3.1 nachgezogen) | ✅ | Engineering Owner | 2026-04-05 |
 | Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST | ⬜ | QA/Operations | offen |
 | On-call/Eskalations-Roster verbindlich benennen | Roster mit Namen, Kontakt, Vertretung (operationalisierte Vorlage in `docs/ONCALL_ESCALATION_ROSTER.md`; Inhalte offen) | ⬜ | Operations Lead | offen |
 
@@ -120,10 +120,10 @@ Status legend:
 
 | # | Task | Owner | ETA | Abhaengigkeit | Nachweis fuer "Done" | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | 2026-03-22 18:00 | - | Screenshot/Export aus Billing & Plans + bestaetigter Runner-Start | ⛔ |
+| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | 2026-03-22 18:00 | - | Aktuelle Revalidierung zeigt keinen Billing-Blocker mehr; historischer Punkt geschlossen | ✅ |
 | 2 | CI-Rerun nach Billing-Fix ausloesen (`-RerunLatestFailed`) | Engineering Owner | 2026-03-22 19:00 | 1 | Aktualisiertes `docs/CI_REVALIDATION_LATEST.md` mit laufenden Jobs | ✅ |
-| 3 | CodeQL-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | ⛔ |
-| 4 | Android-CI-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | ⛔ |
+| 3 | CodeQL-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | 🔄 |
+| 4 | Android-CI-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | ✅ |
 | 5 | Firebase-Key-Rotation nach Runbook durchfuehren | Security Owner | 2026-03-23 10:00 | - | Key-ID alt/neu + Loeschzeit in Evidence Register dokumentiert | ⬜ |
 | 6 | Play Console Data Safety einreichen | Product/Ops | 2026-03-23 12:00 | - | Review-Screenshot + Formularstatus "Submitted" | ⬜ |
 | 7 | IARC-Rating finalisieren | Product/Ops | 2026-03-23 12:30 | 6 | IARC/Content-Rating Screenshot in Play Console | ⬜ |
