@@ -67,16 +67,19 @@ struct ChildPairingView: View {
 
     private var pairButton: some View {
         Button(action: pair) {
-            Group {
-                if isLoading {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Text("Verbinden")
-                        .fontWeight(.semibold)
+            HStack {
+                Spacer(minLength: 0)
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Verbinden")
+                            .fontWeight(.semibold)
+                    }
                 }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
             .padding()
             .background(code.count == 6 ? Color.accentColor : Color.gray)
             .foregroundColor(.white)

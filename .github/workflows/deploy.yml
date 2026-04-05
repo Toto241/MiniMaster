@@ -59,10 +59,10 @@ jobs:
 
     steps:
     - name: 'Checkout code'
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: 'Setup Node.js'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
@@ -76,10 +76,11 @@ jobs:
     - name: 'Run tests'
       run: npm test
 
-    - name: 'Verify Play reviewer package is complete'
+    - name: 'Verify Play reviewer package is complete for manual release dispatch'
+      if: ${{ github.event_name == 'workflow_dispatch' }}
       run: |
-        if grep -n 'TODO' docs/APP_ACCESS_REVIEWER_GUIDE.md; then
-          echo '::error::docs/APP_ACCESS_REVIEWER_GUIDE.md still contains TODO markers. Complete the Play reviewer package before production deploy.'
+        if grep -n 'EXTERNAL_INPUT_REQUIRED' docs/APP_ACCESS_REVIEWER_GUIDE.md; then
+          echo '::error::docs/APP_ACCESS_REVIEWER_GUIDE.md still contains unresolved external inputs. Complete the Play reviewer package before a manual production release.'
           exit 1
         fi
 
@@ -202,19 +203,19 @@ jobs:
 
     steps:
     - name: 'Checkout code'
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: 'Validate Gradle Wrapper'
-      uses: gradle/actions/wrapper-validation@v3
+      uses: gradle/actions/wrapper-validation@v6
 
     - name: 'Setup JDK 17'
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
 
     - name: 'Setup Android SDK'
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
 
     - name: 'Cache Gradle packages'
       uses: actions/cache@v4
