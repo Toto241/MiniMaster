@@ -9,6 +9,7 @@
     "firebase.ts",
     "src/**/*.ts",
     "test/**/*.ts",
+    "*.js",
     "*.ts"
   ],
   "exclude": [

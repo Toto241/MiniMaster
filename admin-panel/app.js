@@ -190,6 +190,55 @@ const defaultOperatorConfig = {
     }
 };
 
+const recommendedPlayStorePrivacyUrl = "https://minimaster.app/privacy";
+const recommendedPlayStoreSupportEmail = "privacy@minimaster.app";
+
+function buildEffectiveOperatorConfig(config = getOperatorConfigFormValues(), bootstrapConfig = firebaseConfig) {
+    const normalizedBootstrap = normalizeBootstrapFirebaseConfig(bootstrapConfig) || {};
+    const cloud = { ...defaultOperatorConfig.cloud, ...(config?.cloud || {}) };
+    const ai = { ...defaultOperatorConfig.ai, ...(config?.ai || {}) };
+
+    const runtimeProjectId = String(cloud.projectId || "").trim();
+    const bootstrapProjectId = String(normalizedBootstrap.projectId || "").trim();
+    const effectiveProjectId = !isPlaceholderProjectId(runtimeProjectId)
+        ? runtimeProjectId
+        : !isPlaceholderProjectId(bootstrapProjectId)
+            ? bootstrapProjectId
+            : String(defaultOperatorConfig.cloud.projectId || "").trim();
+
+    const recommendedKeyRef = effectiveProjectId
+        ? `projects/${effectiveProjectId}/secrets/gemini-api-key/versions/latest`
+        : "";
+    const parsedTemperature = Number.parseFloat(String(ai.temperature ?? defaultOperatorConfig.ai.temperature));
+
+    return {
+        cloud: {
+            ...cloud,
+            projectId: effectiveProjectId,
+            region: String(cloud.region || "").trim() || defaultOperatorConfig.cloud.region,
+            appCheckMode: String(cloud.appCheckMode || "").trim() || defaultOperatorConfig.cloud.appCheckMode,
+            releaseChannel: String(cloud.releaseChannel || "").trim() || defaultOperatorConfig.cloud.releaseChannel,
+        },
+        ai: {
+            ...ai,
+            provider: String(ai.provider || "").trim() || defaultOperatorConfig.ai.provider,
+            model: String(ai.model || "").trim() || defaultOperatorConfig.ai.model,
+            temperature: Number.isFinite(parsedTemperature) ? parsedTemperature : defaultOperatorConfig.ai.temperature,
+            endpoint: String(ai.endpoint || "").trim(),
+            keyRef: String(ai.keyRef || "").trim() || recommendedKeyRef,
+            systemPrompt: String(ai.systemPrompt || "").trim() || defaultOperatorConfig.ai.systemPrompt,
+        },
+    };
+}
+
+function buildEffectivePlayStoreReadinessState(state = getPlayStoreReadinessState()) {
+    return {
+        ...state,
+        privacyUrl: String(state?.privacyUrl || "").trim() || recommendedPlayStorePrivacyUrl,
+        supportEmail: String(state?.supportEmail || "").trim() || recommendedPlayStoreSupportEmail,
+    };
+}
+
 const defaultCommandBuilderConfig = {
     workspacePath: "D:\\Tools\\MiniMaster",
     firstAdminEmail: "",
@@ -382,9 +431,9 @@ async function executeCommandViaPythonBridge(data) {
 }
 
 function collectCommissioningAutomationContext() {
-    const runtimeConfig = getOperatorConfigFormValues();
+    const runtimeConfig = buildEffectiveOperatorConfig(getOperatorConfigFormValues(), firebaseConfig);
     const attestationState = getCommissioningAttestations();
-    const playStoreState = getPlayStoreReadinessState();
+    const playStoreState = buildEffectivePlayStoreReadinessState(getPlayStoreReadinessState());
     const validationSummary = getEffectiveValidationSummary();
 
     return {
@@ -7721,10 +7770,10 @@ function applyGeminiRuntimeTemplate() {
 }
 
 function renderOperatorConfig(config, loadedAt) {
-    const merged = {
+    const merged = buildEffectiveOperatorConfig({
         cloud: { ...defaultOperatorConfig.cloud, ...(config?.cloud || {}) },
         ai: { ...defaultOperatorConfig.ai, ...(config?.ai || {}) }
-    };
+    }, firebaseConfig);
 
     document.getElementById("cfg-cloud-project-id").value = merged.cloud.projectId || "";
     document.getElementById("cfg-cloud-region").value = merged.cloud.region || "";
@@ -10950,7 +10999,7 @@ function setPlayStoreReadinessState(state) {
 }
 
 function renderPlayStoreReadiness() {
-    const state = getPlayStoreReadinessState();
+    const state = buildEffectivePlayStoreReadinessState(getPlayStoreReadinessState());
 
     const checkboxes = {
         "ps-check-data-safety": "dataSafety",

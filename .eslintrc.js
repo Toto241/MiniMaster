@@ -16,6 +16,21 @@ module.exports = {
   plugins: [
     '@typescript-eslint',
   ],
+  overrides: [
+    {
+      files: ['shared-ui-tooltips.js'],
+      env: {
+        browser: true,
+      },
+      parserOptions: {
+        project: null,
+      },
+      globals: {
+        MutationObserver: 'readonly',
+        Node: 'readonly',
+      },
+    },
+  ],
   rules: {
     'quotes': ['error', 'double'],
     '@typescript-eslint/no-explicit-any': 'off',
