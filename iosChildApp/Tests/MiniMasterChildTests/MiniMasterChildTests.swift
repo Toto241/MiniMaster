@@ -10,4 +10,9 @@ final class MiniMasterChildTests: XCTestCase {
         let notice = AppBlacklistEnforcement.notice(for: ["com.example.blocked"])
         XCTAssertEqual(notice, AppBlacklistEnforcement.iosUnsupportedMessage)
     }
+
+    func testPartialNoticeIsShownForResidualBundleIds() throws {
+        let notice = AppBlacklistEnforcement.partialNotice(forResidualBundleIDs: ["com.example.legacy"])
+        XCTAssertEqual(notice, AppBlacklistEnforcement.iosPartialSupportMessage)
+    }
 }

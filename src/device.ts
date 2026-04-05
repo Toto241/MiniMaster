@@ -8,6 +8,42 @@ import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 
+const MAX_APP_BLACKLIST_ENTRIES = 200;
+const MAX_APP_BLACKLIST_VALUE_LENGTH = 4096;
+
+function normalizeAppBlacklist(appBlacklist: unknown): string[] {
+  if (!Array.isArray(appBlacklist)) {
+    throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'appBlacklist' array.");
+  }
+
+  if (appBlacklist.length > MAX_APP_BLACKLIST_ENTRIES) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `appBlacklist may contain at most ${MAX_APP_BLACKLIST_ENTRIES} entries.`
+    );
+  }
+
+  const normalized = appBlacklist.map((value) => {
+    if (typeof value !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "appBlacklist entries must be strings.");
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      throw new functions.https.HttpsError("invalid-argument", "appBlacklist entries must not be empty.");
+    }
+    if (trimmed.length > MAX_APP_BLACKLIST_VALUE_LENGTH) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `appBlacklist entries must not exceed ${MAX_APP_BLACKLIST_VALUE_LENGTH} characters.`
+      );
+    }
+    return trimmed;
+  });
+
+  return Array.from(new Set(normalized));
+}
+
 export const setDeviceLocked = functions.https.onCall(
   async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
     const startTime = Date.now();
@@ -67,11 +103,13 @@ export const updateAppBlacklist = functions.https.onCall(
     const startTime = Date.now();
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
-    const { childId, appBlacklist } = data;
+    const { childId } = data;
 
-    if (!childId || typeof childId !== "string" || !Array.isArray(appBlacklist)) {
+    if (!childId || typeof childId !== "string") {
       throw new functions.https.HttpsError("invalid-argument", "Request must include valid 'childId' and 'appBlacklist' array.");
     }
+
+    const appBlacklist = normalizeAppBlacklist(data.appBlacklist);
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
     const masterDoc = await masterDeviceRef.get();
@@ -91,7 +129,7 @@ export const updateAppBlacklist = functions.https.onCall(
 
     try {
       await childDeviceRef.update({
-        appBlacklist: appBlacklist,
+        appBlacklist,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
