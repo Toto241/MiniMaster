@@ -130,14 +130,11 @@ struct AppBlacklistView: View {
 
     var body: some View {
         List {
-            if let unsupportedMessage = child.platform.appBlacklistUnsupportedMessage {
-                Section("Hinweis") {
-                    Text(unsupportedMessage)
-                        .foregroundStyle(.orange)
-                }
-            }
-
             if child.platform.supportsBundleIdBlacklistEditing {
+                Section("Hinweis") {
+                    Text(child.platform.appBlacklistEditorHint)
+                        .foregroundStyle(.secondary)
+                }
                 Section {
                     HStack {
                         TextField("Bundle-ID (z.B. com.example.app)", text: $newApp)
@@ -152,14 +149,29 @@ struct AppBlacklistView: View {
                     }
                 }
             }
-            Section("Blockierte Apps (\(apps.count))") {
-                ForEach(apps, id: \.self) { app in
-                    Text(app)
-                }
-                .onDelete { idx in
-                    guard child.platform.supportsBundleIdBlacklistEditing else { return }
-                    apps.remove(atOffsets: idx)
+            if child.platform.supportsScreenTimeTokenSelection {
+                IOSScreenTimeBlacklistEditor(storedValues: apps) { newValues in
+                    apps = newValues
                     save()
+                }
+                Section("Gespeicherte iOS-Blacklist") {
+                    Text("Screen-Time-Tokens: \(ScreenTimeAppSelection.encodedTokenCount(in: apps))")
+                        .foregroundStyle(.secondary)
+                    if !ScreenTimeAppSelection.bundleIDs(from: apps).isEmpty {
+                        Text("Nicht migrierte Bundle-IDs: \(ScreenTimeAppSelection.bundleIDs(from: apps).count)")
+                            .foregroundStyle(.orange)
+                    }
+                }
+            } else {
+                Section("Blockierte Apps (\(apps.count))") {
+                    ForEach(apps, id: \.self) { app in
+                        Text(app)
+                    }
+                    .onDelete { idx in
+                        guard child.platform.supportsBundleIdBlacklistEditing else { return }
+                        apps.remove(atOffsets: idx)
+                        save()
+                    }
                 }
             }
         }

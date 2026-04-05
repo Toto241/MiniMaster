@@ -181,6 +181,21 @@ describe("updateAppBlacklist", () => {
     const wrapped = testEnv.wrap(fns.updateAppBlacklist);
     await expect(wrapped({}, asMaster)).rejects.toThrow(/must include valid/);
   });
+
+  it("normalizes and deduplicates blacklist entries", async () => {
+    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ secretKey: "sec" }) });
+    getMock.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
+    updateMock.mockResolvedValue(undefined);
+    const wrapped = testEnv.wrap(fns.updateAppBlacklist);
+    const res = await wrapped({ childId: "c1", appBlacklist: [" com.blocked.app ", "com.blocked.app", "ios-app-token:abc"] }, asMaster);
+    expect(res).toEqual({ success: true });
+    expect(updateMock).toHaveBeenCalledWith({ appBlacklist: ["com.blocked.app", "ios-app-token:abc"], updatedAt: "mock-server-timestamp" });
+  });
+
+  it("rejects non-string blacklist entries", async () => {
+    const wrapped = testEnv.wrap(fns.updateAppBlacklist);
+    await expect(wrapped({ childId: "c1", appBlacklist: [123] }, asMaster)).rejects.toThrow(/entries must be strings/);
+  });
 });
 
 describe("setUsageRules", () => {

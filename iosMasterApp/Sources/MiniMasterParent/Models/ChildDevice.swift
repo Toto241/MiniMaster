@@ -33,8 +33,16 @@ enum DevicePlatform: String, Codable, CaseIterable {
         self == .android
     }
 
-    var appBlacklistUnsupportedMessage: String? {
-        guard self == .ios else { return nil }
-        return "Die iOS-Kinder-App kann Bundle-ID-Blacklists derzeit nicht mit Screen-Time-Tokens durchsetzen. Bearbeitung ist bis zur Token-basierten Auswahl deaktiviert."
+    var supportsScreenTimeTokenSelection: Bool {
+        self == .ios
+    }
+
+    var appBlacklistEditorHint: String {
+        switch self {
+        case .android:
+            return "Android verwendet Paketnamen bzw. Bundle-IDs fuer die App-Blacklist."
+        case .ios:
+            return "iOS verwendet Screen-Time-Tokens aus der System-Auswahl statt manueller Bundle-IDs."
+        }
     }
 }

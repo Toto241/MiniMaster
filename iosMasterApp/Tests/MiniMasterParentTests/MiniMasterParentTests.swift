@@ -4,11 +4,17 @@ import XCTest
 final class MiniMasterParentTests: XCTestCase {
     func testAndroidSupportsBundleIdBlacklistEditing() throws {
         XCTAssertTrue(DevicePlatform.android.supportsBundleIdBlacklistEditing)
-        XCTAssertNil(DevicePlatform.android.appBlacklistUnsupportedMessage)
+        XCTAssertFalse(DevicePlatform.android.supportsScreenTimeTokenSelection)
     }
 
-    func testIosDisablesBundleIdBlacklistEditing() throws {
+    func testIosUsesScreenTimeTokenSelection() throws {
         XCTAssertFalse(DevicePlatform.ios.supportsBundleIdBlacklistEditing)
-        XCTAssertNotNil(DevicePlatform.ios.appBlacklistUnsupportedMessage)
+        XCTAssertTrue(DevicePlatform.ios.supportsScreenTimeTokenSelection)
+    }
+
+    func testTokenPrefixDetection() throws {
+        let values = ["ios-app-token:abc", "com.example.legacy"]
+        XCTAssertEqual(ScreenTimeAppSelection.encodedTokenCount(in: values), 1)
+        XCTAssertEqual(ScreenTimeAppSelection.bundleIDs(from: values), ["com.example.legacy"])
     }
 }

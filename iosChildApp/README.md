@@ -184,9 +184,9 @@ blockingManager.applyCommand(DeviceCommand(type: .lockState, ...))
 ```
 
 Hinweis zur iOS-App-Blacklist:
-- Eine Bundle-ID-Blacklist allein ist auf iOS nicht durchsetzbar.
-- Dafuer werden Screen-Time-Auswahltokens aus FamilyActivityPicker benoetigt.
-- Bis dieser Token-Flow implementiert ist, zeigt die Child-App eine explizite Warnung statt stillschweigend keine Sperre anzuwenden.
+- Eine reine Bundle-ID-Blacklist ist auf iOS nicht durchsetzbar.
+- Die Parent-App kann iOS-Auswahlen jetzt als Screen-Time-Tokens speichern.
+- Die Child-App wendet vorhandene Token bereits an und warnt nur noch fuer verbleibende manuelle Bundle-IDs.
 
 ### Pairing Flow
 ```

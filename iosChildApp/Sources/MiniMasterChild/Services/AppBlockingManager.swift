@@ -97,9 +97,23 @@ final class AppBlockingManager: ObservableObject {
     private func applyAppBlacklist(_ bundleIds: [String]) {
         guard isAuthorized, !bundleIds.isEmpty else {
             appBlacklistNotice = nil
+            store.shield.applications = nil
             store.shield.applicationCategories = nil
             return
         }
+
+        let legacyBundleIds = ScreenTimeAppBlacklistCodec.legacyBundleIDs(from: bundleIds)
+
+#if canImport(FamilyControls)
+        let applicationTokens = ScreenTimeAppBlacklistCodec.decodeTokens(from: bundleIds)
+        if !applicationTokens.isEmpty {
+            store.shield.applications = Set(applicationTokens)
+            store.shield.applicationCategories = nil
+            appBlacklistNotice = AppBlacklistEnforcement.partialNotice(forResidualBundleIDs: legacyBundleIds)
+            return
+        }
+#endif
+
         // Convert bundle ID strings to ApplicationToken set.
         // In production use FamilyActivityPicker (UI flow) to let the master
         // select apps — ApplicationToken cannot be constructed from a bundle ID
@@ -109,7 +123,8 @@ final class AppBlockingManager: ObservableObject {
         // The real implementation stores the tokens returned by FamilyActivityPicker
         // on the master device, transmits them to the backend as opaque data, and
         // the child app applies them here.
-        appBlacklistNotice = AppBlacklistEnforcement.notice(for: bundleIds)
+        store.shield.applications = nil
+        appBlacklistNotice = AppBlacklistEnforcement.notice(for: legacyBundleIds)
         store.shield.applicationCategories = nil
     }
 
