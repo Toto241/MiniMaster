@@ -1,6 +1,7 @@
 package com.minimaster.masterapp
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.datastore.core.DataStore
@@ -35,7 +36,55 @@ class MasterCredentialsRepository @Inject constructor(
         val SECRET_KEY = stringPreferencesKey("secret_key")
     }
 
-    private val encryptedPrefs by lazy {
+    private val secureStore by lazy { MasterCredentialSecureStoreFactory.create(context) }
+
+    /**
+     * A [Flow] that emits a [Pair] of the master IMEI and secret key.
+     * It emits a new pair whenever the credentials change in the DataStore.
+     * The values in the pair will be null if they have not been set.
+     */
+    val getCredentials: Flow<Pair<String?, String?>> = dataStore.data
+        .map { preferences ->
+            val imei = preferences[PreferencesKeys.MASTER_IMEI]
+                ?: secureStore.getString("master_imei")
+            val secret = preferences[PreferencesKeys.SECRET_KEY]
+                ?: secureStore.getString("secret_key")
+            imei to secret
+        }
+
+    /**
+     * Saves the master device's IMEI and secret key to DataStore.
+     *
+     * @param imei The unique identifier of the master device.
+     * @param secretKey The secret key associated with the master device.
+     */
+    suspend fun saveCredentials(imei: String, secretKey: String) {
+        secureStore.putCredentials(imei, secretKey)
+
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.MASTER_IMEI] = imei
+            preferences[PreferencesKeys.SECRET_KEY] = secretKey
+        }
+    }
+}
+
+internal interface MasterCredentialSecureStore {
+    fun getString(key: String): String?
+    fun putCredentials(imei: String, secretKey: String)
+}
+
+internal object MasterCredentialSecureStoreFactory {
+    @Volatile
+    var create: (Context) -> MasterCredentialSecureStore = { context ->
+        defaultMasterCredentialSecureStore(context)
+    }
+}
+
+internal fun defaultMasterCredentialSecureStore(context: Context): MasterCredentialSecureStore =
+    EncryptedSharedPreferencesSecureStore(context)
+
+private class EncryptedSharedPreferencesSecureStore(context: Context) : MasterCredentialSecureStore {
+    private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -49,35 +98,12 @@ class MasterCredentialsRepository @Inject constructor(
         )
     }
 
-    /**
-     * A [Flow] that emits a [Pair] of the master IMEI and secret key.
-     * It emits a new pair whenever the credentials change in the DataStore.
-     * The values in the pair will be null if they have not been set.
-     */
-    val getCredentials: Flow<Pair<String?, String?>> = dataStore.data
-        .map { preferences ->
-            val imei = preferences[PreferencesKeys.MASTER_IMEI]
-                ?: encryptedPrefs.getString("master_imei", null)
-            val secret = preferences[PreferencesKeys.SECRET_KEY]
-                ?: encryptedPrefs.getString("secret_key", null)
-            imei to secret
-        }
+    override fun getString(key: String): String? = encryptedPrefs.getString(key, null)
 
-    /**
-     * Saves the master device's IMEI and secret key to DataStore.
-     *
-     * @param imei The unique identifier of the master device.
-     * @param secretKey The secret key associated with the master device.
-     */
-    suspend fun saveCredentials(imei: String, secretKey: String) {
+    override fun putCredentials(imei: String, secretKey: String) {
         encryptedPrefs.edit()
             .putString("master_imei", imei)
             .putString("secret_key", secretKey)
             .apply()
-
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.MASTER_IMEI] = imei
-            preferences[PreferencesKeys.SECRET_KEY] = secretKey
-        }
     }
 }
