@@ -13,6 +13,11 @@ const path = require("path");
 const admin = require("firebase-admin");
 const readline = require("readline");
 
+const SECURITY_ENV_FILES = [
+  path.join(__dirname, "..", ".security-test.env"),
+  path.join(__dirname, "security-test.env"),
+];
+
 const EXPECTED_FUNCTIONS = [
   "createTask",
   "submitTaskProof",
@@ -60,14 +65,61 @@ function parseBoolean(value, optionName) {
   throw new Error(`Invalid boolean for ${optionName}: ${value}`);
 }
 
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+
+  const values = {};
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    if (key) {
+      values[key] = value;
+    }
+  }
+
+  return values;
+}
+
+function resolveSecurityEnv() {
+  const resolved = {};
+  for (const envFile of SECURITY_ENV_FILES) {
+    Object.assign(resolved, loadEnvFile(envFile));
+  }
+
+  for (const key of [
+    "SECURITY_TEST_MODE",
+    "SECURITY_TEST_ADMIN_EMAIL",
+    "SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED",
+    "SECURITY_TEST_FUNCTIONS_DEPLOYED",
+    "SECURITY_TEST_SERVICE_ACCOUNT",
+  ]) {
+    const envValue = process.env[key];
+    if (typeof envValue === "string" && envValue.trim()) {
+      resolved[key] = envValue.trim();
+    }
+  }
+
+  return resolved;
+}
+
 function parseArgs(argv) {
+  const resolvedEnv = resolveSecurityEnv();
   const options = {
-    mode: process.env.SECURITY_TEST_MODE || "interactive",
-    adminEmail: process.env.SECURITY_TEST_ADMIN_EMAIL || "",
-    unauthorizedAccessFailed: process.env.SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED,
-    functionsDeployed: process.env.SECURITY_TEST_FUNCTIONS_DEPLOYED,
+    mode: resolvedEnv.SECURITY_TEST_MODE || "interactive",
+    adminEmail: resolvedEnv.SECURITY_TEST_ADMIN_EMAIL || "",
+    unauthorizedAccessFailed: resolvedEnv.SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED,
+    functionsDeployed: resolvedEnv.SECURITY_TEST_FUNCTIONS_DEPLOYED,
     serviceAccountPath:
-      process.env.SECURITY_TEST_SERVICE_ACCOUNT || path.join(__dirname, "..", "serviceAccountKey.json"),
+      resolvedEnv.SECURITY_TEST_SERVICE_ACCOUNT || path.join(__dirname, "..", "serviceAccountKey.json"),
     help: false,
   };
 
@@ -172,15 +224,37 @@ function validateCiInputs(options) {
   }
 }
 
-function initializeFirebase(serviceAccountPath) {
+function resolveServiceAccountStatus(serviceAccountPath) {
   if (!serviceAccountPath) {
-    throw new Error("No service account path was provided.");
+    return {
+      exists: false,
+      resolvedPath: "",
+      message: "No service account path was provided.",
+    };
   }
-  const resolved = path.resolve(serviceAccountPath);
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`Service account file not found: ${resolved}`);
+
+  const resolvedPath = path.resolve(serviceAccountPath);
+  if (!fs.existsSync(resolvedPath)) {
+    return {
+      exists: false,
+      resolvedPath,
+      message: `Service account file not found: ${resolvedPath}`,
+    };
   }
-  const serviceAccount = require(resolved);
+
+  return {
+    exists: true,
+    resolvedPath,
+    message: null,
+  };
+}
+
+function initializeFirebase(serviceAccountPath) {
+  const status = resolveServiceAccountStatus(serviceAccountPath);
+  if (!status.exists) {
+    throw new Error(status.message);
+  }
+  const serviceAccount = require(status.resolvedPath);
 
   if (!admin.apps.length) {
     admin.initializeApp({
@@ -253,11 +327,25 @@ async function runTests(options) {
     validateCiInputs(options);
   }
 
-  const { db, auth } = initializeFirebase(options.serviceAccountPath);
   const rl = options.mode === "interactive" ? createReadline() : null;
   const results = createResultTracker();
+  const serviceAccountStatus = resolveServiceAccountStatus(options.serviceAccountPath);
+  const canUseFirebase = serviceAccountStatus.exists;
+  let db = null;
+  let auth = null;
+
+  if (canUseFirebase) {
+    ({ db, auth } = initializeFirebase(options.serviceAccountPath));
+  } else if (options.mode !== "ci") {
+    throw new Error(serviceAccountStatus.message);
+  }
 
   printHeader();
+
+  if (!canUseFirebase && options.mode === "ci") {
+    console.log(`SKIP Firebase-backed checks: ${serviceAccountStatus.message}`);
+    console.log("");
+  }
 
   try {
     console.log("Test 1: Firestore Rules - Unauthorized Access");
@@ -280,27 +368,35 @@ async function runTests(options) {
     console.log("");
 
     console.log("Test 2: Admin Custom Claim Verification");
-    const adminEmail = options.adminEmail || (await question(rl, "Enter admin email: "));
-    try {
-      const user = await auth.getUserByEmail(String(adminEmail || "").trim());
-      const claims = user.customClaims || {};
-      if (claims.role === "admin") {
-        results.pass("Admin claim is set.");
-      } else {
-        results.fail("Admin claim is not set.");
+    if (!canUseFirebase) {
+      results.skip(`Admin claim verification skipped: ${serviceAccountStatus.message}`);
+    } else {
+      const adminEmail = options.adminEmail || (await question(rl, "Enter admin email: "));
+      try {
+        const user = await auth.getUserByEmail(String(adminEmail || "").trim());
+        const claims = user.customClaims || {};
+        if (claims.role === "admin") {
+          results.pass("Admin claim is set.");
+        } else {
+          results.fail("Admin claim is not set.");
+        }
+      } catch (error) {
+        results.fail(`Admin claim verification failed: ${error.message}`);
       }
-    } catch (error) {
-      results.fail(`Admin claim verification failed: ${error.message}`);
     }
     console.log("");
 
     console.log("Test 3: Firestore Indexes Verification");
-    try {
-      await db.collectionGroup("tasks").limit(1).get();
-      results.pass("collectionGroup query works.");
-    } catch (error) {
-      results.fail(`Firestore index check failed: ${error.message}`);
-      console.log("Hint: firebase deploy --only firestore:indexes");
+    if (!canUseFirebase) {
+      results.skip(`Firestore index verification skipped: ${serviceAccountStatus.message}`);
+    } else {
+      try {
+        await db.collectionGroup("tasks").limit(1).get();
+        results.pass("collectionGroup query works.");
+      } catch (error) {
+        results.fail(`Firestore index check failed: ${error.message}`);
+        console.log("Hint: firebase deploy --only firestore:indexes");
+      }
     }
     console.log("");
 
@@ -360,4 +456,15 @@ async function main() {
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  loadEnvFile,
+  resolveSecurityEnv,
+  parseArgs,
+  validateCiInputs,
+  resolveServiceAccountStatus,
+  runTests,
+};
