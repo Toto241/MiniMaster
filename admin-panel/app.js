@@ -158,9 +158,9 @@ const commissioningQaRegisterDefinitions = [
     { key: "service-account-ready", label: "serviceAccountKey.json lokal für setup-admin verfügbar", automationType: "automatic" },
     { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft", automationType: "manual" },
     { key: "device-sync-verified", label: "Device-Sync zwischen Parent Panel und Child geprüft", automationType: "manual" },
-    { key: "support-flow-verified", label: "Support-Ticket-Flow geprüft", automationType: "manual" },
-    { key: "compliance-flow-verified", label: "DSAR- und Audit-Flow geprüft", automationType: "manual" },
-    { key: "storage-rules-verified", label: "Storage Rules aktiv und geprüft", automationType: "manual" },
+    { key: "support-flow-verified", label: "Support-Ticket-Flow geprüft", automationType: "automatic" },
+    { key: "compliance-flow-verified", label: "DSAR- und Audit-Flow geprüft", automationType: "automatic" },
+    { key: "storage-rules-verified", label: "Storage Rules aktiv und geprüft", automationType: "automatic" },
 ];
 
 const commissioningAttestationItems = commissioningQaRegisterDefinitions
@@ -3756,7 +3756,7 @@ function buildPlausibilityFindings(attestations, platformState, config, validati
     if (attestations["device-sync-verified"] && !hasPlatformQaSignal(platformState, "ca-fcm-sync", "static-ca-fcm-sync")) {
         findings.push({ severity: "warn", text: "Device-Sync als geprüft markiert, aber FCM-Sync in ChildApp nicht bestätigt." });
     }
-    if (attestations["storage-rules-verified"] && !hasPlatformQaSignal(platformState, "ca-task-proof")) {
+    if (hasPassingCommissioningQaCheck("storage-rules-verified") && !hasPlatformQaSignal(platformState, "ca-task-proof")) {
         findings.push({ severity: "info", text: "Storage-Rules geprüft, aber Foto-Beweis-Upload noch nicht bestätigt." });
     }
 
@@ -4975,8 +4975,8 @@ function syncCommissioningChecklist(validationSummary) {
         "appcheck-active": Boolean(config.cloud.appCheckMode),
         "android-apps": Boolean(attestations["android-master-registered"] && attestations["android-child-registered"]),
         "ai-config": Boolean((config.ai.provider && config.ai.model && config.ai.keyRef && config.ai.systemPrompt) && validationSummary?.checks?.aiConfigured),
-        "support-workflow": Boolean(attestations["support-flow-verified"]),
-        "compliance-flow": Boolean(attestations["compliance-flow-verified"]),
+        "support-workflow": hasPassingCommissioningQaCheck("support-flow-verified"),
+        "compliance-flow": hasPassingCommissioningQaCheck("compliance-flow-verified"),
     };
 
     if (
