@@ -11,14 +11,21 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
   const storage = new Map(Object.entries(initialStorage));
   const elements = new Map<string, any>();
 
-  const documentMock: any = {
-    addEventListener: jest.fn(),
-    getElementById: jest.fn((id: string) => elements.get(id) || null),
-    createElement: jest.fn((tag: string) => ({
+  const escapeForHtml = (value: string) => value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+  const createMockElement = (tag: string) => {
+    let innerHTML = "";
+    let textContent = "";
+
+    return {
       tagName: tag.toUpperCase(),
       style: {},
       dataset: {},
-      innerHTML: "",
       value: "",
       appendChild: jest.fn(),
       remove: jest.fn(),
@@ -28,7 +35,26 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
       setAttribute: jest.fn(),
       select: jest.fn(),
       click: jest.fn(),
-    })),
+      get innerHTML() {
+        return innerHTML;
+      },
+      set innerHTML(value: string) {
+        innerHTML = value;
+      },
+      get textContent() {
+        return textContent;
+      },
+      set textContent(value: string) {
+        textContent = value;
+        innerHTML = escapeForHtml(String(value ?? ""));
+      },
+    };
+  };
+
+  const documentMock: any = {
+    addEventListener: jest.fn(),
+    getElementById: jest.fn((id: string) => elements.get(id) || null),
+    createElement: jest.fn((tag: string) => createMockElement(tag)),
     body: {
       appendChild: jest.fn(),
       removeChild: jest.fn(),
@@ -100,6 +126,10 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  getAuthErrorHint,",
     "  formatAuthDebugCode,",
     "  safeDebugStringify,",
+    "  escapeHtmlText,",
+    "  encodeInlineArgument,",
+    "  decodeInlineArgument,",
+    "  toDateSafe,",
     "  formatPythonAutomationTimestamp,",
     "  formatPythonAutomationEvidenceDetails,",
     "  buildPythonAutomationRunIndex,",
@@ -170,6 +200,30 @@ describe("admin-panel helper functions", () => {
 
     expect(exports.buildDeployCommand("demo-project")).toContain("--project demo-project");
     expect(exports.buildPowerShellScript("firebase deploy", "C:/MiniMaster")).toContain("Set-Location -Path \"C:/MiniMaster\"");
+  });
+
+  it("encodes inline arguments and escapes textarea content safely", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const raw = "master'\"><textarea></textarea><img src=x onerror=alert(1)>";
+    const encoded = exports.encodeInlineArgument(raw);
+
+    expect(encoded).toContain("%27");
+    expect(exports.decodeInlineArgument(encoded)).toBe(raw);
+    expect(exports.escapeHtmlText(raw)).not.toContain("<textarea>");
+    expect(exports.escapeHtmlText(raw)).toContain("&lt;textarea&gt;");
+  });
+
+  it("normalizes timestamp payloads from callable responses", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const dateFromSeconds = exports.toDateSafe({ _seconds: 1710000000, _nanoseconds: 500000000 });
+    const dateFromIso = exports.toDateSafe("2026-04-05T10:15:00.000Z");
+
+    expect(Object.prototype.toString.call(dateFromSeconds)).toBe("[object Date]");
+    expect(dateFromSeconds.toISOString()).toBe("2024-03-09T16:00:00.500Z");
+    expect(Object.prototype.toString.call(dateFromIso)).toBe("[object Date]");
+    expect(dateFromIso.toISOString()).toBe("2026-04-05T10:15:00.000Z");
   });
 
   it("tracks commissioning attestations and missing checklist items", () => {
