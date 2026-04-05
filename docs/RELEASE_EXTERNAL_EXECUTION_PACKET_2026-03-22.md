@@ -9,14 +9,14 @@ Ziel: P0-Blocker nacheinander schliessen und Nachweise sofort in das Evidence Re
 
 ## 2. Hard Blockers (Current)
 
-1. GitHub Actions Billing/Spending-Limit blockiert CodeQL und Android CI.
+1. CodeQL bleibt extern blockiert, weil GitHub Code Scanning im Repository noch nicht aktiviert ist.
 2. Play Console Submission-Paket (Data Safety, IARC, Permissions, App Access) offen.
 3. Firebase Key Rotation nur in Console durchfuehrbar.
 4. Physische Commissioning-Checks und On-call Sign-off fehlen.
 
 ## 3. One-Pass Execution Order
 
-1. Repo Owner: Billing/Spending-Limit fixen.
+1. Repo Owner: GitHub Code Scanning aktivieren und Repository-Settings pruefen.
 2. Engineering: CI-Reruns triggern und erfolgreiche Runs verlinken.
 3. Security: Firebase Key Rotation durchfuehren und dokumentieren.
 4. Product/Ops + Compliance: Play Console Data Safety, IARC, Permissions, App Access einreichen.
@@ -25,12 +25,13 @@ Ziel: P0-Blocker nacheinander schliessen und Nachweise sofort in das Evidence Re
 
 ## 4. Action Blocks
 
-### 4.1 Billing Fix (Repo Owner)
+### 4.1 GitHub Code Scanning / Repository Settings (Repo Owner)
 
-- Aktion: GitHub -> Settings -> Billing & plans -> Zahlungsproblem/Spending-Limit bereinigen.
+- Aktion: GitHub -> Settings -> Security / Code security and analysis -> Code scanning aktivieren.
+- Zusatzcheck: Sicherstellen, dass der Workflow nicht an fehlenden Repository-Rechten scheitert.
 - Done-Nachweis:
-  - Screenshot Billing-Status
-  - Anschliessend CI-Job startet wieder (kein "job was not started because recent account payments have failed...").
+  - Screenshot der aktivierten Code-Scanning-Einstellung
+  - Anschliessend CodeQL meldet keinen Repository-Blocker mehr in `docs/CI_REVALIDATION_LATEST.md`
 - Ziel-Doku:
   - docs/CI_REVALIDATION_LATEST.md
   - docs/RELEASE_EVIDENCE_REGISTER.md

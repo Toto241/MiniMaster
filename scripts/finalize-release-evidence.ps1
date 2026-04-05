@@ -55,7 +55,7 @@ function Write-TextNormalized {
     [System.IO.File]::WriteAllText((Resolve-Path $Path), $normalized, $utf8NoBom)
 }
 
-function Parse-CiRun {
+function Get-CiRunSummary {
     param(
         [string]$CiText,
         [string]$SectionName
@@ -78,6 +78,8 @@ function Parse-CiRun {
         Url = $runMatch.Groups[2].Value
         IsFailure = [Regex]::IsMatch($section, "- Latest status:\s+completed\s*/\s*failure")
         BillingBlocked = [Regex]::IsMatch($section, "Billing blocker detected:\s+yes")
+        CodeScanningBlocked = [Regex]::IsMatch($section, "Repository code scanning blocker detected:\s+yes")
+        HasSuccess = [Regex]::IsMatch($section, "- Latest status:\s+completed\s*/\s*success")
     }
 }
 
@@ -93,8 +95,6 @@ $nowDate = (Get-Date).ToString("yyyy-MM-dd")
 $backendJest = $results | Where-Object { $_.suite_id -eq "backend-jest" } | Select-Object -First 1
 $staticReadiness = $results | Where-Object { $_.suite_id -eq "static-readiness" } | Select-Object -First 1
 $androidConnectedMaster = $results | Where-Object { $_.suite_id -eq "android-connected-master" } | Select-Object -First 1
-$androidConnectedChild = $results | Where-Object { $_.suite_id -eq "android-connected-child" } | Select-Object -First 1
-
 $testSuites = "?"
 $testCases = "?"
 if ($backendJest -and $backendJest.stderr) {
@@ -124,15 +124,29 @@ if ($androidConnectedMaster -and $androidConnectedMaster.reason) {
     $deviceReason = [string]$androidConnectedMaster.reason
 }
 
-$codeql = Parse-CiRun -CiText $ciText -SectionName "CodeQL Security Analysis"
-$androidCi = Parse-CiRun -CiText $ciText -SectionName "Android CI"
+$codeql = Get-CiRunSummary -CiText $ciText -SectionName "CodeQL Security Analysis"
+$androidCi = Get-CiRunSummary -CiText $ciText -SectionName "Android CI"
 
 $codeqlLine = if ($codeql) {
-    "| CodeQL security scan (0 high/critical) | Run [$($codeql.Id)]($($codeql.Url)): completed/failure; Annotation: `"job was not started because recent account payments have failed or your spending limit needs to be increased`"; letzter erfolgreicher Referenz-Run: [23381838965](https://github.com/Toto241/MiniMaster/actions/runs/23381838965) | ⬜ | Engineering (blocked by repo billing) | $nowDate |"
+    if ($codeql.CodeScanningBlocked) {
+        "| CodeQL security scan (0 high/critical) | Run [$($codeql.Id)]($($codeql.Url)): completed/failure; aktueller Blocker: Code scanning im Repository nicht aktiviert; siehe docs/CI_REVALIDATION_LATEST.md | ⬜ | Engineering | $nowDate |"
+    } elseif ($codeql.BillingBlocked) {
+        "| CodeQL security scan (0 high/critical) | Run [$($codeql.Id)]($($codeql.Url)): completed/failure; aktueller Blocker: Billing/Spending-Limit; siehe docs/CI_REVALIDATION_LATEST.md | ⬜ | Engineering | $nowDate |"
+    } elseif ($codeql.HasSuccess) {
+        "| CodeQL security scan (0 high/critical) | Run [$($codeql.Id)]($($codeql.Url)): completed/success | ✅ | Automated | $nowDate |"
+    } else {
+        "| CodeQL security scan (0 high/critical) | Run [$($codeql.Id)]($($codeql.Url)): completed/failure; aktueller Blocker: Workflow- oder Build-Fehler, siehe docs/CI_REVALIDATION_LATEST.md | ⬜ | Engineering | $nowDate |"
+    }
 } else { $null }
 
 $androidLine = if ($androidCi) {
-    "| Android build (if applicable) | Run [$($androidCi.Id)]($($androidCi.Url)): completed/failure; Annotation: `"job was not started because recent account payments have failed or your spending limit needs to be increased`"; letzter erfolgreicher Referenz-Run: none in inspected history | ⬜ | Engineering (blocked by repo billing) | $nowDate |"
+    if ($androidCi.HasSuccess) {
+        "| Android build (if applicable) | Run [$($androidCi.Id)]($($androidCi.Url)): completed/success | ✅ | Automated | $nowDate |"
+    } elseif ($androidCi.BillingBlocked) {
+        "| Android build (if applicable) | Run [$($androidCi.Id)]($($androidCi.Url)): completed/failure; aktueller Blocker: Billing/Spending-Limit; siehe docs/CI_REVALIDATION_LATEST.md | ⬜ | Engineering | $nowDate |"
+    } else {
+        "| Android build (if applicable) | Run [$($androidCi.Id)]($($androidCi.Url)): completed/failure; siehe docs/CI_REVALIDATION_LATEST.md | ⬜ | Engineering | $nowDate |"
+    }
 } else { $null }
 
 $evidence = Update-Line -Text $evidence -Pattern '^\| Build artifact .*$' -Replacement "| Build artifact (npm run build) | Local build successful (tsc -p tsconfig.json) | ✅ | Automated | $nowDate |"
@@ -143,21 +157,61 @@ $evidence = Update-Line -Text $evidence -Pattern '^\| .*ndroid-apps \(pairing \+
 
 if ($codeqlLine) {
     $evidence = Update-Line -Text $evidence -Pattern '^\| CodeQL security scan \(0 high/critical\) \|.*$' -Replacement $codeqlLine
-    $evidence = Update-Line -Text $evidence -Pattern '^\| CodeQL-Ergebnis verlinken \|.*$' -Replacement "| CodeQL-Ergebnis verlinken | Letzter Run: [$($codeql.Id)]($($codeql.Url)) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |"
+    if ($codeql.CodeScanningBlocked) {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| CodeQL-Ergebnis verlinken \|.*$' -Replacement "| CodeQL-Ergebnis verlinken | Letzter Run: [$($codeql.Id)]($($codeql.Url)) (completed/failure; aktueller Blocker: Code scanning nicht aktiviert) | ⬜ | Engineering Owner | offen |"
+    } elseif ($codeql.BillingBlocked) {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| CodeQL-Ergebnis verlinken \|.*$' -Replacement "| CodeQL-Ergebnis verlinken | Letzter Run: [$($codeql.Id)]($($codeql.Url)) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |"
+    } elseif ($codeql.HasSuccess) {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| CodeQL-Ergebnis verlinken \|.*$' -Replacement "| CodeQL-Ergebnis verlinken | Letzter Run: [$($codeql.Id)]($($codeql.Url)) (completed/success) | ✅ | Engineering Owner | $nowDate |"
+    } else {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| CodeQL-Ergebnis verlinken \|.*$' -Replacement "| CodeQL-Ergebnis verlinken | Letzter Run: [$($codeql.Id)]($($codeql.Url)) (completed/failure; aktueller Blocker: Workflow- oder Build-Fehler) | ⬜ | Engineering Owner | offen |"
+    }
 }
 if ($androidLine) {
     $evidence = Update-Line -Text $evidence -Pattern '^\| Android build \(if applicable\) \|.*$' -Replacement $androidLine
-    $evidence = Update-Line -Text $evidence -Pattern '^\| Android CI Build-Nachweis verlinken \|.*$' -Replacement "| Android CI Build-Nachweis verlinken | Letzter Run: [$($androidCi.Id)]($($androidCi.Url)) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |"
+    if ($androidCi.HasSuccess) {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| Android CI Build-Nachweis verlinken \|.*$' -Replacement "| Android CI Build-Nachweis verlinken | Letzter Run: [$($androidCi.Id)]($($androidCi.Url)) (completed/success) | ✅ | Engineering Owner | $nowDate |"
+    } elseif ($androidCi.BillingBlocked) {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| Android CI Build-Nachweis verlinken \|.*$' -Replacement "| Android CI Build-Nachweis verlinken | Letzter Run: [$($androidCi.Id)]($($androidCi.Url)) (completed/failure; Billing weiterhin kritisch) | ⬜ | Engineering Owner | offen |"
+    } else {
+        $evidence = Update-Line -Text $evidence -Pattern '^\| Android CI Build-Nachweis verlinken \|.*$' -Replacement "| Android CI Build-Nachweis verlinken | Letzter Run: [$($androidCi.Id)]($($androidCi.Url)) (completed/failure) | ⬜ | Engineering Owner | offen |"
+    }
 }
 
-$decision = Update-Line -Text $decision -Pattern '^\| Technical Quality \(build/lint/test\) \|.*$' -Replacement "| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Build/Lint/Test lokal gruen ($testSuites/$testSuites Suites, $testCases/$testCases Tests) inkl. static-readiness; Device-Commissioning aktuell mangels verbundenem ADB-Device als skipped dokumentiert; CodeQL- und Android-CI-Reruns bleiben durch Billing/Spending-Limit extern blockiert. |"
+$technicalBlockerText = if ($codeql) {
+    if ($codeql.CodeScanningBlocked) {
+        "Build/Lint/Test lokal gruen ($testSuites/$testSuites Suites, $testCases/$testCases Tests) inkl. static-readiness; Android CI ist aktuell gruen, aber CodeQL bleibt rot, weil Code scanning im Repository nicht aktiviert ist."
+    } elseif ($codeql.BillingBlocked) {
+        "Build/Lint/Test lokal gruen ($testSuites/$testSuites Suites, $testCases/$testCases Tests) inkl. static-readiness; CodeQL bleibt durch Billing/Spending-Limit extern blockiert."
+    } elseif ($androidCi -and $androidCi.HasSuccess) {
+        "Build/Lint/Test lokal gruen ($testSuites/$testSuites Suites, $testCases/$testCases Tests) inkl. static-readiness; Android CI ist aktuell gruen, CodeQL bleibt noch technischer Restblocker."
+    } else {
+        "Build/Lint/Test lokal gruen ($testSuites/$testSuites Suites, $testCases/$testCases Tests) inkl. static-readiness; CodeQL bleibt technischer Restblocker."
+    }
+} else {
+    "Build/Lint/Test lokal gruen ($testSuites/$testSuites Suites, $testCases/$testCases Tests) inkl. static-readiness."
+}
+$decision = Update-Line -Text $decision -Pattern '^\| Technical Quality \(build/lint/test\) \|.*$' -Replacement "| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | $technicalBlockerText |"
 if ($codeql) {
-    $decision = Update-Line -Text $decision -Pattern '^\| CodeQL result linked \|.*$' -Replacement "| CodeQL result linked | Open - Run [$($codeql.Id)]($($codeql.Url)) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |"
-    $decision = Update-Line -Text $decision -Pattern '^\| CodeQL nach Billing-Fix erneut ausfuehren und verlinken \(letzter Fehl-Run: .*\) \|.*$' -Replacement "| CodeQL nach Billing-Fix erneut ausfuehren und verlinken (letzter Fehl-Run: $($codeql.Id)) | Engineering | P0 | offen |"
+    if ($codeql.CodeScanningBlocked) {
+        $decision = Update-Line -Text $decision -Pattern '^\| CodeQL result linked \|.*$' -Replacement "| CodeQL result linked | Open - Run [$($codeql.Id)]($($codeql.Url)) completed/failure (aktueller Blocker: Code scanning nicht aktiviert) | Engineering Owner | offen | No |"
+    } elseif ($codeql.BillingBlocked) {
+        $decision = Update-Line -Text $decision -Pattern '^\| CodeQL result linked \|.*$' -Replacement "| CodeQL result linked | Open - Run [$($codeql.Id)]($($codeql.Url)) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |"
+    } elseif ($codeql.HasSuccess) {
+        $decision = Update-Line -Text $decision -Pattern '^\| CodeQL result linked \|.*$' -Replacement "| CodeQL result linked | Closed - Run [$($codeql.Id)]($($codeql.Url)) completed/success | Engineering Owner | $nowDate | No |"
+    } else {
+        $decision = Update-Line -Text $decision -Pattern '^\| CodeQL result linked \|.*$' -Replacement "| CodeQL result linked | Open - Run [$($codeql.Id)]($($codeql.Url)) completed/failure (aktueller Blocker: Workflow- oder Build-Fehler) | Engineering Owner | offen | No |"
+    }
+    $decision = Update-Line -Text $decision -Pattern '^\| CodeQL nach .*erneut ausfuehren und erfolgreichen Lauf verlinken \(letzter Fehl-Run: .*\) \|.*$' -Replacement "| CodeQL nach Repo-Aktivierung erneut ausfuehren und erfolgreichen Lauf verlinken (letzter Fehl-Run: $($codeql.Id)) | Engineering | P0 | offen |"
+    $decision = Update-Line -Text $decision -Pattern '^\| CodeQL nach Billing-Fix erneut ausfuehren und verlinken \(letzter Fehl-Run: .*\) \|.*$' -Replacement "| CodeQL nach Repo-Aktivierung erneut ausfuehren und erfolgreichen Lauf verlinken (letzter Fehl-Run: $($codeql.Id)) | Engineering | P0 | offen |"
 }
 if ($androidCi) {
-    $decision = Update-Line -Text $decision -Pattern '^\| Android CI build evidence linked \|.*$' -Replacement "| Android CI build evidence linked | Open - Run [$($androidCi.Id)]($($androidCi.Url)) completed/failure (Billing/Spending-Limit; kein Runner-Start) | Engineering Owner | offen | No |"
-    $decision = Update-Line -Text $decision -Pattern '^\| Android CI nach Billing-Fix erneut ausfuehren und verlinken \(letzter Fehl-Run: .*\) \|.*$' -Replacement "| Android CI nach Billing-Fix erneut ausfuehren und verlinken (letzter Fehl-Run: $($androidCi.Id)) | Engineering | P0 | offen |"
+    if ($androidCi.HasSuccess) {
+        $decision = Update-Line -Text $decision -Pattern '^\| Android CI build evidence linked \|.*$' -Replacement "| Android CI build evidence linked | Closed - Run [$($androidCi.Id)]($($androidCi.Url)) completed/success | Engineering Owner | $nowDate | No |"
+    } else {
+        $decision = Update-Line -Text $decision -Pattern '^\| Android CI build evidence linked \|.*$' -Replacement "| Android CI build evidence linked | Open - Run [$($androidCi.Id)]($($androidCi.Url)) completed/failure | Engineering Owner | offen | No |"
+    }
+    $decision = Update-Line -Text $decision -Pattern '^\| Android CI nach Billing-Fix erneut ausfuehren und verlinken \(letzter Fehl-Run: .*\) \|.*$' -Replacement "| Android CI nach aktuellem Fehl-Run erneut ausfuehren und verlinken (letzter Fehl-Run: $($androidCi.Id)) | Engineering | P1 | offen |"
 }
 
 Write-TextNormalized -Path $EvidenceFile -Content $evidence

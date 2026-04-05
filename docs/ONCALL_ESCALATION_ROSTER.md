@@ -8,12 +8,20 @@ Owner: Operations Lead
 Release blocker reference: On-call roster assigned
 
 Owner and target:
+
 - Owner: Operations Lead
 - Due: 2026-03-23 16:30 (local)
 - Evidence target: named roster + reachable contacts + sign-off
 
 Completion rule:
+
 - This document is "done" only when all role rows are fully filled, paging channels are set, and section 10 is signed.
+
+## 0.1 Current Status Snapshot
+
+- Template and escalation logic exist.
+- External inputs are still missing for named owners, paging channels, bridge URL, and reachability proof.
+- This file should be completed together with [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) and [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md).
 
 ## 1. Coverage Window
 
@@ -21,6 +29,7 @@ Primary region: DE pilot
 Coverage mode: 24/7 during launch window, then business-hours + pager fallback.
 
 Launch window:
+
 - Start: TODO
 - End: TODO
 
@@ -35,9 +44,21 @@ Launch window:
 | Product/Ops On-call | TODO | TODO | Phone + Chat | 30 min |
 
 Reachability check:
+
 - [ ] All primary contacts answered test ping
 - [ ] All secondary contacts answered test ping
 - [ ] Backup escalation path verified
+
+## 2.1 External Inputs Required Before Go-Live
+
+| Input | Source owner | Required for |
+| --- | --- | --- |
+| Named primary/secondary contacts | Operations Lead | Section 2 |
+| Pager or alerting channel | Operations Lead | Section 5 |
+| Incident chat room and exec channel | Operations Lead + Product/Ops | Section 5 |
+| Release bridge URL and owner | Operations Lead | Section 5 |
+| Reachability test evidence | Operations Lead | Section 9 |
+| Sign-off names and dates | Operations Lead, Engineering, Security | Section 8 |
 
 ## 3. Escalation Matrix
 
@@ -69,14 +90,17 @@ Reachability check:
 ## 5. Paging and Communications
 
 Primary channels:
+
 - Pager: TODO
 - Incident chat room: TODO
 - Executive update channel: TODO
 
 Fallback:
+
 - Phone tree (if pager unavailable): TODO
 
 Release bridge:
+
 - Bridge URL: TODO
 - Bridge owner: TODO
 - Incident note document: TODO
@@ -84,23 +108,37 @@ Release bridge:
 ## 6. Release-Day Command Cadence
 
 T-60 min:
+
 - Confirm all on-call members are reachable.
 - Confirm rollback owner is assigned.
 
 T-0:
+
 - Start release bridge.
 - Freeze unrelated changes.
 
 T+30 / T+60 / T+120:
+
 - Report health checks, crash trends, and user-impact summary.
 
 ## 7. Handover Notes
 
 Every handover must include:
+
 - Active incidents and current severity
 - Open release blockers
 - Last known-good deployment reference
 - Pending actions with owner and ETA
+
+## 7.1 Minimum Completion Package For This Roster
+
+Before this file can be considered done, collect all of the following:
+
+1. Named primary and secondary contacts for every role.
+2. One tested paging path and one tested bridge path.
+3. Reachability timestamp recorded in section 9.
+4. Signed confirmation from Operations, Engineering, and Security.
+5. Matching status update in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
 
 ## 8. Sign-off
 

@@ -22,33 +22,30 @@
 
 ## ⏳ Erforderliche Manuelle Aktion (1 Punkt)
 
-### GitHub Actions Billing Beheben (CRITICAL - Blocking)
+### GitHub Code Scanning Aktivieren (CRITICAL - Blocking)
 
-**Problem**: CodeQL und Android CI können nicht ausgeführt werden
-```
-The job was not started because recent account payments have failed
-or your spending limit needs to be increased.
+**Problem**: CodeQL bleibt extern blockiert, obwohl Android CI wieder läuft
+
+```text
+Code scanning is not enabled for this repository.
 ```
 
 **Lösung (5-10 Minuten):**
 
 1. GitHub → Profil-Icon → Einstellungen
-2. **Billing & Plans** aufrufen
-3. **Payment Methods** prüfen
-   - Zahlungsmethode gültig? → [Update if needed]
-   - Recent failed charges? → [Resolve]
-4. **Spending Limits** prüfen
-   - Actions quota ausgeschöpft? → [Increase if needed]
+2. Repository → **Settings** → **Security** / **Code security and analysis**
+3. **Code scanning** aktivieren
+4. Prüfen, dass der Workflow Zugriff auf Security-Ergebnisse hat
 5. GitHub zurück → Actions Tab
 6. Workspace öffnen und Release Gates erneut ausführen:
-   ```bash
-   # In VS Code Terminal
-   $> npm test           # Sollte grün sein
-   npm run lint           # Sollte grün sein
-   ```
+
+  In VS Code im Terminal nacheinander ausführen:
+  `npm run ci:revalidate:rerun`
+  `npm run ci:revalidate`
 
 **Nach Behebung:**
-- CodeQL Analysis läuft wieder ✓
+
+- CodeQL Analysis kann ohne Repo-Blocker laufen ✓
 - Android CI läuft wieder ✓
 - Hard Gate wird erzwungen ✓
 
@@ -56,22 +53,22 @@ or your spending limit needs to be increased.
 
 ## Validierungsergebnisse
 
-```
+```text
 ✅ Cloud Functions Tests:        1897/1897 passing (53/53 suites)
 ✅ Android Gradle Build:         BUILD SUCCESSFUL
 ✅ Firestore Rules:              All collections validated
 ✅ Node.js Version:              22 überall konsistent
-✅ CodeQL Hard Gate:             Configured (wartet auf Billing Fix)
+✅ CodeQL Hard Gate:             Configured (wartet auf Repository-Code-Scanning)
 ✅ iOS CI Structure Validation:  PASSING
 ⏳ iOS CI Build/Test:            Template ready (wartet auf Xcode Project)
-⏳ CodeQL Security Results:      Blocked by billingissue
+⏳ CodeQL Security Results:      Blocked by repository setting
 ```
 
 ---
 
 ## Datei-Übersicht der Änderungen
 
-```
+```text
 d:\Tools\MiniMaster\
 ├── .github/workflows/
 │   ├── codeql-analysis.yml ............ FIXED (security gate)
@@ -86,12 +83,12 @@ d:\Tools\MiniMaster\
 
 ---
 
-## Nächste Schritte (Nach Billing Fix)
+## Nächste Schritte (Nach Repo-Aktivierung)
 
-1. **Sofort:** GitHub Billing (diese Checkliste, Punkt 2)
+1. **Sofort:** GitHub Code Scanning aktivieren (diese Checkliste, Punkt 2)
 2. **Dann:** CodeQL Scan-Ergebnisse inspizieren
 3. **Optional:** iOS Build aktivieren (wenn Xcode Project bereit)
 
 ---
 
-**Status**: 🟡 Wartend auf GitHub Billing (Benutzeraktion erforderlich)
+**Status**: 🟡 Wartend auf GitHub Repository-Einstellung (Benutzeraktion erforderlich)

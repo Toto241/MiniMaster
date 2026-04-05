@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Require-Command {
+function Test-CommandAvailable {
     param([string]$Name)
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
         throw "Required command '$Name' is not available in PATH."
@@ -75,6 +75,19 @@ function Test-BillingBlocker {
 
     $hit = $Annotations | Where-Object {
         $_.message -match "payments have failed|spending limit needs to be increased|Billing & plans"
+    }
+    return [bool]$hit
+}
+
+function Test-CodeScanningBlocker {
+    param([object[]]$Annotations)
+
+    if (-not $Annotations) {
+        return $false
+    }
+
+    $hit = $Annotations | Where-Object {
+        $_.message -match "Code scanning is not enabled|security-events: read permission|CodeQL Action API endpoints"
     }
     return [bool]$hit
 }
@@ -151,6 +164,7 @@ function New-RunSection {
         $lines += "Run is not completed yet; annotations are not available."
         $lines += ""
         $lines += "Billing blocker detected: pending"
+        $lines += "Repository code scanning blocker detected: pending"
         return $lines
     }
 
@@ -172,10 +186,17 @@ function New-RunSection {
         $lines += "Billing blocker detected: no"
     }
 
+    $codeScanningHit = Test-CodeScanningBlocker -Annotations $annotations
+    if ($codeScanningHit) {
+        $lines += "Repository code scanning blocker detected: yes"
+    } else {
+        $lines += "Repository code scanning blocker detected: no"
+    }
+
     return $lines
 }
 
-Require-Command -Name "gh"
+Test-CommandAvailable -Name "gh"
 
 $codeqlRuns = Get-Runs -Workflow "CodeQL Security Analysis" -RepoName $Repo -Limit $HistoryLimit
 $androidRuns = Get-Runs -Workflow "Android CI" -RepoName $Repo -Limit $HistoryLimit
@@ -204,19 +225,31 @@ $report += (New-RunSection -WorkflowName "Android CI" -Runs $androidRuns -RepoNa
 $codeqlAnnotations = @()
 $androidAnnotations = @()
 if ($codeqlRuns.Count -gt 0) {
-    $codeqlAnnotations = Get-AnnotationsForRun -RunId ($codeqlRuns[0].databaseId) -RepoName $Repo
+    if ($codeqlRuns[0].status -eq "completed") {
+        $codeqlAnnotations = Get-AnnotationsForRun -RunId ($codeqlRuns[0].databaseId) -RepoName $Repo
+    }
 }
 if ($androidRuns.Count -gt 0) {
-    $androidAnnotations = Get-AnnotationsForRun -RunId ($androidRuns[0].databaseId) -RepoName $Repo
+    if ($androidRuns[0].status -eq "completed") {
+        $androidAnnotations = Get-AnnotationsForRun -RunId ($androidRuns[0].databaseId) -RepoName $Repo
+    }
 }
 
 $hasBillingBlocker = (Test-BillingBlocker -Annotations $codeqlAnnotations) -or (Test-BillingBlocker -Annotations $androidAnnotations)
+$hasCodeScanningBlocker = Test-CodeScanningBlocker -Annotations $codeqlAnnotations
+$hasPendingRun = ($codeqlRuns.Count -gt 0 -and $codeqlRuns[0].status -ne "completed") -or ($androidRuns.Count -gt 0 -and $androidRuns[0].status -ne "completed")
 
 $report += ""
 $report += "## Recommendation"
-if ($hasBillingBlocker) {
+if ($hasPendingRun) {
+    $report += "- At least one tracked workflow run is still pending; wait for completion before drawing final release conclusions from this report."
+    $report += "- Re-run this script after the pending workflow completes to refresh blocker classification."
+} elseif ($hasBillingBlocker) {
     $report += "- Immediate action: Resolve GitHub Actions billing/spending-limit issue in account settings."
     $report += "- Then rerun this script with -RerunLatestFailed to request reruns and regenerate evidence."
+} elseif ($hasCodeScanningBlocker) {
+    $report += "- Enable GitHub code scanning in the repository settings before treating CodeQL as a releasable gate."
+    $report += "- After enabling it, rerun the workflow and regenerate this report to verify the remaining build-level issues."
 } else {
     $report += "- No billing blocker detected in latest run annotations."
     $report += "- Continue with code/workflow-level troubleshooting if runs still fail."

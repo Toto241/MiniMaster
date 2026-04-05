@@ -8,18 +8,27 @@ Owner: Product/Ops
 Release blocker reference: App access guide attached
 
 Owner and target:
+
 - Owner: Product/Ops
 - Due: 2026-03-23 14:00 (local)
 - Evidence target: Play Console screenshot + reviewer guide link
 
 Completion rule:
+
 - This document is "done" only when section 11 is fully completed and linked in the release evidence register.
+
+## 0.1 Current Status Snapshot
+
+- Draft is present and usable as the reviewer-facing baseline.
+- External inputs are still missing for credentials, named contacts, Play Console URL, screenshots, and sign-off.
+- Current technical references should be taken from [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) and [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md).
 
 ## 1. Purpose
 
 This document is intended for Google Play reviewers to validate app behavior that depends on privileged Android permissions and parent-managed flows.
 
 Apps:
+
 - Parent app: com.minimaster.masterapp
 - Child app: com.google.pairing
 
@@ -33,8 +42,20 @@ Use dedicated reviewer accounts only.
 | Child test profile | TODO | TODO | Paired to parent account |
 
 Security notes:
+
 - Rotate credentials after review.
 - Do not reuse production operator credentials.
+
+## 2.1 External Inputs Required Before Submission
+
+| Input | Source owner | Required for |
+| --- | --- | --- |
+| Reviewer parent account email/password | Product/Ops + Firebase Auth admin | Section 2, Play Console reviewer access |
+| Paired child test profile | Product/Ops | Section 2, end-to-end reviewer path |
+| Named review contacts | Product/Ops, Engineering, Operations | Section 8 |
+| Play Console submission URL | Product/Ops | Section 10 |
+| Before/after submission screenshots | Product/Ops | Section 10 |
+| Final sign-off names | Product/Ops, Compliance, Engineering | Section 11 |
 
 ## 3. Required Devices
 
@@ -43,6 +64,7 @@ Security notes:
 - Stable internet connection
 
 Optional:
+
 - USB cable + adb for debug validation (not required for core app access review)
 
 ## 4. Setup Steps (Reviewer)
@@ -55,6 +77,7 @@ Optional:
 6. Grant requested permissions on child app when prompted.
 
 Expected outcome:
+
 - Child appears in parent dashboard.
 - Parent can create task and push rule updates.
 
@@ -63,35 +86,43 @@ Expected outcome:
 ### 5.1 Device Administrator (child app)
 
 Why needed:
+
 - Enforce remote lock/unlock requested by parent.
 - Prevent circumvention of active safety rules.
 
 Where used:
+
 - Child app lock flow and anti-tamper checks.
 
 ### 5.2 Accessibility Service (child app)
 
 Why needed:
+
 - Enforce app blocking rules selected by parent.
 - Detect foreground blocked apps and show blocking overlay.
 
 Where used:
+
 - Child app enforcement pipeline.
 
 ### 5.3 Camera (optional)
 
 Why needed:
+
 - Optional photo proof for task completion.
 
 Where used:
+
 - Child task submission when parent requires photo.
 
 ### 5.4 Location (optional)
 
 Why needed:
+
 - Optional location-based rules configured by parent.
 
 Where used:
+
 - Child rule evaluation only if location rule is enabled.
 
 ## 6. Minimal Reviewer Test Scenario
@@ -103,6 +134,7 @@ Where used:
 5. Parent triggers lock and unlock.
 
 Expected outcome:
+
 - Blocked app cannot be opened while rule is active.
 - Lock/unlock is reflected on child device.
 - Task appears and can be completed according to configuration.
@@ -131,12 +163,21 @@ Expected outcome:
 ### 8.2 Contact Fill-In Guide (Product/Ops)
 
 Fuer jede TODO-Zelle:
+
 - Name + Nachname + Rolle
 - E-Mail-Adresse (intern)
 - Mobilnummer fuer Eskalation
 - Die Zeile erst als ausgefuellt markieren wenn der Kontakt per Test-Ping bestaetigt hat.
-| Engineering support | TODO | TODO |
-| Escalation | TODO | TODO |
+
+## 8.3 Completion Package For This Guide
+
+Before this document can move from draft to done, attach all of the following:
+
+1. Reviewer credentials verified on release build.
+2. One screenshot of the Play Console app-access form before submission.
+3. One screenshot after submission with visible timestamp.
+4. Final contact roster for reviewer follow-up.
+5. Link update in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
 
 ## 9. Submission Checklist
 
@@ -158,6 +199,7 @@ Fuer jede TODO-Zelle:
 | Submission timestamp (local) | TODO |
 
 Notes:
+
 - Save screenshots before and after pressing submit.
 - Add this evidence in docs/RELEASE_EVIDENCE_REGISTER.md under "Before Go-Live: Operative Restpunkte".
 
@@ -170,6 +212,7 @@ Notes:
 | Engineering witness | TODO | TODO | TODO |
 
 Final status:
+
 - [ ] Submitted in Play Console
 - [ ] Evidence captured and stored
 - [ ] Release Evidence Register updated
