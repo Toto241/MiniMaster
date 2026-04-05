@@ -90,6 +90,7 @@ const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
 const asUser = { auth: { uid: "user1", token: { role: "master" } } };
 const asSupport = { auth: { uid: "support1", token: { role: "support" } } };
 const withAppCheck = { app: { appId: "test-app" } };
+const asAdminWithAppCheck = { auth: { uid: "admin1", token: { role: "admin" } }, app: { appId: "test-app" } };
 
 import { createHash } from "crypto";
 const TEST_RAW_KEY = "test-secret-key-that-is-at-least-43-characters-long!!";
@@ -786,6 +787,27 @@ describe("resetOperatorAccounts — happy path with env config & operators", () 
     await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNonAdmin))
       .rejects.toHaveProperty("code", "permission-denied");
   });
+
+  it("blockiert destruktiven Reset in Produktion ohne Projekt-Allowlist", async () => {
+    const oldNodeEnv = process.env.NODE_ENV;
+    const oldProject = process.env.GCLOUD_PROJECT;
+    const oldAllowlist = process.env.MINIMASTER_RESET_ALLOWED_PROJECTS;
+    process.env.NODE_ENV = "production";
+    process.env.GCLOUD_PROJECT = "prod-project-1";
+    delete process.env.MINIMASTER_RESET_ALLOWED_PROJECTS;
+
+    try {
+      const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
+      await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdminWithAppCheck))
+        .rejects.toThrow(/MINIMASTER_RESET_ALLOWED_PROJECTS|deployment/i);
+    } finally {
+      process.env.NODE_ENV = oldNodeEnv;
+      if (oldProject === undefined) delete process.env.GCLOUD_PROJECT;
+      else process.env.GCLOUD_PROJECT = oldProject;
+      if (oldAllowlist === undefined) delete process.env.MINIMASTER_RESET_ALLOWED_PROJECTS;
+      else process.env.MINIMASTER_RESET_ALLOWED_PROJECTS = oldAllowlist;
+    }
+  });
 });
 
 describe("resetAllAuthUsers — happy path with env config & users", () => {
@@ -853,6 +875,38 @@ describe("resetAllAuthUsers — happy path with env config & users", () => {
     }, { auth: undefined } as any);
     expect(res.success).toBe(true);
     expect(res.requestId).toBe("test-request-123");
+  });
+
+  it("erfordert in Produktion App Check und Projekt-Allowlist auch für Recovery-Reset", async () => {
+    const oldNodeEnv = process.env.NODE_ENV;
+    const oldProject = process.env.GCLOUD_PROJECT;
+    const oldAllowlist = process.env.MINIMASTER_RESET_ALLOWED_PROJECTS;
+    process.env.NODE_ENV = "production";
+    process.env.GCLOUD_PROJECT = "prod-project-1";
+    process.env.MINIMASTER_RESET_ALLOWED_PROJECTS = "prod-project-1";
+
+    mockAuth.listUsers.mockReset();
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+
+    try {
+      const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
+      await expect(wrapped({
+        confirmText: "RESET_ALL_AUTH_USERS",
+        recoveryToken: "secret-token-456",
+      }, { auth: undefined } as any)).rejects.toThrow(/App Check/i);
+
+      const res = await wrapped({
+        confirmText: "RESET_ALL_AUTH_USERS",
+        recoveryToken: "secret-token-456",
+      }, { auth: undefined, app: { appId: "test-app" } } as any);
+      expect(res.success).toBe(true);
+    } finally {
+      process.env.NODE_ENV = oldNodeEnv;
+      if (oldProject === undefined) delete process.env.GCLOUD_PROJECT;
+      else process.env.GCLOUD_PROJECT = oldProject;
+      if (oldAllowlist === undefined) delete process.env.MINIMASTER_RESET_ALLOWED_PROJECTS;
+      else process.env.MINIMASTER_RESET_ALLOWED_PROJECTS = oldAllowlist;
+    }
   });
 
   it("wirft bei fehlendem Auth + ungültigem Recovery-Token (line 469)", async () => {

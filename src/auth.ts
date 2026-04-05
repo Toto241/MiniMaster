@@ -25,6 +25,79 @@ function getAdminRecoveryToken(): string {
   return String(process.env.ADMIN_RECOVERY_TOKEN || process.env.MINIMASTER_ADMIN_RECOVERY_TOKEN || "").trim();
 }
 
+function getCurrentProjectId(): string | null {
+  const directProjectId = String(process.env.GCLOUD_PROJECT || "").trim();
+  if (directProjectId) {
+    return directProjectId;
+  }
+
+  const firebaseConfig = String(process.env.FIREBASE_CONFIG || "").trim();
+  if (!firebaseConfig) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(firebaseConfig) as { projectId?: unknown };
+    return typeof parsed.projectId === "string" && parsed.projectId.trim().length > 0
+      ? parsed.projectId.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function getResetAllowedProjects(): string[] {
+  const raw = String(
+    process.env.MINIMASTER_RESET_ALLOWED_PROJECTS || process.env.RESET_ALLOWED_PROJECTS || ""
+  ).trim();
+
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function getResetGuardStatus(): {
+  projectId: string | null;
+  allowedProjectsConfigured: boolean;
+  projectAllowedForReset: boolean;
+  emulatorBypass: boolean;
+  guardActive: boolean;
+} {
+  const emulatorBypass = process.env.FUNCTIONS_EMULATOR === "true";
+  const guardActive = !emulatorBypass && process.env.NODE_ENV !== "test";
+  const projectId = getCurrentProjectId();
+  const allowedProjects = getResetAllowedProjects();
+  const allowedProjectsConfigured = allowedProjects.length > 0;
+  const projectAllowedForReset = projectId !== null && allowedProjects.includes(projectId);
+
+  return {
+    projectId,
+    allowedProjectsConfigured,
+    projectAllowedForReset,
+    emulatorBypass,
+    guardActive,
+  };
+}
+
+function assertResetDeploymentAllowed(): void {
+  const status = getResetGuardStatus();
+  if (!status.guardActive) {
+    return;
+  }
+
+  if (!status.allowedProjectsConfigured || !status.projectAllowedForReset) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Destructive reset is not allowed for this deployment. Configure MINIMASTER_RESET_ALLOWED_PROJECTS to include the current project."
+    );
+  }
+}
+
 function safeSecretEquals(expected: string, provided: string): boolean {
   const expectedBuffer = Buffer.from(expected, "utf8");
   const providedBuffer = Buffer.from(provided, "utf8");
@@ -341,6 +414,8 @@ export const resetOperatorAccounts = functions.https.onCall(
       );
     }
 
+    assertResetDeploymentAllowed();
+
     if (!callerIsAdmin) {
       functions.logger.warn("DEV resetOperatorAccounts invoked by non-admin user.", {
         uid: context.auth.uid,
@@ -351,6 +426,8 @@ export const resetOperatorAccounts = functions.https.onCall(
         "Admin privileges required for operator account reset."
       );
     }
+
+    validateAppCheck(context, true);
 
     const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
     if (confirmText !== "RESET_OPERATOR_ACCOUNTS") {
@@ -467,6 +544,8 @@ export const resetAllAuthUsers = functions.https.onCall(
       );
     }
 
+    assertResetDeploymentAllowed();
+
     if (!context.auth && !recoveryTokenAllowed) {
       throw new functions.https.HttpsError(
         "unauthenticated",
@@ -480,6 +559,8 @@ export const resetAllAuthUsers = functions.https.onCall(
         "Admin privileges or a valid recovery token are required for all-user reset."
       );
     }
+
+    validateAppCheck(context, true);
 
     const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
     const includeCurrentSessionUser = data?.includeCurrentSessionUser === true;
@@ -655,6 +736,7 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
 
     const resetEnabled = isOperatorResetEnabled();
     const recoveryTokenConfigured = getAdminRecoveryToken().length > 0;
+    const resetGuardStatus = getResetGuardStatus();
 
     const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "none";
     return {
@@ -662,6 +744,10 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
       requestId,
       resetEnabled,
       recoveryTokenConfigured,
+      projectId: resetGuardStatus.projectId,
+      allowedProjectsConfigured: resetGuardStatus.allowedProjectsConfigured,
+      projectAllowedForReset: resetGuardStatus.projectAllowedForReset,
+      emulatorBypass: resetGuardStatus.emulatorBypass,
       callerRole,
       isAdmin: callerRole === "admin",
       requiredConfirmText: "RESET_ALL_AUTH_USERS",

@@ -36,6 +36,11 @@ In einer fünften Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umge
 1. Die un-authentifizierten Legacy-Branches in [src/auth.ts](src/auth.ts) erzwingen jetzt App Check.
 2. Die Legacy-Pfade `generateCustomToken` und `registerMasterDevice` haben zusätzliche Missbrauchsgrenzen über lokale Rate Limits erhalten.
 
+In einer sechsten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
+
+1. Die destruktiven Reset-Endpunkte in [src/auth.ts](src/auth.ts) sind jetzt zusätzlich über eine Projekt-Allowlist für Deployments abgesichert.
+2. Auch Reset-Aufrufe mit Admin-Kontext oder Recovery-Token erzwingen jetzt App Check, und [src/auth.ts](src/auth.ts) stellt den Guard-Status im Health-Endpunkt transparenter bereit.
+
 ## Angriffsflächen
 
 ### 1. Administrative Reset-Endpunkte
@@ -61,11 +66,15 @@ Umgesetzt:
 - `resetOperatorAccounts` verlangt jetzt immer Admin-Rechte.
 - `resetAllAuthUsers` verlangt jetzt Admin-Rechte oder einen gültigen Recovery-Token.
 - Nicht-Admin-Aufrufe werden explizit mit `permission-denied` abgewiesen.
+- Beide destruktiven Reset-Endpunkte erzwingen jetzt zusätzlich App Check.
+- Außerhalb von Emulator/Test werden destruktive Resets nur noch erlaubt, wenn das aktuelle Projekt explizit in `MINIMASTER_RESET_ALLOWED_PROJECTS` bzw. `RESET_ALLOWED_PROJECTS` freigeschaltet ist.
+- `resetAllAuthUsersHealth` liefert jetzt zusätzlich Informationen zum aktuellen Projekt und zum aktiven Deployment-Guard.
 
 Restrisiko:
 
 - Die Endpunkte bleiben grundsätzlich gefährlich, solange sie deployt und nur per Environment Flag gesteuert werden.
 - Der Recovery-Token bleibt ein Single-Secret-Kontrollmechanismus und braucht saubere Rotation und Secret-Härtung.
+- Die Projekt-Allowlist ist ein wichtiger Betriebsriegel, ersetzt aber keine Secret-Rotation und keine getrennten Administrationsumgebungen.
 
 ### 2. Support-Debug-Zugriff
 
@@ -232,3 +241,5 @@ Umgesetzt:
 - Dediziertes Rate Limit für den Operator-Assistenten `aiExplainProblem`
 - App-Check-Erzwingung für die un-authentifizierten Legacy-Zweige von `generateCustomToken` und `registerMasterDevice`
 - Lokale Rate Limits für die Legacy-Pfade `generateCustomToken` und `registerMasterDevice`
+- Deployment-Allowlist und App-Check-Erzwingung für die destruktiven Reset-Endpunkte `resetOperatorAccounts` und `resetAllAuthUsers`
+- Erweiterter Guard-Status im Health-Endpunkt `resetAllAuthUsersHealth`
