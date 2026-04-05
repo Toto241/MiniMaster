@@ -328,12 +328,12 @@ describe("processUserReplyMessage – escalated status branch", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// GET DEBUG INFO – empty debugScope bypasses scope check
+// GET DEBUG INFO – explicit diagnostic scope required
 // ══════════════════════════════════════════════════════════════════════════
 
-describe("getDebugInfo – empty debugScope", () => {
+describe("getDebugInfo – explicit diagnostic scope required", () => {
 
-  it("allows access when debugScope is empty array (skips scope filter)", async () => {
+  it("rejects access when debugScope is empty array", async () => {
     state.supportTickets = {
       t1: {
         masterImei: "m1",
@@ -342,20 +342,19 @@ describe("getDebugInfo – empty debugScope", () => {
     };
     state.supportAccessGrants = {
       grant1: {
+        masterImei: "m1",
+        ticketId: "t1",
         status: "active",
-        debugScope: [],  // empty → all scopes allowed
+        debugScope: [],
         expiresAt: { seconds: Math.floor(Date.now() / 1000) + 3600, toMillis: () => Date.now() + 3600000 },
       },
     };
 
     const wrapped = testEnv.wrap(fns.getDebugInfo);
-    const res = await wrapped({ ticketId: "t1" }, asMaster);
-    expect(res.ticketId).toBe("t1");
-    expect(res.grantId).toBe("grant1");
-    expect(res.snapshot).toBeDefined();
+    await expect(wrapped({ ticketId: "t1" }, asMaster)).rejects.toHaveProperty("code", "permission-denied");
   });
 
-  it("allows access when debugScope field is missing (defaults to empty)", async () => {
+  it("rejects access when debugScope field is missing", async () => {
     state.supportTickets = {
       t1: {
         masterImei: "m1",
@@ -364,15 +363,36 @@ describe("getDebugInfo – empty debugScope", () => {
     };
     state.supportAccessGrants = {
       grant2: {
+        masterImei: "m1",
+        ticketId: "t1",
         status: "active",
-        // no debugScope field → defaults to []
         expiresAt: { seconds: Math.floor(Date.now() / 1000) + 3600, toMillis: () => Date.now() + 3600000 },
       },
     };
 
     const wrapped = testEnv.wrap(fns.getDebugInfo);
-    const res = await wrapped({ ticketId: "t1" }, asMaster);
-    expect(res.ticketId).toBe("t1");
+    await expect(wrapped({ ticketId: "t1" }, asMaster)).rejects.toHaveProperty("code", "permission-denied");
+  });
+
+  it("rejects access when grant does not belong to the ticket", async () => {
+    state.supportTickets = {
+      t1: {
+        masterImei: "m1",
+        debugAccessGrantId: "grant3",
+      },
+    };
+    state.supportAccessGrants = {
+      grant3: {
+        masterImei: "other-master",
+        ticketId: "other-ticket",
+        status: "active",
+        debugScope: ["diagnostic_logs"],
+        expiresAt: { seconds: Math.floor(Date.now() / 1000) + 3600, toMillis: () => Date.now() + 3600000 },
+      },
+    };
+
+    const wrapped = testEnv.wrap(fns.getDebugInfo);
+    await expect(wrapped({ ticketId: "t1" }, asMaster)).rejects.toHaveProperty("code", "permission-denied");
   });
 });
 

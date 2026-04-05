@@ -329,12 +329,15 @@ export const testGeminiConnection = functions.runWith({ secrets: ["GEMINI_API_KE
     }
 
     const testPrompt = data?.prompt || "Antworte kurz: Was ist MiniMaster?";
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
 
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: testPrompt }] }],
           generationConfig: { temperature: 0.7, maxOutputTokens: 500 },

@@ -470,22 +470,20 @@ describe("resetOperatorAccounts — with env config", () => {
     expect(res.matchedUsers).toBe(2);
   });
 
-  it("nich-admin Aufrufer wird gewarnt (line 329)", async () => {
+  it("nicht-admin Aufrufer wird abgewiesen", async () => {
     mockAuth.listUsers.mockReset();
     mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
     const asNonAdmin = { auth: { uid: "u1", token: { role: "support" } } };
     const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
-    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNonAdmin);
-    expect(res.success).toBe(true);
+    await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNonAdmin)).rejects.toHaveProperty("code", "permission-denied");
   });
 
-  it("callerRole Fallback bei fehlendem token.role (line 315 blk67 br1)", async () => {
+  it("callerRole Fallback bei fehlendem token.role fuehrt zu permission-denied", async () => {
     mockAuth.listUsers.mockReset();
     mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
     const asNoRole = { auth: { uid: "u-norole", token: {} } };
     const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
-    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNoRole);
-    expect(res.success).toBe(true);
+    await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNoRole)).rejects.toHaveProperty("code", "permission-denied");
   });
 
   it("confirmText Fallback bei null data (line 333 blk72 br0)", async () => {
@@ -572,14 +570,13 @@ describe("resetAllAuthUsers — with env config", () => {
     }, { auth: undefined } as any)).rejects.toThrow(/angemeldet|Recovery/i);
   });
 
-  it("callerRole Fallback bei token.role nicht-String (blk 81+ callerRole)", async () => {
+  it("callerRole Fallback bei token.role nicht-String fuehrt zu permission-denied", async () => {
     process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
     mockAuth.listUsers.mockReset();
     mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
     const asNoRole = { auth: { uid: "nr1", token: {} } };
     const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
-    const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asNoRole);
-    expect(res.success).toBe(true);
+    await expect(wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asNoRole)).rejects.toHaveProperty("code", "permission-denied");
   });
 
   it("ignoriert K_CONFIGURATION ohne Legacy-Config-Zugriff", async () => {
