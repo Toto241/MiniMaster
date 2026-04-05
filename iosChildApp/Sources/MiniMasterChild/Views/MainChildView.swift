@@ -145,7 +145,7 @@ struct MainChildView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .foregroundColor(tint)
-                .frame(width: 24, height: 24)
+                .font(.body)
             Text(label)
         }
     }

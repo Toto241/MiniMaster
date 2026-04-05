@@ -72,6 +72,13 @@ jobs:
     - name: 'Run tests'
       run: npm test
 
+    - name: 'Verify Play reviewer package is complete'
+      run: |
+        if grep -n 'TODO' docs/APP_ACCESS_REVIEWER_GUIDE.md; then
+          echo '::error::docs/APP_ACCESS_REVIEWER_GUIDE.md still contains TODO markers. Complete the Play reviewer package before production deploy.'
+          exit 1
+        fi
+
     - name: 'Authenticate to Firebase'
       uses: google-github-actions/auth@v2
       with:

@@ -206,8 +206,11 @@ struct UsageRulesView: View {
                     .keyboardType(.numbersAndPunctuation)
             }
             Section {
-                Button("Speichern") { save() }
-                    .frame(maxWidth: .infinity)
+                HStack {
+                    Spacer()
+                    Button("Speichern") { save() }
+                    Spacer()
+                }
             }
         }
         .navigationTitle("Nutzungsregeln")
