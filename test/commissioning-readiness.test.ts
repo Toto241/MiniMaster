@@ -6,7 +6,7 @@
  *
  * Covers:
  * - Cloud Project ID / KI-Runtime-Konfiguration validation
- * - Commissioning attestation tracking (9 manual QA sign-offs)
+ * - Commissioning attestation tracking (6 manual QA sign-offs)
  * - Play-Store-Readiness checks, Privacy-Policy-URL, Support-E-Mail
  * - Go-Live Ampel computation (red / yellow / green)
  * - Prioritized action plan generation
@@ -192,22 +192,19 @@ describe("Commissioning & Readiness – automated checks", () => {
   });
 
   /* -------------------------------------------------------------- */
-  /*  3) Manuelle Freigaben (9 QA evidence items)                    */
+  /*  3) Manuelle Freigaben (6 QA evidence items)                    */
   /* -------------------------------------------------------------- */
-  describe("Commissioning attestations (9 manual QA sign-offs)", () => {
-    it("lists all 9 manual attestations as missing when none are confirmed", () => {
+  describe("Commissioning attestations (6 manual QA sign-offs)", () => {
+    it("lists all 6 manual attestations as missing when none are confirmed", () => {
       const { exports } = loadTestExports();
       const missing = exports.getMissingAttestations() as string[];
-      expect(missing).toHaveLength(9);
+      expect(missing).toHaveLength(6);
       expect(missing).toContain("Firebase Authentication aktiviert");
       expect(missing).toContain("Cloud Messaging aktiviert oder bewusst nicht benötigt");
       expect(missing).toContain("Android-App com.minimaster.masterapp registriert");
       expect(missing).toContain("Android-App com.google.pairing registriert");
       expect(missing).toContain("Parent Web Panel Login geprüft");
       expect(missing).toContain("Device-Sync zwischen Parent Panel und Child geprüft");
-      expect(missing).toContain("Support-Ticket-Flow geprüft");
-      expect(missing).toContain("DSAR- und Audit-Flow geprüft");
-      expect(missing).toContain("Storage Rules aktiv und geprüft");
     });
 
     it("removes confirmed attestations from the missing list", () => {
@@ -217,21 +214,20 @@ describe("Commissioning & Readiness – automated checks", () => {
         "messaging-enabled": true,
       });
       const missing = exports.getMissingAttestations() as string[];
-      expect(missing).toHaveLength(7);
+      expect(missing).toHaveLength(4);
       expect(missing).not.toContain("Firebase Authentication aktiviert");
       expect(missing).not.toContain("Cloud Messaging aktiviert oder bewusst nicht benötigt");
       // Still missing:
       expect(missing).toContain("Android-App com.minimaster.masterapp registriert");
-      expect(missing).toContain("DSAR- und Audit-Flow geprüft");
+      expect(missing).toContain("Parent Web Panel Login geprüft");
     });
 
-    it("returns empty list when all 9 manual attestations are confirmed", () => {
+    it("returns empty list when all 6 manual attestations are confirmed", () => {
       const allKeys: Record<string, boolean> = {};
       const items = [
         "firebase-auth-enabled", "messaging-enabled", "android-master-registered", "android-child-registered",
         "parent-panel-verified",
-        "device-sync-verified", "support-flow-verified", "compliance-flow-verified",
-        "storage-rules-verified",
+        "device-sync-verified",
       ];
       items.forEach(k => { allKeys[k] = true; });
 
@@ -254,13 +250,16 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(fresh["parent-panel-verified"]).toBe(true);
     });
 
-    it("matches exactly the 9 manual items defined in commissioningAttestationItems", () => {
+    it("matches exactly the 6 manual items defined in commissioningAttestationItems", () => {
       const { exports } = loadTestExports();
       const items = exports.commissioningAttestationItems as Array<{ key: string; label: string }>;
-      expect(items).toHaveLength(9);
+      expect(items).toHaveLength(6);
       const keys = items.map((i: any) => i.key);
       expect(keys).toContain("firebase-auth-enabled");
-      expect(keys).toContain("storage-rules-verified");
+      expect(keys).toContain("device-sync-verified");
+      expect(keys).not.toContain("storage-rules-verified");
+      expect(keys).not.toContain("support-flow-verified");
+      expect(keys).not.toContain("compliance-flow-verified");
       expect(keys).not.toContain("firestore-enabled");
       expect(keys).not.toContain("service-account-ready");
     });
@@ -699,7 +698,7 @@ describe("Commissioning & Readiness – automated checks", () => {
 
       // Attestations
       missing.forEach(item => pending.push(`QA-Nachweis offen: ${item}`));
-      expect(pending.filter(p => p.startsWith("QA-Nachweis offen:"))).toHaveLength(9);
+      expect(pending.filter(p => p.startsWith("QA-Nachweis offen:"))).toHaveLength(6);
 
       // Play Store
       const openPlayChecks = Object.entries(playState.checks).filter(([, v]) => !v);
@@ -726,8 +725,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       [
         "firebase-auth-enabled", "messaging-enabled", "android-master-registered", "android-child-registered",
         "parent-panel-verified",
-        "device-sync-verified", "support-flow-verified", "compliance-flow-verified",
-        "storage-rules-verified",
+        "device-sync-verified",
       ].forEach(k => { allAttestKeys[k] = true; });
 
       const allPlayChecks = {
@@ -790,7 +788,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       const attestations = exports.getCommissioningAttestations();
       expect(attestations).toEqual({});
       const missing = exports.getMissingAttestations();
-      expect(missing).toHaveLength(9);
+      expect(missing).toHaveLength(6);
     });
 
     it("handles corrupted localStorage for play-store state gracefully", () => {
