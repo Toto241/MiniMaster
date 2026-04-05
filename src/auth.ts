@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
-import { requireAdmin, AuditLogger } from "./shared";
+import { requireAdmin, AuditLogger, checkRateLimit, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
 
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
@@ -745,6 +745,9 @@ export const generateCustomToken = functions.https.onCall(
         );
       }
 
+      validateAppCheck(context, true);
+      checkRateLimit(masterImei, "auth.generate_custom_token_legacy", 10, 15 * 60 * 1000);
+
       const masterDoc = await db().collection("masters").doc(masterImei).get();
       const storedSecretKey = masterDoc.data()?.secretKey;
       if (!masterDoc.exists || typeof storedSecretKey !== "string" || !safeSecretEquals(storedSecretKey, secretKey)) {
@@ -812,6 +815,8 @@ export const registerMasterDevice = functions.https.onCall(
     }
 
     if (!context.auth) {
+      validateAppCheck(context, true);
+      checkRateLimit(imei, "auth.register_master_device_legacy", 5, 60 * 60 * 1000);
       functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
       await logLegacyAuthUsage("registerMasterDevice", "imei_registration", imei);
     }
