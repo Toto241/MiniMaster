@@ -45,28 +45,16 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
     }
 
     private fun applyUninstallProtection(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            return
-        }
-
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
         val admin = ComponentName(context, MiniMasterDeviceAdminReceiver::class.java)
-        if (!dpm.isAdminActive(admin)) {
-            return
-        }
-
-        try {
-            val packageName = context.packageName
-            val wasBlocked = dpm.isUninstallBlocked(admin, packageName)
-            if (!wasBlocked) {
-                dpm.setUninstallBlocked(admin, packageName, true)
-                Log.i(TAG, "Uninstall protection enabled via DevicePolicyManager")
-            }
-        } catch (security: SecurityException) {
-            Log.w(TAG, "setUninstallBlocked requires device owner/profile owner; skipping", security)
-        } catch (error: Exception) {
-            Log.w(TAG, "Failed to apply uninstall protection", error)
-        }
+        UninstallProtectionPolicy.apply(
+            devicePolicyManager = dpm,
+            admin = admin,
+            packageName = context.packageName,
+            sdkInt = Build.VERSION.SDK_INT,
+            logInfo = { Log.i(TAG, it) },
+            logWarning = { message, error -> Log.w(TAG, message, error) },
+        )
     }
 
     /**
@@ -97,5 +85,41 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
             "event_type" to eventType,
             "child_id" to childId
         ))
+    }
+}
+
+internal object UninstallProtectionPolicy {
+    fun apply(
+        devicePolicyManager: DevicePolicyManager?,
+        admin: ComponentName,
+        packageName: String,
+        sdkInt: Int = Build.VERSION.SDK_INT,
+        logInfo: (String) -> Unit = {},
+        logWarning: (String, Throwable?) -> Unit = { _, _ -> },
+    ): Boolean {
+        if (sdkInt < Build.VERSION_CODES.P || devicePolicyManager == null) {
+            return false
+        }
+
+        if (!devicePolicyManager.isAdminActive(admin)) {
+            return false
+        }
+
+        return try {
+            val wasBlocked = devicePolicyManager.isUninstallBlocked(admin, packageName)
+            if (!wasBlocked) {
+                devicePolicyManager.setUninstallBlocked(admin, packageName, true)
+                logInfo("Uninstall protection enabled via DevicePolicyManager")
+                true
+            } else {
+                false
+            }
+        } catch (security: SecurityException) {
+            logWarning("setUninstallBlocked requires device owner/profile owner; skipping", security)
+            false
+        } catch (error: Exception) {
+            logWarning("Failed to apply uninstall protection", error)
+            false
+        }
     }
 }
