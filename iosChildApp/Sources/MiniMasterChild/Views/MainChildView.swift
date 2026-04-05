@@ -7,6 +7,7 @@ struct MainChildView: View {
     @EnvironmentObject private var authService: ChildAuthService
     @EnvironmentObject private var policyStore: PolicyStore
     @EnvironmentObject private var syncService: CommandSyncService
+    @EnvironmentObject private var blockingManager: AppBlockingManager
 
     @State private var tasks: [ChildTask] = []
     @State private var isLoadingTasks = false
@@ -17,6 +18,9 @@ struct MainChildView: View {
         NavigationStack {
             List {
                 statusSection
+                if let blacklistNotice = blockingManager.appBlacklistNotice {
+                    blacklistNoticeSection(blacklistNotice)
+                }
                 if !syncService.pendingCommandCount.isZero {
                     syncSection
                 }
@@ -66,6 +70,17 @@ struct MainChildView: View {
                 ProgressView()
                     .padding(.trailing, 4)
                 Text("Befehle werden angewendet…")
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private func blacklistNoticeSection(_ message: String) -> some View {
+        Section("App-Blacklist") {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text(message)
                     .foregroundColor(.secondary)
             }
         }

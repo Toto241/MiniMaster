@@ -21,6 +21,7 @@ final class AppBlockingManager: ObservableObject {
 
     @Published private(set) var isAuthorized = false
     @Published private(set) var authorizationError: Error?
+    @Published private(set) var appBlacklistNotice: String?
 
     private let store = ManagedSettingsStore()
     private let activityCenter = DeviceActivityCenter()
@@ -95,6 +96,7 @@ final class AppBlockingManager: ObservableObject {
 
     private func applyAppBlacklist(_ bundleIds: [String]) {
         guard isAuthorized, !bundleIds.isEmpty else {
+            appBlacklistNotice = nil
             store.shield.applicationCategories = nil
             return
         }
@@ -107,8 +109,7 @@ final class AppBlockingManager: ObservableObject {
         // The real implementation stores the tokens returned by FamilyActivityPicker
         // on the master device, transmits them to the backend as opaque data, and
         // the child app applies them here.
-        //
-        // Placeholder: shield no apps (safe default).
+        appBlacklistNotice = AppBlacklistEnforcement.notice(for: bundleIds)
         store.shield.applicationCategories = nil
     }
 

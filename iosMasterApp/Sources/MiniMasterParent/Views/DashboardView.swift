@@ -130,16 +130,25 @@ struct AppBlacklistView: View {
 
     var body: some View {
         List {
-            Section {
-                HStack {
-                    TextField("Bundle-ID (z.B. com.example.app)", text: $newApp)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Button("Hinzufügen") {
-                        guard !newApp.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                        apps.append(newApp.trimmingCharacters(in: .whitespaces))
-                        newApp = ""
-                        save()
+            if let unsupportedMessage = child.platform.appBlacklistUnsupportedMessage {
+                Section("Hinweis") {
+                    Text(unsupportedMessage)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            if child.platform.supportsBundleIdBlacklistEditing {
+                Section {
+                    HStack {
+                        TextField("Bundle-ID (z.B. com.example.app)", text: $newApp)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        Button("Hinzufügen") {
+                            guard !newApp.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                            apps.append(newApp.trimmingCharacters(in: .whitespaces))
+                            newApp = ""
+                            save()
+                        }
                     }
                 }
             }
@@ -148,6 +157,7 @@ struct AppBlacklistView: View {
                     Text(app)
                 }
                 .onDelete { idx in
+                    guard child.platform.supportsBundleIdBlacklistEditing else { return }
                     apps.remove(atOffsets: idx)
                     save()
                 }
