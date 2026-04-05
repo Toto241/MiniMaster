@@ -132,6 +132,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
 
   try {
     requireAdmin(context);
+    validateAppCheck(context, true);
 
     const uid = data.uid;
     if (!uid) {
@@ -229,6 +230,7 @@ export const createOperatorAccessKey = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
+    validateAppCheck(context, true);
 
     const keyHash = typeof data?.keyHash === "string" ? data.keyHash.trim().toLowerCase() : "";
     const requestedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "admin";
@@ -291,6 +293,7 @@ export const redeemOperatorAccessKey = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
+    validateAppCheck(context, true);
 
     const rawKey = typeof data?.key === "string" ? data.key.trim() : "";
     if (rawKey.length < 43) {
@@ -359,6 +362,7 @@ export const setUserRole = functions.https.onCall(
 
     try {
       requireAdmin(context);
+      validateAppCheck(context, true);
 
       const { uid, role } = data;
       if (!uid || typeof uid !== "string") {
@@ -728,6 +732,7 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
+    validateAppCheck(context, true);
 
     const requestId =
       typeof (data as { requestId?: string })?.requestId === "string" && (data as { requestId?: string }).requestId?.trim()
@@ -766,6 +771,7 @@ export const bootstrapFirstAdmin = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
+    validateAppCheck(context, true);
 
     const callerUid = context.auth.uid;
 
@@ -814,6 +820,7 @@ export const generateCustomToken = functions.https.onCall(
     let uid: string;
 
     if (context.auth) {
+      validateAppCheck(context, true);
       uid = context.auth.uid;
     } else {
       if (LEGACY_AUTH_DISABLED) {
@@ -900,8 +907,9 @@ export const registerMasterDevice = functions.https.onCall(
       );
     }
 
+    validateAppCheck(context, true);
+
     if (!context.auth) {
-      validateAppCheck(context, true);
       checkRateLimit(imei, "auth.register_master_device_legacy", 5, 60 * 60 * 1000);
       functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
       await logLegacyAuthUsage("registerMasterDevice", "imei_registration", imei);
@@ -994,6 +1002,7 @@ export const revokeUserTokens = functions.https.onCall(
     const startTime = Date.now();
     try {
       requireAdmin(context);
+      validateAppCheck(context, true);
       const targetUid = data.uid;
       if (!targetUid || typeof targetUid !== "string") {
         throw new functions.https.HttpsError("invalid-argument", "A valid user UID is required.");

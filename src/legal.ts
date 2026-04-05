@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, requireAdmin } from "./shared";
+import { requireAuth, requireAdmin, validateAppCheck } from "./shared";
 
 type PolicyType = "terms" | "privacy";
 
@@ -226,6 +226,7 @@ function buildConsentDocId(masterImei: string, country: string, locale: string):
 export const getActiveLegalPolicies = functions.https.onCall(
   async (data: { country: string; locale: string }, context: CallableContext) => {
     requireAuth(context);
+    validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
 
     const policies = await getEffectivePolicies(country, locale);
@@ -251,6 +252,7 @@ export const getActiveLegalPolicies = functions.https.onCall(
 export const needsLegalReconsent = functions.https.onCall(
   async (data: { country: string; locale: string }, context: CallableContext) => {
     const masterImei = requireAuth(context);
+    validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
 
     const policies = await getEffectivePolicies(country, locale);
@@ -317,6 +319,7 @@ export const recordLegalConsent = functions.https.onCall(
     appVersion?: string;
   }, context: CallableContext) => {
     const masterImei = requireAuth(context);
+    validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
     const { termsVersion, privacyVersion, consentSource, appVersion } = parseRecordConsentInput(data);
     if (!termsVersion || !privacyVersion) {
@@ -386,6 +389,7 @@ export const publishLegalPolicy = functions.https.onCall(
     status?: "draft" | "approved" | "active" | "retired";
   }, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
     const { policyType, country, locale, version, contentUrl, status, effectiveAt, isMajorChange } = parsePublishPolicyInput(data);
 
     if (!version) {
@@ -434,6 +438,7 @@ export const publishLegalPolicy = functions.https.onCall(
 export const markLegalReconsentRequired = functions.https.onCall(
   async (data: { country: string; locale: string; masterImei?: string }, context: CallableContext) => {
     requireAdmin(context);
+    validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
     const targetMaster = resolveTargetMaster(data?.masterImei);
 

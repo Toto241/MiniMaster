@@ -8,7 +8,7 @@ import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, AuditLogger, hasActiveAccess } from "./shared";
+import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
 
 const DEFAULT_CHILD_APP_LIMIT = 4;
 const DEFAULT_PARENT_APP_LIMIT = 2;
@@ -43,6 +43,7 @@ async function activateTrialIfPending(masterId: string, masterData: admin.firest
 export const createPairingCode = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
   const startTime = Date.now();
   const masterId = requireAuth(context);
+  validateAppCheck(context, true);
 
   const masterDoc = await db().collection("masters").doc(masterId).get();
   if (!masterDoc.exists) {
@@ -114,6 +115,7 @@ export const validatePairingCode = functions.https.onCall(async (data: { pairing
   const startTime = Date.now();
   const { pairingCode } = data;
   const childId = requireAuth(context);
+  validateAppCheck(context, true);
 
   if (!pairingCode || typeof pairingCode !== "string") {
     throw new functions.https.HttpsError("invalid-argument", "The function must be called with a 'pairingCode' string.");
@@ -235,6 +237,7 @@ export const generatePairingLink = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
+    validateAppCheck(context, true);
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
 
@@ -310,6 +313,7 @@ export const validatePairingToken = functions.https.onCall(
     const startTime = Date.now();
     const { pairingToken } = data;
     const childId = requireAuth(context);
+    validateAppCheck(context, true);
 
     if (!pairingToken || typeof pairingToken !== "string") {
       throw new functions.https.HttpsError("invalid-argument", "Request must include a valid 'pairingToken'.");
