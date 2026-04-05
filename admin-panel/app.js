@@ -3273,6 +3273,70 @@ function getPriorityWeight(severity) {
     return 50;
 }
 
+const prioritizedActionTestingRegisterMap = {
+    "playstore-dataSafety": ["p0-play-data-safety", "play-store-required-checks-complete"],
+    "playstore-appAccessGuide": ["p0-play-app-access", "doc-reviewer-test-credentials", "doc-reviewer-minimal-scenario", "doc-reviewer-submission-checklist"],
+    "attestation-compliance-flow-verified": ["compliance-flow-verified", "p0-commissioning-compliance", "doc-support-compliance-test"],
+};
+
+function getPrioritizedActionLinkedTestIds(stepId) {
+    const normalizedStepId = String(stepId || "");
+    const linkedIds = [];
+
+    if (normalizedStepId.startsWith("attestation-")) {
+        linkedIds.push(normalizedStepId.slice("attestation-".length));
+    }
+
+    if (Array.isArray(platformQaStateMapping?.[normalizedStepId])) {
+        linkedIds.push(...platformQaStateMapping[normalizedStepId]);
+    }
+
+    if (Array.isArray(prioritizedActionTestingRegisterMap?.[normalizedStepId])) {
+        linkedIds.push(...prioritizedActionTestingRegisterMap[normalizedStepId]);
+    }
+
+    return Array.from(new Set(linkedIds.filter(Boolean)));
+}
+
+function buildPrioritizedActionTestInsights(step, payload = testingRegisterPayload) {
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const itemIndex = new Map(items.map(item => [String(item?.id || ""), item]));
+    const linkedIds = getPrioritizedActionLinkedTestIds(step?.id);
+    const linkedTests = linkedIds.map(testId => {
+        const item = itemIndex.get(String(testId || ""));
+        if (!item) return null;
+
+        const rawStatus = String(item.status || "not_run");
+        return {
+            id: String(item.id || testId),
+            title: String(item.title || testId),
+            groupTitle: String(item.groupTitle || item.groupId || ""),
+            automationType: String(item.automationType || "automatic"),
+            rawStatus,
+            statusLabel: rawStatus === "pass" ? "OK" : "FAIL",
+            details: String(item.details || ""),
+        };
+    }).filter(Boolean);
+
+    let summary = "";
+    if (!linkedTests.length) {
+        summary = "Noch kein verknüpfter Testfall im QA-Register hinterlegt.";
+    } else if (linkedTests.every(test => test.rawStatus === "pass")) {
+        summary = "Bereits mit Testfall verknüpft; alle verknüpften Nachweise stehen aktuell auf OK.";
+    } else if (linkedTests.some(test => test.rawStatus === "pass")) {
+        const failCount = linkedTests.filter(test => test.rawStatus !== "pass").length;
+        summary = `${failCount} verknüpfte Nachweise stehen noch auf FAIL oder offen.`;
+    } else {
+        summary = "Testfälle vorhanden, aber aktuell noch nicht erfolgreich bewertet.";
+    }
+
+    return {
+        linkedTests,
+        summary,
+        hasLinkedTests: linkedTests.length > 0,
+    };
+}
+
 function buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, missingAttestations) {
     const validationChecks = validation?.checks || {};
     const steps = [];
@@ -3538,7 +3602,27 @@ function renderPrioritizedActionPlan() {
     }
 
     const topSteps = steps.slice(0, 12);
-    const html = topSteps.map(step => `
+    const html = topSteps.map(step => {
+        const insights = buildPrioritizedActionTestInsights(step);
+        const insightsHtml = insights.hasLinkedTests
+            ? `
+                <div class="priority-plan-tests">
+                    <p><strong>Erkenntnisse:</strong> ${escapeHtml(insights.summary)}</p>
+                    <div class="priority-plan-test-list">
+                        ${insights.linkedTests.map(test => `
+                            <div class="priority-plan-test-item">
+                                <strong>${escapeHtml(test.statusLabel)}</strong>
+                                <span>${escapeHtml(test.title)}</span>
+                                <span class="muted-note">${escapeHtml(formatPythonAutomationType(test.automationType))}${test.groupTitle ? ` · ${escapeHtml(test.groupTitle)}` : ""}</span>
+                                ${test.details ? `<div class="muted-note">${escapeHtml(test.details)}</div>` : ""}
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `
+            : `<div class="priority-plan-tests"><p><strong>Erkenntnisse:</strong> ${escapeHtml(insights.summary)}</p></div>`;
+
+        return `
         <div class="priority-plan-item priority-${escapeHtml(step.severity)}">
             <div class="priority-plan-header">
                 <span class="priority-rank">#${step.order}</span>
@@ -3548,8 +3632,10 @@ function renderPrioritizedActionPlan() {
             <div class="priority-meta">${escapeHtml(step.platform)} · ${escapeHtml(step.category)}</div>
             <p><strong>Warum jetzt:</strong> ${escapeHtml(step.why)}</p>
             <p><strong>Nächster Schritt:</strong> ${escapeHtml(step.action)}</p>
+            ${insightsHtml}
         </div>
-    `).join("");
+    `;
+    }).join("");
 
     const hiddenCount = steps.length - topSteps.length;
     const summary = hiddenCount > 0
