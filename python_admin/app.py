@@ -188,7 +188,7 @@ def infer_register_metadata(
         owner = "Product/Ops"
         severity = "critical"
         blocking_for_release = True
-    elif any(token in group_key for token in ("android", "device", "desktop", "runtime", "backend", "support", "integration", "system", "operator", "web")):
+    elif any(token in group_key for token in ("android", "ios", "device", "desktop", "runtime", "backend", "support", "integration", "system", "operator", "web")):
         owner = "Engineering"
         severity = "high"
         blocking_for_release = True
@@ -212,6 +212,8 @@ def infer_register_metadata(
         environment = "python"
     elif suite_ref.startswith("release-"):
         environment = "release"
+    elif "ios" in group_key:
+        environment = "ios"
 
     if suite_ref in {"android-connected-master", "android-connected-child", "android-usb-master", "android-usb-child", "android-e2e-shell", "android-e2e-shell-script"}:
         known_constraints = "Erfordert verbundenes Android-Geraet oder Emulator via adb."
@@ -219,6 +221,8 @@ def infer_register_metadata(
         known_constraints = "Erfordert laufenden Firestore-Emulator bzw. firebase-tools."
     elif suite_ref.startswith("python-tests-"):
         known_constraints = "Erfordert pytest in der lokalen Python-Umgebung."
+    elif "ios" in group_key:
+        known_constraints = "Echte iOS-Builds und XCTest-Laeufe erfordern macOS/Xcode; aktuell existiert keine direkte Suite-Anbindung im Python-QA-Backend."
     elif prereq_reason:
         known_constraints = prereq_reason
 
@@ -2367,6 +2371,10 @@ def repo_test_group_title(relative_path: str) -> str:
         return "Repo-Tests: Android Device MasterApp"
     if relative_path.startswith("childApp/src/androidTest/java/"):
         return "Repo-Tests: Android Device ChildApp"
+    if relative_path.startswith("iosMasterApp/Tests/"):
+        return "Repo-Tests: iOS Unit ParentApp"
+    if relative_path.startswith("iosChildApp/Tests/"):
+        return "Repo-Tests: iOS Unit ChildApp"
     if relative_path.startswith("scripts/tests/"):
         return "Repo-Tests: Python QA-Infrastruktur"
     return "Repo-Tests: Unsupported / Not Yet Mapped"
@@ -2379,12 +2387,23 @@ def repo_test_description(relative_path: str) -> str:
         return "Automatischer Android-Instrumentation-/Device-Test aus der Codebasis."
     if "/src/test/" in relative_path:
         return "Automatischer Android-Unit-Test aus der Codebasis."
+    if relative_path.startswith("iosMasterApp/Tests/") or relative_path.startswith("iosChildApp/Tests/"):
+        return "Automatischer iOS-XCTest aus der Codebasis; aktuell ohne direkte Suite-Anbindung im Python-QA-Backend."
     return "Automatischer Repo-Test aus der Codebasis."
 
 
 def iter_repo_test_inventory_paths() -> list[Path]:
     discovered: list[Path] = []
-    for pattern in ("test/**/*.test.ts", "masterApp/src/test/java/**/*.kt", "childApp/src/test/java/**/*.kt", "masterApp/src/androidTest/java/**/*Test.kt", "childApp/src/androidTest/java/**/*Test.kt", "scripts/tests/test_*.py"):
+    for pattern in (
+        "test/**/*.test.ts",
+        "masterApp/src/test/java/**/*.kt",
+        "childApp/src/test/java/**/*.kt",
+        "masterApp/src/androidTest/java/**/*Test.kt",
+        "childApp/src/androidTest/java/**/*Test.kt",
+        "iosMasterApp/Tests/**/*.swift",
+        "iosChildApp/Tests/**/*.swift",
+        "scripts/tests/test_*.py",
+    ):
         for path in REPO_ROOT.glob(pattern):
             if path.is_file():
                 discovered.append(path)

@@ -57,4 +57,12 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
   - liefert die letzten protokollierten Nachweise (neueste zuerst)
   - enthaelt zusaetzlich `latestByTestId`, damit die UI pro Testfall den letzten Nachweisstatus direkt darstellen kann
 
+## QA-Register-Semantik
+
+- `blockingForRelease` markiert Eintraege, die fachlich fuer einen Go-Live relevant sind.
+- `staleEvidence` wird fuer manuelle oder dokumentierte Checks gesetzt, wenn der letzte Nachweis aelter als das definierte Stale-Fenster ist.
+- In der Operator-Sicht gilt ein Release-Blocker nur dann als sauber geschlossen, wenn ein aktueller PASS vorliegt. Ein veralteter PASS-Nachweis wird daher weiter als offener Handlungsbedarf behandelt.
+- `Unsupported / Not Yet Mapped` kennzeichnet inventarisierte Repo-Tests ohne Zuordnung zu einer direkt ausfuehrbaren Suite. Diese Eintraege sind bewusst sichtbar, um Automationsluecken nicht zu verdecken.
+- Dazu gehoeren aktuell auch iOS-XCTest-Dateien aus `iosMasterApp/Tests` und `iosChildApp/Tests`, solange keine macOS-/Xcode-Suite im Python-QA-Backend hinterlegt ist.
+
 Timeout fuer Kommandoausfuehrungen kann mit `MINIMASTER_COMMAND_TIMEOUT_SEC` konfiguriert werden (Standard: `1800` Sekunden).
