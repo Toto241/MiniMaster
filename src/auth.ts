@@ -335,6 +335,10 @@ export const resetOperatorAccounts = functions.https.onCall(
         uid: context.auth.uid,
         role: callerRole || "none",
       });
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Admin privileges required for operator account reset."
+      );
     }
 
     const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
@@ -456,6 +460,13 @@ export const resetAllAuthUsers = functions.https.onCall(
       throw new functions.https.HttpsError(
         "unauthenticated",
         "Sie müssen angemeldet sein oder einen gültigen Recovery-Token angeben."
+      );
+    }
+
+    if (!recoveryTokenAllowed && callerRole !== "admin") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Admin privileges or a valid recovery token are required for all-user reset."
       );
     }
 

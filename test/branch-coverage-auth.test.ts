@@ -343,11 +343,10 @@ describe("resetOperatorAccounts — branch coverage", () => {
     }
   });
 
-  it("loggt Warnung bei non-admin Caller (line 364)", async () => {
-    // non-admin user calls with reset enabled
+  it("weist non-admin Caller ab (line 364)", async () => {
     const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
-    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asSupport);
-    expect(res.success).toBe(true);
+    await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asSupport))
+      .rejects.toHaveProperty("code", "permission-denied");
   });
 
   it("behandelt accessKey-Cleanup-Fehler (line 397)", async () => {
@@ -748,13 +747,13 @@ describe("resetOperatorAccounts — happy path with env config & operators", () 
     expect(res.failedUsers).toContain("op-fail");
   });
 
-  it("nicht-admin Aufrufer wird gewarnt (line 329)", async () => {
+  it("nicht-admin Aufrufer wird abgewiesen (line 329)", async () => {
     mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
 
     const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
     const asNonAdmin = { auth: { uid: "user-1", token: { role: "support" } } };
-    const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNonAdmin);
-    expect(res.success).toBe(true);
+    await expect(wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asNonAdmin))
+      .rejects.toHaveProperty("code", "permission-denied");
   });
 });
 

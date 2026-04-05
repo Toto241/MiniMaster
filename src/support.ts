@@ -1141,8 +1141,12 @@ export const getDebugInfo = functions.https.onCall(
     }
 
     const grant = grantDoc.data() || {};
-    const debugScope = Array.isArray(grant.debugScope) ? grant.debugScope : [];
-    if (debugScope.length > 0 && !debugScope.includes("diagnostic_logs")) {
+    if (String(grant.ticketId || "") !== ticketId || String(grant.masterImei || "") !== String(ticketData.masterImei || "")) {
+      throw new functions.https.HttpsError("permission-denied", "Debug access grant does not belong to this ticket.");
+    }
+
+    const debugScope = Array.isArray(grant.debugScope) ? grant.debugScope : null;
+    if (!debugScope || !debugScope.includes("diagnostic_logs")) {
       throw new functions.https.HttpsError(
         "permission-denied",
         "Debug scope does not allow diagnostic data access."
