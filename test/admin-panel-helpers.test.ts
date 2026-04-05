@@ -151,6 +151,8 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildCommandCatalog,",
     "  buildRolloutBundleScript,",
     "  buildPrioritizedActionPlanFromData,",
+    "  getPrioritizedActionLinkedTestIds,",
+    "  buildPrioritizedActionTestInsights,",
     "  getP0BlockCompletion,",
     "  getP0BlockerCockpitState,",
     "  setP0BlockerCockpitState,",
@@ -1283,6 +1285,58 @@ describe("admin-panel helper functions", () => {
     expect(plan.some((s: any) => s.id === "playstore-dataSafety")).toBe(true);
     expect(plan.some((s: any) => s.id === "playstore-privacy-url-value")).toBe(true);
     expect(plan.some((s: any) => s.id === "playstore-support-email-value")).toBe(true);
+  });
+
+  it("verknüpft Play-Store-Schritte mit vorhandenen QA-Nachweisen", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.getPrioritizedActionLinkedTestIds("playstore-appAccessGuide")).toEqual([
+      "p0-play-app-access",
+      "doc-reviewer-test-credentials",
+      "doc-reviewer-minimal-scenario",
+      "doc-reviewer-submission-checklist",
+    ]);
+  });
+
+  it("leitet OK und FAIL aus verknüpften Testing-Register-Einträgen ab", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const insights = exports.buildPrioritizedActionTestInsights(
+      { id: "playstore-appAccessGuide" },
+      {
+        items: [
+          {
+            id: "p0-play-app-access",
+            title: "Play Console App-Zugang",
+            groupTitle: "Play Store",
+            automationType: "manual",
+            status: "pass",
+            details: "Reviewer-Zugang dokumentiert",
+          },
+          {
+            id: "doc-reviewer-test-credentials",
+            title: "Reviewer Testkonto",
+            groupTitle: "Reviewer Guide",
+            automationType: "manual",
+            status: "fail",
+            details: "Zugangsdaten fehlen",
+          },
+        ],
+      },
+    );
+
+    expect(insights.hasLinkedTests).toBe(true);
+    expect(insights.linkedTests).toHaveLength(2);
+    expect(insights.linkedTests[0].statusLabel).toBe("OK");
+    expect(insights.linkedTests[1].statusLabel).toBe("FAIL");
+    expect(insights.summary).toContain("FAIL");
+  });
+
+  it("kennzeichnet fehlende QA-Verknüpfungen eindeutig", () => {
+    const { exports } = loadAdminPanelTestExports();
+    const insights = exports.buildPrioritizedActionTestInsights({ id: "unmapped-step" }, { items: [] });
+
+    expect(insights.hasLinkedTests).toBe(false);
+    expect(insights.summary).toContain("Noch kein verknüpfter Testfall");
   });
 
   // ── getP0BlockCompletion ──

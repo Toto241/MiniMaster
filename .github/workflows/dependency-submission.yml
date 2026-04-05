@@ -10,6 +10,9 @@ on:
       - 'gradle/**'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   submit-dependencies:
     runs-on: ubuntu-latest
@@ -22,15 +25,84 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate Gradle Wrapper
-        uses: gradle/gradle-build-action@v3
-        with:
-          validate-wrapper: true
+        uses: gradle/actions/wrapper-validation@v3
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare Firebase placeholder configs
+        run: |
+          cat > masterApp/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-ci",
+              "storage_bucket": "placeholder-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:placeholdermaster",
+                  "android_client_info": {
+                    "package_name": "com.minimaster.masterapp"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          cat > childApp/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-ci",
+              "storage_bucket": "placeholder-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:placeholderchild",
+                  "android_client_info": {
+                    "package_name": "com.google.pairing"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
       - name: Test network access to Google Maven
         id: network-test
@@ -46,11 +118,7 @@ jobs:
 
       - name: Dependency Submission
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        uses: gradle/gradle-build-action@v3
-        with:
-          dependency-submission: true
-          # Projekt im Repository-Root, daher working-directory: .
-          working-directory: .
+        uses: gradle/actions/dependency-submission@v4
 
       - name: Skip dependency submission (Network Restricted)
         if: steps.network-test.outputs.google-maven-accessible == 'false'
