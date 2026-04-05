@@ -82,6 +82,7 @@ export const completeTask = functions.https.onCall(
   async (data: { taskId: string; photoUrl: string }, context: CallableContext) => {
     const startTime = Date.now();
     const childId = requireAuth(context);
+    validateAppCheck(context, true);
     const { taskId, photoUrl } = data;
 
     if (!taskId || !photoUrl) {

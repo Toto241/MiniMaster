@@ -101,7 +101,7 @@ jobs:
       - name: Android test (instrumentation)
         run: echo "Instrumentation tests are typically run on emulator; configure matrix if needed."
       - name: Jacoco report
-        run: ./scripts/run-android-checks.sh jacocoTestReport || echo "Jacoco not configured, skipping coverage"
+        run: ./scripts/run-android-checks.sh jacocoTestReport
       - name: Upload reports
         uses: actions/upload-artifact@v4
         with:

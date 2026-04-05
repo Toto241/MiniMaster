@@ -104,26 +104,15 @@ jobs:
           }
           EOF
 
-      - name: Test network access to Google Maven
-        id: network-test
+      - name: Require Google Maven access
         run: |
           if curl -f --connect-timeout 10 \
             https://dl.google.com/dl/android/maven2/ > /dev/null 2>&1; then
-            echo "google-maven-accessible=true" >> $GITHUB_OUTPUT
             echo "✓ Google Maven repository is accessible"
           else
-            echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Google Maven repository (dl.google.com) not accessible"
+            echo "::error::Google Maven repository (dl.google.com) is not accessible from this runner"
+            exit 1
           fi
 
       - name: Dependency Submission
-        if: steps.network-test.outputs.google-maven-accessible == 'true'
         uses: gradle/actions/dependency-submission@v4
-
-      - name: Skip dependency submission (Network Restricted)
-        if: steps.network-test.outputs.google-maven-accessible == 'false'
-        run: |
-          echo "::warning::Gradle dependency submission skipped"
-          echo "::notice::dl.google.com not accessible from CI environment"
-          echo "::notice::Known limitation - works with full network access"
-          echo "::notice::Backend validation completed successfully"
