@@ -260,6 +260,43 @@ class TestBuildTestingRegister:
         assert checks["firebase-project-bound"]["status"] == "pass"
         assert checks["service-account-ready"]["status"] == "pass"
 
+    def test_missing_service_account_is_reported_as_manual_required(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_local_firebase_binding_status", lambda project_id: (True, f"bound:{project_id or 'default'}"))
+        monkeypatch.setattr(app, "load_local_service_account_status", lambda: (False, "serviceAccountKey.json fehlt lokal; Setup-Admin-Lauf wird deshalb uebersprungen."))
+
+        result = app.evaluate_commissioning_context(
+            {
+                "runtimeConfig": {
+                    "cloud": {
+                        "projectId": "minimaster-28fbd",
+                        "appCheckMode": "enforced",
+                    },
+                    "ai": {
+                        "provider": "gemini",
+                        "model": "gemini-3.0-flash",
+                        "keyRef": "projects/demo/secrets/key",
+                        "systemPrompt": "Assist.",
+                    },
+                },
+                "validationSummary": {
+                    "errorCount": 0,
+                    "checks": {
+                        "firestoreAccessOk": True,
+                        "storageHealthOk": True,
+                        "functionsReachable": True,
+                    },
+                },
+                "attestations": {},
+                "playStoreState": {"checks": {}},
+            }
+        )
+
+        checks = {item["id"]: item for item in result["checks"]}
+        assert checks["service-account-ready"]["status"] == "manual_required"
+        assert "uebersprungen" in checks["service-account-ready"]["details"]
+
 
 class TestRunCommand:
     def test_uses_utf8_replace_for_subprocess_output(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

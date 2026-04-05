@@ -941,8 +941,13 @@
 
                             <div class="setup-actions" style="margin-block-start: 12px">
                                 <button onclick="loadOperatorConfig()" class="btn btn-secondary" title="Aktuelle Betreiber-Konfiguration aus Firestore laden">Konfiguration laden</button>
+                                <button onclick="applyBootstrapProjectIdToRuntime()" class="btn btn-secondary" title="Firebase-Projekt-ID aus der Bootstrap-Konfiguration in den Runtime-Block übernehmen">Bootstrap-Projekt übernehmen</button>
+                                <button onclick="applyGeminiRuntimeTemplate()" class="btn btn-secondary" title="Gemini-Defaults und Secret-Referenz-Vorlage für die Runtime-Konfiguration einsetzen">Gemini-Vorlage einsetzen</button>
                                 <button onclick="saveOperatorConfig()" class="btn btn-primary" title="Änderungen an der Betreiber-Konfiguration in Firestore speichern">Konfiguration speichern</button>
                                 <button onclick="testAiConfiguration()" class="btn btn-secondary" title="Verbindung zum KI-Anbieter mit den aktuellen Einstellungen testen">Test KI-Konfiguration</button>
+                            </div>
+                            <div id="operator-config-guidance" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Runtime-Hinweise werden geladen.</div>
                             </div>
                             <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
                                 <div class="info">Noch keine Konfiguration geladen.</div>
@@ -1055,6 +1060,8 @@
                                 <select id="testing-register-type-filter" title="Testregister nach Testart filtern">
                                     <option value="all">Alle Tests</option>
                                     <option value="open">Nur offene Punkte</option>
+                                    <option value="evidenceOpen">Nur offene Nachweise</option>
+                                    <option value="playStoreBlocking">Nur Play-Store-/Reviewer-Blocker</option>
                                     <option value="critical">Nur kritische Punkte</option>
                                     <option value="blocking">Nur Release-Blocker</option>
                                     <option value="stale">Nur veraltete Nachweise</option>
@@ -1862,7 +1869,7 @@
                 </div>
 
                 <!-- Section 3: Richtlinie veröffentlichen (Admin only) -->
-                <div class="compliance-section admin-only" style="margin-block-end: 30px">
+                <div id="playstore-readiness-card" class="compliance-section admin-only" style="margin-block-end: 30px">
                     <h3>Richtlinie veröffentlichen</h3>
                     <p>Erstellt oder aktualisiert eine AGB- oder Datenschutz-Richtlinie für ein bestimmtes Land/Locale.</p>
                     <div class="dsar-form" style="flex-direction: column; gap: 10px; align-items: stretch">

@@ -1642,6 +1642,7 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
             service_account_ok,
             service_account_detail,
             source="workspace",
+            manual_if_failed=True,
         )
     )
 

@@ -15,7 +15,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
   const createMockElement = (tag: string) => {
@@ -163,6 +163,10 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  getLatestPythonAutomationEvidence,",
     "  findPythonAutomationTestById,",
     "  setPythonAutomationEvidenceCache,",
+    "  isOpenTestingRegisterStatus,",
+    "  isPlayStoreTestingRegisterItem,",
+    "  buildOperatorConfigGuidance,",
+    "  buildPythonAutomationRunActionSummary,",
     "  getTestingRegisterStatusPriority,",
     "  getTestingRegisterSeverityPriority,",
     "  setSetupValidationResultsForTests: (results) => { setupValidationResults = results; },",
@@ -791,6 +795,79 @@ describe("admin-panel helper functions", () => {
     const { exports } = loadAdminPanelTestExports();
 
     expect(exports.buildPythonAutomationRunClipboardPayload(null)).toBe("");
+  });
+
+  it("klassifiziert offene Statuswerte und Play-Store-QA-Eintraege", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.isOpenTestingRegisterStatus("fail")).toBe(true);
+    expect(exports.isOpenTestingRegisterStatus("manual_required")).toBe(true);
+    expect(exports.isOpenTestingRegisterStatus("not_run")).toBe(true);
+    expect(exports.isOpenTestingRegisterStatus("pass")).toBe(false);
+
+    expect(exports.isPlayStoreTestingRegisterItem({
+      id: "doc-reviewer-test-credentials",
+      title: "Reviewer Testkonto",
+      groupTitle: "Play Store",
+    })).toBe(true);
+    expect(exports.isPlayStoreTestingRegisterItem({
+      id: "support-flow-verified",
+      title: "Support Flow",
+      groupTitle: "Support",
+    })).toBe(false);
+  });
+
+  it("baut Runtime-Guidance fuer fehlende Projekt- und KI-Werte", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const guidance = exports.buildOperatorConfigGuidance(
+      {
+        cloud: { projectId: "", region: "europe-west1", appCheckMode: "enforced", releaseChannel: "prod" },
+        ai: { provider: "gemini", model: "", temperature: 0.3, endpoint: "", keyRef: "", systemPrompt: "" },
+      },
+      {
+        apiKey: "AIzaSyTest",
+        authDomain: "demo.firebaseapp.com",
+        projectId: "demo-project",
+        storageBucket: "demo.appspot.com",
+        messagingSenderId: "123456",
+        appId: "1:123:web:abc",
+      },
+    );
+
+    expect(guidance.isReady).toBe(false);
+    expect(guidance.bootstrapProjectId).toBe("demo-project");
+    expect(guidance.items.some((item: any) => item.id === "cloud-project-id" && item.severity === "warn")).toBe(true);
+    expect(guidance.items.some((item: any) => item.id === "ai-runtime-config" && item.detail.includes("model, keyRef, systemPrompt"))).toBe(true);
+  });
+
+  it("leitet naechste Operator-Aktionen aus Python-Run, Evidence und Play-Store-Backlog ab", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const summary = exports.buildPythonAutomationRunActionSummary(
+      {
+        evaluation: {
+          checks: [
+            { id: "cloud-project-id", title: "Cloud Project ID gesetzt", status: "fail" },
+            { id: "ai-runtime-config", title: "AI Runtime vollstaendig", status: "manual_required" },
+          ],
+        },
+        evidenceCoverage: {
+          counts: { uncovered: 2, failed: 1 },
+        },
+      },
+      {
+        items: [
+          { id: "doc-reviewer-test-credentials", title: "Reviewer Testkonto", groupTitle: "Play Store", status: "fail" },
+          { id: "support-flow-verified", title: "Support Flow", groupTitle: "Support", status: "pass" },
+        ],
+      },
+    );
+
+    expect(summary.map((item: any) => item.id)).toEqual(["runtime", "evidence", "playstore"]);
+    expect(summary[0].detail).toContain("Cloud Project ID gesetzt");
+    expect(summary[1].detail).toContain("3");
+    expect(summary[2].detail).toContain("1 QA-Einträge");
   });
 
   // ── buildFirebaseRecoveryCommands / buildFirebaseRecoveryScript ──
