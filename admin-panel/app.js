@@ -7500,6 +7500,7 @@ async function loadUsers(direction) {
             const email = data.email || "N/A";
             const subStatus = data.subscription ? data.subscription.status : "none";
             const subClass = subStatus === "active" ? "status-active" : subStatus === "expired" ? "status-expired" : "";
+            const encodedMasterId = encodeInlineArgument(doc.id);
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
@@ -7507,7 +7508,7 @@ async function loadUsers(direction) {
                 <td><span class="${subClass}">${escapeHtml(subStatus)}</span></td>
                 <td>${created}</td>
                 <td>
-                    <button onclick="viewUserDetails('${escapeHtml(doc.id)}')" class="btn btn-secondary btn-sm">View</button>
+                    <button onclick="viewUserDetails(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-secondary btn-sm">View</button>
                 </td>
             </tr>`;
         });
@@ -7558,13 +7559,14 @@ function searchUsers() {
             const created = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
             const email = data.email || "N/A";
             const subStatus = data.subscription ? data.subscription.status : "none";
+            const encodedMasterId = encodeInlineArgument(result.id);
 
             html += `<tr>
-                <td title="${result.id}">${result.id.substring(0, 12)}...</td>
-                <td>${email}</td>
-                <td>${subStatus}</td>
+                <td title="${escapeHtml(result.id)}">${escapeHtml(result.id.substring(0, 12))}...</td>
+                <td>${escapeHtml(email)}</td>
+                <td>${escapeHtml(subStatus)}</td>
                 <td>${created}</td>
-                <td><button onclick="viewUserDetails('${result.id}')" class="btn btn-secondary btn-sm">View</button></td>
+                <td><button onclick="viewUserDetails(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-secondary btn-sm">View</button></td>
             </tr>`;
         });
         html += "</table>";
@@ -7646,23 +7648,25 @@ async function viewUserDetails(masterId) {
                 const lastSeen = childData.lastSeen ? new Date(childData.lastSeen.seconds * 1000) : null;
                 const lastSeenStr = lastSeen ? lastSeen.toLocaleString() : "N/A";
                 const onlineStatus = getOnlineStatus(lastSeen);
+                const encodedChildId = encodeInlineArgument(childDoc.id);
                 html += `<tr>
                     <td>${escapeHtml(childDoc.id)}</td>
                     <td>${childData.isLocked ? "🔒 Yes" : "🔓 No"}</td>
                     <td>${lastSeenStr}</td>
                     <td>${onlineStatus}</td>
-                    <td><button onclick="viewDeviceDetails('${childDoc.id}')" class="btn btn-secondary btn-sm">Details</button></td>
+                    <td><button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button></td>
                 </tr>`;
             });
             html += "</table>";
         }
 
         // Actions
+        const encodedMasterId = encodeInlineArgument(masterId);
         html += `<h4>Actions</h4>`;
         html += `<div class="ticket-actions">`;
-        html += `<button onclick="triggerDsarExportForUser('${masterId}')" class="btn btn-primary">Export User Data (DSAR)</button>`;
-        html += `<button onclick="revokeUserSubscription('${masterId}')" class="btn btn-danger">Revoke Subscription</button>`;
-        html += `<button onclick="revokeUserTokens('${masterId}')" class="btn btn-danger">Revoke Tokens (Force Re-Auth)</button>`;
+        html += `<button onclick="triggerDsarExportForUser(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-primary">Export User Data (DSAR)</button>`;
+        html += `<button onclick="revokeUserSubscription(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-danger">Revoke Subscription</button>`;
+        html += `<button onclick="revokeUserTokens(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-danger">Revoke Tokens (Force Re-Auth)</button>`;
         html += `</div>`;
 
         modalContent.innerHTML = html;
@@ -7737,6 +7741,7 @@ async function loadSubscriptions(direction) {
             const started = sub.startedAt ? new Date(sub.startedAt.seconds * 1000).toLocaleDateString() : "N/A";
             const expires = sub.expiresAt ? new Date(sub.expiresAt.seconds * 1000).toLocaleDateString() : "N/A";
             const statusClass = sub.status === "active" ? "status-active" : "status-expired";
+            const encodedMasterId = encodeInlineArgument(doc.id);
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
@@ -7745,7 +7750,7 @@ async function loadSubscriptions(direction) {
                 <td>${started}</td>
                 <td>${expires}</td>
                 <td>
-                    ${sub.status === "active" ? `<button onclick="revokeUserSubscription('${escapeHtml(doc.id)}')" class="btn btn-danger btn-sm">Revoke</button>` : ""}
+                    ${sub.status === "active" ? `<button onclick="revokeUserSubscription(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-danger btn-sm">Revoke</button>` : ""}
                 </td>
             </tr>`;
         });
@@ -7818,18 +7823,19 @@ async function loadSupportTickets(direction) {
             const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
             const statusClass = getStatusClass(ticket.status);
             const aiConfidence = ticket.aiConfidenceScore ? (ticket.aiConfidenceScore * 100).toFixed(0) + "%" : "N/A";
+            const encodedTicketId = encodeInlineArgument(doc.id);
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 8))}...</td>
                 <td title="${escapeHtml(ticket.masterImei || '')}">${escapeHtml((ticket.masterImei || "").substring(0, 10))}...</td>
-                <td><span class="${statusClass}">${ticket.status}</span></td>
+                <td><span class="${statusClass}">${escapeHtml(ticket.status)}</span></td>
                 <td>${aiConfidence}</td>
                 <td>${createdAt}</td>
                 <td>${ticket.accessGranted ? "Granted" : "No"}</td>
                 <td>
-                    <button onclick="viewTicketDetails('${doc.id}')" class="btn btn-secondary btn-sm">View</button>
+                    <button onclick="viewTicketDetails(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-secondary btn-sm">View</button>
                     ${ticket.status !== "closed" ?
-                        `<button onclick="updateTicketStatus('${doc.id}', 'closed')" class="btn btn-danger btn-sm">Close</button>` : ""}
+                        `<button onclick="updateTicketStatus(decodeInlineArgument('${encodedTicketId}'), 'closed')" class="btn btn-danger btn-sm">Close</button>` : ""}
                 </td>
             </tr>`;
         });
@@ -7877,12 +7883,14 @@ async function viewTicketDetails(ticketId) {
         const ticket = doc.data();
         const createdAt = ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleString() : "N/A";
         const updatedAt = ticket.updatedAt ? new Date(ticket.updatedAt.seconds * 1000).toLocaleString() : "N/A";
+        const encodedTicketId = encodeInlineArgument(ticketId);
+        const encodedMasterId = encodeInlineArgument(ticket.masterImei || "");
 
         let html = `<h3>Ticket Details</h3>`;
         html += `<div class="ticket-detail-grid">`;
-        html += `<p><strong>Ticket ID:</strong> ${ticketId}</p>`;
-        html += `<p><strong>Master IMEI:</strong> ${ticket.masterImei}</p>`;
-        html += `<p><strong>Status:</strong> <span class="${getStatusClass(ticket.status)}">${ticket.status}</span></p>`;
+        html += `<p><strong>Ticket ID:</strong> ${escapeHtml(ticketId)}</p>`;
+        html += `<p><strong>Master IMEI:</strong> ${escapeHtml(ticket.masterImei || "N/A")}</p>`;
+        html += `<p><strong>Status:</strong> <span class="${getStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></p>`;
         html += `<p><strong>Created:</strong> ${createdAt}</p>`;
         html += `<p><strong>Updated:</strong> ${updatedAt}</p>`;
         html += `<p><strong>Access Granted:</strong> ${ticket.accessGranted ? "Yes" : "No"}</p>`;
@@ -7898,22 +7906,22 @@ async function viewTicketDetails(ticketId) {
 
         // Admin response section
         html += `<h4>Admin Response</h4>`;
-        html += `<textarea id="admin-response-text" rows="4" style="inline-size: 100%; margin-block-end: 10px;" placeholder="Enter admin response...">${ticket.adminResponse || ""}</textarea>`;
+        html += `<textarea id="admin-response-text" rows="4" style="inline-size: 100%; margin-block-end: 10px;" placeholder="Enter admin response...">${escapeHtmlText(ticket.adminResponse || "")}</textarea>`;
 
         // Action buttons
         html += `<div class="ticket-actions">`;
-        html += `<button onclick="saveAdminResponse('${ticketId}')" class="btn btn-primary">Save Response</button>`;
+        html += `<button onclick="saveAdminResponse(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-primary">Save Response</button>`;
 
         if (ticket.status !== "closed") {
-            html += `<button onclick="updateTicketStatus('${ticketId}', 'in_progress'); closeTicketDetailsModal();" class="btn btn-secondary">Mark In Progress</button>`;
-            html += `<button onclick="updateTicketStatus('${ticketId}', 'closed'); closeTicketDetailsModal();" class="btn btn-danger">Close Ticket</button>`;
+            html += `<button onclick="updateTicketStatus(decodeInlineArgument('${encodedTicketId}'), 'in_progress'); closeTicketDetailsModal();" class="btn btn-secondary">Mark In Progress</button>`;
+            html += `<button onclick="updateTicketStatus(decodeInlineArgument('${encodedTicketId}'), 'closed'); closeTicketDetailsModal();" class="btn btn-danger">Close Ticket</button>`;
         }
 
         if (ticket.accessGranted) {
             if (currentUserRole === "admin") {
-                html += `<button onclick="viewUserDetails('${ticket.masterImei}')" class="btn btn-primary">View User Data (Admin)</button>`;
+                html += `<button onclick="viewUserDetails(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-primary">View User Data (Admin)</button>`;
             } else {
-                html += `<button onclick="viewTicketUserData('${ticketId}')" class="btn btn-primary">View User Data (Grant)</button>`;
+                html += `<button onclick="viewTicketUserData(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-primary">View User Data (Grant)</button>`;
             }
         }
         html += `</div>`;
@@ -7964,7 +7972,8 @@ async function viewTicketUserData(ticketId) {
         if (children.length > 0) {
             html += "<table><tr><th>Child ID</th><th>Locked</th><th>Last Seen</th></tr>";
             children.forEach(child => {
-                const lastSeen = child.lastSeen ? new Date(child.lastSeen._seconds * 1000).toLocaleString() : "N/A";
+                const lastSeenDate = toDateSafe(child.lastSeen);
+                const lastSeen = lastSeenDate ? lastSeenDate.toLocaleString() : "N/A";
                 html += `<tr>
                     <td>${escapeHtml(child.id)}</td>
                     <td>${child.isLocked ? "🔒" : "🔓"}</td>
@@ -8033,51 +8042,25 @@ async function triggerDsarExportForUser(masterId) {
     resultEl.innerHTML = "<div class='loading'>Exporting user data...</div>";
 
     try {
-        // Collect all data for the user
-        const masterDoc = await db.collection("masters").doc(masterId).get();
-        if (!masterDoc.exists) {
-            resultEl.innerHTML = "<div class='error'>User not found.</div>";
-            return;
+        const exportFunc = functions.httpsCallable("exportUserData");
+        const result = await exportFunc({ masterId });
+        const exportData = result?.data?.data;
+
+        if (!exportData || typeof exportData !== "object") {
+            throw new Error("Ungültige Export-Antwort vom Backend.");
         }
-
-        const exportData = {
-            exportedAt: new Date().toISOString(),
-            masterId: masterId,
-            masterProfile: masterDoc.data()
-        };
-
-        // Children
-        const childrenSnap = await db.collection("children").where("masterImei", "==", masterId).get();
-        exportData.children = [];
-        for (const childDoc of childrenSnap.docs) {
-            const childData = { id: childDoc.id, ...childDoc.data() };
-            const tasksSnap = await childDoc.ref.collection("tasks").get();
-            childData.tasks = tasksSnap.docs.map(t => ({ id: t.id, ...t.data() }));
-            const usageSnap = await childDoc.ref.collection("usageHistory").get();
-            childData.usageHistory = usageSnap.docs.map(u => ({ id: u.id, ...u.data() }));
-            exportData.children.push(childData);
-        }
-
-        // Support tickets
-        const ticketsSnap = await db.collection("supportTickets").where("masterImei", "==", masterId).get();
-        exportData.supportTickets = ticketsSnap.docs.map(t => ({ id: t.id, ...t.data() }));
-
-        // Audit logs
-        const auditSnap = await db.collection("audit_logs")
-            .where("userId", "==", masterId)
-            .orderBy("timestamp", "desc")
-            .limit(500)
-            .get();
-        exportData.auditLogs = auditSnap.docs.map(a => ({ id: a.id, ...a.data() }));
 
         // Create downloadable JSON
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
+        const childCount = Array.isArray(exportData.children) ? exportData.children.length : 0;
+        const ticketCount = Array.isArray(exportData.supportTickets) ? exportData.supportTickets.length : 0;
+        const auditCount = Array.isArray(exportData.auditLogs) ? exportData.auditLogs.length : 0;
 
         resultEl.innerHTML = `
             <div class="success-box">
                 <p>Data export completed successfully.</p>
-                <p><strong>Records:</strong> ${exportData.children.length} children, ${exportData.supportTickets.length} tickets, ${exportData.auditLogs.length} audit logs</p>
+                <p><strong>Records:</strong> ${childCount} children, ${ticketCount} tickets, ${auditCount} audit logs</p>
                 <a href="${url}" download="dsar_export_${masterId}_${Date.now()}.json" class="btn btn-primary">Download JSON Export</a>
             </div>
         `;
@@ -8253,6 +8236,7 @@ async function loadDevices(direction) {
             const onlineStatus = getOnlineStatus(lastSeen);
             const blacklistCount = Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0;
             const hasFcm = d.fcmToken ? "✅" : "❌";
+            const encodedChildId = encodeInlineArgument(doc.id);
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 16))}${doc.id.length > 16 ? "..." : ""}</td>
@@ -8262,7 +8246,7 @@ async function loadDevices(direction) {
                 <td>${lastSeen ? lastSeen.toLocaleString() : "N/A"}</td>
                 <td>${onlineStatus}</td>
                 <td>${hasFcm}</td>
-                <td><button onclick="viewDeviceDetails('${doc.id}')" class="btn btn-secondary btn-sm">Details</button></td>
+                <td><button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button></td>
             </tr>`;
         });
         html += "</table>";
@@ -8309,6 +8293,7 @@ function searchDevices() {
             const lastSeen = d.lastSeen ? new Date(d.lastSeen.seconds * 1000) : null;
             const onlineStatus = getOnlineStatus(lastSeen);
             const blacklistCount = Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0;
+            const encodedChildId = encodeInlineArgument(r.id);
             html += `<tr>
                 <td>${escapeHtml(r.id)}</td>
                 <td>${escapeHtml((d.masterImei || "").substring(0, 12))}...</td>
@@ -8316,7 +8301,7 @@ function searchDevices() {
                 <td>${blacklistCount} Apps</td>
                 <td>${lastSeen ? lastSeen.toLocaleString() : "N/A"}</td>
                 <td>${onlineStatus}</td>
-                <td><button onclick="viewDeviceDetails('${r.id}')" class="btn btn-secondary btn-sm">Details</button></td>
+                <td><button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button></td>
             </tr>`;
         });
         html += "</table>";
@@ -8414,7 +8399,7 @@ async function viewDeviceDetails(childId) {
         // Link to Master
         html += `<h4>Actions</h4>`;
         html += `<div class="ticket-actions">`;
-        html += `<button onclick="viewUserDetails('${escapeHtml(d.masterImei || "")}')" class="btn btn-primary">Master anzeigen</button>`;
+        html += `<button onclick="viewUserDetails(decodeInlineArgument('${encodeInlineArgument(d.masterImei || "")}'))" class="btn btn-primary">Master anzeigen</button>`;
         html += `</div>`;
 
         content.innerHTML = html;
@@ -8795,6 +8780,44 @@ function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML.replace(/\n/g, "<br>");
+}
+
+function escapeHtmlText(text) {
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
+}
+
+function encodeInlineArgument(value) {
+    return encodeURIComponent(value == null ? "" : String(value)).replace(/'/g, "%27");
+}
+
+function decodeInlineArgument(value) {
+    try {
+        return decodeURIComponent(value == null ? "" : String(value));
+    } catch (_error) {
+        return value == null ? "" : String(value);
+    }
+}
+
+function toDateSafe(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") return value.toDate();
+    if (typeof value === "string" || typeof value === "number") {
+        const directDate = new Date(value);
+        return Number.isNaN(directDate.getTime()) ? null : directDate;
+    }
+
+    const seconds = typeof value.seconds === "number"
+        ? value.seconds
+        : (typeof value._seconds === "number" ? value._seconds : null);
+    if (seconds == null) return null;
+
+    const nanoseconds = typeof value.nanoseconds === "number"
+        ? value.nanoseconds
+        : (typeof value._nanoseconds === "number" ? value._nanoseconds : 0);
+    return new Date((seconds * 1000) + Math.floor(nanoseconds / 1_000_000));
 }
 
 // ==================== ROLE MANAGEMENT (Admin only) ====================
