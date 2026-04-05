@@ -107,6 +107,7 @@ dependencies {
     testImplementation 'androidx.arch.core:core-testing:2.2.0'
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0'
     testImplementation 'com.google.android.gms:play-services-tasks:18.2.0'
+    testImplementation 'org.json:json:20240303'
 
     // Hilt - Updated for security
     implementation "com.google.dagger:hilt-android:2.51.1"

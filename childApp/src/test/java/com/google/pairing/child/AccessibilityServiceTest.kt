@@ -1,66 +1,104 @@
 package com.google.pairing.child
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Unit tests for AccessibilityService related functionality
- */
 class AccessibilityServiceTest {
 
     @Test
-    fun `blocked apps parsing should handle comma separated values`() {
-        // Given
-        val blockedAppsString = "com.app1,com.app2,com.app3"
+    fun `blocked apps parsing should normalize comma separated values`() {
+        val blockedAppsSet = ChildProtectionPolicy.parseBlockedApps("com.app1, com.app2 ,,com.app3 ")
 
-        // When
-        val blockedAppsSet = blockedAppsString.split(",").toSet()
-
-        // Then
-        assertEquals("Should have 3 blocked apps", 3, blockedAppsSet.size)
-        assertTrue("Should contain com.app1", blockedAppsSet.contains("com.app1"))
-        assertTrue("Should contain com.app2", blockedAppsSet.contains("com.app2"))
-        assertTrue("Should contain com.app3", blockedAppsSet.contains("com.app3"))
+        assertEquals(setOf("com.app1", "com.app2", "com.app3"), blockedAppsSet)
     }
 
     @Test
-    fun `empty blocked apps string should result in empty set`() {
-        // Given
-        val blockedAppsString = ""
+    fun `blocked apps parsing should handle JSON array payloads`() {
+        val blockedAppsSet = ChildProtectionPolicy.parseBlockedApps("[\"com.app1\", \" com.app2 \", \"\"]")
 
-        // When
-        val blockedAppsSet = if (blockedAppsString.isNotEmpty()) {
-            blockedAppsString.split(",").toSet()
-        } else {
-            emptySet()
-        }
-
-        // Then
-        assertEquals("Empty string should result in empty set", 0, blockedAppsSet.size)
+        assertEquals(setOf("com.app1", "com.app2"), blockedAppsSet)
     }
 
     @Test
-    fun `system apps should be filtered out correctly`() {
-        // Given
-        val testPackages = listOf(
-            "com.android.settings",
-            "com.android.systemui",
-            "com.google.pairing.child",
-            "com.example.userapp",
-            "com.facebook.katana"
+    fun `usage rules parsing should convert limits and allowed hours`() {
+        val parsedRules = ChildProtectionPolicy.parseUsageRules(
+            """
+            {
+              "dailyLimitSeconds": 1800,
+              "appLimits": {"com.game": 600, "com.video": 1200},
+              "allowedHours": {"start": "08:15", "end": "20:45"}
+            }
+            """.trimIndent()
         )
 
-        // When - Filter system apps and our own app
-        val userApps = testPackages.filter { packageName ->
-            !packageName.startsWith("com.android") &&
-            packageName != "com.google.pairing.child"
-        }
-
-        // Then
-        assertEquals("Should have 2 user apps", 2, userApps.size)
-        assertTrue("Should contain user app", userApps.contains("com.example.userapp"))
-        assertTrue("Should contain Facebook", userApps.contains("com.facebook.katana"))
+        assertEquals(1_800_000L, parsedRules.dailyLimitMillis)
+        assertEquals(600_000L, parsedRules.perAppLimitsMillis["com.game"])
+        assertEquals(1_200_000L, parsedRules.perAppLimitsMillis["com.video"])
+        assertEquals(495, parsedRules.allowedStartMinutes)
+        assertEquals(1245, parsedRules.allowedEndMinutes)
     }
 
+    @Test
+    fun `usage blocking should trigger for global limit on managed app`() {
+        val shouldBlock = ChildProtectionPolicy.shouldBlockForUsage(
+            packageName = "com.example.userapp",
+            ownPackageName = "com.google.pairing",
+            dailyLimitMillis = 1_000L,
+            currentDayUsageMillis = 1_001L,
+            perAppLimitsMillis = emptyMap(),
+            perAppUsageMillis = emptyMap(),
+        )
+
+        assertTrue(shouldBlock)
+    }
+
+    @Test
+    fun `usage blocking should ignore system and own apps`() {
+        assertFalse(
+            ChildProtectionPolicy.shouldBlockForUsage(
+                packageName = "com.android.settings",
+                ownPackageName = "com.google.pairing",
+                dailyLimitMillis = 1_000L,
+                currentDayUsageMillis = 5_000L,
+                perAppLimitsMillis = emptyMap(),
+                perAppUsageMillis = emptyMap(),
+            )
+        )
+
+        assertFalse(
+            ChildProtectionPolicy.shouldBlockForUsage(
+                packageName = "com.google.pairing",
+                ownPackageName = "com.google.pairing",
+                dailyLimitMillis = 1_000L,
+                currentDayUsageMillis = 5_000L,
+                perAppLimitsMillis = emptyMap(),
+                perAppUsageMillis = emptyMap(),
+            )
+        )
+    }
+
+    @Test
+    fun `usage blocking should trigger for per app limit`() {
+        val shouldBlock = ChildProtectionPolicy.shouldBlockForUsage(
+            packageName = "com.example.game",
+            ownPackageName = "com.google.pairing",
+            dailyLimitMillis = -1L,
+            currentDayUsageMillis = 0L,
+            perAppLimitsMillis = mapOf("com.example.game" to 300_000L),
+            perAppUsageMillis = mapOf("com.example.game" to 300_001L),
+        )
+
+        assertTrue(shouldBlock)
+    }
+
+    @Test
+    fun `allowed window should support daytime and overnight ranges`() {
+        assertFalse(ChildProtectionPolicy.isOutsideAllowedWindow(9 * 60, 8 * 60, 20 * 60))
+        assertTrue(ChildProtectionPolicy.isOutsideAllowedWindow(21 * 60, 8 * 60, 20 * 60))
+        assertFalse(ChildProtectionPolicy.isOutsideAllowedWindow(23 * 60, 22 * 60, 7 * 60))
+        assertFalse(ChildProtectionPolicy.isOutsideAllowedWindow(6 * 60, 22 * 60, 7 * 60))
+        assertTrue(ChildProtectionPolicy.isOutsideAllowedWindow(12 * 60, 22 * 60, 7 * 60))
+    }
 }

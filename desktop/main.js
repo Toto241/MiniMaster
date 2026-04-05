@@ -14,20 +14,95 @@ const ALLOWED_COMMANDS = [
 // Laufende Prozesse pro commandId
 const runningProcesses = new Map();
 
+const WINDOWS_EXECUTABLE_MAP = {
+  firebase: "firebase.cmd",
+  npm: "npm.cmd",
+  npx: "npx.cmd",
+  node: "node.exe",
+  adb: "adb.exe",
+};
+
+function splitCommandLines(command) {
+  return String(command || "")
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+}
+
+function tokenizeCommandLine(line) {
+  const tokens = [];
+  const pattern = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+  let match;
+
+  while ((match = pattern.exec(line)) !== null) {
+    tokens.push(match[1] ?? match[2] ?? match[3]);
+  }
+
+  return tokens;
+}
+
+function normalizeCommandName(command) {
+  return String(command || "").replace(/\.bat$|\.cmd$|\.exe$/i, "").toLowerCase();
+}
+
+function hasRejectedControlTokens(tokens) {
+  return tokens.some(token => /^(?:&&|\|\||[;|<>]|>>)$/.test(token));
+}
+
+function resolveExecutable(command) {
+  const normalized = normalizeCommandName(command);
+  if (process.platform === "win32") {
+    return WINDOWS_EXECUTABLE_MAP[normalized] || command;
+  }
+  return normalized;
+}
+
 function isCommandAllowed(command) {
-  const trimmed = command.trim();
-  // Erlaube mehrzeilige Befehle (z.B. "npm install\nnpm test") –
-  // jede Zeile muss mit einem erlaubten Programm beginnen.
-  const lines = trimmed.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const lines = splitCommandLines(command);
   return lines.every(line => {
-    const first = line.split(/\s/)[0].replace(/\.bat$|\.cmd$|\.exe$/i, "");
-    return ALLOWED_COMMANDS.includes(first.toLowerCase());
+    const tokens = tokenizeCommandLine(line);
+    if (tokens.length === 0 || hasRejectedControlTokens(tokens.slice(1))) {
+      return false;
+    }
+    return ALLOWED_COMMANDS.includes(normalizeCommandName(tokens[0]));
   });
 }
 
 function sanitizeArg(value) {
   // Entfernt Shell-Metazeichen aus einzelnen Argumenten
   return String(value).replace(/[;&|`$(){}[\]!<>]/g, "");
+}
+
+async function runCommandSequence(lines, cwd, onOutput, onProcess) {
+  let lastCode = 0;
+  for (const line of lines) {
+    const tokens = tokenizeCommandLine(line);
+    if (tokens.length === 0) {
+      continue;
+    }
+
+    lastCode = await new Promise((resolve, reject) => {
+      const [command, ...args] = tokens;
+      const proc = spawn(resolveExecutable(command), args, {
+        cwd,
+        shell: false,
+        windowsHide: true,
+        env: { ...process.env },
+      });
+
+      onProcess(proc);
+      proc.stdout.on("data", (data) => onOutput("stdout", data.toString()));
+      proc.stderr.on("data", (data) => onOutput("stderr", data.toString()));
+      proc.on("error", reject);
+      proc.on("close", (code) => resolve(code ?? 0));
+    });
+
+    if (lastCode !== 0) {
+      break;
+    }
+  }
+
+  return lastCode;
 }
 
 // ── IPC: CLI ausführen ─────────────────────────────────────────────────
@@ -45,45 +120,44 @@ ipcMain.handle("run-cli", (event, rawCommand, rawCwd) => {
 
     const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     let output = "";
+    const lines = splitCommandLines(command);
+    const processState = {
+      proc: null,
+      kill() {
+        if (this.proc) {
+          this.proc.kill("SIGTERM");
+        }
+      },
+    };
 
-    // Mehrzeilige Befehle als Einzel-Skript über Shell ausführen
-    const proc = spawn(command, {
+    runningProcesses.set(commandId, processState);
+
+    runCommandSequence(
+      lines,
       cwd,
-      shell: true,
-      windowsHide: true,
-      env: { ...process.env },
-    });
-
-    runningProcesses.set(commandId, proc);
-
-    proc.stdout.on("data", (data) => {
-      const text = data.toString();
-      output += text;
-      event.sender.send("cli-output", { stream: "stdout", data: text, commandId });
-    });
-
-    proc.stderr.on("data", (data) => {
-      const text = data.toString();
-      output += text;
-      event.sender.send("cli-output", { stream: "stderr", data: text, commandId });
-    });
-
-    proc.on("error", (err) => {
-      runningProcesses.delete(commandId);
-      reject(new Error(`Prozess-Fehler: ${err.message}`));
-    });
-
-    proc.on("close", (code) => {
-      runningProcesses.delete(commandId);
-      resolve({ code, output, commandId });
-    });
+      (stream, text) => {
+        output += text;
+        event.sender.send("cli-output", { stream, data: text, commandId });
+      },
+      (proc) => {
+        processState.proc = proc;
+      },
+    )
+      .then((code) => {
+        runningProcesses.delete(commandId);
+        resolve({ code, output, commandId });
+      })
+      .catch((err) => {
+        runningProcesses.delete(commandId);
+        reject(new Error(`Prozess-Fehler: ${err.message}`));
+      });
   });
 });
 
 ipcMain.handle("abort-cli", (_event, commandId) => {
-  const proc = runningProcesses.get(commandId);
-  if (proc) {
-    proc.kill("SIGTERM");
+  const processState = runningProcesses.get(commandId);
+  if (processState) {
+    processState.kill();
     runningProcesses.delete(commandId);
     return true;
   }
@@ -145,31 +219,48 @@ function createOperatorWindow() {
 // Startmodus: --operator öffnet direkt das Operator Dashboard
 const isOperatorMode = process.argv.includes("--operator");
 
-app.whenReady().then(() => {
-  if (isOperatorMode) {
-    createOperatorWindow();
-  } else {
-    createParentWindow();
-  }
+function startDesktopApp() {
+  app.whenReady().then(() => {
+    if (isOperatorMode) {
+      createOperatorWindow();
+    } else {
+      createParentWindow();
+    }
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      if (isOperatorMode) {
-        createOperatorWindow();
-      } else {
-        createParentWindow();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        if (isOperatorMode) {
+          createOperatorWindow();
+        } else {
+          createParentWindow();
+        }
       }
+    });
+  });
+
+  app.on("window-all-closed", () => {
+    for (const [id, processState] of runningProcesses) {
+      processState.kill();
+      runningProcesses.delete(id);
+    }
+    if (process.platform !== "darwin") {
+      app.quit();
     }
   });
-});
+}
 
-app.on("window-all-closed", () => {
-  // Alle laufenden CLI-Prozesse beenden
-  for (const [id, proc] of runningProcesses) {
-    proc.kill("SIGTERM");
-    runningProcesses.delete(id);
-  }
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+if (require.main === module) {
+  startDesktopApp();
+}
+
+module.exports = {
+  ALLOWED_COMMANDS,
+  splitCommandLines,
+  tokenizeCommandLine,
+  isCommandAllowed,
+  sanitizeArg,
+  normalizeCommandName,
+  hasRejectedControlTokens,
+  resolveExecutable,
+  startDesktopApp,
+};
