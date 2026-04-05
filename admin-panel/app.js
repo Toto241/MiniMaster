@@ -1050,6 +1050,7 @@ function renderPythonAutomationResult(run) {
     const evCounts = evCov.counts || {};
     const evOverall = evCov.overall || "pass";
     const evScore = typeof evCov.coverageScore === "number" ? evCov.coverageScore : 100;
+    const actionSummary = buildPythonAutomationRunActionSummary(run);
     const evUncoveredRows = Array.isArray(evCov.uncovered) && evCov.uncovered.length > 0
         ? evCov.uncovered.map(item => `
             <tr>
@@ -1112,6 +1113,23 @@ function renderPythonAutomationResult(run) {
         ` : ""}
     ` : "";
 
+    const actionSummaryHtml = actionSummary.length > 0
+        ? `
+            <h5 style='margin-block-start: 10px'>Nächste Operator-Aktionen</h5>
+            <div class='data-list'>
+                ${actionSummary.map(item => `
+                    <div class='python-clarity-box' style='margin-block-end: 8px'>
+                        <strong>${escapeHtml(item.title || "Aktion")}</strong><br />
+                        ${escapeHtml(item.detail || "")}
+                        <div class='setup-actions' style='margin-block-start: 8px'>
+                            <button class='btn btn-secondary btn-sm' onclick="${item.action || ""}">${escapeHtml(item.buttonLabel || "Öffnen")}</button>
+                        </div>
+                    </div>
+                `).join("")}
+            </div>
+        `
+        : "";
+
     resultEl.innerHTML = `
         <div class='${run.overall === "pass" ? "success-box" : run.overall === "manual_required" ? "warning-box" : "error"}'>
             <strong>Gesamtstatus:</strong> ${escapeHtml(formatPythonAutomationStatus(run.overall))}<br />
@@ -1137,6 +1155,8 @@ function renderPythonAutomationResult(run) {
                 <span>Kommandos Pass/Fail</span>
             </div>
         </div>
+
+        ${actionSummaryHtml}
 
         <h5 style='margin-block-start: 10px'>Automatisierte Bewertung</h5>
         ${shouldShowOnlyOpenAutomationChecks() ? "<p class='python-muted-caption'>Aktiver Filter: Es werden nur offene oder fehlgeschlagene Checks angezeigt.</p>" : ""}
@@ -1620,6 +1640,128 @@ async function copyLatestPythonAutomationRunToClipboard() {
     } catch (error) {
         showNotification("Testergebnisse konnten nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
     }
+}
+
+function isOpenTestingRegisterStatus(status) {
+    return ["fail", "manual_required", "not_run"].includes(String(status || "not_run"));
+}
+
+function isPlayStoreTestingRegisterItem(item) {
+    const tokens = [
+        String(item?.id || ""),
+        String(item?.groupId || ""),
+        String(item?.groupTitle || ""),
+        String(item?.title || ""),
+        String(item?.details || ""),
+    ].join(" ").toLowerCase();
+    return ["playstore", "play-store", "reviewer", "data safety", "privacy policy", "iarc", "store listing", "app access"].some(token => tokens.includes(token));
+}
+
+function getDashboardTabButton(labelFragment) {
+    return Array.from(document.querySelectorAll(".nav-tab")).find(button => String(button.textContent || "").includes(labelFragment));
+}
+
+function openDashboardTab(tabName, labelFragment) {
+    const button = getDashboardTabButton(labelFragment);
+    switchTab(tabName, button ? { target: button } : null);
+}
+
+function focusDashboardElement(elementId) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    if (typeof element.scrollIntoView === "function") {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    if (typeof element.focus === "function") {
+        element.focus();
+    }
+}
+
+function openRuntimeSetupView() {
+    openDashboardTab("setup", "Einrichtung");
+    focusDashboardElement("cfg-cloud-project-id");
+}
+
+function openQaEvidenceBacklogView() {
+    openDashboardTab("qa", "Qualitätssicherung");
+    const typeEl = document.getElementById("testing-register-type-filter");
+    if (typeEl) typeEl.value = "evidenceOpen";
+    const sortEl = document.getElementById("testing-register-sort");
+    if (sortEl) sortEl.value = "severity";
+    const searchEl = document.getElementById("testing-register-search");
+    if (searchEl) searchEl.value = "";
+    if (testingRegisterPayload) {
+        rerenderTestingRegisterFromCache();
+    } else if (isPythonOperator) {
+        loadTestingRegister();
+    }
+}
+
+function openQaPlayStoreBlockersView() {
+    openDashboardTab("qa", "Qualitätssicherung");
+    const typeEl = document.getElementById("testing-register-type-filter");
+    if (typeEl) typeEl.value = "playStoreBlocking";
+    const sortEl = document.getElementById("testing-register-sort");
+    if (sortEl) sortEl.value = "severity";
+    const searchEl = document.getElementById("testing-register-search");
+    if (searchEl) searchEl.value = "";
+    if (testingRegisterPayload) {
+        rerenderTestingRegisterFromCache();
+    } else if (isPythonOperator) {
+        loadTestingRegister();
+    }
+}
+
+function openPlayStoreReadinessView() {
+    openDashboardTab("legal", "Recht");
+    focusDashboardElement("playstore-readiness-card");
+}
+
+function buildPythonAutomationRunActionSummary(run = pythonCommissioningLastRun, payload = testingRegisterPayload) {
+    if (!run) return [];
+
+    const checks = Array.isArray(run?.evaluation?.checks) ? run.evaluation.checks : [];
+    const openCheckIds = new Set(checks.filter(item => String(item?.status || "") !== "pass").map(item => String(item?.id || "")));
+    const actions = [];
+
+    if (["cloud-project-id", "ai-runtime-config", "app-check-mode"].some(id => openCheckIds.has(id))) {
+        const missingLabels = checks
+            .filter(item => openCheckIds.has(String(item?.id || "")) && ["cloud-project-id", "ai-runtime-config", "app-check-mode"].includes(String(item?.id || "")))
+            .map(item => String(item?.title || item?.id || ""));
+        actions.push({
+            id: "runtime",
+            title: "Runtime-Konfiguration nachziehen",
+            detail: `Im Python-Lauf sind noch Runtime-Punkte offen: ${missingLabels.join(", ")}.`,
+            buttonLabel: "Zum Setup-Tab",
+            action: "openRuntimeSetupView()",
+        });
+    }
+
+    const evidenceCounts = run?.evidenceCoverage?.counts || {};
+    const openEvidenceCount = Number(evidenceCounts.uncovered || 0) + Number(evidenceCounts.failed || 0);
+    if (openEvidenceCount > 0) {
+        actions.push({
+            id: "evidence",
+            title: "Offene Nachweise schließen",
+            detail: `${openEvidenceCount} manuelle oder dokumentierte Nachweise fehlen oder stehen auf FAIL.`,
+            buttonLabel: "Evidence-Backlog filtern",
+            action: "openQaEvidenceBacklogView()",
+        });
+    }
+
+    const registerItems = Array.isArray(payload?.items) ? payload.items : [];
+    const playStoreBlockers = registerItems.filter(item => isPlayStoreTestingRegisterItem(item) && isOpenTestingRegisterStatus(item?.status));
+    if (playStoreBlockers.length > 0) {
+        actions.push({
+            id: "playstore",
+            title: "Play-Store- und Reviewer-Blocker bearbeiten",
+            detail: `${playStoreBlockers.length} QA-Einträge zu Play Store oder Reviewer-Guide sind noch offen.`,
+            buttonLabel: "Play-Store-Blocker im QA-Register",
+            action: "openQaPlayStoreBlockersView()",
+        });
+    }
+
+    return actions;
 }
 
 function getTestingRegisterFilters() {
@@ -2150,6 +2292,8 @@ function renderTestingRegisterList(payload) {
         const automationType = String(item.automationType || "automatic");
         const entryKind = String(item.entryKind || "commissioning");
         const severity = String(item.severity || "");
+        const hasOpenEvidence = Boolean(item.evidenceRequired) && (status === "manual_required" || status === "fail" || item.staleEvidence || !item.hasSuccessfulRun);
+        const playStoreItem = isPlayStoreTestingRegisterItem(item);
         const haystack = [
             String(item.id || ""),
             String(item.title || ""),
@@ -2164,6 +2308,12 @@ function renderTestingRegisterList(payload) {
         ].join(" ").toLowerCase();
 
         if (filters.type === "open" && !(status === "fail" || status === "manual_required" || status === "not_run")) {
+            return false;
+        }
+        if (filters.type === "evidenceOpen" && !hasOpenEvidence) {
+            return false;
+        }
+        if (filters.type === "playStoreBlocking" && !(playStoreItem && (isOpenTestingRegisterStatus(status) || item.blockingForRelease))) {
             return false;
         }
         if (filters.type === "critical" && severity !== "critical") {
@@ -5667,6 +5817,25 @@ document.addEventListener("DOMContentLoaded", async function() {
         testingRegisterSortEl.addEventListener("change", rerenderTestingRegisterFromCache);
     }
 
+    [
+        "cfg-cloud-project-id",
+        "cfg-cloud-region",
+        "cfg-cloud-appcheck",
+        "cfg-cloud-release-channel",
+        "cfg-ai-provider",
+        "cfg-ai-model",
+        "cfg-ai-temperature",
+        "cfg-ai-endpoint",
+        "cfg-ai-key-ref",
+        "cfg-ai-system-prompt",
+    ].forEach(id => {
+        const element = document.getElementById(id);
+        if (!element || element.__operatorGuidanceBound) return;
+        element.addEventListener("input", () => renderOperatorConfigGuidance());
+        element.addEventListener("change", () => renderOperatorConfigGuidance());
+        element.__operatorGuidanceBound = true;
+    });
+
     const suiteGroupFilterEl = document.getElementById("suite-group-filter");
     if (suiteGroupFilterEl) {
         suiteGroupFilterEl.addEventListener("change", () => loadSuiteCatalog());
@@ -7158,6 +7327,7 @@ function initializeSetupAssistant() {
     renderAiConsentStatus();
     renderBootstrapFirebaseConfig(firebaseConfig);
     renderCommandBuilderConfig(loadCommandBuilderConfig());
+    renderOperatorConfigGuidance();
     loadOperatorConfig();
     refreshCommissioningReport();
     renderCommandCatalog(firebaseConfig.projectId);
@@ -7226,6 +7396,140 @@ function getOperatorConfigFormValues() {
     };
 }
 
+function buildOperatorConfigGuidance(config = getOperatorConfigFormValues(), bootstrapConfig = firebaseConfig) {
+    const normalizedBootstrap = normalizeBootstrapFirebaseConfig(bootstrapConfig) || {};
+    const runtimeProjectId = String(config?.cloud?.projectId || "").trim();
+    const bootstrapProjectId = String(normalizedBootstrap?.projectId || "").trim();
+    const aiProvider = String(config?.ai?.provider || "").trim();
+    const aiModel = String(config?.ai?.model || "").trim();
+    const aiKeyRef = String(config?.ai?.keyRef || "").trim();
+    const aiPrompt = String(config?.ai?.systemPrompt || "").trim();
+    const items = [];
+
+    if (!runtimeProjectId) {
+        items.push({
+            id: "cloud-project-id",
+            severity: "warn",
+            title: "Cloud Project ID pflegen",
+            detail: bootstrapProjectId
+                ? `Runtime-Feld ist leer. Mit \"Bootstrap-Projekt übernehmen\" kann ${bootstrapProjectId} direkt übernommen werden.`
+                : "Runtime-Feld ist leer. Trage die produktive Firebase-Projekt-ID bewusst ein.",
+        });
+    } else if (bootstrapProjectId && runtimeProjectId !== bootstrapProjectId) {
+        items.push({
+            id: "cloud-project-id",
+            severity: "warn",
+            title: "Project-ID-Abweichung prüfen",
+            detail: `Runtime nutzt ${runtimeProjectId}, Bootstrap liefert ${bootstrapProjectId}. Diese Abweichung sollte bewusst dokumentiert sein.`,
+        });
+    } else {
+        items.push({
+            id: "cloud-project-id",
+            severity: "ok",
+            title: "Cloud Project ID konsistent",
+            detail: runtimeProjectId ? `Runtime und Bootstrap zeigen auf ${runtimeProjectId}.` : "Project ID wird separat gepflegt.",
+        });
+    }
+
+    const missingAiFields = [
+        !aiProvider ? "provider" : "",
+        !aiModel ? "model" : "",
+        !aiKeyRef ? "keyRef" : "",
+        !aiPrompt ? "systemPrompt" : "",
+    ].filter(Boolean);
+
+    if (missingAiFields.length > 0) {
+        items.push({
+            id: "ai-runtime-config",
+            severity: "warn",
+            title: "KI-Runtime vervollständigen",
+            detail: `Es fehlen: ${missingAiFields.join(", ")}. Die Schaltfläche \"Gemini-Vorlage einsetzen\" ergänzt die Standardwerte schneller und konsistenter.`,
+        });
+    } else {
+        items.push({
+            id: "ai-runtime-config",
+            severity: "ok",
+            title: "KI-Runtime vollständig",
+            detail: `${aiProvider}/${aiModel} ist vollständig hinterlegt; Secret-Referenz und System-Prompt sind gesetzt.`,
+        });
+    }
+
+    if (aiProvider.toLowerCase() === "gemini" && aiKeyRef && runtimeProjectId && !aiKeyRef.includes(runtimeProjectId)) {
+        items.push({
+            id: "ai-keyref-project-mismatch",
+            severity: "warn",
+            title: "Gemini-Secret-Referenz prüfen",
+            detail: `keyRef verweist nicht sichtbar auf das Runtime-Projekt ${runtimeProjectId}. Prüfe Secret-Region und Projektbezug vor dem Go-Live.`,
+        });
+    }
+
+    return {
+        isReady: items.every(item => item.severity === "ok"),
+        projectId: runtimeProjectId,
+        bootstrapProjectId,
+        aiProvider,
+        items,
+    };
+}
+
+function renderOperatorConfigGuidance(config = getOperatorConfigFormValues(), bootstrapConfig = firebaseConfig) {
+    const container = document.getElementById("operator-config-guidance");
+    if (!container) return;
+
+    const guidance = buildOperatorConfigGuidance(config, bootstrapConfig);
+    const itemsHtml = guidance.items.map(item => {
+        const cssClass = item.severity === "ok" ? "success-box" : item.severity === "warn" ? "info" : "error";
+        return `<div class='${cssClass}' style='margin-block-start: 8px'><strong>${escapeHtml(item.title || "Hinweis")}</strong><br />${escapeHtml(item.detail || "")}</div>`;
+    }).join("");
+
+    container.innerHTML = `
+        <div class='python-clarity-box'>
+            <strong>Pflegehilfe für Runtime & KI</strong><br />
+            Runtime Project ID: ${escapeHtml(guidance.projectId || "nicht gesetzt")}<br />
+            Bootstrap Project ID: ${escapeHtml(guidance.bootstrapProjectId || "nicht erkannt")}<br />
+            KI-Provider: ${escapeHtml(guidance.aiProvider || "nicht gesetzt")}
+        </div>
+        ${itemsHtml}
+    `;
+}
+
+function applyBootstrapProjectIdToRuntime() {
+    const normalizedBootstrap = normalizeBootstrapFirebaseConfig(firebaseConfig);
+    const projectId = String(normalizedBootstrap?.projectId || "").trim();
+    if (!projectId) {
+        showNotification("In der Bootstrap-Konfiguration wurde keine Projekt-ID gefunden.", "info");
+        renderOperatorConfigGuidance();
+        return;
+    }
+
+    const input = document.getElementById("cfg-cloud-project-id");
+    if (input) input.value = projectId;
+    renderOperatorConfigGuidance();
+    showNotification(`Bootstrap-Projekt ${projectId} in den Runtime-Block übernommen.`, "success");
+}
+
+function applyGeminiRuntimeTemplate() {
+    const normalizedBootstrap = normalizeBootstrapFirebaseConfig(firebaseConfig) || {};
+    const runtimeProjectId = (document.getElementById("cfg-cloud-project-id")?.value || "").trim() || String(normalizedBootstrap.projectId || "").trim();
+    const recommendedKeyRef = runtimeProjectId
+        ? `projects/${runtimeProjectId}/secrets/gemini-api-key/versions/latest`
+        : "projects/<project-id>/secrets/gemini-api-key/versions/latest";
+
+    const providerEl = document.getElementById("cfg-ai-provider");
+    if (providerEl) providerEl.value = defaultOperatorConfig.ai.provider;
+    const modelEl = document.getElementById("cfg-ai-model");
+    if (modelEl) modelEl.value = defaultOperatorConfig.ai.model;
+    const temperatureEl = document.getElementById("cfg-ai-temperature");
+    if (temperatureEl) temperatureEl.value = String(defaultOperatorConfig.ai.temperature);
+    const keyRefEl = document.getElementById("cfg-ai-key-ref");
+    if (keyRefEl && !String(keyRefEl.value || "").trim()) keyRefEl.value = recommendedKeyRef;
+    const promptEl = document.getElementById("cfg-ai-system-prompt");
+    if (promptEl && !String(promptEl.value || "").trim()) promptEl.value = defaultOperatorConfig.ai.systemPrompt;
+
+    renderOperatorConfigGuidance();
+    showNotification("Gemini-Defaults in die Runtime-Konfiguration eingesetzt.", "success");
+}
+
 function renderOperatorConfig(config, loadedAt) {
     const merged = {
         cloud: { ...defaultOperatorConfig.cloud, ...(config?.cloud || {}) },
@@ -7248,6 +7552,8 @@ function renderOperatorConfig(config, loadedAt) {
     if (status) {
         status.innerHTML = `<div class='info'>Konfiguration geladen (${loadedAt ? new Date(loadedAt).toLocaleString() : "lokale Defaults"}).</div>`;
     }
+
+    renderOperatorConfigGuidance(merged);
 }
 
 async function loadOperatorConfig() {

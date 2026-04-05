@@ -1,5 +1,9 @@
 /// <reference types="jest" />
 
+import { createRequire } from "module";
+
+const loadDesktopModule = createRequire(__filename);
+
 jest.mock("electron", () => ({
   app: {
     whenReady: jest.fn(() => Promise.resolve()),
@@ -12,7 +16,7 @@ jest.mock("electron", () => ({
 }));
 
 describe("Desktop CLI security helpers", () => {
-  const loadModule = () => require("../desktop/main.js") as Record<string, any>;
+  const loadModule = () => loadDesktopModule("../desktop/main.js") as Record<string, any>;
 
   beforeEach(() => {
     jest.resetModules();
@@ -40,7 +44,7 @@ describe("Desktop CLI security helpers", () => {
   it("tokenizes quoted arguments without keeping quote characters", () => {
     const desktopMain = loadModule();
 
-    expect(desktopMain.tokenizeCommandLine('firebase deploy --only "functions,firestore"')).toEqual([
+    expect(desktopMain.tokenizeCommandLine("firebase deploy --only \"functions,firestore\"")).toEqual([
       "firebase",
       "deploy",
       "--only",

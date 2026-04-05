@@ -1,6 +1,9 @@
 import * as fs from "fs";
+import { createRequire } from "module";
 import * as os from "os";
 import * as path from "path";
+
+const loadModule = createRequire(__filename);
 
 jest.mock("firebase-admin", () => ({
   apps: [],
@@ -51,7 +54,7 @@ describe("run-security-tests env resolution", () => {
     delete process.env.SECURITY_TEST_FUNCTIONS_DEPLOYED;
     delete process.env.SECURITY_TEST_SERVICE_ACCOUNT;
 
-    const runner = require(path.join(scriptsDir, "run-security-tests.js"));
+    const runner = loadModule(path.join(scriptsDir, "run-security-tests.js"));
     const options = runner.parseArgs(["--mode", "ci"]);
 
     expect(options.adminEmail).toBe("admin@example.com");
@@ -81,7 +84,7 @@ describe("run-security-tests env resolution", () => {
     process.env.SECURITY_TEST_UNAUTHORIZED_ACCESS_FAILED = "true";
     process.env.SECURITY_TEST_FUNCTIONS_DEPLOYED = "true";
 
-    const runner = require(path.join(scriptsDir, "run-security-tests.js"));
+    const runner = loadModule(path.join(scriptsDir, "run-security-tests.js"));
     const options = runner.parseArgs(["--mode", "ci"]);
 
     expect(options.adminEmail).toBe("env@example.com");
@@ -110,7 +113,7 @@ describe("run-security-tests env resolution", () => {
     );
 
     process.chdir(tempRoot);
-    const runner = require(path.join(scriptsDir, "run-security-tests.js"));
+    const runner = loadModule(path.join(scriptsDir, "run-security-tests.js"));
     const options = runner.parseArgs(["--mode", "ci"]);
     const status = runner.resolveServiceAccountStatus(options.serviceAccountPath);
 
@@ -140,7 +143,7 @@ describe("run-security-tests env resolution", () => {
     );
 
     process.chdir(tempRoot);
-    const runner = require(path.join(scriptsDir, "run-security-tests.js"));
+    const runner = loadModule(path.join(scriptsDir, "run-security-tests.js"));
     const exitSpy = jest.spyOn(process, "exit").mockImplementation((code?: number) => {
       throw new Error(`process.exit:${code}`);
     });

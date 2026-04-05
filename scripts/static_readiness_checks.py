@@ -262,12 +262,20 @@ def check_dt_credential_security() -> CheckResult:
                            "desktop/ Verzeichnis nicht gefunden.", "static")
     found = False
     unsafe_persistence = False
+    suspicious_patterns = [
+        r"\blocalStorage\b",
+        r"\bsessionStorage\b",
+        r"\.setItem\s*\(",
+        r"\b(password|secret)\b",
+        r"\b(access|refresh|auth|api)[-_ ]?token\b",
+        r"credentials?",
+    ]
     for js_file in desktop.glob("*.js"):
         text = js_file.read_text(encoding="utf-8", errors="replace")
         if re.search(r"(keytar|safeStorage|electron\.safeStorage)", text):
             found = True
             break
-        if re.search(r"(localStorage|sessionStorage|setItem\(|secret|token|password)", text, re.IGNORECASE):
+        if any(re.search(pattern, text, re.IGNORECASE) for pattern in suspicious_patterns):
             unsafe_persistence = True
 
     if found:
