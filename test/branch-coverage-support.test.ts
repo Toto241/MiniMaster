@@ -87,6 +87,7 @@ let state: Record<string, any> = {};
 const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
 const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
 const asOther = { auth: { uid: "other1", token: { role: "master" } } };
+const asMasterWithApp = { auth: { uid: "m1", token: { role: "master" } }, app: { appId: "test-app" } };
 
 function makeExpiresAt(offsetSeconds: number) {
   const seconds = Math.floor(Date.now() / 1000) + offsetSeconds;
@@ -631,7 +632,7 @@ describe("runAiAnalysisRound — solved path (lines 660,663,678-679)", () => {
 
     try {
       const wrapped = testEnv.wrap(fns.analyzeWithDebugData);
-      const res = await wrapped({ ticketId: "ticket-solve", userMessage: "Bitte analysieren" }, asMaster);
+      const res = await wrapped({ ticketId: "ticket-solve", userMessage: "Bitte analysieren" }, asMasterWithApp);
       expect(res.success).toBe(true);
       const ticket = state.supportTickets["ticket-solve"];
       expect(ticket.conversationStatus).toBe("closed");
@@ -681,7 +682,7 @@ describe("runAiAnalysisRound — escalated path (lines 681-682, 715)", () => {
 
     try {
       const wrapped = testEnv.wrap(fns.analyzeWithDebugData);
-      const res = await wrapped({ ticketId: "ticket-escal", userMessage: "Immer noch kaputt" }, asMaster);
+      const res = await wrapped({ ticketId: "ticket-escal", userMessage: "Immer noch kaputt" }, asMasterWithApp);
       expect(res.success).toBe(true);
       const ticket = state.supportTickets["ticket-escal"];
       expect(ticket.conversationStatus).toBe("escalated");
@@ -861,7 +862,7 @@ describe("generateWithGemini — AbortError (lines 127-130)", () => {
 
     try {
       const wrapped = testEnv.wrap(fns.analyzeWithDebugData);
-      await expect(wrapped({ ticketId: "ticket-abort", userMessage: "Test" }, asMaster))
+      await expect(wrapped({ ticketId: "ticket-abort", userMessage: "Test" }, asMasterWithApp))
         .rejects.toThrow(/timeout|abort|30s/i);
     } finally {
       process.env.NODE_ENV = origNodeEnv;
@@ -890,7 +891,7 @@ describe("generateWithGemini — AbortError (lines 127-130)", () => {
 
     try {
       const wrapped = testEnv.wrap(fns.analyzeWithDebugData);
-      await expect(wrapped({ ticketId: "ticket-rethrow", userMessage: "Test" }, asMaster))
+      await expect(wrapped({ ticketId: "ticket-rethrow", userMessage: "Test" }, asMasterWithApp))
         .rejects.toThrow(/Network failure/);
     } finally {
       process.env.NODE_ENV = origNodeEnv;

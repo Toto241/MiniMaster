@@ -16,6 +16,8 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
 - App Check auf mutierenden Device-Endpunkten konsistent erzwungen in [src/device.ts](src/device.ts)
 - App Check auf privilegierten Admin-/Operator-Endpunkten konsistent erzwungen in [src/admin.ts](src/admin.ts)
 - App-Check-Initialisierung im [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an den Web-Control-Betriebsmodus angeglichen
+- App Check auf sensiblen Support-Endpunkten konsistent erzwungen in [src/support.ts](src/support.ts)
+- Operator-Assistent `aiExplainProblem` mit zusätzlichem Rate Limit abgesichert in [src/support.ts](src/support.ts)
 
 ## Offene Lücken nach Priorität
 
@@ -57,6 +59,9 @@ Die wichtigsten offenen Punkte wurden nach Sicherheitswirkung, Betriebsrisiko un
 
    Warum:
    Externe Provider, Timeout-Verhalten und Rohfehlertexte sollten weiter vereinheitlicht werden.
+
+   Status:
+   App Check und ein erstes Rate Limit sind jetzt auch auf der Support-Seite eingezogen. Offen bleiben vor allem persistentere Missbrauchsgrenzen, Reply-/Mail-Flows und ein konsequent minimiertes Fehler- und Provider-Logging.
 
 3. Firestore-Migrationspfad vorbereiten
    Betroffene Stellen:
@@ -100,8 +105,9 @@ Die in dieser Arbeit geänderten Hochrisiko-Pfade wurden mit folgenden Suiten ge
 - [test/branch-coverage-support-gaps.test.ts](test/branch-coverage-support-gaps.test.ts)
 - [test/branch-coverage-boost.test.ts](test/branch-coverage-boost.test.ts)
 - [test/branch-coverage-wave3.test.ts](test/branch-coverage-wave3.test.ts)
+- [test/branch-coverage-support.test.ts](test/branch-coverage-support.test.ts)
 
 Ergebnis zum Zeitpunkt der Analyse:
 
-- 12 gezielte Test-Suiten grün
-- 416 gezielte Tests grün
+- 15 gezielte Test-Suiten grün
+- 508 gezielte Tests grün

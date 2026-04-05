@@ -9,7 +9,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
-import { AuditLogger, checkRateLimit, requireSupportOrAdmin } from "./shared";
+import { AuditLogger, checkRateLimit, requireSupportOrAdmin, validateAppCheck } from "./shared";
 
 // ==================== AI CLIENT ====================
 
@@ -337,6 +337,7 @@ export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const { problemDescription, allowSupportAccess, consentSource } = data;
     if (!problemDescription || typeof problemDescription !== "string" || problemDescription.trim().length === 0) {
@@ -394,6 +395,7 @@ export const grantSupportAccess = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const { ticketId } = data;
     if (!ticketId || typeof ticketId !== "string") {
@@ -453,6 +455,7 @@ export const revokeSupportAccess = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const { grantId } = data;
     if (!grantId || typeof grantId !== "string") {
@@ -839,6 +842,7 @@ export const analyzeWithDebugData = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const ticketId = String(data?.ticketId || "").trim();
     if (!ticketId) {
@@ -890,6 +894,7 @@ export const grantDebugAccess = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const ticketId = String(data?.ticketId || "").trim();
     if (!ticketId) {
@@ -975,6 +980,7 @@ export const skipDebugMode = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const ticketId = String(data?.ticketId || "").trim();
     if (!ticketId) {
@@ -1037,6 +1043,7 @@ export const processUserReplyMessage = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const ticketId = String(data?.ticketId || "").trim();
     const message = String(data?.message || "").trim();
@@ -1112,6 +1119,7 @@ export const getDebugInfo = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const ticketId = String(data?.ticketId || "").trim();
     if (!ticketId) {
@@ -1172,6 +1180,7 @@ export const provideSolutionFeedback = functions.https.onCall(
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const { ticketId, feedback, comment } = data;
     if (!ticketId || !feedback) {
@@ -1227,6 +1236,7 @@ export const getTicketUserData = functions.https.onCall(
   async (data: { ticketId: string }, context: CallableContext) => {
     requireSupportOrAdmin(context);
     const callerId = context.auth!.uid;
+    validateAppCheck(context, true);
 
     const { ticketId } = data;
     if (!ticketId || typeof ticketId !== "string") {
@@ -1303,11 +1313,14 @@ export const aiExplainProblem = functions.runWith({ secrets: ["GEMINI_API_KEY"] 
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
+    validateAppCheck(context, true);
 
     const role = context.auth.token.role as string | undefined;
     if (role !== "admin" && role !== "support") {
       throw new functions.https.HttpsError("permission-denied", "Only admin or support users can use the AI assistant.");
     }
+
+    checkRateLimit(context.auth.uid, "support.ai_explain_problem", 20, 60 * 60 * 1000);
 
     const { problemContext, consentGiven } = data;
 
