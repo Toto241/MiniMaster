@@ -100,7 +100,7 @@ class RuleSyncService : FirebaseMessagingService() {
         Log.d(TAG, "Handling device lock message")
         // Support both "isLocked" (from onChildDeviceUpdateV2) and legacy "locked" key
         val isLocked = data["isLocked"]?.toBoolean() ?: data["locked"]?.toBoolean() ?: false
-        
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val childId = childIdRepository.getChildId().first()
@@ -127,18 +127,7 @@ class RuleSyncService : FirebaseMessagingService() {
 
         if (!blockedAppsJson.isNullOrEmpty()) {
             try {
-                val blockedApps = if (blockedAppsJson.trim().startsWith("[")) {
-                    // Parse JSON array
-                    val jsonArray = org.json.JSONArray(blockedAppsJson)
-                    val list = mutableListOf<String>()
-                    for (i in 0 until jsonArray.length()) {
-                        list.add(jsonArray.getString(i))
-                    }
-                    list.toSet()
-                } else {
-                    // Legacy comma separated
-                    blockedAppsJson.split(",").toSet()
-                }
+                val blockedApps = com.google.pairing.child.ChildProtectionPolicy.parseBlockedApps(blockedAppsJson)
                 updateAccessibilityServiceRules(blockedApps)
                 AppLogger.logRuleSyncEvent("app_blocking", "success", "Updated ${blockedApps.size} blocked apps")
             } catch (e: Exception) {
@@ -167,7 +156,7 @@ class RuleSyncService : FirebaseMessagingService() {
      */
     private fun handleSyncRequest() {
         Log.d(TAG, "Handling sync request")
-        
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val childId = childIdRepository.getChildId().first()

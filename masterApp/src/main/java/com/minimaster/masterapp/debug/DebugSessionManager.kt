@@ -2,7 +2,6 @@ package com.minimaster.masterapp.debug
 
 import android.util.Log
 import com.minimaster.masterapp.BuildConfig
-import java.security.SecureRandom
 import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -41,6 +40,10 @@ object DebugSessionManager {
     private const val HMAC_SUFFIX = "_ACTIVATE_MASTER"
     private const val HMAC_ALGORITHM = "HmacSHA256"
 
+    internal var currentTimeProvider: () -> Long = { System.currentTimeMillis() }
+    internal var secretProvider: () -> String = { BuildConfig.DEBUG_SESSION_SECRET_MASTER }
+    internal var challengeProvider: () -> String = { UUID.randomUUID().toString().replace("-", "") }
+
     @Volatile private var sessionActive = false
     @Volatile private var sessionExpiresAt = 0L
     @Volatile private var pendingChallenge: String? = null
@@ -51,7 +54,7 @@ object DebugSessionManager {
 
     /** Returns true while an authenticated, non-expired session is active. */
     fun isSessionActive(): Boolean {
-        if (sessionActive && System.currentTimeMillis() > sessionExpiresAt) {
+        if (sessionActive && currentTimeProvider() > sessionExpiresAt) {
             deactivateSession()
         }
         return sessionActive
@@ -66,7 +69,7 @@ object DebugSessionManager {
             Log.w(TAG, "Debug interface is DISABLED (secret not configured in local.properties).")
             return
         }
-        val nonce = UUID.randomUUID().toString().replace("-", "")
+        val nonce = challengeProvider()
         pendingChallenge = nonce
         // Log exactly once so the admin script can grep for it
         Log.i(TAG_CHALLENGE, "CHALLENGE:$nonce")
@@ -96,7 +99,7 @@ object DebugSessionManager {
         val expected = computeHmac(challenge + HMAC_SUFFIX)
         return if (constantTimeEquals(expected, response)) {
             sessionActive = true
-            sessionExpiresAt = System.currentTimeMillis() + SESSION_DURATION_MS
+            sessionExpiresAt = currentTimeProvider() + SESSION_DURATION_MS
             Log.i(TAG, "Debug session ACTIVATED. Expires in 30 min.")
             true
         } else {
@@ -127,7 +130,7 @@ object DebugSessionManager {
         if (!isSessionActive()) {
             return """{"error":"no_active_debug_session"}"""
         }
-        val remaining = ((sessionExpiresAt - System.currentTimeMillis()) / 1000 / 60).coerceAtLeast(0)
+        val remaining = ((sessionExpiresAt - currentTimeProvider()) / 1000 / 60).coerceAtLeast(0)
         return """
 {
   "app": "masterApp",
@@ -146,10 +149,10 @@ object DebugSessionManager {
     // ──────────────────────────────────────────────────────────────
 
     private fun isSecretDisabled(): Boolean =
-        BuildConfig.DEBUG_SESSION_SECRET_MASTER == "DISABLED"
+        secretProvider() == "DISABLED"
 
     private fun computeHmac(data: String): String {
-        val key = BuildConfig.DEBUG_SESSION_SECRET_MASTER.toByteArray(Charsets.UTF_8)
+        val key = secretProvider().toByteArray(Charsets.UTF_8)
         val mac = Mac.getInstance(HMAC_ALGORITHM)
         mac.init(SecretKeySpec(key, HMAC_ALGORITHM))
         return mac.doFinal(data.toByteArray(Charsets.UTF_8))
@@ -162,5 +165,14 @@ object DebugSessionManager {
         var diff = 0
         for (i in a.indices) diff = diff or (a[i].code xor b[i].code)
         return diff == 0
+    }
+
+    internal fun peekPendingChallenge(): String? = pendingChallenge
+
+    internal fun resetForTesting() {
+        deactivateSession()
+        currentTimeProvider = { System.currentTimeMillis() }
+        secretProvider = { BuildConfig.DEBUG_SESSION_SECRET_MASTER }
+        challengeProvider = { UUID.randomUUID().toString().replace("-", "") }
     }
 }

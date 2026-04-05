@@ -95,6 +95,8 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private var currentDayStart: Long = 0L
     private var lastStorageWriteTime: Long = 0L
     private var lastBackendReportTime: Long = 0L
+    private var allowedStartMinutes: Int? = null
+    private var allowedEndMinutes: Int? = null
 
     // Per-app usage tracking
     private val perAppUsageMillis = mutableMapOf<String, Long>()
@@ -355,37 +357,26 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         try {
             usageRules = org.json.JSONObject(json)
 
-            // Global daily limit
-            val dailyLimitSeconds = usageRules?.optLong("dailyLimitSeconds", -1L) ?: -1L
-            dailyLimitMillis = if (dailyLimitSeconds != -1L) dailyLimitSeconds * 1000 else -1L
-
-            // Per-app limits: { "appLimits": { "com.example.game": 1800 } } (seconds)
-            val appLimits = usageRules?.optJSONObject("appLimits")
-            if (appLimits != null) {
-                perAppLimitsMillis.clear()
-                appLimits.keys().forEach { pkg ->
-                    val limitSeconds = appLimits.getLong(pkg)
-                    perAppLimitsMillis[pkg] = limitSeconds * 1000
-                }
-                Log.d(TAG, "Parsed per-app limits: ${perAppLimitsMillis.size} apps")
-            }
-
-            // Time window: { "allowedHours": { "start": "08:00", "end": "20:00" } }
-            val allowedHours = usageRules?.optJSONObject("allowedHours")
-            if (allowedHours != null) {
-                val startParts = allowedHours.optString("start", "").split(":")
-                val endParts = allowedHours.optString("end", "").split(":")
-                if (startParts.size == 2 && endParts.size == 2) {
-                    allowedStartHour = startParts[0].toIntOrNull() ?: -1
-                    allowedStartMinute = startParts[1].toIntOrNull() ?: 0
-                    allowedEndHour = endParts[0].toIntOrNull() ?: -1
-                    allowedEndMinute = endParts[1].toIntOrNull() ?: 0
-                    Log.d(TAG, "Parsed time window: $allowedStartHour:$allowedStartMinute - $allowedEndHour:$allowedEndMinute")
-                }
+            val parsedRules = ChildProtectionPolicy.parseUsageRules(json)
+            dailyLimitMillis = parsedRules.dailyLimitMillis
+            perAppLimitsMillis.clear()
+            perAppLimitsMillis.putAll(parsedRules.perAppLimitsMillis)
+            allowedStartMinutes = parsedRules.allowedStartMinutes
+            allowedEndMinutes = parsedRules.allowedEndMinutes
+            if (allowedStartMinutes != null && allowedEndMinutes != null) {
+                allowedStartHour = allowedStartMinutes!! / 60
+                allowedStartMinute = allowedStartMinutes!! % 60
+                allowedEndHour = allowedEndMinutes!! / 60
+                allowedEndMinute = allowedEndMinutes!! % 60
+                Log.d(TAG, "Parsed time window: $allowedStartHour:$allowedStartMinute - $allowedEndHour:$allowedEndMinute")
             } else {
                 allowedStartHour = -1
                 allowedEndHour = -1
+                allowedStartMinute = 0
+                allowedEndMinute = 0
             }
+
+            Log.d(TAG, "Parsed per-app limits: ${perAppLimitsMillis.size} apps")
 
             Log.d(TAG, "Parsed usage rules: dailyLimitMillis=$dailyLimitMillis")
         } catch (e: Exception) {
@@ -558,25 +549,16 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     }
 
     private fun checkUsageLimits() {
-        // 1. Global daily limit
-        if (dailyLimitMillis != -1L && currentDayUsageMillis > dailyLimitMillis) {
-            Log.i(TAG, "Daily limit exceeded: $currentDayUsageMillis > $dailyLimitMillis")
-            if (currentForegroundApp != null &&
-                !currentForegroundApp!!.startsWith("com.android") &&
-                currentForegroundApp != packageName) {
-                blockApplication(currentForegroundApp!!)
-            }
-            return
-        }
-
-        // 2. Per-app limits
-        if (currentForegroundApp != null && perAppLimitsMillis.isNotEmpty()) {
-            val appLimit = perAppLimitsMillis[currentForegroundApp]
-            val appUsage = perAppUsageMillis[currentForegroundApp] ?: 0L
-            if (appLimit != null && appUsage > appLimit) {
-                Log.i(TAG, "Per-app limit exceeded for $currentForegroundApp: $appUsage > $appLimit")
-                blockApplication(currentForegroundApp!!)
-            }
+        if (ChildProtectionPolicy.shouldBlockForUsage(
+                packageName = currentForegroundApp,
+                ownPackageName = packageName,
+                dailyLimitMillis = dailyLimitMillis,
+                currentDayUsageMillis = currentDayUsageMillis,
+                perAppLimitsMillis = perAppLimitsMillis,
+                perAppUsageMillis = perAppUsageMillis,
+            )) {
+            Log.i(TAG, "Usage limit exceeded for $currentForegroundApp")
+            blockApplication(currentForegroundApp!!)
         }
     }
 
@@ -585,25 +567,16 @@ class MiniMasterAccessibilityService : AccessibilityService() {
      * Blocks all non-system apps if outside allowed hours.
      */
     private fun checkTimeWindow() {
-        if (allowedStartHour == -1 || allowedEndHour == -1) return
-
         val calendar = Calendar.getInstance()
         val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
         val currentMinute = calendar.get(Calendar.MINUTE)
         val currentMinutes = currentHour * 60 + currentMinute
-        val startMinutes = allowedStartHour * 60 + allowedStartMinute
-        val endMinutes = allowedEndHour * 60 + allowedEndMinute
 
-        val isWithinWindow = if (startMinutes <= endMinutes) {
-            currentMinutes in startMinutes..endMinutes
-        } else {
-            // Overnight window (e.g., 22:00 - 07:00)
-            currentMinutes >= startMinutes || currentMinutes <= endMinutes
-        }
-
-        if (!isWithinWindow && currentForegroundApp != null &&
-            !currentForegroundApp!!.startsWith("com.android") &&
-            currentForegroundApp != packageName) {
+        if (ChildProtectionPolicy.isOutsideAllowedWindow(
+                currentMinutes = currentMinutes,
+                allowedStartMinutes = allowedStartMinutes,
+                allowedEndMinutes = allowedEndMinutes,
+            ) && ChildProtectionPolicy.isManagedUserApp(currentForegroundApp, packageName)) {
             Log.i(TAG, "Outside allowed time window ($allowedStartHour:$allowedStartMinute - $allowedEndHour:$allowedEndMinute)")
             blockApplication(currentForegroundApp!!)
         }
