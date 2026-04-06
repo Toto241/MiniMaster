@@ -25,8 +25,16 @@ class DebugBroadcastReceiver : BroadcastReceiver() {
         when (intent.action) {
 
             ACTION_GET_CHALLENGE -> {
-                DebugSessionManager.generateChallenge()
-                Log.i(tag, "Challenge generated. Read with: adb logcat -s MINIMASTER_DEBUG_CHALLENGE_CHILD -d")
+                val challenge = DebugSessionManager.generateChallenge()
+                if (challenge == null) {
+                    setResultCode(2)
+                    setResultData("DEBUG_INTERFACE_DISABLED")
+                    Log.w(tag, "Challenge generation failed: debug interface disabled.")
+                } else {
+                    setResultCode(0)
+                    setResultData(challenge)
+                    Log.i(tag, "Challenge generated. Read with: adb logcat -s MINIMASTER_DEBUG_CHALLENGE_CHILD -d")
+                }
             }
 
             ACTION_ACTIVATE -> {
