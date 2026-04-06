@@ -1391,6 +1391,24 @@ input:focus, select:focus, textarea:focus {
     border-color: #bae6fd;
 }
 
+.python-automation-chip-suite {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+.python-automation-chip-static {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+}
+
+.python-automation-chip-docs {
+    background: #ffedd5;
+    color: #c2410c;
+    border-color: #fdba74;
+}
+
 .python-automation-chip-manual {
     background: #fef3c7;
     color: #92400e;
