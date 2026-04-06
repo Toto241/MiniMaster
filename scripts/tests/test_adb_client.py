@@ -326,14 +326,27 @@ class TestBroadcastLogcat:
     def test_send_broadcast_with_extras(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0, stdout="Broadcasting...", stderr="")
         client = AdbClient(serial="X")
-        result = client.send_broadcast("com.test.ACTION", extras={"key": "val"})
+        result = client.send_broadcast(
+            "com.test.ACTION",
+            extras={"key": "val"},
+            component="com.test/.Receiver",
+            receiver_foreground=True,
+        )
         assert result.ok
         cmd = mock_run.call_args[0][0]
         assert "-a" in cmd
+        assert "--receiver-foreground" in cmd
+        assert "-n" in cmd
+        assert "com.test/.Receiver" in cmd
         assert "com.test.ACTION" in cmd
         assert "-e" in cmd
         assert "key" in cmd
         assert "val" in cmd
+
+    def test_debug_receiver_component_known_packages(self):
+        assert AdbClient.debug_receiver_component("com.minimaster.masterapp") == "com.minimaster.masterapp/com.minimaster.masterapp.debug.DebugBroadcastReceiver"
+        assert AdbClient.debug_receiver_component("com.google.pairing") == "com.google.pairing/com.google.pairing.debug.DebugBroadcastReceiver"
+        assert AdbClient.debug_receiver_component("com.unknown.app") is None
 
     @patch("adb_client.subprocess.run")
     def test_read_logcat(self, mock_run):
@@ -405,13 +418,7 @@ class TestDebugSession:
         """Challenge-Anforderung für Master-App."""
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="", stderr=""),
-            MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
-            MagicMock(
-                returncode=0,
-                stdout="01-01 00:00:00.000 D/MINIMASTER_DEBUG_CHALLENGE(12345): CHALLENGE:abc123def456\n",
-                stderr="",
-            ),
-            MagicMock(returncode=0, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout='Broadcast completed: result=0, data="abc123def456"', stderr=""),
         ]
         client = AdbClient(serial="X")
         challenge = client.request_debug_challenge("com.minimaster.masterapp")
@@ -423,13 +430,7 @@ class TestDebugSession:
         """Challenge-Anforderung für Child-App mit anderem Tag."""
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="", stderr=""),
-            MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
-            MagicMock(
-                returncode=0,
-                stdout="D MINIMASTER_DEBUG_CHALLENGE_CHILD: CHALLENGE:child999\n",
-                stderr="",
-            ),
-            MagicMock(returncode=0, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout='Broadcast completed: result=0, data="child999"', stderr=""),
         ]
         client = AdbClient(serial="X")
         challenge = client.request_debug_challenge("com.google.pairing")
@@ -455,9 +456,7 @@ class TestDebugSession:
     def test_request_debug_challenge_result_reports_disabled_secret(self, mock_run, mock_sleep):
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="", stderr=""),
-            MagicMock(returncode=0, stdout="Broadcasting...", stderr=""),
-            MagicMock(returncode=0, stdout="", stderr=""),
-            MagicMock(returncode=0, stdout="D/MINIMASTER_DEBUG: Debug interface is DISABLED (secret not configured in local.properties).\n", stderr=""),
+            MagicMock(returncode=0, stdout='Broadcast completed: result=2, data="DEBUG_INTERFACE_DISABLED"', stderr=""),
         ]
         client = AdbClient(serial="X")
         result = client.request_debug_challenge_result("com.minimaster.masterapp")
