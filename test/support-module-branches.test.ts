@@ -56,7 +56,9 @@ describe("support module load branches", () => {
       AuditLogger: {
         log: jest.fn().mockResolvedValue(undefined),
       },
+      checkRateLimit: jest.fn(),
       requireSupportOrAdmin: jest.fn(),
+      validateAppCheck: jest.fn(),
     }));
 
     let wrapped: any;

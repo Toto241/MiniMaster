@@ -86,10 +86,11 @@ let db: any;
 
 let state: Record<string, any> = {};
 
-const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
-const asOtherMaster = { auth: { uid: "m2", token: { role: "master" } } };
-const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
-const asSupport = { auth: { uid: "support1", token: { role: "support" } } };
+const appCheckContext = { app: { appId: "test-app-check" } };
+const asMaster = { auth: { uid: "m1", token: { role: "master" } }, ...appCheckContext };
+const asOtherMaster = { auth: { uid: "m2", token: { role: "master" } }, ...appCheckContext };
+const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } }, ...appCheckContext };
+const asSupport = { auth: { uid: "support1", token: { role: "support" } }, ...appCheckContext };
 
 function makeExpiresAt(offsetSeconds: number) {
   const seconds = Math.floor(Date.now() / 1000) + offsetSeconds;
@@ -174,6 +175,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.NODE_ENV = "test";
   resetState();
 
   jest.spyOn(db, "collection").mockImplementation((...args: unknown[]) => {
@@ -561,9 +563,9 @@ describe("getDebugInfo", () => {
   });
 
   it("wirft deadline-exceeded bei abgelaufenem Grant", async () => {
-    state.supportTickets["ticket-open"].debugAccessGrantId = "grant-expired";
+    state.supportTickets["ticket-1"].debugAccessGrantId = "grant-expired";
     const wrapped = testEnv.wrap(fns.getDebugInfo);
-    await expect(wrapped({ ticketId: "ticket-open" }, asMaster)).rejects.toThrow(/expired/);
+    await expect(wrapped({ ticketId: "ticket-1" }, asMaster)).rejects.toThrow(/expired/);
     expect(state.supportAccessGrants["grant-expired"].status).toBe("expired");
   });
 

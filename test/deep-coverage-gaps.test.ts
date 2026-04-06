@@ -88,10 +88,11 @@ const mockFetch = jest.fn();
 
 let state: Record<string, any> = {};
 
-const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
-const asSupport = { auth: { uid: "support1", token: { role: "support" } } };
-const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
-const asAuditor = { auth: { uid: "auditor1", token: { role: "auditor" } } };
+const appCheckContext = { app: { appId: "test-app-check" } };
+const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } }, ...appCheckContext };
+const asSupport = { auth: { uid: "support1", token: { role: "support" } }, ...appCheckContext };
+const asMaster = { auth: { uid: "m1", token: { role: "master" } }, ...appCheckContext };
+const asAuditor = { auth: { uid: "auditor1", token: { role: "auditor" } }, ...appCheckContext };
 
 function resetState() {
   state = {
@@ -929,7 +930,7 @@ describe("grantSupportAccess", () => {
   });
 
   it("wirft permission-denied für fremdes Ticket", async () => {
-    const otherMaster = { auth: { uid: "m2", token: { role: "master" } } };
+    const otherMaster = { auth: { uid: "m2", token: { role: "master" } }, ...appCheckContext };
     const wrapped = testEnv.wrap(fns.grantSupportAccess);
     await expect(wrapped({ ticketId: "ticket-1" }, otherMaster))
       .rejects.toThrow(/denied|not found/i);
@@ -968,7 +969,7 @@ describe("revokeSupportAccess", () => {
   });
 
   it("wirft permission-denied für fremden Grant", async () => {
-    const otherMaster = { auth: { uid: "m2", token: { role: "master" } } };
+    const otherMaster = { auth: { uid: "m2", token: { role: "master" } }, ...appCheckContext };
     const wrapped = testEnv.wrap(fns.revokeSupportAccess);
     await expect(wrapped({ grantId: "grant-active" }, otherMaster))
       .rejects.toThrow(/denied|not found/i);
