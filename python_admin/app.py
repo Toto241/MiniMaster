@@ -531,10 +531,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "doc-verify-app-blocking-enforcement",
                 "title": "Test 3.2: Verify App Blocking Enforcement",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter ChildApp-Commissioning-Test fuer Blocking-Overlay und Enforcement-Konfiguration aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-child",
+                "successCriteria": "Die ChildApp-Commissioning-Suite validiert Blocking-Overlay, Sperrnachricht und Fullscreen-Enforcement-Konfiguration erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-32-verify-app-blocking-enforcement",
             },
             {
@@ -2598,7 +2599,7 @@ def build_testing_register() -> dict[str, object]:
     evidence_index = load_latest_commissioning_evidence()
     suite_catalog = get_suite_catalog()
     latest_suite_results = load_latest_suite_results()
-    static_analysis_index = {
+    static_analysis_index: dict[str, dict[str, object]] = {
         str(item.get("id") or ""): {
             "status": str(item.get("status") or "not_run"),
             "details": str(item.get("details") or ""),
@@ -2609,7 +2610,7 @@ def build_testing_register() -> dict[str, object]:
         for item in collect_static_analysis_checks()
         if str(item.get("id") or "")
     }
-    docs_validation_index = {
+    docs_validation_index: dict[str, dict[str, object]] = {
         str(item.get("id") or ""): {
             "status": str(item.get("status") or "not_run"),
             "details": str(item.get("details") or ""),

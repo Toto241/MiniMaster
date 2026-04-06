@@ -31,9 +31,30 @@ class BlockingOverlayService : Service() {
     companion object {
         private const val CHANNEL_ID = "BlockingOverlayChannel"
         private const val NOTIFICATION_ID = 1001
+        const val OVERLAY_TITLE = "Access Restricted"
+        const val OVERLAY_BUTTON_TEXT = "Go Back"
         const val EXTRA_BLOCKED_PACKAGE = "blocked_package"
         const val ACTION_SHOW_OVERLAY = "com.google.pairing.SHOW_OVERLAY"
         const val ACTION_HIDE_OVERLAY = "com.google.pairing.HIDE_OVERLAY"
+
+        fun buildOverlayMessage(packageName: String?): String =
+            if (packageName != null) {
+                "The app \"$packageName\" is currently blocked by your parents."
+            } else {
+                "This app is currently blocked by your parents."
+            }
+
+        fun createOverlayLayoutParams(): WindowManager.LayoutParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+            PixelFormat.TRANSLUCENT
+        )
     }
 
     override fun onCreate() {
@@ -76,7 +97,7 @@ class BlockingOverlayService : Service() {
         }
 
         val title = TextView(this).apply {
-            text = "Access Restricted"
+            text = OVERLAY_TITLE
             textSize = 24f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -84,10 +105,7 @@ class BlockingOverlayService : Service() {
         }
 
         val message = TextView(this).apply {
-            text = if (packageName != null)
-                "The app \"$packageName\" is currently blocked by your parents."
-            else
-                "This app is currently blocked by your parents."
+            text = buildOverlayMessage(packageName)
             textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -95,7 +113,7 @@ class BlockingOverlayService : Service() {
         }
 
         val button = Button(this).apply {
-            text = "Go Back"
+            text = OVERLAY_BUTTON_TEXT
             setOnClickListener {
                 val homeIntent = Intent(Intent.ACTION_MAIN)
                 homeIntent.addCategory(Intent.CATEGORY_HOME)
@@ -112,20 +130,7 @@ class BlockingOverlayService : Service() {
         view.addView(button)
         overlayView = view
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
-            // Overlay captures all touch events (no pass-through to blocked app)
-            // FLAG_LAYOUT_IN_SCREEN: cover status bar
-            // FLAG_SHOW_WHEN_LOCKED: show over lock screen
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
-            PixelFormat.TRANSLUCENT
-        )
+        val params = createOverlayLayoutParams()
 
         try {
             windowManager.addView(overlayView, params)

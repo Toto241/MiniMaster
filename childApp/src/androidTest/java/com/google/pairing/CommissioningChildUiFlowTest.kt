@@ -8,9 +8,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import android.graphics.PixelFormat
+import android.os.Build
+import android.view.WindowManager
 
 @RunWith(AndroidJUnit4::class)
 class CommissioningChildUiFlowTest {
@@ -67,6 +71,30 @@ class CommissioningChildUiFlowTest {
 
         composeTestRule.onNodeWithText("Task Required").assertIsDisplayed()
         composeTestRule.onNodeWithText("Submit Proof").assertIsDisplayed()
+    }
+
+    @Test
+    fun phase3_2_blockingOverlay_enforcesFullScreenMessageAndLayout() {
+        val params = BlockingOverlayService.createOverlayLayoutParams()
+        val message = BlockingOverlayService.buildOverlayMessage("com.example.blocked")
+
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params.width)
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params.height)
+        assertEquals(PixelFormat.TRANSLUCENT, params.format)
+        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN != 0)
+        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED != 0)
+        assertEquals(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                WindowManager.LayoutParams.TYPE_PHONE
+            },
+            params.type,
+        )
+        assertTrue(message.contains("com.example.blocked"))
+        assertTrue(message.contains("blocked by your parents"))
+        assertEquals("Access Restricted", BlockingOverlayService.OVERLAY_TITLE)
+        assertEquals("Go Back", BlockingOverlayService.OVERLAY_BUTTON_TEXT)
     }
 
     @Test
