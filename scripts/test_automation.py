@@ -166,6 +166,65 @@ def has_connected_adb_device() -> bool:
     return any(line.endswith("\tdevice") for line in lines)
 
 
+def connected_adb_devices() -> list[str]:
+    adb = adb_command()
+    if not command_exists(adb):
+        return []
+    result = subprocess.run(
+        [adb, "devices"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    devices: list[str] = []
+    for line in result.stdout.splitlines()[1:]:
+        stripped = line.strip()
+        if not stripped or not stripped.endswith("\tdevice"):
+            continue
+        serial = stripped.split("\t", 1)[0].strip()
+        if serial:
+            devices.append(serial)
+    return devices
+
+
+def child_unit_suite_device_guard() -> tuple[bool, str | None]:
+    adb = adb_command()
+    if not command_exists(adb):
+        return True, None
+
+    ready_devices = connected_adb_devices()
+    if not ready_devices:
+        return True, None
+
+    package_name = "com.minimaster.masterapp"
+    for serial in ready_devices:
+        result = subprocess.run(
+            [adb, "-s", serial, "shell", "pm", "list", "packages", package_name],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if result.returncode != 0:
+            continue
+        installed = any(line.strip() == f"package:{package_name}" for line in result.stdout.splitlines())
+        if installed:
+            return (
+                False,
+                (
+                    f"Auf dem verbundenen Gerät {serial} ist die Eltern-App ({package_name}) installiert. "
+                    "android-unit-child wird im QA-Dashboard blockiert, bis die Eltern-App vom Kind-Testgerät entfernt ist."
+                ),
+            )
+
+    return True, None
+
+
 def is_ignored_inventory_path(path: Path) -> bool:
     return any(part in IGNORED_INVENTORY_PARTS for part in path.parts)
 
@@ -336,6 +395,7 @@ PREREQ_CHECKS: dict[str, Callable[[], tuple[bool, str | None]]] = {
     "android_sdk": lambda: (resolve_android_sdk() is not None, "Android SDK not found. Set ANDROID_HOME/ANDROID_SDK_ROOT or local.properties."),
     "adb": lambda: (command_exists(adb_command()), f"{adb_command()} not found in PATH."),
     "adb_device": lambda: (has_connected_adb_device(), "No connected Android device or emulator detected via adb."),
+    "child_device_without_master_app": child_unit_suite_device_guard,
     "gradle_wrapper": lambda: (gradle_wrapper().exists(), f"Gradle wrapper not found at {gradle_wrapper()}."),
     "android_java": lambda: (
         supported_android_java_home() is not None,
@@ -357,11 +417,11 @@ SUITES: tuple[Suite, ...] = (
     Suite("backend-rules-emulator", "Firestore rules emulator", "backend", [npm_command(), "run", "test:rules:emulator"], ("npm", "node_modules", "java"), timeout_sec=1800),
     Suite("backend-security", "Security regression script", "backend", [npm_command(), "run", "test:security:ci"], ("npm", "node_modules", "security_ci_inputs"), timeout_sec=1800),
     Suite("android-task-translation-check", "Child task translation completeness", "android", [sys.executable, str(REPO_ROOT / "scripts" / "sync_child_task_translations.py")], tuple()),
-    Suite("android-lint", "Android lint", "android", [str(gradle_wrapper()), "lint"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
-    Suite("android-unit-master", "masterApp unit tests", "android", [str(gradle_wrapper()), ":masterApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
-    Suite("android-unit-child", "childApp unit tests", "android", [str(gradle_wrapper()), ":childApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
-    Suite("android-instrumentation-build-master", "masterApp instrumentation build", "android", [str(gradle_wrapper()), ":masterApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
-    Suite("android-instrumentation-build-child", "childApp instrumentation build", "android", [str(gradle_wrapper()), ":childApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
+    Suite("android-lint", "Android lint (Host)", "android", [str(gradle_wrapper()), "lint"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
+    Suite("android-unit-master", "masterApp unit tests (Host)", "android", [str(gradle_wrapper()), ":masterApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
+    Suite("android-unit-child", "childApp unit tests (Host)", "android", [str(gradle_wrapper()), ":childApp:testDebugUnitTest"], ("gradle_wrapper", "android_java", "android_sdk", "child_device_without_master_app"), timeout_sec=3600),
+    Suite("android-instrumentation-build-master", "masterApp instrumentation build (Host)", "android", [str(gradle_wrapper()), ":masterApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
+    Suite("android-instrumentation-build-child", "childApp instrumentation build (Host)", "android", [str(gradle_wrapper()), ":childApp:assembleDebugAndroidTest"], ("gradle_wrapper", "android_java", "android_sdk"), timeout_sec=3600),
     Suite("android-connected-master", "masterApp connected test", "device", [str(gradle_wrapper()), ":masterApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.minimaster.masterapp.MasterAppE2ETest", "-PuseAndroidTestOrchestrator=false"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
     Suite("android-connected-child", "childApp connected test", "device", [str(gradle_wrapper()), ":childApp:connectedDebugAndroidTest", "-Pandroid.testInstrumentationRunnerArguments.class=com.google.pairing.PairingScreenUITest", "-PuseAndroidTestOrchestrator=false"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device"), timeout_sec=3600),
     Suite("android-usb-master", "masterApp USB commissioning", "device", [sys.executable, str(REPO_ROOT / "scripts" / "usb_test_runner.py"), "--app-id", "master", "--suite", "commissioning"], ("gradle_wrapper", "android_java", "android_sdk", "adb", "adb_device", "local_properties", "debug_secret_master"), timeout_sec=7200),
