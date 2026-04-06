@@ -9,6 +9,25 @@ plugins {
     id 'com.google.firebase.crashlytics' // Firebase Crashlytics
 }
 
+import java.util.Properties
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { stream ->
+        localProperties.load(stream)
+    }
+}
+
+def resolveDebugSecret = { String propertyName ->
+    def value = project.findProperty(propertyName) ?: localProperties.getProperty(propertyName) ?: 'DISABLED'
+    def normalized = value.toString().trim()
+    if (!normalized) {
+        return 'DISABLED'
+    }
+    return normalized.replace('\\', '\\\\').replace('"', '\\"')
+}
+
 android {
     compileSdk 35
     namespace "com.minimaster.masterapp"
@@ -24,8 +43,7 @@ android {
 
         // Debug session secret – set in local.properties, NEVER commit to VCS.
         // If unset the debug interface is disabled (secure-by-default).
-        def debugSecretMaster = project.hasProperty('debug.session.secret.master')
-            ? project.getProperty('debug.session.secret.master') : 'DISABLED'
+        def debugSecretMaster = resolveDebugSecret('debug.session.secret.master')
         buildConfigField("String", "DEBUG_SESSION_SECRET_MASTER", "\"${debugSecretMaster}\"")
     }
 

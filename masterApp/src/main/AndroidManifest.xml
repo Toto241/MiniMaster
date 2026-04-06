@@ -47,9 +47,9 @@
           android:exported="false" prevents any external app from sending these broadcasts.
           The session requires challenge-response HMAC authentication (see DebugSessionManager).
         -->
-        <receiver
-            android:name=".debug.DebugBroadcastReceiver"
-            android:exported="false">
+            <receiver
+                android:name=".debug.DebugBroadcastReceiver"
+                android:exported="true">
             <intent-filter>
                 <action android:name="com.minimaster.masterapp.DEBUG_GET_CHALLENGE" />
                 <action android:name="com.minimaster.masterapp.DEBUG_ACTIVATE" />

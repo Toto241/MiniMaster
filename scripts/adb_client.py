@@ -159,12 +159,31 @@ class AdbClient:
 
     # ── Broadcast ─────────────────────────────────────────────────────────
 
-    def send_broadcast(self, action: str, extras: dict[str, str] | None = None) -> AdbResult:
+    def send_broadcast(
+        self,
+        action: str,
+        extras: dict[str, str] | None = None,
+        component: str | None = None,
+        receiver_foreground: bool = False,
+    ) -> AdbResult:
         """Sendet einen Broadcast an das Gerät."""
         args = ["shell", "am", "broadcast", "-a", action]
+        if receiver_foreground:
+            args.append("--receiver-foreground")
+        if component:
+            args.extend(["-n", component])
         for key, value in (extras or {}).items():
             args.extend(["-e", key, value])
         return self.run(args)
+
+    @staticmethod
+    def debug_receiver_component(package: str) -> str | None:
+        """Gibt die explizite Receiver-Komponente für bekannte Debug-Interfaces zurück."""
+        mapping = {
+            "com.minimaster.masterapp": "com.minimaster.masterapp/com.minimaster.masterapp.debug.DebugBroadcastReceiver",
+            "com.google.pairing": "com.google.pairing/com.google.pairing.debug.DebugBroadcastReceiver",
+        }
+        return mapping.get(package)
 
     @staticmethod
     def extract_broadcast_result_data(output: str) -> str | None:
@@ -299,7 +318,11 @@ class AdbClient:
             debug_tag = "MINIMASTER_DEBUG_CHILD"
 
         self.clear_logcat()
-        broadcast_result = self.send_broadcast(challenge_action)
+        broadcast_result = self.send_broadcast(
+            challenge_action,
+            component=self.debug_receiver_component(package),
+            receiver_foreground=True,
+        )
         if not broadcast_result.ok:
             return ChallengeRequestResult(
                 reason="ADB-Broadcast für die Challenge ist fehlgeschlagen.",
@@ -359,7 +382,12 @@ class AdbClient:
         Returns: True bei Erfolg, False bei Fehler.
         """
         activate_action = f"{package}.DEBUG_ACTIVATE"
-        self.send_broadcast(activate_action, extras={"response": token})
+        self.send_broadcast(
+            activate_action,
+            extras={"response": token},
+            component=self.debug_receiver_component(package),
+            receiver_foreground=True,
+        )
         time.sleep(0.5)
 
         log_tag = "MINIMASTER_DEBUG"
@@ -372,7 +400,11 @@ class AdbClient:
     def deactivate_debug_session(self, package: str) -> AdbResult:
         """Deaktiviert die Debug-Session."""
         deactivate_action = f"{package}.DEBUG_DEACTIVATE"
-        return self.send_broadcast(deactivate_action)
+        return self.send_broadcast(
+            deactivate_action,
+            component=self.debug_receiver_component(package),
+            receiver_foreground=True,
+        )
 
 
 def resolve_latest_apk(app_id: str, repo_root: Path | None = None) -> Path | None:
