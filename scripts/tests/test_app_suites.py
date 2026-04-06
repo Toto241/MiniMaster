@@ -247,7 +247,43 @@ class TestBuildTestingRegister:
             assert item["automationType"] == "automatic"
             assert item["source"] == "docs-validation"
             assert item["origin"] == "docs-validation"
-            assert item["status"] in {"pass", "fail"}
+            assert item["status"] in {"pass", "manual_required"}
+
+    def test_play_store_checklist_gate_is_manual_required_when_checklist_is_open(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_local_firebase_binding_status", lambda project_id: (True, f"bound:{project_id or 'default'}"))
+        monkeypatch.setattr(app, "load_local_service_account_status", lambda: (True, "service-account-ready"))
+
+        result = app.evaluate_commissioning_context(
+            {
+                "runtimeConfig": {
+                    "cloud": {
+                        "projectId": "minimaster-28fbd",
+                        "appCheckMode": "enforced",
+                    },
+                    "ai": {
+                        "provider": "gemini",
+                        "model": "gemini-3.0-flash",
+                        "keyRef": "projects/demo/secrets/key",
+                        "systemPrompt": "Assist.",
+                    },
+                },
+                "validationSummary": {
+                    "errorCount": 0,
+                    "checks": {
+                        "firestoreAccessOk": True,
+                        "storageHealthOk": True,
+                        "functionsReachable": True,
+                    },
+                },
+                "attestations": {},
+                "playStoreState": {"checks": {"listing": True, "permissions": False}},
+            }
+        )
+
+        checks = {item["id"]: item for item in result["checks"]}
+        assert checks["play-store-required-checks-complete"]["status"] == "manual_required"
 
     def test_register_contains_remaining_platform_readiness_groups(self):
         from app import get_commissioning_test_catalog, build_testing_register
