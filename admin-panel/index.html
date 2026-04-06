@@ -1372,39 +1372,6 @@
                                     </div>
                                 </section>
 
-                                <section class="python-automation-panel qa-suite-catalog-panel">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Suite-Katalog</h5>
-                                            <p>Alle verf&uuml;gbaren Testsuiten mit Voraussetzungs-Status.</p>
-                                        </div>
-                                    </div>
-                                    <div class="python-automation-toolbar">
-                                        <select id="suite-group-filter">
-                                            <option value="all">Alle Gruppen</option>
-                                            <option value="backend">Backend</option>
-                                            <option value="android">Android</option>
-                                            <option value="device">Device/USB</option>
-                                            <option value="release">Release</option>
-                                        </select>
-                                        <label class="setup-checklist-item python-inline-check">
-                                            <input type="checkbox" id="suite-ready-only" />
-                                            Nur lauff&auml;hige anzeigen
-                                        </label>
-                                    </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadSuiteCatalog()" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
-                                    </div>
-                                    <p class="qa-suite-catalog-hint">
-                                        Breite Katalogansicht mit klar getrennten Spalten f&uuml;r ID, Beschreibung, Voraussetzungen und Startaktion.
-                                    </p>
-                                    <div id="suite-catalog" class="data-list">
-                                        <div class="info">Noch nicht geladen.</div>
-                                    </div>
-                                </section>
-                            </div>
-
-                            <div class="python-automation-layout" style="margin-block-start: 14px">
                                 <section class="python-automation-panel">
                                     <div class="python-automation-panel-header">
                                         <div>
@@ -1455,7 +1422,9 @@
                                         <button onclick="startUsbTestRun()" class="btn btn-primary" title="USB-Testlauf für das ausgewählte Gerät und die Suite starten">USB-Testlauf starten</button>
                                     </div>
                                 </section>
+                            </div>
 
+                            <div class="python-automation-layout" style="margin-block-start: 14px">
                                 <section class="python-automation-panel">
                                     <div class="python-automation-panel-header">
                                         <div>
@@ -1468,6 +1437,37 @@
                                     </div>
                                     <div id="suite-active-runs" class="data-list">
                                         <div class="info">Noch keine Testl&auml;ufe.</div>
+                                    </div>
+                                </section>
+
+                                <section class="python-automation-panel qa-suite-catalog-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Suite-Katalog</h5>
+                                            <p>Alle verf&uuml;gbaren Testsuiten mit Voraussetzungs-Status.</p>
+                                        </div>
+                                    </div>
+                                    <div class="python-automation-toolbar">
+                                        <select id="suite-group-filter">
+                                            <option value="all">Alle Gruppen</option>
+                                            <option value="backend">Backend</option>
+                                            <option value="android">Android</option>
+                                            <option value="device">Device/USB</option>
+                                            <option value="release">Release</option>
+                                        </select>
+                                        <label class="setup-checklist-item python-inline-check">
+                                            <input type="checkbox" id="suite-ready-only" />
+                                            Nur lauff&auml;hige anzeigen
+                                        </label>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="loadSuiteCatalog()" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
+                                    </div>
+                                    <p class="qa-suite-catalog-hint">
+                                        Breite Katalogansicht mit klar getrennten Spalten f&uuml;r ID, Beschreibung, Voraussetzungen und Startaktion.
+                                    </p>
+                                    <div id="suite-catalog" class="data-list">
+                                        <div class="info">Noch nicht geladen.</div>
                                     </div>
                                 </section>
                             </div>

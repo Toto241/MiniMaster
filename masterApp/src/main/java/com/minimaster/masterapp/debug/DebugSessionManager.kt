@@ -64,16 +64,17 @@ object DebugSessionManager {
      * Generates a one-time nonce and logs it to logcat.
      * The previous pending challenge is invalidated.
      */
-    fun generateChallenge() {
+    fun generateChallenge(): String? {
         if (isSecretDisabled()) {
             Log.w(TAG, "Debug interface is DISABLED (secret not configured in local.properties).")
-            return
+            return null
         }
         val nonce = challengeProvider()
         pendingChallenge = nonce
         // Log exactly once so the admin script can grep for it
         Log.i(TAG_CHALLENGE, "CHALLENGE:$nonce")
         Log.i(TAG, "Debug challenge issued. Expires after first activation attempt.")
+        return nonce
     }
 
     /**

@@ -166,6 +166,24 @@ class AdbClient:
             args.extend(["-e", key, value])
         return self.run(args)
 
+    @staticmethod
+    def extract_broadcast_result_data(output: str) -> str | None:
+        """Extrahiert result/data-Felder aus der Ausgabe von `adb shell am broadcast`."""
+        if not output:
+            return None
+
+        patterns = [
+            r"\bdata=\"([^\"]+)\"",
+            r"\bdata=([^\s]+)",
+            r"resultData=\"([^\"]+)\"",
+            r"resultData=([^\s]+)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, output)
+            if match:
+                return match.group(1).strip()
+        return None
+
     # ── Logcat ────────────────────────────────────────────────────────────
 
     def read_logcat(self, tag: str, max_lines: int = 50, since_seconds: int = 5) -> list[str]:
@@ -286,6 +304,18 @@ class AdbClient:
             return ChallengeRequestResult(
                 reason="ADB-Broadcast für die Challenge ist fehlgeschlagen.",
                 details=broadcast_result.output,
+            )
+
+        broadcast_challenge = self.extract_broadcast_result_data(broadcast_result.output)
+        if broadcast_challenge == "DEBUG_INTERFACE_DISABLED":
+            return ChallengeRequestResult(
+                reason="Debug-Interface ist im App-Build deaktiviert. Secret in local.properties prüfen und die APK neu bauen.",
+                details=broadcast_result.output,
+            )
+        if broadcast_challenge:
+            return ChallengeRequestResult(
+                challenge=broadcast_challenge,
+                details=f"Broadcast: {broadcast_result.output.strip()}",
             )
 
         deadline = time.time() + 3.0
