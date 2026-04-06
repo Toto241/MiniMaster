@@ -1976,11 +1976,14 @@ def load_latest_commissioning_evidence() -> dict[str, dict[str, object]]:
 
 
 def collect_static_analysis_checks() -> list[dict[str, object]]:
-    static_results = {
-        f"static-{str(item.get('id') or '').strip()}": item
-        for item in run_static_readiness_checks()
-        if str(item.get("id") or "").strip()
-    }
+    static_results: dict[str, dict[str, object]] = {}
+    for item in run_static_readiness_checks():
+        result_id = str(item.get("id") or "").strip()
+        if not result_id:
+            continue
+        static_results[result_id] = item
+        static_results[f"static-{result_id}"] = item
+
     collected: list[dict[str, object]] = []
 
     for _group, test in iter_commissioning_tests():
@@ -2633,8 +2636,14 @@ def build_testing_register() -> dict[str, object]:
         for test in cast(list[dict[str, object]], group.get("tests") or []):
             test_id = str(test.get("id") or "")
             automation_type = str(test.get("automationType") or "automatic")
+            source = str(test.get("source") or "")
             suite_ref = str(test.get("suiteRef") or "")
-            register_state = commissioning_index.get(test_id)
+            if source == "static-analysis":
+                register_state = static_analysis_index.get(test_id)
+            elif source == "docs-validation":
+                register_state = docs_validation_index.get(test_id)
+            else:
+                register_state = commissioning_index.get(test_id)
             evidence_entry = evidence_index.get(test_id)
             suite_meta: dict[str, object] = {}
 
@@ -2647,10 +2656,10 @@ def build_testing_register() -> dict[str, object]:
                     "origin": "commissioning-evidence",
                 }
 
-            if register_state is None and str(test.get("source") or "") == "static-analysis":
+            if register_state is None and source == "static-analysis":
                 register_state = static_analysis_index.get(test_id)
 
-            if register_state is None and str(test.get("source") or "") == "docs-validation":
+            if register_state is None and source == "docs-validation":
                 register_state = docs_validation_index.get(test_id)
 
             if register_state is None and suite_ref:

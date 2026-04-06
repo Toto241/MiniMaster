@@ -22,11 +22,34 @@ function Get-Runs {
         [int]$Limit
     )
 
-    $raw = gh run list --repo $RepoName --workflow $Workflow --limit $Limit --json databaseId,headSha,status,conclusion,createdAt,updatedAt,displayTitle
-    if (-not $raw) {
+    $raw = & gh run list --repo $RepoName --workflow $Workflow --limit $Limit --json databaseId,headSha,status,conclusion,createdAt,updatedAt,displayTitle 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        $message = ($raw | Out-String).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($message)) {
+            Write-Warning "Could not load workflow runs for '$Workflow': $message"
+        } else {
+            Write-Warning "Could not load workflow runs for '$Workflow' (gh exit code $exitCode)."
+        }
         return @()
     }
-    return ($raw | ConvertFrom-Json)
+
+    $json = ($raw | Out-String).Trim()
+    if (-not $json) {
+        return @()
+    }
+
+    try {
+        $parsed = $json | ConvertFrom-Json
+    } catch {
+        Write-Warning "Could not parse workflow runs for '$Workflow' as JSON: $($_.Exception.Message)"
+        return @()
+    }
+
+    if ($parsed -is [System.Array]) {
+        return @($parsed)
+    }
+    return @($parsed)
 }
 
 function Get-AnnotationsForRun {
@@ -63,7 +86,7 @@ function Get-AnnotationsForRun {
 
 function Select-LatestSuccess {
     param([object[]]$Runs)
-    return ($Runs | Where-Object { $_.conclusion -eq "success" } | Select-Object -First 1)
+    return ($Runs | Where-Object { $_ -and $_.PSObject.Properties["conclusion"] -and $_.conclusion -eq "success" } | Select-Object -First 1)
 }
 
 function Test-BillingBlocker {
@@ -110,6 +133,11 @@ function Invoke-RerunIfRequested {
         return
     }
 
+    if (-not $latest.PSObject.Properties["conclusion"] -or -not $latest.PSObject.Properties["databaseId"]) {
+        Write-Host "Latest run payload for '$WorkflowName' is incomplete; rerun skipped."
+        return
+    }
+
     if ($latest.conclusion -ne "failure") {
         Write-Host "Latest run for '$WorkflowName' is not failed; rerun skipped."
         return
@@ -139,6 +167,12 @@ function New-RunSection {
     if (-not $latest) {
         $lines += ""
         $lines += "No runs found."
+        return $lines
+    }
+
+    if (-not $latest.PSObject.Properties["databaseId"]) {
+        $lines += ""
+        $lines += "Latest run payload is incomplete; GitHub CLI did not return the expected fields."
         return $lines
     }
 

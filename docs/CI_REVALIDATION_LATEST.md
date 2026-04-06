@@ -1,15 +1,15 @@
 # CI Revalidation Report
 
-Generated: 2026-04-06 00:06:17 +02:00
+Generated: 2026-04-06 11:39:03 +02:00
 Repository: Toto241/MiniMaster
 Rerun requested for latest failures: false
 
 ## CodeQL Security Analysis
 
-- Latest run: [24011366991](https://github.com/Toto241/MiniMaster/actions/runs/24011366991)
+- Latest run: [24026791086](https://github.com/Toto241/MiniMaster/actions/runs/24026791086)
 - Latest status: in_progress / pending
-- Head SHA: acf4137f9e5e00246a7dd3a057bf6178a045f72a
-- Updated at: 04/05/2026 21:58:17
+- Head SHA: f35c6de8410555591217cf5c6528b097b26cb207
+- Updated at: 04/06/2026 09:34:51
 - Latest success: none in inspected history
 
 Run is not completed yet; annotations are not available.
@@ -19,14 +19,13 @@ Repository code scanning blocker detected: pending
 
 ## Android CI
 
-- Latest run: [24011366972](https://github.com/Toto241/MiniMaster/actions/runs/24011366972)
+- Latest run: [24024870915](https://github.com/Toto241/MiniMaster/actions/runs/24024870915)
 - Latest status: completed / failure
-- Head SHA: acf4137f9e5e00246a7dd3a057bf6178a045f72a
-- Updated at: 04/05/2026 22:03:36
+- Head SHA: baa097731c24131afb3c1bf3a50ba1acdac897fb
+- Updated at: 04/06/2026 08:35:11
 - Latest success: [24000686837](https://github.com/Toto241/MiniMaster/actions/runs/24000686837)
 
 ### Latest Failure Annotations
-- [android] Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, android-actions/setup-android@v3, gradle/actions/setup-gradle@v4, gradle/actions/wrapper-validation@v3. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
 - [android] Process completed with exit code 1.
 
 Billing blocker detected: no
