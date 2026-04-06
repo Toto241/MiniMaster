@@ -174,6 +174,7 @@ class TestBuildTestingRegister:
             "doc-child-submits-task-photo": "android-usb-child",
             "doc-task-approval-workflow": "android-usb-master",
             "doc-create-app-blocking-rule": "android-usb-master",
+            "doc-verify-app-blocking-enforcement": "android-usb-child",
             "doc-screen-lock-enforcement": "android-usb-master",
         }
 
