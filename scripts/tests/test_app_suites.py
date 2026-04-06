@@ -392,6 +392,78 @@ class TestBuildTestingRegister:
         assert checks["service-account-ready"]["status"] == "manual_required"
         assert "uebersprungen" in checks["service-account-ready"]["details"]
 
+    def test_full_validation_error_count_is_inferred_from_checks(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_local_firebase_binding_status", lambda project_id: (True, f"bound:{project_id or 'default'}"))
+        monkeypatch.setattr(app, "load_local_service_account_status", lambda: (True, "service-account-ready"))
+
+        result = app.evaluate_commissioning_context(
+            {
+                "runtimeConfig": {
+                    "cloud": {
+                        "projectId": "minimaster-28fbd",
+                        "appCheckMode": "enforced",
+                    },
+                    "ai": {
+                        "provider": "gemini",
+                        "model": "gemini-3.0-flash",
+                        "keyRef": "projects/demo/secrets/key",
+                        "systemPrompt": "Assist.",
+                    },
+                },
+                "validationSummary": {
+                    "checks": {
+                        "firestoreAccessOk": True,
+                        "storageHealthOk": False,
+                        "functionsReachable": False,
+                    },
+                },
+                "attestations": {},
+                "playStoreState": {"checks": {}},
+            }
+        )
+
+        checks = {item["id"]: item for item in result["checks"]}
+        assert checks["full-validation-status"]["status"] == "fail"
+        assert checks["full-validation-status"]["details"] == "Full Validation meldet 2 Fehler."
+
+    def test_full_validation_passes_when_checks_are_present_without_error_count(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_local_firebase_binding_status", lambda project_id: (True, f"bound:{project_id or 'default'}"))
+        monkeypatch.setattr(app, "load_local_service_account_status", lambda: (True, "service-account-ready"))
+
+        result = app.evaluate_commissioning_context(
+            {
+                "runtimeConfig": {
+                    "cloud": {
+                        "projectId": "minimaster-28fbd",
+                        "appCheckMode": "enforced",
+                    },
+                    "ai": {
+                        "provider": "gemini",
+                        "model": "gemini-3.0-flash",
+                        "keyRef": "projects/demo/secrets/key",
+                        "systemPrompt": "Assist.",
+                    },
+                },
+                "validationSummary": {
+                    "checks": {
+                        "firestoreAccessOk": True,
+                        "storageHealthOk": True,
+                        "functionsReachable": True,
+                    },
+                },
+                "attestations": {},
+                "playStoreState": {"checks": {}},
+            }
+        )
+
+        checks = {item["id"]: item for item in result["checks"]}
+        assert checks["full-validation-status"]["status"] == "pass"
+        assert checks["full-validation-status"]["details"] == "Full Validation meldet 0 Fehler."
+
 
 class TestRunCommand:
     def test_uses_utf8_replace_for_subprocess_output(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

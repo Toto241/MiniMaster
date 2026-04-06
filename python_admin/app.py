@@ -1510,6 +1510,45 @@ def bool_from_payload(value: object, default: bool = False) -> bool:
     return default
 
 
+def derive_validation_error_count(
+    validation: dict[str, object], validation_checks: dict[str, object]
+) -> int:
+    explicit_error_count = parse_int(
+        validation.get("errorCount"), default=-1, min_value=-1, max_value=100000
+    )
+    if explicit_error_count >= 0:
+        return explicit_error_count
+
+    analysis_count = parse_int(
+        validation.get("analysisCount"), default=-1, min_value=-1, max_value=100000
+    )
+    ok_count = parse_int(validation.get("ok"), default=-1, min_value=-1, max_value=100000)
+    warn_count = parse_int(
+        validation.get("warn"), default=0, min_value=0, max_value=100000
+    )
+    if analysis_count >= 0 and ok_count >= 0:
+        return max(0, analysis_count - ok_count - warn_count)
+
+    inferred_failures = 0
+    found_explicit_check = False
+    for raw_value in validation_checks.values():
+        if isinstance(raw_value, bool):
+            found_explicit_check = True
+            if not raw_value:
+                inferred_failures += 1
+            continue
+        if isinstance(raw_value, str):
+            normalized = raw_value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                found_explicit_check = True
+                continue
+            if normalized in {"0", "false", "no", "off"}:
+                found_explicit_check = True
+                inferred_failures += 1
+
+    return inferred_failures if found_explicit_check else -1
+
+
 def trim_output(text: str, max_chars: int = 12000) -> str:
     if len(text) <= max_chars:
         return text
@@ -1751,7 +1790,7 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
         )
     )
 
-    validation_error_count = parse_int(validation.get("errorCount"), default=-1, min_value=-1, max_value=100000)
+    validation_error_count = derive_validation_error_count(validation, validation_checks)
     validation_ok = validation_error_count == 0
     checks.append(
         make_check(
