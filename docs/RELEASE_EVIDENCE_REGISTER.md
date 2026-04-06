@@ -2,6 +2,8 @@
 
 Status: consolidated evidence register for release candidate approval.
 
+Current synthesis note (2026-04-06): Repo-side remediation is complete and the local workspace is clean. Remaining blockers are external evidence and go-live operations. See [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md).
+
 ## 1. Purpose
 
 Every release candidate must have traceable evidence for all mandatory gates. This register is the single artifact that links to all required proof.
@@ -28,8 +30,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
 | Static readiness checks | scripts/static_readiness_checks.py: 20/20 checks passed (100%) (python scripts/test_automation.py --suite static-readiness) | ✅ | Automated | 2026-04-05 |
-| CodeQL security scan (0 high/critical) | Run [23998139916](https://github.com/Toto241/MiniMaster/actions/runs/23998139916): completed/failure; aktueller Blocker: Workflow- oder Build-Fehler, siehe docs/CI_REVALIDATION_LATEST.md | ⬜ | Engineering | 2026-04-05 |
-| Android build (if applicable) | Run [23949514844](https://github.com/Toto241/MiniMaster/actions/runs/23949514844): completed/success | ✅ | Automated | 2026-04-05 |
+| CodeQL security scan (0 high/critical) | Aktuelle Revalidation zeigt einen noch laufenden Run [24011366991](https://github.com/Toto241/MiniMaster/actions/runs/24011366991); nach Repo-Fix ist ein frischer erfolgreicher Nachweis noch ausstehend, siehe [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | ⬜ | Engineering | 2026-04-06 |
+| Android build (if applicable) | Letzter Erfolg: [24000686837](https://github.com/Toto241/MiniMaster/actions/runs/24000686837); letzter Fehlschlag [24011366972](https://github.com/Toto241/MiniMaster/actions/runs/24011366972) basiert auf vor dem Repo-Fix gemeldeten veralteten Action-Versionen, frischer Nachweis ausstehend | ⬜ | Engineering | 2026-04-06 |
 | Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
 
 ### 3.2 Functional Commissioning Gate
@@ -37,7 +39,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Checklist Key | Result | Evidence Link | Tester | Date |
 | --------------- | -------- | --------------- | -------- | ------ |
 | android-apps (pairing + sync) | ⬜ | build/test-automation/latest-summary.json (android-connected-master/android-connected-child skipped: No connected Android device or emulator detected via adb.) | Automated + Device Owner pending | 2026-04-05 |
-| `ai-config` (AI setup + generation) | ⬜ | | | |
+| `ai-config` (AI setup + generation) | ⬜ | Betriebsnachweis fuer produktiven Provider/Fallback noch offen | Engineering + Product/Ops | offen |
 | `support-workflow` (ticket lifecycle) | ✅ | build/test-automation/latest-summary.json (`backend-jest` inkl. e2e-ticket-lifecycle) | Automated | 2026-03-29 |
 | `compliance-flow` (DSAR + audit) | ✅ | test/enforcement-automation.test.ts | Automated | 2026-03-19 |
 
@@ -47,7 +49,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | --------------- | --------------- | -------- | ------------- | ------ |
 | Legacy auth telemetry snapshot | docs/LEGACY_AUTH_INVENTORY.md | ✅ | Documented | 2026-03-19 |
 | Auth mode / feature flags confirmed | copilot-instructions.md: Legacy Auth Freeze active | ✅ | Documented | 2026-03-19 |
-| Secrets/config review | `start.html`+`Firebase-Konsole.txt` bereinigt; `.env.example` + `.gitignore` aktualisiert; `deploy.yml` Projekt-ID-Bug (minimaster-app→minimaster-28fbd) behoben; Firebase-Key-Rotation im Console-Runbook offen | ⬜ | Security Owner | 2026-03-21 |
+| Secrets/config review | Repo-seitige Bereinigung abgeschlossen; verbleibend ist die externe Firebase-Key-Rotation inkl. Restriktionsnachweis aus der Console | ⬜ | Security Owner | 2026-04-06 |
 | Security baseline checklist | docs/SECURITY_BASELINE_CHECKLIST.md | ✅ | Documented | 2026-03-19 |
 
 ### 3.4 Compliance Gate
@@ -64,7 +66,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Evidence Item | Link/Reference | Status | Verified By | Date |
 | --------------- | --------------- | -------- | ------------- | ------ |
 | Runbook current version | RUNBOOK.md | ✅ | Documented | 2026-03-19 |
-| On-call / escalation roster | `docs/ONCALL_ESCALATION_ROSTER.md` (operationalisiert; Namen/Kontakte/Reachability/Sign-off noch offen) | ⬜ | Operations Lead | 2026-03-22 |
+| On-call / escalation roster | [docs/ONCALL_ESCALATION_ROSTER.md](docs/ONCALL_ESCALATION_ROSTER.md) ist operationalisiert; reale Namen, Kontakte, Reachability und Sign-off noch offen | ⬜ | Operations Lead | 2026-04-06 |
 | Rollback rehearsal or path validated | deploy.sh includes rollback instructions | ✅ | Documented | 2026-03-19 |
 | Operator validation summary export | docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md | ✅ | Documented | 2026-03-19 |
 
@@ -90,6 +92,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 Dieses Register wird bei jedem Steering-Checkpoint aktualisiert und ist Teil des endgültigen Release-Artefakts. Alle Links müssen vor der Go/No-Go-Entscheidung verifiziert und aktuell sein.
 
 Fuer die externe Umsetzungsstrecke (Billing/Console/Sign-off) siehe: `docs/RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md`.
+Aktuelle Priorisierung siehe: [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md).
 
 ## 6. Before Go-Live: Operative Restpunkte
 
@@ -102,14 +105,14 @@ Fuer die externe Umsetzungsstrecke (Billing/Console/Sign-off) siehe: `docs/RELEA
 | Permissions Declaration einreichen (Accessibility/Usage/Overlay) | Arbeitsstand dokumentiert in `docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`; finale Einreichbestaetigung aus Play Console noch offen | ⬜ | Compliance Owner | offen |
 | App-Access-Anleitung in Play Console hinterlegen | Link/Screenshot zur Reviewer-Anleitung (operationalisierter Draft in `docs/APP_ACCESS_REVIEWER_GUIDE.md`; Play Console Verlinkung noch offen) | ⬜ | Product/Ops | offen |
 | GitHub Actions Billing/Spending-Limit bereinigen | Kein aktiver Billing-Blocker mehr laut [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md); Punkt als erledigt dokumentieren und nicht weiter als Release-Blocker fuehren | ✅ | Repo Owner | 2026-04-05 |
-| CodeQL-Ergebnis verlinken | Letzter Run: [23998139916](https://github.com/Toto241/MiniMaster/actions/runs/23998139916) (completed/failure; aktueller Blocker: Workflow- oder Build-Fehler) | ⬜ | Engineering Owner | offen |
-| Android CI Build-Nachweis verlinken | Letzter Run: [23949514844](https://github.com/Toto241/MiniMaster/actions/runs/23949514844) (completed/success) | ✅ | Engineering Owner | 2026-04-05 |
+| CodeQL-Ergebnis verlinken | Frischer Nachweis nach Repo-Fix offen; aktueller Pending-Run: [24011366991](https://github.com/Toto241/MiniMaster/actions/runs/24011366991) | ⬜ | Engineering Owner | offen |
+| Android CI Build-Nachweis verlinken | Frischer Nachweis nach Repo-Fix offen; letzter Fehlschlag basiert auf vor Fix gemeldeten veralteten Action-Versionen | ⬜ | Engineering Owner | offen |
 | Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST | ⬜ | QA/Operations | offen |
 | On-call/Eskalations-Roster verbindlich benennen | Roster mit Namen, Kontakt, Vertretung (operationalisierte Vorlage in `docs/ONCALL_ESCALATION_ROSTER.md`; Inhalte offen) | ⬜ | Operations Lead | offen |
 
-## 7. 24h Execution Plan (Owner-Driven)
+## 7. Current Priority Execution Plan (Owner-Driven)
 
-Zeitraum: 2026-03-22 bis 2026-03-23 (lokale Zeit).
+Stand: 2026-04-06.
 
 Status legend:
 
@@ -120,21 +123,19 @@ Status legend:
 
 | # | Task | Owner | ETA | Abhaengigkeit | Nachweis fuer "Done" | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | 2026-03-22 18:00 | - | Aktuelle Revalidierung zeigt keinen Billing-Blocker mehr; historischer Punkt geschlossen | ✅ |
-| 2 | CI-Rerun nach Billing-Fix ausloesen (`-RerunLatestFailed`) | Engineering Owner | 2026-03-22 19:00 | 1 | Aktualisiertes `docs/CI_REVALIDATION_LATEST.md` mit laufenden Jobs | ✅ |
-| 3 | CodeQL-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | 🔄 |
-| 4 | Android-CI-Resultat verlinken und auf gruen pruefen | Engineering Owner | 2026-03-22 21:00 | 2 | Erfolgreicher Run-Link im Abschnitt 3.1 | ✅ |
-| 5 | Firebase-Key-Rotation nach Runbook durchfuehren | Security Owner | 2026-03-23 10:00 | - | Key-ID alt/neu + Loeschzeit in Evidence Register dokumentiert | ⬜ |
-| 6 | Play Console Data Safety einreichen | Product/Ops | 2026-03-23 12:00 | - | Review-Screenshot + Formularstatus "Submitted" | ⬜ |
-| 7 | IARC-Rating finalisieren | Product/Ops | 2026-03-23 12:30 | 6 | IARC/Content-Rating Screenshot in Play Console | ⬜ |
-| 8 | Permissions Declaration + App-Access-Guide hinterlegen | Compliance Owner + Product/Ops | 2026-03-23 14:00 | 6 | Bestaetigte Declarations + Reviewer-Guide Link (`docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md` vorbereitet) | 🔄 |
-| 9 | Physische Commissioning-Checks abschliessen | QA/Operations | 2026-03-23 16:00 | 5, 8 | Ausgefuellte [docs/PHYSICAL_COMMISSIONING_CHECKLIST.md](docs/PHYSICAL_COMMISSIONING_CHECKLIST.md) + Sign-off | ⬜ |
-| 10 | On-call/Eskalations-Roster benennen | Operations Lead | 2026-03-23 16:30 | - | Namen + Kontakte + Vertretung in Runbook/Evidence | ⬜ |
-| 11 | Go/No-Go Re-Decision dokumentieren | Release Manager | 2026-03-23 18:00 | 1-10 | Aktualisierte [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | ⬜ |
+| 1 | CodeQL und Android CI nach Repo-Fix neu ausfuehren | Engineering Owner | kurzfristig | GitHub Actions | Aktualisierte [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) mit aktuellen Runs | 🔄 |
+| 2 | Aktuelle CI-Evidenz im Register nachziehen | Engineering Owner | nach 1 | 1 | Frische Run-Links in Abschnitt 3.1 | ⬜ |
+| 3 | Finalen Deploy-Nachweis erfassen | Engineering Owner | nach 1 | 1 | Deployment-Referenz in Abschnitt 3.1 | ⬜ |
+| 4 | Firebase-Key-Rotation nach Runbook durchfuehren | Security Owner | offen | - | Key-ID alt/neu + Revocation-Zeitpunkt dokumentiert | ⬜ |
+| 5 | Data Safety, IARC und Store Listing finalisieren | Product/Ops | offen | - | Play-Console-Nachweise im Register | ⬜ |
+| 6 | Permissions Declaration und App Access final einreichen | Compliance Owner + Product/Ops | offen | 5 | Declarations + Reviewer-Guide Link dokumentiert | ⬜ |
+| 7 | Physische Commissioning-Checks abschliessen | QA/Operations | offen | 4, 6 | Ausgefuellte [docs/PHYSICAL_COMMISSIONING_CHECKLIST.md](docs/PHYSICAL_COMMISSIONING_CHECKLIST.md) + Sign-off | ⬜ |
+| 8 | On-call/Eskalations-Roster benennen und Reachability pruefen | Operations Lead | offen | - | Vollstaendige [docs/ONCALL_ESCALATION_ROSTER.md](docs/ONCALL_ESCALATION_ROSTER.md) + Evidence | ⬜ |
+| 9 | Go/No-Go Re-Decision dokumentieren | Release Manager | nach 1-8 | 1-8 | Aktualisierte [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | ⬜ |
 
 ### 7.1 Fast-Track Criteria fuer Conditional Go
 
-- Alle P0-Tasks 1-10 sind auf "Done" mit Nachweis.
+- Alle P0-Tasks 1-9 sind auf "Done" mit Nachweis.
 - CodeQL und Android CI haben jeweils mindestens einen erfolgreichen aktuellen Run.
 - Security Owner bestaetigt abgeschlossene Key-Rotation inkl. altem Key-Revocation-Nachweis.
 - Product/Ops bestaetigt, dass Data Safety, IARC, Permissions Declaration und App Access im Store eingereicht sind.
