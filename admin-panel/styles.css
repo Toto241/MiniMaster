@@ -1868,6 +1868,17 @@ input:focus, select:focus, textarea:focus {
     overflow-wrap: anywhere;
 }
 
+.suite-catalog-scope-note {
+    margin-block-start: 8px;
+    color: #1d4ed8;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
 .suite-catalog-prereq {
     display: inline-flex;
     align-items: center;

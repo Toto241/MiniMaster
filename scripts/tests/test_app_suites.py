@@ -63,8 +63,37 @@ class TestGetSuiteCatalog:
             assert "suiteId" in s
             assert "title" in s
             assert "group" in s
+            assert "scope" in s
+            assert "scopeNote" in s
             assert "prereqsMet" in s
             assert isinstance(s["prereqsMet"], bool)
+
+    def test_android_unit_child_is_marked_as_host_suite(self):
+        from app import get_suite_catalog
+
+        result = get_suite_catalog()
+        suites = {item["suiteId"]: item for item in result["suites"]}
+
+        suite = suites["android-unit-child"]
+        assert suite["scope"] == "host"
+        assert "bewertet keine installierten Apps" in suite["scopeNote"]
+
+    def test_android_unit_child_is_blocked_when_master_app_is_installed_on_connected_device(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        def fake_check(required_prereqs):
+            if "child_device_without_master_app" in required_prereqs:
+                return False, "Auf dem verbundenen Gerät TEST123 ist die Eltern-App installiert."
+            return True, None
+
+        monkeypatch.setattr(app, "ta_check_prereqs", fake_check)
+
+        result = app.get_suite_catalog()
+        suites = {item["suiteId"]: item for item in result["suites"]}
+
+        suite = suites["android-unit-child"]
+        assert suite["prereqsMet"] is False
+        assert "Eltern-App installiert" in suite["prereqReason"]
 
     def test_groups_structure(self):
         from app import get_suite_catalog

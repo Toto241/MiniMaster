@@ -564,6 +564,13 @@ function getLatestSuiteRunIndex(runs = suiteRunHistoryPayload) {
 }
 
 function getSuiteCatalogExecutionStatus(item) {
+    if (!getSuiteCatalogItemReady(item)) {
+        return {
+            state: "fail",
+            label: "FAIL",
+            detail: getSuiteCatalogItemReason(item) || "Voraussetzungen aktuell nicht erfüllt",
+        };
+    }
     const suiteId = getSuiteCatalogItemId(item);
     const latestRun = getLatestSuiteRunIndex().get(suiteId);
     return normalizeSuiteExecutionState(latestRun);
@@ -2961,6 +2968,7 @@ function renderSuiteCatalog(suites) {
                 const suiteId = getSuiteCatalogItemId(s);
                 const subtitle = s.title || "Kein Kurztitel hinterlegt";
                 const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
+                const scopeNote = String(s.scopeNote || "");
                 const isReady = getSuiteCatalogItemReady(s);
                 const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
                 const executionStatus = getSuiteCatalogExecutionStatus(s);
@@ -2980,6 +2988,7 @@ function renderSuiteCatalog(suites) {
                         <div class="suite-catalog-cell">
                             <span class="suite-catalog-label">Beschreibung</span>
                             <div class="suite-catalog-description">${escapeHtml(description)}</div>
+                            ${scopeNote ? `<div class="suite-catalog-scope-note">${escapeHtml(scopeNote)}</div>` : ""}
                         </div>
                         <div class="suite-catalog-cell">
                             <span class="suite-catalog-label">Voraussetzungen</span>

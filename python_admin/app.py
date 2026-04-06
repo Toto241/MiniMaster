@@ -2959,10 +2959,27 @@ def get_suite_catalog() -> dict[str, object]:
     suites_list: list[dict[str, object]] = []
     for suite in TA_SUITES:
         ok, reason = ta_check_prereqs(suite.required_prereqs)
+        scope = "host"
+        scope_note = ""
+        if suite.group == "device" or any(prereq in {"adb", "adb_device"} for prereq in suite.required_prereqs):
+            scope = "device"
+            scope_note = "Gerätebasierte Suite. Installationszustand und Laufzeitumgebung des verbundenen Android-Geräts sind relevant."
+        elif suite.group == "android":
+            scope = "host"
+            scope_note = "Host-basierte Android-Suite. Sie prüft Build, Lint oder Unit-Tests lokal und bewertet keine installierten Apps auf angeschlossenen Geräten."
+        elif suite.group == "backend":
+            scope = "backend"
+        elif suite.group == "python":
+            scope = "python"
+        elif suite.group == "release":
+            scope = "release"
+
         suites_list.append({
             "suiteId": suite.suite_id,
             "title": suite.title,
             "group": suite.group,
+            "scope": scope,
+            "scopeNote": scope_note,
             "command": " ".join(suite.command),
             "prereqs": list(suite.required_prereqs),
             "prereqsMet": ok,
