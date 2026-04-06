@@ -2838,24 +2838,44 @@ function renderSuiteCatalog(suites) {
 
     const groupLabels = { backend: "Backend", android: "Android", device: "Device/USB", release: "Release", sonstige: "Sonstige" };
 
-    el.innerHTML = Object.entries(groupMap).map(([group, items]) => `
-        <div style="margin-block-end: 12px">
-            <h6 style="margin:0 0 4px">${escapeHtml(groupLabels[group] || group)}</h6>
-            <table class="data-table" style="inline-size:100%">
-                <thead><tr>
-                    <th>Suite</th><th>Beschreibung</th><th>Voraussetzungen</th><th></th>
-                </tr></thead>
-                <tbody>${items.map(s => `
-                    <tr>
-                        <td><strong>${escapeHtml(getSuiteCatalogItemId(s))}</strong><div class='python-muted-caption'>${escapeHtml(s.title || '')}</div></td>
-                        <td>${escapeHtml(s.command || s.description || '')}</td>
-                        <td><span class="badge ${getSuiteCatalogItemReady(s) ? 'pass' : 'fail'}">${getSuiteCatalogItemReady(s) ? 'OK' : escapeHtml(getSuiteCatalogItemReason(s) || 'Nicht bereit')}</span></td>
-                        <td><button onclick="startSuiteRun('${encodeURIComponent(getSuiteCatalogItemId(s))}')" class="btn btn-secondary btn-sm" ${getSuiteCatalogItemReady(s) ? '' : 'disabled'}>Starten</button></td>
-                    </tr>`).join("")}
-                </tbody>
-            </table>
-        </div>
-    `).join("");
+    el.innerHTML = `<div class="suite-catalog-groups">${Object.entries(groupMap).map(([group, items]) => `
+        <section class="suite-catalog-group">
+            <header class="suite-catalog-group-header">
+                <h6>${escapeHtml(groupLabels[group] || group)}</h6>
+                <span class="suite-catalog-group-count">${items.length} Suite${items.length === 1 ? "" : "n"}</span>
+            </header>
+            <div class="suite-catalog-list">${items.map(s => {
+                const suiteId = getSuiteCatalogItemId(s);
+                const subtitle = s.title || "Kein Kurztitel hinterlegt";
+                const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
+                const isReady = getSuiteCatalogItemReady(s);
+                const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
+
+                return `
+                    <article class="suite-catalog-item">
+                        <div class="suite-catalog-cell suite-catalog-title">
+                            <span class="suite-catalog-label">Suite</span>
+                            <strong class="suite-catalog-id">${escapeHtml(suiteId)}</strong>
+                            <span class="suite-catalog-subtitle">${escapeHtml(subtitle)}</span>
+                        </div>
+                        <div class="suite-catalog-cell">
+                            <span class="suite-catalog-label">Beschreibung</span>
+                            <div class="suite-catalog-description">${escapeHtml(description)}</div>
+                        </div>
+                        <div class="suite-catalog-cell">
+                            <span class="suite-catalog-label">Voraussetzungen</span>
+                            <div class="suite-catalog-prereq">
+                                <span class="badge ${isReady ? 'pass' : 'fail'}">${isReady ? 'Bereit' : 'Blockiert'}</span>
+                                <span class="suite-catalog-prereq-text">${escapeHtml(prereqText)}</span>
+                            </div>
+                        </div>
+                        <div class="suite-catalog-cell suite-catalog-action">
+                            <button onclick="startSuiteRun('${encodeURIComponent(suiteId)}')" class="btn btn-secondary btn-sm" ${isReady ? '' : 'disabled'}>Starten</button>
+                        </div>
+                    </article>`;
+            }).join("")}</div>
+        </section>
+    `).join("")}</div>`;
 }
 
 async function startSuiteRun(suiteId) {
