@@ -1882,6 +1882,69 @@ input:focus, select:focus, textarea:focus {
     overflow-wrap: anywhere;
 }
 
+.suite-catalog-status-block {
+    display: grid;
+    gap: 6px;
+    margin-block-start: 10px;
+}
+
+.suite-catalog-status-label {
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.suite-status-field {
+    display: inline-grid;
+    grid-template-columns: repeat(3, minmax(54px, auto));
+    inline-size: fit-content;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #f8fafc;
+}
+
+.suite-status-cell {
+    padding: 6px 10px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: lowercase;
+    border-inline-end: 1px solid #e2e8f0;
+}
+
+.suite-status-cell:last-child {
+    border-inline-end: none;
+}
+
+.suite-status-cell.is-active {
+    color: #0f172a;
+}
+
+.suite-status-cell.is-active.state-ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.suite-status-cell.is-active.state-fail {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.suite-status-cell.is-active.state-open {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.suite-catalog-status-caption {
+    color: #475569;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 .suite-catalog-action {
     display: flex;
     justify-content: flex-end;
@@ -2027,6 +2090,55 @@ input:focus, select:focus, textarea:focus {
     justify-content: space-between;
     gap: 10px;
     align-items: flex-start;
+}
+
+.python-test-status-stack {
+    display: grid;
+    gap: 8px;
+    justify-items: end;
+    flex-shrink: 0;
+}
+
+.python-test-status-field {
+    display: inline-grid;
+    grid-template-columns: repeat(3, minmax(54px, auto));
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #f8fafc;
+}
+
+.python-test-status-cell {
+    padding: 6px 10px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: lowercase;
+    border-inline-end: 1px solid #e2e8f0;
+}
+
+.python-test-status-cell:last-child {
+    border-inline-end: none;
+}
+
+.python-test-status-cell.is-active {
+    color: #0f172a;
+}
+
+.python-test-status-cell.is-active.state-ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.python-test-status-cell.is-active.state-fail {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.python-test-status-cell.is-active.state-open {
+    background: #fef3c7;
+    color: #92400e;
 }
 
 .python-test-card-header h6 {
@@ -2543,6 +2655,10 @@ input:focus, select:focus, textarea:focus {
     .python-automation-panel-header,
     .python-automation-intro {
         flex-direction: column;
+    }
+
+    .python-test-status-stack {
+        justify-items: flex-start;
     }
 
     .suite-catalog-group-header {

@@ -133,6 +133,7 @@ let pythonEvidenceFilterTestId = "";
 let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
 let suiteCatalogPayload = [];
+let suiteRunHistoryPayload = [];
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -464,6 +465,114 @@ function getPythonAutomationStatusMeta(status) {
         return { label: "FAIL", className: "python-status-fail", cardClass: "status-fail" };
     }
     return { label: "OFFEN", className: "python-status-not_run", cardClass: "status-not_run" };
+}
+
+function getPythonAutomationFieldState(status) {
+    if (status === "pass") return "ok";
+    if (status === "fail") return "fail";
+    return "open";
+}
+
+function renderPythonAutomationStatusField(status) {
+    const activeState = getPythonAutomationFieldState(status);
+    const options = ["ok", "fail", "open"];
+    return `
+        <div class='python-test-status-field' aria-label='Teststatus'>
+            ${options.map(option => `
+                <span class='python-test-status-cell ${option === activeState ? `is-active state-${option}` : ""}'>${escapeHtml(option)}</span>
+            `).join("")}
+        </div>
+    `;
+}
+
+function renderTriStateStatusField(activeState, wrapperClass = "python-test-status-field", cellClass = "python-test-status-cell") {
+    const normalizedState = ["ok", "fail", "open"].includes(activeState) ? activeState : "open";
+    const options = ["ok", "fail", "open"];
+    return `
+        <div class='${wrapperClass}' aria-label='Statusfeld'>
+            ${options.map(option => `
+                <span class='${cellClass} ${option === normalizedState ? `is-active state-${option}` : ""}'>${escapeHtml(option)}</span>
+            `).join("")}
+        </div>
+    `;
+}
+
+function getSuiteRunTimestampValue(run) {
+    const raw = run?.startedAt || run?.started_at || run?.timestamp || run?.finishedAt || run?.updatedAt || "";
+    const parsed = Date.parse(String(raw || ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getSuiteRunKey(run) {
+    return String(run?.suiteId || run?.suite_id || run?.id || "");
+}
+
+function normalizeSuiteExecutionState(run) {
+    if (!run) {
+        return {
+            state: "open",
+            label: "OPEN",
+            detail: "Noch kein Lauf protokolliert",
+        };
+    }
+
+    const lifecycle = String(run.status || "").toLowerCase();
+    const resultStatus = String(run?.result?.status || run?.result?.overall_status || run?.overall_status || "").toLowerCase();
+
+    if (lifecycle === "running" || lifecycle === "queued" || lifecycle === "pending") {
+        return {
+            state: "open",
+            label: "OPEN",
+            detail: "Lauf aktiv oder wartend",
+        };
+    }
+
+    if (["passed", "pass", "ok", "success"].includes(resultStatus)) {
+        return {
+            state: "ok",
+            label: "OK",
+            detail: "Letzter Lauf erfolgreich",
+        };
+    }
+
+    if (["failed", "fail", "error", "errored"].includes(resultStatus) || (lifecycle === "finished" && resultStatus && resultStatus !== "passed" && resultStatus !== "pass" && resultStatus !== "skipped")) {
+        return {
+            state: "fail",
+            label: "FAIL",
+            detail: run?.result?.reason || run?.result?.error || run?.error || "Letzter Lauf fehlgeschlagen",
+        };
+    }
+
+    return {
+        state: "open",
+        label: "OPEN",
+        detail: resultStatus === "skipped" ? "Letzter Lauf übersprungen" : "Status noch offen",
+    };
+}
+
+function getLatestSuiteRunIndex(runs = suiteRunHistoryPayload) {
+    const index = new Map();
+    (Array.isArray(runs) ? runs : []).forEach(run => {
+        const suiteKey = getSuiteRunKey(run);
+        if (!suiteKey) return;
+        const previous = index.get(suiteKey);
+        if (!previous || getSuiteRunTimestampValue(run) >= getSuiteRunTimestampValue(previous)) {
+            index.set(suiteKey, run);
+        }
+    });
+    return index;
+}
+
+function getSuiteCatalogExecutionStatus(item) {
+    const suiteId = getSuiteCatalogItemId(item);
+    const latestRun = getLatestSuiteRunIndex().get(suiteId);
+    return normalizeSuiteExecutionState(latestRun);
+}
+
+function rerenderSuiteCatalogFromCache() {
+    if (Array.isArray(suiteCatalogPayload) && suiteCatalogPayload.length > 0) {
+        renderSuiteCatalog(suiteCatalogPayload);
+    }
 }
 
 function formatPythonAutomationType(type, source = "") {
@@ -909,6 +1018,7 @@ function renderPythonAutomationCatalog(catalog, run) {
         const { group, test, resolved, status } = entry;
         const statusMeta = getPythonAutomationStatusMeta(status);
         const extraCardClass = test.automationType === "documented" ? " status-documented" : "";
+        const statusFieldHtml = renderPythonAutomationStatusField(status);
         const evaluatedAt = resolved.evaluatedAt
             ? new Date(resolved.evaluatedAt).toLocaleString("de-DE")
             : "noch nicht protokolliert";
@@ -928,7 +1038,10 @@ function renderPythonAutomationCatalog(catalog, run) {
                         <h6>${escapeHtml(test.title || test.id || "Prüffall")}</h6>
                         <p class='python-muted-caption'>ID: ${escapeHtml(test.id || "-")} · Quelle: ${escapeHtml(test.source || "-")} · Gruppe: ${escapeHtml(group.title || "-")}</p>
                     </div>
-                    <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
+                    <div class='python-test-status-stack'>
+                        ${statusFieldHtml}
+                        <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
+                    </div>
                 </div>
                 <div class='python-test-meta'>
                     <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType, test.source)}'>${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}</span>
@@ -2850,6 +2963,12 @@ function renderSuiteCatalog(suites) {
                 const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
                 const isReady = getSuiteCatalogItemReady(s);
                 const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
+                const executionStatus = getSuiteCatalogExecutionStatus(s);
+                const executionField = renderTriStateStatusField(executionStatus.state, "suite-status-field", "suite-status-cell");
+                const latestRun = getLatestSuiteRunIndex().get(suiteId);
+                const latestRunMeta = latestRun
+                    ? `Run ${escapeHtml(String(latestRun.runId || latestRun.run_id || "-"))} · ${escapeHtml(String(latestRun.startedAt || latestRun.started_at || latestRun.timestamp || ""))}`
+                    : "Noch kein Lauf vorhanden";
 
                 return `
                     <article class="suite-catalog-item">
@@ -2867,6 +2986,11 @@ function renderSuiteCatalog(suites) {
                             <div class="suite-catalog-prereq">
                                 <span class="badge ${isReady ? 'pass' : 'fail'}">${isReady ? 'Bereit' : 'Blockiert'}</span>
                                 <span class="suite-catalog-prereq-text">${escapeHtml(prereqText)}</span>
+                            </div>
+                            <div class="suite-catalog-status-block">
+                                <span class="suite-catalog-status-label">Teststatus</span>
+                                ${executionField}
+                                <span class="suite-catalog-status-caption">${escapeHtml(executionStatus.detail)} · ${latestRunMeta}</span>
                             </div>
                         </div>
                         <div class="suite-catalog-cell suite-catalog-action">
@@ -2889,6 +3013,17 @@ async function startSuiteRun(suiteId) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Suite konnte nicht gestartet werden.");
+        suiteRunHistoryPayload = [
+            {
+                suiteId: decodedSuiteId,
+                runId: data.runId,
+                status: "running",
+                startedAt: new Date().toISOString(),
+                result: { status: "running" },
+            },
+            ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || "")),
+        ];
+        rerenderSuiteCatalogFromCache();
         showNotification(`Suite '${decodedSuiteId}' gestartet (Run-ID: ${data.runId}).`, "success");
         pollSuiteRunStatus(data.runId);
         appendSuiteActiveRun(data.runId, decodedSuiteId);
@@ -2982,14 +3117,26 @@ function pollSuiteRunStatus(runId) {
                     const resultStatus = data.result?.status || data.result?.overall_status;
                     const isPass = data.status === "finished" && resultStatus === "passed";
                     const isSkipped = data.status === "finished" && resultStatus === "skipped";
+                    const existingRun = suiteRunHistoryPayload.find(item => String(item?.runId || item?.run_id || "") === String(runId || ""));
+                    const mergedRun = {
+                        ...(existingRun || {}),
+                        ...data,
+                        suiteId: data.suiteId || data.suite_id || existingRun?.suiteId || existingRun?.suite_id || "",
+                    };
                     badge.className = `badge ${isPass ? "pass" : isSkipped ? "running" : data.status === "finished" ? "fail" : "fail"}`;
                     badge.textContent = data.status === "finished"
                         ? (isPass ? "fertig" : isSkipped ? "übersprungen" : "fehlgeschlagen")
                         : data.status;
                     if (detail) detail.textContent = data.result?.reason || data.result?.error || data.error || resultStatus || "";
+                    suiteRunHistoryPayload = [
+                        mergedRun,
+                        ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || runId || "")),
+                    ];
+                    rerenderSuiteCatalogFromCache();
                     clearInterval(_suiteActivePollers[runId]);
                     delete _suiteActivePollers[runId];
                     loadTestingRegister();
+                    loadSuiteRunHistory();
                 }
             }
         } catch { /* ignore */ }
@@ -3011,6 +3158,8 @@ async function loadSuiteRunHistory() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
         const runs = data.runs || [];
+        suiteRunHistoryPayload = runs;
+        rerenderSuiteCatalogFromCache();
         if (runs.length === 0) {
             el.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
             return;
