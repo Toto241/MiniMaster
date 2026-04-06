@@ -466,17 +466,24 @@ function getPythonAutomationStatusMeta(status) {
     return { label: "OFFEN", className: "python-status-not_run", cardClass: "status-not_run" };
 }
 
-function formatPythonAutomationType(type) {
+function formatPythonAutomationType(type, source = "") {
     if (type === "command") return "Lokales Gate-Kommando";
     if (type === "documented") return "Dokumentierter Testplan";
     if (type === "manual") return "Manueller Nachweis";
+    if (source === "device-suite") return "Device-Suite-Check";
+    if (source === "static-analysis") return "Statische Analyse";
+    if (source === "docs-validation") return "Dokument-Evidenzcheck";
+    if (source === "playstore-readiness") return "Play-Store-Readiness";
     return "Automatisch bewertet";
 }
 
-function getPythonAutomationTypeChipClass(type) {
+function getPythonAutomationTypeChipClass(type, source = "") {
     if (type === "command") return "python-automation-chip-command";
     if (type === "documented") return "python-automation-chip-documented";
     if (type === "manual") return "python-automation-chip-manual";
+    if (source === "device-suite") return "python-automation-chip-suite";
+    if (source === "static-analysis") return "python-automation-chip-static";
+    if (source === "docs-validation") return "python-automation-chip-docs";
     return "python-automation-chip-auto";
 }
 
@@ -492,11 +499,36 @@ function getPythonAutomationCatalogFilters() {
     };
 }
 
-function getPythonAutomationModeHint(type) {
+function getPythonAutomationModeHint(type, source = "") {
     if (type === "command") return "Automatisiertes CLI/PowerShell-Gate";
     if (type === "documented") return "Manueller Nachweis anhand dokumentierter Schrittfolge";
     if (type === "manual") return "Manuelle Prüfung mit Operator-Nachweis";
+    if (source === "device-suite") return "Automatische Bewertung aus einer verknüpften Device- oder USB-Suite";
+    if (source === "static-analysis") return "Automatische Code-, Build- oder Manifest-Prüfung ohne Geräteausführung";
+    if (source === "docs-validation") return "Automatische Prüfung von Reviewer-, Release- oder Store-Dokumentation";
     return "Automatische Bewertung im Python-Lauf";
+}
+
+function formatTestingRegisterSourceLabel(source) {
+    if (source === "device-suite") return "Quelle: Device-Suite";
+    if (source === "static-analysis") return "Quelle: Statische Analyse";
+    if (source === "docs-validation") return "Quelle: Dokument-Check";
+    if (source === "playstore-readiness") return "Quelle: Play-Store-Readiness";
+    if (source === "command") return "Quelle: Lokales Gate";
+    if (source === "manual") return "Quelle: Manueller Nachweis";
+    if (source === "docs") return "Quelle: Dokumentierter Testplan";
+    return source ? `Quelle: ${String(source)}` : "";
+}
+
+function getTestingRegisterSourceChipClass(source) {
+    if (source === "device-suite") return "python-automation-chip-suite";
+    if (source === "static-analysis") return "python-automation-chip-static";
+    if (source === "docs-validation") return "python-automation-chip-docs";
+    if (source === "playstore-readiness") return "python-automation-chip-auto";
+    if (source === "command") return "python-automation-chip-command";
+    if (source === "manual") return "python-automation-chip-manual";
+    if (source === "docs") return "python-automation-chip-documented";
+    return "python-automation-chip-neutral";
 }
 
 function isManualAutomationType(type) {
@@ -659,7 +691,7 @@ function renderPythonAutomationProtocolEditor() {
                     <h6>${escapeHtml(test.title || test.id || "Prueffall")}</h6>
                     <p class='python-muted-caption'>Gruppe: ${escapeHtml(group.title || "-")} · ID: ${escapeHtml(test.id || "-")}</p>
                 </div>
-                <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType)}'>${escapeHtml(formatPythonAutomationType(test.automationType))}</span>
+                <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType, test.source)}'>${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}</span>
             </div>
             <p>${escapeHtml(test.description || "")}</p>
             <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
@@ -899,9 +931,9 @@ function renderPythonAutomationCatalog(catalog, run) {
                     <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
                 </div>
                 <div class='python-test-meta'>
-                    <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType)}'>${escapeHtml(formatPythonAutomationType(test.automationType))}</span>
+                    <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType, test.source)}'>${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}</span>
                 </div>
-                <div class='python-test-detail'><strong>Bewertungsmodus:</strong> ${escapeHtml(getPythonAutomationModeHint(test.automationType))}</div>
+                <div class='python-test-detail'><strong>Bewertungsmodus:</strong> ${escapeHtml(getPythonAutomationModeHint(test.automationType, test.source))}</div>
                 <p>${escapeHtml(test.description || "")}</p>
                 <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
                 ${test.command ? `<div class='python-test-detail'><strong>Kommando:</strong> ${escapeHtml(test.command)}</div>` : ""}
@@ -1877,6 +1909,12 @@ function buildTestingRegisterMetaBadges(item) {
     if (item.owner) {
         badges.push(`<span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr(`Verantwortlich: ${String(item.owner)}`, `Verantwortlich ${String(item.owner)}`)}>${escapeTestingRegisterText(String(item.owner))}</span>`);
     }
+    if (item.source) {
+        const sourceLabel = formatTestingRegisterSourceLabel(String(item.source || ""));
+        if (sourceLabel) {
+            badges.push(`<span class='python-automation-chip ${getTestingRegisterSourceChipClass(String(item.source || ""))}' ${buildTestingRegisterTooltipAttr(sourceLabel, sourceLabel)}>${escapeTestingRegisterText(sourceLabel.replace(/^Quelle:\s*/, ""))}</span>`);
+        }
+    }
     if (item.blockingForRelease) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zu einem aktuellen, bestaetigten PASS. Veraltete Nachweise gelten hier ebenfalls als offen.", "Release-Blocker")}>Release-Blocker</span>`);
     }
@@ -1895,6 +1933,9 @@ function buildTestingRegisterLegend() {
             Register-Legende:
             <span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr("Prioritaet des Testfalls", "Prioritaet")}>CRITICAL/HIGH</span>
             <span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr("Fachlich oder technisch verantwortliche Rolle", "Owner")}>Owner</span>
+            <span class='python-automation-chip python-automation-chip-suite' ${buildTestingRegisterTooltipAttr("Automatische Bewertung aus einer verknüpften Device- oder Repo-Suite", "Device-Suite")}>Device-Suite</span>
+            <span class='python-automation-chip python-automation-chip-static' ${buildTestingRegisterTooltipAttr("Automatische Code-, Build- oder Manifest-Prüfung", "Statische Analyse")}>Static-Analysis</span>
+            <span class='python-automation-chip python-automation-chip-docs' ${buildTestingRegisterTooltipAttr("Automatischer Review von Dokumenten, Checklisten oder Release-Evidenz", "Dokument-Check")}>Dokument-Check</span>
             <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Release darf ohne aktuellen PASS nicht freigegeben werden; veraltete Nachweise zählen ebenfalls als offen", "Release-Blocker")}>Release-Blocker</span>
             <span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Inventarisiert, aber noch nicht an eine Suite gekoppelt", "Unsupported")}>Unsupported</span>
         </div>
@@ -2026,6 +2067,8 @@ function getTestingRegisterActionLabel(item) {
     const action = String(item?.action || "commissioning-run");
     if (action === "suite-run") return "Suite-Start";
     if (action === "protocol") return "Nachweis-Protokoll";
+    if (String(item?.source || "") === "docs-validation") return "Dokument-Check ausführen";
+    if (String(item?.source || "") === "static-analysis") return "Static-Checks ausführen";
     return "Python-Commissioning-Lauf";
 }
 
@@ -2037,6 +2080,12 @@ function buildTestingRegisterExecutionPath(item) {
     }
     if (String(item?.action || "") === "protocol") {
         return "Manuell im Nachweisformular abschließen";
+    }
+    if (String(item?.source || "") === "docs-validation") {
+        return "Im Python-Lauf als Dokument-Validierung enthalten";
+    }
+    if (String(item?.source || "") === "static-analysis") {
+        return "Im Python-Lauf als statische Analyse enthalten";
     }
     return "Im Python-Commissioning-Lauf enthalten";
 }
@@ -2283,6 +2332,8 @@ function buildTestingRegisterActionTooltip(item) {
 function buildTestingRegisterDetailText(item) {
     const parts = [];
     if (item.details) parts.push(String(item.details));
+    const sourceLabel = formatTestingRegisterSourceLabel(String(item.source || "")).replace(/^Quelle:\s*/, "");
+    if (sourceLabel) parts.push(sourceLabel);
     if (item.environment) parts.push(`Umgebung: ${item.environment}`);
     if (item.linkedSuite) parts.push(`Suite: ${item.linkedSuite}`);
     if (item.linkedCommand) parts.push(`Kommando: ${item.linkedCommand}`);
@@ -2463,13 +2514,13 @@ function renderTestingRegisterPanelRows(items) {
     return items.map(item => {
         const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
         const updatedAt = item.updatedAt ? formatPythonAutomationTimestamp(item.updatedAt) : "noch nicht protokolliert";
-        const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"));
+        const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"), String(item.source || ""));
         const detailText = buildTestingRegisterDetailText(item);
         return `
             <tr>
                 <td><strong>${escapeHtml(item.title || item.id || "-")}</strong><div class='python-muted-caption'>${escapeHtml(item.id || "-")}</div></td>
                 <td>${escapeHtml(formatTestingRegisterGroupTitle(item))}</td>
-                <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"))}'>${escapeHtml(typeLabel)}</span></td>
+            <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"), String(item.source || ""))}'>${escapeHtml(typeLabel)}</span></td>
                 <td>${buildTestingRegisterMetaBadges(item) || "-"}</td>
                 <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
                 <td>${escapeHtml(buildTestingRegisterExecutionPath(item))}</td>
@@ -2565,6 +2616,15 @@ function renderTestingRegisterList(payload) {
             return false;
         }
         if (filters.type === "unsupported" && String(item.groupId || "") !== "repo-tests-unsupported") {
+            return false;
+        }
+        if (filters.type === "deviceSuite" && String(item.source || "") !== "device-suite") {
+            return false;
+        }
+        if (filters.type === "staticAnalysis" && String(item.source || "") !== "static-analysis") {
+            return false;
+        }
+        if (filters.type === "docsValidation" && String(item.source || "") !== "docs-validation") {
             return false;
         }
         if (filters.type === "automatic" && !(automationType === "automatic" || automationType === "command")) {
@@ -3590,7 +3650,7 @@ function renderCommissioningQaApprovalList(items, emptyMessage) {
 
     return `<ul>${items.map(item => {
         const definition = commissioningQaRegisterDefinitionMap.get(String(item.id || ""));
-        const type = formatPythonAutomationType(String(item.automationType || definition?.automationType || "automatic"));
+        const type = formatPythonAutomationType(String(item.automationType || definition?.automationType || "automatic"), String(item.source || definition?.source || ""));
         const status = formatPythonAutomationStatus(String(item.status || "not_run"));
         return `<li><strong>${escapeHtml(item.title || definition?.label || item.id || "-")}</strong> <span class="python-muted-caption">(${escapeHtml(type)} · ${escapeHtml(status)})</span></li>`;
     }).join("")}</ul>`;
@@ -4022,7 +4082,7 @@ function renderPrioritizedActionPlan() {
                             <div class="priority-plan-test-item">
                                 <strong>${escapeHtml(test.statusLabel)}</strong>
                                 <span>${escapeHtml(test.title)}</span>
-                                <span class="muted-note">${escapeHtml(formatPythonAutomationType(test.automationType))}${test.groupTitle ? ` · ${escapeHtml(test.groupTitle)}` : ""}</span>
+                                <span class="muted-note">${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}${test.groupTitle ? ` · ${escapeHtml(test.groupTitle)}` : ""}</span>
                                 ${test.details ? `<div class="muted-note">${escapeHtml(test.details)}</div>` : ""}
                             </div>
                         `).join("")}
