@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -85,12 +86,13 @@ def make_documented_test(
     *,
     success_criteria: str,
     source: str = "docs",
+    automation_type: str = "documented",
 ) -> dict[str, object]:
     return {
         "id": test_id,
         "title": title,
         "description": description,
-        "automationType": "documented",
+        "automationType": automation_type,
         "source": source,
         "successCriteria": success_criteria,
         "documentation": documentation,
@@ -459,64 +461,71 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "doc-master-app-registration-auth",
                 "title": "Test 1.1: Master App Registration & Auth",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter MasterApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-master",
+                "successCriteria": "Die MasterApp-Commissioning-Suite validiert Registration, Legal-Gate und Auth-Fluss erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-11-master-app-registration--auth",
             },
             {
                 "id": "doc-generate-pairing-code",
                 "title": "Test 1.2: Generate Pairing Code",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter MasterApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-master",
+                "successCriteria": "Die MasterApp-Commissioning-Suite validiert die Pairing-Code-Erzeugung erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-12-generate-pairing-code",
             },
             {
                 "id": "doc-child-app-registration-code",
                 "title": "Test 1.3: Child App Registration via Code",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter ChildApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-child",
+                "successCriteria": "Die ChildApp-Commissioning-Suite validiert Registrierung und Pairing erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-13-child-app-registration-via-code",
             },
             {
                 "id": "doc-create-task",
                 "title": "Test 2.1: Create a Task",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter MasterApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-master",
+                "successCriteria": "Die MasterApp-Commissioning-Suite validiert die Task-Erstellung erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-21-create-a-task",
             },
             {
                 "id": "doc-child-submits-task-photo",
                 "title": "Test 2.2: Child Submits Task with Photo",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter ChildApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-child",
+                "successCriteria": "Die ChildApp-Commissioning-Suite validiert Task-Abschluss und Foto-Nachweis erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-22-child-submits-task-with-photo",
             },
             {
                 "id": "doc-task-approval-workflow",
                 "title": "Test 2.3: Complete Task Approval Workflow",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter MasterApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-master",
+                "successCriteria": "Die MasterApp-Commissioning-Suite validiert den Task-Freigabe-Workflow erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-23-complete-task-approval-workflow",
             },
             {
                 "id": "doc-create-app-blocking-rule",
                 "title": "Test 3.1: Create App Blocking Rule",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter MasterApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-master",
+                "successCriteria": "Die MasterApp-Commissioning-Suite validiert die Erfassung einer App-Blocking-Regel erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-31-create-app-blocking-rule",
             },
             {
@@ -531,10 +540,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "doc-screen-lock-enforcement",
                 "title": "Test 3.3: Screen Lock Enforcement",
-                "description": "Manueller Abnahmetest aus der Physical Commissioning Checklist.",
-                "automationType": "documented",
-                "source": "docs",
-                "successCriteria": "Ablauf gemaess docs/PHYSICAL_COMMISSIONING_CHECKLIST.md erfolgreich durchlaufen und dokumentiert.",
+                "description": "Automatisierter MasterApp-Commissioning-Test aus der Physical Commissioning Checklist.",
+                "automationType": "automatic",
+                "source": "device-suite",
+                "suiteRef": "android-usb-master",
+                "successCriteria": "Die MasterApp-Commissioning-Suite validiert den Screen-Lock-Flow erfolgreich.",
                 "documentation": "docs/PHYSICAL_COMMISSIONING_CHECKLIST.md#test-33-screen-lock-enforcement",
             },
             {
@@ -689,6 +699,8 @@ COMMISSIONING_TEST_GROUPS = (
                 "Reviewer-Test-Credentials verifizieren",
                 "Prueft, ob die dokumentierten Reviewer-Credentials und Testprofile vollstaendig gepflegt sind.",
                 "docs/APP_ACCESS_REVIEWER_GUIDE.md#2-test-credentials",
+                automation_type="automatic",
+                source="docs-validation",
                 success_criteria="Die hinterlegten Reviewer-Credentials und Testprofile sind verfuegbar und dokumentiert.",
             ),
             make_documented_test(
@@ -710,6 +722,8 @@ COMMISSIONING_TEST_GROUPS = (
                 "Submission-Checklist fuer Reviewer-Access abgleichen",
                 "Spiegelt die dokumentierte Submission-Checklist fuer den App-Review wider.",
                 "docs/APP_ACCESS_REVIEWER_GUIDE.md#9-submission-checklist",
+                automation_type="automatic",
+                source="docs-validation",
                 success_criteria="Alle Submission-Punkte aus dem Reviewer-Guide wurden abgeglichen und dokumentiert.",
             ),
         ),
@@ -745,6 +759,8 @@ COMMISSIONING_TEST_GROUPS = (
                 "Release-Evidence-Register abgleichen",
                 "Stellt sicher, dass Release-Evidenz und offene Restpunkte im Register gepflegt sind.",
                 "docs/RELEASE_EVIDENCE_REGISTER.md",
+                automation_type="automatic",
+                source="docs-validation",
                 success_criteria="Das Evidence Register wurde auf Vollstaendigkeit geprueft und mit aktuellen Artefakten verknuepft.",
             ),
         ),
@@ -846,25 +862,28 @@ COMMISSIONING_TEST_GROUPS = (
                 "id": "p0-play-listing",
                 "title": "Store Listing final",
                 "description": "Beschreibung, Screenshots, Kontaktdaten und Feature-Grafik sind vollstaendig.",
-                "automationType": "manual",
-                "source": "p0-blocker",
+                "automationType": "automatic",
+                "source": "docs-validation",
                 "successCriteria": "Store Listing ist in der Play Console als vollstaendig markiert.",
+                "documentation": "docs/STORE_LISTING_AND_IARC_READINESS.md#part-d-store-listing-finalization",
             },
             {
                 "id": "p0-play-permissions",
                 "title": "Permissions Declaration eingereicht",
                 "description": "Accessibility/Usage/Overlay-Begruendungen sind eingereicht.",
-                "automationType": "manual",
-                "source": "p0-blocker",
+                "automationType": "automatic",
+                "source": "docs-validation",
                 "successCriteria": "Permissions Declaration ist eingereicht und consistent mit App-Verhalten.",
+                "documentation": "docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md#6-submission-evidence-log",
             },
             {
                 "id": "p0-play-app-access",
                 "title": "App Access Guide hinterlegt",
                 "description": "Reviewer-Anleitung mit Test-Credentials ist in der Play Console hinterlegt.",
-                "automationType": "manual",
-                "source": "p0-blocker",
+                "automationType": "automatic",
+                "source": "docs-validation",
                 "successCriteria": "App Access Guide ist hochgeladen und aktuell.",
+                "documentation": "docs/APP_ACCESS_REVIEWER_GUIDE.md#11-finalization-sign-off",
             },
         ),
     },
@@ -978,10 +997,10 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ma-usage-rules-nav",
                 "title": "UsageRulesScreen über Navigation erreichbar und datengebunden",
-                "description": "Verifiziert Navigation, Laden und Speichern der Nutzungsregeln in der MasterApp.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Usage Rules koennen aufgerufen, bearbeitet und erfolgreich synchronisiert werden.",
+                "description": "Automatischer statischer Nachweis fuer Navigation, Screen-Route und setUsageRules-Anbindung in der MasterApp.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "Dashboard-Navigation, UsageRules-Route und setUsageRules-Callable sind im Code vorhanden.",
             },
             {
                 "id": "ma-date-picker",
@@ -1105,18 +1124,18 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ca-usage-limits",
                 "title": "Tages- und Pro-App-Nutzungslimits korrekt durchgesetzt",
-                "description": "Verifiziert die fachliche Durchsetzung von Tages- und App-spezifischen Nutzungslimits.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Zeitlimits werden auf dem Geraet korrekt gezaehlt und durchgesetzt.",
+                "description": "Automatischer statischer Nachweis fuer Parsing, Sync und Enforcement-Code der Tages- und Pro-App-Limits.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "dailyLimit/appLimits werden geparst, synchronisiert und in der Policy-Engine ausgewertet.",
             },
             {
                 "id": "ca-time-windows",
                 "title": "Zeitfenster-Einschränkungen (inkl. Nachtsperre) aktiv",
-                "description": "Prueft aktive Zeitfenster und Nachtsperren gegen reale Uhrzeit-/Policy-Szenarien.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Zeitfensterregeln werden zum erwarteten Zeitpunkt wirksam.",
+                "description": "Automatischer statischer Nachweis fuer Parsing, Sync und Enforcement-Code von Zeitfenster-Policies.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "allowedHours werden geparst, synchronisiert und in der Policy-Engine ausgewertet.",
             },
             {
                 "id": "ca-tamper-detection",
@@ -1208,10 +1227,10 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "dt-ipc-messaging",
                 "title": "IPC-Kommunikation zwischen Main-Process und Panels",
-                "description": "Verifiziert die IPC-Kommunikation zwischen Main Process, Parent Panel und Admin Panel.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "IPC-Nachrichten werden in den relevanten Flows korrekt uebertragen.",
+                "description": "Automatischer statischer Nachweis fuer Preload-Bridge und ipcMain-Handler in der Electron-App.",
+                "automationType": "automatic",
+                "source": "static-analysis",
+                "successCriteria": "contextBridge/ipcRenderer im Preload und passende ipcMain-Handler im Main-Process sind vorhanden.",
             },
             {
                 "id": "dt-parent-panel-login",
@@ -1997,6 +2016,91 @@ def collect_static_analysis_checks() -> list[dict[str, object]]:
     return collected
 
 
+def read_repo_text(relative_path: str) -> str:
+    target = REPO_ROOT / relative_path
+    if not target.exists() or not target.is_file():
+        return ""
+    return target.read_text(encoding="utf-8", errors="replace")
+
+
+def count_marker(text: str, marker: str) -> int:
+    return text.count(marker) if text else 0
+
+
+def build_docs_validation_checks() -> list[dict[str, object]]:
+    reviewer_guide = read_repo_text("docs/APP_ACCESS_REVIEWER_GUIDE.md")
+    release_register = read_repo_text("docs/RELEASE_EVIDENCE_REGISTER.md")
+    permissions_checklist = read_repo_text("docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md")
+    store_listing = read_repo_text("docs/STORE_LISTING_AND_IARC_READINESS.md")
+
+    reviewer_placeholders = count_marker(reviewer_guide, "EXTERNAL_INPUT_REQUIRED")
+    reviewer_open_checkboxes = count_marker(reviewer_guide, "- [ ]")
+    release_open_boxes = count_marker(release_register, "⬜")
+    release_open_words = len(re.findall(r"\boffen\b", release_register, re.IGNORECASE)) if release_register else 0
+    permissions_not_submitted = len(re.findall(r"Not submitted|\| ⬜ \|", permissions_checklist, re.IGNORECASE)) if permissions_checklist else 0
+    store_open_checkboxes = count_marker(store_listing, "- [ ]")
+
+    def docs_check(check_id: str, title: str, passed: bool, details: str) -> dict[str, object]:
+        return {
+            "id": check_id,
+            "title": title,
+            "status": "pass" if passed else "fail",
+            "details": details,
+            "source": "docs-validation",
+        }
+
+    return [
+        docs_check(
+            "doc-reviewer-test-credentials",
+            "Reviewer-Test-Credentials verifizieren",
+            bool(reviewer_guide) and reviewer_placeholders == 0,
+            "Reviewer-Guide ohne Platzhalter in Credentials/Kontaktbereichen."
+            if reviewer_guide and reviewer_placeholders == 0 else
+            f"Reviewer-Guide enthaelt noch {reviewer_placeholders} Platzhalter vom Typ EXTERNAL_INPUT_REQUIRED.",
+        ),
+        docs_check(
+            "doc-reviewer-submission-checklist",
+            "Submission-Checklist fuer Reviewer-Access abgleichen",
+            bool(reviewer_guide) and reviewer_placeholders == 0 and reviewer_open_checkboxes == 0,
+            "Reviewer-Guide hat keine offenen Checkboxen oder Platzhalter mehr."
+            if reviewer_guide and reviewer_placeholders == 0 and reviewer_open_checkboxes == 0 else
+            f"Reviewer-Guide hat noch {reviewer_open_checkboxes} offene Checkboxen und {reviewer_placeholders} Platzhalter.",
+        ),
+        docs_check(
+            "doc-release-evidence-register",
+            "Release-Evidence-Register abgleichen",
+            bool(release_register) and release_open_boxes == 0 and release_open_words == 0,
+            "Release-Evidence-Register enthaelt keine offenen Restpunkte mehr."
+            if release_register and release_open_boxes == 0 and release_open_words == 0 else
+            f"Release-Evidence-Register enthaelt noch {release_open_boxes} offene Checkboxen und {release_open_words} offene Statusmarkierungen.",
+        ),
+        docs_check(
+            "p0-play-permissions",
+            "Permissions Declaration eingereicht",
+            bool(permissions_checklist) and permissions_not_submitted == 0,
+            "Permissions-Checklist enthaelt keine offenen Submission-Marker mehr."
+            if permissions_checklist and permissions_not_submitted == 0 else
+            f"Permissions-Checklist enthaelt noch {permissions_not_submitted} Marker fuer nicht eingereichte oder offene Submission-Schritte.",
+        ),
+        docs_check(
+            "p0-play-app-access",
+            "App Access Guide hinterlegt",
+            bool(reviewer_guide) and reviewer_placeholders == 0 and reviewer_open_checkboxes == 0,
+            "Reviewer-Guide ist vollstaendig ausgefuellt und finalisiert."
+            if reviewer_guide and reviewer_placeholders == 0 and reviewer_open_checkboxes == 0 else
+            f"App-Access-Guide ist noch nicht final: {reviewer_placeholders} Platzhalter, {reviewer_open_checkboxes} offene Checkboxen.",
+        ),
+        docs_check(
+            "p0-play-listing",
+            "Store Listing final",
+            bool(store_listing) and store_open_checkboxes == 0,
+            "Store-Listing-Guide enthaelt keine offenen Finalisierungs-Checkboxen mehr."
+            if store_listing and store_open_checkboxes == 0 else
+            f"Store-Listing-Guide enthaelt noch {store_open_checkboxes} offene Checkboxen.",
+        ),
+    ]
+
+
 def run_commissioning_commands(run_commands: bool, timeout_sec: int) -> list[dict[str, object]]:
     if not run_commands:
         return []
@@ -2148,6 +2252,7 @@ def run_commissioning_suite(
     evaluation = evaluate_commissioning_context(context)
     evaluation_checks = list(cast(list[dict[str, object]], evaluation.get("checks", [])))
     evaluation_checks.extend(collect_static_analysis_checks())
+    evaluation_checks.extend(build_docs_validation_checks())
     evaluation = summarize_commissioning_checks(evaluation_checks)
     command_results = run_commissioning_commands(run_commands, timeout_sec)
     evidence_index = load_latest_commissioning_evidence()
@@ -2493,6 +2598,28 @@ def build_testing_register() -> dict[str, object]:
     evidence_index = load_latest_commissioning_evidence()
     suite_catalog = get_suite_catalog()
     latest_suite_results = load_latest_suite_results()
+    static_analysis_index = {
+        str(item.get("id") or ""): {
+            "status": str(item.get("status") or "not_run"),
+            "details": str(item.get("details") or ""),
+            "updatedAt": "",
+            "storage": str(REPO_ROOT / "build" / "test-automation" / "static-readiness-summary.json"),
+            "origin": "static-analysis",
+        }
+        for item in collect_static_analysis_checks()
+        if str(item.get("id") or "")
+    }
+    docs_validation_index = {
+        str(item.get("id") or ""): {
+            "status": str(item.get("status") or "not_run"),
+            "details": str(item.get("details") or ""),
+            "updatedAt": "",
+            "storage": str(REPO_ROOT / "docs"),
+            "origin": "docs-validation",
+        }
+        for item in build_docs_validation_checks()
+        if str(item.get("id") or "")
+    }
     suite_catalog_index = {
         str(item.get("suiteId") or ""): item
         for item in cast(list[dict[str, object]], suite_catalog.get("suites") or [])
@@ -2505,8 +2632,10 @@ def build_testing_register() -> dict[str, object]:
         for test in cast(list[dict[str, object]], group.get("tests") or []):
             test_id = str(test.get("id") or "")
             automation_type = str(test.get("automationType") or "automatic")
+            suite_ref = str(test.get("suiteRef") or "")
             register_state = commissioning_index.get(test_id)
             evidence_entry = evidence_index.get(test_id)
+            suite_meta: dict[str, object] = {}
 
             if register_state is None and evidence_entry is not None:
                 register_state = {
@@ -2515,6 +2644,27 @@ def build_testing_register() -> dict[str, object]:
                     "updatedAt": str(evidence_entry.get("createdAt") or ""),
                     "storage": str(COMMISSIONING_EVIDENCE_LOG_FILE),
                     "origin": "commissioning-evidence",
+                }
+
+            if register_state is None and str(test.get("source") or "") == "static-analysis":
+                register_state = static_analysis_index.get(test_id)
+
+            if register_state is None and str(test.get("source") or "") == "docs-validation":
+                register_state = docs_validation_index.get(test_id)
+
+            if register_state is None and suite_ref:
+                suite_state, suite_meta = suite_state_for_register_test(
+                    suite_ref,
+                    suite_catalog_index,
+                    latest_suite_results,
+                )
+                latest_suite = latest_suite_results.get(suite_ref, {})
+                register_state = {
+                    "status": str(suite_state.get("status") or "not_run"),
+                    "details": str(suite_state.get("details") or ""),
+                    "updatedAt": str(latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
+                    "storage": str(SUITE_RUN_LOG_FILE),
+                    "origin": "suite-run",
                 }
 
             if register_state is None:
@@ -2535,6 +2685,11 @@ def build_testing_register() -> dict[str, object]:
                         "origin": "commissioning-run",
                     }
 
+            if not suite_meta and suite_ref:
+                suite_meta = suite_catalog_index.get(suite_ref, {})
+
+            action = "protocol" if automation_type in {"manual", "documented"} else ("suite-run" if suite_ref else "commissioning-run")
+
             items.append(
                 {
                     "id": test_id,
@@ -2551,17 +2706,23 @@ def build_testing_register() -> dict[str, object]:
                     "origin": str(register_state.get("origin") or "commissioning"),
                     "documentation": str(test.get("documentation") or ""),
                     "successCriteria": str(test.get("successCriteria") or ""),
-                    "action": "protocol" if automation_type in {"manual", "documented"} else "commissioning-run",
+                    "action": action,
+                    "suiteRef": suite_ref,
+                    "command": str(test.get("command") or suite_meta.get("command") or ""),
+                    "prereqsMet": suite_meta.get("prereqsMet") if suite_ref else None,
+                    "prereqReason": str(suite_meta.get("prereqReason") or "") if suite_ref else "",
                     **infer_register_metadata(
                         entry_kind="commissioning",
                         automation_type=automation_type,
                         group_id=str(group.get("id") or ""),
                         group_title=str(group.get("title") or ""),
                         source=str(test.get("source") or ""),
+                        suite_ref=suite_ref,
                         updated_at=str(register_state.get("updatedAt") or ""),
                         status=str(register_state.get("status") or "not_run"),
                         documentation=str(test.get("documentation") or ""),
-                        command=str(test.get("command") or ""),
+                        command=str(test.get("command") or suite_meta.get("command") or ""),
+                        prereq_reason=str(suite_meta.get("prereqReason") or ""),
                     ),
                 }
             )

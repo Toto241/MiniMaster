@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import json
 import sys
-import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -137,9 +136,6 @@ class TestBuildTestingRegister:
             "android-child-registered",
             "parent-panel-verified",
             "device-sync-verified",
-            "support-flow-verified",
-            "compliance-flow-verified",
-            "storage-rules-verified",
         }
         expected_automatic = {
             "cloud-project-id",
@@ -152,6 +148,9 @@ class TestBuildTestingRegister:
             "play-store-required-checks-complete",
             "play-store-privacy-url-valid",
             "play-store-support-email-valid",
+            "support-flow-verified",
+            "compliance-flow-verified",
+            "storage-rules-verified",
         }
 
         assert expected_manual.issubset(ids)
@@ -160,6 +159,94 @@ class TestBuildTestingRegister:
             assert automation_types[test_id] == "manual"
         for test_id in expected_automatic:
             assert automation_types[test_id] == "automatic"
+
+    def test_documented_commissioning_phase_1_to_3_items_are_bound_to_device_suites(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+        items_by_id = {item["id"]: item for item in result["items"]}
+
+        expected_suite_refs = {
+            "doc-master-app-registration-auth": "android-usb-master",
+            "doc-generate-pairing-code": "android-usb-master",
+            "doc-child-app-registration-code": "android-usb-child",
+            "doc-create-task": "android-usb-master",
+            "doc-child-submits-task-photo": "android-usb-child",
+            "doc-task-approval-workflow": "android-usb-master",
+            "doc-create-app-blocking-rule": "android-usb-master",
+            "doc-screen-lock-enforcement": "android-usb-master",
+        }
+
+        for test_id, suite_ref in expected_suite_refs.items():
+            item = items_by_id[test_id]
+            assert item["automationType"] == "automatic"
+            assert item["source"] == "device-suite"
+            assert item["suiteRef"] == suite_ref
+            assert item["linkedSuite"] == suite_ref
+            assert item["action"] == "suite-run"
+
+    def test_commissioning_entries_can_inherit_pass_state_from_suite_runs(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_commissioning_history", lambda limit: [])
+        monkeypatch.setattr(app, "load_latest_commissioning_evidence", lambda: {})
+        monkeypatch.setattr(
+            app,
+            "get_suite_catalog",
+            lambda: {
+                "suites": [
+                    {
+                        "suiteId": "android-usb-master",
+                        "title": "masterApp USB commissioning",
+                        "group": "device",
+                        "command": "python scripts/usb_test_runner.py --app-id master --suite commissioning",
+                        "prereqsMet": True,
+                        "prereqReason": "",
+                    }
+                ]
+            },
+        )
+        monkeypatch.setattr(
+            app,
+            "load_latest_suite_results",
+            lambda: {
+                "android-usb-master": {
+                    "suiteId": "android-usb-master",
+                    "status": "finished",
+                    "timestamp": "2026-01-02T03:04:05Z",
+                    "result": {"status": "passed", "returncode": 0},
+                }
+            },
+        )
+
+        result = app.build_testing_register()
+        items_by_id = {item["id"]: item for item in result["items"]}
+
+        assert items_by_id["doc-create-task"]["status"] == "pass"
+        assert items_by_id["doc-create-task"]["origin"] == "suite-run"
+        assert items_by_id["doc-create-task"]["updatedAt"] == "2026-01-02T03:04:05Z"
+
+    def test_docs_validation_gates_are_automatic_and_expose_validator_results(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+        items_by_id = {item["id"]: item for item in result["items"]}
+
+        expected_docs_validators = {
+            "doc-reviewer-test-credentials",
+            "doc-reviewer-submission-checklist",
+            "doc-release-evidence-register",
+            "p0-play-listing",
+            "p0-play-permissions",
+            "p0-play-app-access",
+        }
+
+        for test_id in expected_docs_validators:
+            item = items_by_id[test_id]
+            assert item["automationType"] == "automatic"
+            assert item["source"] == "docs-validation"
+            assert item["origin"] == "docs-validation"
+            assert item["status"] in {"pass", "fail"}
 
     def test_register_contains_remaining_platform_readiness_groups(self):
         from app import get_commissioning_test_catalog, build_testing_register
@@ -182,7 +269,6 @@ class TestBuildTestingRegister:
             "ma-task-create",
             "ma-task-review",
             "ma-task-reject-ui",
-            "ma-usage-rules-nav",
             "ma-date-picker",
             "ma-subscription-check",
             "ma-subscription-enforce",
@@ -197,8 +283,6 @@ class TestBuildTestingRegister:
             "ca-overlay-secure",
             "ca-settings-protection",
             "ca-device-admin-enforced",
-            "ca-usage-limits",
-            "ca-time-windows",
             "ca-tamper-detection",
             "ca-task-proof",
             "ca-factory-reset-protection",
@@ -209,16 +293,26 @@ class TestBuildTestingRegister:
             "dt-system-tray",
             "dt-desktop-notifications",
             "dt-window-persistence",
-            "dt-ipc-messaging",
             "dt-parent-panel-login",
             "dt-admin-panel-login",
             "dt-crash-reporting",
         }
 
+        expected_static = {
+            "ma-usage-rules-nav",
+            "ca-usage-limits",
+            "ca-time-windows",
+            "dt-ipc-messaging",
+        }
+
         assert expected_manual.issubset(items_by_id.keys())
+        assert expected_static.issubset(items_by_id.keys())
         for test_id in expected_manual:
             assert items_by_id[test_id]["automationType"] == "manual"
             assert items_by_id[test_id]["source"] == "platform-readiness"
+        for test_id in expected_static:
+            assert items_by_id[test_id]["automationType"] == "automatic"
+            assert items_by_id[test_id]["source"] == "static-analysis"
 
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
         import app

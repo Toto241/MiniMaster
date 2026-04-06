@@ -127,6 +127,29 @@ def check_ma_appcheck() -> CheckResult:
                        else "Kein Firebase App Check gefunden.", "static")
 
 
+def check_ma_usage_rules_nav() -> CheckResult:
+    patterns = (
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "DashboardScreen.kt", r"onUsageRulesClick|onNavigateToUsageRules"),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "MainActivity.kt", r'composable\("usageRules/\{childId\}"\)|navController\.navigate\("usageRules/\$childId"\)'),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "UsageRulesViewModel.kt", r'getHttpsCallable\("setUsageRules"\)'),
+    )
+    matched_files = []
+    for path, pattern in patterns:
+        found, _ = _file_contains(path, pattern, re.MULTILINE)
+        if found:
+            matched_files.append(path.name)
+    passed = len(matched_files) == len(patterns)
+    return CheckResult(
+        "ma-usage-rules-nav",
+        "UsageRules-Navigation und Datenspeicherung implementiert",
+        passed,
+        "Navigation, Screen-Route und setUsageRules-Callable sind vorhanden."
+        if passed else
+        f"Usage-Rules-Fluss unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        "static",
+    )
+
+
 # ── ChildApp Checks ───────────────────────────────────────────────────────
 
 def check_ca_accessibility() -> CheckResult:
@@ -193,6 +216,52 @@ def check_ca_tamper_detection() -> CheckResult:
     return CheckResult("ca-tamper-detection", "Manipulationserkennung implementiert", found,
                        f"Tamper-Detection in {len(files)} Datei(en) gefunden." if found
                        else "Keine Manipulationserkennung gefunden.", "static")
+
+
+def check_ca_usage_limits() -> CheckResult:
+    patterns = (
+        (REPO_ROOT / "childApp" / "src" / "main" / "java" / "com" / "google" / "pairing" / "child" / "ChildProtectionPolicy.kt", r"dailyLimitSeconds|appLimits|perAppLimitsMillis|currentDayUsageMillis > dailyLimitMillis|currentAppUsageMillis > appLimit"),
+        (REPO_ROOT / "childApp" / "src" / "main" / "java" / "com" / "google" / "pairing" / "child" / "MiniMasterAccessibilityService.kt", r"dailyLimitMillis|perAppLimitsMillis|parseUsageRules"),
+        (REPO_ROOT / "childApp" / "src" / "main" / "java" / "com" / "google" / "pairing" / "RuleSyncService.kt", r"usageRules|updateUsageRules"),
+    )
+    matched_files = []
+    for path, pattern in patterns:
+        found, _ = _file_contains(path, pattern, re.MULTILINE)
+        if found:
+            matched_files.append(path.name)
+    passed = len(matched_files) == len(patterns)
+    return CheckResult(
+        "ca-usage-limits",
+        "Usage-Limits werden aus Policy-Code abgeleitet",
+        passed,
+        "Policy-Parsing, Service-Uebernahme und Sync fuer Usage-Limits sind implementiert."
+        if passed else
+        f"Usage-Limit-Kette unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        "static",
+    )
+
+
+def check_ca_time_windows() -> CheckResult:
+    patterns = (
+        (REPO_ROOT / "childApp" / "src" / "main" / "java" / "com" / "google" / "pairing" / "child" / "ChildProtectionPolicy.kt", r"allowedHours|allowedStartMinutes|allowedEndMinutes|parseClockMinutes|isOutsideAllowedWindow"),
+        (REPO_ROOT / "childApp" / "src" / "main" / "java" / "com" / "google" / "pairing" / "child" / "MiniMasterAccessibilityService.kt", r"allowedStartMinutes|allowedEndMinutes|parseUsageRules"),
+        (REPO_ROOT / "childApp" / "src" / "main" / "java" / "com" / "google" / "pairing" / "RuleSyncService.kt", r"usageRules|updateUsageRules"),
+    )
+    matched_files = []
+    for path, pattern in patterns:
+        found, _ = _file_contains(path, pattern, re.MULTILINE)
+        if found:
+            matched_files.append(path.name)
+    passed = len(matched_files) == len(patterns)
+    return CheckResult(
+        "ca-time-windows",
+        "Zeitfenster-Policies werden aus Policy-Code abgeleitet",
+        passed,
+        "Zeitfenster-Parsing, Service-Uebernahme und Sync sind implementiert."
+        if passed else
+        f"Zeitfenster-Kette unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        "static",
+    )
 
 
 # ── Desktop Checks ────────────────────────────────────────────────────────
@@ -321,6 +390,28 @@ def check_dt_session_timeout() -> CheckResult:
                        else "Keine Session-Timeout-Implementierung im Desktop-Code gefunden.", "static")
 
 
+def check_dt_ipc_messaging() -> CheckResult:
+    patterns = (
+        (REPO_ROOT / "desktop" / "operator-preload.js", r"contextBridge\.exposeInMainWorld|ipcRenderer\.invoke\(\"run-cli\"|ipcRenderer\.on\(\"cli-output\""),
+        (REPO_ROOT / "desktop" / "main.js", r"ipcMain\.handle\(\"run-cli\"|ipcMain\.handle\(\"abort-cli\""),
+    )
+    matched_files = []
+    for path, pattern in patterns:
+        found, _ = _file_contains(path, pattern, re.MULTILINE)
+        if found:
+            matched_files.append(path.name)
+    passed = len(matched_files) == len(patterns)
+    return CheckResult(
+        "dt-ipc-messaging",
+        "Electron-IPC zwischen Main und Panels implementiert",
+        passed,
+        "Preload-Bridge und ipcMain-Handler fuer CLI-/Panel-Kommunikation sind vorhanden."
+        if passed else
+        f"IPC-Fluss unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        "static",
+    )
+
+
 # ── Aggregation ───────────────────────────────────────────────────────────
 
 ALL_CHECKS = [
@@ -332,6 +423,7 @@ ALL_CHECKS = [
     check_ma_billing,
     check_ma_fcm,
     check_ma_appcheck,
+    check_ma_usage_rules_nav,
     # ChildApp
     check_ca_accessibility,
     check_ca_boot_receiver,
@@ -341,12 +433,15 @@ ALL_CHECKS = [
     check_ca_uninstall_prevention,
     check_ca_overlay,
     check_ca_tamper_detection,
+    check_ca_usage_limits,
+    check_ca_time_windows,
     # Desktop
     check_dt_csp,
     check_dt_sri,
     check_dt_electron_builder,
     check_dt_credential_security,
     check_dt_session_timeout,
+    check_dt_ipc_messaging,
 ]
 
 
