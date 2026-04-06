@@ -9,6 +9,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -89,6 +92,43 @@ class CommissioningMasterUiFlowTest {
 
         composeTestRule.onNodeWithText("Create Task").assertIsDisplayed().performClick()
         assertTrue("Create task callback must be triggered", createTaskClicked)
+    }
+
+    @Test
+    fun phase3_1_usageRulesForm_capturesPerAppLimitAndSaves() {
+        var state by mutableStateOf(UsageRulesState())
+        var savedSnapshot: UsageRulesState? = null
+
+        composeTestRule.setContent {
+            UsageRulesContent(
+                state = state,
+                onUpdateDailyLimit = { minutes ->
+                    state = state.copy(dailyLimitMinutes = minutes)
+                },
+                onUpdateAllowedStartTime = { start ->
+                    state = state.copy(allowedStartTime = start)
+                },
+                onUpdateAllowedEndTime = { end ->
+                    state = state.copy(allowedEndTime = end)
+                },
+                onAddPerAppLimit = { packageName, minutes ->
+                    state = state.copy(perAppLimits = state.perAppLimits + (packageName to minutes))
+                },
+                onRemovePerAppLimit = { packageName ->
+                    state = state.copy(perAppLimits = state.perAppLimits - packageName)
+                },
+                onSaveRules = {
+                    savedSnapshot = state
+                },
+            )
+        }
+
+        composeTestRule.onNodeWithText("Package name").performTextInput("com.example.blocked")
+        composeTestRule.onNodeWithText("Min").performTextInput("15")
+        composeTestRule.onNodeWithText("Add").performClick()
+        composeTestRule.onNodeWithText("Save Rules").assertIsEnabled().performClick()
+
+        assertEquals(15, savedSnapshot?.perAppLimits?.get("com.example.blocked"))
     }
 
     @Test
