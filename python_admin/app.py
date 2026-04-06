@@ -1769,6 +1769,7 @@ def evaluate_commissioning_context(context: dict[str, object]) -> dict[str, obje
             if play_checks_ok
             else "Mindestens ein Play-Store-Pflichtcheck ist noch offen.",
             source="playstore",
+            manual_if_failed=True,
         )
     )
     checks.append(
@@ -2084,13 +2085,14 @@ def build_docs_validation_checks() -> list[dict[str, object]]:
     store_open_checkboxes = count_marker(store_listing, "- [ ]")
 
     def docs_check(check_id: str, title: str, passed: bool, details: str) -> dict[str, object]:
-        return {
-            "id": check_id,
-            "title": title,
-            "status": "pass" if passed else "fail",
-            "details": details,
-            "source": "docs-validation",
-        }
+        return make_check(
+            check_id,
+            title,
+            passed,
+            details,
+            source="docs-validation",
+            manual_if_failed=True,
+        )
 
     return [
         docs_check(
