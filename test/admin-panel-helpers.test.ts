@@ -132,6 +132,8 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  toDateSafe,",
     "  formatPythonAutomationTimestamp,",
     "  formatPythonAutomationEvidenceDetails,",
+    "  getPythonEvidenceRequirements,",
+    "  buildPythonEvidenceValidationErrors,",
     "  buildPythonAutomationRunIndex,",
     "  buildPythonAutomationRunClipboardPayload,",
     "  buildFirebaseRecoveryCommands,",
@@ -180,6 +182,8 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildTestingRegisterExecutionPath,",
     "  buildTestingRegisterDetailText,",
     "  buildQaExecutionGuideData,",
+    "  getUsbFormVisibilityState,",
+    "  buildUsbTestRunRequestPayload,",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
     "};",
@@ -203,6 +207,103 @@ describe("admin-panel helper functions", () => {
     expect(exports.sanitizeAdbSerial("serial;rm -rf /")).toBe("");
     expect(exports.sanitizeApkPath("builds/app-release.apk", "fallback.apk")).toBe("builds/app-release.apk");
     expect(exports.sanitizeApkPath("bad\npath.apk", "fallback.apk")).toBe("fallback.apk");
+  });
+
+  it("derives USB form visibility from test type", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.getUsbFormVisibilityState("dual-device")).toMatchObject({
+      isDual: true,
+      showChildSerial: true,
+      showScenario: true,
+      showProfile: true,
+      showFaultModes: true,
+      showSuite: false,
+      showSkipActivation: false,
+      showParallel: true,
+    });
+    expect(exports.getUsbFormVisibilityState("single-master")).toMatchObject({
+      isDual: false,
+      showChildSerial: false,
+      showSuite: true,
+      showSkipActivation: true,
+      showParallel: false,
+    });
+  });
+
+  it("builds separate USB payloads for single-device and dual-device runs", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const single = exports.buildUsbTestRunRequestPayload({
+      testType: "single-child",
+      masterSerial: "auto",
+      suite: "default",
+      installApk: true,
+      skipActivation: true,
+    });
+    expect(single.endpoint).toBe("/api/suites/usb-test");
+    expect(single.payload).toMatchObject({
+      appId: "child",
+      serial: "auto",
+      suite: "default",
+      installApk: true,
+      skipActivation: true,
+    });
+
+    const dual = exports.buildUsbTestRunRequestPayload({
+      testType: "dual-device",
+      masterSerial: "auto",
+      childSerial: "child-123",
+      scenarioId: "offline-online-resync",
+      profileId: "dual-device-balanced",
+      faultModes: ["disconnect"],
+      installApk: true,
+      parallel: true,
+      suite: "default",
+      skipActivation: true,
+    });
+    expect(dual.endpoint).toBe("/api/suites/dual-device");
+    expect(dual.payload).toMatchObject({
+      masterSerial: "auto",
+      childSerial: "child-123",
+      scenarioId: "offline-online-resync",
+      profileId: "dual-device-balanced",
+      faultModes: ["disconnect"],
+      installApk: true,
+      parallel: true,
+    });
+    expect(dual.payload.suite).toBeUndefined();
+    expect(dual.payload.skipActivation).toBeUndefined();
+  });
+
+  it("requires stronger evidence fields for manual and documented QA proofs", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.getPythonEvidenceRequirements({ automationType: "manual" }, "pass")).toMatchObject({
+      requiresEvidenceRef: true,
+      requiresDocumentationCheck: false,
+      requiresNotes: false,
+    });
+    expect(exports.getPythonEvidenceRequirements({ automationType: "documented" }, "fail")).toMatchObject({
+      requiresEvidenceRef: true,
+      requiresDocumentationCheck: true,
+      requiresNotes: true,
+    });
+
+    const errors = exports.buildPythonEvidenceValidationErrors({
+      selected: { automationType: "documented" },
+      status: "fail",
+      operator: "",
+      evidenceRef: "",
+      notes: "",
+      documentationChecked: false,
+    });
+    expect(errors).toEqual(expect.arrayContaining([
+      "Bitte den Operator für den Nachweis angeben.",
+      "Bitte eine belastbare Evidenzreferenz angeben.",
+      "Bitte den dokumentierten Ablauf und die Evidenzquelle als abgeglichen markieren.",
+      "Bitte eine aussagekräftige Notiz für FAIL oder Nacharbeit hinterlegen.",
+    ]));
   });
 
   it("builds PowerShell deploy scripts with project scoping", () => {
