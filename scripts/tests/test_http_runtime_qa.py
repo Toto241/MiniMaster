@@ -1,6 +1,7 @@
 """HTTP-nahe Integrationstests für QA- und Suite-Endpunkte des Python-Admin-Servers."""
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 import threading
@@ -17,10 +18,14 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(REPO_ROOT / "python_admin"))
 
 
+def load_app_module():
+    return importlib.import_module("app")
+
+
 @pytest.fixture()
 def qa_http_server(monkeypatch: pytest.MonkeyPatch):
     import python_admin_app_loader as _  # noqa: F401
-    import app
+    app = load_app_module()
 
     monkeypatch.setattr(app.MiniMasterAdminHandler, "log_message", lambda *args, **kwargs: None)
     server = app.ThreadingHTTPServer(("127.0.0.1", 0), app.MiniMasterAdminHandler)
@@ -50,7 +55,7 @@ def _read_json(url: str, *, method: str = "GET", body: dict[str, object] | None 
 
 class TestQaRuntimeHttpContracts:
     def test_runtime_http_serves_qa_catalog_payload(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
-        import app
+        app = load_app_module()
 
         monkeypatch.setattr(app, "get_qa_catalog", lambda: {"androidMatrix": [{"apiLevel": 35}], "criticalBacklog": []})
 
@@ -61,7 +66,7 @@ class TestQaRuntimeHttpContracts:
         assert payload == {"androidMatrix": [{"apiLevel": 35}], "criticalBacklog": []}
 
     def test_runtime_http_clamps_evidence_history_limit_and_returns_latest_index(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
-        import app
+        app = load_app_module()
 
         history_calls: list[tuple[int, str | None]] = []
 
@@ -80,7 +85,7 @@ class TestQaRuntimeHttpContracts:
         assert payload["latestByTestId"] == {"ios-xctest-parent": {"status": "pass"}}
 
     def test_runtime_http_clamps_suite_history_limit(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
-        import app
+        app = load_app_module()
 
         calls: list[int] = []
 
