@@ -567,6 +567,36 @@ describe("admin-panel helper functions", () => {
     expect(overview.innerHTML).toContain("nur im Python-Operator verfügbar");
   });
 
+  it("shows empty artifact overview when no runs or evidence exist in operator mode", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const overview = { innerHTML: "" };
+    elements.set("qa-artifact-overview", overview);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setSuiteRunHistoryPayloadForTests([]);
+    exports.setPythonCommissioningEvidenceHistoryForTests([]);
+    exports.setQaPlatformCatalogPayloadForTests({});
+    exports.setQaArtifactFiltersForTests();
+    exports.renderQaArtifactsOverview();
+
+    expect(overview.innerHTML).toContain("Noch keine Artefakte oder Laufspuren vorhanden");
+  });
+
+  it("reports suite history as unavailable in read-only runtime", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    elements.set("suite-run-history", historyEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    const result = await exports.loadSuiteRunHistory();
+
+    expect(result).toMatchObject({ ok: false, message: "Nur im Python-Operator verfügbar." });
+    expect(historyEl.innerHTML).toContain("Historie ist nur im Python-Operator verfuegbar");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("loads empty suite history into the dedicated history container", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
@@ -587,6 +617,71 @@ describe("admin-panel helper functions", () => {
     expect(result).toMatchObject({ ok: true });
     expect(historyEl.innerHTML).toContain("Keine Testlaeufe in der Historie");
     expect(activeRunsEl.innerHTML).toBe("aktive Läufe bleiben unberührt");
+  });
+
+  it("renders populated suite history entries with status mapping", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    elements.set("suite-run-history", historyEl);
+    context.loadTestingRegister = jest.fn();
+    context.rerenderSuiteCatalogFromCache = jest.fn();
+    context.renderQaArtifactsOverview = jest.fn();
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        runs: [
+          {
+            runId: "run-pass-1",
+            suiteId: "daily-smoke",
+            status: "finished",
+            startedAt: "2026-04-07T11:00:00Z",
+            result: { status: "passed" },
+          },
+          {
+            runId: "run-skip-2",
+            suite_id: "device-sync",
+            status: "finished",
+            started_at: "2026-04-07T12:00:00Z",
+            result: { overall_status: "skipped" },
+          },
+        ],
+      }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    const result = await exports.loadSuiteRunHistory();
+
+    expect(result).toMatchObject({ ok: true, message: "2 Suite-Läufe geladen." });
+    expect(historyEl.innerHTML).toContain('badge pass">passed</span>');
+    expect(historyEl.innerHTML).toContain('badge running">skipped</span>');
+    expect(historyEl.innerHTML).toContain("daily-smoke");
+    expect(historyEl.innerHTML).toContain("device-sync");
+    expect(historyEl.innerHTML).toContain("run-pass-1");
+    expect(context.loadTestingRegister).toHaveBeenCalled();
+    expect(context.rerenderSuiteCatalogFromCache).toHaveBeenCalled();
+    expect(context.renderQaArtifactsOverview).toHaveBeenCalled();
+  });
+
+  it("renders suite history load errors into the history container", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    elements.set("suite-run-history", historyEl);
+    context.renderQaArtifactsOverview = jest.fn();
+    context.rerenderSuiteCatalogFromCache = jest.fn();
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Backend nicht erreichbar" }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    const result = await exports.loadSuiteRunHistory();
+
+    expect(result).toMatchObject({ ok: false, message: "Backend nicht erreichbar" });
+    expect(historyEl.innerHTML).toContain("Backend nicht erreichbar");
   });
 
   it("builds PowerShell deploy scripts with project scoping", () => {
