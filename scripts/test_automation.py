@@ -433,7 +433,9 @@ SUITES: tuple[Suite, ...] = (
     Suite("python-tests-debug-token", "Python debug token tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_debug_token.py")], ("python_pytest",), timeout_sec=1800),
     Suite("python-tests-dual-device-runner", "Python dual-device runner tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_dual_device_runner.py")], ("python_pytest",), timeout_sec=1800),
     Suite("python-tests-integration", "Python integration tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_integration.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("python-tests-qa-catalog", "Python QA catalog tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_qa_catalog.py")], ("python_pytest",), timeout_sec=1800),
     Suite("python-tests-usb-runner", "Python USB runner tests", "python", [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "scripts" / "pytest.ini"), str(REPO_ROOT / "scripts" / "tests" / "test_usb_test_runner.py")], ("python_pytest",), timeout_sec=1800),
+    Suite("qa-catalog-export", "Canonical QA catalog export", "release", [sys.executable, str(REPO_ROOT / "scripts" / "qa_catalog.py"), "--json-out", str(REPO_ROOT / "build" / "test-automation" / "qa-catalog.json")], tuple()),
     Suite("release-revalidate", "Release gate revalidation", "release", [npm_command(), "run", "ci:revalidate"], ("npm", "node_modules"), timeout_sec=3600),
     Suite("static-readiness", "Static platform readiness checks", "release", [sys.executable, str(REPO_ROOT / "scripts" / "static_readiness_checks.py")], tuple()),
 )

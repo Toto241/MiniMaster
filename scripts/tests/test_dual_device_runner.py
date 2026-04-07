@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -22,12 +20,14 @@ class TestDualDeviceResult:
         assert r.overall_status == "not_started"
         assert r.master_result is None
         assert r.child_result is None
+        assert r.scenario_id == ""
 
     def test_to_dict_structure(self):
         r = DualDeviceResult(master_serial="M1", child_serial="C1")
         d = r.to_dict()
         assert d["masterSerial"] == "M1"
         assert d["childSerial"] == "C1"
+        assert d["scenarioId"] == ""
         assert "timestamp" in d
         assert d["masterResult"] is None
         assert d["childResult"] is None
@@ -45,11 +45,18 @@ class TestDualDeviceResult:
             master_result=master_res,
             child_result=child_res,
             overall_status="passed",
+            scenario_id="pairing-token-happy-path",
+            scenario_title="Pairing per Token Happy Path",
+            profile_id="dual-device-balanced",
+            fault_modes=["timeout"],
         )
         d = r.to_dict()
         assert d["masterResult"] is not None
         assert d["childResult"] is not None
         assert d["overallStatus"] == "passed"
+        assert d["scenarioId"] == "pairing-token-happy-path"
+        assert d["profileId"] == "dual-device-balanced"
+        assert d["faultModes"] == ["timeout"]
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -167,6 +174,56 @@ class TestRunDualDeviceSequential:
         assert calls[0][1]["uninstall_first"] is True
         assert calls[1][1]["install_apk"] is True
         assert calls[1][1]["apk_path"] == "/apk/child.apk"
+
+    @patch("dual_device_runner.run_usb_test")
+    def test_accepts_known_scenario_and_fault_mode(self, mock_run):
+        from usb_test_runner import UsbTestRunResult
+        master_res = UsbTestRunResult(app_id="master", serial="M1", suite="commissioning")
+        master_res.overall_status = "passed"
+        child_res = UsbTestRunResult(app_id="child", serial="C1", suite="commissioning")
+        child_res.overall_status = "passed"
+        mock_run.side_effect = [master_res, child_res]
+
+        result = run_dual_device(
+            master_serial="M1",
+            child_serial="C1",
+            scenario_id="offline-online-resync",
+            profile_id="dual-device-balanced",
+            fault_modes=["disconnect"],
+            verbose=False,
+        )
+
+        assert result.scenario_id == "offline-online-resync"
+        assert result.profile_id == "dual-device-balanced"
+        assert result.fault_modes == ["disconnect"]
+
+    def test_rejects_unknown_scenario(self):
+        try:
+            run_dual_device(
+                master_serial="M1",
+                child_serial="C1",
+                scenario_id="does-not-exist",
+                verbose=False,
+            )
+        except ValueError as exc:
+            assert "Unbekannte Dual-Device-Szenario-ID" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for unknown scenario")
+
+    def test_rejects_fault_mode_not_allowed_by_scenario(self):
+        try:
+            run_dual_device(
+                master_serial="M1",
+                child_serial="C1",
+                scenario_id="pairing-code-expiry",
+                fault_modes=["disconnect"],
+                verbose=False,
+            )
+        except ValueError as exc:
+            assert "Fault Modes" in str(exc)
+            assert "Erlaubt" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for invalid fault mode")
 
 
 # ═══════════════════════════════════════════════════════════════════

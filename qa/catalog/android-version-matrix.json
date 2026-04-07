@@ -1,0 +1,51 @@
+[
+  {
+    "androidVersion": "10",
+    "apiLevel": 29,
+    "coverageTier": "baseline",
+    "status": "active",
+    "recommendedProfiles": ["phone-compact", "dual-device-low-band"]
+  },
+  {
+    "androidVersion": "11",
+    "apiLevel": 30,
+    "coverageTier": "baseline",
+    "status": "active",
+    "recommendedProfiles": ["phone-standard", "dual-device-low-band"]
+  },
+  {
+    "androidVersion": "12",
+    "apiLevel": 31,
+    "coverageTier": "full",
+    "status": "active",
+    "recommendedProfiles": ["phone-standard", "dual-device-balanced"]
+  },
+  {
+    "androidVersion": "13",
+    "apiLevel": 33,
+    "coverageTier": "full",
+    "status": "active",
+    "recommendedProfiles": ["phone-standard", "dual-device-balanced"]
+  },
+  {
+    "androidVersion": "14",
+    "apiLevel": 34,
+    "coverageTier": "full",
+    "status": "active",
+    "recommendedProfiles": ["phone-large", "dual-device-balanced"]
+  },
+  {
+    "androidVersion": "15",
+    "apiLevel": 35,
+    "coverageTier": "full",
+    "status": "active",
+    "recommendedProfiles": ["phone-large", "dual-device-high-band"]
+  },
+  {
+    "androidVersion": "16",
+    "apiLevel": 36,
+    "coverageTier": "canary",
+    "status": "preview",
+    "recommendedProfiles": ["phone-large", "dual-device-high-band"]
+  }
+]

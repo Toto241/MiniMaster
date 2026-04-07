@@ -31,6 +31,12 @@ from test_automation import (  # noqa: E402
     check_security_service_account_prereq,
     run_suite as ta_run_suite,
 )
+from qa_catalog import (  # noqa: E402
+    build_qa_catalog,
+    load_android_version_matrix,
+    load_device_profiles,
+    load_dual_device_scenarios,
+)
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
 from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
@@ -3143,6 +3149,21 @@ def get_suite_catalog() -> dict[str, object]:
     }
 
 
+def get_qa_catalog() -> dict[str, object]:
+    """Liefert den kanonischen QA-Katalog inklusive Lauf- und Register-Metadaten."""
+    suite_catalog = get_suite_catalog()
+    testing_register = build_testing_register()
+    payload = build_qa_catalog(cast(list[dict[str, object]], suite_catalog.get("suites") or []))
+    payload["executionSummary"] = suite_catalog.get("summary", {})
+    payload["registerSummary"] = testing_register.get("summary", {})
+    payload["testingRegisterCount"] = len(cast(list[dict[str, object]], testing_register.get("items") or []))
+    payload["criticalBacklog"] = [
+        item for item in cast(list[dict[str, object]], payload.get("automationBacklog") or [])
+        if str(item.get("priority", "")).strip() in {"P0", "P1"}
+    ]
+    return payload
+
+
 def get_device_status() -> dict[str, object]:
     """Gibt den Status angeschlossener ADB-Geräte zurück."""
     if not adb_available():
@@ -3350,6 +3371,18 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/testing/register":
             return self._write_json(HTTPStatus.OK, build_testing_register())
 
+        if parsed.path == "/api/qa/catalog":
+            return self._write_json(HTTPStatus.OK, get_qa_catalog())
+
+        if parsed.path == "/api/qa/android-matrix":
+            return self._write_json(HTTPStatus.OK, {"androidMatrix": load_android_version_matrix()})
+
+        if parsed.path == "/api/qa/device-profiles":
+            return self._write_json(HTTPStatus.OK, {"deviceProfiles": load_device_profiles()})
+
+        if parsed.path == "/api/qa/dual-device-scenarios":
+            return self._write_json(HTTPStatus.OK, {"dualDeviceScenarios": load_dual_device_scenarios()})
+
         if parsed.path == "/api/commissioning/evidence":
             query = parse_qs(parsed.query)
             limit = parse_int(
@@ -3549,12 +3582,21 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
                 "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
                 "parallel": bool_from_payload(payload.get("parallel"), default=False),
+                "scenario_id": str(payload.get("scenarioId") or "").strip(),
+                "profile_id": str(payload.get("profileId") or "").strip(),
+                "fault_modes": [
+                    str(item).strip()
+                    for item in cast(list[object], payload.get("faultModes") or [])
+                    if str(item).strip()
+                ],
             }
 
             with _active_suite_lock:
                 _active_suite_runs[run_id] = {
                     "runId": run_id,
                     "type": "dual-device",
+                    "scenarioId": kwargs["scenario_id"],
+                    "profileId": kwargs["profile_id"],
                     "status": "queued",
                     "startedAt": None,
                     "finishedAt": None,

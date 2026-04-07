@@ -1,0 +1,83 @@
+[
+  {
+    "id": "AUTO-P0-001",
+    "title": "Kanonischen Testkatalog aus Code und Doku ableiten",
+    "priority": "P0",
+    "phase": "foundation",
+    "owner": "QA Automation",
+    "type": "platform",
+    "status": "in_progress"
+  },
+  {
+    "id": "AUTO-P0-002",
+    "title": "Android-10-bis-16-Matrix im Admin-Backend abbilden",
+    "priority": "P0",
+    "phase": "foundation",
+    "owner": "QA Automation",
+    "type": "matrix",
+    "status": "in_progress"
+  },
+  {
+    "id": "AUTO-P0-003",
+    "title": "Dual-Device-Szenarien mit Rollen und Fehlerfaellen definieren",
+    "priority": "P0",
+    "phase": "foundation",
+    "owner": "Android QA",
+    "type": "dual-device",
+    "status": "in_progress"
+  },
+  {
+    "id": "AUTO-P1-004",
+    "title": "Emulator-Lifecycle und Profil-Reservierung automatisieren",
+    "priority": "P1",
+    "phase": "execution",
+    "owner": "Platform Engineering",
+    "type": "emulator",
+    "status": "planned"
+  },
+  {
+    "id": "AUTO-P1-005",
+    "title": "UiAutomator-Layer fuer Systemdialoge und Permissions ergaenzen",
+    "priority": "P1",
+    "phase": "automation",
+    "owner": "Android QA",
+    "type": "automation",
+    "status": "planned"
+  },
+  {
+    "id": "AUTO-P1-006",
+    "title": "Flaky-Klassifikation und RCA-Codes einfuehren",
+    "priority": "P1",
+    "phase": "reporting",
+    "owner": "QA Automation",
+    "type": "quality",
+    "status": "planned"
+  },
+  {
+    "id": "AUTO-P1-007",
+    "title": "Artefakt-Explorer fuer Screenshots, Videos und Bugreports bauen",
+    "priority": "P1",
+    "phase": "admin-panel",
+    "owner": "Full Stack",
+    "type": "ui",
+    "status": "planned"
+  },
+  {
+    "id": "AUTO-P2-008",
+    "title": "Langlauf- und Recovery-Suiten fuer Restart und Resync ergaenzen",
+    "priority": "P2",
+    "phase": "stability",
+    "owner": "Android QA",
+    "type": "stability",
+    "status": "planned"
+  },
+  {
+    "id": "AUTO-P2-009",
+    "title": "Release-Evidence-Paket und Sign-off-Export einfuehren",
+    "priority": "P2",
+    "phase": "release",
+    "owner": "Release Management",
+    "type": "governance",
+    "status": "planned"
+  }
+]

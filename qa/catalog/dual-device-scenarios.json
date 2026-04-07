@@ -1,0 +1,82 @@
+[
+  {
+    "scenarioId": "pairing-token-happy-path",
+    "title": "Pairing per Token Happy Path",
+    "priority": "P0",
+    "risk": "critical",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["10", "12", "14", "15"],
+    "failureModes": [],
+    "suiteHints": ["android-usb-master", "android-usb-child", "android-e2e-shell-script"]
+  },
+  {
+    "scenarioId": "pairing-code-expiry",
+    "title": "Pairing Code Expiry and Retry",
+    "priority": "P0",
+    "risk": "high",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["10", "13", "15", "16"],
+    "failureModes": ["timeout", "expired-token"],
+    "suiteHints": ["android-usb-master", "android-usb-child"]
+  },
+  {
+    "scenarioId": "rule-sync-lock-unlock",
+    "title": "Rule Sync Lock and Unlock",
+    "priority": "P0",
+    "risk": "critical",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["11", "12", "14", "15"],
+    "failureModes": ["delayed-delivery", "stale-state"],
+    "suiteHints": ["android-usb-master", "android-usb-child", "android-connected-child"]
+  },
+  {
+    "scenarioId": "task-lifecycle-photo-proof",
+    "title": "Task Lifecycle with Photo Proof",
+    "priority": "P1",
+    "risk": "high",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["10", "13", "14", "15"],
+    "failureModes": ["network-drop", "upload-delay"],
+    "suiteHints": ["android-usb-master", "android-usb-child"]
+  },
+  {
+    "scenarioId": "notification-permission-cross-device",
+    "title": "Notification Permission and Cross Device Signal",
+    "priority": "P1",
+    "risk": "high",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["13", "14", "15", "16"],
+    "failureModes": ["permission-denied", "late-notification"],
+    "suiteHints": ["android-connected-master", "android-connected-child"]
+  },
+  {
+    "scenarioId": "offline-online-resync",
+    "title": "Offline Online Resync",
+    "priority": "P1",
+    "risk": "high",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["10", "12", "14", "16"],
+    "failureModes": ["disconnect", "late-resync", "conflicting-state"],
+    "suiteHints": ["android-usb-master", "android-usb-child"]
+  },
+  {
+    "scenarioId": "device-restart-recovery",
+    "title": "Device Restart Recovery",
+    "priority": "P2",
+    "risk": "medium",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["11", "13", "15", "16"],
+    "failureModes": ["app-restart", "worker-delay"],
+    "suiteHints": ["android-usb-child", "android-connected-child"]
+  },
+  {
+    "scenarioId": "conflicting-rule-updates",
+    "title": "Conflicting Rule Updates",
+    "priority": "P2",
+    "risk": "high",
+    "deviceRoles": ["master", "child"],
+    "androidVersions": ["12", "13", "14", "15"],
+    "failureModes": ["duplicate-update", "stale-state", "contradicting-rules"],
+    "suiteHints": ["android-usb-master", "android-usb-child"]
+  }
+]
