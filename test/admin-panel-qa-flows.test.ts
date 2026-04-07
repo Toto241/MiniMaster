@@ -207,6 +207,37 @@ describe("admin-panel QA flow integration", () => {
     expect(overview.innerHTML).not.toContain("run-a");
   });
 
+  it("builds reusable artifact export payloads from the selected run state", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const selectedRun = {
+      runId: "run-b",
+      scenarioId: "scenario-b",
+      result: { scenarioId: "scenario-b" },
+    };
+
+    exports.setQaPlatformCatalogPayloadForTests({
+      androidScenarioMappings: [
+        { scenarioId: "scenario-b", role: "child", testClass: "SyncSpec", testMethod: "resyncAfterReconnect" },
+        { scenarioId: "scenario-a", role: "master", testClass: "IgnoreSpec", testMethod: "other" },
+      ],
+    });
+    exports.setPythonCommissioningEvidenceHistoryForTests([
+      { testId: "doc-1", evidenceRef: "DOC-1", status: "pass" },
+    ]);
+
+    const payload = exports.buildQaArtifactExportPayload(selectedRun, "2026-04-07T14:00:00Z");
+
+    expect(payload).toMatchObject({
+      exportedAt: "2026-04-07T14:00:00Z",
+      selectedRun,
+      evidenceSnapshot: [{ testId: "doc-1", evidenceRef: "DOC-1", status: "pass" }],
+    });
+    expect(payload.linkedAndroidMappings).toEqual([
+      { scenarioId: "scenario-b", role: "child", testClass: "SyncSpec", testMethod: "resyncAfterReconnect" },
+    ]);
+  });
+
   it("exports the selected dual-device artifact with linked mappings and evidence snapshot", () => {
     const { exports, elements, context } = loadAdminPanelTestExports();
 
@@ -280,5 +311,25 @@ describe("admin-panel QA flow integration", () => {
       expect.objectContaining({ sectionKey: "register", ok: false, message: "register stale" }),
       expect.objectContaining({ sectionKey: "qaPlatform", ok: false, message: "qa catalog missing" }),
     ]));
+  });
+
+  it("exposes the QA dashboard section loader registry for orchestration", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const sections = exports.getQaDashboardSectionLoaders();
+
+    expect(sections).toHaveLength(9);
+    expect(sections.map((entry: [string, unknown]) => entry[0])).toEqual([
+      "catalog",
+      "history",
+      "evidence",
+      "register",
+      "qaPlatform",
+      "emulators",
+      "suites",
+      "suiteHistory",
+      "devices",
+    ]);
+    expect(sections.every((entry: [string, unknown]) => typeof entry[1] === "function")).toBe(true);
   });
 });

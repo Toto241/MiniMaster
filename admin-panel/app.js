@@ -440,6 +440,20 @@ function updateQaRefreshSummary(reason, sectionResults = []) {
     renderQaRefreshStatus();
 }
 
+function getQaDashboardSectionLoaders() {
+    return [
+        ["catalog", loadPythonAutomationCatalog],
+        ["history", loadPythonAutomationHistory],
+        ["evidence", loadPythonAutomationEvidenceHistory],
+        ["register", loadTestingRegister],
+        ["qaPlatform", loadQaPlatformCatalog],
+        ["emulators", loadEmulatorLabOverview],
+        ["suites", loadSuiteCatalog],
+        ["suiteHistory", loadSuiteRunHistory],
+        ["devices", loadSuiteDeviceStatus],
+    ];
+}
+
 function buildPythonAutomationTargetEntries(catalog = pythonCommissioningCatalog, payload = testingRegisterPayload) {
     const entries = [];
     const seenIds = new Set();
@@ -2147,17 +2161,7 @@ async function loadQaDashboardData(reason = "manuell") {
     renderQaRefreshStatus();
 
     qaDashboardLoadPromise = (async () => {
-        const sections = [
-            ["catalog", loadPythonAutomationCatalog],
-            ["history", loadPythonAutomationHistory],
-            ["evidence", loadPythonAutomationEvidenceHistory],
-            ["register", loadTestingRegister],
-            ["qaPlatform", loadQaPlatformCatalog],
-            ["emulators", loadEmulatorLabOverview],
-            ["suites", loadSuiteCatalog],
-            ["suiteHistory", loadSuiteRunHistory],
-            ["devices", loadSuiteDeviceStatus],
-        ];
+        const sections = getQaDashboardSectionLoaders();
 
         const results = [];
         for (const [sectionKey, loader] of sections) {
@@ -2211,6 +2215,27 @@ function getSelectedQaArtifactRun(filteredRuns = getDualDeviceRunsFromHistory())
     return fallback;
 }
 
+function getFilteredDualDeviceRuns() {
+    const dualRuns = getDualDeviceRunsFromHistory();
+    return qaArtifactScenarioFilter
+        ? dualRuns.filter(run => String(run?.scenarioId || run?.result?.scenarioId || "") === qaArtifactScenarioFilter)
+        : dualRuns;
+}
+
+function buildQaArtifactExportPayload(selectedRun, exportedAt = new Date().toISOString()) {
+    const scenarioId = String(selectedRun?.scenarioId || selectedRun?.result?.scenarioId || "");
+    const mappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings)
+        ? qaPlatformCatalogPayload.androidScenarioMappings.filter(item => String(item?.scenarioId || "") === scenarioId)
+        : [];
+
+    return {
+        exportedAt,
+        selectedRun,
+        linkedAndroidMappings: mappings,
+        evidenceSnapshot: pythonCommissioningEvidenceHistory.slice(0, 20),
+    };
+}
+
 function applyQaArtifactFilters() {
     qaArtifactScenarioFilter = document.getElementById("qa-artifact-scenario-filter")?.value || "";
     qaArtifactSelectedRunId = document.getElementById("qa-artifact-run-select")?.value || "";
@@ -2218,10 +2243,7 @@ function applyQaArtifactFilters() {
 }
 
 function exportSelectedQaArtifact() {
-    const dualRuns = getDualDeviceRunsFromHistory();
-    const filteredRuns = qaArtifactScenarioFilter
-        ? dualRuns.filter(run => String(run?.scenarioId || run?.result?.scenarioId || "") === qaArtifactScenarioFilter)
-        : dualRuns;
+    const filteredRuns = getFilteredDualDeviceRuns();
     const selectedRun = getSelectedQaArtifactRun(filteredRuns);
     if (!selectedRun) {
         showNotification("Es liegt noch kein exportierbares Dual-Device-Artefakt vor.", "info");
@@ -2229,16 +2251,7 @@ function exportSelectedQaArtifact() {
     }
 
     const scenarioId = String(selectedRun?.scenarioId || selectedRun?.result?.scenarioId || "");
-    const mappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings)
-        ? qaPlatformCatalogPayload.androidScenarioMappings.filter(item => String(item?.scenarioId || "") === scenarioId)
-        : [];
-
-    const payload = {
-        exportedAt: new Date().toISOString(),
-        selectedRun,
-        linkedAndroidMappings: mappings,
-        evidenceSnapshot: pythonCommissioningEvidenceHistory.slice(0, 20),
-    };
+    const payload = buildQaArtifactExportPayload(selectedRun);
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2270,10 +2283,7 @@ function renderQaArtifactsOverview() {
         return;
     }
 
-    const dualRuns = getDualDeviceRunsFromHistory();
-    const filteredRuns = qaArtifactScenarioFilter
-        ? dualRuns.filter(run => String(run?.scenarioId || run?.result?.scenarioId || "") === qaArtifactScenarioFilter)
-        : dualRuns;
+    const filteredRuns = getFilteredDualDeviceRuns();
     const latestDualRun = getSelectedQaArtifactRun(filteredRuns) || getLatestDualDeviceRun();
     const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
     const evidenceCounts = buildEvidenceStatusCounts(evidenceEntries);
