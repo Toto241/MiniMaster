@@ -17,6 +17,7 @@ class TestQaCatalog:
         assert "androidMatrix" in result
         assert "deviceProfiles" in result
         assert "dualDeviceScenarios" in result
+        assert "androidScenarioMappings" in result
         assert "suiteEntries" in result
         assert "inventoryEntries" in result
         assert "automationBacklog" in result
@@ -41,6 +42,15 @@ class TestQaCatalog:
         assert suite_entries["android-e2e-shell-script"]["deviceMode"] == "dual-device"
         assert suite_entries["backend-jest"]["deviceMode"] == "host"
 
+    def test_android_scenario_mappings_reference_known_scenarios(self):
+        result = build_qa_catalog()
+        scenario_ids = {entry["scenarioId"] for entry in result["dualDeviceScenarios"]}
+
+        assert result["androidScenarioMappings"]
+        assert all(entry["scenarioId"] in scenario_ids for entry in result["androidScenarioMappings"])
+        assert any(entry["role"] == "master" for entry in result["androidScenarioMappings"])
+        assert any(entry["role"] == "child" for entry in result["androidScenarioMappings"])
+
     def test_export_writes_json_file(self, tmp_path: Path):
         output = tmp_path / "qa-catalog.json"
 
@@ -48,3 +58,4 @@ class TestQaCatalog:
 
         assert output.exists()
         assert payload["summary"]["suiteCount"] >= 1
+        assert payload["summary"]["androidScenarioMappingCount"] >= 1

@@ -59,7 +59,7 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
   - enthaelt zusaetzlich `latestByTestId`, damit die UI pro Testfall den letzten Nachweisstatus direkt darstellen kann
 
 - `GET /api/qa/catalog`
-  - liefert den kanonischen QA-Katalog als Seed-Struktur fuer Android-Matrix, Suite-Inventar, Repo-Test-Inventar und priorisierten Automatisierungs-Backlog
+  - liefert den kanonischen QA-Katalog als Seed-Struktur fuer Android-Matrix, Geräteprofile, Android-Szenario-Mappings, Suite-Inventar, Repo-Test-Inventar und priorisierten Automatisierungs-Backlog
   - kombiniert den versionierten Katalog aus `qa/catalog/` mit der bestehenden Suite- und Registersicht
 
 - `GET /api/qa/android-matrix`

@@ -3313,17 +3313,29 @@ def _run_dual_device_background(run_id: str, kwargs: dict[str, object]) -> None:
     with _active_suite_lock:
         _active_suite_runs[run_id]["status"] = "running"
         _active_suite_runs[run_id]["startedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _active_suite_runs[run_id]["timeline"] = []
+        _active_suite_runs[run_id]["currentPhase"] = "preflight"
+        _active_suite_runs[run_id]["lastEvent"] = None
 
     try:
-        result = run_dual_device(**kwargs, verbose=False)
+        def _on_event(event: dict[str, object]) -> None:
+            with _active_suite_lock:
+                timeline = cast(list[dict[str, object]], _active_suite_runs[run_id].setdefault("timeline", []))
+                timeline.append(dict(event))
+                _active_suite_runs[run_id]["currentPhase"] = str(event.get("phase") or "running")
+                _active_suite_runs[run_id]["lastEvent"] = dict(event)
+
+        result = run_dual_device(**kwargs, on_event=_on_event, verbose=False)
         with _active_suite_lock:
             _active_suite_runs[run_id]["status"] = "finished"
             _active_suite_runs[run_id]["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             _active_suite_runs[run_id]["result"] = result.to_dict()
+            _active_suite_runs[run_id]["currentPhase"] = "finished"
     except Exception as exc:
         with _active_suite_lock:
             _active_suite_runs[run_id]["status"] = "error"
             _active_suite_runs[run_id]["error"] = str(exc)
+            _active_suite_runs[run_id]["currentPhase"] = "error"
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     with _active_suite_lock:

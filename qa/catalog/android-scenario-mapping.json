@@ -1,0 +1,122 @@
+[
+  {
+    "mappingId": "master-phase1-pairing-link",
+    "scenarioId": "pairing-token-happy-path",
+    "platform": "master-androidTest",
+    "suiteId": "android-usb-master",
+    "sourcePath": "masterApp/src/androidTest/java/com/minimaster/masterapp/CommissioningMasterPhase1UiTest.kt",
+    "testClass": "com.minimaster.masterapp.CommissioningMasterPhase1UiTest",
+    "testMethod": "phase1_1_registerDeviceButtonVisibleAfterConsent",
+    "phase": "phase1",
+    "role": "master",
+    "coverage": "token-generation-entry"
+  },
+  {
+    "mappingId": "master-phase1-generate-pairing-link",
+    "scenarioId": "pairing-token-happy-path",
+    "platform": "master-androidTest",
+    "suiteId": "android-usb-master",
+    "sourcePath": "masterApp/src/androidTest/java/com/minimaster/masterapp/CommissioningMasterPhase1UiTest.kt",
+    "testClass": "com.minimaster.masterapp.CommissioningMasterPhase1UiTest",
+    "testMethod": "phase1_2_generatePairingLinkVisibleAfterRegistration",
+    "phase": "phase1",
+    "role": "master",
+    "coverage": "pairing-link-generation"
+  },
+  {
+    "mappingId": "child-deeplink-pairing-success",
+    "scenarioId": "pairing-token-happy-path",
+    "platform": "child-androidTest",
+    "suiteId": "android-usb-child",
+    "sourcePath": "childApp/src/androidTest/java/com/google/pairing/DeepLinkE2ETest.kt",
+    "testClass": "com.google.pairing.DeepLinkE2ETest",
+    "testMethod": "verifySuccessfulPairingFromDeepLink_showsLockScreen",
+    "phase": "phase1",
+    "role": "child",
+    "coverage": "pairing-link-consumption"
+  },
+  {
+    "mappingId": "master-create-task",
+    "scenarioId": "task-lifecycle-photo-proof",
+    "platform": "master-androidTest",
+    "suiteId": "android-usb-master",
+    "sourcePath": "masterApp/src/androidTest/java/com/minimaster/masterapp/CommissioningMasterUiFlowTest.kt",
+    "testClass": "com.minimaster.masterapp.CommissioningMasterUiFlowTest",
+    "testMethod": "phase2_1_createTaskForm_submitsValidInput",
+    "phase": "phase2",
+    "role": "master",
+    "coverage": "task-creation"
+  },
+  {
+    "mappingId": "child-proof-submission",
+    "scenarioId": "task-lifecycle-photo-proof",
+    "platform": "child-androidTest",
+    "suiteId": "android-usb-child",
+    "sourcePath": "childApp/src/androidTest/java/com/google/pairing/CommissioningChildUiFlowTest.kt",
+    "testClass": "com.google.pairing.CommissioningChildUiFlowTest",
+    "testMethod": "phase2_2_pendingTask_showsAndTriggersCompleteButton",
+    "phase": "phase2",
+    "role": "child",
+    "coverage": "proof-submission-entry"
+  },
+  {
+    "mappingId": "master-task-review-approve",
+    "scenarioId": "task-lifecycle-photo-proof",
+    "platform": "master-androidTest",
+    "suiteId": "android-usb-master",
+    "sourcePath": "masterApp/src/androidTest/java/com/minimaster/masterapp/CommissioningMasterUiFlowTest.kt",
+    "testClass": "com.minimaster.masterapp.CommissioningMasterUiFlowTest",
+    "testMethod": "phase2_3_taskReviewItem_triggersApproveAction",
+    "phase": "phase2",
+    "role": "master",
+    "coverage": "task-approval"
+  },
+  {
+    "mappingId": "master-lock-toggle",
+    "scenarioId": "rule-sync-lock-unlock",
+    "platform": "master-androidTest",
+    "suiteId": "android-usb-master",
+    "sourcePath": "masterApp/src/androidTest/java/com/minimaster/masterapp/CommissioningMasterUiFlowTest.kt",
+    "testClass": "com.minimaster.masterapp.CommissioningMasterUiFlowTest",
+    "testMethod": "phase3_3_childCard_lockSwitch_togglesState",
+    "phase": "phase3",
+    "role": "master",
+    "coverage": "lock-toggle-command"
+  },
+  {
+    "mappingId": "child-overlay-enforcement",
+    "scenarioId": "rule-sync-lock-unlock",
+    "platform": "child-androidTest",
+    "suiteId": "android-usb-child",
+    "sourcePath": "childApp/src/androidTest/java/com/google/pairing/CommissioningChildUiFlowTest.kt",
+    "testClass": "com.google.pairing.CommissioningChildUiFlowTest",
+    "testMethod": "phase3_2_blockingOverlay_enforcesFullScreenMessageAndLayout",
+    "phase": "phase3",
+    "role": "child",
+    "coverage": "overlay-enforcement"
+  },
+  {
+    "mappingId": "master-usage-rules-save",
+    "scenarioId": "conflicting-rule-updates",
+    "platform": "master-androidTest",
+    "suiteId": "android-usb-master",
+    "sourcePath": "masterApp/src/androidTest/java/com/minimaster/masterapp/CommissioningMasterUiFlowTest.kt",
+    "testClass": "com.minimaster.masterapp.CommissioningMasterUiFlowTest",
+    "testMethod": "phase3_1_usageRulesForm_capturesPerAppLimitAndSaves",
+    "phase": "phase3",
+    "role": "master",
+    "coverage": "usage-rule-payload"
+  },
+  {
+    "mappingId": "child-pending-approval-state",
+    "scenarioId": "task-lifecycle-photo-proof",
+    "platform": "child-androidTest",
+    "suiteId": "android-usb-child",
+    "sourcePath": "childApp/src/androidTest/java/com/google/pairing/CommissioningChildUiFlowTest.kt",
+    "testClass": "com.google.pairing.CommissioningChildUiFlowTest",
+    "testMethod": "phase3_3_taskLock_pendingApproval_showsWaitingState",
+    "phase": "phase3",
+    "role": "child",
+    "coverage": "approval-waiting-state"
+  }
+]

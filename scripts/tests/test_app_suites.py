@@ -876,6 +876,7 @@ class TestRunDualDeviceBackground:
 
         with _active_suite_lock:
             assert _active_suite_runs[run_id]["status"] == "finished"
+            assert _active_suite_runs[run_id]["currentPhase"] == "finished"
 
     @patch("app.run_dual_device", side_effect=RuntimeError("Device disconnect"))
     def test_error_handling(self, mock_run_dual, suite_log_file):
@@ -890,6 +891,34 @@ class TestRunDualDeviceBackground:
         with _active_suite_lock:
             assert _active_suite_runs[run_id]["status"] == "error"
             assert "Device disconnect" in _active_suite_runs[run_id]["error"]
+            assert _active_suite_runs[run_id]["currentPhase"] == "error"
+
+    @patch("app.run_dual_device")
+    def test_progress_callback_updates_timeline(self, mock_run_dual, suite_log_file):
+        from app import _run_dual_device_background, _active_suite_runs, _active_suite_lock
+        from dual_device_runner import DualDeviceResult
+
+        run_id = "dual-progress"
+
+        def fake_run_dual_device(*args, **kwargs):
+            callback = kwargs.get("on_event")
+            if callback:
+                callback({"phase": "preflight", "status": "running", "message": "Preflight"})
+                callback({"phase": "master", "status": "running", "message": "Master"})
+            result = DualDeviceResult(master_serial="M1", child_serial="C1", timeline=[])
+            result.overall_status = "passed"
+            return result
+
+        mock_run_dual.side_effect = fake_run_dual_device
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_dual_device_background(run_id, {"master_serial": "M1", "child_serial": "C1"})
+
+        with _active_suite_lock:
+            assert len(_active_suite_runs[run_id]["timeline"]) == 2
+            assert _active_suite_runs[run_id]["lastEvent"]["phase"] == "master"
 
 
 # ═══════════════════════════════════════════════════════════════════

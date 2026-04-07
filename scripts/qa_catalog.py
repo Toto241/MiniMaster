@@ -29,6 +29,10 @@ def load_dual_device_scenarios() -> list[dict[str, object]]:
     return cast(list[dict[str, object]], _read_json_file(CATALOG_ROOT / "dual-device-scenarios.json"))
 
 
+def load_android_scenario_mappings() -> list[dict[str, object]]:
+    return cast(list[dict[str, object]], _read_json_file(CATALOG_ROOT / "android-scenario-mapping.json"))
+
+
 def load_automation_backlog() -> list[dict[str, object]]:
     backlog = cast(list[dict[str, object]], _read_json_file(CATALOG_ROOT / "automation-backlog.json"))
     priority_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
@@ -248,6 +252,7 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
     matrix = load_android_version_matrix()
     profiles = load_device_profiles()
     scenarios = load_dual_device_scenarios()
+    scenario_mappings = load_android_scenario_mappings()
     backlog = load_automation_backlog()
     suite_entries = build_suite_entries(matrix, suites=suites)
     inventory_entries = build_repo_inventory(matrix)
@@ -262,6 +267,7 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
         "androidMatrix": matrix,
         "deviceProfiles": profiles,
         "dualDeviceScenarios": scenarios,
+        "androidScenarioMappings": scenario_mappings,
         "suiteEntries": suite_entries,
         "inventoryEntries": inventory_entries,
         "automationBacklog": backlog,
@@ -270,6 +276,7 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
             "inventoryCount": len(inventory_entries),
             "androidVersions": _all_android_versions(matrix),
             "dualDeviceScenarioCount": len(scenarios),
+            "androidScenarioMappingCount": len(scenario_mappings),
             "dualDeviceSuiteCount": dual_device_count,
             "singleDeviceSuiteCount": single_device_count,
             "hostSuiteCount": host_count,

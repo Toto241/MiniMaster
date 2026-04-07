@@ -1925,6 +1925,7 @@ async function loadPythonAutomationEvidenceHistory() {
         renderPythonAutomationOverview(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationCatalog(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
+        renderQaArtifactsOverview();
         renderPythonAutomationProtocolEditor();
         rerenderTestingRegisterFromCache();
         setQaRefreshSectionState("evidence", "success", `${pythonCommissioningEvidenceHistory.length} Nachweise geladen`);
@@ -1985,6 +1986,84 @@ async function loadQaDashboardData(reason = "manuell") {
 
 async function refreshQaDashboard() {
     await loadQaDashboardData("manueller Refresh");
+}
+
+function getLatestDualDeviceRun() {
+    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).find(run => {
+        const type = String(run?.type || "");
+        const suiteId = String(run?.suiteId || run?.suite_id || "");
+        return type === "dual-device" || suiteId === "dual-device";
+    }) || null;
+}
+
+function buildEvidenceStatusCounts(entries = pythonCommissioningEvidenceHistory) {
+    const counts = { pass: 0, fail: 0, manual_required: 0 };
+    (Array.isArray(entries) ? entries : []).forEach(entry => {
+        const status = String(entry?.status || "");
+        if (status === "pass" || status === "fail" || status === "manual_required") {
+            counts[status] += 1;
+        }
+    });
+    return counts;
+}
+
+function renderQaArtifactsOverview() {
+    const el = document.getElementById("qa-artifact-overview");
+    if (!el) return;
+
+    if (!isPythonOperator) {
+        el.innerHTML = "<div class='info'>Artefakte und Laufspuren sind nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    const latestDualRun = getLatestDualDeviceRun();
+    const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
+    const evidenceCounts = buildEvidenceStatusCounts(evidenceEntries);
+    const recentEvidence = evidenceEntries.slice(0, 5);
+    const timeline = Array.isArray(latestDualRun?.timeline)
+        ? latestDualRun.timeline
+        : Array.isArray(latestDualRun?.result?.timeline)
+            ? latestDualRun.result.timeline
+            : [];
+    const faultModes = Array.isArray(latestDualRun?.result?.faultModes) ? latestDualRun.result.faultModes : [];
+
+    if (!latestDualRun && evidenceEntries.length === 0) {
+        el.innerHTML = "<div class='info'>Noch keine Artefakte oder Laufspuren vorhanden.</div>";
+        return;
+    }
+
+    el.innerHTML = `
+        <div class='qa-platform-mini-grid'>
+            <section class='python-clarity-box'>
+                <strong>Letzter Dual-Device-Lauf</strong><br />
+                ${latestDualRun ? `
+                    <div class='qa-platform-mini-row'>
+                        <strong>${escapeHtml(String(latestDualRun?.scenarioId || latestDualRun?.result?.scenarioId || "ohne Szenario"))}</strong>
+                        <span>Status: ${escapeHtml(String(latestDualRun?.status || latestDualRun?.result?.overallStatus || "-"))}</span>
+                        <span>Profil: ${escapeHtml(String(latestDualRun?.profileId || latestDualRun?.result?.profileId || "-"))}</span>
+                        <span>Fault-Modes: ${escapeHtml(faultModes.join(", ") || "keine")}</span>
+                    </div>
+                ` : "Noch kein Dual-Device-Lauf protokolliert."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Manuelle Evidenzlage</strong><br />
+                <div class='qa-platform-mini-row'>
+                    <strong>${escapeHtml(String(evidenceEntries.length))} Nachweise</strong>
+                    <span>PASS ${escapeHtml(String(evidenceCounts.pass))} · FAIL ${escapeHtml(String(evidenceCounts.fail))} · Offen ${escapeHtml(String(evidenceCounts.manual_required))}</span>
+                </div>
+            </section>
+        </div>
+        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
+            <section class='python-clarity-box'>
+                <strong>Dual-Device-Timeline</strong><br />
+                ${timeline.length > 0 ? timeline.slice(0, 8).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.phase || "-"))}</strong><span>${escapeHtml(String(item?.message || "-"))}</span><span>${escapeHtml(String(item?.timestamp || "-"))}</span></div>`).join("") : "Keine Timeline für Dual-Device-Läufe verfügbar."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Letzte Evidenzartefakte</strong><br />
+                ${recentEvidence.length > 0 ? recentEvidence.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.testTitle || item?.testId || "-"))}</strong><span>${escapeHtml(String(item?.status || "-"))} · ${escapeHtml(String(item?.operator || "-"))}</span><span>${escapeHtml(String(item?.evidenceRef || item?.notes || "-"))}</span></div>`).join("") : "Keine manuellen Evidenzartefakte vorhanden."}
+            </section>
+        </div>
+    `;
 }
 
 function getLatestFailedSuiteRun() {
@@ -3342,6 +3421,7 @@ function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
     const androidMatrix = Array.isArray(payload.androidMatrix) ? payload.androidMatrix : [];
     const deviceProfiles = Array.isArray(payload.deviceProfiles) ? payload.deviceProfiles : [];
     const dualDeviceScenarios = Array.isArray(payload.dualDeviceScenarios) ? payload.dualDeviceScenarios : [];
+    const androidScenarioMappings = Array.isArray(payload.androidScenarioMappings) ? payload.androidScenarioMappings : [];
     const suiteEntries = Array.isArray(payload.suiteEntries) ? payload.suiteEntries : [];
     const criticalBacklog = Array.isArray(payload.criticalBacklog) ? payload.criticalBacklog : [];
     const registerSummary = payload.registerSummary || {};
@@ -3362,6 +3442,11 @@ function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
                 <strong>Geräteprofile</strong>
                 <span>${deviceProfiles.length} Profile, davon ${dualProfiles.length} Dual-Device</span>
                 <div class='qa-refresh-meta'>Suite-Referenzen: ${escapeHtml(String(suiteEntries.length))}</div>
+            </article>
+            <article class='qa-refresh-card is-success'>
+                <strong>Android-Szenario-Mapping</strong>
+                <span>${androidScenarioMappings.length} Bindungen zwischen Szenario und Testklasse</span>
+                <div class='qa-refresh-meta'>Master: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "master").length))} · Child: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "child").length))}</div>
             </article>
             <article class='qa-refresh-card ${criticalBacklog.length > 0 ? "is-loading" : "is-success"}'>
                 <strong>Priorisierte Lücken</strong>
@@ -3404,6 +3489,10 @@ function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
             <section class='python-clarity-box'>
                 <strong>Nächste Plattformarbeiten</strong><br />
                 ${criticalBacklog.slice(0, 4).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.priority || "-"))}</strong> ${escapeHtml(String(item?.title || item?.id || "-"))}<span>${escapeHtml(String(item?.owner || item?.team || "Owner offen"))}</span></div>`).join("") || "Keine kritischen Backlogeinträge vorhanden."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Android-Testbindungen</strong><br />
+                ${androidScenarioMappings.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.scenarioId || "-"))}</strong> ${escapeHtml(String(item?.testClass || "-"))}<span>${escapeHtml(String(item?.testMethod || "-"))}</span></div>`).join("") || "Noch keine Android-Szenario-Bindungen vorhanden."}
             </section>
         </div>
     `;
@@ -3902,7 +3991,9 @@ function pollSuiteRunStatus(runId) {
                 if (data.status === "running") {
                     badge.className = "badge running";
                     badge.textContent = "laufend";
-                    if (detail) detail.textContent = data.startedAt || "...";
+                    if (detail) {
+                        detail.textContent = data.lastEvent?.message || data.currentPhase || data.startedAt || "...";
+                    }
                 } else {
                     const resultStatus = data.result?.status || data.result?.overall_status;
                     const isPass = data.status === "finished" && resultStatus === "passed";
@@ -3922,6 +4013,7 @@ function pollSuiteRunStatus(runId) {
                         mergedRun,
                         ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || runId || "")),
                     ];
+                    renderQaArtifactsOverview();
                     rerenderSuiteCatalogFromCache();
                     clearInterval(_suiteActivePollers[runId]);
                     delete _suiteActivePollers[runId];
@@ -3951,6 +4043,7 @@ async function loadSuiteRunHistory() {
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
         const runs = data.runs || [];
         suiteRunHistoryPayload = runs;
+        renderQaArtifactsOverview();
         rerenderSuiteCatalogFromCache();
         if (runs.length === 0) {
             el.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
@@ -7531,7 +7624,7 @@ function renderAdminActivationContent(user) {
             </div>
             <div id="bootstrap-admin-status" class="phase-status" style="margin-block-start: 8px"></div>
 
-            <hr style="margin: 14px 0; border: none; border-top: 1px solid #bbf7d0;" />
+            <hr style="margin: 14px 0; border: none; border-block-start: 1px solid #bbf7d0;" />
             <p>
                 Entwicklungsmodus: Falls eine falsche Einrichtung vorliegt, können Sie
                 <strong>alle bisherigen Nutzerkonten</strong> zurücksetzen.
@@ -7551,7 +7644,7 @@ function renderAdminActivationContent(user) {
             </div>
             <div id="reset-all-users-health" class="phase-status" style="margin-block-start: 8px"></div>
             <div id="reset-all-users-status" class="phase-status" style="margin-block-start: 8px"></div>
-            <div id="reset-debug-log" style="margin-block-start: 10px; background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; max-height: 300px; overflow-y: auto; display: none; white-space: pre-wrap;"></div>
+            <div id="reset-debug-log" style="margin-block-start: 10px; background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; max-block-size: 300px; overflow-y: auto; display: none; white-space: pre-wrap;"></div>
         </div>
 
         <div class="admin-info-box" style="background: #f8fafc; border-color: #e2e8f0;">
@@ -7596,7 +7689,7 @@ function renderAdminActivationContent(user) {
             </div>
             <div id="access-key-generate-status" class="phase-status" style="margin-block-start: 8px"></div>
 
-            <hr style="margin: 14px 0; border: none; border-top: 1px solid #fed7aa;" />
+            <hr style="margin: 14px 0; border: none; border-block-start: 1px solid #fed7aa;" />
 
             <div class="form-group">
                 <label for="access-key-file">Schlüsseldatei einlösen
@@ -7802,7 +7895,7 @@ async function generateOperatorAccessKeyFile() {
         downloadJson(fileName, fileData);
 
         if (statusEl) {
-            statusEl.innerHTML = `<div class='success-box'>✅ Schlüsseldatei erzeugt und gespeichert.<br />Rolle: <strong>${escapeHtml(fileData.role)}</strong> · Ablauf: <strong>${escapeHtml(fileData.expiresAt)}</strong><br />Fingerprint: <code>${escapeHtml(fileData.fingerprint)}</code><br /><button class='btn btn-secondary btn-sm' style='margin-top:8px' onclick='copyAccessKeyFingerprint(${JSON.stringify(fileData.fingerprint)})'>Fingerprint kopieren</button></div>`;
+            statusEl.innerHTML = `<div class='success-box'>✅ Schlüsseldatei erzeugt und gespeichert.<br />Rolle: <strong>${escapeHtml(fileData.role)}</strong> · Ablauf: <strong>${escapeHtml(fileData.expiresAt)}</strong><br />Fingerprint: <code>${escapeHtml(fileData.fingerprint)}</code><br /><button class='btn btn-secondary btn-sm' style='margin-block-start:8px' onclick='copyAccessKeyFingerprint(${JSON.stringify(fileData.fingerprint)})'>Fingerprint kopieren</button></div>`;
         }
         showNotification("Zugangsschlüsseldatei wurde erzeugt.", "success");
     } catch (error) {
@@ -7857,7 +7950,7 @@ async function redeemOperatorAccessKeyFile() {
         const grantedRole = escapeHtml(result?.data?.role || "unbekannt");
 
         if (statusEl) {
-            statusEl.innerHTML = `<div class='success-box'>✅ Zugang freigeschaltet. Rolle: <strong>${grantedRole}</strong>. Token wird aktualisiert...<br />Fingerprint: <code>${escapeHtml(actualFingerprint)}</code><br /><button class='btn btn-secondary btn-sm' style='margin-top:8px' onclick='copyAccessKeyFingerprint(${JSON.stringify(actualFingerprint)})'>Fingerprint kopieren</button></div>`;
+            statusEl.innerHTML = `<div class='success-box'>✅ Zugang freigeschaltet. Rolle: <strong>${grantedRole}</strong>. Token wird aktualisiert...<br />Fingerprint: <code>${escapeHtml(actualFingerprint)}</code><br /><button class='btn btn-secondary btn-sm' style='margin-block-start:8px' onclick='copyAccessKeyFingerprint(${JSON.stringify(actualFingerprint)})'>Fingerprint kopieren</button></div>`;
         }
 
         await recheckAdminAccess();
@@ -8460,7 +8553,7 @@ async function handleForgotPassword() {
                 ? `Absender meist: noreply@${escapeHtml(firebaseConfig.projectId)}.firebaseapp.com.`
                 : "Absender meist: noreply@<projekt>.firebaseapp.com.";
             if (Array.isArray(methods) && methods.length === 0) {
-                statusEl.innerHTML = `<div class='info'>ℹ️ Reset-Anfrage wurde an Firebase übergeben. Wegen aktivem Kontoschutz kann der Versand nicht verifiziert werden. Bitte in Firebase Console unter Authentication → Users prüfen, ob für diese E-Mail ein Passwort-Provider existiert.</div><div class='info' style='margin-top:6px'>${senderHint}</div>`;
+                statusEl.innerHTML = `<div class='info'>ℹ️ Reset-Anfrage wurde an Firebase übergeben. Wegen aktivem Kontoschutz kann der Versand nicht verifiziert werden. Bitte in Firebase Console unter Authentication → Users prüfen, ob für diese E-Mail ein Passwort-Provider existiert.</div><div class='info' style='margin-block-start:6px'>${senderHint}</div>`;
             } else {
                 statusEl.innerHTML = `<div class='success-box'>✅ Passwort-Reset-E-Mail versendet. Bitte Posteingang, Spam und ggf. Gmail-Kategorie "Werbung" prüfen.<br />${senderHint}</div>`;
             }
