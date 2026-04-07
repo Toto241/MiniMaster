@@ -153,6 +153,8 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  formatPythonAutomationEvidenceDetails,",
     "  getPythonEvidenceRequirements,",
     "  buildPythonEvidenceValidationErrors,",
+    "  renderPythonAutomationProtocolRequirements,",
+    "  renderPythonAutomationProtocolEditor,",
     "  renderQaRuntimeModeBanner,",
     "  applyQaRuntimeInteractionState,",
     "  buildPythonAutomationRunIndex,",
@@ -205,7 +207,11 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildQaExecutionGuideData,",
     "  getUsbFormVisibilityState,",
     "  buildUsbTestRunRequestPayload,",
+    "  updateUsbTestTypeFormState,",
     "  setPythonOperatorRuntimeForTests: (value) => { isPythonOperator = Boolean(value); },",
+    "  setPythonCommissioningCatalogForTests: (value) => { pythonCommissioningCatalog = value; },",
+    "  setTestingRegisterPayloadForTests: (value) => { testingRegisterPayload = value; },",
+    "  setPythonAutomationSelectedTestIdForTests: (value) => { pythonCommissioningSelectedTestId = value; },",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
     "};",
@@ -368,6 +374,100 @@ describe("admin-panel helper functions", () => {
       "Bitte den dokumentierten Ablauf und die Evidenzquelle als abgeglichen markieren.",
       "Bitte eine aussagekräftige Notiz für FAIL oder Nacharbeit hinterlegen.",
     ]));
+  });
+
+  it("renders protocol editor requirements and documented-only controls", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const selectedEl = { innerHTML: "" };
+    const requirementsEl = { innerHTML: "" };
+    const docRowEl = { style: { display: "none" } };
+    const statusEl = { value: "fail" };
+    const operatorEl = { value: "", };
+    const evidenceRefEl = { value: "", };
+    const notesEl = { value: "", };
+    const docCheckEl = { checked: false };
+
+    elements.set("python-automation-protocol-selected", selectedEl);
+    elements.set("python-automation-protocol-requirements", requirementsEl);
+    elements.set("python-automation-protocol-doc-row", docRowEl);
+    elements.set("python-automation-protocol-status", statusEl);
+    elements.set("python-automation-protocol-operator", operatorEl);
+    elements.set("python-automation-protocol-evidence-ref", evidenceRefEl);
+    elements.set("python-automation-protocol-notes", notesEl);
+    elements.set("python-automation-protocol-doc-check", docCheckEl);
+
+    exports.setPythonCommissioningCatalogForTests({
+      groups: [{
+        title: "Dokumentierte Nachweise",
+        tests: [{
+          id: "ios-xctest-parent",
+          title: "iOS XCTest Parent",
+          groupTitle: "iOS",
+          automationType: "documented",
+          source: "ios-external",
+          description: "Extern ausgeführter XCTest.",
+          successCriteria: "Evidenz dokumentiert",
+          documentation: "iOS_BUILD_REFERENCE.md",
+        }],
+      }],
+    });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    exports.setPythonAutomationSelectedTestIdForTests("ios-xctest-parent");
+
+    exports.renderPythonAutomationProtocolEditor();
+
+    statusEl.value = "fail";
+    exports.renderPythonAutomationProtocolRequirements();
+
+    expect(selectedEl.innerHTML).toContain("iOS XCTest Parent");
+    expect(docRowEl.style.display).toBe("flex");
+    expect(requirementsEl.innerHTML).toContain("Evidenzreferenz ist Pflicht");
+    expect(requirementsEl.innerHTML).toContain("Dokumentationsabgleich muss bestätigt werden");
+    expect(requirementsEl.innerHTML).toContain("Für FAIL oder Nacharbeit sind Notizen Pflicht");
+  });
+
+  it("updates USB form rows based on selected test type", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const typeSelect = { value: "dual-device" };
+    const childRow = { style: { display: "none" } };
+    const scenarioRow = { style: { display: "none" } };
+    const profileRow = { style: { display: "none" } };
+    const faultModesRow = { style: { display: "none" } };
+    const suiteRow = { style: { display: "" } };
+    const skipActivationRow = { style: { display: "" } };
+    const parallelRow = { style: { display: "none" } };
+
+    elements.set("suite-usb-test-type", typeSelect);
+    elements.set("suite-usb-child-serial-row", childRow);
+    elements.set("suite-usb-dual-scenario-row", scenarioRow);
+    elements.set("suite-usb-dual-profile-row", profileRow);
+    elements.set("suite-usb-fault-modes-row", faultModesRow);
+    elements.set("suite-usb-suite-row", suiteRow);
+    elements.set("suite-usb-skip-activation-row", skipActivationRow);
+    elements.set("suite-usb-parallel-row", parallelRow);
+
+    exports.updateUsbTestTypeFormState();
+
+    expect(childRow.style.display).toBe("");
+    expect(scenarioRow.style.display).toBe("");
+    expect(profileRow.style.display).toBe("");
+    expect(faultModesRow.style.display).toBe("");
+    expect(parallelRow.style.display).toBe("");
+    expect(suiteRow.style.display).toBe("none");
+    expect(skipActivationRow.style.display).toBe("none");
+
+    typeSelect.value = "single-master";
+    exports.updateUsbTestTypeFormState();
+
+    expect(childRow.style.display).toBe("none");
+    expect(scenarioRow.style.display).toBe("none");
+    expect(profileRow.style.display).toBe("none");
+    expect(faultModesRow.style.display).toBe("none");
+    expect(parallelRow.style.display).toBe("none");
+    expect(suiteRow.style.display).toBe("");
+    expect(skipActivationRow.style.display).toBe("");
   });
 
   it("builds PowerShell deploy scripts with project scoping", () => {
