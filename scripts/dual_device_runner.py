@@ -13,10 +13,12 @@ import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from qa_catalog import load_dual_device_scenarios  # noqa: E402
 from usb_test_runner import UsbTestRunResult, run_usb_test  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -27,6 +29,10 @@ DEFAULT_JSON_OUT = REPO_ROOT / "build" / "test-automation" / "dual-device-latest
 class DualDeviceResult:
     master_serial: str
     child_serial: str
+    scenario_id: str = ""
+    scenario_title: str = ""
+    profile_id: str = ""
+    fault_modes: list[str] | None = None
     master_result: UsbTestRunResult | None = None
     child_result: UsbTestRunResult | None = None
     overall_status: str = "not_started"
@@ -36,12 +42,46 @@ class DualDeviceResult:
         return {
             "masterSerial": self.master_serial,
             "childSerial": self.child_serial,
+            "scenarioId": self.scenario_id,
+            "scenarioTitle": self.scenario_title,
+            "profileId": self.profile_id,
+            "faultModes": list(self.fault_modes or []),
             "masterResult": self.master_result.to_dict() if self.master_result else None,
             "childResult": self.child_result.to_dict() if self.child_result else None,
             "overallStatus": self.overall_status,
             "durationSec": self.duration_sec,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
+
+
+def _resolve_scenario_definition(scenario_id: str) -> dict[str, object] | None:
+    normalized = scenario_id.strip()
+    if not normalized:
+        return None
+    for scenario in load_dual_device_scenarios():
+        if str(scenario.get("scenarioId", "")).strip() == normalized:
+            return scenario
+    raise ValueError(f"Unbekannte Dual-Device-Szenario-ID: {scenario_id}")
+
+
+def _validate_fault_modes(scenario: dict[str, object] | None, fault_modes: list[str] | None) -> list[str]:
+    normalized = [mode.strip() for mode in (fault_modes or []) if mode and mode.strip()]
+    if scenario is None or not normalized:
+        return normalized
+
+    allowed = {
+        str(mode).strip()
+        for mode in cast(list[object], scenario.get("failureModes", []))
+        if str(mode).strip()
+    }
+    invalid = [mode for mode in normalized if mode not in allowed]
+    if invalid:
+        invalid_list = ", ".join(invalid)
+        allowed_list = ", ".join(sorted(allowed)) or "keine"
+        raise ValueError(
+            f"Fault Modes fuer Szenario {scenario.get('scenarioId', '')} ungueltig: {invalid_list}. Erlaubt: {allowed_list}."
+        )
+    return normalized
 
 
 def run_dual_device(
@@ -53,6 +93,9 @@ def run_dual_device(
     uninstall_first: bool = False,
     timeout_sec: int = 7200,
     parallel: bool = False,
+    scenario_id: str = "",
+    profile_id: str = "",
+    fault_modes: list[str] | None = None,
     verbose: bool = True,
 ) -> DualDeviceResult:
     """
@@ -72,7 +115,16 @@ def run_dual_device(
     Returns: DualDeviceResult
     """
     started = time.perf_counter()
-    result = DualDeviceResult(master_serial=master_serial, child_serial=child_serial)
+    scenario = _resolve_scenario_definition(scenario_id)
+    normalized_fault_modes = _validate_fault_modes(scenario, fault_modes)
+    result = DualDeviceResult(
+        master_serial=master_serial,
+        child_serial=child_serial,
+        scenario_id=scenario_id.strip(),
+        scenario_title=str(scenario.get("title", "")) if scenario else "",
+        profile_id=profile_id.strip(),
+        fault_modes=normalized_fault_modes,
+    )
 
     def _print(msg: str) -> None:
         if verbose:
@@ -85,6 +137,12 @@ def run_dual_device(
     _print(f"  Master-Gerät: {master_serial}")
     _print(f"  Child-Gerät:  {child_serial}")
     _print(f"  Modus:        {'Parallel' if parallel else 'Sequentiell'}")
+    if result.scenario_id:
+        _print(f"  Szenario:     {result.scenario_id} ({result.scenario_title or 'ohne Titel'})")
+    if result.profile_id:
+        _print(f"  Profil:       {result.profile_id}")
+    if normalized_fault_modes:
+        _print(f"  Fault Modes:  {', '.join(normalized_fault_modes)}")
     _print("")
 
     def _run_master() -> UsbTestRunResult:
@@ -173,6 +231,9 @@ def main() -> int:
     parser.add_argument("--uninstall-first", action="store_true", help="Apps vor Install deinstallieren")
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout pro Gerät (Sekunden)")
     parser.add_argument("--parallel", action="store_true", help="Beide Geräte parallel testen")
+    parser.add_argument("--scenario-id", default="", help="Kanonische Szenario-ID aus qa/catalog/dual-device-scenarios.json")
+    parser.add_argument("--profile-id", default="", help="Optionales Geräteprofil aus qa/catalog/device-profiles.json")
+    parser.add_argument("--fault-mode", action="append", default=[], help="Optionaler Fault Mode. Kann mehrfach angegeben werden.")
     parser.add_argument("--json-out", type=Path, default=DEFAULT_JSON_OUT, help="JSON-Ergebnis speichern")
     args = parser.parse_args()
 
@@ -185,6 +246,9 @@ def main() -> int:
         uninstall_first=args.uninstall_first,
         timeout_sec=args.timeout,
         parallel=args.parallel,
+        scenario_id=args.scenario_id,
+        profile_id=args.profile_id,
+        fault_modes=args.fault_mode,
     )
 
     args.json_out.parent.mkdir(parents=True, exist_ok=True)

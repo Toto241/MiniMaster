@@ -111,6 +111,30 @@ class TestGetSuiteCatalog:
         assert summary["ready"] + summary["notReady"] == summary["total"]
 
 
+class TestGetQaCatalog:
+    def test_returns_canonical_qa_sections(self):
+        from app import get_qa_catalog
+
+        result = get_qa_catalog()
+
+        assert "androidMatrix" in result
+        assert "deviceProfiles" in result
+        assert "dualDeviceScenarios" in result
+        assert "suiteEntries" in result
+        assert "inventoryEntries" in result
+        assert "executionSummary" in result
+        assert "registerSummary" in result
+        assert "criticalBacklog" in result
+
+    def test_critical_backlog_contains_only_p0_or_p1(self):
+        from app import get_qa_catalog
+
+        result = get_qa_catalog()
+
+        assert result["criticalBacklog"]
+        assert all(item["priority"] in {"P0", "P1"} for item in result["criticalBacklog"])
+
+
 class TestBuildTestingRegister:
     def test_register_exposes_extended_summary_and_metadata(self):
         from app import build_testing_register
