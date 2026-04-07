@@ -622,6 +622,33 @@ class TestGetDeviceStatus:
         assert result["count"] == 0
 
 
+class TestEmulatorLabOverview:
+    @patch("app.get_emulator_lab_overview")
+    def test_overview_is_returned(self, mock_overview):
+        mock_overview.return_value = {
+            "sdkConfigured": True,
+            "matrixPlanCount": 4,
+            "reservationCount": 1,
+            "availableAvdCount": 2,
+        }
+
+        from app import get_emulator_lab_overview
+
+        result = get_emulator_lab_overview()
+        assert result["sdkConfigured"] is True
+        assert result["matrixPlanCount"] == 4
+
+    @patch("app.load_emulator_reservations")
+    def test_reservations_can_be_loaded(self, mock_reservations):
+        mock_reservations.return_value = [{"reservationId": "emu-1"}]
+
+        from app import load_emulator_reservations
+
+        result = load_emulator_reservations()
+        assert len(result) == 1
+        assert result[0]["reservationId"] == "emu-1"
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  start_suite_run / get_suite_run_status
 # ═══════════════════════════════════════════════════════════════════

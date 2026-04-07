@@ -1381,6 +1381,38 @@
                                 Suiten werden asynchron ausgef&uuml;hrt &ndash; Ergebnisse k&ouml;nnen per Polling abgerufen werden.
                             </p>
 
+                            <div class="python-automation-layout qa-platform-layout" style="margin-block-start: 14px">
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>QA-Plattformkatalog</h5>
+                                            <p>Android 10 bis 16, Geräteprofile und priorisierte Dual-Device-Szenarien aus dem kanonischen QA-Katalog.</p>
+                                        </div>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="loadQaPlatformCatalog()" class="btn btn-secondary" title="QA-Katalog, Android-Matrix und Dual-Device-Szenarien neu laden">QA-Katalog laden</button>
+                                    </div>
+                                    <div id="qa-platform-overview" class="data-list">
+                                        <div class="info">Noch kein QA-Katalog geladen.</div>
+                                    </div>
+                                </section>
+
+                                <section class="python-automation-panel">
+                                    <div class="python-automation-panel-header">
+                                        <div>
+                                            <h5>Emulator-Labor</h5>
+                                            <p>SDK-/AVD-Status, Matrixplan und aktive Reservierungen für die PC-basierte Android-Testlandschaft.</p>
+                                        </div>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="loadEmulatorLabOverview()" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
+                                    </div>
+                                    <div id="qa-emulator-lab" class="data-list">
+                                        <div class="info">Noch kein Emulator-Labor geladen.</div>
+                                    </div>
+                                </section>
+                            </div>
+
                             <div class="python-automation-layout" style="margin-block-start: 14px">
                                 <section class="python-automation-panel">
                                     <div class="python-automation-panel-header">
@@ -1420,6 +1452,24 @@
                                         <label id="suite-usb-child-serial-row">
                                             <span>Child-Serial</span>
                                             <input type="text" id="suite-usb-child-serial" placeholder="Serial des Kind-Ger&auml;ts" />
+                                        </label>
+                                        <label id="suite-usb-dual-scenario-row">
+                                            <span>Dual-Device-Szenario</span>
+                                            <select id="suite-usb-dual-scenario">
+                                                <option value="">Standard-Dual-Device-Lauf</option>
+                                            </select>
+                                            <small id="suite-usb-dual-scenario-help" class="qa-usb-help">Optional: kanonisches Szenario aus dem QA-Katalog wählen, damit Laufhistorie und Fehlerbilder sauber klassifiziert werden.</small>
+                                        </label>
+                                        <label id="suite-usb-dual-profile-row">
+                                            <span>Geräteprofil</span>
+                                            <select id="suite-usb-dual-profile">
+                                                <option value="">Kein Profil erzwungen</option>
+                                            </select>
+                                        </label>
+                                        <label id="suite-usb-fault-modes-row">
+                                            <span>Fault-Modes</span>
+                                            <input type="text" id="suite-usb-fault-modes" placeholder="z. B. network-loss, child-reboot" />
+                                            <small class="qa-usb-help">Mehrere Fault-Modes komma-separiert eintragen. Es werden nur im Katalog bekannte Werte akzeptiert.</small>
                                         </label>
                                         <label>
                                             <span>Suite</span>

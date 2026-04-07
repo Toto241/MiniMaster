@@ -71,6 +71,18 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
 - `GET /api/qa/dual-device-scenarios`
   - liefert priorisierte Zwei-Geraete-Szenarien mit Rollen, Fehlerfaellen und Suite-Hinweisen
 
+- `GET /api/qa/emulators`
+  - liefert den Status der lokalen Android-SDK-/Emulator-Umgebung, vorhandene AVDs, aktive Reservierungen und den aus dem QA-Katalog abgeleiteten Matrixplan
+
+- `GET /api/qa/emulators/reservations`
+  - liefert aktive Emulator-Reservierungen fuer Matrix- und Zwei-Geraete-Laeufe
+
+- `POST /api/qa/emulators/reservations`
+  - reserviert ein standardisiertes Profil fuer eine Android-Version mit Owner, Zweck und TTL
+
+- `POST /api/qa/emulators/release`
+  - gibt eine vorhandene Emulator-Reservierung wieder frei
+
 ## QA-Register-Semantik
 
 - `blockingForRelease` markiert Eintraege, die fachlich fuer einen Go-Live relevant sind.

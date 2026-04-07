@@ -132,6 +132,8 @@ let pythonEvidenceFilterStatus = "";
 let pythonEvidenceFilterTestId = "";
 let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
+let qaPlatformCatalogPayload = null;
+let emulatorLabPayload = null;
 let suiteCatalogPayload = [];
 let suiteRunHistoryPayload = [];
 let qaDashboardLoadPromise = null;
@@ -148,6 +150,8 @@ const qaRefreshSectionLabels = {
     history: "Laufhistorie",
     evidence: "Nachweise",
     register: "Testregister",
+    qaPlatform: "QA-Plattform",
+    emulators: "Emulator-Labor",
     suites: "Suite-Katalog",
     suiteHistory: "Suite-Historie",
     devices: "Gerätestatus",
@@ -1952,6 +1956,8 @@ async function loadQaDashboardData(reason = "manuell") {
             ["history", loadPythonAutomationHistory],
             ["evidence", loadPythonAutomationEvidenceHistory],
             ["register", loadTestingRegister],
+            ["qaPlatform", loadQaPlatformCatalog],
+            ["emulators", loadEmulatorLabOverview],
             ["suites", loadSuiteCatalog],
             ["suiteHistory", loadSuiteRunHistory],
             ["devices", loadSuiteDeviceStatus],
@@ -3159,6 +3165,296 @@ async function loadTestingRegister() {
 
 let _suiteActivePollers = {};
 
+function parseQaMultiValueInput(value) {
+    return String(value || "")
+        .split(",")
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+function updateUsbTestTypeFormState() {
+    const typeSelect = document.getElementById("suite-usb-test-type");
+    const childRow = document.getElementById("suite-usb-child-serial-row");
+    const parallelCb = document.getElementById("suite-usb-parallel");
+    const scenarioRow = document.getElementById("suite-usb-dual-scenario-row");
+    const profileRow = document.getElementById("suite-usb-dual-profile-row");
+    const faultModesRow = document.getElementById("suite-usb-fault-modes-row");
+    const isDual = typeSelect?.value === "dual-device";
+
+    if (childRow) childRow.style.display = isDual ? "" : "none";
+    if (parallelCb?.closest("label")) parallelCb.closest("label").style.display = isDual ? "" : "none";
+    if (scenarioRow) scenarioRow.style.display = isDual ? "" : "none";
+    if (profileRow) profileRow.style.display = isDual ? "" : "none";
+    if (faultModesRow) faultModesRow.style.display = isDual ? "" : "none";
+}
+
+function syncDualDeviceCatalogOptions() {
+    const scenarioSelect = document.getElementById("suite-usb-dual-scenario");
+    const profileSelect = document.getElementById("suite-usb-dual-profile");
+    const scenarioHelp = document.getElementById("suite-usb-dual-scenario-help");
+    const scenarios = Array.isArray(qaPlatformCatalogPayload?.dualDeviceScenarios) ? qaPlatformCatalogPayload.dualDeviceScenarios : [];
+    const profiles = Array.isArray(qaPlatformCatalogPayload?.deviceProfiles)
+        ? qaPlatformCatalogPayload.deviceProfiles.filter(item => String(item?.deviceMode || "") === "dual-device")
+        : [];
+
+    if (scenarioSelect) {
+        const currentValue = scenarioSelect.value || "";
+        scenarioSelect.innerHTML = [
+            `<option value="">Standard-Dual-Device-Lauf</option>`,
+            ...scenarios.map(item => {
+                const scenarioId = String(item?.scenarioId || "");
+                const title = String(item?.title || scenarioId);
+                const priority = String(item?.priority || "");
+                return `<option value="${escapeHtml(scenarioId)}">${escapeHtml(priority ? `${priority} · ${title}` : title)}</option>`;
+            }),
+        ].join("");
+        if (currentValue && scenarios.some(item => String(item?.scenarioId || "") === currentValue)) {
+            scenarioSelect.value = currentValue;
+        }
+
+        const selected = scenarios.find(item => String(item?.scenarioId || "") === scenarioSelect.value) || null;
+        if (scenarioHelp) {
+            if (selected) {
+                const failureModes = Array.isArray(selected.failureModes) ? selected.failureModes.map(item => String(item)).filter(Boolean) : [];
+                const androidVersions = Array.isArray(selected.androidVersions) ? selected.androidVersions.map(item => String(item)).filter(Boolean) : [];
+                scenarioHelp.innerHTML = `${escapeHtml(String(selected.description || ""))}<br /><span class='qa-refresh-meta'>Android: ${escapeHtml(androidVersions.join(", ") || "offen")} · Fault-Modes: ${escapeHtml(failureModes.join(", ") || "keine vordefiniert")}</span>`;
+            } else {
+                scenarioHelp.innerHTML = "Optional: kanonisches Szenario aus dem QA-Katalog wählen, damit Laufhistorie und Fehlerbilder sauber klassifiziert werden.";
+            }
+        }
+
+        if (!scenarioSelect.__qaCatalogBound) {
+            scenarioSelect.addEventListener("change", syncDualDeviceCatalogOptions);
+            scenarioSelect.__qaCatalogBound = true;
+        }
+    }
+
+    if (profileSelect) {
+        const currentValue = profileSelect.value || "";
+        profileSelect.innerHTML = [
+            `<option value="">Kein Profil erzwungen</option>`,
+            ...profiles.map(item => {
+                const profileId = String(item?.profileId || "");
+                const displayName = String(item?.displayName || profileId);
+                const networkProfile = String(item?.networkProfile || "");
+                return `<option value="${escapeHtml(profileId)}">${escapeHtml(networkProfile ? `${displayName} · ${networkProfile}` : displayName)}</option>`;
+            }),
+        ].join("");
+        if (currentValue && profiles.some(item => String(item?.profileId || "") === currentValue)) {
+            profileSelect.value = currentValue;
+        }
+    }
+}
+
+function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
+    const el = document.getElementById("qa-platform-overview");
+    if (!el) return;
+
+    if (!isPythonOperator) {
+        el.innerHTML = "<div class='info'>QA-Plattformdaten sind nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    if (!payload) {
+        el.innerHTML = "<div class='info'>Noch kein QA-Katalog geladen.</div>";
+        return;
+    }
+
+    const androidMatrix = Array.isArray(payload.androidMatrix) ? payload.androidMatrix : [];
+    const deviceProfiles = Array.isArray(payload.deviceProfiles) ? payload.deviceProfiles : [];
+    const dualDeviceScenarios = Array.isArray(payload.dualDeviceScenarios) ? payload.dualDeviceScenarios : [];
+    const suiteEntries = Array.isArray(payload.suiteEntries) ? payload.suiteEntries : [];
+    const criticalBacklog = Array.isArray(payload.criticalBacklog) ? payload.criticalBacklog : [];
+    const registerSummary = payload.registerSummary || {};
+
+    const dualProfiles = deviceProfiles.filter(item => String(item?.deviceMode || "") === "dual-device");
+    const highestPriorityScenarios = dualDeviceScenarios
+        .filter(item => ["P0", "P1"].includes(String(item?.priority || "")))
+        .slice(0, 4);
+
+    el.innerHTML = `
+        <div class='qa-refresh-grid'>
+            <article class='qa-refresh-card is-success'>
+                <strong>Android-Matrix</strong>
+                <span>${androidMatrix.length} Versionen im Katalog</span>
+                <div class='qa-refresh-meta'>Abdeckung: ${escapeHtml(androidMatrix.map(item => String(item?.androidVersion || "")).filter(Boolean).join(", ") || "-")}</div>
+            </article>
+            <article class='qa-refresh-card is-success'>
+                <strong>Geräteprofile</strong>
+                <span>${deviceProfiles.length} Profile, davon ${dualProfiles.length} Dual-Device</span>
+                <div class='qa-refresh-meta'>Suite-Referenzen: ${escapeHtml(String(suiteEntries.length))}</div>
+            </article>
+            <article class='qa-refresh-card ${criticalBacklog.length > 0 ? "is-loading" : "is-success"}'>
+                <strong>Priorisierte Lücken</strong>
+                <span>${criticalBacklog.length} offene P0/P1-Backlogpunkte</span>
+                <div class='qa-refresh-meta'>Blocker: ${escapeHtml(String(registerSummary.blocking || 0))} · Stale: ${escapeHtml(String(registerSummary.stale || 0))}</div>
+            </article>
+        </div>
+        <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
+            <table class='qa-platform-table'>
+                <thead>
+                    <tr>
+                        <th>Android</th>
+                        <th>API</th>
+                        <th>Tier</th>
+                        <th>Status</th>
+                        <th>Empfohlene Profile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${androidMatrix.map(item => `
+                        <tr>
+                            <td><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong></td>
+                            <td>${escapeHtml(String(item?.apiLevel || "-"))}</td>
+                            <td>${escapeHtml(String(item?.coverageTier || "-"))}</td>
+                            <td>${escapeHtml(String(item?.status || "-"))}</td>
+                            <td>${escapeHtml((Array.isArray(item?.recommendedProfiles) ? item.recommendedProfiles : []).map(entry => String(entry)).filter(Boolean).join(", ") || "-")}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </div>
+        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
+            <section class='python-clarity-box'>
+                <strong>Dual-Device-Szenarien mit Vorrang</strong><br />
+                ${highestPriorityScenarios.length > 0 ? highestPriorityScenarios.map(item => {
+                    const failureModes = Array.isArray(item.failureModes) ? item.failureModes.map(entry => String(entry)).filter(Boolean).join(", ") : "";
+                    return `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.priority || "P?"))}</strong> ${escapeHtml(String(item?.title || item?.scenarioId || "-"))}<span>${escapeHtml(failureModes || "keine Fault-Modes hinterlegt")}</span></div>`;
+                }).join("") : "Keine priorisierten Szenarien im Katalog."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Nächste Plattformarbeiten</strong><br />
+                ${criticalBacklog.slice(0, 4).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.priority || "-"))}</strong> ${escapeHtml(String(item?.title || item?.id || "-"))}<span>${escapeHtml(String(item?.owner || item?.team || "Owner offen"))}</span></div>`).join("") || "Keine kritischen Backlogeinträge vorhanden."}
+            </section>
+        </div>
+    `;
+}
+
+function renderEmulatorLabOverview(payload = emulatorLabPayload) {
+    const el = document.getElementById("qa-emulator-lab");
+    if (!el) return;
+
+    if (!isPythonOperator) {
+        el.innerHTML = "<div class='info'>Emulatorstatus ist nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    if (!payload) {
+        el.innerHTML = "<div class='info'>Noch kein Emulator-Labor geladen.</div>";
+        return;
+    }
+
+    const availableAvds = Array.isArray(payload.availableAvds) ? payload.availableAvds : [];
+    const reservations = Array.isArray(payload.reservations) ? payload.reservations : [];
+    const matrixPlan = Array.isArray(payload.matrixPlan) ? payload.matrixPlan : [];
+
+    const statusCards = [
+        { title: "SDK", ok: Boolean(payload.sdkConfigured), detail: payload.sdkConfigured ? (payload.sdkRoot || "Pfad erkannt") : "Nicht konfiguriert" },
+        { title: "ADB", ok: Boolean(payload.adbAvailable), detail: payload.adbAvailable ? "Verfügbar" : "Nicht verfügbar" },
+        { title: "Emulator-Binary", ok: Boolean(payload.emulatorBinaryAvailable), detail: payload.emulatorBinaryAvailable ? "Gefunden" : "Fehlt" },
+        { title: "AVD Manager", ok: Boolean(payload.avdManagerAvailable), detail: payload.avdManagerAvailable ? "Gefunden" : "Fehlt" },
+    ];
+
+    el.innerHTML = `
+        <div class='qa-refresh-grid'>
+            ${statusCards.map(card => `
+                <article class='qa-refresh-card ${card.ok ? "is-success" : "is-error"}'>
+                    <strong>${escapeHtml(card.title)}</strong>
+                    <span>${escapeHtml(card.detail)}</span>
+                </article>
+            `).join("")}
+        </div>
+        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
+            <section class='python-clarity-box'>
+                <strong>Verfügbare AVDs</strong><br />
+                ${availableAvds.length > 0 ? availableAvds.map(name => `<div class='qa-platform-mini-row'><strong>AVD</strong> ${escapeHtml(String(name))}</div>`).join("") : "Keine AVDs erkannt."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Aktive Reservierungen</strong><br />
+                ${reservations.length > 0 ? reservations.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong> ${escapeHtml(String(item?.profileId || "-"))}<span>${escapeHtml(String(item?.owner || "-"))} · ${escapeHtml(String(item?.purpose || "-"))}</span></div>`).join("") : "Keine aktiven Reservierungen."}
+            </section>
+        </div>
+        <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
+            <table class='qa-platform-table'>
+                <thead>
+                    <tr>
+                        <th>Plan</th>
+                        <th>Android</th>
+                        <th>Profil</th>
+                        <th>Modus</th>
+                        <th>Netz</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${matrixPlan.slice(0, 8).map(item => `
+                        <tr>
+                            <td>${escapeHtml(String(item?.planId || "-"))}</td>
+                            <td>${escapeHtml(String(item?.androidVersion || "-"))} / API ${escapeHtml(String(item?.apiLevel || "-"))}</td>
+                            <td>${escapeHtml(String(item?.profileDisplayName || item?.profileId || "-"))}</td>
+                            <td>${escapeHtml(String(item?.deviceMode || "-"))}</td>
+                            <td>${escapeHtml(String(item?.networkProfile || "-"))}</td>
+                        </tr>
+                    `).join("") || "<tr><td colspan='5'>Noch kein Matrixplan verfügbar.</td></tr>"}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function loadQaPlatformCatalog() {
+    const el = document.getElementById("qa-platform-overview");
+    if (!el) return { ok: false, message: "QA-Plattform-Container fehlt." };
+    if (!isPythonOperator) {
+        renderQaPlatformOverview(null);
+        setQaRefreshSectionState("qaPlatform", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
+    }
+    el.innerHTML = "<div class='loading'>Lade QA-Katalog...</div>";
+    setQaRefreshSectionState("qaPlatform", "loading", "Lädt…");
+    try {
+        const res = await fetch("/api/qa/catalog");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
+        qaPlatformCatalogPayload = data;
+        renderQaPlatformOverview(data);
+        syncDualDeviceCatalogOptions();
+        setQaRefreshSectionState("qaPlatform", "success", `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen`);
+        return { ok: true, message: `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen.` };
+    } catch (err) {
+        qaPlatformCatalogPayload = null;
+        renderQaPlatformOverview(null);
+        syncDualDeviceCatalogOptions();
+        setQaRefreshSectionState("qaPlatform", "error", err.message || "Fehler beim Laden");
+        return { ok: false, message: err.message || "Fehler beim Laden" };
+    }
+}
+
+async function loadEmulatorLabOverview() {
+    const el = document.getElementById("qa-emulator-lab");
+    if (!el) return { ok: false, message: "Emulator-Labor-Container fehlt." };
+    if (!isPythonOperator) {
+        renderEmulatorLabOverview(null);
+        setQaRefreshSectionState("emulators", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
+    }
+    el.innerHTML = "<div class='loading'>Lade Emulator-Labor...</div>";
+    setQaRefreshSectionState("emulators", "loading", "Lädt…");
+    try {
+        const res = await fetch("/api/qa/emulators");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
+        emulatorLabPayload = data;
+        renderEmulatorLabOverview(data);
+        setQaRefreshSectionState("emulators", "success", `${Number(data.availableAvdCount || 0)} AVD(s), ${Number(data.reservationCount || 0)} Reservierungen`);
+        return { ok: true, message: `${Number(data.availableAvdCount || 0)} AVD(s), ${Number(data.reservationCount || 0)} Reservierungen.` };
+    } catch (err) {
+        emulatorLabPayload = null;
+        renderEmulatorLabOverview(null);
+        setQaRefreshSectionState("emulators", "error", err.message || "Fehler beim Laden");
+        return { ok: false, message: err.message || "Fehler beim Laden" };
+    }
+}
+
 async function loadSuiteDeviceStatus() {
     const el = document.getElementById("suite-device-status");
     if (!el) return { ok: false, message: "Gerätestatus-Container fehlt." };
@@ -3385,6 +3681,9 @@ async function startUsbTestRun() {
     const testType = document.getElementById("suite-usb-test-type")?.value || "single-master";
     const masterSerial = (document.getElementById("suite-usb-master-serial")?.value || "auto").trim();
     const childSerial = (document.getElementById("suite-usb-child-serial")?.value || "").trim();
+    const scenarioId = (document.getElementById("suite-usb-dual-scenario")?.value || "").trim();
+    const profileId = (document.getElementById("suite-usb-dual-profile")?.value || "").trim();
+    const faultModes = parseQaMultiValueInput(document.getElementById("suite-usb-fault-modes")?.value || "");
     const suite = document.getElementById("suite-usb-suite")?.value || "commissioning";
     const installApk = document.getElementById("suite-usb-install-apk")?.checked || false;
     const skipActivation = document.getElementById("suite-usb-skip-activation")?.checked || false;
@@ -3403,7 +3702,11 @@ async function startUsbTestRun() {
                 body: JSON.stringify({
                     masterSerial: masterSerial === "auto" ? "" : masterSerial,
                     childSerial: childSerial,
+                    installApk: installApk,
                     parallel: parallel,
+                    scenarioId: scenarioId,
+                    profileId: profileId,
+                    faultModes: faultModes,
                 }),
             });
         } else {
@@ -3536,17 +3839,11 @@ async function loadSuiteRunHistory() {
 // Dual-Device: Child-Serial-Zeile nur bei Dual-Device anzeigen
 document.addEventListener("DOMContentLoaded", () => {
     const typeSelect = document.getElementById("suite-usb-test-type");
-    const childRow = document.getElementById("suite-usb-child-serial-row");
-    const parallelCb = document.getElementById("suite-usb-parallel");
-    if (typeSelect && childRow) {
-        const toggle = () => {
-            const isDual = typeSelect.value === "dual-device";
-            childRow.style.display = isDual ? "" : "none";
-            if (parallelCb) parallelCb.closest("label").style.display = isDual ? "" : "none";
-        };
-        typeSelect.addEventListener("change", toggle);
-        toggle();
+    if (typeSelect) {
+        typeSelect.addEventListener("change", updateUsbTestTypeFormState);
+        updateUsbTestTypeFormState();
     }
+    syncDualDeviceCatalogOptions();
 });
 
 // ===================== ENDE TEST-SUITEN-ZENTRALE =====================
