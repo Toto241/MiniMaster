@@ -1713,6 +1713,17 @@ input:focus, select:focus, textarea:focus {
     color: #166534;
 }
 
+.qa-runtime-section-disabled {
+    opacity: 0.68;
+}
+
+.qa-runtime-section-disabled .btn,
+.qa-runtime-section-disabled input,
+.qa-runtime-section-disabled select,
+.qa-runtime-section-disabled textarea {
+    cursor: not-allowed;
+}
+
 .qa-platform-layout {
     align-items: start;
 }

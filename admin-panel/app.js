@@ -15,6 +15,13 @@ const SESSION_MONITORING_EVENTS = ["mousedown", "keydown", "scroll", "touchstart
 let sessionMonitoringActive = false;
 let authBindingsInitialized = false;
 let authStateObserverInitialized = false;
+const QA_RUNTIME_OPERATOR_SECTION_IDS = [
+    "qa-refresh-card",
+    "qa-start-guide-card",
+    "qa-register-card",
+    "qa-python-run-card",
+    "qa-suite-card",
+];
 
 function resetSessionTimeout() {
     if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
@@ -1067,10 +1074,40 @@ function renderQaRuntimeModeBanner() {
 
     if (isPythonOperator) {
         banner.innerHTML = "<div class='qa-runtime-banner is-operator'><strong>Python-Operator aktiv.</strong> QA-Register, Suite-Läufe, Emulator-Labor und Artefakte können vollständig geladen und ausgeführt werden.</div>";
+        applyQaRuntimeInteractionState();
         return;
     }
 
     banner.innerHTML = "<div class='qa-runtime-banner is-readonly'><strong>Read-only QA-Ansicht.</strong> Ohne Python-Operator sind laufzeitabhängige QA-Bereiche nur eingeschränkt verfügbar. Sichtbar bleiben Dokumentation, Zusammenfassungen und bereits geladene Zustände.</div>";
+    applyQaRuntimeInteractionState();
+}
+
+function applyQaRuntimeInteractionState() {
+    const shouldDisable = !isPythonOperator;
+
+    QA_RUNTIME_OPERATOR_SECTION_IDS.forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+
+        if (section.classList?.toggle) {
+            section.classList.toggle("qa-runtime-section-disabled", shouldDisable);
+        } else if (section.classList?.add && section.classList?.remove) {
+            if (shouldDisable) section.classList.add("qa-runtime-section-disabled");
+            else section.classList.remove("qa-runtime-section-disabled");
+        }
+
+        const controls = typeof section.querySelectorAll === "function"
+            ? Array.from(section.querySelectorAll("button, input, select, textarea"))
+            : [];
+        controls.forEach(control => {
+            control.disabled = shouldDisable;
+            if (shouldDisable) {
+                control.setAttribute?.("aria-disabled", "true");
+            } else {
+                control.removeAttribute?.("aria-disabled");
+            }
+        });
+    });
 }
 
 function ensurePythonAutomationSelectedTest() {
