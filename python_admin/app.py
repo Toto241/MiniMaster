@@ -41,7 +41,10 @@ from emulator_manager import (  # noqa: E402
     create_reservation as create_emulator_reservation,
     get_emulator_lab_overview,
     load_active_reservations as load_emulator_reservations,
+    list_running_emulators,
     release_reservation as release_emulator_reservation,
+    start_emulator,
+    stop_emulator,
 )
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
@@ -3392,6 +3395,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/qa/emulators":
             return self._write_json(HTTPStatus.OK, get_emulator_lab_overview())
 
+        if parsed.path == "/api/qa/emulators/running":
+            running = list_running_emulators()
+            return self._write_json(HTTPStatus.OK, {"runningEmulators": running, "count": len(running)})
+
         if parsed.path == "/api/qa/emulators/reservations":
             return self._write_json(
                 HTTPStatus.OK,
@@ -3469,6 +3476,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_dual_device_test()
         if parsed.path == "/api/qa/emulators/reservations":
             return self._handle_create_emulator_reservation()
+        if parsed.path == "/api/qa/emulators/start":
+            return self._handle_start_emulator()
+        if parsed.path == "/api/qa/emulators/stop":
+            return self._handle_stop_emulator()
         if parsed.path == "/api/qa/emulators/release":
             return self._handle_release_emulator_reservation()
 
@@ -3666,6 +3677,31 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if not released:
             return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Reservierung nicht gefunden."})
         return self._write_json(HTTPStatus.OK, {"released": True, "reservationId": reservation_id})
+
+    def _handle_start_emulator(self) -> None:
+        try:
+            payload = self._read_json_body()
+            result = start_emulator(
+                str(payload.get("avdName") or "").strip(),
+                headless=bool_from_payload(payload.get("headless"), default=True),
+                wipe_data=bool_from_payload(payload.get("wipeData"), default=False),
+                no_snapshot=bool_from_payload(payload.get("noSnapshot"), default=True),
+            )
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_stop_emulator(self) -> None:
+        try:
+            payload = self._read_json_body()
+            result = stop_emulator(str(payload.get("serial") or "").strip())
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
 
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))

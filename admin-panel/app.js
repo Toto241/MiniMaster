@@ -3246,6 +3246,85 @@ function syncDualDeviceCatalogOptions() {
     }
 }
 
+function syncEmulatorReservationOptions() {
+    const androidSelect = document.getElementById("qa-emulator-android-version");
+    const profileSelect = document.getElementById("qa-emulator-profile");
+    const matrix = Array.isArray(qaPlatformCatalogPayload?.androidMatrix) ? qaPlatformCatalogPayload.androidMatrix : [];
+    const profiles = Array.isArray(qaPlatformCatalogPayload?.deviceProfiles) ? qaPlatformCatalogPayload.deviceProfiles : [];
+
+    if (androidSelect) {
+        const currentValue = androidSelect.value || "";
+        androidSelect.innerHTML = [
+            `<option value="">Android-Version wählen</option>`,
+            ...matrix.map(item => {
+                const androidVersion = String(item?.androidVersion || "");
+                const apiLevel = String(item?.apiLevel || "");
+                return `<option value="${escapeHtml(androidVersion)}">${escapeHtml(apiLevel ? `Android ${androidVersion} · API ${apiLevel}` : `Android ${androidVersion}`)}</option>`;
+            }),
+        ].join("");
+        if (currentValue && matrix.some(item => String(item?.androidVersion || "") === currentValue)) {
+            androidSelect.value = currentValue;
+        }
+    }
+
+    if (profileSelect) {
+        const currentValue = profileSelect.value || "";
+        profileSelect.innerHTML = [
+            `<option value="">Geräteprofil wählen</option>`,
+            ...profiles.map(item => {
+                const profileId = String(item?.profileId || "");
+                const displayName = String(item?.displayName || profileId);
+                const deviceMode = String(item?.deviceMode || "single-device");
+                return `<option value="${escapeHtml(profileId)}">${escapeHtml(`${displayName} · ${deviceMode}`)}</option>`;
+            }),
+        ].join("");
+        if (currentValue && profiles.some(item => String(item?.profileId || "") === currentValue)) {
+            profileSelect.value = currentValue;
+        }
+    }
+}
+
+async function startEmulatorAvd(avdName) {
+    if (!isPythonOperator || !avdName) return;
+
+    try {
+        const res = await fetch("/api/qa/emulators/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                avdName,
+                headless: true,
+                wipeData: false,
+                noSnapshot: true,
+            }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Emulator konnte nicht gestartet werden.");
+        showNotification(`Emulator ${avdName} gestartet.`, "success");
+        await loadEmulatorLabOverview();
+    } catch (error) {
+        showNotification("Emulatorstart fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+async function stopRunningEmulator(serial) {
+    if (!isPythonOperator || !serial) return;
+
+    try {
+        const res = await fetch("/api/qa/emulators/stop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ serial }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Emulator konnte nicht beendet werden.");
+        showNotification(`Emulator ${serial} beendet.`, "success");
+        await loadEmulatorLabOverview();
+    } catch (error) {
+        showNotification("Emulator-Stopp fehlgeschlagen: " + error.message, "error");
+    }
+}
+
 function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
     const el = document.getElementById("qa-platform-overview");
     if (!el) return;
@@ -3345,6 +3424,7 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
     }
 
     const availableAvds = Array.isArray(payload.availableAvds) ? payload.availableAvds : [];
+    const runningEmulators = Array.isArray(payload.runningEmulators) ? payload.runningEmulators : [];
     const reservations = Array.isArray(payload.reservations) ? payload.reservations : [];
     const matrixPlan = Array.isArray(payload.matrixPlan) ? payload.matrixPlan : [];
 
@@ -3367,11 +3447,15 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
         <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
             <section class='python-clarity-box'>
                 <strong>Verfügbare AVDs</strong><br />
-                ${availableAvds.length > 0 ? availableAvds.map(name => `<div class='qa-platform-mini-row'><strong>AVD</strong> ${escapeHtml(String(name))}</div>`).join("") : "Keine AVDs erkannt."}
+                ${availableAvds.length > 0 ? availableAvds.map(name => `<div class='qa-platform-mini-row'><strong>AVD</strong> ${escapeHtml(String(name))}<button type='button' class='btn btn-secondary qa-mini-action-btn' onclick="startEmulatorAvd('${escapeHtml(String(name))}')">Starten</button></div>`).join("") : "Keine AVDs erkannt."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Laufende Emulatoren</strong><br />
+                ${runningEmulators.length > 0 ? runningEmulators.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.serial || "-"))}</strong> ${escapeHtml(String(item?.model || item?.device || "Emulator"))}<span>${escapeHtml(String(item?.state || "unknown"))}</span><button type='button' class='btn btn-secondary qa-mini-action-btn' onclick="stopRunningEmulator('${escapeHtml(String(item?.serial || ""))}')">Stoppen</button></div>`).join("") : "Keine laufenden Emulatoren erkannt."}
             </section>
             <section class='python-clarity-box'>
                 <strong>Aktive Reservierungen</strong><br />
-                ${reservations.length > 0 ? reservations.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong> ${escapeHtml(String(item?.profileId || "-"))}<span>${escapeHtml(String(item?.owner || "-"))} · ${escapeHtml(String(item?.purpose || "-"))}</span></div>`).join("") : "Keine aktiven Reservierungen."}
+                ${reservations.length > 0 ? reservations.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong> ${escapeHtml(String(item?.profileId || "-"))}<span>${escapeHtml(String(item?.owner || "-"))} · ${escapeHtml(String(item?.purpose || "-"))}</span><button type='button' class='btn btn-secondary qa-mini-action-btn' onclick="releaseEmulatorReservation('${escapeHtml(String(item?.reservationId || ""))}')">Freigeben</button></div>`).join("") : "Keine aktiven Reservierungen."}
             </section>
         </div>
         <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
@@ -3401,6 +3485,59 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
     `;
 }
 
+async function createEmulatorReservation() {
+    if (!isPythonOperator) return;
+
+    const androidVersion = (document.getElementById("qa-emulator-android-version")?.value || "").trim();
+    const profileId = (document.getElementById("qa-emulator-profile")?.value || "").trim();
+    const owner = (document.getElementById("qa-emulator-owner")?.value || "").trim();
+    const purpose = (document.getElementById("qa-emulator-purpose")?.value || "").trim();
+    const ttlMinutes = Number(document.getElementById("qa-emulator-ttl")?.value || 120);
+
+    if (!androidVersion || !profileId || !owner || !purpose) {
+        showNotification("Für eine Emulator-Reservierung sind Android-Version, Profil, Owner und Zweck erforderlich.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/qa/emulators/reservations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                androidVersion,
+                profileId,
+                owner,
+                purpose,
+                ttlMinutes,
+            }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Reservierung konnte nicht erstellt werden.");
+        showNotification(`Reservierung ${data.reservationId} erstellt.`, "success");
+        await loadEmulatorLabOverview();
+    } catch (error) {
+        showNotification("Reservierung fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+async function releaseEmulatorReservation(reservationId) {
+    if (!isPythonOperator || !reservationId) return;
+
+    try {
+        const res = await fetch("/api/qa/emulators/release", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reservationId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Reservierung konnte nicht freigegeben werden.");
+        showNotification(`Reservierung ${reservationId} freigegeben.`, "success");
+        await loadEmulatorLabOverview();
+    } catch (error) {
+        showNotification("Freigabe fehlgeschlagen: " + error.message, "error");
+    }
+}
+
 async function loadQaPlatformCatalog() {
     const el = document.getElementById("qa-platform-overview");
     if (!el) return { ok: false, message: "QA-Plattform-Container fehlt." };
@@ -3418,12 +3555,14 @@ async function loadQaPlatformCatalog() {
         qaPlatformCatalogPayload = data;
         renderQaPlatformOverview(data);
         syncDualDeviceCatalogOptions();
+        syncEmulatorReservationOptions();
         setQaRefreshSectionState("qaPlatform", "success", `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen`);
         return { ok: true, message: `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen.` };
     } catch (err) {
         qaPlatformCatalogPayload = null;
         renderQaPlatformOverview(null);
         syncDualDeviceCatalogOptions();
+        syncEmulatorReservationOptions();
         setQaRefreshSectionState("qaPlatform", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }
@@ -3844,6 +3983,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateUsbTestTypeFormState();
     }
     syncDualDeviceCatalogOptions();
+    syncEmulatorReservationOptions();
 });
 
 // ===================== ENDE TEST-SUITEN-ZENTRALE =====================

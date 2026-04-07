@@ -18,6 +18,18 @@ RESERVATION_FILE = REPO_ROOT / "build" / "test-automation" / "emulator-reservati
 IS_WINDOWS = os.name == "nt"
 
 
+def _adb_binary() -> str | None:
+    adb_name = "adb.exe" if IS_WINDOWS else "adb"
+    direct = shutil.which(adb_name)
+    if direct:
+        return direct
+    sdk_root = resolve_android_sdk()
+    if sdk_root is None:
+        return None
+    candidate = sdk_root / "platform-tools" / adb_name
+    return str(candidate) if candidate.exists() else None
+
+
 def resolve_android_sdk() -> Path | None:
     candidates = [os.environ.get("ANDROID_HOME"), os.environ.get("ANDROID_SDK_ROOT")]
     for candidate in candidates:
@@ -87,6 +99,128 @@ def list_avds() -> list[str]:
     if result.returncode != 0:
         return []
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def list_running_emulators() -> list[dict[str, object]]:
+    adb_binary = _adb_binary()
+    if not adb_binary:
+        return []
+    result = subprocess.run(
+        [adb_binary, "devices", "-l"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=20,
+    )
+    if result.returncode != 0:
+        return []
+
+    devices: list[dict[str, object]] = []
+    for raw_line in result.stdout.splitlines()[1:]:
+        line = raw_line.strip()
+        if not line or not line.startswith("emulator-"):
+            continue
+        parts = line.split()
+        serial = parts[0]
+        state = parts[1] if len(parts) > 1 else "unknown"
+        details: dict[str, str] = {}
+        for token in parts[2:]:
+            if ":" not in token:
+                continue
+            key, value = token.split(":", 1)
+            details[key] = value
+        devices.append(
+            {
+                "serial": serial,
+                "state": state,
+                "model": details.get("model", ""),
+                "device": details.get("device", ""),
+                "transportId": details.get("transport_id", ""),
+            }
+        )
+    return devices
+
+
+def start_emulator(
+    avd_name: str,
+    *,
+    headless: bool = True,
+    wipe_data: bool = False,
+    no_snapshot: bool = True,
+) -> dict[str, object]:
+    normalized_avd_name = avd_name.strip()
+    if not normalized_avd_name:
+        raise ValueError("avdName ist erforderlich.")
+    if normalized_avd_name not in list_avds():
+        raise ValueError(f"AVD {normalized_avd_name} ist nicht vorhanden.")
+
+    emulator_path = emulator_binary_path()
+    if emulator_path is None:
+        raise ValueError("Emulator-Binary ist nicht verfügbar.")
+
+    command = [str(emulator_path), "-avd", normalized_avd_name]
+    if headless:
+        command.extend(["-no-window", "-no-audio"])
+    if wipe_data:
+        command.append("-wipe-data")
+    if no_snapshot:
+        command.append("-no-snapshot")
+
+    popen_kwargs: dict[str, object] = {
+        "cwd": REPO_ROOT,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if IS_WINDOWS:
+        creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        if creationflags:
+            popen_kwargs["creationflags"] = creationflags
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    process = subprocess.Popen(command, **popen_kwargs)
+    return {
+        "started": True,
+        "avdName": normalized_avd_name,
+        "pid": process.pid,
+        "headless": headless,
+        "wipeData": wipe_data,
+        "noSnapshot": no_snapshot,
+        "command": command,
+        "startedAt": _utc_now(),
+    }
+
+
+def stop_emulator(serial: str) -> dict[str, object]:
+    normalized_serial = serial.strip()
+    if not normalized_serial:
+        raise ValueError("serial ist erforderlich.")
+
+    adb_binary = _adb_binary()
+    if not adb_binary:
+        raise ValueError("ADB ist nicht verfügbar.")
+
+    result = subprocess.run(
+        [adb_binary, "-s", normalized_serial, "emu", "kill"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=20,
+    )
+    if result.returncode != 0:
+        error_output = (result.stderr or result.stdout or "Emulator konnte nicht beendet werden.").strip()
+        raise ValueError(error_output)
+    return {
+        "stopped": True,
+        "serial": normalized_serial,
+        "output": (result.stdout or "").strip(),
+    }
 
 
 def _load_reservations() -> list[dict[str, object]]:
@@ -246,6 +380,7 @@ def get_emulator_lab_overview() -> dict[str, object]:
     emulator_path = emulator_binary_path()
     avdmanager_path = avdmanager_binary_path()
     avds = list_avds()
+    running = list_running_emulators()
     reservations = load_active_reservations()
     plan = build_emulator_matrix_plan()
 
@@ -259,6 +394,8 @@ def get_emulator_lab_overview() -> dict[str, object]:
         "avdManagerBinary": str(avdmanager_path) if avdmanager_path is not None else "",
         "availableAvds": avds,
         "availableAvdCount": len(avds),
+        "runningEmulators": running,
+        "runningEmulatorCount": len(running),
         "reservations": reservations,
         "reservationCount": len(reservations),
         "matrixPlan": plan,

@@ -1407,6 +1407,35 @@
                                     <div class="setup-actions" style="margin-block-end: 8px">
                                         <button onclick="loadEmulatorLabOverview()" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
                                     </div>
+                                    <div class="dsar-form" style="display: grid; gap: 8px; margin-block-end: 10px">
+                                        <label>
+                                            <span>Android-Version</span>
+                                            <select id="qa-emulator-android-version">
+                                                <option value="">Android-Version wählen</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span>Geräteprofil</span>
+                                            <select id="qa-emulator-profile">
+                                                <option value="">Geräteprofil wählen</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span>Owner</span>
+                                            <input type="text" id="qa-emulator-owner" placeholder="z. B. qa-automation" />
+                                        </label>
+                                        <label>
+                                            <span>Zweck</span>
+                                            <input type="text" id="qa-emulator-purpose" placeholder="z. B. android-14-dual-device-regression" />
+                                        </label>
+                                        <label>
+                                            <span>TTL in Minuten</span>
+                                            <input type="number" id="qa-emulator-ttl" min="15" max="1440" step="15" value="120" />
+                                        </label>
+                                    </div>
+                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                        <button onclick="createEmulatorReservation()" class="btn btn-primary" title="Neue Reservierung im Emulator-Labor anlegen">Reservierung anlegen</button>
+                                    </div>
                                     <div id="qa-emulator-lab" class="data-list">
                                         <div class="info">Noch kein Emulator-Labor geladen.</div>
                                     </div>

@@ -648,6 +648,36 @@ class TestEmulatorLabOverview:
         assert len(result) == 1
         assert result[0]["reservationId"] == "emu-1"
 
+    @patch("app.list_running_emulators")
+    def test_running_emulators_can_be_loaded(self, mock_running):
+        mock_running.return_value = [{"serial": "emulator-5554", "state": "device"}]
+
+        from app import list_running_emulators
+
+        result = list_running_emulators()
+        assert len(result) == 1
+        assert result[0]["serial"] == "emulator-5554"
+
+    @patch("app.start_emulator")
+    def test_start_emulator_helper_is_available(self, mock_start):
+        mock_start.return_value = {"started": True, "avdName": "Pixel_8_API_34"}
+
+        from app import start_emulator
+
+        result = start_emulator("Pixel_8_API_34")
+        assert result["started"] is True
+        assert result["avdName"] == "Pixel_8_API_34"
+
+    @patch("app.stop_emulator")
+    def test_stop_emulator_helper_is_available(self, mock_stop):
+        mock_stop.return_value = {"stopped": True, "serial": "emulator-5554"}
+
+        from app import stop_emulator
+
+        result = stop_emulator("emulator-5554")
+        assert result["stopped"] is True
+        assert result["serial"] == "emulator-5554"
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  start_suite_run / get_suite_run_status
