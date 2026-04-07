@@ -960,6 +960,26 @@
                         <h2>🧪 Qualitätssicherung &amp; Tests</h2>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
+                            <div class="qa-refresh-header">
+                                <div>
+                                    <h3>QA-Datenstand &amp; Synchronisierung</h3>
+                                    <p>
+                                        Zeigt, welche Bereiche des QA-Reiters frisch geladen wurden und wann zuletzt ein kompletter
+                                        Synchronisationslauf stattgefunden hat.
+                                    </p>
+                                </div>
+                                <div class="setup-actions" style="margin-block-start: 0">
+                                    <button onclick="refreshQaDashboard()" class="btn btn-secondary" title="Alle QA-Datenquellen neu laden und den Datenstand aktualisieren">
+                                        QA-Daten aktualisieren
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="qa-refresh-status" class="data-list" style="margin-block-start: 12px">
+                                <div class="info">Noch keine QA-Synchronisierung ausgeführt.</div>
+                            </div>
+                        </div>
+
+                        <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>Startwege &amp; enthaltene Testfälle</h3>
                             <p>
                                 Diese Übersicht zeigt pro Startaktion, <strong>welche Testfälle tatsächlich enthalten sind</strong>,
@@ -1208,6 +1228,10 @@
                                                 Lokale Gate-Kommandos ausführen (validate:readiness + ci:revalidate)
                                             </label>
                                             <label class="setup-checklist-item python-inline-check">
+                                                <input type="checkbox" id="python-automation-rerun-failed" />
+                                                Beim Release-Gate nur zuletzt fehlgeschlagene Checks erneut ausführen
+                                            </label>
+                                            <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="python-automation-refresh-validation" checked />
                                                 Vor dem Python-Lauf Full Validation aktualisieren
                                             </label>
@@ -1231,6 +1255,7 @@
                                         </div>
                                         <div class="setup-actions" style="margin-block-start: 10px">
                                             <button id="python-automation-run-btn" onclick="runPythonAutomationSuite()" class="btn btn-primary" title="Alle ausgewählten Testfälle automatisch bewerten und protokollieren">Python-Testlauf starten</button>
+                                            <button id="python-automation-recovery-btn" onclick="runQaQuickRecovery()" class="btn btn-secondary" title="Nur betroffene Suite-/Gate-Fehler erneut anstoßen und danach das Register aktualisieren">Quick Recovery</button>
                                             <button onclick="loadPythonAutomationCatalog()" class="btn btn-secondary" title="Testfallkatalog aus der Konfiguration neu laden">Testfallkatalog neu laden</button>
                                             <button onclick="copyLatestPythonAutomationRunToClipboard()" class="btn btn-secondary" title="Ergebnis des letzten Testlaufs direkt in die Zwischenablage kopieren">Testergebnisse kopieren</button>
                                             <button onclick="exportLatestPythonAutomationRun()" class="btn btn-secondary" title="Ergebnis des letzten Testlaufs als Datei exportieren">Letzten Lauf exportieren</button>
@@ -1450,10 +1475,6 @@
                                     <div class="python-automation-toolbar">
                                         <select id="suite-group-filter">
                                             <option value="all">Alle Gruppen</option>
-                                            <option value="backend">Backend</option>
-                                            <option value="android">Android</option>
-                                            <option value="device">Device/USB</option>
-                                            <option value="release">Release</option>
                                         </select>
                                         <label class="setup-checklist-item python-inline-check">
                                             <input type="checkbox" id="suite-ready-only" />

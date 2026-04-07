@@ -43,6 +43,7 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
   - startet einen Automationslauf fuer offene Inbetriebnahme-Punkte
   - bewertet Runtime-/Play-Store-/Attestation-Status
   - fuehrt optional lokale Gate-Kommandos aus (`npm run validate:readiness`, `npm run ci:revalidate`)
+  - mit `options.rerunLatestFailed=true` werden nur die im letzten Lauf fehlgeschlagenen Gate-Kommandos erneut gestartet; fuer `ci:revalidate` wird dabei automatisch `npm run ci:revalidate:rerun` verwendet
   - schreibt jedes Ergebnis als JSON-Zeile in `python_admin/logs/commissioning_runs.jsonl`
 
 - `GET /api/commissioning/history?limit=10`
@@ -63,6 +64,6 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
 - `staleEvidence` wird fuer manuelle oder dokumentierte Checks gesetzt, wenn der letzte Nachweis aelter als das definierte Stale-Fenster ist.
 - In der Operator-Sicht gilt ein Release-Blocker nur dann als sauber geschlossen, wenn ein aktueller PASS vorliegt. Ein veralteter PASS-Nachweis wird daher weiter als offener Handlungsbedarf behandelt.
 - `Unsupported / Not Yet Mapped` kennzeichnet inventarisierte Repo-Tests ohne Zuordnung zu einer direkt ausfuehrbaren Suite. Diese Eintraege sind bewusst sichtbar, um Automationsluecken nicht zu verdecken.
-- Dazu gehoeren aktuell auch iOS-XCTest-Dateien aus `iosMasterApp/Tests` und `iosChildApp/Tests`, solange keine macOS-/Xcode-Suite im Python-QA-Backend hinterlegt ist.
+- Fuer iOS-XCTest-Dateien aus `iosMasterApp/Tests` und `iosChildApp/Tests` existieren jetzt explizite externe QA-Suites (`ios-xctest-parent`, `ios-xctest-child`). Diese werden auf Windows bewusst nicht lokal gestartet, sondern nach externem macOS-/Xcode-Lauf per Evidenz im QA-Register protokolliert.
 
 Timeout fuer Kommandoausfuehrungen kann mit `MINIMASTER_COMMAND_TIMEOUT_SEC` konfiguriert werden (Standard: `1800` Sekunden).

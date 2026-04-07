@@ -1703,6 +1703,81 @@ input:focus, select:focus, textarea:focus {
     font-size: 0.85rem;
 }
 
+.qa-refresh-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.qa-refresh-header h3 {
+    margin: 0 0 4px;
+    color: #0f172a;
+}
+
+.qa-refresh-header p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.9rem;
+}
+
+.qa-refresh-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+}
+
+.qa-refresh-card {
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    padding: 12px 14px;
+    display: grid;
+    gap: 6px;
+}
+
+.qa-refresh-card strong {
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.qa-refresh-card span {
+    color: #475569;
+    font-size: 0.82rem;
+}
+
+.qa-refresh-card.is-loading {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+
+.qa-refresh-card.is-success {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+}
+
+.qa-refresh-card.is-error {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.qa-refresh-meta {
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.suite-catalog-action.is-external {
+    justify-content: flex-start;
+}
+
+.suite-catalog-action-note {
+    color: #475569;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    max-inline-size: 260px;
+}
+
 .testing-register-panels .python-automation-panel {
     min-inline-size: 0;
 }

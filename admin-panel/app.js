@@ -134,6 +134,24 @@ let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
 let suiteCatalogPayload = [];
 let suiteRunHistoryPayload = [];
+let qaDashboardLoadPromise = null;
+let qaRefreshState = {
+    lastStartedAt: "",
+    lastCompletedAt: "",
+    lastReason: "",
+    lastSummary: "Noch keine QA-Synchronisierung ausgeführt.",
+    sections: {},
+};
+
+const qaRefreshSectionLabels = {
+    catalog: "Python-Katalog",
+    history: "Laufhistorie",
+    evidence: "Nachweise",
+    register: "Testregister",
+    suites: "Suite-Katalog",
+    suiteHistory: "Suite-Historie",
+    devices: "Gerätestatus",
+};
 
 const setupChecklistItems = [
     { key: "firebase-config", label: "Firebase-Konfiguration ersetzt (keine Platzhalterwerte)" },
@@ -259,6 +277,122 @@ function loadCommandBuilderConfig() {
         console.warn("Failed to load command builder config:", error);
         return { ...defaultCommandBuilderConfig };
     }
+}
+
+function formatQaRefreshTimestamp(value) {
+    if (!value) return "noch nicht";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString("de-DE");
+}
+
+function renderQaRefreshStatus() {
+    const container = document.getElementById("qa-refresh-status");
+    if (!container) return;
+
+    if (!isPythonOperator) {
+        container.innerHTML = "<div class='info'>Vollständige QA-Synchronisierung ist nur im Python-Operator verfügbar.</div>";
+        return;
+    }
+
+    const sectionKeys = Object.keys(qaRefreshSectionLabels);
+    const cardsHtml = sectionKeys.map(key => {
+        const entry = qaRefreshState.sections[key] || {};
+        const state = String(entry.state || "idle");
+        const stateClass = state === "success" ? "is-success" : state === "error" ? "is-error" : state === "loading" ? "is-loading" : "";
+        const label = qaRefreshSectionLabels[key] || key;
+        const detail = entry.message || (state === "success" ? "Aktuell geladen" : state === "error" ? "Fehler beim Laden" : state === "loading" ? "Lädt gerade" : "Noch nicht geladen");
+        return `
+            <article class='qa-refresh-card ${stateClass}'>
+                <strong>${escapeHtml(label)}</strong>
+                <span>${escapeHtml(detail)}</span>
+                <div class='qa-refresh-meta'>Zuletzt: ${escapeHtml(formatQaRefreshTimestamp(entry.updatedAt || ""))}</div>
+            </article>
+        `;
+    }).join("");
+
+    const startedAt = qaRefreshState.lastStartedAt ? `Letzter Start: ${formatQaRefreshTimestamp(qaRefreshState.lastStartedAt)}` : "Noch kein QA-Refresh gestartet";
+    const completedAt = qaRefreshState.lastCompletedAt ? `Letzter Abschluss: ${formatQaRefreshTimestamp(qaRefreshState.lastCompletedAt)}` : "Noch kein QA-Refresh abgeschlossen";
+
+    container.innerHTML = `
+        <div class='python-clarity-box'>
+            <strong>Gesamtsicht:</strong> ${escapeHtml(qaRefreshState.lastSummary || "Noch keine QA-Synchronisierung ausgeführt.")}<br />
+            <span class='qa-refresh-meta'>${escapeHtml(startedAt)} · ${escapeHtml(completedAt)} · Anlass: ${escapeHtml(qaRefreshState.lastReason || "-")}</span>
+        </div>
+        <div class='qa-refresh-grid' style='margin-block-start: 12px'>
+            ${cardsHtml}
+        </div>
+    `;
+}
+
+function setQaRefreshSectionState(sectionKey, state, message = "") {
+    qaRefreshState.sections[sectionKey] = {
+        state,
+        message,
+        updatedAt: new Date().toISOString(),
+    };
+    renderQaRefreshStatus();
+}
+
+function updateQaRefreshSummary(reason, sectionResults = []) {
+    const successCount = sectionResults.filter(item => item.ok).length;
+    const errorCount = sectionResults.length - successCount;
+    qaRefreshState.lastCompletedAt = new Date().toISOString();
+    qaRefreshState.lastReason = reason || qaRefreshState.lastReason || "manuell";
+    qaRefreshState.lastSummary = errorCount > 0
+        ? `${successCount}/${sectionResults.length} QA-Bereiche geladen, ${errorCount} mit Fehler.`
+        : `${successCount}/${sectionResults.length} QA-Bereiche erfolgreich synchronisiert.`;
+    renderQaRefreshStatus();
+}
+
+function buildPythonAutomationTargetEntries(catalog = pythonCommissioningCatalog, payload = testingRegisterPayload) {
+    const entries = [];
+    const seenIds = new Set();
+
+    const registerItems = Array.isArray(payload?.items) ? payload.items : [];
+    registerItems
+        .filter(item => String(item?.action || "") === "protocol")
+        .forEach(item => {
+            const id = String(item.id || "");
+            if (!id || seenIds.has(id)) return;
+            seenIds.add(id);
+            entries.push({
+                id,
+                title: String(item.title || id),
+                groupId: String(item.groupId || ""),
+                groupTitle: String(item.groupTitle || "-"),
+                automationType: String(item.automationType || "manual"),
+                source: String(item.source || ""),
+                description: String(item.description || item.details || ""),
+                successCriteria: String(item.successCriteria || item.details || "Belastbaren Nachweis protokollieren."),
+                documentation: String(item.documentation || ""),
+            });
+        });
+
+    if (Array.isArray(catalog?.groups)) {
+        catalog.groups.forEach(group => {
+            (group.tests || []).forEach(test => {
+                const automationType = String(test?.automationType || "automatic");
+                if (!(automationType === "manual" || automationType === "documented")) return;
+                const id = String(test?.id || "");
+                if (!id || seenIds.has(id)) return;
+                seenIds.add(id);
+                entries.push({
+                    id,
+                    title: String(test?.title || id),
+                    groupId: String(group?.id || ""),
+                    groupTitle: String(group?.title || "-"),
+                    automationType,
+                    source: String(test?.source || ""),
+                    description: String(test?.description || ""),
+                    successCriteria: String(test?.successCriteria || "Belastbaren Nachweis protokollieren."),
+                    documentation: String(test?.documentation || ""),
+                });
+            });
+        });
+    }
+
+    return entries;
 }
 
 function getCommandBuilderFormValues() {
@@ -563,7 +697,43 @@ function getLatestSuiteRunIndex(runs = suiteRunHistoryPayload) {
     return index;
 }
 
+function getTestingRegisterItemById(itemId, payload = testingRegisterPayload) {
+    return (Array.isArray(payload?.items) ? payload.items : []).find(item => String(item?.id || "") === String(itemId || "")) || null;
+}
+
 function getSuiteCatalogExecutionStatus(item) {
+    if (String(item?.executionMode || "") === "external-evidence") {
+        const registerItem = getTestingRegisterItemById(getSuiteCatalogItemId(item));
+        if (registerItem) {
+            const status = String(registerItem.status || "not_run");
+            if (status === "pass") {
+                return {
+                    state: "ok",
+                    label: "OK",
+                    detail: String(registerItem.details || "Externer Nachweis protokolliert"),
+                };
+            }
+            if (status === "fail") {
+                return {
+                    state: "fail",
+                    label: "FAIL",
+                    detail: String(registerItem.details || "Externer Nachweis fehlgeschlagen"),
+                };
+            }
+            return {
+                state: "open",
+                label: "OPEN",
+                detail: String(registerItem.details || item?.prereqReason || "Externer Lauf noch nicht protokolliert"),
+            };
+        }
+
+        return {
+            state: "open",
+            label: "OPEN",
+            detail: getSuiteCatalogItemReason(item) || "Externer Lauf noch nicht protokolliert",
+        };
+    }
+
     if (!getSuiteCatalogItemReady(item)) {
         return {
             state: "fail",
@@ -692,15 +862,8 @@ function getLatestPythonAutomationEvidence(testId) {
 }
 
 function findPythonAutomationTestById(testId) {
-    if (!testId || !pythonCommissioningCatalog?.groups) return null;
-    for (const group of pythonCommissioningCatalog.groups) {
-        for (const test of group.tests || []) {
-            if (test?.id === testId) {
-                return { group, test };
-            }
-        }
-    }
-    return null;
+    if (!testId) return null;
+    return buildPythonAutomationTargetEntries().find(entry => entry.id === testId) || null;
 }
 
 function formatPythonAutomationTimestamp(value) {
@@ -755,8 +918,8 @@ function ensurePythonAutomationSelectedTest() {
         return;
     }
 
-    const allTests = pythonCommissioningCatalog?.groups?.flatMap(group => group.tests || []) || [];
-    const preferred = allTests.find(test => test.automationType === "documented" || test.automationType === "manual") || allTests[0] || null;
+    const allTargets = buildPythonAutomationTargetEntries();
+    const preferred = allTargets.find(target => target.automationType === "documented" || String(target.source || "").includes("ios")) || allTargets[0] || null;
     pythonCommissioningSelectedTestId = preferred?.id || null;
 }
 
@@ -794,8 +957,7 @@ function renderPythonAutomationProtocolEditor() {
         return;
     }
 
-    const { group, test } = selected;
-    const evidence = getLatestPythonAutomationEvidence(test.id);
+    const evidence = getLatestPythonAutomationEvidence(selected.id);
     const evidenceDetails = evidence
         ? `<div class='python-muted-caption'>Letzter Nachweis: ${escapeHtml(formatPythonAutomationStatus(evidence.status))} · ${escapeHtml(formatPythonAutomationTimestamp(evidence.createdAt))}</div>`
         : "<div class='python-muted-caption'>Noch kein manueller Nachweis vorhanden.</div>";
@@ -804,14 +966,14 @@ function renderPythonAutomationProtocolEditor() {
         <div class='python-protocol-selected-card'>
             <div class='python-test-card-header'>
                 <div>
-                    <h6>${escapeHtml(test.title || test.id || "Prueffall")}</h6>
-                    <p class='python-muted-caption'>Gruppe: ${escapeHtml(group.title || "-")} · ID: ${escapeHtml(test.id || "-")}</p>
+                    <h6>${escapeHtml(selected.title || selected.id || "Prueffall")}</h6>
+                    <p class='python-muted-caption'>Gruppe: ${escapeHtml(selected.groupTitle || "-")} · ID: ${escapeHtml(selected.id || "-")}</p>
                 </div>
-                <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType, test.source)}'>${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}</span>
+                <span class='python-automation-chip ${getPythonAutomationTypeChipClass(selected.automationType, selected.source)}'>${escapeHtml(formatPythonAutomationType(selected.automationType, selected.source))}</span>
             </div>
-            <p>${escapeHtml(test.description || "")}</p>
-            <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
-            ${test.documentation ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(test.documentation)}</div>` : ""}
+            <p>${escapeHtml(selected.description || "")}</p>
+            <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(selected.successCriteria || "-")}</div>
+            ${selected.documentation ? `<div class='python-test-detail python-test-doc'><strong>Dokumentation:</strong> ${escapeHtml(selected.documentation)}</div>` : ""}
             ${evidenceDetails}
         </div>
     `;
@@ -827,7 +989,7 @@ function renderPythonAutomationProtocolEditor() {
     if (evidenceRefEl && document.activeElement !== evidenceRefEl) evidenceRefEl.value = evidence?.evidenceRef || "";
     if (notesEl && document.activeElement !== notesEl) notesEl.value = evidence?.notes || "";
     if (docCheckEl) docCheckEl.checked = Boolean(evidence?.documentationChecked);
-    if (docRowEl) docRowEl.style.display = test.automationType === "documented" ? "flex" : "none";
+    if (docRowEl) docRowEl.style.display = selected.automationType === "documented" ? "flex" : "none";
 }
 
 function buildPythonAutomationRunIndex(run) {
@@ -1157,17 +1319,19 @@ function renderPythonAutomationCatalog(catalog, run) {
 
 async function loadPythonAutomationCatalog() {
     const catalogEl = document.getElementById("python-automation-catalog");
-    if (!catalogEl) return;
+    if (!catalogEl) return { ok: false, message: "Katalog-Container fehlt." };
 
     if (!isPythonOperator) {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
         renderQaExecutionGuide(null, testingRegisterPayload, suiteCatalogPayload);
         catalogEl.innerHTML = "<div class='info'>Der Python-Testkatalog ist nur im Python-Operator verfügbar.</div>";
-        return;
+        setQaRefreshSectionState("catalog", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
     catalogEl.innerHTML = "<div class='loading'>Lade Python-Testkatalog...</div>";
+    setQaRefreshSectionState("catalog", "loading", "Lädt…");
     try {
         const response = await fetch("/api/commissioning/catalog", {
             headers: { "Accept": "application/json" },
@@ -1182,11 +1346,15 @@ async function loadPythonAutomationCatalog() {
         renderPythonAutomationCatalog(payload, pythonCommissioningLastRun);
         renderQaExecutionGuide(payload, testingRegisterPayload, suiteCatalogPayload);
         renderPythonAutomationProtocolEditor();
+        setQaRefreshSectionState("catalog", "success", `${payload?.summary?.testCount || 0} Prüffälle geladen`);
+        return { ok: true, message: `${payload?.summary?.testCount || 0} Prüffälle geladen.` };
     } catch (error) {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
         renderQaExecutionGuide(null, testingRegisterPayload, suiteCatalogPayload);
         catalogEl.innerHTML = `<div class='error'>Testkatalog konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        setQaRefreshSectionState("catalog", "error", error.message || "Fehler beim Laden");
+        return { ok: false, message: error.message || "Fehler beim Laden" };
     }
 }
 
@@ -1431,6 +1599,7 @@ async function runPythonAutomationSuite() {
     resultEl.innerHTML = "<div class='loading'>Starte Python-Automationslauf...</div>";
 
     const runCommands = Boolean(document.getElementById("python-automation-run-commands")?.checked);
+    const rerunLatestFailed = runCommands && Boolean(document.getElementById("python-automation-rerun-failed")?.checked);
     const refreshValidation = Boolean(document.getElementById("python-automation-refresh-validation")?.checked);
     const timeoutRaw = parseInt(document.getElementById("python-automation-timeout")?.value || "1800", 10);
     const timeoutSec = Number.isFinite(timeoutRaw) ? Math.min(7200, Math.max(30, timeoutRaw)) : 1800;
@@ -1462,6 +1631,7 @@ async function runPythonAutomationSuite() {
                 context: collectCommissioningAutomationContext(),
                 options: {
                     runCommands,
+                    rerunLatestFailed,
                     timeoutSec,
                 },
             }),
@@ -1585,14 +1755,16 @@ function showPythonAutomationHistoryRun(index) {
 
 async function loadPythonAutomationHistory() {
     const historyEl = document.getElementById("python-automation-history");
-    if (!historyEl) return;
+    if (!historyEl) return { ok: false, message: "Historie-Container fehlt." };
 
     if (!isPythonOperator) {
         historyEl.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfügbar.</div>";
-        return;
+        setQaRefreshSectionState("history", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
     historyEl.innerHTML = "<div class='loading'>Lade Laufhistorie...</div>";
+    setQaRefreshSectionState("history", "loading", "Lädt…");
     try {
         const response = await fetch("/api/commissioning/history?limit=10", {
             headers: { "Accept": "application/json" },
@@ -1607,8 +1779,12 @@ async function loadPythonAutomationHistory() {
             renderPythonAutomationResult(runs[0]);
         }
         renderPythonAutomationHistory(runs);
+        setQaRefreshSectionState("history", "success", `${runs.length} Lauf/Läufe geladen`);
+        return { ok: true, message: `${runs.length} Lauf/Läufe geladen.` };
     } catch (error) {
         historyEl.innerHTML = `<div class='error'>Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        setQaRefreshSectionState("history", "error", error.message || "Fehler beim Laden");
+        return { ok: false, message: error.message || "Fehler beim Laden" };
     }
 }
 
@@ -1723,14 +1899,16 @@ function resetPythonEvidenceFilter() {
 
 async function loadPythonAutomationEvidenceHistory() {
     const historyEl = document.getElementById("python-automation-protocol-history");
-    if (!historyEl) return;
+    if (!historyEl) return { ok: false, message: "Nachweis-Container fehlt." };
 
     if (!isPythonOperator) {
         historyEl.innerHTML = "<div class='info'>Nachweis-Historie ist nur im Python-Operator verfuegbar.</div>";
-        return;
+        setQaRefreshSectionState("evidence", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
     historyEl.innerHTML = "<div class='loading'>Lade Nachweis-Historie...</div>";
+    setQaRefreshSectionState("evidence", "loading", "Lädt…");
     try {
         const response = await fetch("/api/commissioning/evidence?limit=80", {
             headers: { "Accept": "application/json" },
@@ -1745,8 +1923,97 @@ async function loadPythonAutomationEvidenceHistory() {
         renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
         renderPythonAutomationProtocolEditor();
         rerenderTestingRegisterFromCache();
+        setQaRefreshSectionState("evidence", "success", `${pythonCommissioningEvidenceHistory.length} Nachweise geladen`);
+        return { ok: true, message: `${pythonCommissioningEvidenceHistory.length} Nachweise geladen.` };
     } catch (error) {
         historyEl.innerHTML = `<div class='error'>Nachweis-Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        setQaRefreshSectionState("evidence", "error", error.message || "Fehler beim Laden");
+        return { ok: false, message: error.message || "Fehler beim Laden" };
+    }
+}
+
+async function loadQaDashboardData(reason = "manuell") {
+    if (!isPythonOperator) {
+        renderQaRefreshStatus();
+        return [];
+    }
+    if (qaDashboardLoadPromise) {
+        return qaDashboardLoadPromise;
+    }
+
+    qaRefreshState.lastStartedAt = new Date().toISOString();
+    qaRefreshState.lastReason = reason;
+    qaRefreshState.lastSummary = "QA-Synchronisierung läuft gerade.";
+    renderQaRefreshStatus();
+
+    qaDashboardLoadPromise = (async () => {
+        const sections = [
+            ["catalog", loadPythonAutomationCatalog],
+            ["history", loadPythonAutomationHistory],
+            ["evidence", loadPythonAutomationEvidenceHistory],
+            ["register", loadTestingRegister],
+            ["suites", loadSuiteCatalog],
+            ["suiteHistory", loadSuiteRunHistory],
+            ["devices", loadSuiteDeviceStatus],
+        ];
+
+        const results = [];
+        for (const [sectionKey, loader] of sections) {
+            try {
+                const result = await loader();
+                results.push({ sectionKey, ok: Boolean(result?.ok), message: result?.message || "" });
+            } catch (error) {
+                const message = error?.message || "Fehler beim Laden";
+                setQaRefreshSectionState(sectionKey, "error", message);
+                results.push({ sectionKey, ok: false, message });
+            }
+        }
+
+        updateQaRefreshSummary(reason, results);
+        qaDashboardLoadPromise = null;
+        return results;
+    })();
+
+    return qaDashboardLoadPromise;
+}
+
+async function refreshQaDashboard() {
+    await loadQaDashboardData("manueller Refresh");
+}
+
+function getLatestFailedSuiteRun() {
+    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).find(run => {
+        const lifecycle = String(run?.status || "").toLowerCase();
+        const resultStatus = String(run?.result?.status || run?.result?.overall_status || "").toLowerCase();
+        return lifecycle === "finished" && ["failed", "fail", "error", "errored"].includes(resultStatus);
+    }) || null;
+}
+
+async function runQaQuickRecovery() {
+    if (!isPythonOperator) {
+        showNotification("Quick Recovery ist nur im Python-Operator verfügbar.", "error");
+        return;
+    }
+
+    const failedSuiteRun = getLatestFailedSuiteRun();
+    if (failedSuiteRun?.suiteId) {
+        await startSuiteRun(encodeURIComponent(String(failedSuiteRun.suiteId)));
+    }
+
+    const refreshValidationEl = document.getElementById("python-automation-refresh-validation");
+    const rerunFailedEl = document.getElementById("python-automation-rerun-failed");
+    const previousRefresh = Boolean(refreshValidationEl?.checked);
+    const previousRerun = Boolean(rerunFailedEl?.checked);
+
+    if (refreshValidationEl) refreshValidationEl.checked = false;
+    if (rerunFailedEl) rerunFailedEl.checked = true;
+
+    try {
+        await runPythonAutomationSuite();
+        showNotification("Quick Recovery angestoßen. Register und Historien werden automatisch aktualisiert.", "success");
+    } finally {
+        if (refreshValidationEl) refreshValidationEl.checked = previousRefresh;
+        if (rerunFailedEl) rerunFailedEl.checked = previousRerun;
     }
 }
 
@@ -1781,7 +2048,7 @@ async function savePythonAutomationEvidence() {
                 "Accept": "application/json",
             },
             body: JSON.stringify({
-                testId: selected.test.id,
+                testId: selected.id,
                 status,
                 operator,
                 evidenceRef,
@@ -1801,7 +2068,7 @@ async function savePythonAutomationEvidence() {
             rerenderPythonAutomationCatalogFromCache();
         }
         await loadTestingRegister();
-        showNotification(`Nachweis gespeichert fuer ${selected.test.title || selected.test.id}.`, "success");
+        showNotification(`Nachweis gespeichert fuer ${selected.title || selected.id}.`, "success");
     } catch (error) {
         showNotification("Nachweis konnte nicht gespeichert werden: " + error.message, "error");
     }
@@ -2187,6 +2454,7 @@ function getTestingRegisterActionLabel(item) {
     const action = String(item?.action || "commissioning-run");
     if (action === "suite-run") return "Suite-Start";
     if (action === "protocol") return "Nachweis-Protokoll";
+    if (action === "external-protocol") return "Externer Lauf + Nachweis";
     if (String(item?.source || "") === "docs-validation") return "Dokument-Check ausführen";
     if (String(item?.source || "") === "static-analysis") return "Static-Checks ausführen";
     return "Python-Commissioning-Lauf";
@@ -2199,7 +2467,9 @@ function buildTestingRegisterExecutionPath(item) {
         return suiteRef ? `${actionLabel}: ${suiteRef}` : actionLabel;
     }
     if (String(item?.action || "") === "protocol") {
-        return "Manuell im Nachweisformular abschließen";
+        return String(item?.environment || "") === "ios"
+            ? "Extern ausführen und im Nachweisformular abschließen"
+            : "Manuell im Nachweisformular abschließen";
     }
     if (String(item?.source || "") === "docs-validation") {
         return "Im Python-Lauf als Dokument-Validierung enthalten";
@@ -2244,6 +2514,19 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
         const type = String(entry.test?.automationType || "automatic");
         return type === "manual" || type === "documented";
     });
+    const externalManualEntries = (Array.isArray(payload?.items) ? payload.items : [])
+        .filter(item => String(item?.action || "") === "protocol")
+        .filter(item => !allCatalogTests.some(entry => String(entry.test?.id || "") === String(item?.id || "")))
+        .map(item => ({
+            group: {
+                title: String(item.groupTitle || "Externe Nachweise"),
+                description: String(item.details || item.description || ""),
+            },
+            test: {
+                id: String(item.id || ""),
+                title: String(item.title || item.id || "Prüffall"),
+            },
+        }));
 
     const items = Array.isArray(payload?.items) ? payload.items : [];
     const suiteMap = new Map();
@@ -2320,8 +2603,8 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
             groups: groupSummary(commissioningAutomatic),
         },
         manualEvidence: {
-            total: manualEvidence.length,
-            groups: groupSummary(manualEvidence),
+            total: manualEvidence.length + externalManualEntries.length,
+            groups: groupSummary([...manualEvidence, ...externalManualEntries]),
         },
         suites: suitesSummary,
         storage: payload?.storage || null,
@@ -2444,7 +2727,9 @@ function buildTestingRegisterActionTooltip(item) {
         return `Verknuepfte Suite ${String(item.suiteRef || item.id || "") } starten`;
     }
     if (item.action === "protocol") {
-        return "Manuellen oder dokumentierten Nachweis fuer diesen Testfall protokollieren";
+        return String(item?.environment || "") === "ios"
+            ? "Externen Lauf auf macOS/Xcode ausführen und anschließend hier als Evidenz protokollieren"
+            : "Manuellen oder dokumentierten Nachweis fuer diesen Testfall protokollieren";
     }
     return "Automatischen Python-Testlauf fuer diesen Registereintrag starten";
 }
@@ -2827,7 +3112,7 @@ function renderTestingRegisterList(payload) {
 async function loadTestingRegister() {
     const automaticListEl = document.getElementById("testing-register-list-automatic");
     const manualListEl = document.getElementById("testing-register-list-manual");
-    if (!automaticListEl || !manualListEl) return;
+    if (!automaticListEl || !manualListEl) return { ok: false, message: "Register-Container fehlt." };
 
     if (!isPythonOperator) {
         testingRegisterPayload = null;
@@ -2837,12 +3122,14 @@ async function loadTestingRegister() {
         const infoHtml = "<div class='info'>Das Testregister ist nur im Python-Operator verfügbar.</div>";
         automaticListEl.innerHTML = infoHtml;
         manualListEl.innerHTML = infoHtml;
-        return;
+        setQaRefreshSectionState("register", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
     const loadingHtml = "<div class='loading'>Lade Gesamt-Testregister...</div>";
     automaticListEl.innerHTML = loadingHtml;
     manualListEl.innerHTML = loadingHtml;
+    setQaRefreshSectionState("register", "loading", "Lädt…");
     try {
         const response = await fetch("/api/testing/register", {
             headers: { "Accept": "application/json" },
@@ -2853,6 +3140,8 @@ async function loadTestingRegister() {
         }
         testingRegisterPayload = payload;
         rerenderTestingRegisterFromCache();
+        setQaRefreshSectionState("register", "success", `${payload?.summary?.total || 0} Registereinträge geladen`);
+        return { ok: true, message: `${payload?.summary?.total || 0} Registereinträge geladen.` };
     } catch (error) {
         testingRegisterPayload = null;
         renderTestingRegisterOverview(null);
@@ -2861,6 +3150,8 @@ async function loadTestingRegister() {
         const errorHtml = `<div class='error'>Testregister konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
         automaticListEl.innerHTML = errorHtml;
         manualListEl.innerHTML = errorHtml;
+        setQaRefreshSectionState("register", "error", error.message || "Fehler beim Laden");
+        return { ok: false, message: error.message || "Fehler beim Laden" };
     }
 }
 
@@ -2870,23 +3161,27 @@ let _suiteActivePollers = {};
 
 async function loadSuiteDeviceStatus() {
     const el = document.getElementById("suite-device-status");
-    if (!el) return;
+    if (!el) return { ok: false, message: "Gerätestatus-Container fehlt." };
     if (!isPythonOperator) {
         el.innerHTML = "<div class='info'>Geraetestatus ist nur im Python-Operator verfuegbar.</div>";
-        return;
+        setQaRefreshSectionState("devices", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
     el.innerHTML = "<div class='loading'>Lade Geraetestatus...</div>";
+    setQaRefreshSectionState("devices", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites/devices");
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
         if (!data.adbAvailable) {
             el.innerHTML = "<div class='error'>ADB ist nicht verfuegbar. Bitte Android SDK installieren.</div>";
-            return;
+            setQaRefreshSectionState("devices", "error", "ADB nicht verfügbar");
+            return { ok: false, message: "ADB nicht verfügbar." };
         }
         if (!data.devices || data.devices.length === 0) {
             el.innerHTML = "<div class='info'>Keine Geraete angeschlossen.</div>";
-            return;
+            setQaRefreshSectionState("devices", "success", "Keine Geräte angeschlossen");
+            return { ok: true, message: "Keine Geräte angeschlossen." };
         }
         el.innerHTML = data.devices.map(d => `
             <div class="data-row" style="display:flex;gap:12px;align-items:center">
@@ -2895,8 +3190,12 @@ async function loadSuiteDeviceStatus() {
                 <span>${escapeHtml(d.model || '')} &middot; Android ${escapeHtml(d.androidVersion || '?')}</span>
             </div>
         `).join("");
+        setQaRefreshSectionState("devices", "success", `${data.devices.length} Gerät(e) erkannt`);
+        return { ok: true, message: `${data.devices.length} Gerät(e) erkannt.` };
     } catch (err) {
         el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        setQaRefreshSectionState("devices", "error", err.message || "Fehler beim Laden");
+        return { ok: false, message: err.message || "Fehler beim Laden" };
     }
 }
 
@@ -2914,21 +3213,51 @@ function getSuiteCatalogItemReason(item) {
     return String(item?.prereqReason || item?.missing_prereqs || "");
 }
 
+function syncSuiteGroupFilterOptions(suites) {
+    const filterEl = document.getElementById("suite-group-filter");
+    if (!filterEl) return;
+
+    const currentValue = filterEl.value || "all";
+    const groups = [...new Set((Array.isArray(suites) ? suites : []).map(item => String(item?.group || "")).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right, "de"));
+    const labels = {
+        android: "Android",
+        backend: "Backend",
+        device: "Device/USB",
+        ios: "iOS / extern",
+        python: "Python",
+        release: "Release",
+    };
+
+    filterEl.innerHTML = [
+        `<option value="all">Alle Gruppen</option>`,
+        ...groups.map(group => `<option value="${escapeHtml(group)}">${escapeHtml(labels[group] || group)}</option>`),
+    ].join("");
+
+    filterEl.value = groups.includes(currentValue) || currentValue === "all" ? currentValue : "all";
+}
+
 async function loadSuiteCatalog() {
     const el = document.getElementById("suite-catalog");
-    if (!el) return;
+    if (!el) return { ok: false, message: "Suite-Katalog-Container fehlt." };
     if (!isPythonOperator) {
         el.innerHTML = "<div class='info'>Suite-Katalog ist nur im Python-Operator verfuegbar.</div>";
-        return;
+        setQaRefreshSectionState("suites", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
     el.innerHTML = "<div class='loading'>Lade Katalog...</div>";
+    setQaRefreshSectionState("suites", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites");
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
         renderSuiteCatalog(data.suites || []);
+        setQaRefreshSectionState("suites", "success", `${(data.suites || []).length} Suite(s) geladen`);
+        return { ok: true, message: `${(data.suites || []).length} Suite(s) geladen.` };
     } catch (err) {
         el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        setQaRefreshSectionState("suites", "error", err.message || "Fehler beim Laden");
+        return { ok: false, message: err.message || "Fehler beim Laden" };
     }
 }
 
@@ -2937,6 +3266,7 @@ function renderSuiteCatalog(suites) {
     if (!el) return;
     suiteCatalogPayload = Array.isArray(suites) ? suites : [];
     renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
+    syncSuiteGroupFilterOptions(suiteCatalogPayload);
     const groupFilter = document.getElementById("suite-group-filter")?.value || "all";
     const readyOnly = document.getElementById("suite-ready-only")?.checked || false;
 
@@ -2956,7 +3286,7 @@ function renderSuiteCatalog(suites) {
         groupMap[g].push(s);
     }
 
-    const groupLabels = { backend: "Backend", android: "Android", device: "Device/USB", release: "Release", sonstige: "Sonstige" };
+    const groupLabels = { backend: "Backend", android: "Android", device: "Device/USB", ios: "iOS / extern", python: "Python", release: "Release", sonstige: "Sonstige" };
 
     el.innerHTML = `<div class="suite-catalog-groups">${Object.entries(groupMap).map(([group, items]) => `
         <section class="suite-catalog-group">
@@ -2970,6 +3300,7 @@ function renderSuiteCatalog(suites) {
                 const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
                 const scopeNote = String(s.scopeNote || "");
                 const isReady = getSuiteCatalogItemReady(s);
+                const isExternalEvidenceSuite = String(s.executionMode || "") === "external-evidence";
                 const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
                 const executionStatus = getSuiteCatalogExecutionStatus(s);
                 const executionField = renderTriStateStatusField(executionStatus.state, "suite-status-field", "suite-status-cell");
@@ -2977,6 +3308,16 @@ function renderSuiteCatalog(suites) {
                 const latestRunMeta = latestRun
                     ? `Run ${escapeHtml(String(latestRun.runId || latestRun.run_id || "-"))} · ${escapeHtml(String(latestRun.startedAt || latestRun.started_at || latestRun.timestamp || ""))}`
                     : "Noch kein Lauf vorhanden";
+                const actionHtml = isExternalEvidenceSuite
+                    ? `
+                        <div class="suite-catalog-action is-external">
+                            <div>
+                                <button onclick="openPythonAutomationProtocol('${encodeURIComponent(String(s.evidenceTargetId || suiteId))}')" class="btn btn-secondary btn-sm">Extern protokollieren</button>
+                                <div class="suite-catalog-action-note">Externer macOS/Xcode-Lauf. Ergebnis anschließend als Evidenz im QA-Formular festhalten.</div>
+                            </div>
+                        </div>
+                    `
+                    : `<div class="suite-catalog-cell suite-catalog-action"><button onclick="startSuiteRun('${encodeURIComponent(suiteId)}')" class="btn btn-secondary btn-sm" ${isReady ? '' : 'disabled'}>Starten</button></div>`;
 
                 return `
                     <article class="suite-catalog-item">
@@ -3002,9 +3343,7 @@ function renderSuiteCatalog(suites) {
                                 <span class="suite-catalog-status-caption">${escapeHtml(executionStatus.detail)} · ${latestRunMeta}</span>
                             </div>
                         </div>
-                        <div class="suite-catalog-cell suite-catalog-action">
-                            <button onclick="startSuiteRun('${encodeURIComponent(suiteId)}')" class="btn btn-secondary btn-sm" ${isReady ? '' : 'disabled'}>Starten</button>
-                        </div>
+                        ${actionHtml}
                     </article>`;
             }).join("")}</div>
         </section>
@@ -3156,12 +3495,14 @@ function pollSuiteRunStatus(runId) {
 
 async function loadSuiteRunHistory() {
     const el = document.getElementById("suite-active-runs");
-    if (!el) return;
+    if (!el) return { ok: false, message: "Suite-Historien-Container fehlt." };
     if (!isPythonOperator) {
         el.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfuegbar.</div>";
-        return;
+        setQaRefreshSectionState("suiteHistory", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
     el.innerHTML = "<div class='loading'>Lade Historie...</div>";
+    setQaRefreshSectionState("suiteHistory", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites/history");
         const data = await res.json().catch(() => ({}));
@@ -3171,7 +3512,8 @@ async function loadSuiteRunHistory() {
         rerenderSuiteCatalogFromCache();
         if (runs.length === 0) {
             el.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
-            return;
+            setQaRefreshSectionState("suiteHistory", "success", "Keine Testläufe vorhanden");
+            return { ok: true, message: "Keine Testläufe vorhanden." };
         }
         el.innerHTML = runs.slice(0, 50).map(r => `
             <div class="data-row" style="display:flex;gap:8px;align-items:center">
@@ -3182,8 +3524,12 @@ async function loadSuiteRunHistory() {
             </div>
         `).join("");
         loadTestingRegister();
+        setQaRefreshSectionState("suiteHistory", "success", `${runs.length} Suite-Läufe geladen`);
+        return { ok: true, message: `${runs.length} Suite-Läufe geladen.` };
     } catch (err) {
         el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        setQaRefreshSectionState("suiteHistory", "error", err.message || "Fehler beim Laden");
+        return { ok: false, message: err.message || "Fehler beim Laden" };
     }
 }
 
@@ -3442,6 +3788,22 @@ function buildCommandCatalog(projectId) {
             command: "bash ./scripts/update-firebase-config.sh",
             cwd: values.workspacePath,
             fileName: "minimaster-config-sync",
+        },
+        {
+            id: "qa-readiness-full",
+            label: "QA: Vollständige Readiness-Prüfung",
+            description: "Führt Build, Lint, CI-Tests und strukturelle Rules-Checks als kompletten QA-Gate-Lauf aus.",
+            command: "npm run validate:readiness",
+            cwd: values.workspacePath,
+            fileName: "minimaster-qa-readiness-full",
+        },
+        {
+            id: "qa-release-rerun",
+            label: "QA: Nur fehlgeschlagene Release-Gates erneut ausführen",
+            description: "Beschleunigter Recovery-Pfad nach Fixes: startet nur die zuletzt fehlgeschlagenen Release-Gates neu.",
+            command: "npm run ci:revalidate:rerun",
+            cwd: values.workspacePath,
+            fileName: "minimaster-qa-release-rerun",
         },
         {
             id: "setup-admin",
@@ -6241,6 +6603,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     setupBootstrapConfigLiveSync();
     renderCommandBuilderConfig(loadCommandBuilderConfig());
     renderCommandCatalog(firebaseConfig.projectId);
+    renderQaRefreshStatus();
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
     renderPlayStoreReadiness();
@@ -6330,10 +6693,7 @@ document.addEventListener("DOMContentLoaded", async function() {
             badge.style.display = "block";
             if (isPythonOperator) {
                 badge.innerHTML = '<span class="operator-badge">🐍 Python-Operator-Modus</span> CLI- und PowerShell-Befehle können direkt aus diesem Dashboard ausgeführt werden.';
-                loadPythonAutomationCatalog();
-                loadPythonAutomationHistory();
-                loadPythonAutomationEvidenceHistory();
-                loadTestingRegister();
+                loadQaDashboardData("Initialisierung");
             }
         }
     }
@@ -7790,8 +8150,12 @@ function switchTab(tabName, evt) {
         evt.target.classList.add("active");
     }
 
-    if (tabName === "qa" && isPythonOperator) {
-        loadTestingRegister();
+    if (tabName === "qa") {
+        if (isPythonOperator) {
+            loadQaDashboardData("Tabwechsel QA");
+        } else {
+            renderQaRefreshStatus();
+        }
     }
 }
 
