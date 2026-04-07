@@ -73,9 +73,49 @@ COMMISSIONING_COMMANDS = (
         "id": "ci-revalidate",
         "label": "CI Revalidate Release Gates",
         "command": "npm run ci:revalidate",
+        "rerunCommand": "npm run ci:revalidate:rerun",
         "cwd": REPO_ROOT,
     },
 )
+
+EXTERNAL_QA_SUITES = (
+    {
+        "suiteId": "ios-xctest-parent",
+        "title": "iOS XCTest ParentApp extern",
+        "group": "ios",
+        "scope": "ios",
+        "scopeNote": "Externer Startweg auf macOS/Xcode. Das Ergebnis wird nach dem Lauf als Evidenz im QA-Register protokolliert.",
+        "command": "xcodebuild test -scheme MiniMasterParentTests -destination 'platform=iOS Simulator,name=iPhone 15'",
+        "prereqs": ["macOS", "Xcode"],
+        "prereqsMet": False,
+        "prereqReason": "Dieser Lauf muss auf einem macOS-/Xcode-Host extern ausgeführt und anschließend als Evidenz erfasst werden.",
+        "timeoutSec": 0,
+        "executionMode": "external-evidence",
+        "evidenceTargetId": "ios-xctest-parent",
+        "automationType": "documented",
+        "source": "ios-external",
+        "documentation": "iOS_BUILD_REFERENCE.md",
+    },
+    {
+        "suiteId": "ios-xctest-child",
+        "title": "iOS XCTest ChildApp extern",
+        "group": "ios",
+        "scope": "ios",
+        "scopeNote": "Externer Startweg auf macOS/Xcode. Das Ergebnis wird nach dem Lauf als Evidenz im QA-Register protokolliert.",
+        "command": "xcodebuild test -scheme MiniMasterChildTests -destination 'platform=iOS Simulator,name=iPhone 15'",
+        "prereqs": ["macOS", "Xcode"],
+        "prereqsMet": False,
+        "prereqReason": "Dieser Lauf muss auf einem macOS-/Xcode-Host extern ausgeführt und anschließend als Evidenz erfasst werden.",
+        "timeoutSec": 0,
+        "executionMode": "external-evidence",
+        "evidenceTargetId": "ios-xctest-child",
+        "automationType": "documented",
+        "source": "ios-external",
+        "documentation": "iOS_BUILD_REFERENCE.md",
+    },
+)
+
+EXTERNAL_QA_SUITE_IDS = {str(entry["suiteId"]) for entry in EXTERNAL_QA_SUITES}
 
 
 def make_documented_test(
@@ -1881,13 +1921,55 @@ def format_evidence_details(entry: dict[str, object]) -> str:
     return " ".join(detail_parts).strip()
 
 
+def register_state_from_evidence(entry: dict[str, object], *, storage: Path | str) -> dict[str, object]:
+    return {
+        "status": str(entry.get("status") or "not_run"),
+        "details": str(entry.get("details") or format_evidence_details(entry)),
+        "updatedAt": str(entry.get("createdAt") or ""),
+        "storage": str(storage),
+        "origin": "commissioning-evidence",
+    }
+
+
+def find_evidence_target(test_id: str) -> dict[str, object] | None:
+    match = find_commissioning_test(test_id)
+    if match:
+        group, test = match
+        return {
+            "testId": test_id,
+            "title": str(test.get("title") or test_id),
+            "groupId": str(group.get("id") or ""),
+            "groupTitle": str(group.get("title") or ""),
+            "automationType": str(test.get("automationType") or "automatic"),
+            "source": str(test.get("source") or ""),
+            "documentation": str(test.get("documentation") or ""),
+        }
+
+    register = build_testing_register()
+    for item in cast(list[dict[str, object]], register.get("items") or []):
+        if str(item.get("id") or "") != test_id:
+            continue
+        if str(item.get("action") or "") != "protocol":
+            continue
+        return {
+            "testId": test_id,
+            "title": str(item.get("title") or test_id),
+            "groupId": str(item.get("groupId") or ""),
+            "groupTitle": str(item.get("groupTitle") or ""),
+            "automationType": str(item.get("automationType") or "manual"),
+            "source": str(item.get("source") or ""),
+            "documentation": str(item.get("documentation") or ""),
+        }
+
+    return None
+
+
 def build_commissioning_evidence_entry(payload: dict[str, object]) -> dict[str, object]:
     test_id = normalize_text_field(payload.get("testId"), field_name="testId", max_length=120, required=True)
-    match = find_commissioning_test(test_id)
-    if not match:
+    target = find_evidence_target(test_id)
+    if not target:
         raise ValueError("Unbekannter Testfall.")
 
-    group, test = match
     status = normalize_text_field(payload.get("status"), field_name="status", max_length=40, required=True)
     if status not in ALLOWED_EVIDENCE_STATUSES:
         raise ValueError("status muss pass, fail oder manual_required sein.")
@@ -1902,16 +1984,16 @@ def build_commissioning_evidence_entry(payload: dict[str, object]) -> dict[str, 
         "entryId": f"evidence-{uuid4().hex[:12]}",
         "createdAt": created_at,
         "testId": test_id,
-        "testTitle": str(test.get("title") or test_id),
-        "groupId": str(group.get("id") or ""),
-        "groupTitle": str(group.get("title") or ""),
-        "automationType": str(test.get("automationType") or "automatic"),
-        "source": str(test.get("source") or ""),
+        "testTitle": str(target.get("title") or test_id),
+        "groupId": str(target.get("groupId") or ""),
+        "groupTitle": str(target.get("groupTitle") or ""),
+        "automationType": str(target.get("automationType") or "automatic"),
+        "source": str(target.get("source") or ""),
         "status": status,
         "operator": operator,
         "notes": notes,
         "evidenceRef": evidence_ref,
-        "documentation": str(test.get("documentation") or ""),
+        "documentation": str(target.get("documentation") or ""),
         "documentationChecked": documentation_checked,
         "details": format_evidence_details(
             {
@@ -2146,14 +2228,33 @@ def build_docs_validation_checks() -> list[dict[str, object]]:
     ]
 
 
-def run_commissioning_commands(run_commands: bool, timeout_sec: int) -> list[dict[str, object]]:
+def run_commissioning_commands(run_commands: bool, timeout_sec: int, *, rerun_latest_failed: bool = False) -> list[dict[str, object]]:
     if not run_commands:
         return []
 
     results: list[dict[str, object]] = []
+    rerun_command_ids: set[str] = set()
+    if rerun_latest_failed:
+        latest_history = load_commissioning_history(1)
+        latest_run = latest_history[0] if latest_history else {}
+        latest_commands = cast(list[dict[str, object]], as_dict(as_dict(latest_run).get("commands")).get("results") or [])
+        rerun_command_ids = {
+            str(item.get("id") or "")
+            for item in latest_commands
+            if str(item.get("status") or "") != "pass"
+        }
+
     for command_def in COMMISSIONING_COMMANDS:
+        command_id = str(command_def["id"])
+        if rerun_latest_failed and command_id not in rerun_command_ids:
+            continue
+
+        command_text = str(command_def.get("command") or "")
+        if rerun_latest_failed and command_id == "ci-revalidate" and command_def.get("rerunCommand"):
+            command_text = str(command_def["rerunCommand"])
+
         command_request = CommandRequest(
-            command=str(command_def["command"]),
+            command=command_text,
             cwd=sanitize_cwd(str(command_def["cwd"])),
         )
         started = time.time()
@@ -2164,8 +2265,8 @@ def run_commissioning_commands(run_commands: bool, timeout_sec: int) -> list[dic
         results.append(
             {
                 "id": command_def["id"],
-                "label": command_def["label"],
-                "command": command_def["command"],
+                "label": f"{command_def['label']} (Rerun)" if rerun_latest_failed else command_def["label"],
+                "command": command_text,
                 "cwd": str(command_request.cwd),
                 "code": exit_code,
                 "status": "pass" if exit_code == 0 else "fail",
@@ -2289,7 +2390,7 @@ def evaluate_evidence_coverage(
 
 
 def run_commissioning_suite(
-    context: dict[str, object], *, run_commands: bool, timeout_sec: int
+    context: dict[str, object], *, run_commands: bool, timeout_sec: int, rerun_latest_failed: bool = False
 ) -> dict[str, object]:
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     run_id = f"run-{uuid4().hex[:12]}"
@@ -2299,7 +2400,7 @@ def run_commissioning_suite(
     evaluation_checks.extend(collect_static_analysis_checks())
     evaluation_checks.extend(build_docs_validation_checks())
     evaluation = summarize_commissioning_checks(evaluation_checks)
-    command_results = run_commissioning_commands(run_commands, timeout_sec)
+    command_results = run_commissioning_commands(run_commands, timeout_sec, rerun_latest_failed=rerun_latest_failed)
     evidence_index = load_latest_commissioning_evidence()
     evidence_coverage = evaluate_evidence_coverage(evidence_index)
 
@@ -2357,6 +2458,7 @@ def run_commissioning_suite(
         "evidenceCoverage": evidence_coverage,
         "commands": {
             "executed": run_commands,
+            "rerunLatestFailed": rerun_latest_failed,
             "timeoutSec": timeout_sec,
             "results": command_results,
             "statusCounts": command_counts,
@@ -2472,6 +2574,10 @@ def repo_test_suite_ref(relative_path: str) -> str | None:
         return "android-usb-master"
     if relative_path.startswith("childApp/src/androidTest/java/"):
         return "android-usb-child"
+    if relative_path.startswith("iosMasterApp/Tests/"):
+        return "ios-xctest-parent"
+    if relative_path.startswith("iosChildApp/Tests/"):
+        return "ios-xctest-child"
     if relative_path == "scripts/tests/test_app_suites.py":
         return "python-tests-app-suites"
     if relative_path == "scripts/tests/test_adb_client.py":
@@ -2538,7 +2644,7 @@ def repo_test_description(relative_path: str) -> str:
     if "/src/test/" in relative_path:
         return "Automatischer Android-Unit-Test aus der Codebasis."
     if relative_path.startswith("iosMasterApp/Tests/") or relative_path.startswith("iosChildApp/Tests/"):
-        return "Automatischer iOS-XCTest aus der Codebasis; aktuell ohne direkte Suite-Anbindung im Python-QA-Backend."
+        return "Automatischer iOS-XCTest aus der Codebasis; extern auf macOS/Xcode ausführen und anschließend als Evidenz im QA-Register protokollieren."
     return "Automatischer Repo-Test aus der Codebasis."
 
 
@@ -2586,6 +2692,7 @@ def suite_state_for_register_test(
 def build_repo_test_inventory_entries(
     suite_catalog_index: dict[str, dict[str, object]],
     latest_suite_results: dict[str, dict[str, object]],
+    evidence_index: dict[str, dict[str, object]],
 ) -> list[dict[str, object]]:
     items: list[dict[str, object]] = []
     for path in iter_repo_test_inventory_paths():
@@ -2595,36 +2702,51 @@ def build_repo_test_inventory_entries(
         unsupported = not suite_ref
         group_title = "Repo-Tests: Unsupported / Not Yet Mapped" if unsupported else repo_test_group_title(relative_path)
         group_id = "repo-tests-unsupported" if unsupported else group_title.lower().replace(" ", "-").replace(":", "")
+        item_id = normalize_repo_test_id(relative_path)
+        evidence_entry = evidence_index.get(item_id)
+        automation_type = "documented" if suite_ref in EXTERNAL_QA_SUITE_IDS else "automatic"
+        action = "protocol" if automation_type == "documented" else ("suite-run" if suite_ref else "commissioning-run")
+        updated_at = str(latest_suite_results.get(suite_ref or "", {}).get("timestamp") or latest_suite_results.get(suite_ref or "", {}).get("finishedAt") or "")
+
+        if evidence_entry is not None:
+            register_state = register_state_from_evidence(evidence_entry, storage=COMMISSIONING_EVIDENCE_LOG_FILE)
+            updated_at = str(register_state.get("updatedAt") or "")
+
         items.append(
             {
-                "id": normalize_repo_test_id(relative_path),
+                "id": item_id,
                 "entryKind": "repo-test",
                 "title": relative_path,
                 "groupId": group_id,
                 "groupTitle": group_title,
-                "automationType": "automatic",
+                "automationType": automation_type,
                 "source": "repo-inventory",
                 "status": str(register_state.get("status") or "not_run"),
                 "details": str(register_state.get("details") or ""),
-                "updatedAt": str(latest_suite_results.get(suite_ref or "", {}).get("timestamp") or latest_suite_results.get(suite_ref or "", {}).get("finishedAt") or ""),
-                "storage": str(SUITE_RUN_LOG_FILE if suite_ref else REPO_ROOT / relative_path),
+                "updatedAt": updated_at,
+                "storage": str(register_state.get("storage") or (SUITE_RUN_LOG_FILE if suite_ref else REPO_ROOT / relative_path)),
                 "origin": "suite-run" if suite_ref else "repo-inventory",
                 "documentation": relative_path,
-                "successCriteria": f"Die zugeordnete Suite {suite_ref} laeuft fehlerfrei durch." if suite_ref else "Der Test ist im QA-Register inventarisiert und muss separat ausgeführt werden.",
+                "successCriteria": (
+                    "Externen XCTest-Lauf auf macOS/Xcode ausführen und das Ergebnis hier mit belastbarer Evidenz protokollieren."
+                    if suite_ref in EXTERNAL_QA_SUITE_IDS else
+                    f"Die zugeordnete Suite {suite_ref} laeuft fehlerfrei durch." if suite_ref else
+                    "Der Test ist im QA-Register inventarisiert und muss separat ausgeführt werden."
+                ),
                 "description": repo_test_description(relative_path),
-                "action": "suite-run" if suite_ref else "commissioning-run",
+                "action": action,
                 "suiteRef": suite_ref or "",
                 "command": str(suite_meta.get("command") or ""),
                 "prereqsMet": suite_meta.get("prereqsMet") if suite_ref else None,
                 "prereqReason": str(suite_meta.get("prereqReason") or "") if suite_ref else "",
                 **infer_register_metadata(
                     entry_kind="repo-test",
-                    automation_type="automatic",
+                    automation_type=automation_type,
                     group_id=group_id,
                     group_title=group_title,
                     source="repo-inventory",
                     suite_ref=suite_ref or "",
-                    updated_at=str(latest_suite_results.get(suite_ref or "", {}).get("timestamp") or latest_suite_results.get(suite_ref or "", {}).get("finishedAt") or ""),
+                    updated_at=updated_at,
                     status=str(register_state.get("status") or "not_run"),
                     documentation=relative_path,
                     command=str(suite_meta.get("command") or ""),
@@ -2689,13 +2811,7 @@ def build_testing_register() -> dict[str, object]:
             suite_meta: dict[str, object] = {}
 
             if register_state is None and evidence_entry is not None:
-                register_state = {
-                    "status": str(evidence_entry.get("status") or "not_run"),
-                    "details": str(evidence_entry.get("details") or ""),
-                    "updatedAt": str(evidence_entry.get("createdAt") or ""),
-                    "storage": str(COMMISSIONING_EVIDENCE_LOG_FILE),
-                    "origin": "commissioning-evidence",
-                }
+                register_state = register_state_from_evidence(evidence_entry, storage=COMMISSIONING_EVIDENCE_LOG_FILE)
 
             if register_state is None and source == "static-analysis":
                 register_state = static_analysis_index.get(test_id)
@@ -2781,7 +2897,21 @@ def build_testing_register() -> dict[str, object]:
     for suite in cast(list[dict[str, object]], suite_catalog.get("suites") or []):
         suite_id = str(suite.get("suiteId") or "")
         latest_suite = latest_suite_results.get(suite_id, {})
-        register_state = suite_result_to_register_state(latest_suite)
+        suite_automation_type = str(suite.get("automationType") or "automatic")
+        suite_action = "protocol" if str(suite.get("executionMode") or "") == "external-evidence" else "suite-run"
+        evidence_entry = evidence_index.get(suite_id)
+        if evidence_entry is not None and suite_action == "protocol":
+            register_state = register_state_from_evidence(evidence_entry, storage=COMMISSIONING_EVIDENCE_LOG_FILE)
+        else:
+            register_state = suite_result_to_register_state(latest_suite)
+            if suite_action == "protocol" and not latest_suite:
+                register_state = {
+                    "status": "not_run",
+                    "details": str(suite.get("prereqReason") or "Externer Lauf noch nicht protokolliert."),
+                    "updatedAt": "",
+                    "storage": str(COMMISSIONING_EVIDENCE_LOG_FILE),
+                    "origin": "commissioning-evidence",
+                }
         items.append(
             {
                 "id": suite_id,
@@ -2789,33 +2919,38 @@ def build_testing_register() -> dict[str, object]:
                 "title": str(suite.get("title") or suite_id),
                 "groupId": str(suite.get("group") or ""),
                 "groupTitle": f"Testsuite: {str(suite.get('group') or 'sonstige')}",
-                "automationType": "automatic",
-                "source": "suite",
+                "automationType": suite_automation_type,
+                "source": str(suite.get("source") or "suite"),
                 "status": str(register_state.get("status") or "not_run"),
                 "details": str(register_state.get("details") or suite.get("prereqReason") or ""),
-                "updatedAt": str(latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
-                "storage": str(SUITE_RUN_LOG_FILE),
-                "origin": "suite-run",
+                "updatedAt": str(register_state.get("updatedAt") or latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
+                "storage": str(register_state.get("storage") or SUITE_RUN_LOG_FILE),
+                "origin": str(register_state.get("origin") or "suite-run"),
                 "command": str(suite.get("command") or ""),
                 "prereqsMet": bool(suite.get("prereqsMet")),
                 "prereqReason": str(suite.get("prereqReason") or ""),
-                "action": "suite-run",
+                "action": suite_action,
+                "documentation": str(suite.get("documentation") or ""),
+                "successCriteria": "Externe Suite ausführen und als belastbare Evidenz protokollieren." if suite_action == "protocol" else "Testsuite erfolgreich abschließen.",
+                "executionMode": str(suite.get("executionMode") or ""),
+                "evidenceTargetId": str(suite.get("evidenceTargetId") or suite_id),
                 **infer_register_metadata(
                     entry_kind="suite",
-                    automation_type="automatic",
+                    automation_type=suite_automation_type,
                     group_id=str(suite.get("group") or ""),
                     group_title=f"Testsuite: {str(suite.get('group') or 'sonstige')}",
-                    source="suite",
+                    source=str(suite.get("source") or "suite"),
                     suite_ref=suite_id,
-                    updated_at=str(latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
+                    updated_at=str(register_state.get("updatedAt") or latest_suite.get("timestamp") or latest_suite.get("finishedAt") or ""),
                     status=str(register_state.get("status") or "not_run"),
+                    documentation=str(suite.get("documentation") or ""),
                     command=str(suite.get("command") or ""),
                     prereq_reason=str(suite.get("prereqReason") or ""),
                 ),
             }
         )
 
-    items.extend(build_repo_test_inventory_entries(suite_catalog_index, latest_suite_results))
+    items.extend(build_repo_test_inventory_entries(suite_catalog_index, latest_suite_results, evidence_index))
 
     summary = {
         "total": len(items),
@@ -2986,6 +3121,8 @@ def get_suite_catalog() -> dict[str, object]:
             "prereqReason": reason,
             "timeoutSec": suite.timeout_sec,
         })
+
+    suites_list.extend(dict(entry) for entry in EXTERNAL_QA_SUITES)
 
     groups: dict[str, list[dict[str, object]]] = {}
     for s in suites_list:
@@ -3304,6 +3441,7 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             options = as_dict(payload.get("options"))
 
             run_commands = bool_from_payload(options.get("runCommands"), default=True)
+            rerun_latest_failed = bool_from_payload(options.get("rerunLatestFailed"), default=False)
             timeout_sec = parse_int(
                 options.get("timeoutSec"),
                 default=DEFAULT_COMMAND_TIMEOUT_SEC,
@@ -3315,6 +3453,7 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 context,
                 run_commands=run_commands,
                 timeout_sec=timeout_sec,
+                rerun_latest_failed=rerun_latest_failed,
             )
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
