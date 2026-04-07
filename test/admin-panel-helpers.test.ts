@@ -85,6 +85,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     console,
     setTimeout,
     clearTimeout,
+    fetch: jest.fn(),
     Blob: function Blob(parts: any[], options: any) { return { parts, options }; },
     URL: {
       createObjectURL: jest.fn(() => "blob:test"),
@@ -157,6 +158,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  renderPythonAutomationProtocolEditor,",
     "  renderQaRuntimeModeBanner,",
     "  applyQaRuntimeInteractionState,",
+    "  renderQaArtifactsOverview,",
     "  buildPythonAutomationRunIndex,",
     "  buildPythonAutomationRunClipboardPayload,",
     "  buildFirebaseRecoveryCommands,",
@@ -208,10 +210,15 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  getUsbFormVisibilityState,",
     "  buildUsbTestRunRequestPayload,",
     "  updateUsbTestTypeFormState,",
+    "  loadSuiteRunHistory,",
     "  setPythonOperatorRuntimeForTests: (value) => { isPythonOperator = Boolean(value); },",
     "  setPythonCommissioningCatalogForTests: (value) => { pythonCommissioningCatalog = value; },",
     "  setTestingRegisterPayloadForTests: (value) => { testingRegisterPayload = value; },",
     "  setPythonAutomationSelectedTestIdForTests: (value) => { pythonCommissioningSelectedTestId = value; },",
+    "  setSuiteRunHistoryPayloadForTests: (value) => { suiteRunHistoryPayload = Array.isArray(value) ? value : []; },",
+    "  setPythonCommissioningEvidenceHistoryForTests: (value) => { pythonCommissioningEvidenceHistory = Array.isArray(value) ? value : []; },",
+    "  setQaPlatformCatalogPayloadForTests: (value) => { qaPlatformCatalogPayload = value; },",
+    "  setQaArtifactFiltersForTests: ({ scenarioFilter = '', selectedRunId = '' } = {}) => { qaArtifactScenarioFilter = scenarioFilter; qaArtifactSelectedRunId = selectedRunId; },",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
     "};",
@@ -224,6 +231,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     storage,
     elements,
     context,
+    fetchMock: context.fetch,
   };
 }
 
@@ -277,6 +285,30 @@ describe("admin-panel helper functions", () => {
     expect(qaSection.classList.toggle).toHaveBeenCalledWith("qa-runtime-section-disabled", false);
     expect(actionButton.disabled).toBe(false);
     expect(actionButton.removeAttribute).toHaveBeenCalledWith("aria-disabled");
+  });
+
+  it("renders the QA runtime banner for read-only and operator mode", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const banner = { innerHTML: "" };
+    const qaSection = {
+      classList: { toggle: jest.fn() },
+      querySelectorAll: jest.fn(() => []),
+    };
+    elements.set("qa-runtime-mode-banner", banner);
+    elements.set("qa-refresh-card", qaSection);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    exports.renderQaRuntimeModeBanner();
+
+    expect(banner.innerHTML).toContain("Read-only QA-Ansicht");
+    expect(qaSection.classList.toggle).toHaveBeenCalledWith("qa-runtime-section-disabled", true);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.renderQaRuntimeModeBanner();
+
+    expect(banner.innerHTML).toContain("Python-Operator aktiv");
+    expect(qaSection.classList.toggle).toHaveBeenCalledWith("qa-runtime-section-disabled", false);
   });
 
   it("derives USB form visibility from test type", () => {
@@ -468,6 +500,93 @@ describe("admin-panel helper functions", () => {
     expect(parallelRow.style.display).toBe("none");
     expect(suiteRow.style.display).toBe("");
     expect(skipActivationRow.style.display).toBe("");
+  });
+
+  it("renders QA artifacts overview with dual-device run, evidence and android mappings", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const overview = { innerHTML: "" };
+    elements.set("qa-artifact-overview", overview);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setQaArtifactFiltersForTests({ scenarioFilter: "offline-online-resync", selectedRunId: "run-42" });
+    exports.setSuiteRunHistoryPayloadForTests([
+      {
+        runId: "run-42",
+        type: "dual-device",
+        status: "finished",
+        scenarioId: "offline-online-resync",
+        profileId: "dual-device-balanced",
+        timeline: [
+          { phase: "disconnect", message: "Netz getrennt", timestamp: "2026-04-07T10:00:00Z" },
+        ],
+        result: {
+          scenarioId: "offline-online-resync",
+          profileId: "dual-device-balanced",
+          faultModes: ["disconnect"],
+          overallStatus: "passed",
+        },
+      },
+    ]);
+    exports.setPythonCommissioningEvidenceHistoryForTests([
+      {
+        testId: "ios-xctest-parent",
+        testTitle: "iOS XCTest Parent",
+        status: "pass",
+        operator: "qa-operator",
+        evidenceRef: "EVID-123",
+      },
+    ]);
+    exports.setQaPlatformCatalogPayloadForTests({
+      dualDeviceScenarios: [
+        { scenarioId: "offline-online-resync", title: "Offline/Online Resync" },
+      ],
+      androidScenarioMappings: [
+        { scenarioId: "offline-online-resync", role: "child", testClass: "SyncSpec", testMethod: "resyncAfterReconnect" },
+      ],
+    });
+
+    exports.renderQaArtifactsOverview();
+
+    expect(overview.innerHTML).toContain("Letzter Dual-Device-Lauf");
+    expect(overview.innerHTML).toContain("offline-online-resync");
+    expect(overview.innerHTML).toContain("EVID-123");
+    expect(overview.innerHTML).toContain("SyncSpec");
+    expect(overview.innerHTML).toContain("qa-artifact-run-select");
+  });
+
+  it("shows read-only artifact overview when python runtime is unavailable", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const overview = { innerHTML: "" };
+    elements.set("qa-artifact-overview", overview);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    exports.renderQaArtifactsOverview();
+
+    expect(overview.innerHTML).toContain("nur im Python-Operator verfügbar");
+  });
+
+  it("loads empty suite history into the dedicated history container", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    const activeRunsEl = { innerHTML: "aktive Läufe bleiben unberührt" };
+    elements.set("suite-run-history", historyEl);
+    elements.set("suite-active-runs", activeRunsEl);
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ runs: [] }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    const result = await exports.loadSuiteRunHistory();
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/suites/history");
+    expect(result).toMatchObject({ ok: true });
+    expect(historyEl.innerHTML).toContain("Keine Testlaeufe in der Historie");
+    expect(activeRunsEl.innerHTML).toBe("aktive Läufe bleiben unberührt");
   });
 
   it("builds PowerShell deploy scripts with project scoping", () => {
