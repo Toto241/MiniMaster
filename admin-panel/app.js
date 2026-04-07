@@ -1001,6 +1001,78 @@ function formatPythonAutomationEvidenceDetails(entry) {
     return parts.join(" · ");
 }
 
+function getPythonEvidenceRequirements(selected, status = "pass") {
+    const automationType = String(selected?.automationType || "manual");
+    const normalizedStatus = String(status || "pass");
+    const requiresEvidenceRef = automationType === "manual" || automationType === "documented";
+    const requiresDocumentationCheck = automationType === "documented";
+    const requiresNotes = normalizedStatus === "fail" || normalizedStatus === "manual_required";
+
+    const lines = [];
+    lines.push("Operator ist immer erforderlich.");
+    if (requiresEvidenceRef) lines.push("Evidenzreferenz ist Pflicht.");
+    if (requiresDocumentationCheck) lines.push("Dokumentationsabgleich muss bestätigt werden.");
+    if (requiresNotes) lines.push("Für FAIL oder Nacharbeit sind Notizen Pflicht.");
+
+    return {
+        automationType,
+        requiresEvidenceRef,
+        requiresDocumentationCheck,
+        requiresNotes,
+        lines,
+    };
+}
+
+function buildPythonEvidenceValidationErrors({ selected, status, operator, evidenceRef, notes, documentationChecked }) {
+    const requirements = getPythonEvidenceRequirements(selected, status);
+    const errors = [];
+
+    if (!String(operator || "").trim()) {
+        errors.push("Bitte den Operator für den Nachweis angeben.");
+    }
+    if (requirements.requiresEvidenceRef && !String(evidenceRef || "").trim()) {
+        errors.push("Bitte eine belastbare Evidenzreferenz angeben.");
+    }
+    if (requirements.requiresDocumentationCheck && !documentationChecked) {
+        errors.push("Bitte den dokumentierten Ablauf und die Evidenzquelle als abgeglichen markieren.");
+    }
+    if (requirements.requiresNotes && !String(notes || "").trim()) {
+        errors.push("Bitte eine aussagekräftige Notiz für FAIL oder Nacharbeit hinterlegen.");
+    }
+
+    return errors;
+}
+
+function renderPythonAutomationProtocolRequirements() {
+    const requirementsEl = document.getElementById("python-automation-protocol-requirements");
+    if (!requirementsEl) return;
+
+    const selected = findPythonAutomationTestById(pythonCommissioningSelectedTestId);
+    if (!selected) {
+        requirementsEl.innerHTML = "Bitte zuerst einen manuellen oder dokumentierten Testfall auswählen.";
+        return;
+    }
+
+    const status = document.getElementById("python-automation-protocol-status")?.value || "pass";
+    const requirements = getPythonEvidenceRequirements(selected, status);
+    requirementsEl.innerHTML = `
+        <strong>Nachweisregeln</strong><br />
+        <span class='python-muted-caption'>${escapeHtml(requirements.lines.join(" · "))}</span>
+    `;
+}
+
+function renderQaRuntimeModeBanner() {
+    const banner = document.getElementById("qa-runtime-mode-banner");
+    if (!banner) return;
+
+    if (isPythonOperator) {
+        banner.innerHTML = "<div class='qa-runtime-banner is-operator'><strong>Python-Operator aktiv.</strong> QA-Register, Suite-Läufe, Emulator-Labor und Artefakte können vollständig geladen und ausgeführt werden.</div>";
+        return;
+    }
+
+    banner.innerHTML = "<div class='qa-runtime-banner is-readonly'><strong>Read-only QA-Ansicht.</strong> Ohne Python-Operator sind laufzeitabhängige QA-Bereiche nur eingeschränkt verfügbar. Sichtbar bleiben Dokumentation, Zusammenfassungen und bereits geladene Zustände.</div>";
+}
+
 function ensurePythonAutomationSelectedTest() {
     if (findPythonAutomationTestById(pythonCommissioningSelectedTestId)) {
         return;
@@ -1042,6 +1114,7 @@ function renderPythonAutomationProtocolEditor() {
         summaryEl.innerHTML = "<div class='info'>Noch kein Testfall fuer die Protokollierung ausgewaehlt.</div>";
         clearPythonAutomationProtocolForm();
         if (docRowEl) docRowEl.style.display = "none";
+        renderPythonAutomationProtocolRequirements();
         return;
     }
 
@@ -1078,6 +1151,7 @@ function renderPythonAutomationProtocolEditor() {
     if (notesEl && document.activeElement !== notesEl) notesEl.value = evidence?.notes || "";
     if (docCheckEl) docCheckEl.checked = Boolean(evidence?.documentationChecked);
     if (docRowEl) docRowEl.style.display = selected.automationType === "documented" ? "flex" : "none";
+    renderPythonAutomationProtocolRequirements();
 }
 
 function buildPythonAutomationRunIndex(run) {
@@ -3427,20 +3501,73 @@ function parseQaMultiValueInput(value) {
         .filter(Boolean);
 }
 
+function getUsbFormVisibilityState(testType) {
+    const isDual = testType === "dual-device";
+    return {
+        isDual,
+        showChildSerial: isDual,
+        showScenario: isDual,
+        showProfile: isDual,
+        showFaultModes: isDual,
+        showSuite: !isDual,
+        showSkipActivation: !isDual,
+        showParallel: isDual,
+    };
+}
+
+function buildUsbTestRunRequestPayload(input) {
+    const testType = String(input?.testType || "single-master");
+    const masterSerial = String(input?.masterSerial || "auto").trim() || "auto";
+    const childSerial = String(input?.childSerial || "").trim();
+
+    if (testType === "dual-device") {
+        if (!childSerial) {
+            return { error: "Bitte Child-Serial angeben fuer Dual-Device-Test." };
+        }
+        return {
+            endpoint: "/api/suites/dual-device",
+            payload: {
+                masterSerial: masterSerial || "auto",
+                childSerial,
+                installApk: Boolean(input?.installApk),
+                parallel: Boolean(input?.parallel),
+                scenarioId: String(input?.scenarioId || "").trim(),
+                profileId: String(input?.profileId || "").trim(),
+                faultModes: Array.isArray(input?.faultModes) ? input.faultModes : [],
+            },
+        };
+    }
+
+    return {
+        endpoint: "/api/suites/usb-test",
+        payload: {
+            appId: testType === "single-child" ? "child" : "master",
+            serial: masterSerial === "auto" ? "auto" : masterSerial,
+            suite: String(input?.suite || "commissioning").trim() || "commissioning",
+            installApk: Boolean(input?.installApk),
+            skipActivation: Boolean(input?.skipActivation),
+        },
+    };
+}
+
 function updateUsbTestTypeFormState() {
     const typeSelect = document.getElementById("suite-usb-test-type");
     const childRow = document.getElementById("suite-usb-child-serial-row");
-    const parallelCb = document.getElementById("suite-usb-parallel");
+    const parallelRow = document.getElementById("suite-usb-parallel-row");
     const scenarioRow = document.getElementById("suite-usb-dual-scenario-row");
     const profileRow = document.getElementById("suite-usb-dual-profile-row");
     const faultModesRow = document.getElementById("suite-usb-fault-modes-row");
-    const isDual = typeSelect?.value === "dual-device";
+    const suiteRow = document.getElementById("suite-usb-suite-row");
+    const skipActivationRow = document.getElementById("suite-usb-skip-activation-row");
+    const visibility = getUsbFormVisibilityState(typeSelect?.value || "single-master");
 
-    if (childRow) childRow.style.display = isDual ? "" : "none";
-    if (parallelCb?.closest("label")) parallelCb.closest("label").style.display = isDual ? "" : "none";
-    if (scenarioRow) scenarioRow.style.display = isDual ? "" : "none";
-    if (profileRow) profileRow.style.display = isDual ? "" : "none";
-    if (faultModesRow) faultModesRow.style.display = isDual ? "" : "none";
+    if (childRow) childRow.style.display = visibility.showChildSerial ? "" : "none";
+    if (parallelRow) parallelRow.style.display = visibility.showParallel ? "" : "none";
+    if (scenarioRow) scenarioRow.style.display = visibility.showScenario ? "" : "none";
+    if (profileRow) profileRow.style.display = visibility.showProfile ? "" : "none";
+    if (faultModesRow) faultModesRow.style.display = visibility.showFaultModes ? "" : "none";
+    if (suiteRow) suiteRow.style.display = visibility.showSuite ? "" : "none";
+    if (skipActivationRow) skipActivationRow.style.display = visibility.showSkipActivation ? "" : "none";
 }
 
 function syncDualDeviceCatalogOptions() {
@@ -3502,14 +3629,17 @@ function syncDualDeviceCatalogOptions() {
 }
 
 function syncEmulatorReservationOptions() {
-    const androidSelect = document.getElementById("qa-emulator-android-version");
-    const profileSelect = document.getElementById("qa-emulator-profile");
+    const reservationAndroidSelect = document.getElementById("qa-emulator-reservation-android-version");
+    const avdAndroidSelect = document.getElementById("qa-emulator-avd-android-version");
+    const reservationProfileSelect = document.getElementById("qa-emulator-reservation-profile");
+    const avdProfileSelect = document.getElementById("qa-emulator-avd-profile");
     const matrix = Array.isArray(qaPlatformCatalogPayload?.androidMatrix) ? qaPlatformCatalogPayload.androidMatrix : [];
     const profiles = Array.isArray(qaPlatformCatalogPayload?.deviceProfiles) ? qaPlatformCatalogPayload.deviceProfiles : [];
 
-    if (androidSelect) {
-        const currentValue = androidSelect.value || "";
-        androidSelect.innerHTML = [
+    const applyAndroidOptions = (selectEl) => {
+        if (!selectEl) return;
+        const currentValue = selectEl.value || "";
+        selectEl.innerHTML = [
             `<option value="">Android-Version wählen</option>`,
             ...matrix.map(item => {
                 const androidVersion = String(item?.androidVersion || "");
@@ -3518,13 +3648,14 @@ function syncEmulatorReservationOptions() {
             }),
         ].join("");
         if (currentValue && matrix.some(item => String(item?.androidVersion || "") === currentValue)) {
-            androidSelect.value = currentValue;
+            selectEl.value = currentValue;
         }
-    }
+    };
 
-    if (profileSelect) {
-        const currentValue = profileSelect.value || "";
-        profileSelect.innerHTML = [
+    const applyProfileOptions = (selectEl) => {
+        if (!selectEl) return;
+        const currentValue = selectEl.value || "";
+        selectEl.innerHTML = [
             `<option value="">Geräteprofil wählen</option>`,
             ...profiles.map(item => {
                 const profileId = String(item?.profileId || "");
@@ -3534,9 +3665,14 @@ function syncEmulatorReservationOptions() {
             }),
         ].join("");
         if (currentValue && profiles.some(item => String(item?.profileId || "") === currentValue)) {
-            profileSelect.value = currentValue;
+            selectEl.value = currentValue;
         }
-    }
+    };
+
+    applyAndroidOptions(reservationAndroidSelect);
+    applyAndroidOptions(avdAndroidSelect);
+    applyProfileOptions(reservationProfileSelect);
+    applyProfileOptions(avdProfileSelect);
 }
 
 async function startEmulatorAvd(avdName) {
@@ -3757,8 +3893,8 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
 async function createEmulatorReservation() {
     if (!isPythonOperator) return;
 
-    const androidVersion = (document.getElementById("qa-emulator-android-version")?.value || "").trim();
-    const profileId = (document.getElementById("qa-emulator-profile")?.value || "").trim();
+    const androidVersion = (document.getElementById("qa-emulator-reservation-android-version")?.value || "").trim();
+    const profileId = (document.getElementById("qa-emulator-reservation-profile")?.value || "").trim();
     const owner = (document.getElementById("qa-emulator-owner")?.value || "").trim();
     const purpose = (document.getElementById("qa-emulator-purpose")?.value || "").trim();
     const ttlMinutes = Number(document.getElementById("qa-emulator-ttl")?.value || 120);
@@ -3792,8 +3928,8 @@ async function createEmulatorReservation() {
 async function createEmulatorAvd() {
     if (!isPythonOperator) return;
 
-    const androidVersion = (document.getElementById("qa-emulator-android-version")?.value || "").trim();
-    const profileId = (document.getElementById("qa-emulator-profile")?.value || "").trim();
+    const androidVersion = (document.getElementById("qa-emulator-avd-android-version")?.value || "").trim();
+    const profileId = (document.getElementById("qa-emulator-avd-profile")?.value || "").trim();
     const avdName = (document.getElementById("qa-emulator-avd-name")?.value || "").trim();
 
     if (!androidVersion || !profileId || !avdName) {
@@ -4119,59 +4255,46 @@ async function startSuiteRun(suiteId) {
 
 async function startUsbTestRun() {
     if (!isPythonOperator) return;
-    const testType = document.getElementById("suite-usb-test-type")?.value || "single-master";
-    const masterSerial = (document.getElementById("suite-usb-master-serial")?.value || "auto").trim();
-    const childSerial = (document.getElementById("suite-usb-child-serial")?.value || "").trim();
-    const scenarioId = (document.getElementById("suite-usb-dual-scenario")?.value || "").trim();
-    const profileId = (document.getElementById("suite-usb-dual-profile")?.value || "").trim();
-    const faultModes = parseQaMultiValueInput(document.getElementById("suite-usb-fault-modes")?.value || "");
-    const suite = document.getElementById("suite-usb-suite")?.value || "commissioning";
-    const installApk = document.getElementById("suite-usb-install-apk")?.checked || false;
-    const skipActivation = document.getElementById("suite-usb-skip-activation")?.checked || false;
-    const parallel = document.getElementById("suite-usb-parallel")?.checked || false;
+    const request = buildUsbTestRunRequestPayload({
+        testType: document.getElementById("suite-usb-test-type")?.value || "single-master",
+        masterSerial: document.getElementById("suite-usb-master-serial")?.value || "auto",
+        childSerial: document.getElementById("suite-usb-child-serial")?.value || "",
+        scenarioId: document.getElementById("suite-usb-dual-scenario")?.value || "",
+        profileId: document.getElementById("suite-usb-dual-profile")?.value || "",
+        faultModes: parseQaMultiValueInput(document.getElementById("suite-usb-fault-modes")?.value || ""),
+        suite: document.getElementById("suite-usb-suite")?.value || "commissioning",
+        installApk: document.getElementById("suite-usb-install-apk")?.checked || false,
+        skipActivation: document.getElementById("suite-usb-skip-activation")?.checked || false,
+        parallel: document.getElementById("suite-usb-parallel")?.checked || false,
+    });
 
     try {
-        let res, data;
-        if (testType === "dual-device") {
-            if (!childSerial) {
-                showNotification("Bitte Child-Serial angeben fuer Dual-Device-Test.", "error");
-                return;
-            }
-            res = await fetch("/api/suites/dual-device", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    masterSerial: masterSerial || "auto",
-                    childSerial: childSerial,
-                    installApk: installApk,
-                    parallel: parallel,
-                    scenarioId: scenarioId,
-                    profileId: profileId,
-                    faultModes: faultModes,
-                }),
-            });
-        } else {
-            const appId = testType === "single-child" ? "child" : "master";
-            res = await fetch("/api/suites/usb-test", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    appId: appId,
-                    serial: masterSerial === "auto" ? "auto" : masterSerial,
-                    suite: suite,
-                    installApk: installApk,
-                    skipActivation: skipActivation,
-                }),
-            });
+        if (request.error) {
+            showNotification(request.error, "error");
+            return;
         }
+        const res = await fetch(request.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(request.payload),
+        });
+        let data;
         data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "USB-Test konnte nicht gestartet werden.");
         showNotification(`USB-Testlauf gestartet (Run-ID: ${data.runId}).`, "success");
         pollSuiteRunStatus(data.runId);
-        appendSuiteActiveRun(data.runId, testType);
+        appendSuiteActiveRun(data.runId, formatSuiteRunLabel(request.payload));
     } catch (err) {
         showNotification("USB-Test fehlgeschlagen: " + err.message, "error");
     }
+}
+
+function formatSuiteRunLabel(payload) {
+    if (!payload || typeof payload !== "object") return "QA-Lauf";
+    if (payload.appId === "master") return "USB: Master-App";
+    if (payload.appId === "child") return "USB: Kind-App";
+    if (payload.scenarioId) return `Dual-Device: ${payload.scenarioId}`;
+    return "Dual-Device";
 }
 
 function appendSuiteActiveRun(runId, label) {
@@ -4246,14 +4369,14 @@ function pollSuiteRunStatus(runId) {
 }
 
 async function loadSuiteRunHistory() {
-    const el = document.getElementById("suite-active-runs");
-    if (!el) return { ok: false, message: "Suite-Historien-Container fehlt." };
+    const historyEl = document.getElementById("suite-run-history");
+    if (!historyEl) return { ok: false, message: "Suite-Historien-Container fehlt." };
     if (!isPythonOperator) {
-        el.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfuegbar.</div>";
+        historyEl.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfuegbar.</div>";
         setQaRefreshSectionState("suiteHistory", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    el.innerHTML = "<div class='loading'>Lade Historie...</div>";
+    historyEl.innerHTML = "<div class='loading'>Lade Historie...</div>";
     setQaRefreshSectionState("suiteHistory", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites/history");
@@ -4264,11 +4387,11 @@ async function loadSuiteRunHistory() {
         renderQaArtifactsOverview();
         rerenderSuiteCatalogFromCache();
         if (runs.length === 0) {
-            el.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
+            historyEl.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
             setQaRefreshSectionState("suiteHistory", "success", "Keine Testläufe vorhanden");
             return { ok: true, message: "Keine Testläufe vorhanden." };
         }
-        el.innerHTML = runs.slice(0, 50).map(r => `
+        historyEl.innerHTML = runs.slice(0, 50).map(r => `
             <div class="data-row" style="display:flex;gap:8px;align-items:center">
                 <span class="badge ${(r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'passed') ? 'pass' : (r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'skipped') ? 'running' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status === 'finished' ? ((r.result?.status || r.result?.overall_status) || r.status) : r.status)}</span>
                 <strong>${escapeHtml(r.suiteId || r.suite_id || r.type || '?')}</strong>
@@ -4280,7 +4403,7 @@ async function loadSuiteRunHistory() {
         setQaRefreshSectionState("suiteHistory", "success", `${runs.length} Suite-Läufe geladen`);
         return { ok: true, message: `${runs.length} Suite-Läufe geladen.` };
     } catch (err) {
-        el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        historyEl.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
         setQaRefreshSectionState("suiteHistory", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }
@@ -4292,6 +4415,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeSelect) {
         typeSelect.addEventListener("change", updateUsbTestTypeFormState);
         updateUsbTestTypeFormState();
+    }
+    const protocolStatusEl = document.getElementById("python-automation-protocol-status");
+    if (protocolStatusEl) {
+        protocolStatusEl.addEventListener("change", renderPythonAutomationProtocolRequirements);
     }
     syncDualDeviceCatalogOptions();
     syncEmulatorReservationOptions();
@@ -7347,6 +7474,7 @@ function refreshCommissioningReport() {
 
 document.addEventListener("DOMContentLoaded", async function() {
     await detectPythonOperatorRuntime();
+    renderQaRuntimeModeBanner();
     renderBootstrapFirebaseConfig(firebaseConfig);
     setupBootstrapConfigLiveSync();
     renderCommandBuilderConfig(loadCommandBuilderConfig());
@@ -7356,6 +7484,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     renderPrioritizedActionPlan();
     renderPlayStoreReadiness();
     renderPythonAutomationOverview(null, null);
+    renderPythonAutomationProtocolRequirements();
 
     const openOnlyChecksEl = document.getElementById("python-automation-show-open-only");
     if (openOnlyChecksEl) {

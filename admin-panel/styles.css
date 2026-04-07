@@ -1693,6 +1693,26 @@ input:focus, select:focus, textarea:focus {
     padding: 16px;
 }
 
+.qa-runtime-banner {
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 1px solid #dbeafe;
+    background: #eff6ff;
+    color: #1e3a8a;
+}
+
+.qa-runtime-banner.is-readonly {
+    border-color: #fde68a;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.qa-runtime-banner.is-operator {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+}
+
 .qa-platform-layout {
     align-items: start;
 }
@@ -1771,6 +1791,15 @@ input:focus, select:focus, textarea:focus {
     grid-column: 1 / -1;
 }
 
+.qa-emulator-form-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.python-protocol-requirements {
+    margin: 0 0 4px;
+}
+
 .qa-suite-catalog-hint {
     margin: 0 0 10px;
     color: #475569;
@@ -1788,6 +1817,22 @@ input:focus, select:focus, textarea:focus {
 .qa-refresh-header h3 {
     margin: 0 0 4px;
     color: #0f172a;
+}
+
+.qa-section-heading {
+    margin: 24px 0 14px;
+    padding: 0 2px;
+}
+
+.qa-section-heading h3 {
+    margin: 0 0 4px;
+    color: #0f172a;
+}
+
+.qa-section-heading p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.9rem;
 }
 
 .qa-refresh-header p {

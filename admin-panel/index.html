@@ -958,6 +958,9 @@
                     <!-- ==================== TAB: QUALITÄTSSICHERUNG ==================== -->
                     <div id="tab-qa" class="tab-content" style="display: none">
                         <h2>🧪 Qualitätssicherung &amp; Tests</h2>
+                        <div id="qa-runtime-mode-banner" class="data-list" style="margin-block-end: 20px">
+                            <div class="info">Prüfe QA-Laufzeitmodus...</div>
+                        </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
                             <div class="qa-refresh-header">
@@ -988,6 +991,11 @@
                             <div id="qa-start-guide" class="data-list" style="margin-block-start: 12px">
                                 <div class="info">Lade QA-Startwege...</div>
                             </div>
+                        </div>
+
+                        <div class="qa-section-heading">
+                            <h3>Release &amp; Freigaben</h3>
+                            <p>Produktionsbereitschaft, Freigaben und priorisierte Restarbeiten für den Go-Live.</p>
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
@@ -1051,6 +1059,11 @@
                             <div id="prioritized-action-plan" class="data-list" style="margin-block-start: 12px">
                                 <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
                             </div>
+                        </div>
+
+                        <div class="qa-section-heading">
+                            <h3>Register &amp; Evidenz</h3>
+                            <p>Zentrale Sicht auf Testbestand, Nachweise, Commissioning-Läufe und manuelle Freigaben.</p>
                         </div>
 
                         <div id="qa-register-card" class="setup-card admin-only" style="margin-block-end: 20px">
@@ -1323,6 +1336,9 @@
                                             <div class="info">Noch kein Testfall fuer die Protokollierung ausgewaehlt.</div>
                                         </div>
                                         <div class="python-protocol-form" style="margin-block-start: 12px">
+                                            <div id="python-automation-protocol-requirements" class="python-clarity-box python-protocol-requirements">
+                                                Anforderungen für den ausgewählten Nachweis werden geladen.
+                                            </div>
                                             <label>
                                                 <span>Status</span>
                                                 <select id="python-automation-protocol-status">
@@ -1374,6 +1390,10 @@
                             </div>
 
                         <!-- ==================== TESTSUITE-ZENTRALE ==================== -->
+                        <div class="qa-section-heading">
+                            <h3>Ausführung &amp; Plattform</h3>
+                            <p>Tests starten, Geräte- und Emulatorstatus prüfen sowie Artefakte und Kataloge auswerten.</p>
+                        </div>
                         <div id="qa-suite-card" class="setup-card admin-only" style="margin-block-end: 20px">
                             <h3>🔬 Test-Suiten &amp; USB-Automatisierung</h3>
                             <p>
@@ -1407,39 +1427,63 @@
                                     <div class="setup-actions" style="margin-block-end: 8px">
                                         <button onclick="loadEmulatorLabOverview()" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
                                     </div>
-                                    <div class="dsar-form" style="display: grid; gap: 8px; margin-block-end: 10px">
-                                        <label>
-                                            <span>Android-Version</span>
-                                            <select id="qa-emulator-android-version">
-                                                <option value="">Android-Version wählen</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            <span>Geräteprofil</span>
-                                            <select id="qa-emulator-profile">
-                                                <option value="">Geräteprofil wählen</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            <span>Owner</span>
-                                            <input type="text" id="qa-emulator-owner" placeholder="z. B. qa-automation" />
-                                        </label>
-                                        <label>
-                                            <span>Zweck</span>
-                                            <input type="text" id="qa-emulator-purpose" placeholder="z. B. android-14-dual-device-regression" />
-                                        </label>
-                                        <label>
-                                            <span>TTL in Minuten</span>
-                                            <input type="number" id="qa-emulator-ttl" min="15" max="1440" step="15" value="120" />
-                                        </label>
-                                        <label>
-                                            <span>AVD-Name</span>
-                                            <input type="text" id="qa-emulator-avd-name" placeholder="z. B. Pixel_8_API_34_QA" />
-                                        </label>
+                                    <div class="python-automation-group">
+                                        <h6>Reservierung für Testfenster</h6>
+                                        <p class="python-muted-caption">Reserviert ein Android-/Profil-Kombinationsfenster für geplante QA-Läufe.</p>
+                                        <div class="dsar-form qa-emulator-form-grid" style="margin-block-start: 10px">
+                                            <label>
+                                                <span>Android-Version</span>
+                                                <select id="qa-emulator-reservation-android-version">
+                                                    <option value="">Android-Version wählen</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                <span>Geräteprofil</span>
+                                                <select id="qa-emulator-reservation-profile">
+                                                    <option value="">Geräteprofil wählen</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                <span>Owner</span>
+                                                <input type="text" id="qa-emulator-owner" placeholder="z. B. qa-automation" />
+                                            </label>
+                                            <label>
+                                                <span>Zweck</span>
+                                                <input type="text" id="qa-emulator-purpose" placeholder="z. B. android-14-dual-device-regression" />
+                                            </label>
+                                            <label>
+                                                <span>TTL in Minuten</span>
+                                                <input type="number" id="qa-emulator-ttl" min="15" max="1440" step="15" value="120" />
+                                            </label>
+                                        </div>
+                                        <div class="setup-actions" style="margin-block-start: 10px; margin-block-end: 8px">
+                                            <button onclick="createEmulatorReservation()" class="btn btn-primary" title="Neue Reservierung im Emulator-Labor anlegen">Reservierung anlegen</button>
+                                        </div>
                                     </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="createEmulatorReservation()" class="btn btn-primary" title="Neue Reservierung im Emulator-Labor anlegen">Reservierung anlegen</button>
-                                        <button onclick="createEmulatorAvd()" class="btn btn-secondary" title="Neues AVD passend zu Android-Version und Geräteprofil anlegen">AVD erstellen</button>
+                                    <div class="python-automation-group">
+                                        <h6>AVD bereitstellen</h6>
+                                        <p class="python-muted-caption">Legt ein neues AVD passend zu Android-Version und Geräteprofil an.</p>
+                                        <div class="dsar-form qa-emulator-form-grid" style="margin-block-start: 10px">
+                                            <label>
+                                                <span>Android-Version</span>
+                                                <select id="qa-emulator-avd-android-version">
+                                                    <option value="">Android-Version wählen</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                <span>Geräteprofil</span>
+                                                <select id="qa-emulator-avd-profile">
+                                                    <option value="">Geräteprofil wählen</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                <span>AVD-Name</span>
+                                                <input type="text" id="qa-emulator-avd-name" placeholder="z. B. Pixel_8_API_34_QA" />
+                                            </label>
+                                        </div>
+                                        <div class="setup-actions" style="margin-block-start: 10px; margin-block-end: 8px">
+                                            <button onclick="createEmulatorAvd()" class="btn btn-secondary" title="Neues AVD passend zu Android-Version und Geräteprofil anlegen">AVD erstellen</button>
+                                        </div>
                                     </div>
                                     <div id="qa-emulator-lab" class="data-list">
                                         <div class="info">Noch kein Emulator-Labor geladen.</div>
@@ -1505,7 +1549,7 @@
                                             <input type="text" id="suite-usb-fault-modes" placeholder="z. B. network-loss, child-reboot" />
                                             <small class="qa-usb-help">Mehrere Fault-Modes komma-separiert eintragen. Es werden nur im Katalog bekannte Werte akzeptiert.</small>
                                         </label>
-                                        <label>
+                                        <label id="suite-usb-suite-row">
                                             <span>Suite</span>
                                             <select id="suite-usb-suite">
                                                 <option value="commissioning" selected>Commissioning</option>
@@ -1517,11 +1561,11 @@
                                                 <input type="checkbox" id="suite-usb-install-apk" />
                                                 APK installieren
                                             </label>
-                                            <label class="setup-checklist-item python-inline-check">
+                                            <label class="setup-checklist-item python-inline-check" id="suite-usb-skip-activation-row">
                                                 <input type="checkbox" id="suite-usb-skip-activation" />
                                                 Aktivierung &uuml;berspringen
                                             </label>
-                                            <label class="setup-checklist-item python-inline-check">
+                                            <label class="setup-checklist-item python-inline-check" id="suite-usb-parallel-row">
                                                 <input type="checkbox" id="suite-usb-parallel" />
                                                 Parallel (Dual-Device)
                                             </label>
@@ -1546,6 +1590,9 @@
                                     </div>
                                     <div id="suite-active-runs" class="data-list">
                                         <div class="info">Noch keine Testl&auml;ufe.</div>
+                                    </div>
+                                    <div id="suite-run-history" class="data-list" style="margin-block-start: 10px">
+                                        <div class="info">Noch keine Historie geladen.</div>
                                     </div>
                                 </section>
 
@@ -1588,6 +1635,11 @@
                                     </div>
                                 </section>
                             </div>
+                        </div>
+
+                        <div class="qa-section-heading">
+                            <h3>Erweiterte Betriebswerkzeuge</h3>
+                            <p>Ops-nahe Hilfen für Befehle, Validierung und operatorische Checklisten.</p>
                         </div>
 
                         <div class="setup-card admin-only" style="margin-block-end: 20px">
