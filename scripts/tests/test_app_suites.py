@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -133,6 +134,113 @@ class TestGetQaCatalog:
 
         assert result["criticalBacklog"]
         assert all(item["priority"] in {"P0", "P1"} for item in result["criticalBacklog"])
+
+
+class TestMiniMasterAdminHandlerRoutes:
+    @staticmethod
+    def _make_handler(path: str):
+        import app
+
+        handler = app.MiniMasterAdminHandler.__new__(app.MiniMasterAdminHandler)
+        handler.path = path
+        handler.headers = {}
+        handler._write_json = MagicMock()
+        handler._read_json_body = MagicMock(return_value={})
+        handler.send_response = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        return handler
+
+    def test_do_get_qa_catalog_returns_backend_payload(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        payload = {"androidMatrix": [{"apiLevel": 34}], "criticalBacklog": []}
+        handler = self._make_handler("/api/qa/catalog")
+        monkeypatch.setattr(app, "get_qa_catalog", lambda: payload)
+
+        app.MiniMasterAdminHandler.do_GET(handler)
+
+        handler._write_json.assert_called_once_with(HTTPStatus.OK, payload)
+
+    def test_do_get_commissioning_evidence_clamps_limit_and_forwards_test_id(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/commissioning/evidence?limit=9999&testId=ios-xctest-parent")
+        history_mock = MagicMock(return_value=[{"testId": "ios-xctest-parent", "status": "pass"}])
+        latest_mock = MagicMock(return_value={"ios-xctest-parent": {"status": "pass"}})
+        monkeypatch.setattr(app, "load_commissioning_evidence_history", history_mock)
+        monkeypatch.setattr(app, "load_latest_commissioning_evidence", latest_mock)
+
+        app.MiniMasterAdminHandler.do_GET(handler)
+
+        history_mock.assert_called_once_with(app.MAX_EVIDENCE_LIMIT, test_id="ios-xctest-parent")
+        latest_mock.assert_called_once_with()
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "entries": [{"testId": "ios-xctest-parent", "status": "pass"}],
+                "latestByTestId": {"ios-xctest-parent": {"status": "pass"}},
+                "count": app.MAX_EVIDENCE_LIMIT,
+            },
+        )
+
+    def test_do_get_suite_history_clamps_limit_to_http_contract(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/history?limit=500")
+        history_mock = MagicMock(return_value=[{"runId": "run-1", "status": "finished"}])
+        monkeypatch.setattr(app, "load_suite_run_history", history_mock)
+
+        app.MiniMasterAdminHandler.do_GET(handler)
+
+        history_mock.assert_called_once_with(200)
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "runs": [{"runId": "run-1", "status": "finished"}],
+                "count": 200,
+            },
+        )
+
+    def test_do_post_dual_device_queues_run_with_scenario_profile_and_fault_modes(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/dual-device")
+        handler._read_json_body.return_value = {
+            "masterSerial": "MASTER-1",
+            "childSerial": "CHILD-1",
+            "scenarioId": "offline-online-resync",
+            "profileId": "dual-device-balanced",
+            "faultModes": ["disconnect", "airplane"],
+            "parallel": True,
+        }
+
+        fake_thread = MagicMock()
+        fake_thread.start = MagicMock()
+        thread_cls = MagicMock(return_value=fake_thread)
+
+        class _FakeUuid:
+            hex = "abcdef1234567890"
+
+        monkeypatch.setattr(app.threading, "Thread", thread_cls)
+        monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {"runId": "dual-abcdef123456", "status": "queued"},
+        )
+        thread_cls.assert_called_once()
+        fake_thread.start.assert_called_once_with()
+        with app._active_suite_lock:
+            queued = app._active_suite_runs["dual-abcdef123456"]
+        assert queued["type"] == "dual-device"
+        assert queued["scenarioId"] == "offline-online-resync"
+        assert queued["profileId"] == "dual-device-balanced"
 
 
 class TestBuildTestingRegister:
