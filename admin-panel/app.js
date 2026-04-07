@@ -11,6 +11,10 @@ const P0_BLOCKER_COCKPIT_STORAGE_KEY = "operatorP0BlockerCockpit";
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
 let sessionTimeoutTimer = null;
 let sessionWarningTimer = null;
+const SESSION_MONITORING_EVENTS = ["mousedown", "keydown", "scroll", "touchstart"];
+let sessionMonitoringActive = false;
+let authBindingsInitialized = false;
+let authStateObserverInitialized = false;
 
 function resetSessionTimeout() {
     if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
@@ -32,16 +36,94 @@ function resetSessionTimeout() {
 }
 
 function startSessionMonitoring() {
-    const events = ["mousedown", "keydown", "scroll", "touchstart"];
-    events.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
+    if (!sessionMonitoringActive) {
+        SESSION_MONITORING_EVENTS.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
+        sessionMonitoringActive = true;
+    }
     resetSessionTimeout();
 }
 
 function stopSessionMonitoring() {
+    if (sessionMonitoringActive) {
+        SESSION_MONITORING_EVENTS.forEach(evt => document.removeEventListener(evt, resetSessionTimeout));
+        sessionMonitoringActive = false;
+    }
     if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
     if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
     sessionTimeoutTimer = null;
     sessionWarningTimer = null;
+}
+
+function initializeAuthBindings() {
+    if (authBindingsInitialized) return;
+
+    const loginForm = document.getElementById("login-form");
+    if (loginForm && !loginForm.__authSubmitBound) {
+        loginForm.addEventListener("submit", handleLogin);
+        loginForm.__authSubmitBound = true;
+    }
+
+    const registerForm = document.getElementById("register-form");
+    if (registerForm && !registerForm.__authSubmitBound) {
+        registerForm.addEventListener("submit", handleRegistration);
+        registerForm.__authSubmitBound = true;
+    }
+
+    const forgotPasswordBtn = document.getElementById("forgot-password-btn");
+    if (forgotPasswordBtn && !forgotPasswordBtn.__authClickBound) {
+        forgotPasswordBtn.addEventListener("click", handleForgotPassword);
+        forgotPasswordBtn.__authClickBound = true;
+    }
+
+    const forgotPasswordProminentBtn = document.getElementById("forgot-password-prominent-btn");
+    if (forgotPasswordProminentBtn && !forgotPasswordProminentBtn.__authClickBound) {
+        forgotPasswordProminentBtn.addEventListener("click", handleForgotPassword);
+        forgotPasswordProminentBtn.__authClickBound = true;
+    }
+
+    const checkProviderBtn = document.getElementById("check-provider-btn");
+    if (checkProviderBtn && !checkProviderBtn.__authClickBound) {
+        checkProviderBtn.addEventListener("click", handleCheckAuthProviders);
+        checkProviderBtn.__authClickBound = true;
+    }
+
+    authBindingsInitialized = true;
+}
+
+function initializeAuthStateObserver() {
+    if (!auth || authStateObserverInitialized) return;
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            user.getIdTokenResult(true).then(idTokenResult => {
+                const role = idTokenResult.claims.role;
+                console.log("Auth state: user=" + user.email + ", role=" + (role || "none"));
+                if (role === "admin" || role === "support" || role === "auditor") {
+                    currentUserRole = role;
+                    showDashboard(user);
+                    applyRoleRestrictions(role);
+                    loadDashboardData();
+                    if (role === "admin") initializeSetupAssistant();
+                } else {
+                    console.warn("User has no operator role. Showing admin activation phase.");
+                    showAdminActivationPhase(user);
+                }
+            }).catch(err => {
+                console.error("Token refresh failed:", err);
+                showNotification("Token-Prüfung fehlgeschlagen: " + err.message, "error");
+            });
+        } else {
+            currentUserRole = null;
+            stopSessionMonitoring();
+            if (!window._resetBlocksPhaseChange) {
+                showOnboarding();
+            } else {
+                console.log("[RESET] Phase change blocked — reset in progress.");
+            }
+        }
+    });
+
+    authStateObserverInitialized = true;
 }
 
 // Laufzeit-Erkennung: Electron Operator oder Python-Webanwendung
@@ -3540,7 +3622,7 @@ function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
             <article class='qa-refresh-card is-success'>
                 <strong>Android-Szenario-Mapping</strong>
                 <span>${androidScenarioMappings.length} Bindungen zwischen Szenario und Testklasse</span>
-                <div class='qa-refresh-meta'>Master: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "master").length))} · Child: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "child").length))}</div>
+                <div class='qa-refresh-meta'>Master: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "master").length))} · Child: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "child").length))} · Offen: ${escapeHtml(String(payload.summary?.unmappedScenarioCount || 0))}</div>
             </article>
             <article class='qa-refresh-card ${criticalBacklog.length > 0 ? "is-loading" : "is-success"}'>
                 <strong>Priorisierte Lücken</strong>
@@ -3587,6 +3669,10 @@ function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
             <section class='python-clarity-box'>
                 <strong>Android-Testbindungen</strong><br />
                 ${androidScenarioMappings.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.scenarioId || "-"))}</strong> ${escapeHtml(String(item?.testClass || "-"))}<span>${escapeHtml(String(item?.testMethod || "-"))}</span></div>`).join("") || "Noch keine Android-Szenario-Bindungen vorhanden."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Offene Szenario-Abdeckung</strong><br />
+                ${(Array.isArray(payload.summary?.unmappedScenarioIds) ? payload.summary.unmappedScenarioIds : []).slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item))}</strong><span>Noch keine Android-Bindung hinterlegt</span></div>`).join("") || "Alle Szenarien sind an Android-Tests gebunden."}
             </section>
         </div>
     `;
@@ -3700,6 +3786,37 @@ async function createEmulatorReservation() {
         await loadEmulatorLabOverview();
     } catch (error) {
         showNotification("Reservierung fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+async function createEmulatorAvd() {
+    if (!isPythonOperator) return;
+
+    const androidVersion = (document.getElementById("qa-emulator-android-version")?.value || "").trim();
+    const profileId = (document.getElementById("qa-emulator-profile")?.value || "").trim();
+    const avdName = (document.getElementById("qa-emulator-avd-name")?.value || "").trim();
+
+    if (!androidVersion || !profileId || !avdName) {
+        showNotification("Für ein neues AVD sind Android-Version, Profil und AVD-Name erforderlich.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/qa/emulators/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                androidVersion,
+                profileId,
+                avdName,
+            }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "AVD konnte nicht erstellt werden.");
+        showNotification(`AVD ${data.avdName || avdName} erstellt.`, "success");
+        await loadEmulatorLabOverview();
+    } catch (error) {
+        showNotification("AVD-Erstellung fehlgeschlagen: " + error.message, "error");
     }
 }
 
@@ -4024,7 +4141,7 @@ async function startUsbTestRun() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    masterSerial: masterSerial === "auto" ? "" : masterSerial,
+                    masterSerial: masterSerial || "auto",
                     childSerial: childSerial,
                     installApk: installApk,
                     parallel: parallel,
@@ -4084,22 +4201,27 @@ function pollSuiteRunStatus(runId) {
             if (row) {
                 const badge = row.querySelector(".badge");
                 const detail = row.querySelector(".suite-run-detail");
+                const existingRun = suiteRunHistoryPayload.find(item => String(item?.runId || item?.run_id || "") === String(runId || ""));
+                const mergedRun = {
+                    ...(existingRun || {}),
+                    ...data,
+                    suiteId: data.suiteId || data.suite_id || existingRun?.suiteId || existingRun?.suite_id || "",
+                };
                 if (data.status === "running") {
                     badge.className = "badge running";
                     badge.textContent = "laufend";
                     if (detail) {
                         detail.textContent = data.lastEvent?.message || data.currentPhase || data.startedAt || "...";
                     }
+                    suiteRunHistoryPayload = [
+                        mergedRun,
+                        ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || runId || "")),
+                    ];
+                    renderQaArtifactsOverview();
                 } else {
                     const resultStatus = data.result?.status || data.result?.overall_status;
                     const isPass = data.status === "finished" && resultStatus === "passed";
                     const isSkipped = data.status === "finished" && resultStatus === "skipped";
-                    const existingRun = suiteRunHistoryPayload.find(item => String(item?.runId || item?.run_id || "") === String(runId || ""));
-                    const mergedRun = {
-                        ...(existingRun || {}),
-                        ...data,
-                        suiteId: data.suiteId || data.suite_id || existingRun?.suiteId || existingRun?.suite_id || "",
-                    };
                     badge.className = `badge ${isPass ? "pass" : isSkipped ? "running" : data.status === "finished" ? "fail" : "fail"}`;
                     badge.textContent = data.status === "finished"
                         ? (isPass ? "fertig" : isSkipped ? "übersprungen" : "fehlgeschlagen")
@@ -7335,58 +7457,8 @@ document.addEventListener("DOMContentLoaded", async function() {
         auth = firebase.auth();
         db = firebase.firestore();
         functions = firebase.functions();
-
-        // Setup login form submission
-        document.getElementById("login-form").addEventListener("submit", handleLogin);
-        const forgotPasswordBtn = document.getElementById("forgot-password-btn");
-        if (forgotPasswordBtn) {
-            forgotPasswordBtn.addEventListener("click", handleForgotPassword);
-        }
-        const forgotPasswordProminentBtn = document.getElementById("forgot-password-prominent-btn");
-        if (forgotPasswordProminentBtn) {
-            forgotPasswordProminentBtn.addEventListener("click", handleForgotPassword);
-        }
-        const checkProviderBtn = document.getElementById("check-provider-btn");
-        if (checkProviderBtn) {
-            checkProviderBtn.addEventListener("click", handleCheckAuthProviders);
-        }
-
-        // Setup registration form submission
-        const registerForm = document.getElementById("register-form");
-        if (registerForm) {
-            registerForm.addEventListener("submit", handleRegistration);
-        }
-
-        // Check authentication state
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                user.getIdTokenResult(true).then(idTokenResult => {
-                    const role = idTokenResult.claims.role;
-                    console.log("Auth state: user=" + user.email + ", role=" + (role || "none"));
-                    if (role === "admin" || role === "support" || role === "auditor") {
-                        currentUserRole = role;
-                        showDashboard(user);
-                        applyRoleRestrictions(role);
-                        loadDashboardData();
-                        if (role === "admin") initializeSetupAssistant();
-                    } else {
-                        // User is authenticated but has no operator role -> show phase 3
-                        console.warn("User has no operator role. Showing admin activation phase.");
-                        showAdminActivationPhase(user);
-                    }
-                }).catch(err => {
-                    console.error("Token refresh failed:", err);
-                    showNotification("Token-Prüfung fehlgeschlagen: " + err.message, "error");
-                });
-            } else {
-                currentUserRole = null;
-                if (!window._resetBlocksPhaseChange) {
-                    showOnboarding();
-                } else {
-                    console.log("[RESET] Phase change blocked — reset in progress.");
-                }
-            }
-        });
+        initializeAuthBindings();
+        initializeAuthStateObserver();
 
         // Show phase 2 since Firebase is configured
         updateOnboardingStepper(2);
@@ -9320,32 +9392,8 @@ function initializeFirebaseAfterConfigSave() {
         auth = firebase.auth();
         db = firebase.firestore();
         functions = firebase.functions();
-
-        document.getElementById("login-form").addEventListener("submit", handleLogin);
-        const registerForm = document.getElementById("register-form");
-        if (registerForm) {
-            registerForm.addEventListener("submit", handleRegistration);
-        }
-
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                user.getIdTokenResult(true).then(idTokenResult => {
-                    const role = idTokenResult.claims.role;
-                    if (role === "admin" || role === "support" || role === "auditor") {
-                        currentUserRole = role;
-                        showDashboard(user);
-                        applyRoleRestrictions(role);
-                        loadDashboardData();
-                        if (role === "admin") initializeSetupAssistant();
-                    } else {
-                        showAdminActivationPhase(user);
-                    }
-                });
-            } else {
-                currentUserRole = null;
-                showOnboarding();
-            }
-        });
+        initializeAuthBindings();
+        initializeAuthStateObserver();
 
         updateOnboardingStepper(2);
         showOnboardingPhase(2);

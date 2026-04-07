@@ -38,6 +38,7 @@ from qa_catalog import (  # noqa: E402
     load_dual_device_scenarios,
 )
 from emulator_manager import (  # noqa: E402
+    create_avd as create_emulator_avd,
     create_reservation as create_emulator_reservation,
     get_emulator_lab_overview,
     load_active_reservations as load_emulator_reservations,
@@ -3490,6 +3491,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_create_emulator_reservation()
         if parsed.path == "/api/qa/emulators/start":
             return self._handle_start_emulator()
+        if parsed.path == "/api/qa/emulators/create":
+            return self._handle_create_emulator_avd()
         if parsed.path == "/api/qa/emulators/stop":
             return self._handle_stop_emulator()
         if parsed.path == "/api/qa/emulators/release":
@@ -3698,6 +3701,20 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 headless=bool_from_payload(payload.get("headless"), default=True),
                 wipe_data=bool_from_payload(payload.get("wipeData"), default=False),
                 no_snapshot=bool_from_payload(payload.get("noSnapshot"), default=True),
+            )
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_create_emulator_avd(self) -> None:
+        try:
+            payload = self._read_json_body()
+            result = create_emulator_avd(
+                str(payload.get("avdName") or "").strip(),
+                profile_id=str(payload.get("profileId") or "").strip(),
+                android_version=str(payload.get("androidVersion") or "").strip(),
             )
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})

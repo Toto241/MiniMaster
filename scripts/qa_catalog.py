@@ -260,6 +260,17 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
     dual_device_count = sum(1 for item in suite_entries if item.get("deviceMode") == "dual-device")
     single_device_count = sum(1 for item in suite_entries if item.get("deviceMode") == "single-device")
     host_count = sum(1 for item in suite_entries if item.get("deviceMode") == "host")
+    mapped_scenario_ids = {
+        str(item.get("scenarioId", "")).strip()
+        for item in scenario_mappings
+        if str(item.get("scenarioId", "")).strip()
+    }
+    all_scenario_ids = {
+        str(item.get("scenarioId", "")).strip()
+        for item in scenarios
+        if str(item.get("scenarioId", "")).strip()
+    }
+    unmapped_scenario_ids = sorted(all_scenario_ids - mapped_scenario_ids)
 
     return {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -277,6 +288,9 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
             "androidVersions": _all_android_versions(matrix),
             "dualDeviceScenarioCount": len(scenarios),
             "androidScenarioMappingCount": len(scenario_mappings),
+            "mappedScenarioCount": len(mapped_scenario_ids),
+            "unmappedScenarioCount": len(unmapped_scenario_ids),
+            "unmappedScenarioIds": unmapped_scenario_ids,
             "dualDeviceSuiteCount": dual_device_count,
             "singleDeviceSuiteCount": single_device_count,
             "hostSuiteCount": host_count,

@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from uuid import uuid4
 
 from qa_catalog import load_android_version_matrix, load_device_profiles
@@ -80,6 +80,13 @@ def avdmanager_binary_path() -> Path | None:
             if candidate.exists():
                 return candidate
     return None
+
+
+def _safe_int(value: object, default: int = 0) -> int:
+    try:
+        return int(str(value or default))
+    except (TypeError, ValueError):
+        return default
 
 
 def list_avds() -> list[str]:
@@ -169,7 +176,7 @@ def start_emulator(
     if no_snapshot:
         command.append("-no-snapshot")
 
-    popen_kwargs: dict[str, object] = {
+    popen_kwargs: dict[str, Any] = {
         "cwd": REPO_ROOT,
         "stdout": subprocess.DEVNULL,
         "stderr": subprocess.DEVNULL,
@@ -191,6 +198,81 @@ def start_emulator(
         "noSnapshot": no_snapshot,
         "command": command,
         "startedAt": _utc_now(),
+    }
+
+
+def create_avd(
+    avd_name: str,
+    *,
+    profile_id: str,
+    android_version: str,
+) -> dict[str, object]:
+    normalized_avd_name = avd_name.strip()
+    normalized_profile_id = profile_id.strip()
+    normalized_android_version = android_version.strip()
+    if not normalized_avd_name:
+        raise ValueError("avdName ist erforderlich.")
+    if not normalized_profile_id or not normalized_android_version:
+        raise ValueError("profileId und androidVersion sind erforderlich.")
+    if normalized_avd_name in list_avds():
+        raise ValueError(f"AVD {normalized_avd_name} ist bereits vorhanden.")
+
+    avdmanager_path = avdmanager_binary_path()
+    sdk_root = resolve_android_sdk()
+    if avdmanager_path is None or sdk_root is None:
+        raise ValueError("AVD Manager ist nicht verfügbar.")
+
+    profiles = _profile_index()
+    matrix = _matrix_index()
+    profile = profiles.get(normalized_profile_id)
+    version_entry = matrix.get(normalized_android_version)
+    if profile is None:
+        raise ValueError(f"Unbekanntes Geräteprofil: {profile_id}")
+    if version_entry is None:
+        raise ValueError(f"Unbekannte Android-Version: {android_version}")
+
+    api_level = _safe_int(version_entry.get("apiLevel"), 0)
+    abi = "x86_64"
+    tag = "google_apis_playstore" if bool(profile.get("playStore")) else "google_apis"
+    package = f"system-images;android-{api_level};{tag};{abi}"
+    device_name = "pixel"
+    command = [
+        str(avdmanager_path),
+        "create",
+        "avd",
+        "--force",
+        "--name",
+        normalized_avd_name,
+        "--package",
+        package,
+        "--device",
+        device_name,
+    ]
+
+    result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=120,
+        input="no\n",
+    )
+    if result.returncode != 0:
+        error_output = (result.stderr or result.stdout or "AVD konnte nicht erstellt werden.").strip()
+        raise ValueError(error_output)
+
+    return {
+        "created": True,
+        "avdName": normalized_avd_name,
+        "profileId": normalized_profile_id,
+        "androidVersion": normalized_android_version,
+        "apiLevel": api_level,
+        "systemImagePackage": package,
+        "deviceName": device_name,
+        "output": (result.stdout or "").strip(),
     }
 
 
@@ -246,10 +328,7 @@ def _epoch_now() -> int:
 
 
 def _parse_expiry(value: object) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
+    return _safe_int(value, 0)
 
 
 def load_active_reservations() -> list[dict[str, object]]:
@@ -281,7 +360,7 @@ def build_emulator_matrix_plan() -> list[dict[str, object]]:
     plan: list[dict[str, object]] = []
     for version_entry in load_android_version_matrix():
         android_version = str(version_entry.get("androidVersion", "")).strip()
-        api_level = int(version_entry.get("apiLevel", 0) or 0)
+        api_level = _safe_int(version_entry.get("apiLevel"), 0)
         coverage_tier = str(version_entry.get("coverageTier", "")).strip()
         for profile_id in cast(list[object], version_entry.get("recommendedProfiles", [])):
             normalized_profile_id = str(profile_id).strip()
@@ -347,7 +426,7 @@ def create_reservation(
         "reservationId": f"emu-{uuid4().hex[:12]}",
         "profileId": normalized_profile_id,
         "androidVersion": normalized_version,
-        "apiLevel": int(version_entry.get("apiLevel", 0) or 0),
+        "apiLevel": _safe_int(version_entry.get("apiLevel"), 0),
         "owner": normalized_owner,
         "purpose": normalized_purpose,
         "deviceMode": str(profile.get("deviceMode", "single-device")),

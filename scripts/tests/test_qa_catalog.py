@@ -51,6 +51,17 @@ class TestQaCatalog:
         assert any(entry["role"] == "master" for entry in result["androidScenarioMappings"])
         assert any(entry["role"] == "child" for entry in result["androidScenarioMappings"])
 
+    def test_catalog_summary_exposes_unmapped_scenarios(self):
+        result = build_qa_catalog()
+
+        assert result["summary"]["unmappedScenarioCount"] == 4
+        assert set(result["summary"]["unmappedScenarioIds"]) == {
+            "device-restart-recovery",
+            "notification-permission-cross-device",
+            "offline-online-resync",
+            "pairing-code-expiry",
+        }
+
     def test_export_writes_json_file(self, tmp_path: Path):
         output = tmp_path / "qa-catalog.json"
 
