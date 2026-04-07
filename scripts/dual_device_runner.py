@@ -141,7 +141,7 @@ def _emit_event(
     callback: Callable[[dict[str, object]], None] | None = None,
     metadata: dict[str, object] | None = None,
 ) -> None:
-    event = {
+    event: dict[str, object] = {
         "phase": phase,
         "status": status,
         "role": role,
@@ -307,53 +307,60 @@ def run_dual_device(
             verbose=verbose and not parallel,
         )
 
-    if parallel:
-        _print("[Parallel] Starte beide Commissioning-Suiten gleichzeitig...")
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_master = executor.submit(_run_master)
-            future_child = executor.submit(_run_child)
+    try:
+        if parallel:
+            _print("[Parallel] Starte beide Commissioning-Suiten gleichzeitig...")
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future_master = executor.submit(_run_master)
+                future_child = executor.submit(_run_child)
 
-            for future in as_completed([future_master, future_child]):
-                try:
-                    completed_result = future.result()
-                    role = "master" if completed_result.app_id == "master" else "child"
-                    _emit_event(
-                        result,
-                        role,
-                        completed_result.overall_status,
-                        f"{role.title()}-Commissioning {completed_result.overall_status}.",
-                        role=role,
-                        callback=on_event,
-                    )
-                except Exception as exc:
-                    _print(f"✘  Ein Testlauf ist fehlgeschlagen: {exc}")
-                    _emit_event(result, "parallel", "error", str(exc), callback=on_event)
+                for future in as_completed([future_master, future_child]):
+                    try:
+                        completed_result = future.result()
+                        role = "master" if completed_result.app_id == "master" else "child"
+                        _emit_event(
+                            result,
+                            role,
+                            completed_result.overall_status,
+                            f"{role.title()}-Commissioning {completed_result.overall_status}.",
+                            role=role,
+                            callback=on_event,
+                        )
+                    except Exception as exc:
+                        _print(f"✘  Ein Testlauf ist fehlgeschlagen: {exc}")
+                        _emit_event(result, "parallel", "error", str(exc), callback=on_event)
+                        raise
 
-            result.master_result = future_master.result()
-            result.child_result = future_child.result()
-    else:
-        _print("[1/2] Master Commissioning-Suite")
-        result.master_result = _run_master()
-        _emit_event(
-            result,
-            "master",
-            result.master_result.overall_status,
-            f"Master-Commissioning {result.master_result.overall_status}.",
-            role="master",
-            callback=on_event,
-        )
+                result.master_result = future_master.result()
+                result.child_result = future_child.result()
+        else:
+            _print("[1/2] Master Commissioning-Suite")
+            result.master_result = _run_master()
+            _emit_event(
+                result,
+                "master",
+                result.master_result.overall_status,
+                f"Master-Commissioning {result.master_result.overall_status}.",
+                role="master",
+                callback=on_event,
+            )
 
-        _print("")
-        _print("[2/2] Child Commissioning-Suite")
-        result.child_result = _run_child()
-        _emit_event(
-            result,
-            "child",
-            result.child_result.overall_status,
-            f"Child-Commissioning {result.child_result.overall_status}.",
-            role="child",
-            callback=on_event,
-        )
+            _print("")
+            _print("[2/2] Child Commissioning-Suite")
+            result.child_result = _run_child()
+            _emit_event(
+                result,
+                "child",
+                result.child_result.overall_status,
+                f"Child-Commissioning {result.child_result.overall_status}.",
+                role="child",
+                callback=on_event,
+            )
+    except Exception as exc:
+        result.duration_sec = round(time.perf_counter() - started, 2)
+        result.overall_status = "failed"
+        _emit_event(result, "summary", "error", str(exc), callback=on_event)
+        raise
 
     # ── Gesamtergebnis ────────────────────────────────────────────────────
     result.duration_sec = round(time.perf_counter() - started, 2)

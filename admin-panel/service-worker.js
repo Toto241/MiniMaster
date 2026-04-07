@@ -39,12 +39,28 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
   const isSameOrigin = requestUrl.origin === self.location.origin;
+  const isApiRequest = isSameOrigin && requestUrl.pathname.startsWith("/api/");
+
+  if (isApiRequest) {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        new Response(JSON.stringify({ error: "offline" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+    return;
+  }
 
   // Same-origin assets should prefer the network so UI updates are visible immediately.
   if (isSameOrigin) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
+          if (!networkResponse.ok) {
+            return networkResponse;
+          }
           const clone = networkResponse.clone();
           caches.open(RUNTIME_CACHE_NAME).then((cache) => cache.put(event.request, clone));
           return networkResponse;

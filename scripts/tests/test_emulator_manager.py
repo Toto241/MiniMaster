@@ -139,3 +139,33 @@ class TestEmulatorLifecycle:
 
         assert result["stopped"] is True
         assert result["serial"] == "emulator-5554"
+
+    def test_create_avd_uses_profile_and_android_version(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(emulator_manager, "list_avds", lambda: [])
+        monkeypatch.setattr(emulator_manager, "avdmanager_binary_path", lambda: Path("C:/Android/Sdk/cmdline-tools/latest/bin/avdmanager.bat"))
+        monkeypatch.setattr(emulator_manager, "resolve_android_sdk", lambda: Path("C:/Android/Sdk"))
+
+        completed = subprocess.CompletedProcess(
+            args=["avdmanager"],
+            returncode=0,
+            stdout="Created AVD\n",
+            stderr="",
+        )
+        run_calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run(command, **kwargs):
+            run_calls.append((command, kwargs))
+            return completed
+
+        monkeypatch.setattr(emulator_manager.subprocess, "run", fake_run)
+
+        result = emulator_manager.create_avd(
+            "Pixel_8_API_34_QA",
+            profile_id="phone-standard",
+            android_version="14",
+        )
+
+        assert result["created"] is True
+        assert result["apiLevel"] == 34
+        assert result["systemImagePackage"] == "system-images;android-34;google_apis;x86_64"
+        assert "--name" in run_calls[0][0]
