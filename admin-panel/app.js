@@ -136,6 +136,8 @@ let qaPlatformCatalogPayload = null;
 let emulatorLabPayload = null;
 let suiteCatalogPayload = [];
 let suiteRunHistoryPayload = [];
+let qaArtifactSelectedRunId = "";
+let qaArtifactScenarioFilter = "";
 let qaDashboardLoadPromise = null;
 let qaRefreshState = {
     lastStartedAt: "",
@@ -1996,6 +1998,65 @@ function getLatestDualDeviceRun() {
     }) || null;
 }
 
+function getDualDeviceRunsFromHistory() {
+    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => {
+        const type = String(run?.type || "");
+        const suiteId = String(run?.suiteId || run?.suite_id || "");
+        return type === "dual-device" || suiteId === "dual-device";
+    });
+}
+
+function getSuiteRunIdentifier(run) {
+    return String(run?.runId || run?.run_id || "");
+}
+
+function getSelectedQaArtifactRun(filteredRuns = getDualDeviceRunsFromHistory()) {
+    const selected = filteredRuns.find(run => getSuiteRunIdentifier(run) === qaArtifactSelectedRunId) || null;
+    if (selected) return selected;
+    const fallback = filteredRuns[0] || null;
+    qaArtifactSelectedRunId = fallback ? getSuiteRunIdentifier(fallback) : "";
+    return fallback;
+}
+
+function applyQaArtifactFilters() {
+    qaArtifactScenarioFilter = document.getElementById("qa-artifact-scenario-filter")?.value || "";
+    qaArtifactSelectedRunId = document.getElementById("qa-artifact-run-select")?.value || "";
+    renderQaArtifactsOverview();
+}
+
+function exportSelectedQaArtifact() {
+    const dualRuns = getDualDeviceRunsFromHistory();
+    const filteredRuns = qaArtifactScenarioFilter
+        ? dualRuns.filter(run => String(run?.scenarioId || run?.result?.scenarioId || "") === qaArtifactScenarioFilter)
+        : dualRuns;
+    const selectedRun = getSelectedQaArtifactRun(filteredRuns);
+    if (!selectedRun) {
+        showNotification("Es liegt noch kein exportierbares Dual-Device-Artefakt vor.", "info");
+        return;
+    }
+
+    const scenarioId = String(selectedRun?.scenarioId || selectedRun?.result?.scenarioId || "");
+    const mappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings)
+        ? qaPlatformCatalogPayload.androidScenarioMappings.filter(item => String(item?.scenarioId || "") === scenarioId)
+        : [];
+
+    const payload = {
+        exportedAt: new Date().toISOString(),
+        selectedRun,
+        linkedAndroidMappings: mappings,
+        evidenceSnapshot: pythonCommissioningEvidenceHistory.slice(0, 20),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dual-device-artifact-${scenarioId || "run"}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification("Dual-Device-Artefakt exportiert.", "success");
+}
+
 function buildEvidenceStatusCounts(entries = pythonCommissioningEvidenceHistory) {
     const counts = { pass: 0, fail: 0, manual_required: 0 };
     (Array.isArray(entries) ? entries : []).forEach(entry => {
@@ -2016,10 +2077,20 @@ function renderQaArtifactsOverview() {
         return;
     }
 
-    const latestDualRun = getLatestDualDeviceRun();
+    const dualRuns = getDualDeviceRunsFromHistory();
+    const filteredRuns = qaArtifactScenarioFilter
+        ? dualRuns.filter(run => String(run?.scenarioId || run?.result?.scenarioId || "") === qaArtifactScenarioFilter)
+        : dualRuns;
+    const latestDualRun = getSelectedQaArtifactRun(filteredRuns) || getLatestDualDeviceRun();
     const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
     const evidenceCounts = buildEvidenceStatusCounts(evidenceEntries);
     const recentEvidence = evidenceEntries.slice(0, 5);
+    const scenarios = Array.isArray(qaPlatformCatalogPayload?.dualDeviceScenarios) ? qaPlatformCatalogPayload.dualDeviceScenarios : [];
+    const androidMappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings) ? qaPlatformCatalogPayload.androidScenarioMappings : [];
+    const selectedScenarioId = String(latestDualRun?.scenarioId || latestDualRun?.result?.scenarioId || qaArtifactScenarioFilter || "");
+    const linkedMappings = selectedScenarioId
+        ? androidMappings.filter(item => String(item?.scenarioId || "") === selectedScenarioId).slice(0, 6)
+        : [];
     const timeline = Array.isArray(latestDualRun?.timeline)
         ? latestDualRun.timeline
         : Array.isArray(latestDualRun?.result?.timeline)
@@ -2033,6 +2104,25 @@ function renderQaArtifactsOverview() {
     }
 
     el.innerHTML = `
+        <div class='python-automation-toolbar' style='margin-block-end: 12px'>
+            <select id='qa-artifact-scenario-filter' onchange='applyQaArtifactFilters()'>
+                <option value=''>Alle Dual-Device-Szenarien</option>
+                ${scenarios.map(item => {
+                    const scenarioId = String(item?.scenarioId || "");
+                    const title = String(item?.title || scenarioId);
+                    return `<option value='${escapeHtml(scenarioId)}' ${qaArtifactScenarioFilter === scenarioId ? "selected" : ""}>${escapeHtml(title)}</option>`;
+                }).join("")}
+            </select>
+            <select id='qa-artifact-run-select' onchange='applyQaArtifactFilters()'>
+                ${filteredRuns.map(run => {
+                    const runId = getSuiteRunIdentifier(run);
+                    const scenarioId = String(run?.scenarioId || run?.result?.scenarioId || "ohne-szenario");
+                    const status = String(run?.status || run?.result?.overallStatus || "-");
+                    return `<option value='${escapeHtml(runId)}' ${qaArtifactSelectedRunId === runId ? "selected" : ""}>${escapeHtml(`${scenarioId} · ${status} · ${runId}`)}</option>`;
+                }).join("") || "<option value=''>Keine Dual-Device-Läufe</option>"}
+            </select>
+            <button class='btn btn-secondary btn-sm' onclick='exportSelectedQaArtifact()'>Artefakt exportieren</button>
+        </div>
         <div class='qa-platform-mini-grid'>
             <section class='python-clarity-box'>
                 <strong>Letzter Dual-Device-Lauf</strong><br />
@@ -2061,6 +2151,10 @@ function renderQaArtifactsOverview() {
             <section class='python-clarity-box'>
                 <strong>Letzte Evidenzartefakte</strong><br />
                 ${recentEvidence.length > 0 ? recentEvidence.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.testTitle || item?.testId || "-"))}</strong><span>${escapeHtml(String(item?.status || "-"))} · ${escapeHtml(String(item?.operator || "-"))}</span><span>${escapeHtml(String(item?.evidenceRef || item?.notes || "-"))}</span></div>`).join("") : "Keine manuellen Evidenzartefakte vorhanden."}
+            </section>
+            <section class='python-clarity-box'>
+                <strong>Verknüpfte Android-Testabdeckung</strong><br />
+                ${linkedMappings.length > 0 ? linkedMappings.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.role || "-"))}</strong><span>${escapeHtml(String(item?.testClass || "-"))}</span><span>${escapeHtml(String(item?.testMethod || "-"))}</span></div>`).join("") : "Keine Android-Testbindungen für das gewählte Szenario vorhanden."}
             </section>
         </div>
     `;
@@ -3643,6 +3737,7 @@ async function loadQaPlatformCatalog() {
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
         qaPlatformCatalogPayload = data;
         renderQaPlatformOverview(data);
+        renderQaArtifactsOverview();
         syncDualDeviceCatalogOptions();
         syncEmulatorReservationOptions();
         setQaRefreshSectionState("qaPlatform", "success", `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen`);
@@ -3650,6 +3745,7 @@ async function loadQaPlatformCatalog() {
     } catch (err) {
         qaPlatformCatalogPayload = null;
         renderQaPlatformOverview(null);
+        renderQaArtifactsOverview();
         syncDualDeviceCatalogOptions();
         syncEmulatorReservationOptions();
         setQaRefreshSectionState("qaPlatform", "error", err.message || "Fehler beim Laden");
