@@ -21,18 +21,37 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
   const createMockElement = (tag: string) => {
     let innerHTML = "";
     let textContent = "";
+    const classes = new Set<string>();
 
     return {
       tagName: tag.toUpperCase(),
       style: {},
       dataset: {},
       value: "",
+      disabled: false,
       appendChild: jest.fn(),
       remove: jest.fn(),
+      querySelectorAll: jest.fn(() => []),
       querySelector: jest.fn(() => ({
         addEventListener: jest.fn(),
       })),
+      classList: {
+        add: jest.fn((value: string) => { classes.add(value); }),
+        remove: jest.fn((value: string) => { classes.delete(value); }),
+        toggle: jest.fn((value: string, force?: boolean) => {
+          if (force === undefined) {
+            if (classes.has(value)) classes.delete(value);
+            else classes.add(value);
+          } else if (force) {
+            classes.add(value);
+          } else {
+            classes.delete(value);
+          }
+        }),
+        contains: jest.fn((value: string) => classes.has(value)),
+      },
       setAttribute: jest.fn(),
+      removeAttribute: jest.fn(),
       select: jest.fn(),
       click: jest.fn(),
       get innerHTML() {
@@ -134,6 +153,8 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  formatPythonAutomationEvidenceDetails,",
     "  getPythonEvidenceRequirements,",
     "  buildPythonEvidenceValidationErrors,",
+    "  renderQaRuntimeModeBanner,",
+    "  applyQaRuntimeInteractionState,",
     "  buildPythonAutomationRunIndex,",
     "  buildPythonAutomationRunClipboardPayload,",
     "  buildFirebaseRecoveryCommands,",
@@ -184,6 +205,7 @@ function loadAdminPanelTestExports(initialStorage: StorageMap = {}) {
     "  buildQaExecutionGuideData,",
     "  getUsbFormVisibilityState,",
     "  buildUsbTestRunRequestPayload,",
+    "  setPythonOperatorRuntimeForTests: (value) => { isPythonOperator = Boolean(value); },",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",
     "};",
@@ -207,6 +229,48 @@ describe("admin-panel helper functions", () => {
     expect(exports.sanitizeAdbSerial("serial;rm -rf /")).toBe("");
     expect(exports.sanitizeApkPath("builds/app-release.apk", "fallback.apk")).toBe("builds/app-release.apk");
     expect(exports.sanitizeApkPath("bad\npath.apk", "fallback.apk")).toBe("fallback.apk");
+  });
+
+  it("disables operator-only QA sections in read-only runtime", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const refreshButton = { disabled: false, setAttribute: jest.fn(), removeAttribute: jest.fn() };
+    const refreshInput = { disabled: false, setAttribute: jest.fn(), removeAttribute: jest.fn() };
+    const qaSection = {
+      classList: {
+        toggle: jest.fn(),
+      },
+      querySelectorAll: jest.fn(() => [refreshButton, refreshInput]),
+    };
+    elements.set("qa-refresh-card", qaSection);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    exports.applyQaRuntimeInteractionState();
+
+    expect(qaSection.classList.toggle).toHaveBeenCalledWith("qa-runtime-section-disabled", true);
+    expect(refreshButton.disabled).toBe(true);
+    expect(refreshInput.disabled).toBe(true);
+    expect(refreshButton.setAttribute).toHaveBeenCalledWith("aria-disabled", "true");
+  });
+
+  it("re-enables operator-only QA sections when python runtime is available", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const actionButton = { disabled: true, setAttribute: jest.fn(), removeAttribute: jest.fn() };
+    const qaSection = {
+      classList: {
+        toggle: jest.fn(),
+      },
+      querySelectorAll: jest.fn(() => [actionButton]),
+    };
+    elements.set("qa-suite-card", qaSection);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.applyQaRuntimeInteractionState();
+
+    expect(qaSection.classList.toggle).toHaveBeenCalledWith("qa-runtime-section-disabled", false);
+    expect(actionButton.disabled).toBe(false);
+    expect(actionButton.removeAttribute).toHaveBeenCalledWith("aria-disabled");
   });
 
   it("derives USB form visibility from test type", () => {
