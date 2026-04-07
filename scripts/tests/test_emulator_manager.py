@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -72,9 +74,68 @@ class TestOverview:
         monkeypatch.setattr(emulator_manager, "avdmanager_binary_path", lambda: Path("C:/Android/Sdk/cmdline-tools/latest/bin/avdmanager.bat"))
         monkeypatch.setattr(emulator_manager, "adb_available", lambda: True)
         monkeypatch.setattr(emulator_manager, "list_avds", lambda: ["Pixel_8_API_34", "Pixel_6_API_31"])
+        monkeypatch.setattr(emulator_manager, "list_running_emulators", lambda: [{"serial": "emulator-5554", "state": "device"}])
         overview = emulator_manager.get_emulator_lab_overview()
 
         assert overview["sdkConfigured"] is True
         assert overview["emulatorBinaryAvailable"] is True
         assert overview["availableAvdCount"] == 2
+        assert overview["runningEmulatorCount"] == 1
         assert overview["matrixPlanCount"] >= 1
+
+
+class TestRunningEmulators:
+    def test_list_running_emulators_parses_adb_devices(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(emulator_manager, "_adb_binary", lambda: "adb")
+
+        completed = subprocess.CompletedProcess(
+            args=["adb", "devices", "-l"],
+            returncode=0,
+            stdout="List of devices attached\nemulator-5554 device product:sdk_gphone64_x86_64 model:Pixel_8 device:emu64xa transport_id:5\n",
+            stderr="",
+        )
+        monkeypatch.setattr(emulator_manager.subprocess, "run", lambda *args, **kwargs: completed)
+
+        result = emulator_manager.list_running_emulators()
+
+        assert len(result) == 1
+        assert result[0]["serial"] == "emulator-5554"
+        assert result[0]["model"] == "Pixel_8"
+
+
+class TestEmulatorLifecycle:
+    def test_start_emulator_launches_process(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(emulator_manager, "list_avds", lambda: ["Pixel_8_API_34"])
+        monkeypatch.setattr(emulator_manager, "emulator_binary_path", lambda: Path("C:/Android/Sdk/emulator/emulator.exe"))
+
+        popen_calls: list[tuple[list[str], dict[str, object]]] = []
+
+        class DummyProcess:
+            pid = 4242
+
+        def fake_popen(command, **kwargs):
+            popen_calls.append((command, kwargs))
+            return DummyProcess()
+
+        monkeypatch.setattr(emulator_manager.subprocess, "Popen", fake_popen)
+
+        result = emulator_manager.start_emulator("Pixel_8_API_34")
+
+        assert result["started"] is True
+        assert result["pid"] == 4242
+        assert popen_calls[0][0][1:3] == ["-avd", "Pixel_8_API_34"]
+
+    def test_stop_emulator_calls_adb_kill(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(emulator_manager, "_adb_binary", lambda: "adb")
+        completed = subprocess.CompletedProcess(
+            args=["adb", "-s", "emulator-5554", "emu", "kill"],
+            returncode=0,
+            stdout="OK\n",
+            stderr="",
+        )
+        monkeypatch.setattr(emulator_manager.subprocess, "run", lambda *args, **kwargs: completed)
+
+        result = emulator_manager.stop_emulator("emulator-5554")
+
+        assert result["stopped"] is True
+        assert result["serial"] == "emulator-5554"
