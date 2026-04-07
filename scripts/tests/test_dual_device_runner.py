@@ -57,6 +57,8 @@ class TestDualDeviceResult:
         assert d["scenarioId"] == "pairing-token-happy-path"
         assert d["profileId"] == "dual-device-balanced"
         assert d["faultModes"] == ["timeout"]
+        assert d["executionPlan"] == []
+        assert d["timeline"] == []
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -196,6 +198,48 @@ class TestRunDualDeviceSequential:
         assert result.scenario_id == "offline-online-resync"
         assert result.profile_id == "dual-device-balanced"
         assert result.fault_modes == ["disconnect"]
+        assert result.execution_plan
+        assert any(step["kind"] == "fault-mode" for step in result.execution_plan)
+        assert result.timeline
+        assert result.timeline[-1]["phase"] == "summary"
+
+    def test_rejects_non_dual_device_profile(self):
+        try:
+            run_dual_device(
+                master_serial="M1",
+                child_serial="C1",
+                profile_id="phone-standard",
+                verbose=False,
+            )
+        except ValueError as exc:
+            assert "kein Dual-Device-Profil" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for non-dual profile")
+
+    @patch("dual_device_runner.run_usb_test")
+    def test_emits_events_via_callback(self, mock_run):
+        from usb_test_runner import UsbTestRunResult
+
+        master_res = UsbTestRunResult(app_id="master", serial="M1", suite="commissioning")
+        master_res.overall_status = "passed"
+        child_res = UsbTestRunResult(app_id="child", serial="C1", suite="commissioning")
+        child_res.overall_status = "passed"
+        mock_run.side_effect = [master_res, child_res]
+
+        events: list[dict[str, object]] = []
+        run_dual_device(
+            master_serial="M1",
+            child_serial="C1",
+            scenario_id="offline-online-resync",
+            profile_id="dual-device-balanced",
+            fault_modes=["disconnect"],
+            on_event=events.append,
+            verbose=False,
+        )
+
+        assert events
+        assert events[0]["phase"] == "preflight"
+        assert events[-1]["phase"] == "summary"
 
     def test_rejects_unknown_scenario(self):
         try:
