@@ -37,6 +37,12 @@ from qa_catalog import (  # noqa: E402
     load_device_profiles,
     load_dual_device_scenarios,
 )
+from emulator_manager import (  # noqa: E402
+    create_reservation as create_emulator_reservation,
+    get_emulator_lab_overview,
+    load_active_reservations as load_emulator_reservations,
+    release_reservation as release_emulator_reservation,
+)
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
 from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
@@ -3383,6 +3389,18 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/qa/dual-device-scenarios":
             return self._write_json(HTTPStatus.OK, {"dualDeviceScenarios": load_dual_device_scenarios()})
 
+        if parsed.path == "/api/qa/emulators":
+            return self._write_json(HTTPStatus.OK, get_emulator_lab_overview())
+
+        if parsed.path == "/api/qa/emulators/reservations":
+            return self._write_json(
+                HTTPStatus.OK,
+                {
+                    "reservations": load_emulator_reservations(),
+                    "count": len(load_emulator_reservations()),
+                },
+            )
+
         if parsed.path == "/api/commissioning/evidence":
             query = parse_qs(parsed.query)
             limit = parse_int(
@@ -3449,6 +3467,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_usb_test()
         if parsed.path == "/api/suites/dual-device":
             return self._handle_dual_device_test()
+        if parsed.path == "/api/qa/emulators/reservations":
+            return self._handle_create_emulator_reservation()
+        if parsed.path == "/api/qa/emulators/release":
+            return self._handle_release_emulator_reservation()
 
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden."})
 
@@ -3613,6 +3635,37 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         return self._write_json(HTTPStatus.OK, {"runId": run_id, "status": "queued"})
+
+    def _handle_create_emulator_reservation(self) -> None:
+        try:
+            payload = self._read_json_body()
+            reservation = create_emulator_reservation(
+                str(payload.get("profileId") or "").strip(),
+                str(payload.get("androidVersion") or "").strip(),
+                owner=str(payload.get("owner") or "").strip(),
+                purpose=str(payload.get("purpose") or "").strip(),
+                ttl_minutes=parse_int(payload.get("ttlMinutes"), default=120, min_value=15, max_value=1440),
+            )
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, reservation)
+
+    def _handle_release_emulator_reservation(self) -> None:
+        try:
+            payload = self._read_json_body()
+            reservation_id = str(payload.get("reservationId") or "").strip()
+            if not reservation_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "reservationId fehlt."})
+            released = release_emulator_reservation(reservation_id)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        if not released:
+            return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Reservierung nicht gefunden."})
+        return self._write_json(HTTPStatus.OK, {"released": True, "reservationId": reservation_id})
 
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))

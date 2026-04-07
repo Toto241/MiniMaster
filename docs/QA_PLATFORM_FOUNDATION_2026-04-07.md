@@ -62,11 +62,19 @@ Damit ist noch keine vollstaendige Fault-Injection implementiert. Diese Stufe li
 
 ## Priorisierte naechste Schritte
 
-1. Emulator-Manager fuer standardisierte Device-Profile aufbauen.
-2. Dual-Device-Runs um echte Fault-Injection und Synchronisationspunkte erweitern.
-3. Admin-Panel um QA-Katalog-, Matrix- und Szenarioansichten erweitern.
-4. Bestehende Android-Instrumentation-Tests an Szenario-IDs und Testfall-IDs koppeln.
-5. Artefakt-Explorer fuer fehlgeschlagene Runs und Release-Evidence integrieren.
+1. Dual-Device-Runs um echte Fault-Injection und Synchronisationspunkte erweitern.
+2. Admin-Panel um QA-Katalog-, Matrix-, Emulator- und Szenarioansichten erweitern.
+3. Bestehende Android-Instrumentation-Tests an Szenario-IDs und Testfall-IDs koppeln.
+4. Artefakt-Explorer fuer fehlgeschlagene Runs und Release-Evidence integrieren.
+5. AVD-Erstellung und Boot-Steuerung direkt aus dem Emulator-Manager ansteuern.
+
+## Zusatzstand: Emulator-Management
+
+Die nachgelagerte Ausbaustufe hat bereits begonnen:
+
+- scripts/emulator_manager.py liefert Matrixplan, SDK-/AVD-Status und Reservierungslogik
+- python_admin/app.py stellt Emulator-Endpunkte fuer Uebersicht und Reservierungen bereit
+- scripts/tests/test_emulator_manager.py prueft Matrixplan und Reservierungslogik
 
 ## Validierung
 

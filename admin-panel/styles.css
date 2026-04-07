@@ -1693,6 +1693,75 @@ input:focus, select:focus, textarea:focus {
     padding: 16px;
 }
 
+.qa-platform-layout {
+    align-items: start;
+}
+
+.qa-platform-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.qa-platform-mini-row {
+    display: grid;
+    gap: 3px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.qa-platform-mini-row:last-child {
+    border-bottom: 0;
+}
+
+.qa-platform-mini-row strong {
+    color: #0f172a;
+    font-size: 0.88rem;
+}
+
+.qa-platform-mini-row span {
+    color: #475569;
+    font-size: 0.8rem;
+}
+
+.qa-platform-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.qa-platform-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 620px;
+}
+
+.qa-platform-table th,
+.qa-platform-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: top;
+    font-size: 0.84rem;
+}
+
+.qa-platform-table th {
+    background: #eff6ff;
+    color: #0f172a;
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.qa-usb-help {
+    display: block;
+    margin-block-start: 4px;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
 .qa-suite-catalog-panel {
     grid-column: 1 / -1;
 }
