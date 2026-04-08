@@ -1578,6 +1578,20 @@
                                             <input type="text" id="suite-usb-android-versions" placeholder="z. B. 10, 14, 15" />
                                             <small class="qa-usb-help">Leer lassen, um das gewählte Preset aus dem QA-Katalog zu verwenden.</small>
                                         </label>
+                                        <div id="suite-usb-compatibility-tests-row" style="display:none">
+                                            <span>Automatisierte Testklassen</span>
+                                            <div id="suite-usb-compatibility-tests" class="data-list" style="max-block-size: 220px; overflow:auto; margin-block-start: 6px">
+                                                <div class="info">Noch kein QA-Katalog geladen.</div>
+                                            </div>
+                                            <small class="qa-usb-help">Mehrfachauswahl. Jede ausgewählte Testklasse wird für jede gewählte Android-Version separat ausgeführt.</small>
+                                        </div>
+                                        <div id="suite-usb-compatibility-scenarios-row" style="display:none">
+                                            <span>Dual-Device-Szenarien für Matrixlauf</span>
+                                            <div id="suite-usb-compatibility-scenarios" class="data-list" style="max-block-size: 220px; overflow:auto; margin-block-start: 6px">
+                                                <div class="info">Noch kein QA-Katalog geladen.</div>
+                                            </div>
+                                            <small class="qa-usb-help">Mehrfachauswahl. Jedes gewählte Szenario wird für jede passende Android-Version als eigener Dual-Device-Lauf ausgeführt.</small>
+                                        </div>
                                         <div class="setup-actions" style="gap: 8px; flex-wrap: wrap">
                                             <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="suite-usb-install-apk" />

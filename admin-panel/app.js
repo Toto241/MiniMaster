@@ -2338,6 +2338,7 @@ function renderCompatibilityMatrixTable(run) {
                         const details = [
                             item?.appId ? `App: ${String(item.appId)}` : "",
                             item?.scenarioId ? `Szenario: ${String(item.scenarioId)}` : "",
+                            item?.testClass ? `Testklasse: ${String(item.testClass)}` : "",
                             item?.error ? `Fehler: ${String(item.error)}` : "",
                             item?.result?.error ? `Fehler: ${String(item.result.error)}` : "",
                         ].filter(Boolean).join(" · ");
@@ -3828,18 +3829,123 @@ function getAndroidVersionsForCompatibilityPreset(preset) {
 
 function syncUsbCompatibilityControls() {
     const compatibilityToggle = document.getElementById("suite-usb-compatibility-mode");
+    const typeSelect = document.getElementById("suite-usb-test-type");
     const presetSelect = document.getElementById("suite-usb-compatibility-preset");
     const versionsInput = document.getElementById("suite-usb-android-versions");
     const presetRow = document.getElementById("suite-usb-compatibility-preset-row");
     const versionsRow = document.getElementById("suite-usb-android-versions-row");
+    const testsRow = document.getElementById("suite-usb-compatibility-tests-row");
+    const scenariosRow = document.getElementById("suite-usb-compatibility-scenarios-row");
     const compatibilityEnabled = compatibilityToggle?.checked || false;
+    const isDual = (typeSelect?.value || "single-master") === "dual-device";
     if (presetRow) presetRow.style.display = compatibilityEnabled ? "" : "none";
     if (versionsRow) versionsRow.style.display = compatibilityEnabled ? "" : "none";
+    if (testsRow) testsRow.style.display = compatibilityEnabled && !isDual ? "" : "none";
+    if (scenariosRow) scenariosRow.style.display = compatibilityEnabled && isDual ? "" : "none";
     if (!compatibilityEnabled || !presetSelect || !versionsInput) return;
     const preset = presetSelect.value || "active";
     if (preset !== "custom" && !String(versionsInput.value || "").trim()) {
         versionsInput.value = getAndroidVersionsForCompatibilityPreset(preset).join(", ");
     }
+    renderCompatibilitySelectionOptions();
+}
+
+function getCheckedValuesFromContainer(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    return Array.from(container.querySelectorAll("input[type='checkbox']:checked"))
+        .map(input => String(input.value || "").trim())
+        .filter(Boolean);
+}
+
+function getCompatibilitySelectionVersions() {
+    const versionsInput = document.getElementById("suite-usb-android-versions");
+    const presetSelect = document.getElementById("suite-usb-compatibility-preset");
+    const typedVersions = parseQaMultiValueInput(versionsInput?.value || "");
+    if (typedVersions.length > 0) return typedVersions;
+    return getAndroidVersionsForCompatibilityPreset(presetSelect?.value || "active");
+}
+
+function renderCompatibilitySelectionOptions() {
+    const compatibilityToggle = document.getElementById("suite-usb-compatibility-mode");
+    const typeSelect = document.getElementById("suite-usb-test-type");
+    const testsContainer = document.getElementById("suite-usb-compatibility-tests");
+    const scenariosContainer = document.getElementById("suite-usb-compatibility-scenarios");
+    if (!testsContainer || !scenariosContainer) return;
+
+    const compatibilityEnabled = compatibilityToggle?.checked || false;
+    const testType = String(typeSelect?.value || "single-master");
+    if (!compatibilityEnabled) {
+        testsContainer.innerHTML = "<div class='info'>Android-Kompatibilitätsmatrix aktivieren, um Tests auszuwählen.</div>";
+        scenariosContainer.innerHTML = "<div class='info'>Android-Kompatibilitätsmatrix aktivieren, um Szenarien auszuwählen.</div>";
+        return;
+    }
+
+    const selectedVersions = getCompatibilitySelectionVersions();
+    const scenarios = Array.isArray(qaPlatformCatalogPayload?.dualDeviceScenarios) ? qaPlatformCatalogPayload.dualDeviceScenarios : [];
+    const mappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings) ? qaPlatformCatalogPayload.androidScenarioMappings : [];
+    const selectedTests = new Set(getCheckedValuesFromContainer("suite-usb-compatibility-tests"));
+    const selectedScenarios = new Set(getCheckedValuesFromContainer("suite-usb-compatibility-scenarios"));
+    const allowedScenarioIds = new Set(
+        scenarios
+            .filter(item => {
+                const scenarioVersions = Array.isArray(item?.androidVersions) ? item.androidVersions.map(entry => String(entry || "").trim()).filter(Boolean) : [];
+                return selectedVersions.length === 0 || scenarioVersions.length === 0 || scenarioVersions.some(version => selectedVersions.includes(version));
+            })
+            .map(item => String(item?.scenarioId || "").trim())
+            .filter(Boolean),
+    );
+
+    if (testType === "dual-device") {
+        const compatibleScenarios = scenarios.filter(item => allowedScenarioIds.has(String(item?.scenarioId || "").trim()));
+        scenariosContainer.innerHTML = compatibleScenarios.length > 0
+            ? compatibleScenarios.map(item => {
+                const scenarioId = String(item?.scenarioId || "").trim();
+                const title = String(item?.title || scenarioId).trim();
+                const versions = Array.isArray(item?.androidVersions) ? item.androidVersions.map(entry => String(entry || "").trim()).filter(Boolean) : [];
+                const description = String(item?.description || "").trim();
+                return `
+                    <label class='data-row' style='display:grid;gap:2px'>
+                        <span><input type='checkbox' value='${escapeHtml(scenarioId)}' ${selectedScenarios.has(scenarioId) ? "checked" : ""} /> <strong>${escapeHtml(title)}</strong></span>
+                        <span class='qa-refresh-meta'>${escapeHtml(description || "Kein Beschreibungstext hinterlegt.")}</span>
+                        <span class='qa-refresh-meta'>Android: ${escapeHtml(versions.join(", ") || "offen")}</span>
+                    </label>
+                `;
+            }).join("")
+            : "<div class='info'>Keine passenden Dual-Device-Szenarien für die gewählten Android-Versionen im QA-Katalog gefunden.</div>";
+        testsContainer.innerHTML = "<div class='info'>Für Dual-Device-Läufe werden Szenarien statt Einzel-Testklassen ausgewählt.</div>";
+        return;
+    }
+
+    const role = testType === "single-child" ? "child" : "master";
+    const compatibleTests = [];
+    const seenTestClasses = new Set();
+    mappings.forEach(item => {
+        const mappingRole = String(item?.role || "").trim();
+        const testClass = String(item?.testClass || "").trim();
+        const scenarioId = String(item?.scenarioId || "").trim();
+        if (mappingRole !== role || !testClass || seenTestClasses.has(testClass)) return;
+        if (allowedScenarioIds.size > 0 && scenarioId && !allowedScenarioIds.has(scenarioId)) return;
+        seenTestClasses.add(testClass);
+        compatibleTests.push({
+            testClass,
+            testMethod: String(item?.testMethod || "").trim(),
+            scenarioId,
+            coverage: String(item?.coverage || "").trim(),
+            sourcePath: String(item?.sourcePath || "").trim(),
+        });
+    });
+
+    testsContainer.innerHTML = compatibleTests.length > 0
+        ? compatibleTests.map(item => `
+            <label class='data-row' style='display:grid;gap:2px'>
+                <span><input type='checkbox' value='${escapeHtml(item.testClass)}' ${selectedTests.has(item.testClass) ? "checked" : ""} /> <strong>${escapeHtml(item.testClass)}</strong></span>
+                <span class='qa-refresh-meta'>Szenario: ${escapeHtml(item.scenarioId || "ohne Zuordnung")} · Methode: ${escapeHtml(item.testMethod || "alle")}</span>
+                <span class='qa-refresh-meta'>Coverage: ${escapeHtml(item.coverage || "-")} · Quelle: ${escapeHtml(item.sourcePath || "-")}</span>
+            </label>
+        `).join("")
+        : "<div class='info'>Keine kompatiblen Testklassen für die gewählten Android-Versionen gefunden.</div>";
+    scenariosContainer.innerHTML = "<div class='info'>Für Einzel-App-Läufe werden Testklassen statt Dual-Device-Szenarien ausgewählt.</div>";
 }
 
 function buildUsbTestRunRequestPayload(input) {
@@ -3848,10 +3954,18 @@ function buildUsbTestRunRequestPayload(input) {
     const childSerial = String(input?.childSerial || "").trim();
     const androidVersions = Array.isArray(input?.androidVersions) ? input.androidVersions : [];
     const compatibilityMode = Boolean(input?.compatibilityMode);
+    const selectedTestClasses = Array.isArray(input?.selectedTestClasses) ? input.selectedTestClasses.map(item => String(item || "").trim()).filter(Boolean) : [];
+    const selectedScenarioIds = Array.isArray(input?.selectedScenarioIds) ? input.selectedScenarioIds.map(item => String(item || "").trim()).filter(Boolean) : [];
 
     if (compatibilityMode) {
         if (androidVersions.length === 0) {
             return { error: "Bitte mindestens eine Android-Version für den Kompatibilitätslauf angeben." };
+        }
+        if (testType === "dual-device" && selectedScenarioIds.length === 0 && !String(input?.scenarioId || "").trim()) {
+            return { error: "Bitte mindestens ein Dual-Device-Szenario für den Kompatibilitätslauf auswählen." };
+        }
+        if (testType !== "dual-device" && selectedTestClasses.length === 0) {
+            return { error: "Bitte mindestens eine automatisierte Testklasse für den Kompatibilitätslauf auswählen." };
         }
         return {
             endpoint: "/api/suites/android-compatibility",
@@ -3866,6 +3980,8 @@ function buildUsbTestRunRequestPayload(input) {
                 skipActivation: Boolean(input?.skipActivation),
                 parallel: Boolean(input?.parallel),
                 scenarioId: String(input?.scenarioId || "").trim(),
+                selectedScenarioIds,
+                selectedTestClasses,
                 profileId: String(input?.profileId || "").trim(),
                 faultModes: Array.isArray(input?.faultModes) ? input.faultModes : [],
             },
@@ -3979,6 +4095,8 @@ function syncDualDeviceCatalogOptions() {
             profileSelect.value = currentValue;
         }
     }
+
+    renderCompatibilitySelectionOptions();
 }
 
 function syncEmulatorReservationOptions() {
@@ -4615,6 +4733,8 @@ async function startUsbTestRun() {
         masterSerial: document.getElementById("suite-usb-master-serial")?.value || "auto",
         childSerial: document.getElementById("suite-usb-child-serial")?.value || "",
         scenarioId: document.getElementById("suite-usb-dual-scenario")?.value || "",
+        selectedScenarioIds: getCheckedValuesFromContainer("suite-usb-compatibility-scenarios"),
+        selectedTestClasses: getCheckedValuesFromContainer("suite-usb-compatibility-tests"),
         profileId: document.getElementById("suite-usb-dual-profile")?.value || "",
         faultModes: parseQaMultiValueInput(document.getElementById("suite-usb-fault-modes")?.value || ""),
         suite: document.getElementById("suite-usb-suite")?.value || "commissioning",
@@ -4839,6 +4959,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             syncUsbCompatibilityControls();
         });
+    }
+    const compatibilityVersionsInput = document.getElementById("suite-usb-android-versions");
+    if (compatibilityVersionsInput) {
+        compatibilityVersionsInput.addEventListener("input", renderCompatibilitySelectionOptions);
     }
     const protocolStatusEl = document.getElementById("python-automation-protocol-status");
     if (protocolStatusEl) {
