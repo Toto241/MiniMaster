@@ -227,6 +227,8 @@ let suiteCatalogPayload = [];
 let suiteRunHistoryPayload = [];
 let qaArtifactSelectedRunId = "";
 let qaArtifactScenarioFilter = "";
+let qaCompatibilitySelectedRunId = "";
+let qaCompatibilityModeFilter = "all";
 let qaDashboardLoadPromise = null;
 let qaRefreshState = {
     lastStartedAt: "",
@@ -2217,6 +2219,10 @@ function getDualDeviceRunsFromHistory() {
     });
 }
 
+function getCompatibilityRunsFromHistory() {
+    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => String(run?.type || "") === "android-compatibility");
+}
+
 function getSuiteRunIdentifier(run) {
     return String(run?.runId || run?.run_id || "");
 }
@@ -2226,6 +2232,21 @@ function getSelectedQaArtifactRun(filteredRuns = getDualDeviceRunsFromHistory())
     if (selected) return selected;
     const fallback = filteredRuns[0] || null;
     qaArtifactSelectedRunId = fallback ? getSuiteRunIdentifier(fallback) : "";
+    return fallback;
+}
+
+function getFilteredCompatibilityRuns() {
+    const compatibilityRuns = getCompatibilityRunsFromHistory();
+    return qaCompatibilityModeFilter && qaCompatibilityModeFilter !== "all"
+        ? compatibilityRuns.filter(run => String(run?.executionMode || run?.result?.executionMode || "") === qaCompatibilityModeFilter)
+        : compatibilityRuns;
+}
+
+function getSelectedCompatibilityRun(filteredRuns = getFilteredCompatibilityRuns()) {
+    const selected = filteredRuns.find(run => getSuiteRunIdentifier(run) === qaCompatibilitySelectedRunId) || null;
+    if (selected) return selected;
+    const fallback = filteredRuns[0] || null;
+    qaCompatibilitySelectedRunId = fallback ? getSuiteRunIdentifier(fallback) : "";
     return fallback;
 }
 
@@ -2254,6 +2275,87 @@ function applyQaArtifactFilters() {
     qaArtifactScenarioFilter = document.getElementById("qa-artifact-scenario-filter")?.value || "";
     qaArtifactSelectedRunId = document.getElementById("qa-artifact-run-select")?.value || "";
     renderQaArtifactsOverview();
+}
+
+function applyQaCompatibilityFilters() {
+    qaCompatibilityModeFilter = document.getElementById("qa-compatibility-mode-filter")?.value || "all";
+    qaCompatibilitySelectedRunId = document.getElementById("qa-compatibility-run-select")?.value || "";
+    renderQaArtifactsOverview();
+}
+
+function normalizeCompatibilitySubRuns(run) {
+    return Array.isArray(run?.subRuns)
+        ? run.subRuns
+        : Array.isArray(run?.result?.subRuns)
+            ? run.result.subRuns
+            : [];
+}
+
+function getCompatibilityRunSummary(run) {
+    const summary = run?.result?.summary;
+    if (summary && typeof summary === "object") return summary;
+    const subRuns = normalizeCompatibilitySubRuns(run);
+    const counts = { total: subRuns.length, passed: 0, failed: 0, error: 0, skipped: 0 };
+    subRuns.forEach(item => {
+        const status = String(item?.status || "").toLowerCase();
+        if (status === "passed" || status === "failed" || status === "error" || status === "skipped") {
+            counts[status] += 1;
+        }
+    });
+    return {
+        counts,
+        overallStatus: counts.failed || counts.error ? "failed" : counts.passed ? "passed" : "skipped",
+    };
+}
+
+function renderCompatibilityMatrixTable(run) {
+    const subRuns = normalizeCompatibilitySubRuns(run);
+    if (subRuns.length === 0) {
+        return "<div class='info'>Für den ausgewählten Kompatibilitätslauf liegen noch keine Teil-Ergebnisse vor.</div>";
+    }
+
+    return `
+        <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
+            <table class='qa-platform-table qa-compatibility-table'>
+                <thead>
+                    <tr>
+                        <th>Android</th>
+                        <th>Modus</th>
+                        <th>Status</th>
+                        <th>Profil</th>
+                        <th>Ziel / Provisionierung</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${subRuns.map(item => {
+                        const status = String(item?.status || item?.result?.status || item?.result?.overallStatus || "-");
+                        const executionMode = String(item?.executionMode || run?.executionMode || run?.result?.executionMode || "-");
+                        const provisioning = Array.isArray(item?.provisioning) ? item.provisioning : [];
+                        const provisionText = provisioning.length > 0
+                            ? provisioning.map(entry => `${String(entry?.serial || "-")} (${String(entry?.avdName || entry?.profileId || "AVD")})`).join(" · ")
+                            : (String(item?.result?.serial || item?.result?.masterResult?.serial || "") || "manuell / vorhanden");
+                        const details = [
+                            item?.appId ? `App: ${String(item.appId)}` : "",
+                            item?.scenarioId ? `Szenario: ${String(item.scenarioId)}` : "",
+                            item?.error ? `Fehler: ${String(item.error)}` : "",
+                            item?.result?.error ? `Fehler: ${String(item.result.error)}` : "",
+                        ].filter(Boolean).join(" · ");
+                        return `
+                            <tr>
+                                <td><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong></td>
+                                <td>${escapeHtml(executionMode)}</td>
+                                <td><span class='badge ${status === "passed" ? "pass" : status === "skipped" ? "running" : status === "running" ? "running" : "fail"}'>${escapeHtml(status)}</span></td>
+                                <td>${escapeHtml(String(item?.profileId || "-"))}</td>
+                                <td>${escapeHtml(provisionText || "-")}</td>
+                                <td>${escapeHtml(details || "-")}</td>
+                            </tr>
+                        `;
+                    }).join("")}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 function exportSelectedQaArtifact() {
@@ -2299,6 +2401,9 @@ function renderQaArtifactsOverview() {
 
     const filteredRuns = getFilteredDualDeviceRuns();
     const latestDualRun = getSelectedQaArtifactRun(filteredRuns) || getLatestDualDeviceRun();
+    const filteredCompatibilityRuns = getFilteredCompatibilityRuns();
+    const selectedCompatibilityRun = getSelectedCompatibilityRun(filteredCompatibilityRuns);
+    const compatibilitySummary = selectedCompatibilityRun ? getCompatibilityRunSummary(selectedCompatibilityRun) : null;
     const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
     const evidenceCounts = buildEvidenceStatusCounts(evidenceEntries);
     const recentEvidence = evidenceEntries.slice(0, 5);
@@ -2315,7 +2420,7 @@ function renderQaArtifactsOverview() {
             : [];
     const faultModes = Array.isArray(latestDualRun?.result?.faultModes) ? latestDualRun.result.faultModes : [];
 
-    if (!latestDualRun && evidenceEntries.length === 0) {
+    if (!latestDualRun && !selectedCompatibilityRun && evidenceEntries.length === 0) {
         el.innerHTML = "<div class='info'>Noch keine Artefakte oder Laufspuren vorhanden.</div>";
         return;
     }
@@ -2358,6 +2463,43 @@ function renderQaArtifactsOverview() {
                     <strong>${escapeHtml(String(evidenceEntries.length))} Nachweise</strong>
                     <span>PASS ${escapeHtml(String(evidenceCounts.pass))} · FAIL ${escapeHtml(String(evidenceCounts.fail))} · Offen ${escapeHtml(String(evidenceCounts.manual_required))}</span>
                 </div>
+            </section>
+        </div>
+        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
+            <section class='python-clarity-box qa-compatibility-box'>
+                <strong>Android-Kompatibilitätsmatrix</strong><br />
+                <div class='python-automation-toolbar qa-compatibility-toolbar' style='margin-block: 12px 8px'>
+                    <select id='qa-compatibility-mode-filter' onchange='applyQaCompatibilityFilters()'>
+                        <option value='all'>Alle Modi</option>
+                        <option value='single-master' ${qaCompatibilityModeFilter === "single-master" ? "selected" : ""}>Master-App</option>
+                        <option value='single-child' ${qaCompatibilityModeFilter === "single-child" ? "selected" : ""}>Kind-App</option>
+                        <option value='dual-device' ${qaCompatibilityModeFilter === "dual-device" ? "selected" : ""}>Dual-Device</option>
+                    </select>
+                    <select id='qa-compatibility-run-select' onchange='applyQaCompatibilityFilters()'>
+                        ${filteredCompatibilityRuns.map(run => {
+                            const runId = getSuiteRunIdentifier(run);
+                            const executionMode = String(run?.executionMode || run?.result?.executionMode || "-");
+                            const versions = Array.isArray(run?.androidVersions) ? run.androidVersions : Array.isArray(run?.result?.androidVersions) ? run.result.androidVersions : [];
+                            const status = String(run?.result?.overallStatus || run?.status || "-");
+                            return `<option value='${escapeHtml(runId)}' ${qaCompatibilitySelectedRunId === runId ? "selected" : ""}>${escapeHtml(`${executionMode} · ${versions.join(", ") || "-"} · ${status}`)}</option>`;
+                        }).join("") || "<option value=''>Keine Kompatibilitätsläufe</option>"}
+                    </select>
+                </div>
+                ${selectedCompatibilityRun ? `
+                    <div class='qa-platform-mini-grid qa-compatibility-summary-grid'>
+                        <div class='qa-platform-mini-row'>
+                            <strong>${escapeHtml(String(selectedCompatibilityRun?.executionMode || selectedCompatibilityRun?.result?.executionMode || "-"))}</strong>
+                            <span>Versionen: ${escapeHtml((selectedCompatibilityRun?.androidVersions || selectedCompatibilityRun?.result?.androidVersions || []).join(", ") || "-")}</span>
+                            <span>Status: ${escapeHtml(String(compatibilitySummary?.overallStatus || "-"))}</span>
+                        </div>
+                        <div class='qa-platform-mini-row'>
+                            <strong>Teil-Läufe</strong>
+                            <span>PASS ${escapeHtml(String(compatibilitySummary?.counts?.passed || 0))} · FAIL ${escapeHtml(String(compatibilitySummary?.counts?.failed || 0))} · ERROR ${escapeHtml(String(compatibilitySummary?.counts?.error || 0))} · SKIP ${escapeHtml(String(compatibilitySummary?.counts?.skipped || 0))}</span>
+                            <span>Run-ID: ${escapeHtml(getSuiteRunIdentifier(selectedCompatibilityRun) || "-")}</span>
+                        </div>
+                    </div>
+                    ${renderCompatibilityMatrixTable(selectedCompatibilityRun)}
+                ` : "Noch kein Android-Kompatibilitätslauf protokolliert."}
             </section>
         </div>
         <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
