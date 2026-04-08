@@ -203,6 +203,27 @@ class TestRunDualDeviceSequential:
         assert result.timeline
         assert result.timeline[-1]["phase"] == "summary"
 
+    @patch("dual_device_runner.run_usb_test")
+    def test_passes_expected_android_version_to_both_runs(self, mock_run):
+        from usb_test_runner import UsbTestRunResult
+
+        master_res = UsbTestRunResult(app_id="master", serial="M1", suite="commissioning")
+        master_res.overall_status = "passed"
+        child_res = UsbTestRunResult(app_id="child", serial="C1", suite="commissioning")
+        child_res.overall_status = "passed"
+        mock_run.side_effect = [master_res, child_res]
+
+        result = run_dual_device(
+            master_serial="M1",
+            child_serial="C1",
+            expected_android_version="14",
+            verbose=False,
+        )
+
+        assert result.android_version == "14"
+        assert mock_run.call_args_list[0].kwargs["expected_android_version"] == "14"
+        assert mock_run.call_args_list[1].kwargs["expected_android_version"] == "14"
+
     def test_rejects_non_dual_device_profile(self):
         try:
             run_dual_device(

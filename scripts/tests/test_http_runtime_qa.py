@@ -113,6 +113,18 @@ class TestQaRuntimeHttpContracts:
         payload = json.loads(exc_info.value.read().decode("utf-8"))
         assert payload["error"] == "masterSerial und childSerial sind erforderlich."
 
+    def test_runtime_http_rejects_invalid_android_compatibility_requests(self, qa_http_server: str):
+        with pytest.raises(HTTPError) as exc_info:
+            _read_json(
+                f"{qa_http_server}/api/suites/android-compatibility",
+                method="POST",
+                body={"executionMode": "single-master", "androidVersions": []},
+            )
+
+        assert exc_info.value.code == 400
+        payload = json.loads(exc_info.value.read().decode("utf-8"))
+        assert payload["error"] == "Mindestens eine gültige Android-Version ist erforderlich."
+
     def test_runtime_http_serves_duplicate_coverage_insights_in_testing_register(self, qa_http_server: str):
         status, headers, payload = _read_json(f"{qa_http_server}/api/testing/register")
 

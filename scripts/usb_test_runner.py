@@ -84,6 +84,8 @@ class UsbTestRunResult:
     app_id: str
     serial: str
     suite: str
+    requested_android_version: str = ""
+    detected_android_version: str = ""
     steps: list[dict[str, object]] = field(default_factory=list)
     test_summary: InstrumentedTestSummary | None = None
     gradle_exit_code: int = -1
@@ -167,6 +169,7 @@ def run_usb_test(
     apk_path: str = "",
     uninstall_first: bool = False,
     timeout_sec: int = 3600,
+    expected_android_version: str = "",
     verbose: bool = True,
 ) -> UsbTestRunResult:
     """
@@ -187,7 +190,12 @@ def run_usb_test(
     Returns: UsbTestRunResult mit allen Details
     """
     started = time.perf_counter()
-    result = UsbTestRunResult(app_id=app_id, serial=serial, suite=suite)
+    result = UsbTestRunResult(
+        app_id=app_id,
+        serial=serial,
+        suite=suite,
+        requested_android_version=str(expected_android_version or "").strip(),
+    )
     package = PACKAGES.get(app_id)
     app_module = APP_MODULES.get(app_id)
 
@@ -233,8 +241,22 @@ def run_usb_test(
     adb = AdbClient(serial=serial)
     model = adb.get_device_model()
     android_ver = adb.get_android_version()
+    result.detected_android_version = android_ver
     _log_step(result, "check-device", "Gerät prüfen", "pass",
               f"{serial} ({model}, Android {android_ver})")
+
+    if result.requested_android_version and android_ver != result.requested_android_version:
+        msg = (
+            f"Verbundenes Gerät hat Android {android_ver}; erwartet war Android {result.requested_android_version}. "
+            "Für einen versionsspezifischen Kompatibilitätslauf bitte passendes Gerät oder AVD verbinden."
+        )
+        _log_step(result, "check-android-version", "Android-Version prüfen", "fail", msg)
+        _print(f"✘  {msg}")
+        result.error = msg
+        result.reason = msg
+        result.overall_status = "error"
+        result.duration_sec = round(time.perf_counter() - started, 2)
+        return result
 
     # ── Schritt 2: APK installieren (optional) ───────────────────────────
     if install_apk:
@@ -455,6 +477,7 @@ def main() -> int:
     parser.add_argument("--apk-path", default="", help="Expliziter APK-Pfad")
     parser.add_argument("--uninstall-first", action="store_true", help="App vor Install deinstallieren")
     parser.add_argument("--timeout", type=int, default=3600, help="Timeout in Sekunden")
+    parser.add_argument("--expected-android-version", default="", help="Erwartete Android-Version fuer Kompatibilitaetslauf")
     parser.add_argument("--json-out", type=Path, default=None, help="JSON-Ergebnis speichern")
     args = parser.parse_args()
 
@@ -468,6 +491,7 @@ def main() -> int:
         apk_path=args.apk_path,
         uninstall_first=args.uninstall_first,
         timeout_sec=args.timeout,
+        expected_android_version=args.expected_android_version,
     )
 
     if args.json_out:

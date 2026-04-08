@@ -1561,6 +1561,22 @@
                                                 <option value="default">Alle Tests</option>
                                             </select>
                                         </label>
+                                        <label id="suite-usb-compatibility-preset-row">
+                                            <span>Kompatibilitäts-Preset</span>
+                                            <select id="suite-usb-compatibility-preset">
+                                                <option value="active">Alle aktiven Versionen</option>
+                                                <option value="baseline">Nur Baseline</option>
+                                                <option value="full">Nur Full-Coverage</option>
+                                                <option value="canary">Nur Canary/Preview</option>
+                                                <option value="custom">Benutzerdefiniert</option>
+                                            </select>
+                                            <small class="qa-usb-help">Steuert, welche Android-Versionen für den Batch-Lauf geprüft werden.</small>
+                                        </label>
+                                        <label id="suite-usb-android-versions-row">
+                                            <span>Android-Versionen</span>
+                                            <input type="text" id="suite-usb-android-versions" placeholder="z. B. 10, 14, 15" />
+                                            <small class="qa-usb-help">Leer lassen, um das gewählte Preset aus dem QA-Katalog zu verwenden.</small>
+                                        </label>
                                         <div class="setup-actions" style="gap: 8px; flex-wrap: wrap">
                                             <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="suite-usb-install-apk" />
@@ -1573,6 +1589,10 @@
                                             <label class="setup-checklist-item python-inline-check" id="suite-usb-parallel-row">
                                                 <input type="checkbox" id="suite-usb-parallel" />
                                                 Parallel (Dual-Device)
+                                            </label>
+                                            <label class="setup-checklist-item python-inline-check" id="suite-usb-compatibility-mode-row">
+                                                <input type="checkbox" id="suite-usb-compatibility-mode" />
+                                                Android-Kompatibilitätsmatrix als Batch ausführen
                                             </label>
                                         </div>
                                     </div>

@@ -29,6 +29,7 @@ DEFAULT_JSON_OUT = REPO_ROOT / "build" / "test-automation" / "dual-device-latest
 class DualDeviceResult:
     master_serial: str
     child_serial: str
+    android_version: str = ""
     scenario_id: str = ""
     scenario_title: str = ""
     profile_id: str = ""
@@ -44,6 +45,7 @@ class DualDeviceResult:
         return {
             "masterSerial": self.master_serial,
             "childSerial": self.child_serial,
+            "androidVersion": self.android_version,
             "scenarioId": self.scenario_id,
             "scenarioTitle": self.scenario_title,
             "profileId": self.profile_id,
@@ -199,6 +201,7 @@ def run_dual_device(
     scenario_id: str = "",
     profile_id: str = "",
     fault_modes: list[str] | None = None,
+    expected_android_version: str = "",
     on_event: Callable[[dict[str, object]], None] | None = None,
     verbose: bool = True,
 ) -> DualDeviceResult:
@@ -226,6 +229,7 @@ def run_dual_device(
     result = DualDeviceResult(
         master_serial=master_serial,
         child_serial=child_serial,
+        android_version=expected_android_version.strip(),
         scenario_id=scenario_id.strip(),
         scenario_title=str(scenario.get("title", "")) if scenario else "",
         profile_id=profile_id.strip(),
@@ -291,6 +295,7 @@ def run_dual_device(
             apk_path=master_apk_path,
             uninstall_first=uninstall_first,
             timeout_sec=timeout_sec,
+            expected_android_version=expected_android_version,
             verbose=verbose and not parallel,
         )
 
@@ -304,6 +309,7 @@ def run_dual_device(
             apk_path=child_apk_path,
             uninstall_first=uninstall_first,
             timeout_sec=timeout_sec,
+            expected_android_version=expected_android_version,
             verbose=verbose and not parallel,
         )
 
