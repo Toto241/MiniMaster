@@ -283,6 +283,39 @@ class TestMiniMasterAdminHandlerRoutes:
         assert queued["type"] == "android-compatibility"
         assert queued["androidVersions"] == ["10", "14"]
 
+    def test_do_post_android_compatibility_keeps_selected_tests_and_scenarios(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility")
+        handler._read_json_body.return_value = {
+            "executionMode": "dual-device",
+            "androidVersions": ["14"],
+            "masterSerial": "auto",
+            "childSerial": "auto",
+            "selectedScenarioIds": ["offline-online-resync", "pairing-code-expiry"],
+            "selectedTestClasses": ["com.minimaster.masterapp.MasterScenarioTest"],
+        }
+
+        fake_thread = MagicMock()
+        fake_thread.start = MagicMock()
+        thread_cls = MagicMock(return_value=fake_thread)
+
+        class _FakeUuid:
+            hex = "feedface12345678"
+
+        monkeypatch.setattr(app.threading, "Thread", thread_cls)
+        monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        with app._active_suite_lock:
+            queued = app._active_suite_runs["compat-feedface1234"]
+        assert queued["selectedScenarioIds"] == ["offline-online-resync", "pairing-code-expiry"]
+        assert queued["selectedTestClasses"] == ["com.minimaster.masterapp.MasterScenarioTest"]
+
     def test_do_post_android_compatibility_rejects_missing_dual_serials(self):
         import app
 
@@ -1225,6 +1258,42 @@ class TestRunAndroidCompatibilityBackground:
         with _active_suite_lock:
             assert _active_suite_runs[run_id]["subRuns"][0]["provisioning"][0]["serial"] == "emulator-5554"
 
+    @patch("app.run_usb_test")
+    def test_runs_each_selected_test_class_per_android_version(self, mock_run_usb, suite_log_file):
+        from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
+        from usb_test_runner import UsbTestRunResult
+
+        run_id = "compat-selected-tests"
+        first = UsbTestRunResult(app_id="master", serial="DEVICE-1", suite="commissioning")
+        first.overall_status = "passed"
+        second = UsbTestRunResult(app_id="master", serial="DEVICE-1", suite="commissioning")
+        second.overall_status = "passed"
+        mock_run_usb.side_effect = [first, second]
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_android_compatibility_background(run_id, {
+            "execution_mode": "single-master",
+            "android_versions": ["14"],
+            "app_id": "master",
+            "serial": "DEVICE-1",
+            "suite": "commissioning",
+            "selected_test_classes": [
+                "com.minimaster.masterapp.FirstUiTest",
+                "com.minimaster.masterapp.SecondUiTest",
+            ],
+        })
+
+        assert mock_run_usb.call_count == 2
+        assert mock_run_usb.call_args_list[0].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.FirstUiTest"]
+        assert mock_run_usb.call_args_list[1].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.SecondUiTest"]
+        with _active_suite_lock:
+            sub_runs = _active_suite_runs[run_id]["subRuns"]
+        assert len(sub_runs) == 2
+        assert sub_runs[0]["testClass"] == "com.minimaster.masterapp.FirstUiTest"
+        assert sub_runs[1]["testClass"] == "com.minimaster.masterapp.SecondUiTest"
+
     @patch("app.ensure_emulator_pool")
     @patch("app.run_dual_device")
     def test_provisions_two_emulators_when_dual_run_uses_auto_serials(self, mock_run_dual, mock_pool, suite_log_file):
@@ -1256,6 +1325,45 @@ class TestRunAndroidCompatibilityBackground:
         mock_pool.assert_called_once()
         assert mock_run_dual.call_args.kwargs["master_serial"] == "emulator-5554"
         assert mock_run_dual.call_args.kwargs["child_serial"] == "emulator-5556"
+
+    @patch("app.load_dual_device_scenarios")
+    @patch("app.run_dual_device")
+    def test_runs_each_selected_dual_scenario_for_matching_android_version(self, mock_run_dual, mock_scenarios, suite_log_file):
+        from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
+        from dual_device_runner import DualDeviceResult
+
+        run_id = "compat-selected-scenarios"
+        first = DualDeviceResult(master_serial="M1", child_serial="C1")
+        first.overall_status = "passed"
+        second = DualDeviceResult(master_serial="M1", child_serial="C1")
+        second.overall_status = "passed"
+        mock_run_dual.side_effect = [first, second]
+        mock_scenarios.return_value = [
+            {"scenarioId": "offline-online-resync", "androidVersions": ["14"]},
+            {"scenarioId": "pairing-code-expiry", "androidVersions": ["14", "15"]},
+            {"scenarioId": "legacy-only", "androidVersions": ["10"]},
+        ]
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_android_compatibility_background(run_id, {
+            "execution_mode": "dual-device",
+            "android_versions": ["14"],
+            "master_serial": "M1",
+            "child_serial": "C1",
+            "selected_scenario_ids": ["offline-online-resync", "pairing-code-expiry", "legacy-only"],
+            "profile_id": "dual-device-balanced",
+            "fault_modes": [],
+        })
+
+        assert mock_run_dual.call_count == 2
+        assert mock_run_dual.call_args_list[0].kwargs["scenario_id"] == "offline-online-resync"
+        assert mock_run_dual.call_args_list[1].kwargs["scenario_id"] == "pairing-code-expiry"
+        with _active_suite_lock:
+            sub_runs = _active_suite_runs[run_id]["subRuns"]
+        assert len(sub_runs) == 2
+        assert [item["scenarioId"] for item in sub_runs] == ["offline-online-resync", "pairing-code-expiry"]
 
 
 # ═══════════════════════════════════════════════════════════════════

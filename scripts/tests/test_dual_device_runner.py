@@ -224,6 +224,31 @@ class TestRunDualDeviceSequential:
         assert mock_run.call_args_list[0].kwargs["expected_android_version"] == "14"
         assert mock_run.call_args_list[1].kwargs["expected_android_version"] == "14"
 
+    @patch("dual_device_runner.load_android_scenario_mappings")
+    @patch("dual_device_runner.run_usb_test")
+    def test_derives_selected_test_classes_from_scenario_mapping(self, mock_run, mock_mappings):
+        from usb_test_runner import UsbTestRunResult
+
+        master_res = UsbTestRunResult(app_id="master", serial="M1", suite="commissioning")
+        master_res.overall_status = "passed"
+        child_res = UsbTestRunResult(app_id="child", serial="C1", suite="commissioning")
+        child_res.overall_status = "passed"
+        mock_run.side_effect = [master_res, child_res]
+        mock_mappings.return_value = [
+            {"scenarioId": "offline-online-resync", "role": "master", "testClass": "com.minimaster.masterapp.MasterScenarioTest"},
+            {"scenarioId": "offline-online-resync", "role": "child", "testClass": "com.minimaster.childapp.ChildScenarioTest"},
+        ]
+
+        run_dual_device(
+            master_serial="M1",
+            child_serial="C1",
+            scenario_id="offline-online-resync",
+            verbose=False,
+        )
+
+        assert mock_run.call_args_list[0].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.MasterScenarioTest"]
+        assert mock_run.call_args_list[1].kwargs["selected_test_classes"] == ["com.minimaster.childapp.ChildScenarioTest"]
+
     def test_rejects_non_dual_device_profile(self):
         try:
             run_dual_device(

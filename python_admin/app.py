@@ -3685,7 +3685,22 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
     app_id = str(kwargs.get("app_id") or "")
     scenario_id = str(kwargs.get("scenario_id") or "")
     profile_id = str(kwargs.get("profile_id") or "")
+    selected_test_classes = [
+        str(item).strip()
+        for item in cast(list[object], kwargs.get("selected_test_classes") or [])
+        if str(item).strip()
+    ]
+    selected_scenario_ids = [
+        str(item).strip()
+        for item in cast(list[object], kwargs.get("selected_scenario_ids") or [])
+        if str(item).strip()
+    ]
     sub_runs: list[dict[str, object]] = []
+    scenario_index = {
+        str(item.get("scenarioId", "")).strip(): item
+        for item in load_dual_device_scenarios()
+        if str(item.get("scenarioId", "")).strip()
+    }
 
     _update_active_suite_event(run_id, {
         "phase": "matrix-preflight",
@@ -3722,31 +3737,41 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
                             master_serial = str(provisioning[0].get("serial") or "")
                         if child_serial == "auto" and len(provisioning) >= 2:
                             child_serial = str(provisioning[1].get("serial") or "")
-                    result = run_dual_device(
-                        master_serial=master_serial,
-                        child_serial=child_serial,
-                        install_apk=bool(kwargs.get("install_apk")),
-                        master_apk_path=str(kwargs.get("master_apk_path") or ""),
-                        child_apk_path=str(kwargs.get("child_apk_path") or ""),
-                        uninstall_first=bool(kwargs.get("uninstall_first")),
-                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                        parallel=bool(kwargs.get("parallel")),
-                        scenario_id=scenario_id,
-                        profile_id=recommended_profile,
-                        fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
-                        expected_android_version=android_version,
-                        verbose=False,
-                    )
-                    sub_run = {
-                        "runId": f"{run_id}:{android_version}",
-                        "androidVersion": android_version,
-                        "executionMode": execution_mode,
-                        "scenarioId": scenario_id,
-                        "profileId": recommended_profile,
-                        "provisioning": provisioning,
-                        "status": result.overall_status,
-                        "result": result.to_dict(),
-                    }
+                    run_scenario_ids = selected_scenario_ids or ([scenario_id] if scenario_id else [""])
+                    for current_scenario_id in run_scenario_ids:
+                        scenario_definition = scenario_index.get(current_scenario_id)
+                        scenario_versions = [
+                            str(item).strip()
+                            for item in cast(list[object], scenario_definition.get("androidVersions", []))
+                            if str(item).strip()
+                        ] if scenario_definition else []
+                        if scenario_versions and android_version not in scenario_versions:
+                            continue
+                        result = run_dual_device(
+                            master_serial=master_serial,
+                            child_serial=child_serial,
+                            install_apk=bool(kwargs.get("install_apk")),
+                            master_apk_path=str(kwargs.get("master_apk_path") or ""),
+                            child_apk_path=str(kwargs.get("child_apk_path") or ""),
+                            uninstall_first=bool(kwargs.get("uninstall_first")),
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                            parallel=bool(kwargs.get("parallel")),
+                            scenario_id=current_scenario_id,
+                            profile_id=recommended_profile,
+                            fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
+                            expected_android_version=android_version,
+                            verbose=False,
+                        )
+                        sub_runs.append({
+                            "runId": f"{run_id}:{android_version}:{current_scenario_id or 'default'}",
+                            "androidVersion": android_version,
+                            "executionMode": execution_mode,
+                            "scenarioId": current_scenario_id,
+                            "profileId": recommended_profile,
+                            "provisioning": provisioning,
+                            "status": result.overall_status,
+                            "result": result.to_dict(),
+                        })
                 else:
                     serial = str(kwargs.get("serial") or "auto").strip() or "auto"
                     if serial == "auto":
@@ -3757,31 +3782,36 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
                             timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
                         )
                         serial = str(provisioning[0].get("serial") or "")
-                    result = run_usb_test(
-                        app_id=app_id,
-                        serial=serial,
-                        suite=str(kwargs.get("suite") or "commissioning"),
-                        test_filter=str(kwargs.get("test_filter") or ""),
-                        skip_activation=bool(kwargs.get("skip_activation")),
-                        install_apk=bool(kwargs.get("install_apk")),
-                        apk_path=str(kwargs.get("apk_path") or ""),
-                        uninstall_first=bool(kwargs.get("uninstall_first")),
-                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                        expected_android_version=android_version,
-                        verbose=False,
-                    )
-                    sub_run = {
-                        "runId": f"{run_id}:{android_version}:{app_id}",
-                        "androidVersion": android_version,
-                        "executionMode": execution_mode,
-                        "appId": app_id,
-                        "profileId": recommended_profile,
-                        "provisioning": provisioning,
-                        "status": result.overall_status,
-                        "result": result.to_dict(),
-                    }
+                    run_test_classes = selected_test_classes or ([str(kwargs.get("test_filter") or "").strip()] if str(kwargs.get("test_filter") or "").strip() else [""])
+                    for current_test_class in run_test_classes:
+                        selected_classes_for_run = [current_test_class] if current_test_class else None
+                        result = run_usb_test(
+                            app_id=app_id,
+                            serial=serial,
+                            suite=str(kwargs.get("suite") or "commissioning"),
+                            test_filter="",
+                            selected_test_classes=selected_classes_for_run,
+                            skip_activation=bool(kwargs.get("skip_activation")),
+                            install_apk=bool(kwargs.get("install_apk")),
+                            apk_path=str(kwargs.get("apk_path") or ""),
+                            uninstall_first=bool(kwargs.get("uninstall_first")),
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                            expected_android_version=android_version,
+                            verbose=False,
+                        )
+                        sub_runs.append({
+                            "runId": f"{run_id}:{android_version}:{app_id}:{current_test_class or 'default'}",
+                            "androidVersion": android_version,
+                            "executionMode": execution_mode,
+                            "appId": app_id,
+                            "testClass": current_test_class,
+                            "profileId": recommended_profile,
+                            "provisioning": provisioning,
+                            "status": result.overall_status,
+                            "result": result.to_dict(),
+                        })
             except Exception as exc:
-                sub_run = {
+                sub_runs.append({
                     "runId": f"{run_id}:{android_version}",
                     "androidVersion": android_version,
                     "executionMode": execution_mode,
@@ -3790,16 +3820,15 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
                     "profileId": recommended_profile,
                     "status": "error",
                     "error": str(exc),
-                }
+                })
 
-            sub_runs.append(sub_run)
             with _active_suite_lock:
                 _active_suite_runs[run_id]["subRuns"] = list(sub_runs)
             _update_active_suite_event(run_id, {
                 "phase": "matrix-run",
-                "status": str(sub_run.get("status") or "error"),
+                "status": str(sub_runs[-1].get("status") or "error") if sub_runs else "error",
                 "androidVersion": android_version,
-                "message": f"Android {android_version}: {sub_run.get('status')}",
+                "message": f"Android {android_version}: {sub_runs[-1].get('status') if sub_runs else 'error'}",
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             })
 
@@ -4217,6 +4246,11 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 "android_versions": android_versions,
                 "install_apk": bool_from_payload(payload.get("installApk"), default=False),
                 "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
+                "selected_test_classes": [
+                    str(item).strip()
+                    for item in cast(list[object], payload.get("selectedTestClasses") or [])
+                    if str(item).strip()
+                ],
             }
 
             if execution_mode == "dual-device":
@@ -4231,6 +4265,11 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "child_serial": child_serial,
                     "parallel": bool_from_payload(payload.get("parallel"), default=False),
                     "scenario_id": str(payload.get("scenarioId") or "").strip(),
+                    "selected_scenario_ids": [
+                        str(item).strip()
+                        for item in cast(list[object], payload.get("selectedScenarioIds") or [])
+                        if str(item).strip()
+                    ],
                     "profile_id": str(payload.get("profileId") or "").strip(),
                     "fault_modes": [
                         str(item).strip()
@@ -4256,6 +4295,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "type": "android-compatibility",
                     "executionMode": execution_mode,
                     "androidVersions": android_versions,
+                    "selectedScenarioIds": list(kwargs.get("selected_scenario_ids") or []),
+                    "selectedTestClasses": list(kwargs.get("selected_test_classes") or []),
                     "status": "queued",
                     "startedAt": None,
                     "finishedAt": None,

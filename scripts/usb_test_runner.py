@@ -164,6 +164,7 @@ def run_usb_test(
     serial: str = "auto",
     suite: str = "default",
     test_filter: str = "",
+    selected_test_classes: list[str] | None = None,
     skip_activation: bool = False,
     install_apk: bool = False,
     apk_path: str = "",
@@ -357,7 +358,9 @@ def run_usb_test(
     _print(f"\n▶  Schritt 6/8: Instrumented Tests ausführen ({app_module})")
 
     test_filters: list[str] = []
-    if test_filter:
+    if selected_test_classes:
+        test_filters = [str(item).strip() for item in selected_test_classes if str(item).strip()]
+    elif test_filter:
         test_filters = [test_filter]
     elif suite == "commissioning":
         test_filters = COMMISSIONING_FILTERS.get(app_id, [])

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable, cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from qa_catalog import load_device_profiles, load_dual_device_scenarios  # noqa: E402
+from qa_catalog import load_android_scenario_mappings, load_device_profiles, load_dual_device_scenarios  # noqa: E402
 from usb_test_runner import UsbTestRunResult, run_usb_test  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -189,6 +189,23 @@ def _validate_fault_modes(scenario: dict[str, object] | None, fault_modes: list[
     return normalized
 
 
+def _scenario_test_classes(scenario_id: str, role: str) -> list[str]:
+    normalized_scenario_id = scenario_id.strip()
+    normalized_role = role.strip()
+    if not normalized_scenario_id or not normalized_role:
+        return []
+    classes: list[str] = []
+    for mapping in load_android_scenario_mappings():
+        if str(mapping.get("scenarioId", "")).strip() != normalized_scenario_id:
+            continue
+        if str(mapping.get("role", "")).strip() != normalized_role:
+            continue
+        test_class = str(mapping.get("testClass", "")).strip()
+        if test_class and test_class not in classes:
+            classes.append(test_class)
+    return classes
+
+
 def run_dual_device(
     master_serial: str,
     child_serial: str,
@@ -201,6 +218,8 @@ def run_dual_device(
     scenario_id: str = "",
     profile_id: str = "",
     fault_modes: list[str] | None = None,
+    master_test_classes: list[str] | None = None,
+    child_test_classes: list[str] | None = None,
     expected_android_version: str = "",
     on_event: Callable[[dict[str, object]], None] | None = None,
     verbose: bool = True,
@@ -285,12 +304,20 @@ def run_dual_device(
         callback=on_event,
     )
 
+    effective_master_test_classes = [str(item).strip() for item in (master_test_classes or []) if str(item).strip()]
+    effective_child_test_classes = [str(item).strip() for item in (child_test_classes or []) if str(item).strip()]
+    if not effective_master_test_classes and result.scenario_id:
+        effective_master_test_classes = _scenario_test_classes(result.scenario_id, "master")
+    if not effective_child_test_classes and result.scenario_id:
+        effective_child_test_classes = _scenario_test_classes(result.scenario_id, "child")
+
     def _run_master() -> UsbTestRunResult:
         _emit_event(result, "master", "running", "Master-Commissioning gestartet.", role="master", callback=on_event)
         return run_usb_test(
             app_id="master",
             serial=master_serial,
             suite="commissioning",
+            selected_test_classes=effective_master_test_classes,
             install_apk=install_apk,
             apk_path=master_apk_path,
             uninstall_first=uninstall_first,
@@ -305,6 +332,7 @@ def run_dual_device(
             app_id="child",
             serial=child_serial,
             suite="commissioning",
+            selected_test_classes=effective_child_test_classes,
             install_apk=install_apk,
             apk_path=child_apk_path,
             uninstall_first=uninstall_first,

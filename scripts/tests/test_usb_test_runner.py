@@ -71,6 +71,39 @@ class TestRunUsbTestAndroidVersion:
         assert result.detected_android_version == "13"
         assert "erwartet war Android 14" in str(result.error)
 
+    @patch("usb_test_runner.parse_junit_xml")
+    @patch("usb_test_runner.subprocess.run")
+    @patch("usb_test_runner.AdbClient")
+    def test_uses_selected_test_classes_for_multiple_gradle_runs(self, mock_client_cls, mock_subprocess_run, mock_parse_junit_xml):
+        from adb_client import AdbDevice
+
+        mock_client_cls.list_devices.return_value = [AdbDevice(serial="DEV1", state="device")]
+        mock_client = MagicMock()
+        mock_client.get_device_model.return_value = "Pixel"
+        mock_client.get_android_version.return_value = "14"
+        mock_client_cls.return_value = mock_client
+        mock_subprocess_run.return_value = MagicMock(returncode=0)
+        mock_parse_junit_xml.return_value = MagicMock(total=1, passed=1, failed=0, skipped=0, failures=[])
+
+        result = run_usb_test(
+            app_id="master",
+            serial="DEV1",
+            suite="commissioning",
+            selected_test_classes=[
+                "com.minimaster.masterapp.FirstUiTest",
+                "com.minimaster.masterapp.SecondUiTest",
+            ],
+            skip_activation=True,
+            verbose=False,
+        )
+
+        assert result.overall_status == "passed"
+        assert mock_subprocess_run.call_count == 2
+        first_args = mock_subprocess_run.call_args_list[0].args[0]
+        second_args = mock_subprocess_run.call_args_list[1].args[0]
+        assert any("FirstUiTest" in str(item) for item in first_args)
+        assert any("SecondUiTest" in str(item) for item in second_args)
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  parse_junit_xml
