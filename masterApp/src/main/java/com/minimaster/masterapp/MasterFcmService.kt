@@ -29,8 +29,6 @@ class MasterFcmService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "MasterFcmService"
-        private const val CHANNEL_ID_TASKS = "task_notifications"
-        private const val CHANNEL_ID_DEVICE = "device_notifications"
         private const val CHANNEL_NAME_TASKS = "Task Notifications"
         private const val CHANNEL_NAME_DEVICE = "Device Notifications"
     }
@@ -95,7 +93,7 @@ class MasterFcmService : FirebaseMessagingService() {
             showNotification(
                 title = notification.title ?: "MiniMaster",
                 body = notification.body ?: "",
-                channelId = CHANNEL_ID_TASKS
+                channelId = MasterFcmMessageRouter.CHANNEL_ID_TASKS
             )
         }
     }
@@ -107,36 +105,13 @@ class MasterFcmService : FirebaseMessagingService() {
      * @param data The data payload from the FCM message.
      */
     private fun handleDataMessage(data: Map<String, String>) {
-        val type = data["type"] ?: "general"
-        val title = data["title"] ?: "MiniMaster"
-        val body = data["body"] ?: ""
-        val childId = data["childId"]
-        val taskId = data["taskId"]
-
-        when (type) {
-            "task_pending_approval" -> {
-                showNotification(
-                    title = title,
-                    body = body,
-                    channelId = CHANNEL_ID_TASKS,
-                    extras = mapOf("childId" to (childId ?: ""), "taskId" to (taskId ?: ""))
-                )
-            }
-            "device_status_change" -> {
-                showNotification(
-                    title = title,
-                    body = body,
-                    channelId = CHANNEL_ID_DEVICE
-                )
-            }
-            else -> {
-                showNotification(
-                    title = title,
-                    body = body,
-                    channelId = CHANNEL_ID_TASKS
-                )
-            }
-        }
+        val command = MasterFcmMessageRouter.route(data)
+        showNotification(
+            title = command.title,
+            body = command.body,
+            channelId = command.channelId,
+            extras = command.extras,
+        )
     }
 
     /**
@@ -150,7 +125,7 @@ class MasterFcmService : FirebaseMessagingService() {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
             val taskChannel = NotificationChannel(
-                CHANNEL_ID_TASKS,
+                MasterFcmMessageRouter.CHANNEL_ID_TASKS,
                 CHANNEL_NAME_TASKS,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
@@ -159,7 +134,7 @@ class MasterFcmService : FirebaseMessagingService() {
             }
 
             val deviceChannel = NotificationChannel(
-                CHANNEL_ID_DEVICE,
+                MasterFcmMessageRouter.CHANNEL_ID_DEVICE,
                 CHANNEL_NAME_DEVICE,
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {

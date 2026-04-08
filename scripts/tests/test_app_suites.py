@@ -466,10 +466,7 @@ class TestBuildTestingRegister:
         items_by_id = {item["id"]: item for item in result["items"]}
 
         expected_manual = {
-            "ma-task-reject-ui",
-            "ma-fcm-working",
             "ma-firebase-appcheck",
-            "ma-qr-pairing",
             "ca-accessibility-active",
             "ca-app-blocking-effective",
             "ca-overlay-secure",
@@ -482,11 +479,11 @@ class TestBuildTestingRegister:
             "dt-auto-update",
             "dt-system-tray",
             "dt-desktop-notifications",
-            "dt-window-persistence",
-            "dt-crash-reporting",
         }
 
         expected_static = {
+            "ma-task-reject-ui",
+            "ma-qr-pairing",
             "ma-subscription-check",
             "ca-fcm-sync",
             "ma-usage-rules-nav",
@@ -495,12 +492,15 @@ class TestBuildTestingRegister:
             "dt-ipc-messaging",
         }
         expected_repo_tests = {
+            "ma-fcm-working",
             "ma-date-picker",
             "ma-subscription-enforce",
             "ma-offline-handling",
             "ca-tamper-detection",
             "dt-parent-panel-login",
             "dt-admin-panel-login",
+            "dt-window-persistence",
+            "dt-crash-reporting",
         }
         expected_derived = {
             "ma-registration-flow",
@@ -526,11 +526,14 @@ class TestBuildTestingRegister:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "repo-test"
         assert items_by_id["ma-date-picker"]["suiteRef"] == "backend-jest"
+        assert items_by_id["ma-fcm-working"]["suiteRef"] == "android-unit-master"
         assert items_by_id["ma-subscription-enforce"]["suiteRef"] == "backend-subscription-enforcement"
         assert items_by_id["ma-offline-handling"]["suiteRef"] == "android-unit-master"
         assert items_by_id["ca-tamper-detection"]["suiteRef"] == "android-unit-child"
         assert items_by_id["dt-parent-panel-login"]["suiteRef"] == "web-control-auth-flow"
         assert items_by_id["dt-admin-panel-login"]["suiteRef"] == "admin-panel-auth-flow"
+        assert items_by_id["dt-window-persistence"]["suiteRef"] == "backend-jest"
+        assert items_by_id["dt-crash-reporting"]["suiteRef"] == "backend-jest"
         for test_id in expected_derived:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "register-derivative"
@@ -558,6 +561,8 @@ class TestBuildTestingRegister:
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
         assert items_by_id["ma-date-picker"]["automationType"] == "automatic"
         assert items_by_id["ma-date-picker"]["source"] == "repo-test"
+        assert items_by_id["ma-fcm-working"]["automationType"] == "automatic"
+        assert items_by_id["ma-fcm-working"]["source"] == "repo-test"
         assert items_by_id["ca-tamper-detection"]["automationType"] == "automatic"
         assert items_by_id["ca-tamper-detection"]["source"] == "repo-test"
         assert items_by_id["ma-subscription-enforce"]["automationType"] == "automatic"
@@ -568,7 +573,14 @@ class TestBuildTestingRegister:
         assert items_by_id["dt-parent-panel-login"]["source"] == "repo-test"
         assert items_by_id["dt-admin-panel-login"]["automationType"] == "automatic"
         assert items_by_id["dt-admin-panel-login"]["source"] == "repo-test"
-        assert items_by_id["ma-task-reject-ui"]["automationWave"] == "wave-2"
+        assert items_by_id["dt-window-persistence"]["automationType"] == "automatic"
+        assert items_by_id["dt-window-persistence"]["source"] == "repo-test"
+        assert items_by_id["dt-crash-reporting"]["automationType"] == "automatic"
+        assert items_by_id["dt-crash-reporting"]["source"] == "repo-test"
+        assert items_by_id["ma-task-reject-ui"]["automationType"] == "automatic"
+        assert items_by_id["ma-task-reject-ui"]["source"] == "static-analysis"
+        assert items_by_id["ma-qr-pairing"]["automationType"] == "automatic"
+        assert items_by_id["ma-qr-pairing"]["source"] == "static-analysis"
         assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
 
         manual_insights = result["manualInsights"]

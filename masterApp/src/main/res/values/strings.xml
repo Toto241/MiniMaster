@@ -24,6 +24,8 @@
     <string name="retry_link_generation">Retry Link Generation</string>
     <string name="link_generated_success">Link generated successfully!</string>
     <string name="link_status">Link Status: %1$s</string>
+    <string name="pairing_link_label">Pairing link: %1$s</string>
+    <string name="pairing_qr_code_content_description">QR code for child pairing</string>
 
     <!-- Task creation -->
     <string name="create_new_task">Create New Task</string>
@@ -37,6 +39,7 @@
     <string name="child_label">Child: %1$s</string>
     <string name="proof_for_task">Proof for task: %1$s</string>
     <string name="approve_task">Approve Task</string>
+    <string name="reject_task">Reject Task</string>
     <string name="back_to_dashboard">Back to Dashboard</string>
 
     <!-- Subscription -->
@@ -48,6 +51,7 @@
     <string name="failed_update_lock_state">Failed to update lock state. Please try again.</string>
     <string name="failed_create_task">Failed to create task. Please try again.</string>
     <string name="failed_approve_task">Failed to approve task. Please try again.</string>
+    <string name="failed_reject_task">Failed to reject task. Please try again.</string>
     <string name="unknown_error">An unknown error occurred.</string>
     <string name="error_format">Error (%1$s): %2$s</string>
 
