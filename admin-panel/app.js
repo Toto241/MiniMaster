@@ -2697,6 +2697,9 @@ function buildTestingRegisterMetaBadges(item) {
         const duplicateLabel = `Automatisch aus ${item.derivedFrom.length} vorhandenen Prüffall${item.derivedFrom.length === 1 ? "" : "en"} abgedeckt`;
         badges.push(`<span class='python-automation-chip python-automation-chip-auto' ${buildTestingRegisterTooltipAttr(duplicateLabel, duplicateLabel)}>Abgeleitet</span>`);
     }
+    if (item.manualClassLabel) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr(String(item.manualClassReason || item.manualClassLabel), String(item.manualClassLabel))}>${escapeTestingRegisterText(String(item.manualClassLabel))}</span>`);
+    }
     if (item.blockingForRelease) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zu einem aktuellen, bestaetigten PASS. Veraltete Nachweise gelten hier ebenfalls als offen.", "Release-Blocker")}>Release-Blocker</span>`);
     }
@@ -2832,6 +2835,16 @@ function buildTestingRegisterDuplicateInsights(payload) {
         count: Number(payload?.duplicateInsights?.count || 0),
         sourceCount: Number(payload?.duplicateInsights?.sourceCount || 0),
         entries: duplicateEntries,
+    };
+}
+
+function buildTestingRegisterManualInsights(payload) {
+    const buckets = payload?.manualInsights?.buckets || {};
+    return {
+        total: Number(payload?.manualInsights?.total || 0),
+        physical: Number(buckets["physical-manual"]?.count || 0),
+        backlog: Number(buckets["automation-backlog"]?.count || 0),
+        external: Number(buckets["external-evidence"]?.count || 0),
     };
 }
 
@@ -3150,6 +3163,7 @@ function buildTestingRegisterDetailText(item) {
     if (Array.isArray(item.derivedFromTitles) && item.derivedFromTitles.length > 0) {
         parts.push(`Abgedeckt durch: ${item.derivedFromTitles.join(", ")}`);
     }
+    if (item.manualClassReason) parts.push(String(item.manualClassReason));
     const sourceLabel = formatTestingRegisterSourceLabel(String(item.source || "")).replace(/^Quelle:\s*/, "");
     if (sourceLabel) parts.push(sourceLabel);
     if (item.environment) parts.push(`Umgebung: ${item.environment}`);
@@ -3187,6 +3201,7 @@ function renderTestingRegisterOverview(payload) {
 
     const riskSummary = buildTestingRegisterRiskSummary(payload);
     const duplicateInsights = buildTestingRegisterDuplicateInsights(payload);
+    const manualInsights = buildTestingRegisterManualInsights(payload);
     const alertsHtml = riskSummary.alerts.length > 0
         ? riskSummary.alerts.map(alert => `
             <article class='qa-register-callout qa-register-callout-${escapeHtml(String(alert.tone || "info"))}'>
@@ -3215,6 +3230,18 @@ function renderTestingRegisterOverview(payload) {
                     <div class='python-muted-caption'>${escapeHtml(duplicateInsights.entries.slice(0, 4).map(entry => `${String(entry.title || entry.id || "Prüffall")} ← ${(entry.derivedFromTitles || []).join(" / ")}`).join(" · "))}</div>
                 </div>
                 <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('automatic', { sort: 'group' })">Abgeleitete Checks anzeigen</button>
+            </article>
+        `
+        : "";
+
+    const manualInsightsHtml = manualInsights.total > 0
+        ? `
+            <article class='qa-register-callout qa-register-callout-info'>
+                <div>
+                    <strong>Verbleibende Handprüfungen sind jetzt priorisiert</strong>
+                    <p>${escapeHtml(String(manualInsights.physical))} physisch zwingend manuell · ${escapeHtml(String(manualInsights.backlog))} in der nächsten Automatisierungswelle · ${escapeHtml(String(manualInsights.external))} externe Nachweise.</p>
+                </div>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('manualBacklog', { sort: 'group' })">Automatisierungswelle anzeigen</button>
             </article>
         `
         : "";
@@ -3297,6 +3324,7 @@ function renderTestingRegisterOverview(payload) {
             <div class='qa-register-callout-stack'>
                 ${alertsHtml}
                 ${duplicateHtml}
+                ${manualInsightsHtml}
             </div>
             <div class='qa-register-top-blockers'>
                 <div class='qa-register-top-blockers-header'>
@@ -3464,6 +3492,15 @@ function renderTestingRegisterList(payload) {
             return false;
         }
         if (filters.type === "manual" && !(automationType === "manual" || automationType === "documented")) {
+            return false;
+        }
+        if (filters.type === "manualPhysical" && String(item.manualClass || "") !== "physical-manual") {
+            return false;
+        }
+        if (filters.type === "manualBacklog" && String(item.manualClass || "") !== "automation-backlog") {
+            return false;
+        }
+        if (filters.type === "manualExternal" && String(item.manualClass || "") !== "external-evidence") {
             return false;
         }
         if (filters.type === "suite" && entryKind !== "suite") {

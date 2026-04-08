@@ -157,6 +157,46 @@ def make_documented_test(
 
 TEST_REGISTER_STALE_DAYS = 30
 
+MANUAL_CLASS_AUTOMATION_BACKLOG_IDS = {
+    "ma-task-reject-ui",
+    "ma-date-picker",
+    "ma-subscription-check",
+    "ma-subscription-enforce",
+    "ma-fcm-working",
+    "ma-offline-handling",
+    "ma-qr-pairing",
+    "ca-fcm-sync",
+    "ca-tamper-detection",
+    "dt-auto-update",
+    "dt-window-persistence",
+    "dt-parent-panel-login",
+    "dt-admin-panel-login",
+    "dt-crash-reporting",
+}
+
+MANUAL_CLASS_PHYSICAL_IDS = {
+    "ma-firebase-appcheck",
+    "ca-accessibility-active",
+    "ca-app-blocking-effective",
+    "ca-overlay-secure",
+    "ca-settings-protection",
+    "ca-device-admin-enforced",
+    "ca-factory-reset-protection",
+    "ca-root-detection",
+    "ca-permission-onboarding",
+    "dt-code-signing",
+    "dt-system-tray",
+    "dt-desktop-notifications",
+    "p0-commissioning-ai",
+}
+
+MANUAL_CLASS_EXTERNAL_IDS = {
+    "firebase-auth-enabled",
+    "messaging-enabled",
+    "parent-panel-verified",
+    "device-sync-verified",
+}
+
 TEST_REGISTER_DERIVATIVE_MAPPINGS: dict[str, dict[str, object]] = {
     "android-master-registered": {
         "derivedFrom": ["doc-master-app-registration-auth"],
@@ -274,6 +314,7 @@ def severity_rank(value: str) -> int:
 
 def infer_register_metadata(
     *,
+    test_id: str = "",
     entry_kind: str,
     automation_type: str,
     group_id: str,
@@ -341,6 +382,32 @@ def infer_register_metadata(
         known_constraints = prereq_reason
 
     stale = evidence_required and is_stale_timestamp(updated_at)
+
+    manual_class = ""
+    manual_class_label = ""
+    manual_class_reason = ""
+    if automation_type == "documented":
+        manual_class = "external-evidence"
+        manual_class_label = "Externer Nachweis"
+        manual_class_reason = "Dieser Prüffall bleibt außerhalb des Python-QA-Laufs und muss als externer Evidenzlauf dokumentiert werden."
+    elif automation_type == "manual":
+        if test_id in MANUAL_CLASS_AUTOMATION_BACKLOG_IDS:
+            manual_class = "automation-backlog"
+            manual_class_label = "Nächste Automatisierungswelle"
+            manual_class_reason = "Der Prüffall ist noch manuell, lässt sich aber mit der vorhandenen Infrastruktur voraussichtlich als nächster Schritt automatisieren."
+        elif test_id in MANUAL_CLASS_PHYSICAL_IDS:
+            manual_class = "physical-manual"
+            manual_class_label = "Physisch zwingend manuell"
+            manual_class_reason = "Der Prüffall erfordert reale Geräte-, OS- oder Betriebsinteraktion und bleibt aktuell bewusst manuell."
+        elif test_id in MANUAL_CLASS_EXTERNAL_IDS or source == "attestation":
+            manual_class = "external-evidence"
+            manual_class_label = "Externer Nachweis"
+            manual_class_reason = "Der Prüffall ist ein Projekt-, Betriebs- oder Freigabenachweis und wird bewusst extern protokolliert."
+        else:
+            manual_class = "physical-manual"
+            manual_class_label = "Physisch zwingend manuell"
+            manual_class_reason = "Der Prüffall bleibt aktuell manuell und erfordert Operator- oder Geräteinteraktion."
+
     return {
         "owner": owner,
         "severity": severity,
@@ -353,6 +420,9 @@ def infer_register_metadata(
         "lastSuccessfulAt": updated_at if status == "pass" else "",
         "hasSuccessfulRun": status == "pass",
         "staleEvidence": stale,
+        "manualClass": manual_class,
+        "manualClassLabel": manual_class_label,
+        "manualClassReason": manual_class_reason,
         "sourceOfTruth": documentation or command or suite_ref or source,
         "linkedSuite": suite_ref,
         "linkedCommand": command,
@@ -2834,6 +2904,35 @@ def summarize_testing_register_duplicates(items: list[dict[str, object]]) -> dic
     }
 
 
+def summarize_manual_classifications(items: list[dict[str, object]]) -> dict[str, object]:
+    manual_items = [item for item in items if str(item.get("automationType") or "") in {"manual", "documented"}]
+    buckets = {
+        "physical-manual": {"label": "Physisch zwingend manuell", "count": 0},
+        "automation-backlog": {"label": "Nächste Automatisierungswelle", "count": 0},
+        "external-evidence": {"label": "Externer Nachweis", "count": 0},
+    }
+    entries = []
+    for item in manual_items:
+        manual_class = str(item.get("manualClass") or "physical-manual")
+        if manual_class not in buckets:
+            buckets[manual_class] = {"label": str(item.get("manualClassLabel") or manual_class), "count": 0}
+        buckets[manual_class]["count"] += 1
+        entries.append(
+            {
+                "id": str(item.get("id") or ""),
+                "title": str(item.get("title") or item.get("id") or "Prüffall"),
+                "manualClass": manual_class,
+                "manualClassLabel": str(item.get("manualClassLabel") or buckets[manual_class]["label"]),
+                "manualClassReason": str(item.get("manualClassReason") or ""),
+            }
+        )
+    return {
+        "total": len(manual_items),
+        "buckets": buckets,
+        "entries": entries,
+    }
+
+
 def build_repo_test_inventory_entries(
     suite_catalog_index: dict[str, dict[str, object]],
     latest_suite_results: dict[str, dict[str, object]],
@@ -2885,6 +2984,7 @@ def build_repo_test_inventory_entries(
                 "prereqsMet": suite_meta.get("prereqsMet") if suite_ref else None,
                 "prereqReason": str(suite_meta.get("prereqReason") or "") if suite_ref else "",
                 **infer_register_metadata(
+                    test_id=item_id,
                     entry_kind="repo-test",
                     automation_type=automation_type,
                     group_id=group_id,
@@ -3045,6 +3145,7 @@ def build_testing_register() -> dict[str, object]:
                 "derivedFrom": derived_from,
                 "derivedFromTitles": [str(item_index[source_id].get("title") or source_id) for source_id in derived_from if source_id in item_index],
                 **infer_register_metadata(
+                    test_id=test_id,
                     entry_kind="commissioning",
                     automation_type=automation_type,
                     group_id=str(group.get("id") or ""),
@@ -3102,6 +3203,7 @@ def build_testing_register() -> dict[str, object]:
                 "executionMode": str(suite.get("executionMode") or ""),
                 "evidenceTargetId": str(suite.get("evidenceTargetId") or suite_id),
                 **infer_register_metadata(
+                    test_id=suite_id,
                     entry_kind="suite",
                     automation_type=suite_automation_type,
                     group_id=str(suite.get("group") or ""),
@@ -3136,11 +3238,13 @@ def build_testing_register() -> dict[str, object]:
     }
 
     duplicate_insights = summarize_testing_register_duplicates(items)
+    manual_insights = summarize_manual_classifications(items)
 
     return {
         "items": items,
         "summary": summary,
         "duplicateInsights": duplicate_insights,
+        "manualInsights": manual_insights,
         "storage": {
             "commissioningRuns": str(COMMISSIONING_LOG_FILE),
             "commissioningEvidence": str(COMMISSIONING_EVIDENCE_LOG_FILE),

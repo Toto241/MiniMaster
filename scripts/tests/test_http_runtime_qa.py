@@ -124,3 +124,15 @@ class TestQaRuntimeHttpContracts:
         assert items_by_id["ma-task-create"]["automationType"] == "automatic"
         assert items_by_id["ma-task-create"]["source"] == "register-derivative"
         assert items_by_id["ma-task-create"]["derivedFrom"] == ["doc-create-task"]
+
+    def test_runtime_http_serves_manual_prioritization_insights_in_testing_register(self, qa_http_server: str):
+        status, headers, payload = _read_json(f"{qa_http_server}/api/testing/register")
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert payload["manualInsights"]["total"] >= 1
+
+        items_by_id = {item["id"]: item for item in payload["items"]}
+        assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
+        assert items_by_id["ma-subscription-check"]["manualClass"] == "automation-backlog"
+        assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"

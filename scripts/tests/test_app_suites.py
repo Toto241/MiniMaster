@@ -264,6 +264,9 @@ class TestBuildTestingRegister:
             "environment",
             "hasSuccessfulRun",
             "staleEvidence",
+            "manualClass",
+            "manualClassLabel",
+            "manualClassReason",
             "sourceOfTruth",
             "linkedSuite",
             "linkedCommand",
@@ -531,6 +534,22 @@ class TestBuildTestingRegister:
         assert "ma-task-create" in entries_by_id
         assert entries_by_id["ma-task-create"]["derivedFrom"] == ["doc-create-task"]
         assert entries_by_id["ma-task-create"]["derivedFromTitles"]
+
+    def test_register_classifies_remaining_manual_checks_for_prioritization(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+        items_by_id = {item["id"]: item for item in result["items"]}
+
+        assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
+        assert items_by_id["ma-subscription-check"]["manualClass"] == "automation-backlog"
+        assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
+
+        manual_insights = result["manualInsights"]
+        assert manual_insights["total"] >= 1
+        assert manual_insights["buckets"]["physical-manual"]["count"] >= 1
+        assert manual_insights["buckets"]["automation-backlog"]["count"] >= 1
+        assert manual_insights["buckets"]["external-evidence"]["count"] >= 1
 
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
         import app
