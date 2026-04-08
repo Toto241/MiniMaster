@@ -36,7 +36,11 @@ sealed class LinkGenerationState {
     /** The state when link generation is in progress. */
     object Loading : LinkGenerationState()
     /** The state when the link has been successfully generated. */
-    data class Success(val pairingToken: String) : LinkGenerationState()
+    data class Success(
+        val pairingToken: String,
+        val pairingLink: String,
+        val qrCodeValue: String,
+    ) : LinkGenerationState()
     /** The state when an error has occurred during link generation. */
     data class Error(val message: String) : LinkGenerationState()
 }
@@ -166,9 +170,16 @@ class MasterViewModel @Inject constructor(
 
             try {
                 val result = functions.getHttpsCallable("generatePairingLink").call(data).await()
-                val token = (result.getData() as? Map<String, Any>)?.get("pairingToken") as? String
+                val payload = result.getData() as? Map<*, *>
+                val token = payload?.get("pairingToken") as? String
+                val pairingLink = payload?.get("pairingLink") as? String
+                val qrCodeValue = payload?.get("qrCodeValue") as? String
                 if (token != null) {
-                    _linkGenerationState.value = LinkGenerationState.Success(token)
+                    _linkGenerationState.value = LinkGenerationState.Success(
+                        pairingToken = token,
+                        pairingLink = pairingLink ?: token,
+                        qrCodeValue = qrCodeValue ?: pairingLink ?: token,
+                    )
                 } else {
                     _linkGenerationState.value = LinkGenerationState.Error("Backend returned no token.")
                 }

@@ -8,6 +8,7 @@ import android.util.Log
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -299,9 +301,30 @@ fun LinkGenerationSection(linkState: LinkGenerationState, onGenerateClick: () ->
                 Text(text = stringResource(R.string.generating_link), modifier = Modifier.padding(top = 16.dp))
             }
             is LinkGenerationState.Success -> {
+                val qrBitmap = remember(linkState.qrCodeValue) {
+                    linkState.qrCodeValue
+                        .takeIf { it.isNotBlank() }
+                        ?.let { generatePairingQrBitmap(it) }
+                }
                 Text(text = stringResource(R.string.link_generated_success), style = MaterialTheme.typography.h6)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = linkState.pairingToken, style = MaterialTheme.typography.body2)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.pairing_link_label, linkState.pairingLink),
+                    style = MaterialTheme.typography.body2,
+                    textAlign = TextAlign.Center,
+                )
+                if (qrBitmap != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Image(
+                        bitmap = qrBitmap.asImageBitmap(),
+                        contentDescription = stringResource(R.string.pairing_qr_code_content_description),
+                        modifier = Modifier
+                            .size(220.dp)
+                            .testTag("pairing_qr_code"),
+                    )
+                }
             }
             is LinkGenerationState.Error -> {
                 Text(text = linkState.message, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body1, textAlign = TextAlign.Center)

@@ -123,6 +123,7 @@ dependencies {
 
     // Image Loading
     implementation "io.coil-kt:coil-compose:2.7.0"
+    implementation "com.google.zxing:core:3.5.3"
 
     // Google Play Billing - Updated
     implementation "com.android.billingclient:billing-ktx:7.1.1"

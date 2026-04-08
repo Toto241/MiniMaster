@@ -113,7 +113,13 @@ class MasterViewModelTest {
         whenever(functions.getHttpsCallable(eq("generatePairingLink"))).thenReturn(callable)
 
         val callableResult: HttpsCallableResult = mock()
-        whenever(callableResult.getData()).thenReturn(mapOf("pairingToken" to "token-xyz"))
+        whenever(callableResult.getData()).thenReturn(
+            mapOf(
+                "pairingToken" to "token-xyz",
+                "pairingLink" to "https://pair.example/token-xyz",
+                "qrCodeValue" to "https://pair.example/token-xyz",
+            )
+        )
         whenever(callable.call(any())).thenReturn(Tasks.forResult(callableResult))
 
         val viewModel = MasterViewModel(functions, credentialsRepository)
@@ -126,8 +132,11 @@ class MasterViewModelTest {
         val payloadCaptor = argumentCaptor<Any>()
         verify(callable).call(payloadCaptor.capture())
         val payload = payloadCaptor.firstValue as Map<*, *>
+        val state = viewModel.linkGenerationState.value as LinkGenerationState.Success
 
         assertTrue(payload.isEmpty())
-        assertTrue(viewModel.linkGenerationState.value is LinkGenerationState.Success)
+        assertEquals("token-xyz", state.pairingToken)
+        assertEquals("https://pair.example/token-xyz", state.pairingLink)
+        assertEquals("https://pair.example/token-xyz", state.qrCodeValue)
     }
 }

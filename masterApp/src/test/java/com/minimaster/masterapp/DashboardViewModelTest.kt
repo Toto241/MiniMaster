@@ -120,4 +120,26 @@ class DashboardViewModelTest {
         assertEquals("child-9", payload["childId"])
         assertEquals(true, payload["isLocked"])
     }
+
+    @Test
+    fun rejectTask_with_credentials_calls_backend_with_expected_payload() = runTest {
+        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
+        advanceUntilIdle()
+
+        whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-3" to "secret-3"))
+        whenever(functions.getHttpsCallable(eq("rejectTask"))).thenReturn(callable)
+        whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
+
+        viewModel.rejectTask("child-3", "task-7", "Foto unscharf")
+        advanceUntilIdle()
+
+        val payloadCaptor = argumentCaptor<Any>()
+        verify(callable).call(payloadCaptor.capture())
+        val payload = payloadCaptor.firstValue as Map<*, *>
+
+        assertEquals("child-3", payload["childId"])
+        assertEquals("task-7", payload["taskId"])
+        assertEquals("Foto unscharf", payload["reason"])
+    }
 }

@@ -55,7 +55,8 @@ fun TaskReviewScreen(
                     items(tasksToReview) { task ->
                         TaskReviewItem(
                             task = task,
-                            onApproveClick = { viewModel.approveTask(task.childId, task.taskId) }
+                            onApproveClick = { viewModel.approveTask(task.childId, task.taskId) },
+                            onRejectClick = { viewModel.rejectTask(task.childId, task.taskId) }
                         )
                     }
                 }
@@ -76,11 +77,13 @@ fun TaskReviewScreen(
  *
  * @param task The [ReviewableTask] data to display.
  * @param onApproveClick A callback invoked when the "Approve" button is clicked.
+ * @param onRejectClick A callback invoked when the "Reject" button is clicked.
  */
 @Composable
 fun TaskReviewItem(
     task: ReviewableTask,
-    onApproveClick: () -> Unit
+    onApproveClick: () -> Unit,
+    onRejectClick: () -> Unit
 ) {
     Card(elevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -97,11 +100,16 @@ fun TaskReviewItem(
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onApproveClick,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
             ) {
-                Text(stringResource(R.string.approve_task))
+                OutlinedButton(onClick = onRejectClick) {
+                    Text(stringResource(R.string.reject_task))
+                }
+                Button(onClick = onApproveClick) {
+                    Text(stringResource(R.string.approve_task))
+                }
             }
         }
     }

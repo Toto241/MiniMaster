@@ -150,6 +150,53 @@ def check_ma_usage_rules_nav() -> CheckResult:
     )
 
 
+def check_ma_task_reject_ui() -> CheckResult:
+    patterns = (
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "TaskReviewScreen.kt", r"OutlinedButton\(onClick\s*=\s*onRejectClick\)|stringResource\(R\.string\.reject_task\)|viewModel\.rejectTask\("),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "DashboardViewModel.kt", r'getHttpsCallable\("rejectTask"\)'),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "res" / "values" / "strings.xml", r'name="reject_task"'),
+    )
+    matched_files = []
+    for path, pattern in patterns:
+        found, _ = _file_contains(path, pattern, re.MULTILINE)
+        if found:
+            matched_files.append(path.name)
+    passed = len(matched_files) == len(patterns)
+    return CheckResult(
+        "ma-task-reject-ui",
+        "Reject-Flow im TaskReview-Screen implementiert",
+        passed,
+        "TaskReviewScreen enthaelt Reject-UI und die rejectTask-Callable-Anbindung ist vorhanden."
+        if passed else
+        f"Reject-Flow unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        "static",
+    )
+
+
+def check_ma_qr_pairing() -> CheckResult:
+    patterns = (
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "MasterViewModel.kt", r'"qrCodeValue"|"pairingLink"'),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "MainActivity.kt", r'pairing_qr_code|generatePairingQrBitmap|Image\('),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "PairingQrCodeEncoder.kt", r'QRCodeWriter|BarcodeFormat\.QR_CODE'),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "res" / "values" / "strings.xml", r'name="pairing_qr_code_content_description"'),
+    )
+    matched_files = []
+    for path, pattern in patterns:
+        found, _ = _file_contains(path, pattern, re.MULTILINE)
+        if found:
+            matched_files.append(path.name)
+    passed = len(matched_files) == len(patterns)
+    return CheckResult(
+        "ma-qr-pairing",
+        "QR-Pairing im Parent-Flow implementiert",
+        passed,
+        "Backend-Payload, QR-Encoder und Compose-QR-Anzeige sind im Parent-Flow vorhanden."
+        if passed else
+        f"QR-Pairing unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        "static",
+    )
+
+
 # ── ChildApp Checks ───────────────────────────────────────────────────────
 
 def check_ca_accessibility() -> CheckResult:
@@ -424,6 +471,8 @@ ALL_CHECKS = [
     check_ma_fcm,
     check_ma_appcheck,
     check_ma_usage_rules_nav,
+    check_ma_task_reject_ui,
+    check_ma_qr_pairing,
     # ChildApp
     check_ca_accessibility,
     check_ca_boot_receiver,
