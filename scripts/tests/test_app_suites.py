@@ -467,7 +467,6 @@ class TestBuildTestingRegister:
 
         expected_manual = {
             "ma-task-reject-ui",
-            "ma-date-picker",
             "ma-fcm-working",
             "ma-firebase-appcheck",
             "ma-qr-pairing",
@@ -476,7 +475,6 @@ class TestBuildTestingRegister:
             "ca-overlay-secure",
             "ca-settings-protection",
             "ca-device-admin-enforced",
-            "ca-tamper-detection",
             "ca-factory-reset-protection",
             "ca-root-detection",
             "ca-permission-onboarding",
@@ -497,8 +495,10 @@ class TestBuildTestingRegister:
             "dt-ipc-messaging",
         }
         expected_repo_tests = {
+            "ma-date-picker",
             "ma-subscription-enforce",
             "ma-offline-handling",
+            "ca-tamper-detection",
             "dt-parent-panel-login",
             "dt-admin-panel-login",
         }
@@ -525,8 +525,10 @@ class TestBuildTestingRegister:
         for test_id in expected_repo_tests:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "repo-test"
+        assert items_by_id["ma-date-picker"]["suiteRef"] == "backend-jest"
         assert items_by_id["ma-subscription-enforce"]["suiteRef"] == "backend-subscription-enforcement"
         assert items_by_id["ma-offline-handling"]["suiteRef"] == "android-unit-master"
+        assert items_by_id["ca-tamper-detection"]["suiteRef"] == "android-unit-child"
         assert items_by_id["dt-parent-panel-login"]["suiteRef"] == "web-control-auth-flow"
         assert items_by_id["dt-admin-panel-login"]["suiteRef"] == "admin-panel-auth-flow"
         for test_id in expected_derived:
@@ -554,6 +556,10 @@ class TestBuildTestingRegister:
         items_by_id = {item["id"]: item for item in result["items"]}
 
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
+        assert items_by_id["ma-date-picker"]["automationType"] == "automatic"
+        assert items_by_id["ma-date-picker"]["source"] == "repo-test"
+        assert items_by_id["ca-tamper-detection"]["automationType"] == "automatic"
+        assert items_by_id["ca-tamper-detection"]["source"] == "repo-test"
         assert items_by_id["ma-subscription-enforce"]["automationType"] == "automatic"
         assert items_by_id["ma-subscription-enforce"]["source"] == "repo-test"
         assert items_by_id["ma-offline-handling"]["automationType"] == "automatic"

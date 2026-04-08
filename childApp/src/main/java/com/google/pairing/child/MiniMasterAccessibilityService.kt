@@ -486,19 +486,19 @@ class MiniMasterAccessibilityService : AccessibilityService() {
      */
     private fun handleSettingsAccess(packageName: String) {
         val now = System.currentTimeMillis()
-        if (now - lastSettingsAccessTime < 60_000) {
-            settingsAccessCount++
-        } else {
-            settingsAccessCount = 1
-        }
-        lastSettingsAccessTime = now
+        val tamperState = ChildProtectionPolicy.registerSettingsAccess(
+            previousCount = settingsAccessCount,
+            lastAccessTime = lastSettingsAccessTime,
+            now = now,
+        )
+        settingsAccessCount = tamperState.accessCount
+        lastSettingsAccessTime = tamperState.lastAccessTime
 
         Log.d(TAG, "Settings access detected: $packageName (count: $settingsAccessCount)")
 
         // After 3 accesses within 60 seconds, report suspicious activity
-        if (settingsAccessCount >= 3) {
+        if (tamperState.shouldReport) {
             reportTamperEvent("repeated_settings_access")
-            settingsAccessCount = 0
         }
     }
 

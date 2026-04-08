@@ -159,10 +159,8 @@ TEST_REGISTER_STALE_DAYS = 30
 
 MANUAL_CLASS_AUTOMATION_BACKLOG_IDS = {
     "ma-task-reject-ui",
-    "ma-date-picker",
     "ma-fcm-working",
     "ma-qr-pairing",
-    "ca-tamper-detection",
     "dt-auto-update",
     "dt-window-persistence",
     "dt-crash-reporting",
@@ -1208,10 +1206,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ma-date-picker",
                 "title": "DatePicker statt Freitext-Timestamp für Task-Deadline",
-                "description": "Prueft, dass Deadlines ueber einen DatePicker und nicht ueber Freitext erfasst werden.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Deadline-Eingabe erfolgt nutzerfreundlich ueber DatePicker und wird korrekt gespeichert.",
+                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Das Web-Control-Formular verwendet fuer Deadlines ein datetime-local-Eingabefeld, und der Create-Task-Flow konvertiert den Wert in ein korrektes ISO-Datum fuer das Backend.",
+                "automationType": "automatic",
+                "source": "repo-test",
+                "suiteRef": "backend-jest",
+                "successCriteria": "Repository-Tests pruefen das datetime-local-Deadline-Feld im HTML sowie die ISO-Konvertierung im Create-Task-Flow.",
             },
             {
                 "id": "ma-subscription-check",
@@ -1346,10 +1345,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ca-tamper-detection",
                 "title": "Manipulationserkennung (Settings-Zugriff) getestet",
-                "description": "Verifiziert die Erkennung manipulativer Eingriffe, insbesondere ueber Settings-Zugriffe.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Manipulationsversuche werden erkannt und fuehren zum erwarteten Verhalten.",
+                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Die ChildApp enthaelt eine testbare Settings-Tamper-Policy fuer wiederholte Settings-Zugriffe, waehrend Backend-Tests die reportTamperEvent-Weiterleitung und Parent-Benachrichtigung pruefen.",
+                "automationType": "automatic",
+                "source": "repo-test",
+                "suiteRef": "android-unit-child",
+                "successCriteria": "Child-Unit-Tests pruefen die Erkennung wiederholter Settings-Zugriffe; Backend-Regressionen decken reportTamperEvent inklusive Eltern-Benachrichtigung ab.",
             },
             {
                 "id": "ca-task-proof",
