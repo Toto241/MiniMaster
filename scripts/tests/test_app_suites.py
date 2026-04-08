@@ -468,13 +468,11 @@ class TestBuildTestingRegister:
         expected_manual = {
             "ma-task-reject-ui",
             "ma-date-picker",
-            "ma-subscription-check",
             "ma-subscription-enforce",
             "ma-fcm-working",
             "ma-firebase-appcheck",
             "ma-offline-handling",
             "ma-qr-pairing",
-            "ca-fcm-sync",
             "ca-accessibility-active",
             "ca-app-blocking-effective",
             "ca-overlay-secure",
@@ -495,6 +493,8 @@ class TestBuildTestingRegister:
         }
 
         expected_static = {
+            "ma-subscription-check",
+            "ca-fcm-sync",
             "ma-usage-rules-nav",
             "ca-usage-limits",
             "ca-time-windows",
@@ -544,8 +544,8 @@ class TestBuildTestingRegister:
         items_by_id = {item["id"]: item for item in result["items"]}
 
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
-        assert items_by_id["ma-subscription-check"]["manualClass"] == "automation-backlog"
-        assert items_by_id["ma-subscription-check"]["automationWave"] == "wave-1"
+        assert items_by_id["ma-subscription-enforce"]["manualClass"] == "automation-backlog"
+        assert items_by_id["ma-subscription-enforce"]["automationWave"] == "wave-1"
         assert items_by_id["ma-task-reject-ui"]["automationWave"] == "wave-2"
         assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
 
