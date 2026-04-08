@@ -419,8 +419,8 @@ describe("admin-panel helper functions", () => {
     const result = await exports.loadSuiteRunHistory();
 
     expect(result).toMatchObject({ ok: true, message: "2 Suite-Läufe geladen." });
-    expect(historyEl.innerHTML).toContain('badge pass">passed</span>');
-    expect(historyEl.innerHTML).toContain('badge running">skipped</span>');
+    expect(historyEl.innerHTML).toContain("badge pass\">passed</span>");
+    expect(historyEl.innerHTML).toContain("badge running\">skipped</span>");
     expect(historyEl.innerHTML).toContain("daily-smoke");
     expect(historyEl.innerHTML).toContain("device-sync");
     expect(historyEl.innerHTML).toContain("run-pass-1");

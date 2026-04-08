@@ -273,9 +273,9 @@ describe("admin-panel QA flow integration", () => {
 
     expect(context.URL.createObjectURL).toHaveBeenCalled();
     const blobPayload = context.URL.createObjectURL.mock.calls[0][0];
-    expect(blobPayload.parts[0]).toContain('"scenarioId": "scenario-b"');
-    expect(blobPayload.parts[0]).toContain('"testClass": "SyncSpec"');
-    expect(blobPayload.parts[0]).toContain('"evidenceRef": "DOC-1"');
+    expect(blobPayload.parts[0]).toContain("\"scenarioId\": \"scenario-b\"");
+    expect(blobPayload.parts[0]).toContain("\"testClass\": \"SyncSpec\"");
+    expect(blobPayload.parts[0]).toContain("\"evidenceRef\": \"DOC-1\"");
     expect(anchor.download).toContain("dual-device-artifact-scenario-b-");
     expect(anchor.click).toHaveBeenCalled();
     expect(context.URL.revokeObjectURL).toHaveBeenCalledWith("blob:test");
