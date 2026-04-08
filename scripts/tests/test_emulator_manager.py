@@ -169,3 +169,45 @@ class TestEmulatorLifecycle:
         assert result["apiLevel"] == 34
         assert result["systemImagePackage"] == "system-images;android-34;google_apis;x86_64"
         assert "--name" in run_calls[0][0]
+
+    def test_ensure_emulator_available_reuses_matching_running_emulator(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(emulator_manager, "list_running_emulators", lambda: [{"serial": "emulator-5554", "state": "device"}])
+        monkeypatch.setattr(emulator_manager, "get_emulator_android_version", lambda serial: "14")
+
+        result = emulator_manager.ensure_emulator_available("phone-standard", "14")
+
+        assert result["reused"] is True
+        assert result["serial"] == "emulator-5554"
+
+    def test_ensure_emulator_available_creates_and_waits_for_new_emulator(self, monkeypatch: pytest.MonkeyPatch):
+        running_snapshots = [[], [], [{"serial": "emulator-5556", "state": "device"}]]
+        monkeypatch.setattr(emulator_manager, "list_avds", lambda: [])
+        monkeypatch.setattr(emulator_manager, "create_avd", lambda avd_name, profile_id, android_version: {"created": True, "avdName": avd_name, "profileId": profile_id, "androidVersion": android_version})
+        monkeypatch.setattr(emulator_manager, "start_emulator", lambda *args, **kwargs: {"started": True})
+        monkeypatch.setattr(emulator_manager, "wait_for_emulator_ready", lambda serial, timeout_sec=240: {"ready": True, "serial": serial, "androidVersion": "14"})
+        monkeypatch.setattr(emulator_manager, "time", MagicMock(time=lambda: 0, sleep=lambda seconds: None))
+
+        def fake_list_running():
+            return running_snapshots.pop(0) if running_snapshots else [{"serial": "emulator-5556", "state": "device"}]
+
+        monkeypatch.setattr(emulator_manager, "list_running_emulators", fake_list_running)
+
+        result = emulator_manager.ensure_emulator_available("phone-standard", "14")
+
+        assert result["created"] is True
+        assert result["started"] is True
+        assert result["serial"] == "emulator-5556"
+
+    def test_ensure_emulator_pool_allocates_multiple_slots(self, monkeypatch: pytest.MonkeyPatch):
+        calls: list[int] = []
+
+        def fake_ensure(profile_id, android_version, *, slot=1, **kwargs):
+            calls.append(slot)
+            return {"serial": f"emulator-{slot}", "profileId": profile_id, "androidVersion": android_version}
+
+        monkeypatch.setattr(emulator_manager, "ensure_emulator_available", fake_ensure)
+
+        result = emulator_manager.ensure_emulator_pool("dual-device-balanced", "14", device_count=2)
+
+        assert calls == [1, 2]
+        assert len(result) == 2

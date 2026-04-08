@@ -151,6 +151,180 @@ def list_running_emulators() -> list[dict[str, object]]:
     return devices
 
 
+def get_emulator_android_version(serial: str) -> str:
+    normalized_serial = serial.strip()
+    if not normalized_serial:
+        return ""
+    adb_binary = _adb_binary()
+    if not adb_binary:
+        return ""
+    result = subprocess.run(
+        [adb_binary, "-s", normalized_serial, "shell", "getprop", "ro.build.version.release"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=20,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def wait_for_emulator_ready(serial: str, timeout_sec: int = 240) -> dict[str, object]:
+    normalized_serial = serial.strip()
+    if not normalized_serial:
+        raise ValueError("serial ist erforderlich.")
+    adb_binary = _adb_binary()
+    if not adb_binary:
+        raise ValueError("ADB ist nicht verfügbar.")
+
+    deadline = time.time() + max(30, timeout_sec)
+    while time.time() < deadline:
+        wait_result = subprocess.run(
+            [adb_binary, "-s", normalized_serial, "wait-for-device"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=20,
+        )
+        if wait_result.returncode == 0:
+            boot_result = subprocess.run(
+                [adb_binary, "-s", normalized_serial, "shell", "getprop", "sys.boot_completed"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=20,
+            )
+            if boot_result.returncode == 0 and boot_result.stdout.strip() == "1":
+                return {
+                    "ready": True,
+                    "serial": normalized_serial,
+                    "androidVersion": get_emulator_android_version(normalized_serial),
+                }
+        time.sleep(2)
+
+    raise ValueError(f"Emulator {normalized_serial} wurde nicht rechtzeitig bereit.")
+
+
+def build_managed_avd_name(profile_id: str, android_version: str, slot: int = 1) -> str:
+    normalized_profile = profile_id.strip().replace("-", "_")
+    normalized_version = android_version.strip().replace(".", "_")
+    normalized_slot = max(1, int(slot))
+    return f"MiniMaster_{normalized_profile}_API_{normalized_version}_{normalized_slot}"
+
+
+def find_running_emulator_by_android_version(android_version: str, *, exclude_serials: list[str] | None = None) -> dict[str, object] | None:
+    excluded = {item.strip() for item in (exclude_serials or []) if item and item.strip()}
+    for item in list_running_emulators():
+        serial = str(item.get("serial", "")).strip()
+        if not serial or serial in excluded:
+            continue
+        if get_emulator_android_version(serial) == android_version:
+            enriched = dict(item)
+            enriched["androidVersion"] = android_version
+            return enriched
+    return None
+
+
+def ensure_emulator_available(
+    profile_id: str,
+    android_version: str,
+    *,
+    slot: int = 1,
+    headless: bool = True,
+    wipe_data: bool = False,
+    no_snapshot: bool = True,
+    timeout_sec: int = 240,
+    exclude_serials: list[str] | None = None,
+) -> dict[str, object]:
+    existing = find_running_emulator_by_android_version(android_version, exclude_serials=exclude_serials)
+    if existing is not None:
+        return {
+            "serial": str(existing.get("serial", "")),
+            "androidVersion": android_version,
+            "profileId": profile_id,
+            "avdName": str(existing.get("avdName", "")),
+            "reused": True,
+            "created": False,
+            "started": False,
+        }
+
+    avd_name = build_managed_avd_name(profile_id, android_version, slot=slot)
+    created = False
+    if avd_name not in list_avds():
+        create_avd(avd_name, profile_id=profile_id, android_version=android_version)
+        created = True
+
+    before_serials = {
+        str(item.get("serial", "")).strip()
+        for item in list_running_emulators()
+        if str(item.get("serial", "")).strip()
+    }
+    start_result = start_emulator(
+        avd_name,
+        headless=headless,
+        wipe_data=wipe_data,
+        no_snapshot=no_snapshot,
+    )
+    deadline = time.time() + max(30, timeout_sec)
+    assigned_serial = ""
+    while time.time() < deadline and not assigned_serial:
+        for item in list_running_emulators():
+            serial = str(item.get("serial", "")).strip()
+            if serial and serial not in before_serials:
+                assigned_serial = serial
+                break
+        if not assigned_serial:
+            time.sleep(2)
+
+    if not assigned_serial:
+        raise ValueError(f"Kein neuer Emulator-Serial für {avd_name} erkannt.")
+
+    wait_result = wait_for_emulator_ready(assigned_serial, timeout_sec=timeout_sec)
+    return {
+        "serial": assigned_serial,
+        "androidVersion": android_version,
+        "profileId": profile_id,
+        "avdName": avd_name,
+        "reused": False,
+        "created": created,
+        "started": bool(start_result.get("started")),
+        "boot": wait_result,
+    }
+
+
+def ensure_emulator_pool(
+    profile_id: str,
+    android_version: str,
+    *,
+    device_count: int = 1,
+    timeout_sec: int = 240,
+) -> list[dict[str, object]]:
+    normalized_count = max(1, int(device_count))
+    allocated: list[dict[str, object]] = []
+    exclude_serials: list[str] = []
+    for slot in range(1, normalized_count + 1):
+        entry = ensure_emulator_available(
+            profile_id,
+            android_version,
+            slot=slot,
+            timeout_sec=timeout_sec,
+            exclude_serials=exclude_serials,
+        )
+        serial = str(entry.get("serial", "")).strip()
+        if serial:
+            exclude_serials.append(serial)
+        allocated.append(entry)
+    return allocated
+
+
 def start_emulator(
     avd_name: str,
     *,

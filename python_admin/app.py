@@ -41,6 +41,7 @@ from emulator_manager import (  # noqa: E402
     build_emulator_matrix_plan,
     create_avd as create_emulator_avd,
     create_reservation as create_emulator_reservation,
+    ensure_emulator_pool,
     get_emulator_lab_overview,
     load_active_reservations as load_emulator_reservations,
     list_running_emulators,
@@ -3697,6 +3698,7 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
         for index, android_version in enumerate(android_versions, start=1):
             device_mode = "dual-device" if execution_mode == "dual-device" else "single-device"
             recommended_profile = profile_id or _recommended_profile_for_version(android_version, device_mode)
+            provisioning: list[dict[str, object]] = []
             _update_active_suite_event(run_id, {
                 "phase": "matrix-run",
                 "status": "running",
@@ -3707,9 +3709,22 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
 
             try:
                 if execution_mode == "dual-device":
+                    master_serial = str(kwargs.get("master_serial") or "").strip()
+                    child_serial = str(kwargs.get("child_serial") or "").strip()
+                    if master_serial == "auto" or child_serial == "auto":
+                        provisioning = ensure_emulator_pool(
+                            recommended_profile or _recommended_profile_for_version(android_version, "dual-device"),
+                            android_version,
+                            device_count=2,
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                        )
+                        if master_serial == "auto" and len(provisioning) >= 1:
+                            master_serial = str(provisioning[0].get("serial") or "")
+                        if child_serial == "auto" and len(provisioning) >= 2:
+                            child_serial = str(provisioning[1].get("serial") or "")
                     result = run_dual_device(
-                        master_serial=str(kwargs.get("master_serial") or ""),
-                        child_serial=str(kwargs.get("child_serial") or ""),
+                        master_serial=master_serial,
+                        child_serial=child_serial,
                         install_apk=bool(kwargs.get("install_apk")),
                         master_apk_path=str(kwargs.get("master_apk_path") or ""),
                         child_apk_path=str(kwargs.get("child_apk_path") or ""),
@@ -3728,13 +3743,23 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
                         "executionMode": execution_mode,
                         "scenarioId": scenario_id,
                         "profileId": recommended_profile,
+                        "provisioning": provisioning,
                         "status": result.overall_status,
                         "result": result.to_dict(),
                     }
                 else:
+                    serial = str(kwargs.get("serial") or "auto").strip() or "auto"
+                    if serial == "auto":
+                        provisioning = ensure_emulator_pool(
+                            recommended_profile or _recommended_profile_for_version(android_version, "single-device"),
+                            android_version,
+                            device_count=1,
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                        )
+                        serial = str(provisioning[0].get("serial") or "")
                     result = run_usb_test(
                         app_id=app_id,
-                        serial=str(kwargs.get("serial") or "auto"),
+                        serial=serial,
                         suite=str(kwargs.get("suite") or "commissioning"),
                         test_filter=str(kwargs.get("test_filter") or ""),
                         skip_activation=bool(kwargs.get("skip_activation")),
@@ -3751,6 +3776,7 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
                         "executionMode": execution_mode,
                         "appId": app_id,
                         "profileId": recommended_profile,
+                        "provisioning": provisioning,
                         "status": result.overall_status,
                         "result": result.to_dict(),
                     }
