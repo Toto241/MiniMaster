@@ -1901,11 +1901,13 @@ describe("admin-panel helper functions", () => {
       blockingForRelease: true,
       staleEvidence: true,
       groupId: "repo-tests-unsupported",
+      derivedFrom: ["doc-create-task"],
     });
     expect(badges).toContain("Prioritaet");
     expect(badges).toContain("Verantwortlich");
     expect(badges).toContain("Release-Blocker");
     expect(badges).toContain("Unsupported");
+    expect(badges).toContain("Abgeleitet");
 
     const legend = exports.buildTestingRegisterLegend();
     expect(legend).toContain("Register-Legende");
@@ -1930,6 +1932,39 @@ describe("admin-panel helper functions", () => {
     expect(exports.buildTestingRegisterExecutionPath({ action: "suite-run", suiteRef: "android-master" })).toContain("android-master");
     expect(exports.buildTestingRegisterExecutionPath({ action: "protocol" })).toContain("Nachweisformular");
     expect(exports.buildTestingRegisterExecutionPath({ action: "commissioning-run" })).toContain("Python-Commissioning-Lauf");
+    expect(exports.buildTestingRegisterExecutionPath({ source: "register-derivative", derivedFromTitles: ["Task erstellen"] })).toContain("Task erstellen");
+  });
+
+  it("normalizes duplicate coverage insights from the testing register payload", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const insights = exports.buildTestingRegisterDuplicateInsights({
+      duplicateInsights: {
+        count: 2,
+        sourceCount: 3,
+        entries: [
+          {
+            id: "ma-task-create",
+            title: "Task-Erstellung",
+            derivedFrom: ["doc-create-task"],
+            derivedFromTitles: ["Commissioning: Task anlegen"],
+          },
+        ],
+      },
+    });
+
+    expect(insights).toEqual({
+      count: 2,
+      sourceCount: 3,
+      entries: [
+        {
+          id: "ma-task-create",
+          title: "Task-Erstellung",
+          derivedFrom: ["doc-create-task"],
+          derivedFromTitles: ["Commissioning: Task anlegen"],
+        },
+      ],
+    });
   });
 
   it("summarizes QA start scopes for commissioning, suites and manual evidence", () => {

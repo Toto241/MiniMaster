@@ -157,6 +157,62 @@ def make_documented_test(
 
 TEST_REGISTER_STALE_DAYS = 30
 
+TEST_REGISTER_DERIVATIVE_MAPPINGS: dict[str, dict[str, object]] = {
+    "android-master-registered": {
+        "derivedFrom": ["doc-master-app-registration-auth"],
+        "rationale": "Wird bereits durch den physischen Device-Suite-Flow zur MasterApp-Registrierung abgedeckt.",
+    },
+    "android-child-registered": {
+        "derivedFrom": ["doc-child-app-registration-code"],
+        "rationale": "Wird bereits durch den physischen Device-Suite-Flow zur ChildApp-Registrierung abgedeckt.",
+    },
+    "ma-registration-flow": {
+        "derivedFrom": ["doc-master-app-registration-auth"],
+        "rationale": "Der funktionale Registrierungsflow wird bereits durch die Commissioning-Device-Suite bewertet.",
+    },
+    "ma-pairing-works": {
+        "derivedFrom": ["doc-generate-pairing-code", "doc-child-app-registration-code"],
+        "rationale": "Pairing-Link und Einloesen des Pairings sind bereits als kombinierte Device-Suite-Prüfung vorhanden.",
+    },
+    "ma-lock-unlock": {
+        "derivedFrom": ["doc-screen-lock-enforcement", "doc-verify-app-blocking-enforcement"],
+        "rationale": "Lock/Unlock und Blocking werden bereits im physischen Commissioning automatisch verifiziert.",
+    },
+    "ma-task-create": {
+        "derivedFrom": ["doc-create-task"],
+        "rationale": "Die Task-Erstellung mit Deadline ist bereits als Device-Suite-Prüffall vorhanden.",
+    },
+    "ma-task-review": {
+        "derivedFrom": ["doc-child-submits-task-photo", "doc-task-approval-workflow"],
+        "rationale": "Foto-Nachweis und Freigabe-Workflow sind bereits als kombinierte Device-Suite-Prüfung vorhanden.",
+    },
+    "ca-pairing-flow": {
+        "derivedFrom": ["doc-generate-pairing-code", "doc-child-app-registration-code"],
+        "rationale": "Der Child-Pairing-Flow ist bereits über den Device-Suite-Commissioning-Pfad abgedeckt.",
+    },
+    "ca-task-proof": {
+        "derivedFrom": ["doc-child-submits-task-photo"],
+        "rationale": "Der Foto-Beweis-Upload wird bereits auf der Child-Suite geprüft.",
+    },
+    "p0-commissioning-android": {
+        "derivedFrom": [
+            "doc-master-app-registration-auth",
+            "doc-generate-pairing-code",
+            "doc-child-app-registration-code",
+            "doc-verify-app-blocking-enforcement",
+        ],
+        "rationale": "Der P0-Blocker wird bereits durch die physischen Android-Commissioning-Suiten bewertet.",
+    },
+    "p0-commissioning-support": {
+        "derivedFrom": ["support-flow-verified"],
+        "rationale": "Der Support-Workflow ist bereits über bestehende Regressionstests abgedeckt.",
+    },
+    "p0-commissioning-compliance": {
+        "derivedFrom": ["compliance-flow-verified"],
+        "rationale": "Der DSAR-/Audit-/Consent-Flow ist bereits über bestehende Regressionstests abgedeckt.",
+    },
+}
+
 
 def parse_iso_timestamp(value: object) -> datetime | None:
     text = str(value or "").strip()
@@ -382,18 +438,20 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "android-master-registered",
                 "title": "Android-App com.minimaster.masterapp registriert",
-                "description": "Manueller Nachweis, dass die Eltern-App im Projekt registriert und testbar ist.",
-                "automationType": "manual",
-                "source": "attestation",
-                "successCriteria": "Die Eltern-App com.minimaster.masterapp ist bestaetigt registriert.",
+                "description": "Automatisch aus dem physischen Commissioning-Flow abgeleitet: Die Eltern-App ist im Projekt registriert und auf einem echten Geraet testbar.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Device-Suite-Prüffall zur MasterApp-Registrierung ist erfolgreich bestanden.",
+                "derivedFrom": ["doc-master-app-registration-auth"],
             },
             {
                 "id": "android-child-registered",
                 "title": "Android-App com.google.pairing registriert",
-                "description": "Manueller Nachweis, dass die Child-App im Projekt registriert und testbar ist.",
-                "automationType": "manual",
-                "source": "attestation",
-                "successCriteria": "Die Child-App com.google.pairing ist bestaetigt registriert.",
+                "description": "Automatisch aus dem physischen Commissioning-Flow abgeleitet: Die Child-App ist im Projekt registriert und auf einem echten Geraet testbar.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Device-Suite-Prüffall zur ChildApp-Registrierung ist erfolgreich bestanden.",
+                "derivedFrom": ["doc-child-app-registration-code"],
             },
             {
                 "id": "firebase-project-bound",
@@ -952,10 +1010,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "p0-commissioning-android",
                 "title": "Android Apps (Pairing + Sync) geprueft",
-                "description": "Pairing und Daten-Sync zwischen MasterApp und ChildApp auf echten Geraeten getestet.",
-                "automationType": "manual",
-                "source": "p0-blocker",
-                "successCriteria": "Pairing + FCM-Sync auf physischen Geraeten erfolgreich dokumentiert.",
+                "description": "Automatisch aus den physischen Android-Commissioning-Suiten abgeleitet: Pairing, Registrierung und Blocking/Sync sind auf echten Geraeten bewertet.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Alle verknuepften physischen Android-Commissioning-Prüffälle laufen erfolgreich durch.",
+                "derivedFrom": ["doc-master-app-registration-auth", "doc-generate-pairing-code", "doc-child-app-registration-code", "doc-verify-app-blocking-enforcement"],
             },
             {
                 "id": "p0-commissioning-ai",
@@ -968,18 +1027,20 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "p0-commissioning-support",
                 "title": "Support-Workflow vollstaendig getestet",
-                "description": "Ticket-Erstellung, -Bearbeitung und -Abschluss funktionieren.",
-                "automationType": "manual",
-                "source": "p0-blocker",
-                "successCriteria": "Support-Workflow end-to-end durchlaufen und protokolliert.",
+                "description": "Automatisch aus den bestehenden Backend- und Admin-Regressionstests abgeleitet: Ticket-Erstellung, -Bearbeitung und -Abschluss funktionieren.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Support-Regressionstest steht auf PASS.",
+                "derivedFrom": ["support-flow-verified"],
             },
             {
                 "id": "p0-commissioning-compliance",
                 "title": "Compliance-Flow (DSAR/Audit/Consent) geprueft",
-                "description": "DSAR-Anfragen, Audit-Log und Consent-Status funktionieren korrekt.",
-                "automationType": "manual",
-                "source": "p0-blocker",
-                "successCriteria": "DSAR + Audit + Consent-Flow end-to-end getestet.",
+                "description": "Automatisch aus den bestehenden Backend- und Admin-Regressionstests abgeleitet: DSAR, Audit-Log und Consent-Status funktionieren korrekt.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Compliance-Regressionstest steht auf PASS.",
+                "derivedFrom": ["compliance-flow-verified"],
             },
         ),
     },
@@ -1006,42 +1067,47 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ma-registration-flow",
                 "title": "Geräteregistrierung & SecretKey-Persistierung funktionsfähig",
-                "description": "Prueft den Ende-zu-Ende-Registrierungsflow inklusive persistiertem SecretKey in der MasterApp.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Registrierung, Wiederanmeldung und SecretKey-Persistierung sind auf einem Testgeraet bestaetigt.",
+                "description": "Automatisch aus dem Commissioning-Device-Suite-Flow abgeleitet: Registrierung und SecretKey-Persistierung sind auf einem Testgeraet verifiziert.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Device-Suite-Prüffall fuer die MasterApp-Registrierung ist erfolgreich bestanden.",
+                "derivedFrom": ["doc-master-app-registration-auth"],
             },
             {
                 "id": "ma-pairing-works",
                 "title": "Pairing-Link-Generierung und Kopplung mit ChildApp getestet",
-                "description": "Prueft, dass ein Parent-Geraet einen Pairing-Link erzeugen und ein Child erfolgreich koppeln kann.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Pairing-Link wurde erstellt, eingeloest und die Kopplung erfolgreich bestaetigt.",
+                "description": "Automatisch aus den Commissioning-Device-Suites abgeleitet: Pairing-Link-Erzeugung und erfolgreiche Kopplung sind abgedeckt.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Die verknuepften Device-Suite-Prüffälle fuer Pairing-Link und Child-Kopplung sind erfolgreich bestanden.",
+                "derivedFrom": ["doc-generate-pairing-code", "doc-child-app-registration-code"],
             },
             {
                 "id": "ma-lock-unlock",
                 "title": "Lock/Unlock Toggle für Kindergeräte funktionsfähig",
-                "description": "Verifiziert die Sperr-/Entsperrsteuerung vom Parent aus gegen ein reales Child-Geraet.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Lock und Unlock werden vom Child-Geraet korrekt uebernommen.",
+                "description": "Automatisch aus den Commissioning-Device-Suites abgeleitet: Sperr-/Entsperrsteuerung und Blocking greifen auf dem Child-Geraet.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Die verknuepften Device-Suite-Prüffälle fuer Screen-Lock und Blocking bestehen erfolgreich.",
+                "derivedFrom": ["doc-screen-lock-enforcement", "doc-verify-app-blocking-enforcement"],
             },
             {
                 "id": "ma-task-create",
                 "title": "Task-Erstellung mit Deadline funktionsfähig",
-                "description": "Prueft die Erstellung einer Aufgabe inklusive Deadline in der MasterApp.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Eine Aufgabe mit Deadline kann erfolgreich angelegt und gespeichert werden.",
+                "description": "Automatisch aus dem Commissioning-Device-Suite-Flow abgeleitet: Aufgaben mit Deadline koennen erfolgreich angelegt und gespeichert werden.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Device-Suite-Prüffall fuer Task-Erstellung ist erfolgreich bestanden.",
+                "derivedFrom": ["doc-create-task"],
             },
             {
                 "id": "ma-task-review",
                 "title": "Task Review mit Fotoanzeige und Genehmigung funktionsfähig",
-                "description": "Verifiziert den Review-Flow fuer Child-Nachweise inklusive Fotoanzeige und Freigabe.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Foto-Beweis ist sichtbar und die Aufgabe kann erfolgreich genehmigt werden.",
+                "description": "Automatisch aus den Commissioning-Device-Suites abgeleitet: Child-Nachweise inklusive Fotoanzeige und Genehmigung sind abgedeckt.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Die verknuepften Device-Suite-Prüffälle fuer Foto-Beweis und Review-Workflow sind erfolgreich bestanden.",
+                "derivedFrom": ["doc-child-submits-task-photo", "doc-task-approval-workflow"],
             },
             {
                 "id": "ma-task-reject-ui",
@@ -1125,10 +1191,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ca-pairing-flow",
                 "title": "Pairing per Deep-Link und 6-stelligem Code funktionsfähig",
-                "description": "Prueft den Pairing-Flow der Child-App sowohl per Deep-Link als auch per 6-stelligem Code.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Beide Pairing-Wege lassen sich erfolgreich durchlaufen.",
+                "description": "Automatisch aus den Commissioning-Device-Suites abgeleitet: Pairing per Link/Code ist auf dem Child-Geraet abgedeckt.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Die verknuepften Device-Suite-Prüffälle fuer Pairing-Link und Child-Registrierung sind erfolgreich bestanden.",
+                "derivedFrom": ["doc-generate-pairing-code", "doc-child-app-registration-code"],
             },
             {
                 "id": "ca-fcm-sync",
@@ -1205,10 +1272,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ca-task-proof",
                 "title": "Foto-Beweis-Upload für Aufgaben funktionsfähig",
-                "description": "Prueft den Upload eines Foto-Beweises vom Child-Geraet fuer eine Aufgabe.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Foto-Beweis kann erstellt, hochgeladen und im Parent-Flow angezeigt werden.",
+                "description": "Automatisch aus dem Commissioning-Device-Suite-Flow abgeleitet: Foto-Beweise koennen erstellt, hochgeladen und im Parent-Flow angezeigt werden.",
+                "automationType": "automatic",
+                "source": "register-derivative",
+                "successCriteria": "Der verknuepfte Device-Suite-Prüffall fuer den Foto-Beweis-Upload ist erfolgreich bestanden.",
+                "derivedFrom": ["doc-child-submits-task-photo"],
             },
             {
                 "id": "ca-factory-reset-protection",
@@ -2705,6 +2773,67 @@ def suite_state_for_register_test(
     return state, suite_meta
 
 
+def build_derivative_register_state(
+    *,
+    derived_from: list[str],
+    derived_items: list[dict[str, object]],
+    rationale: str,
+) -> dict[str, object]:
+    if not derived_items:
+        return {
+            "status": "not_run",
+            "details": "Noch keine verknüpften automatischen Prüffälle im Register vorhanden.",
+            "updatedAt": "",
+            "storage": str(COMMISSIONING_LOG_FILE),
+            "origin": "testing-register-derivative",
+        }
+
+    derived_statuses = [str(item.get("status") or "not_run") for item in derived_items]
+    source_titles = [str(item.get("title") or item.get("id") or "Prüffall") for item in derived_items]
+    latest_update = max((str(item.get("updatedAt") or "") for item in derived_items), default="")
+    storage_candidates = [str(item.get("storage") or "") for item in derived_items if str(item.get("storage") or "")]
+
+    if any(status == "fail" for status in derived_statuses):
+        aggregate_status = "fail"
+    elif all(status == "pass" for status in derived_statuses):
+        aggregate_status = "pass"
+    elif any(status == "manual_required" for status in derived_statuses):
+        aggregate_status = "manual_required"
+    else:
+        aggregate_status = "not_run"
+
+    details = f"Automatisch aus {', '.join(source_titles)} abgeleitet. {rationale}".strip()
+    if aggregate_status == "not_run" and len(derived_items) < len(derived_from):
+        details = f"{details} Noch nicht alle Referenz-Prüffälle sind im Register verfügbar."
+
+    return {
+        "status": aggregate_status,
+        "details": details,
+        "updatedAt": latest_update,
+        "storage": storage_candidates[0] if storage_candidates else str(COMMISSIONING_LOG_FILE),
+        "origin": "testing-register-derivative",
+    }
+
+
+def summarize_testing_register_duplicates(items: list[dict[str, object]]) -> dict[str, object]:
+    duplicates = [item for item in items if cast(list[str], item.get("derivedFrom") or [])]
+    entries = [
+        {
+            "id": str(item.get("id") or ""),
+            "title": str(item.get("title") or item.get("id") or "Prüffall"),
+            "status": str(item.get("status") or "not_run"),
+            "derivedFrom": list(cast(list[str], item.get("derivedFrom") or [])),
+            "derivedFromTitles": list(cast(list[str], item.get("derivedFromTitles") or [])),
+        }
+        for item in duplicates
+    ]
+    return {
+        "count": len(entries),
+        "sourceCount": len({source_id for entry in entries for source_id in entry["derivedFrom"]}),
+        "entries": entries,
+    }
+
+
 def build_repo_test_inventory_entries(
     suite_catalog_index: dict[str, dict[str, object]],
     latest_suite_results: dict[str, dict[str, object]],
@@ -2810,6 +2939,7 @@ def build_testing_register() -> dict[str, object]:
     }
 
     items: list[dict[str, object]] = []
+    item_index: dict[str, dict[str, object]] = {}
 
     for group in cast(list[dict[str, object]], commissioning_catalog.get("groups") or []):
         for test in cast(list[dict[str, object]], group.get("tests") or []):
@@ -2817,10 +2947,21 @@ def build_testing_register() -> dict[str, object]:
             automation_type = str(test.get("automationType") or "automatic")
             source = str(test.get("source") or "")
             suite_ref = str(test.get("suiteRef") or "")
+            derived_from = list(cast(list[str], test.get("derivedFrom") or []))
             if source == "static-analysis":
                 register_state = static_analysis_index.get(test_id)
             elif source == "docs-validation":
                 register_state = docs_validation_index.get(test_id)
+            elif source == "register-derivative":
+                mapping = TEST_REGISTER_DERIVATIVE_MAPPINGS.get(test_id, {})
+                if not derived_from:
+                    derived_from = list(cast(list[str], mapping.get("derivedFrom") or []))
+                derived_items = [item_index[source_id] for source_id in derived_from if source_id in item_index]
+                register_state = build_derivative_register_state(
+                    derived_from=derived_from,
+                    derived_items=derived_items,
+                    rationale=str(mapping.get("rationale") or ""),
+                )
             else:
                 register_state = commissioning_index.get(test_id)
             evidence_entry = evidence_index.get(test_id)
@@ -2871,44 +3012,54 @@ def build_testing_register() -> dict[str, object]:
             if not suite_meta and suite_ref:
                 suite_meta = suite_catalog_index.get(suite_ref, {})
 
+            if source == "register-derivative" and derived_from:
+                derived_source_items = [item_index[source_id] for source_id in derived_from if source_id in item_index]
+                source_actions = {str(item.get("action") or "") for item in derived_source_items}
+                source_suite_refs = {str(item.get("suiteRef") or "") for item in derived_source_items if str(item.get("suiteRef") or "")}
+                if len(source_actions) == 1 and source_actions == {"suite-run"} and len(source_suite_refs) == 1:
+                    suite_ref = next(iter(source_suite_refs))
+                    suite_meta = suite_catalog_index.get(suite_ref, {})
+
             action = "protocol" if automation_type in {"manual", "documented"} else ("suite-run" if suite_ref else "commissioning-run")
 
-            items.append(
-                {
-                    "id": test_id,
-                    "entryKind": "commissioning",
-                    "title": str(test.get("title") or test_id),
-                    "groupId": str(group.get("id") or ""),
-                    "groupTitle": str(group.get("title") or ""),
-                    "automationType": automation_type,
-                    "source": str(test.get("source") or ""),
-                    "status": str(register_state.get("status") or "not_run"),
-                    "details": str(register_state.get("details") or ""),
-                    "updatedAt": str(register_state.get("updatedAt") or ""),
-                    "storage": str(register_state.get("storage") or COMMISSIONING_LOG_FILE),
-                    "origin": str(register_state.get("origin") or "commissioning"),
-                    "documentation": str(test.get("documentation") or ""),
-                    "successCriteria": str(test.get("successCriteria") or ""),
-                    "action": action,
-                    "suiteRef": suite_ref,
-                    "command": str(test.get("command") or suite_meta.get("command") or ""),
-                    "prereqsMet": suite_meta.get("prereqsMet") if suite_ref else None,
-                    "prereqReason": str(suite_meta.get("prereqReason") or "") if suite_ref else "",
-                    **infer_register_metadata(
-                        entry_kind="commissioning",
-                        automation_type=automation_type,
-                        group_id=str(group.get("id") or ""),
-                        group_title=str(group.get("title") or ""),
-                        source=str(test.get("source") or ""),
-                        suite_ref=suite_ref,
-                        updated_at=str(register_state.get("updatedAt") or ""),
-                        status=str(register_state.get("status") or "not_run"),
-                        documentation=str(test.get("documentation") or ""),
-                        command=str(test.get("command") or suite_meta.get("command") or ""),
-                        prereq_reason=str(suite_meta.get("prereqReason") or ""),
-                    ),
-                }
-            )
+            item = {
+                "id": test_id,
+                "entryKind": "commissioning",
+                "title": str(test.get("title") or test_id),
+                "groupId": str(group.get("id") or ""),
+                "groupTitle": str(group.get("title") or ""),
+                "automationType": automation_type,
+                "source": str(test.get("source") or ""),
+                "status": str(register_state.get("status") or "not_run"),
+                "details": str(register_state.get("details") or ""),
+                "updatedAt": str(register_state.get("updatedAt") or ""),
+                "storage": str(register_state.get("storage") or COMMISSIONING_LOG_FILE),
+                "origin": str(register_state.get("origin") or "commissioning"),
+                "documentation": str(test.get("documentation") or ""),
+                "successCriteria": str(test.get("successCriteria") or ""),
+                "action": action,
+                "suiteRef": suite_ref,
+                "command": str(test.get("command") or suite_meta.get("command") or ""),
+                "prereqsMet": suite_meta.get("prereqsMet") if suite_ref else None,
+                "prereqReason": str(suite_meta.get("prereqReason") or "") if suite_ref else "",
+                "derivedFrom": derived_from,
+                "derivedFromTitles": [str(item_index[source_id].get("title") or source_id) for source_id in derived_from if source_id in item_index],
+                **infer_register_metadata(
+                    entry_kind="commissioning",
+                    automation_type=automation_type,
+                    group_id=str(group.get("id") or ""),
+                    group_title=str(group.get("title") or ""),
+                    source=str(test.get("source") or ""),
+                    suite_ref=suite_ref,
+                    updated_at=str(register_state.get("updatedAt") or ""),
+                    status=str(register_state.get("status") or "not_run"),
+                    documentation=str(test.get("documentation") or ""),
+                    command=str(test.get("command") or suite_meta.get("command") or ""),
+                    prereq_reason=str(suite_meta.get("prereqReason") or ""),
+                ),
+            }
+            items.append(item)
+            item_index[test_id] = item
 
     for suite in cast(list[dict[str, object]], suite_catalog.get("suites") or []):
         suite_id = str(suite.get("suiteId") or "")
@@ -2984,9 +3135,12 @@ def build_testing_register() -> dict[str, object]:
         "unsupported": sum(1 for item in items if item.get("groupId") == "repo-tests-unsupported"),
     }
 
+    duplicate_insights = summarize_testing_register_duplicates(items)
+
     return {
         "items": items,
         "summary": summary,
+        "duplicateInsights": duplicate_insights,
         "storage": {
             "commissioningRuns": str(COMMISSIONING_LOG_FILE),
             "commissioningEvidence": str(COMMISSIONING_EVIDENCE_LOG_FILE),

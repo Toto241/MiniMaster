@@ -293,12 +293,12 @@ class TestBuildTestingRegister:
         expected_manual = {
             "firebase-auth-enabled",
             "messaging-enabled",
-            "android-master-registered",
-            "android-child-registered",
             "parent-panel-verified",
             "device-sync-verified",
         }
         expected_automatic = {
+            "android-master-registered",
+            "android-child-registered",
             "cloud-project-id",
             "ai-runtime-config",
             "firestore-enabled",
@@ -461,11 +461,6 @@ class TestBuildTestingRegister:
         items_by_id = {item["id"]: item for item in result["items"]}
 
         expected_manual = {
-            "ma-registration-flow",
-            "ma-pairing-works",
-            "ma-lock-unlock",
-            "ma-task-create",
-            "ma-task-review",
             "ma-task-reject-ui",
             "ma-date-picker",
             "ma-subscription-check",
@@ -474,7 +469,6 @@ class TestBuildTestingRegister:
             "ma-firebase-appcheck",
             "ma-offline-handling",
             "ma-qr-pairing",
-            "ca-pairing-flow",
             "ca-fcm-sync",
             "ca-accessibility-active",
             "ca-app-blocking-effective",
@@ -482,7 +476,6 @@ class TestBuildTestingRegister:
             "ca-settings-protection",
             "ca-device-admin-enforced",
             "ca-tamper-detection",
-            "ca-task-proof",
             "ca-factory-reset-protection",
             "ca-root-detection",
             "ca-permission-onboarding",
@@ -502,15 +495,42 @@ class TestBuildTestingRegister:
             "ca-time-windows",
             "dt-ipc-messaging",
         }
+        expected_derived = {
+            "ma-registration-flow",
+            "ma-pairing-works",
+            "ma-lock-unlock",
+            "ma-task-create",
+            "ma-task-review",
+            "ca-pairing-flow",
+            "ca-task-proof",
+        }
 
         assert expected_manual.issubset(items_by_id.keys())
         assert expected_static.issubset(items_by_id.keys())
+        assert expected_derived.issubset(items_by_id.keys())
         for test_id in expected_manual:
             assert items_by_id[test_id]["automationType"] == "manual"
             assert items_by_id[test_id]["source"] == "platform-readiness"
         for test_id in expected_static:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "static-analysis"
+        for test_id in expected_derived:
+            assert items_by_id[test_id]["automationType"] == "automatic"
+            assert items_by_id[test_id]["source"] == "register-derivative"
+            assert items_by_id[test_id]["derivedFrom"]
+
+    def test_register_exposes_duplicate_coverage_insights_for_derived_checks(self):
+        from app import build_testing_register
+
+        result = build_testing_register()
+
+        duplicate_insights = result["duplicateInsights"]
+        assert duplicate_insights["count"] >= 1
+        entries_by_id = {entry["id"]: entry for entry in duplicate_insights["entries"]}
+
+        assert "ma-task-create" in entries_by_id
+        assert entries_by_id["ma-task-create"]["derivedFrom"] == ["doc-create-task"]
+        assert entries_by_id["ma-task-create"]["derivedFromTitles"]
 
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
         import app

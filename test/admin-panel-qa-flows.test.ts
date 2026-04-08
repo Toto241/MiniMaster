@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
 describe("admin-panel QA flow integration", () => {
@@ -331,5 +333,13 @@ describe("admin-panel QA flow integration", () => {
       "devices",
     ]);
     expect(sections.every((entry: [string, unknown]) => typeof entry[1] === "function")).toBe(true);
+  });
+
+  it("stacks QA test case layouts vertically in the stylesheet", () => {
+    const stylesheet = fs.readFileSync(path.join(__dirname, "..", "admin-panel", "styles.css"), "utf8");
+
+    expect(stylesheet).toContain(".testing-register-panels {");
+    expect(stylesheet).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(stylesheet).toContain(".python-automation-card-grid {");
   });
 });
