@@ -28,6 +28,17 @@ class TestUsbTestRunResult:
         assert r.error is None
         assert r.steps == []
 
+    def test_tracks_requested_and_detected_android_version(self):
+        r = UsbTestRunResult(
+            app_id="master",
+            serial="X",
+            suite="default",
+            requested_android_version="14",
+            detected_android_version="13",
+        )
+        assert r.requested_android_version == "14"
+        assert r.detected_android_version == "13"
+
     def test_to_dict(self):
         r = UsbTestRunResult(app_id="child", serial="Y", suite="commissioning")
         d = r.to_dict()
@@ -35,6 +46,30 @@ class TestUsbTestRunResult:
         assert d["serial"] == "Y"
         assert isinstance(d["steps"], list)
         assert d["status"] == "not_started"
+
+
+class TestRunUsbTestAndroidVersion:
+    @patch("usb_test_runner.AdbClient.get_android_version", return_value="13")
+    @patch("usb_test_runner.AdbClient.get_device_model", return_value="Pixel")
+    @patch("usb_test_runner.AdbClient.list_devices")
+    def test_returns_error_on_android_version_mismatch(self, mock_list_devices, _mock_model, _mock_version):
+        mock_device = MagicMock()
+        mock_device.is_ready = True
+        mock_device.serial = "emulator-5554"
+        mock_list_devices.return_value = [mock_device]
+
+        result = run_usb_test(
+            app_id="master",
+            serial="auto",
+            suite="commissioning",
+            expected_android_version="14",
+            verbose=False,
+        )
+
+        assert result.overall_status == "error"
+        assert result.requested_android_version == "14"
+        assert result.detected_android_version == "13"
+        assert "erwartet war Android 14" in str(result.error)
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -242,6 +242,64 @@ class TestMiniMasterAdminHandlerRoutes:
         assert queued["scenarioId"] == "offline-online-resync"
         assert queued["profileId"] == "dual-device-balanced"
 
+    def test_do_post_android_compatibility_queues_run_with_versions(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility")
+        handler._read_json_body.return_value = {
+            "executionMode": "single-master",
+            "androidVersions": ["10", "14"],
+            "serial": "auto",
+            "suite": "commissioning",
+        }
+
+        fake_thread = MagicMock()
+        fake_thread.start = MagicMock()
+        thread_cls = MagicMock(return_value=fake_thread)
+
+        class _FakeUuid:
+            hex = "fedcba1234567890"
+
+        monkeypatch.setattr(app.threading, "Thread", thread_cls)
+        monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "runId": "compat-fedcba123456",
+                "status": "queued",
+                "executionMode": "single-master",
+                "androidVersions": ["10", "14"],
+            },
+        )
+        fake_thread.start.assert_called_once_with()
+        with app._active_suite_lock:
+            queued = app._active_suite_runs["compat-fedcba123456"]
+        assert queued["type"] == "android-compatibility"
+        assert queued["androidVersions"] == ["10", "14"]
+
+    def test_do_post_android_compatibility_rejects_missing_dual_serials(self):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility")
+        handler._read_json_body.return_value = {
+            "executionMode": "dual-device",
+            "androidVersions": ["14"],
+            "masterSerial": "MASTER-1",
+        }
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.BAD_REQUEST,
+            {"error": "masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich."},
+        )
+
 
 class TestBuildTestingRegister:
     def test_register_exposes_extended_summary_and_metadata(self):
@@ -1105,6 +1163,39 @@ class TestRunDualDeviceBackground:
         with _active_suite_lock:
             assert len(_active_suite_runs[run_id]["timeline"]) == 2
             assert _active_suite_runs[run_id]["lastEvent"]["phase"] == "master"
+
+
+class TestRunAndroidCompatibilityBackground:
+    @patch("app.run_usb_test")
+    def test_collects_subruns_and_summary(self, mock_run_usb, suite_log_file):
+        from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
+        from usb_test_runner import UsbTestRunResult
+
+        run_id = "compat-test-1"
+        first = UsbTestRunResult(app_id="master", serial="A", suite="commissioning")
+        first.overall_status = "passed"
+        second = UsbTestRunResult(app_id="master", serial="A", suite="commissioning")
+        second.overall_status = "error"
+        second.error = "Version mismatch"
+        mock_run_usb.side_effect = [first, second]
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_android_compatibility_background(run_id, {
+            "execution_mode": "single-master",
+            "android_versions": ["10", "14"],
+            "app_id": "master",
+            "serial": "auto",
+            "suite": "commissioning",
+        })
+
+        with _active_suite_lock:
+            assert _active_suite_runs[run_id]["status"] == "finished"
+            assert len(_active_suite_runs[run_id]["subRuns"]) == 2
+            assert _active_suite_runs[run_id]["result"]["summary"]["counts"]["passed"] == 1
+            assert _active_suite_runs[run_id]["result"]["summary"]["counts"]["error"] == 1
+            assert _active_suite_runs[run_id]["result"]["overallStatus"] == "failed"
 
 
 # ═══════════════════════════════════════════════════════════════════
