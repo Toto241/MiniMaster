@@ -136,6 +136,37 @@ class TestGetQaCatalog:
         assert all(item["priority"] in {"P0", "P1"} for item in result["criticalBacklog"])
 
 
+class TestAndroidAutomationSweepPlan:
+    def test_collects_all_active_tests_and_dual_scenarios(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_android_version_matrix", lambda: [
+            {"androidVersion": "10", "status": "active"},
+            {"androidVersion": "14", "status": "active"},
+            {"androidVersion": "16", "status": "preview"},
+            {"androidVersion": "9", "status": "retired"},
+        ])
+        monkeypatch.setattr(app, "load_android_scenario_mappings", lambda: [
+            {"scenarioId": "pairing", "role": "master", "testClass": "master.PairingTest"},
+            {"scenarioId": "pairing", "role": "child", "testClass": "child.PairingTest"},
+            {"scenarioId": "rules", "role": "master", "testClass": "master.RulesTest"},
+            {"scenarioId": "rules", "role": "child", "testClass": "child.RulesTest"},
+            {"scenarioId": "incomplete", "role": "master", "testClass": "master.IncompleteTest"},
+        ])
+        monkeypatch.setattr(app, "load_dual_device_scenarios", lambda: [
+            {"scenarioId": "pairing"},
+            {"scenarioId": "rules"},
+            {"scenarioId": "incomplete"},
+        ])
+
+        plan = app._build_android_automation_sweep_plan()
+
+        assert plan["androidVersions"] == ["10", "14", "16"]
+        assert plan["masterTestClasses"] == ["master.PairingTest", "master.RulesTest", "master.IncompleteTest"]
+        assert plan["childTestClasses"] == ["child.PairingTest", "child.RulesTest"]
+        assert plan["selectedScenarioIds"] == ["pairing", "rules"]
+
+
 class TestMiniMasterAdminHandlerRoutes:
     @staticmethod
     def _make_handler(path: str):
@@ -332,6 +363,56 @@ class TestMiniMasterAdminHandlerRoutes:
             HTTPStatus.BAD_REQUEST,
             {"error": "masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich."},
         )
+
+    def test_do_post_android_automation_sweep_queues_catalog_driven_run(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-automation-sweep")
+        handler._read_json_body.return_value = {
+            "installApk": True,
+            "skipActivation": True,
+            "parallel": True,
+        }
+
+        fake_thread = MagicMock()
+        fake_thread.start = MagicMock()
+        thread_cls = MagicMock(return_value=fake_thread)
+
+        class _FakeUuid:
+            hex = "1234567890abcdef"
+
+        monkeypatch.setattr(app.threading, "Thread", thread_cls)
+        monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+        monkeypatch.setattr(app, "_build_android_automation_sweep_plan", lambda: {
+            "androidVersions": ["10", "14"],
+            "masterTestClasses": ["master.PairingTest"],
+            "childTestClasses": ["child.PairingTest"],
+            "selectedScenarioIds": ["pairing"],
+        })
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "runId": "autosweep-1234567890ab",
+                "status": "queued",
+                "executionMode": "all-automated",
+                "androidVersions": ["10", "14"],
+                "masterTestClasses": ["master.PairingTest"],
+                "childTestClasses": ["child.PairingTest"],
+                "selectedScenarioIds": ["pairing"],
+            },
+        )
+        fake_thread.start.assert_called_once_with()
+        with app._active_suite_lock:
+            queued = app._active_suite_runs["autosweep-1234567890ab"]
+        assert queued["type"] == "android-automation-sweep"
+        assert queued["executionMode"] == "all-automated"
+        assert queued["androidVersions"] == ["10", "14"]
 
 
 class TestBuildTestingRegister:
@@ -1364,6 +1445,57 @@ class TestRunAndroidCompatibilityBackground:
             sub_runs = _active_suite_runs[run_id]["subRuns"]
         assert len(sub_runs) == 2
         assert [item["scenarioId"] for item in sub_runs] == ["offline-online-resync", "pairing-code-expiry"]
+
+
+class TestRunAndroidAutomationSweepBackground:
+    @patch("app.ensure_emulator_pool")
+    @patch("app.load_dual_device_scenarios")
+    @patch("app.run_dual_device")
+    @patch("app.run_usb_test")
+    def test_runs_master_child_and_dual_jobs_in_single_sweep(self, mock_run_usb, mock_run_dual, mock_scenarios, mock_pool, suite_log_file):
+        from app import _run_android_automation_sweep_background, _active_suite_runs, _active_suite_lock
+        from dual_device_runner import DualDeviceResult
+        from usb_test_runner import UsbTestRunResult
+
+        run_id = "autosweep-test-1"
+        master_result = UsbTestRunResult(app_id="master", serial="emu-1", suite="commissioning")
+        master_result.overall_status = "passed"
+        child_result = UsbTestRunResult(app_id="child", serial="emu-2", suite="commissioning")
+        child_result.overall_status = "passed"
+        dual_result = DualDeviceResult(master_serial="emu-3", child_serial="emu-4")
+        dual_result.overall_status = "passed"
+        mock_pool.side_effect = [
+            [{"serial": "emu-1", "androidVersion": "14", "profileId": "phone-large"}],
+            [{"serial": "emu-2", "androidVersion": "14", "profileId": "phone-large"}],
+            [
+                {"serial": "emu-3", "androidVersion": "14", "profileId": "dual-device-balanced"},
+                {"serial": "emu-4", "androidVersion": "14", "profileId": "dual-device-balanced"},
+            ],
+        ]
+        mock_run_usb.side_effect = [master_result, child_result]
+        mock_run_dual.return_value = dual_result
+        mock_scenarios.return_value = [{"scenarioId": "pairing", "androidVersions": ["14"]}]
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_android_automation_sweep_background(run_id, {
+            "android_versions": ["14"],
+            "master_test_classes": ["master.PairingTest"],
+            "child_test_classes": ["child.PairingTest"],
+            "selected_scenario_ids": ["pairing"],
+            "skip_activation": True,
+            "parallel": True,
+        })
+
+        assert mock_run_usb.call_count == 2
+        assert mock_run_dual.call_count == 1
+        with _active_suite_lock:
+            run_state = _active_suite_runs[run_id]
+        assert run_state["status"] == "finished"
+        assert run_state["result"]["executionMode"] == "all-automated"
+        assert len(run_state["result"]["subRuns"]) == 3
+        assert [item["executionMode"] for item in run_state["result"]["subRuns"]] == ["single-master", "single-child", "dual-device"]
 
 
 # ═══════════════════════════════════════════════════════════════════

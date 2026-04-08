@@ -2220,7 +2220,10 @@ function getDualDeviceRunsFromHistory() {
 }
 
 function getCompatibilityRunsFromHistory() {
-    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => String(run?.type || "") === "android-compatibility");
+    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => {
+        const type = String(run?.type || "");
+        return type === "android-compatibility" || type === "android-automation-sweep";
+    });
 }
 
 function getSuiteRunIdentifier(run) {
@@ -4770,7 +4773,9 @@ function formatSuiteRunLabel(payload) {
     if (!payload || typeof payload !== "object") return "QA-Lauf";
     const androidVersions = Array.isArray(payload.androidVersions) ? payload.androidVersions.map(item => String(item)).filter(Boolean) : [];
     if (androidVersions.length > 0) {
-        const scope = payload.executionMode === "dual-device"
+        const scope = payload.executionMode === "all-automated"
+            ? "Gesamtlauf"
+            : payload.executionMode === "dual-device"
             ? "Dual-Device"
             : payload.executionMode === "single-child"
                 ? "Kind-App"
@@ -4787,12 +4792,14 @@ function formatSuiteRunLabel(payload) {
 
 function formatSuiteHistoryTitle(run) {
     const type = String(run?.type || run?.suiteId || run?.suite_id || "?");
-    if (type !== "android-compatibility") {
+    if (type !== "android-compatibility" && type !== "android-automation-sweep") {
         return String(run?.suiteId || run?.suite_id || run?.type || "?");
     }
 
     const executionMode = String(run?.executionMode || run?.result?.executionMode || "-");
-    const modeLabel = executionMode === "dual-device"
+    const modeLabel = executionMode === "all-automated"
+        ? "Android-Kompatibilität: Gesamtlauf"
+        : executionMode === "dual-device"
         ? "Android-Kompatibilität: Dual-Device"
         : executionMode === "single-child"
             ? "Android-Kompatibilität: Kind-App"
@@ -4804,7 +4811,7 @@ function formatSuiteHistoryTitle(run) {
 
 function formatSuiteHistoryMeta(run) {
     const type = String(run?.type || run?.suiteId || run?.suite_id || "");
-    if (type !== "android-compatibility") {
+    if (type !== "android-compatibility" && type !== "android-automation-sweep") {
         return "";
     }
 
@@ -4822,6 +4829,29 @@ function formatSuiteHistoryMeta(run) {
         parts.push(`PASS ${Number(summary.passed || 0)} · FAIL ${Number(summary.failed || 0)} · ERROR ${Number(summary.error || 0)} · SKIP ${Number(summary.skipped || 0)}`);
     }
     return parts.join(" · ");
+}
+
+async function startAllAutomatedUsbTests() {
+    if (!isPythonOperator) return;
+    try {
+        const payload = {
+            installApk: document.getElementById("suite-usb-install-apk")?.checked || false,
+            skipActivation: document.getElementById("suite-usb-skip-activation")?.checked || false,
+            parallel: document.getElementById("suite-usb-parallel")?.checked || false,
+        };
+        const res = await fetch("/api/suites/android-automation-sweep", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Gesamtlauf konnte nicht gestartet werden.");
+        showNotification(`Automatisierter Gesamtlauf gestartet (Run-ID: ${data.runId}).`, "success");
+        pollSuiteRunStatus(data.runId);
+        appendSuiteActiveRun(data.runId, formatSuiteRunLabel(data));
+    } catch (err) {
+        showNotification("Gesamtlauf fehlgeschlagen: " + err.message, "error");
+    }
 }
 
 function appendSuiteActiveRun(runId, label) {
