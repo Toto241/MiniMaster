@@ -33,6 +33,7 @@ from test_automation import (  # noqa: E402
 )
 from qa_catalog import (  # noqa: E402
     build_qa_catalog,
+    load_android_scenario_mappings,
     load_android_version_matrix,
     load_device_profiles,
     load_dual_device_scenarios,
@@ -3644,6 +3645,56 @@ def _recommended_profile_for_version(android_version: str, device_mode: str) -> 
     return ""
 
 
+def _all_automated_android_versions() -> list[str]:
+    versions: list[str] = []
+    for entry in load_android_version_matrix():
+        status = str(entry.get("status", "")).strip().lower()
+        android_version = str(entry.get("androidVersion", "")).strip()
+        if not android_version:
+            continue
+        if status and status not in {"active", "preview"}:
+            continue
+        versions.append(android_version)
+    return versions
+
+
+def _build_android_automation_sweep_plan() -> dict[str, object]:
+    mappings = load_android_scenario_mappings()
+    scenarios = load_dual_device_scenarios()
+
+    master_test_classes: list[str] = []
+    child_test_classes: list[str] = []
+    mapped_roles_by_scenario: dict[str, set[str]] = {}
+
+    for mapping in mappings:
+        scenario_key = str(mapping.get("scenarioId", "")).strip()
+        role = str(mapping.get("role", "")).strip()
+        test_class = str(mapping.get("testClass", "")).strip()
+        if scenario_key and role:
+            mapped_roles_by_scenario.setdefault(scenario_key, set()).add(role)
+        if not test_class:
+            continue
+        if role == "master" and test_class not in master_test_classes:
+            master_test_classes.append(test_class)
+        if role == "child" and test_class not in child_test_classes:
+            child_test_classes.append(test_class)
+
+    selected_scenario_ids: list[str] = []
+    for scenario in scenarios:
+        scenario_id = str(scenario.get("scenarioId", "")).strip()
+        if not scenario_id:
+            continue
+        if {"master", "child"}.issubset(mapped_roles_by_scenario.get(scenario_id, set())):
+            selected_scenario_ids.append(scenario_id)
+
+    return {
+        "androidVersions": _all_automated_android_versions(),
+        "masterTestClasses": master_test_classes,
+        "childTestClasses": child_test_classes,
+        "selectedScenarioIds": selected_scenario_ids,
+    }
+
+
 def _summarize_android_compatibility_runs(sub_runs: list[dict[str, object]]) -> dict[str, object]:
     counts = {
         "total": len(sub_runs),
@@ -3668,6 +3719,162 @@ def _summarize_android_compatibility_runs(sub_runs: list[dict[str, object]]) -> 
     elif counts["passed"] == 0 and counts["skipped"]:
         overall_status = "skipped"
     return {"counts": counts, "overallStatus": overall_status}
+
+
+def _execute_android_compatibility_sub_runs(
+    run_id: str,
+    kwargs: dict[str, object],
+    sub_runs: list[dict[str, object]] | None = None,
+    scope_label: str = "",
+) -> list[dict[str, object]]:
+    android_versions = cast(list[str], kwargs["android_versions"])
+    execution_mode = str(kwargs["execution_mode"])
+    app_id = str(kwargs.get("app_id") or "")
+    scenario_id = str(kwargs.get("scenario_id") or "")
+    profile_id = str(kwargs.get("profile_id") or "")
+    selected_test_classes = [
+        str(item).strip()
+        for item in cast(list[object], kwargs.get("selected_test_classes") or [])
+        if str(item).strip()
+    ]
+    selected_scenario_ids = [
+        str(item).strip()
+        for item in cast(list[object], kwargs.get("selected_scenario_ids") or [])
+        if str(item).strip()
+    ]
+    scenario_index = {
+        str(item.get("scenarioId", "")).strip(): item
+        for item in load_dual_device_scenarios()
+        if str(item.get("scenarioId", "")).strip()
+    }
+    collected_sub_runs = sub_runs if sub_runs is not None else []
+
+    for index, android_version in enumerate(android_versions, start=1):
+        device_mode = "dual-device" if execution_mode == "dual-device" else "single-device"
+        recommended_profile = profile_id or _recommended_profile_for_version(android_version, device_mode)
+        provisioning: list[dict[str, object]] = []
+        scope_prefix = f"{scope_label}: " if scope_label else ""
+        _update_active_suite_event(run_id, {
+            "phase": "matrix-run",
+            "status": "running",
+            "androidVersion": android_version,
+            "executionMode": execution_mode,
+            "message": f"{scope_prefix}Starte Android {android_version} ({index}/{len(android_versions)}).",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+
+        try:
+            if execution_mode == "dual-device":
+                master_serial = str(kwargs.get("master_serial") or "").strip()
+                child_serial = str(kwargs.get("child_serial") or "").strip()
+                if master_serial == "auto" or child_serial == "auto":
+                    provisioning = ensure_emulator_pool(
+                        recommended_profile or _recommended_profile_for_version(android_version, "dual-device"),
+                        android_version,
+                        device_count=2,
+                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                    )
+                    if master_serial == "auto" and len(provisioning) >= 1:
+                        master_serial = str(provisioning[0].get("serial") or "")
+                    if child_serial == "auto" and len(provisioning) >= 2:
+                        child_serial = str(provisioning[1].get("serial") or "")
+                run_scenario_ids = selected_scenario_ids or ([scenario_id] if scenario_id else [""])
+                for current_scenario_id in run_scenario_ids:
+                    scenario_definition = scenario_index.get(current_scenario_id)
+                    scenario_versions = [
+                        str(item).strip()
+                        for item in cast(list[object], scenario_definition.get("androidVersions", []))
+                        if str(item).strip()
+                    ] if scenario_definition else []
+                    if scenario_versions and android_version not in scenario_versions:
+                        continue
+                    result = run_dual_device(
+                        master_serial=master_serial,
+                        child_serial=child_serial,
+                        install_apk=bool(kwargs.get("install_apk")),
+                        master_apk_path=str(kwargs.get("master_apk_path") or ""),
+                        child_apk_path=str(kwargs.get("child_apk_path") or ""),
+                        uninstall_first=bool(kwargs.get("uninstall_first")),
+                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                        parallel=bool(kwargs.get("parallel")),
+                        scenario_id=current_scenario_id,
+                        profile_id=recommended_profile,
+                        fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
+                        expected_android_version=android_version,
+                        verbose=False,
+                    )
+                    collected_sub_runs.append({
+                        "runId": f"{run_id}:{execution_mode}:{android_version}:{current_scenario_id or 'default'}",
+                        "androidVersion": android_version,
+                        "executionMode": execution_mode,
+                        "scenarioId": current_scenario_id,
+                        "profileId": recommended_profile,
+                        "provisioning": provisioning,
+                        "status": result.overall_status,
+                        "result": result.to_dict(),
+                    })
+            else:
+                serial = str(kwargs.get("serial") or "auto").strip() or "auto"
+                if serial == "auto":
+                    provisioning = ensure_emulator_pool(
+                        recommended_profile or _recommended_profile_for_version(android_version, "single-device"),
+                        android_version,
+                        device_count=1,
+                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                    )
+                    serial = str(provisioning[0].get("serial") or "")
+                run_test_classes = selected_test_classes or ([str(kwargs.get("test_filter") or "").strip()] if str(kwargs.get("test_filter") or "").strip() else [""])
+                for current_test_class in run_test_classes:
+                    selected_classes_for_run = [current_test_class] if current_test_class else None
+                    result = run_usb_test(
+                        app_id=app_id,
+                        serial=serial,
+                        suite=str(kwargs.get("suite") or "commissioning"),
+                        test_filter="",
+                        selected_test_classes=selected_classes_for_run,
+                        skip_activation=bool(kwargs.get("skip_activation")),
+                        install_apk=bool(kwargs.get("install_apk")),
+                        apk_path=str(kwargs.get("apk_path") or ""),
+                        uninstall_first=bool(kwargs.get("uninstall_first")),
+                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                        expected_android_version=android_version,
+                        verbose=False,
+                    )
+                    collected_sub_runs.append({
+                        "runId": f"{run_id}:{execution_mode}:{android_version}:{app_id}:{current_test_class or 'default'}",
+                        "androidVersion": android_version,
+                        "executionMode": execution_mode,
+                        "appId": app_id,
+                        "testClass": current_test_class,
+                        "profileId": recommended_profile,
+                        "provisioning": provisioning,
+                        "status": result.overall_status,
+                        "result": result.to_dict(),
+                    })
+        except Exception as exc:
+            collected_sub_runs.append({
+                "runId": f"{run_id}:{execution_mode}:{android_version}",
+                "androidVersion": android_version,
+                "executionMode": execution_mode,
+                "appId": app_id or None,
+                "scenarioId": scenario_id or None,
+                "profileId": recommended_profile,
+                "status": "error",
+                "error": str(exc),
+            })
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["subRuns"] = list(collected_sub_runs)
+        _update_active_suite_event(run_id, {
+            "phase": "matrix-run",
+            "status": str(collected_sub_runs[-1].get("status") or "error") if collected_sub_runs else "error",
+            "androidVersion": android_version,
+            "executionMode": execution_mode,
+            "message": f"{scope_prefix}Android {android_version}: {collected_sub_runs[-1].get('status') if collected_sub_runs else 'error'}",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+
+    return collected_sub_runs
 
 
 def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]) -> None:
@@ -3710,127 +3917,7 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
     })
 
     try:
-        for index, android_version in enumerate(android_versions, start=1):
-            device_mode = "dual-device" if execution_mode == "dual-device" else "single-device"
-            recommended_profile = profile_id or _recommended_profile_for_version(android_version, device_mode)
-            provisioning: list[dict[str, object]] = []
-            _update_active_suite_event(run_id, {
-                "phase": "matrix-run",
-                "status": "running",
-                "androidVersion": android_version,
-                "message": f"Starte Android {android_version} ({index}/{len(android_versions)}).",
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            })
-
-            try:
-                if execution_mode == "dual-device":
-                    master_serial = str(kwargs.get("master_serial") or "").strip()
-                    child_serial = str(kwargs.get("child_serial") or "").strip()
-                    if master_serial == "auto" or child_serial == "auto":
-                        provisioning = ensure_emulator_pool(
-                            recommended_profile or _recommended_profile_for_version(android_version, "dual-device"),
-                            android_version,
-                            device_count=2,
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                        )
-                        if master_serial == "auto" and len(provisioning) >= 1:
-                            master_serial = str(provisioning[0].get("serial") or "")
-                        if child_serial == "auto" and len(provisioning) >= 2:
-                            child_serial = str(provisioning[1].get("serial") or "")
-                    run_scenario_ids = selected_scenario_ids or ([scenario_id] if scenario_id else [""])
-                    for current_scenario_id in run_scenario_ids:
-                        scenario_definition = scenario_index.get(current_scenario_id)
-                        scenario_versions = [
-                            str(item).strip()
-                            for item in cast(list[object], scenario_definition.get("androidVersions", []))
-                            if str(item).strip()
-                        ] if scenario_definition else []
-                        if scenario_versions and android_version not in scenario_versions:
-                            continue
-                        result = run_dual_device(
-                            master_serial=master_serial,
-                            child_serial=child_serial,
-                            install_apk=bool(kwargs.get("install_apk")),
-                            master_apk_path=str(kwargs.get("master_apk_path") or ""),
-                            child_apk_path=str(kwargs.get("child_apk_path") or ""),
-                            uninstall_first=bool(kwargs.get("uninstall_first")),
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                            parallel=bool(kwargs.get("parallel")),
-                            scenario_id=current_scenario_id,
-                            profile_id=recommended_profile,
-                            fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
-                            expected_android_version=android_version,
-                            verbose=False,
-                        )
-                        sub_runs.append({
-                            "runId": f"{run_id}:{android_version}:{current_scenario_id or 'default'}",
-                            "androidVersion": android_version,
-                            "executionMode": execution_mode,
-                            "scenarioId": current_scenario_id,
-                            "profileId": recommended_profile,
-                            "provisioning": provisioning,
-                            "status": result.overall_status,
-                            "result": result.to_dict(),
-                        })
-                else:
-                    serial = str(kwargs.get("serial") or "auto").strip() or "auto"
-                    if serial == "auto":
-                        provisioning = ensure_emulator_pool(
-                            recommended_profile or _recommended_profile_for_version(android_version, "single-device"),
-                            android_version,
-                            device_count=1,
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                        )
-                        serial = str(provisioning[0].get("serial") or "")
-                    run_test_classes = selected_test_classes or ([str(kwargs.get("test_filter") or "").strip()] if str(kwargs.get("test_filter") or "").strip() else [""])
-                    for current_test_class in run_test_classes:
-                        selected_classes_for_run = [current_test_class] if current_test_class else None
-                        result = run_usb_test(
-                            app_id=app_id,
-                            serial=serial,
-                            suite=str(kwargs.get("suite") or "commissioning"),
-                            test_filter="",
-                            selected_test_classes=selected_classes_for_run,
-                            skip_activation=bool(kwargs.get("skip_activation")),
-                            install_apk=bool(kwargs.get("install_apk")),
-                            apk_path=str(kwargs.get("apk_path") or ""),
-                            uninstall_first=bool(kwargs.get("uninstall_first")),
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                            expected_android_version=android_version,
-                            verbose=False,
-                        )
-                        sub_runs.append({
-                            "runId": f"{run_id}:{android_version}:{app_id}:{current_test_class or 'default'}",
-                            "androidVersion": android_version,
-                            "executionMode": execution_mode,
-                            "appId": app_id,
-                            "testClass": current_test_class,
-                            "profileId": recommended_profile,
-                            "provisioning": provisioning,
-                            "status": result.overall_status,
-                            "result": result.to_dict(),
-                        })
-            except Exception as exc:
-                sub_runs.append({
-                    "runId": f"{run_id}:{android_version}",
-                    "androidVersion": android_version,
-                    "executionMode": execution_mode,
-                    "appId": app_id or None,
-                    "scenarioId": scenario_id or None,
-                    "profileId": recommended_profile,
-                    "status": "error",
-                    "error": str(exc),
-                })
-
-            with _active_suite_lock:
-                _active_suite_runs[run_id]["subRuns"] = list(sub_runs)
-            _update_active_suite_event(run_id, {
-                "phase": "matrix-run",
-                "status": str(sub_runs[-1].get("status") or "error") if sub_runs else "error",
-                "androidVersion": android_version,
-                "message": f"Android {android_version}: {sub_runs[-1].get('status') if sub_runs else 'error'}",
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            })
+        sub_runs = _execute_android_compatibility_sub_runs(run_id, kwargs)
 
         summary = _summarize_android_compatibility_runs(sub_runs)
         with _active_suite_lock:
@@ -3852,6 +3939,121 @@ def _run_android_compatibility_background(run_id: str, kwargs: dict[str, object]
             "phase": "summary",
             "status": str(summary["overallStatus"]),
             "message": f"Kompatibilitätslauf abgeschlossen: {summary['overallStatus']}",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+    except Exception as exc:
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "error"
+            _active_suite_runs[run_id]["error"] = str(exc)
+            _active_suite_runs[run_id]["currentPhase"] = "error"
+
+    _persist_active_suite_run(run_id)
+
+
+def _run_android_automation_sweep_background(run_id: str, kwargs: dict[str, object]) -> None:
+    """Führt alle automatisierten Android-Tests über alle Katalog-Versionen aus."""
+    with _active_suite_lock:
+        _active_suite_runs[run_id]["status"] = "running"
+        _active_suite_runs[run_id]["startedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _active_suite_runs[run_id]["timeline"] = []
+        _active_suite_runs[run_id]["currentPhase"] = "matrix-preflight"
+        _active_suite_runs[run_id]["lastEvent"] = None
+        _active_suite_runs[run_id]["subRuns"] = []
+
+    android_versions = cast(list[str], kwargs.get("android_versions") or [])
+    master_test_classes = [str(item).strip() for item in cast(list[object], kwargs.get("master_test_classes") or []) if str(item).strip()]
+    child_test_classes = [str(item).strip() for item in cast(list[object], kwargs.get("child_test_classes") or []) if str(item).strip()]
+    selected_scenario_ids = [str(item).strip() for item in cast(list[object], kwargs.get("selected_scenario_ids") or []) if str(item).strip()]
+    sub_runs: list[dict[str, object]] = []
+
+    _update_active_suite_event(run_id, {
+        "phase": "matrix-preflight",
+        "status": "running",
+        "message": (
+            f"Gesamtlauf vorbereitet: {len(android_versions)} Android-Versionen, "
+            f"{len(master_test_classes)} Master-Testklassen, {len(child_test_classes)} Child-Testklassen, "
+            f"{len(selected_scenario_ids)} Dual-Device-Szenarien."
+        ),
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    })
+
+    try:
+        jobs: list[tuple[str, dict[str, object]]] = []
+        if master_test_classes:
+            jobs.append((
+                "Master-App",
+                {
+                    "execution_mode": "single-master",
+                    "android_versions": list(android_versions),
+                    "app_id": "master",
+                    "serial": "auto",
+                    "suite": "commissioning",
+                    "selected_test_classes": list(master_test_classes),
+                    "skip_activation": bool(kwargs.get("skip_activation")),
+                    "install_apk": bool(kwargs.get("install_apk")),
+                    "uninstall_first": bool(kwargs.get("uninstall_first")),
+                    "apk_path": str(kwargs.get("master_apk_path") or kwargs.get("apk_path") or ""),
+                    "timeout_sec": parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                },
+            ))
+        if child_test_classes:
+            jobs.append((
+                "Kind-App",
+                {
+                    "execution_mode": "single-child",
+                    "android_versions": list(android_versions),
+                    "app_id": "child",
+                    "serial": "auto",
+                    "suite": "commissioning",
+                    "selected_test_classes": list(child_test_classes),
+                    "skip_activation": bool(kwargs.get("skip_activation")),
+                    "install_apk": bool(kwargs.get("install_apk")),
+                    "uninstall_first": bool(kwargs.get("uninstall_first")),
+                    "apk_path": str(kwargs.get("child_apk_path") or kwargs.get("apk_path") or ""),
+                    "timeout_sec": parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                },
+            ))
+        if selected_scenario_ids:
+            jobs.append((
+                "Dual-Device",
+                {
+                    "execution_mode": "dual-device",
+                    "android_versions": list(android_versions),
+                    "master_serial": "auto",
+                    "child_serial": "auto",
+                    "install_apk": bool(kwargs.get("install_apk")),
+                    "uninstall_first": bool(kwargs.get("uninstall_first")),
+                    "master_apk_path": str(kwargs.get("master_apk_path") or ""),
+                    "child_apk_path": str(kwargs.get("child_apk_path") or ""),
+                    "parallel": bool(kwargs.get("parallel")),
+                    "selected_scenario_ids": list(selected_scenario_ids),
+                    "timeout_sec": parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                },
+            ))
+
+        for scope_label, job_kwargs in jobs:
+            sub_runs = _execute_android_compatibility_sub_runs(run_id, job_kwargs, sub_runs=sub_runs, scope_label=scope_label)
+
+        summary = _summarize_android_compatibility_runs(sub_runs)
+        with _active_suite_lock:
+            _active_suite_runs[run_id]["status"] = "finished"
+            _active_suite_runs[run_id]["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            _active_suite_runs[run_id]["currentPhase"] = "finished"
+            _active_suite_runs[run_id]["result"] = {
+                "executionMode": "all-automated",
+                "androidVersions": list(android_versions),
+                "masterTestClasses": master_test_classes,
+                "childTestClasses": child_test_classes,
+                "selectedScenarioIds": selected_scenario_ids,
+                "summary": summary,
+                "subRuns": sub_runs,
+                "status": summary["overallStatus"],
+                "overallStatus": summary["overallStatus"],
+            }
+        _update_active_suite_event(run_id, {
+            "phase": "summary",
+            "status": str(summary["overallStatus"]),
+            "message": f"Gesamtlauf abgeschlossen: {summary['overallStatus']}",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
     except Exception as exc:
@@ -4055,6 +4257,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_dual_device_test()
         if parsed.path == "/api/suites/android-compatibility":
             return self._handle_android_compatibility_test()
+        if parsed.path == "/api/suites/android-automation-sweep":
+            return self._handle_android_automation_sweep()
         if parsed.path == "/api/qa/emulators/reservations":
             return self._handle_create_emulator_reservation()
         if parsed.path == "/api/qa/emulators/start":
@@ -4295,8 +4499,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "type": "android-compatibility",
                     "executionMode": execution_mode,
                     "androidVersions": android_versions,
-                    "selectedScenarioIds": list(kwargs.get("selected_scenario_ids") or []),
-                    "selectedTestClasses": list(kwargs.get("selected_test_classes") or []),
+                    "selectedScenarioIds": cast(list[str], kwargs.get("selected_scenario_ids") or []),
+                    "selectedTestClasses": cast(list[str], kwargs.get("selected_test_classes") or []),
                     "status": "queued",
                     "startedAt": None,
                     "finishedAt": None,
@@ -4317,6 +4521,62 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             "status": "queued",
             "executionMode": execution_mode,
             "androidVersions": android_versions,
+        })
+
+    def _handle_android_automation_sweep(self) -> None:
+        try:
+            payload = self._read_json_body()
+            run_id = f"autosweep-{uuid4().hex[:12]}"
+            plan = _build_android_automation_sweep_plan()
+            kwargs: dict[str, object] = {
+                "android_versions": cast(list[str], plan.get("androidVersions") or []),
+                "master_test_classes": cast(list[str], plan.get("masterTestClasses") or []),
+                "child_test_classes": cast(list[str], plan.get("childTestClasses") or []),
+                "selected_scenario_ids": cast(list[str], plan.get("selectedScenarioIds") or []),
+                "install_apk": bool_from_payload(payload.get("installApk"), default=False),
+                "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
+                "skip_activation": bool_from_payload(payload.get("skipActivation"), default=False),
+                "parallel": bool_from_payload(payload.get("parallel"), default=False),
+                "master_apk_path": str(payload.get("masterApkPath") or "").strip(),
+                "child_apk_path": str(payload.get("childApkPath") or "").strip(),
+                "apk_path": str(payload.get("apkPath") or "").strip(),
+                "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
+            }
+            if not cast(list[str], kwargs["android_versions"]):
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "Keine aktiven Android-Versionen im QA-Katalog gefunden."})
+
+            with _active_suite_lock:
+                _active_suite_runs[run_id] = {
+                    "runId": run_id,
+                    "type": "android-automation-sweep",
+                    "executionMode": "all-automated",
+                    "androidVersions": cast(list[str], kwargs["android_versions"]),
+                    "masterTestClasses": cast(list[str], kwargs["master_test_classes"]),
+                    "childTestClasses": cast(list[str], kwargs["child_test_classes"]),
+                    "selectedScenarioIds": cast(list[str], kwargs["selected_scenario_ids"]),
+                    "status": "queued",
+                    "startedAt": None,
+                    "finishedAt": None,
+                    "result": None,
+                    "error": None,
+                }
+
+            thread = threading.Thread(
+                target=_run_android_automation_sweep_background, args=(run_id, kwargs), daemon=True,
+            )
+            thread.start()
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, {
+            "runId": run_id,
+            "status": "queued",
+            "executionMode": "all-automated",
+            "androidVersions": kwargs["android_versions"],
+            "masterTestClasses": kwargs["master_test_classes"],
+            "childTestClasses": kwargs["child_test_classes"],
+            "selectedScenarioIds": kwargs["selected_scenario_ids"],
         })
 
     def _handle_create_emulator_reservation(self) -> None:
