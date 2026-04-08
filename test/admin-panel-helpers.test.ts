@@ -1902,12 +1902,15 @@ describe("admin-panel helper functions", () => {
       staleEvidence: true,
       groupId: "repo-tests-unsupported",
       derivedFrom: ["doc-create-task"],
+      manualClassLabel: "Nächste Automatisierungswelle",
+      manualClassReason: "Soll bald automatisiert werden.",
     });
     expect(badges).toContain("Prioritaet");
     expect(badges).toContain("Verantwortlich");
     expect(badges).toContain("Release-Blocker");
     expect(badges).toContain("Unsupported");
     expect(badges).toContain("Abgeleitet");
+    expect(badges).toContain("Nächste Automatisierungswelle");
 
     const legend = exports.buildTestingRegisterLegend();
     expect(legend).toContain("Register-Legende");
@@ -1933,6 +1936,28 @@ describe("admin-panel helper functions", () => {
     expect(exports.buildTestingRegisterExecutionPath({ action: "protocol" })).toContain("Nachweisformular");
     expect(exports.buildTestingRegisterExecutionPath({ action: "commissioning-run" })).toContain("Python-Commissioning-Lauf");
     expect(exports.buildTestingRegisterExecutionPath({ source: "register-derivative", derivedFromTitles: ["Task erstellen"] })).toContain("Task erstellen");
+  });
+
+  it("normalizes manual prioritization insights from the testing register payload", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const insights = exports.buildTestingRegisterManualInsights({
+      manualInsights: {
+        total: 7,
+        buckets: {
+          "physical-manual": { count: 3 },
+          "automation-backlog": { count: 2 },
+          "external-evidence": { count: 2 },
+        },
+      },
+    });
+
+    expect(insights).toEqual({
+      total: 7,
+      physical: 3,
+      backlog: 2,
+      external: 2,
+    });
   });
 
   it("normalizes duplicate coverage insights from the testing register payload", () => {
