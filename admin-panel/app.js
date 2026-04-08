@@ -865,6 +865,7 @@ function formatPythonAutomationType(type, source = "") {
     if (type === "command") return "Lokales Gate-Kommando";
     if (type === "documented") return "Dokumentierter Testplan";
     if (type === "manual") return "Manueller Nachweis";
+    if (source === "repo-test") return "Repository-Test-Evidenz";
     if (source === "device-suite") return "Device-Suite-Check";
     if (source === "static-analysis") return "Statische Analyse";
     if (source === "docs-validation") return "Dokument-Evidenzcheck";
@@ -876,6 +877,7 @@ function getPythonAutomationTypeChipClass(type, source = "") {
     if (type === "command") return "python-automation-chip-command";
     if (type === "documented") return "python-automation-chip-documented";
     if (type === "manual") return "python-automation-chip-manual";
+    if (source === "repo-test") return "python-automation-chip-auto";
     if (source === "device-suite") return "python-automation-chip-suite";
     if (source === "static-analysis") return "python-automation-chip-static";
     if (source === "docs-validation") return "python-automation-chip-docs";
@@ -899,6 +901,7 @@ function getPythonAutomationModeHint(type, source = "") {
     if (type === "documented") return "Manueller Nachweis anhand dokumentierter Schrittfolge";
     if (type === "manual") return "Manuelle Prüfung mit Operator-Nachweis";
     if (source === "register-derivative") return "Automatische Ableitung aus bereits vorhandenen QA-Prüffällen, um Doppelprüfungen zu vermeiden";
+    if (source === "repo-test") return "Automatische Bewertung aus verknüpften Repository-, Unit- oder Integrations-Tests";
     if (source === "device-suite") return "Automatische Bewertung aus einer verknüpften Device- oder USB-Suite";
     if (source === "static-analysis") return "Automatische Code-, Build- oder Manifest-Prüfung ohne Geräteausführung";
     if (source === "docs-validation") return "Automatische Prüfung von Reviewer-, Release- oder Store-Dokumentation";
@@ -907,6 +910,7 @@ function getPythonAutomationModeHint(type, source = "") {
 
 function formatTestingRegisterSourceLabel(source) {
     if (source === "register-derivative") return "Quelle: Abgeleiteter QA-Check";
+    if (source === "repo-test") return "Quelle: Repository-Tests";
     if (source === "device-suite") return "Quelle: Device-Suite";
     if (source === "static-analysis") return "Quelle: Statische Analyse";
     if (source === "docs-validation") return "Quelle: Dokument-Check";
@@ -919,6 +923,7 @@ function formatTestingRegisterSourceLabel(source) {
 
 function getTestingRegisterSourceChipClass(source) {
     if (source === "register-derivative") return "python-automation-chip-auto";
+    if (source === "repo-test") return "python-automation-chip-auto";
     if (source === "device-suite") return "python-automation-chip-suite";
     if (source === "static-analysis") return "python-automation-chip-static";
     if (source === "docs-validation") return "python-automation-chip-docs";
@@ -2878,6 +2883,7 @@ function getTestingRegisterActionLabel(item) {
     if (action === "suite-run") return "Suite-Start";
     if (action === "protocol") return "Nachweis-Protokoll";
     if (action === "external-protocol") return "Externer Lauf + Nachweis";
+    if (String(item?.source || "") === "repo-test") return "Repository-Tests prüfen";
     if (String(item?.source || "") === "docs-validation") return "Dokument-Check ausführen";
     if (String(item?.source || "") === "static-analysis") return "Static-Checks ausführen";
     return "Python-Commissioning-Lauf";
@@ -2902,6 +2908,9 @@ function buildTestingRegisterExecutionPath(item) {
     }
     if (String(item?.source || "") === "docs-validation") {
         return "Im Python-Lauf als Dokument-Validierung enthalten";
+    }
+    if (String(item?.source || "") === "repo-test") {
+        return "Im Python-Lauf aus verknüpften Repository-Tests bewertet";
     }
     if (String(item?.source || "") === "static-analysis") {
         return "Im Python-Lauf als statische Analyse enthalten";

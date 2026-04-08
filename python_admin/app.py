@@ -160,7 +160,6 @@ TEST_REGISTER_STALE_DAYS = 30
 MANUAL_CLASS_AUTOMATION_BACKLOG_IDS = {
     "ma-task-reject-ui",
     "ma-date-picker",
-    "ma-subscription-enforce",
     "ma-fcm-working",
     "ma-offline-handling",
     "ma-qr-pairing",
@@ -173,7 +172,6 @@ MANUAL_CLASS_AUTOMATION_BACKLOG_IDS = {
 }
 
 MANUAL_CLASS_AUTOMATION_WAVE1_IDS = {
-    "ma-subscription-enforce",
     "ma-offline-handling",
     "dt-parent-panel-login",
     "dt-admin-panel-login",
@@ -1233,10 +1231,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ma-subscription-enforce",
                 "title": "Free-Tier-Limit (1 Kind) wird vor Aktionen erzwungen",
-                "description": "Prueft die fachliche Durchsetzung des Free-Tier-Limits vor relevanten Aktionen.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Aktionen oberhalb des Free-Tier-Limits werden im UI und fachlich blockiert.",
+                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Free-Tier- und Subscription-Enforcement werden in Cloud-Functions und Pairing-Flows bereits hart abgeprueft.",
+                "automationType": "automatic",
+                "source": "repo-test",
+                "suiteRef": "backend-subscription-enforcement",
+                "successCriteria": "Repository-Tests decken sowohl das Child-Limit beim Pairing als auch das Blockieren von Aktionen ohne aktive Subscription ab.",
             },
             {
                 "id": "ma-fcm-working",

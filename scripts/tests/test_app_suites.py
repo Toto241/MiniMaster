@@ -468,7 +468,6 @@ class TestBuildTestingRegister:
         expected_manual = {
             "ma-task-reject-ui",
             "ma-date-picker",
-            "ma-subscription-enforce",
             "ma-fcm-working",
             "ma-firebase-appcheck",
             "ma-offline-handling",
@@ -500,6 +499,9 @@ class TestBuildTestingRegister:
             "ca-time-windows",
             "dt-ipc-messaging",
         }
+        expected_repo_tests = {
+            "ma-subscription-enforce",
+        }
         expected_derived = {
             "ma-registration-flow",
             "ma-pairing-works",
@@ -512,6 +514,7 @@ class TestBuildTestingRegister:
 
         assert expected_manual.issubset(items_by_id.keys())
         assert expected_static.issubset(items_by_id.keys())
+        assert expected_repo_tests.issubset(items_by_id.keys())
         assert expected_derived.issubset(items_by_id.keys())
         for test_id in expected_manual:
             assert items_by_id[test_id]["automationType"] == "manual"
@@ -519,6 +522,10 @@ class TestBuildTestingRegister:
         for test_id in expected_static:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "static-analysis"
+        for test_id in expected_repo_tests:
+            assert items_by_id[test_id]["automationType"] == "automatic"
+            assert items_by_id[test_id]["source"] == "repo-test"
+            assert items_by_id[test_id]["suiteRef"] == "backend-subscription-enforcement"
         for test_id in expected_derived:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "register-derivative"
@@ -544,8 +551,10 @@ class TestBuildTestingRegister:
         items_by_id = {item["id"]: item for item in result["items"]}
 
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
-        assert items_by_id["ma-subscription-enforce"]["manualClass"] == "automation-backlog"
-        assert items_by_id["ma-subscription-enforce"]["automationWave"] == "wave-1"
+        assert items_by_id["ma-subscription-enforce"]["automationType"] == "automatic"
+        assert items_by_id["ma-subscription-enforce"]["source"] == "repo-test"
+        assert items_by_id["dt-parent-panel-login"]["manualClass"] == "automation-backlog"
+        assert items_by_id["dt-parent-panel-login"]["automationWave"] == "wave-1"
         assert items_by_id["ma-task-reject-ui"]["automationWave"] == "wave-2"
         assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
 
