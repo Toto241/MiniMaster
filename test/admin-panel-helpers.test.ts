@@ -518,6 +518,77 @@ describe("admin-panel helper functions", () => {
     expect(missing).toContain("Parent Web Panel Login geprüft");
   });
 
+  it("submits admin login credentials and reports success in the auth panel", async () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+    const signInWithEmailAndPassword = jest.fn(() => Promise.resolve());
+    exports.setAuthForTests({ signInWithEmailAndPassword });
+
+    const statusEl = { innerHTML: "" };
+    const submitBtn = { disabled: false };
+    elements.set("login-email", { value: "operator@example.com" });
+    elements.set("login-password", { value: "secret-pass" });
+    elements.set("login-status", statusEl);
+
+    const event = {
+      preventDefault: jest.fn(),
+      target: {
+        querySelector: jest.fn(() => submitBtn),
+      },
+    };
+
+    exports.handleLogin(event);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(signInWithEmailAndPassword).toHaveBeenCalledWith("operator@example.com", "secret-pass");
+    expect(statusEl.innerHTML).toContain("Anmeldung erfolgreich");
+    expect(submitBtn.disabled).toBe(false);
+  });
+
+  it("promotes authenticated admin users into the dashboard and starts session monitoring", async () => {
+    const { exports, elements, context } = loadAdminPanelTestExports();
+    const onAuthStateChanged = jest.fn();
+    exports.setAuthForTests({ onAuthStateChanged });
+    context.loadDashboardData = jest.fn();
+    context.applyRoleRestrictions = jest.fn();
+    context.initializeSetupAssistant = jest.fn();
+
+    const onboardingSection = { style: { display: "block" } };
+    const dashboardSection = { style: { display: "none" } };
+    const dashboardNav = { style: { display: "none" } };
+    const logoutBtn = { style: { display: "none" } };
+    const userEmail = { textContent: "" };
+    elements.set("notification", { textContent: "", className: "", style: {} });
+    elements.set("onboarding-section", onboardingSection);
+    elements.set("dashboard-section", dashboardSection);
+    elements.set("dashboard-nav", dashboardNav);
+    elements.set("logout-btn", logoutBtn);
+    elements.set("user-email", userEmail);
+
+    exports.initializeAuthStateObserver();
+    const authCallback = onAuthStateChanged.mock.calls[0][0];
+
+    authCallback({
+      email: "admin@example.com",
+      getIdTokenResult: () => Promise.resolve({ claims: { role: "admin" } }),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onboardingSection.style.display).toBe("none");
+    expect(dashboardSection.style.display).toBe("block");
+    expect(dashboardNav.style.display).toBe("flex");
+    expect(logoutBtn.style.display).toBe("inline-block");
+    expect(userEmail.textContent).toContain("admin@example.com");
+    expect(userEmail.textContent).toContain("ADMIN");
+    expect(context.document.addEventListener).toHaveBeenCalled();
+    expect(context.applyRoleRestrictions).toHaveBeenCalledWith("admin");
+    expect(context.loadDashboardData).toHaveBeenCalled();
+    expect(context.initializeSetupAssistant).toHaveBeenCalled();
+  });
+
   it("renders a commissioning snapshot into the report", () => {
     const { exports, elements } = loadAdminPanelTestExports({
       operatorCommissioningAttestations: JSON.stringify({ "firebase-auth-enabled": true }),

@@ -470,7 +470,6 @@ class TestBuildTestingRegister:
             "ma-date-picker",
             "ma-fcm-working",
             "ma-firebase-appcheck",
-            "ma-offline-handling",
             "ma-qr-pairing",
             "ca-accessibility-active",
             "ca-app-blocking-effective",
@@ -486,8 +485,6 @@ class TestBuildTestingRegister:
             "dt-system-tray",
             "dt-desktop-notifications",
             "dt-window-persistence",
-            "dt-parent-panel-login",
-            "dt-admin-panel-login",
             "dt-crash-reporting",
         }
 
@@ -501,6 +498,9 @@ class TestBuildTestingRegister:
         }
         expected_repo_tests = {
             "ma-subscription-enforce",
+            "ma-offline-handling",
+            "dt-parent-panel-login",
+            "dt-admin-panel-login",
         }
         expected_derived = {
             "ma-registration-flow",
@@ -525,7 +525,10 @@ class TestBuildTestingRegister:
         for test_id in expected_repo_tests:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "repo-test"
-            assert items_by_id[test_id]["suiteRef"] == "backend-subscription-enforcement"
+        assert items_by_id["ma-subscription-enforce"]["suiteRef"] == "backend-subscription-enforcement"
+        assert items_by_id["ma-offline-handling"]["suiteRef"] == "android-unit-master"
+        assert items_by_id["dt-parent-panel-login"]["suiteRef"] == "web-control-auth-flow"
+        assert items_by_id["dt-admin-panel-login"]["suiteRef"] == "admin-panel-auth-flow"
         for test_id in expected_derived:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "register-derivative"
@@ -553,8 +556,12 @@ class TestBuildTestingRegister:
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
         assert items_by_id["ma-subscription-enforce"]["automationType"] == "automatic"
         assert items_by_id["ma-subscription-enforce"]["source"] == "repo-test"
-        assert items_by_id["dt-parent-panel-login"]["manualClass"] == "automation-backlog"
-        assert items_by_id["dt-parent-panel-login"]["automationWave"] == "wave-1"
+        assert items_by_id["ma-offline-handling"]["automationType"] == "automatic"
+        assert items_by_id["ma-offline-handling"]["source"] == "repo-test"
+        assert items_by_id["dt-parent-panel-login"]["automationType"] == "automatic"
+        assert items_by_id["dt-parent-panel-login"]["source"] == "repo-test"
+        assert items_by_id["dt-admin-panel-login"]["automationType"] == "automatic"
+        assert items_by_id["dt-admin-panel-login"]["source"] == "repo-test"
         assert items_by_id["ma-task-reject-ui"]["automationWave"] == "wave-2"
         assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
 
@@ -563,7 +570,6 @@ class TestBuildTestingRegister:
         assert manual_insights["buckets"]["physical-manual"]["count"] >= 1
         assert manual_insights["buckets"]["automation-backlog"]["count"] >= 1
         assert manual_insights["buckets"]["external-evidence"]["count"] >= 1
-        assert manual_insights["waves"]["wave-1"]["count"] >= 1
         assert manual_insights["waves"]["wave-2"]["count"] >= 1
 
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):

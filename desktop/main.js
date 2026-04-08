@@ -262,5 +262,7 @@ module.exports = {
   normalizeCommandName,
   hasRejectedControlTokens,
   resolveExecutable,
+  createParentWindow,
+  createOperatorWindow,
   startDesktopApp,
 };
