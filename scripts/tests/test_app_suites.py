@@ -1186,7 +1186,7 @@ class TestRunAndroidCompatibilityBackground:
             "execution_mode": "single-master",
             "android_versions": ["10", "14"],
             "app_id": "master",
-            "serial": "auto",
+            "serial": "DEVICE-1",
             "suite": "commissioning",
         })
 
@@ -1196,6 +1196,66 @@ class TestRunAndroidCompatibilityBackground:
             assert _active_suite_runs[run_id]["result"]["summary"]["counts"]["passed"] == 1
             assert _active_suite_runs[run_id]["result"]["summary"]["counts"]["error"] == 1
             assert _active_suite_runs[run_id]["result"]["overallStatus"] == "failed"
+
+    @patch("app.ensure_emulator_pool")
+    @patch("app.run_usb_test")
+    def test_provisions_emulator_when_single_run_uses_auto_serial(self, mock_run_usb, mock_pool, suite_log_file):
+        from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
+        from usb_test_runner import UsbTestRunResult
+
+        run_id = "compat-auto-single"
+        mock_pool.return_value = [{"serial": "emulator-5554", "androidVersion": "14", "profileId": "phone-large"}]
+        result = UsbTestRunResult(app_id="master", serial="emulator-5554", suite="commissioning")
+        result.overall_status = "passed"
+        mock_run_usb.return_value = result
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_android_compatibility_background(run_id, {
+            "execution_mode": "single-master",
+            "android_versions": ["14"],
+            "app_id": "master",
+            "serial": "auto",
+            "suite": "commissioning",
+        })
+
+        mock_pool.assert_called_once()
+        assert mock_run_usb.call_args.kwargs["serial"] == "emulator-5554"
+        with _active_suite_lock:
+            assert _active_suite_runs[run_id]["subRuns"][0]["provisioning"][0]["serial"] == "emulator-5554"
+
+    @patch("app.ensure_emulator_pool")
+    @patch("app.run_dual_device")
+    def test_provisions_two_emulators_when_dual_run_uses_auto_serials(self, mock_run_dual, mock_pool, suite_log_file):
+        from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
+        from dual_device_runner import DualDeviceResult
+
+        run_id = "compat-auto-dual"
+        mock_pool.return_value = [
+            {"serial": "emulator-5554", "androidVersion": "14", "profileId": "dual-device-balanced"},
+            {"serial": "emulator-5556", "androidVersion": "14", "profileId": "dual-device-balanced"},
+        ]
+        result = DualDeviceResult(master_serial="emulator-5554", child_serial="emulator-5556")
+        result.overall_status = "passed"
+        mock_run_dual.return_value = result
+
+        with _active_suite_lock:
+            _active_suite_runs[run_id] = {"status": "queued"}
+
+        _run_android_compatibility_background(run_id, {
+            "execution_mode": "dual-device",
+            "android_versions": ["14"],
+            "master_serial": "auto",
+            "child_serial": "auto",
+            "scenario_id": "offline-online-resync",
+            "profile_id": "dual-device-balanced",
+            "fault_modes": [],
+        })
+
+        mock_pool.assert_called_once()
+        assert mock_run_dual.call_args.kwargs["master_serial"] == "emulator-5554"
+        assert mock_run_dual.call_args.kwargs["child_serial"] == "emulator-5556"
 
 
 # ═══════════════════════════════════════════════════════════════════
