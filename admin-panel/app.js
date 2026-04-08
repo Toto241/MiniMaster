@@ -3853,9 +3853,6 @@ function buildUsbTestRunRequestPayload(input) {
         if (androidVersions.length === 0) {
             return { error: "Bitte mindestens eine Android-Version für den Kompatibilitätslauf angeben." };
         }
-        if (testType === "dual-device" && !childSerial) {
-            return { error: "Bitte Child-Serial angeben für Dual-Device-Kompatibilitätslauf." };
-        }
         return {
             endpoint: "/api/suites/android-compatibility",
             payload: {
@@ -3863,7 +3860,7 @@ function buildUsbTestRunRequestPayload(input) {
                 androidVersions,
                 serial: masterSerial === "auto" ? "auto" : masterSerial,
                 masterSerial: masterSerial || "auto",
-                childSerial,
+                childSerial: testType === "dual-device" ? (childSerial || "auto") : childSerial,
                 suite: String(input?.suite || "commissioning").trim() || "commissioning",
                 installApk: Boolean(input?.installApk),
                 skipActivation: Boolean(input?.skipActivation),
@@ -4668,6 +4665,45 @@ function formatSuiteRunLabel(payload) {
     return "Dual-Device";
 }
 
+function formatSuiteHistoryTitle(run) {
+    const type = String(run?.type || run?.suiteId || run?.suite_id || "?");
+    if (type !== "android-compatibility") {
+        return String(run?.suiteId || run?.suite_id || run?.type || "?");
+    }
+
+    const executionMode = String(run?.executionMode || run?.result?.executionMode || "-");
+    const modeLabel = executionMode === "dual-device"
+        ? "Android-Kompatibilität: Dual-Device"
+        : executionMode === "single-child"
+            ? "Android-Kompatibilität: Kind-App"
+            : executionMode === "single-master"
+                ? "Android-Kompatibilität: Master-App"
+                : "Android-Kompatibilität";
+    return modeLabel;
+}
+
+function formatSuiteHistoryMeta(run) {
+    const type = String(run?.type || run?.suiteId || run?.suite_id || "");
+    if (type !== "android-compatibility") {
+        return "";
+    }
+
+    const versions = Array.isArray(run?.androidVersions)
+        ? run.androidVersions
+        : Array.isArray(run?.result?.androidVersions)
+            ? run.result.androidVersions
+            : [];
+    const summary = run?.result?.summary?.counts || {};
+    const parts = [];
+    if (versions.length > 0) {
+        parts.push(`Android ${versions.map(item => String(item)).join(", ")}`);
+    }
+    if (Number(summary.total || 0) > 0) {
+        parts.push(`PASS ${Number(summary.passed || 0)} · FAIL ${Number(summary.failed || 0)} · ERROR ${Number(summary.error || 0)} · SKIP ${Number(summary.skipped || 0)}`);
+    }
+    return parts.join(" · ");
+}
+
 function appendSuiteActiveRun(runId, label) {
     const el = document.getElementById("suite-active-runs");
     if (!el) return;
@@ -4765,7 +4801,10 @@ async function loadSuiteRunHistory() {
         historyEl.innerHTML = runs.slice(0, 50).map(r => `
             <div class="data-row" style="display:flex;gap:8px;align-items:center">
                 <span class="badge ${(r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'passed') ? 'pass' : (r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'skipped') ? 'running' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status === 'finished' ? ((r.result?.status || r.result?.overall_status) || r.status) : r.status)}</span>
-                <strong>${escapeHtml(r.suiteId || r.suite_id || r.type || '?')}</strong>
+                <div style="display:grid;gap:2px;min-inline-size:0">
+                    <strong>${escapeHtml(formatSuiteHistoryTitle(r))}</strong>
+                    ${formatSuiteHistoryMeta(r) ? `<span style="font-size:0.8em;color:#475569">${escapeHtml(formatSuiteHistoryMeta(r))}</span>` : ""}
+                </div>
                 <code style="font-size:0.75em">${escapeHtml(r.runId || r.run_id || '')}</code>
                 <span style="margin-inline-start:auto;font-size:0.85em">${escapeHtml(r.startedAt || r.started_at || r.timestamp || '')}</span>
             </div>
