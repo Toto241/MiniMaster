@@ -500,6 +500,7 @@ describe("admin-panel helper functions", () => {
       operatorCommissioningAttestations: JSON.stringify({ "parent-panel-verified": true }),
     });
 
+    expect(exports.formatPythonAutomationType("automatic", "repo-test")).toBe("Repository-Test-Evidenz");
     exports.setPythonAutomationEvidenceCache({
       entries: [],
       latestByTestId: {
@@ -1933,10 +1934,12 @@ describe("admin-panel helper functions", () => {
     expect(exports.getTestingRegisterActionLabel({ action: "suite-run" })).toBe("Suite-Start");
     expect(exports.getTestingRegisterActionLabel({ action: "protocol" })).toBe("Nachweis-Protokoll");
     expect(exports.getTestingRegisterActionLabel({ action: "commissioning-run" })).toBe("Python-Commissioning-Lauf");
+    expect(exports.getTestingRegisterActionLabel({ source: "repo-test" })).toBe("Repository-Tests prüfen");
 
     expect(exports.buildTestingRegisterExecutionPath({ action: "suite-run", suiteRef: "android-master" })).toContain("android-master");
     expect(exports.buildTestingRegisterExecutionPath({ action: "protocol" })).toContain("Nachweisformular");
     expect(exports.buildTestingRegisterExecutionPath({ action: "commissioning-run" })).toContain("Python-Commissioning-Lauf");
+    expect(exports.buildTestingRegisterExecutionPath({ source: "repo-test" })).toContain("Repository-Tests");
     expect(exports.buildTestingRegisterExecutionPath({ source: "register-derivative", derivedFromTitles: ["Task erstellen"] })).toContain("Task erstellen");
   });
 
