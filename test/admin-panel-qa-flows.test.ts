@@ -335,6 +335,139 @@ describe("admin-panel QA flow integration", () => {
     expect(sections.every((entry: [string, unknown]) => typeof entry[1] === "function")).toBe(true);
   });
 
+  it("filters the testing register down to manual wave-1 backlog items in a UI-like flow", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const automaticListEl = { innerHTML: "" };
+    const manualListEl = { innerHTML: "" };
+    const typeFilterEl = { value: "all" };
+    const sortEl = { value: "status" };
+    const searchEl = { value: "" };
+    const registerCardEl = { scrollIntoView: jest.fn() };
+
+    elements.set("testing-register-list-automatic", automaticListEl);
+    elements.set("testing-register-list-manual", manualListEl);
+    elements.set("testing-register-type-filter", typeFilterEl);
+    elements.set("testing-register-sort", sortEl);
+    elements.set("testing-register-search", searchEl);
+    elements.set("qa-register-card", registerCardEl);
+
+    const payload = {
+      items: [
+        {
+          id: "dt-parent-panel-login",
+          title: "Parent-Panel-Login im Electron-Fenster geprüft",
+          groupTitle: "Desktop: Betrieb & Integrations-Readiness",
+          groupId: "functional-readiness-desktop",
+          automationType: "manual",
+          source: "platform-readiness",
+          manualClass: "automation-backlog",
+          automationWave: "wave-1",
+          status: "not_run",
+          severity: "high",
+          owner: "QA Automation",
+        },
+        {
+          id: "ma-task-reject-ui",
+          title: "Task-Ablehnung im UI getestet",
+          groupTitle: "MasterApp: Funktionale Readiness",
+          groupId: "functional-readiness-masterapp",
+          automationType: "manual",
+          source: "platform-readiness",
+          manualClass: "automation-backlog",
+          automationWave: "wave-2",
+          status: "not_run",
+          severity: "medium",
+          owner: "QA Automation",
+        },
+        {
+          id: "ma-subscription-enforce",
+          title: "Free-Tier-Limit wird erzwungen",
+          groupTitle: "MasterApp: Funktionale Readiness",
+          groupId: "functional-readiness-masterapp",
+          automationType: "automatic",
+          source: "repo-test",
+          status: "pass",
+          severity: "critical",
+          owner: "Backend",
+          suiteRef: "backend-subscription-enforcement",
+        },
+      ],
+    };
+
+    exports.setTestingRegisterPayloadForTests(payload);
+    exports.applyTestingRegisterQuickFilter("manualBacklogWave1", { sort: "group" });
+
+    expect(typeFilterEl.value).toBe("manualBacklogWave1");
+    expect(sortEl.value).toBe("group");
+    expect(registerCardEl.scrollIntoView).toHaveBeenCalled();
+    expect(manualListEl.innerHTML).toContain("dt-parent-panel-login");
+    expect(manualListEl.innerHTML).toContain("1 sichtbar (1 gefiltert / 3 gesamt)");
+    expect(manualListEl.innerHTML).not.toContain("ma-task-reject-ui");
+    expect(manualListEl.innerHTML).not.toContain("ma-subscription-enforce");
+    expect(automaticListEl.innerHTML).toContain("Keine automatischen Tests passen auf die aktuellen Filter");
+  });
+
+  it("renders unsupported repo-tests through the QA register filter into the automatic panel", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const automaticListEl = { innerHTML: "" };
+    const manualListEl = { innerHTML: "" };
+    const typeFilterEl = { value: "all" };
+    const sortEl = { value: "status" };
+    const searchEl = { value: "" };
+    const registerCardEl = { scrollIntoView: jest.fn() };
+
+    elements.set("testing-register-list-automatic", automaticListEl);
+    elements.set("testing-register-list-manual", manualListEl);
+    elements.set("testing-register-type-filter", typeFilterEl);
+    elements.set("testing-register-sort", sortEl);
+    elements.set("testing-register-search", searchEl);
+    elements.set("qa-register-card", registerCardEl);
+
+    const payload = {
+      items: [
+        {
+          id: "repo-unsupported-1",
+          title: "masterApp/src/androidTest/.../UnmappedSpec.kt",
+          groupTitle: "Repo-Tests: Unsupported / Not Yet Mapped",
+          groupId: "repo-tests-unsupported",
+          entryKind: "repo-test",
+          automationType: "automatic",
+          source: "repo-test",
+          status: "pass",
+          severity: "medium",
+          owner: "QA Automation",
+          suiteRef: "",
+        },
+        {
+          id: "dt-parent-panel-login",
+          title: "Parent-Panel-Login im Electron-Fenster geprüft",
+          groupTitle: "Desktop: Betrieb & Integrations-Readiness",
+          groupId: "functional-readiness-desktop",
+          automationType: "manual",
+          source: "platform-readiness",
+          manualClass: "automation-backlog",
+          automationWave: "wave-1",
+          status: "not_run",
+          severity: "high",
+          owner: "QA Automation",
+        },
+      ],
+    };
+
+    exports.setTestingRegisterPayloadForTests(payload);
+    exports.applyTestingRegisterQuickFilter("unsupported", { sort: "group", search: "unmapped" });
+
+    expect(typeFilterEl.value).toBe("unsupported");
+    expect(searchEl.value).toBe("unmapped");
+    expect(automaticListEl.innerHTML).toContain("repo-unsupported-1");
+    expect(automaticListEl.innerHTML).toContain("Repository-Test-Evidenz");
+    expect(automaticListEl.innerHTML).toContain("Unsupported:");
+    expect(manualListEl.innerHTML).toContain("Keine manuellen/dokumentierten Tests passen auf die aktuellen Filter");
+    expect(manualListEl.innerHTML).not.toContain("dt-parent-panel-login");
+  });
+
   it("stacks QA test case layouts vertically in the stylesheet", () => {
     const stylesheet = fs.readFileSync(path.join(__dirname, "..", "admin-panel", "styles.css"), "utf8");
 
