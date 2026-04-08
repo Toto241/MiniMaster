@@ -23,7 +23,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
   const createMockElement = (tag: string) => {

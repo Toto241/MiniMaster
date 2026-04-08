@@ -165,7 +165,7 @@ describe("Desktop CLI security helpers", () => {
     expect(mockedFs.mkdirSync).toHaveBeenCalled();
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       expect.stringContaining("window-state.json"),
-      expect.stringContaining('"operator"'),
+      expect.stringContaining("\"operator\""),
       "utf8",
     );
   });
@@ -179,10 +179,10 @@ describe("Desktop CLI security helpers", () => {
     expect(mockedFs.mkdirSync).toHaveBeenCalled();
     expect(mockedFs.appendFileSync).toHaveBeenCalledWith(
       expect.stringContaining("desktop-crash-reports.jsonl"),
-      expect.stringContaining('"kind":"uncaught-exception"'),
+      expect.stringContaining("\"kind\":\"uncaught-exception\""),
       "utf8",
     );
-    expect(mockedFs.appendFileSync.mock.calls[0][1]).toContain('"message":"boom"');
+    expect(mockedFs.appendFileSync.mock.calls[0][1]).toContain("\"message\":\"boom\"");
   });
 
   it("registers Electron crash handlers for process and renderer failures", () => {

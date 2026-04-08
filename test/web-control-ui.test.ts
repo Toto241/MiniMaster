@@ -354,8 +354,8 @@ describe("web-control browser flows", () => {
   it("renders the task deadline field as a datetime-local picker in the HTML shell", () => {
     const html = fs.readFileSync(path.join(__dirname, "..", "web-control", "index.html"), "utf8");
 
-    expect(html).toContain('id="task-deadline"');
-    expect(html).toContain('type="datetime-local"');
+    expect(html).toContain("id=\"task-deadline\"");
+    expect(html).toContain("type=\"datetime-local\"");
   });
 
   it("logs into web-control via custom token, updates the UI and starts session monitoring", async () => {
