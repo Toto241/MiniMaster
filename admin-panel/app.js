@@ -2700,6 +2700,9 @@ function buildTestingRegisterMetaBadges(item) {
     if (item.manualClassLabel) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr(String(item.manualClassReason || item.manualClassLabel), String(item.manualClassLabel))}>${escapeTestingRegisterText(String(item.manualClassLabel))}</span>`);
     }
+    if (item.automationWaveLabel) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr(`Automatisierungsplanung: ${String(item.automationWaveLabel)}`, `Automatisierungsplanung ${String(item.automationWaveLabel)}`)}>${escapeTestingRegisterText(String(item.automationWaveLabel))}</span>`);
+    }
     if (item.blockingForRelease) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zu einem aktuellen, bestaetigten PASS. Veraltete Nachweise gelten hier ebenfalls als offen.", "Release-Blocker")}>Release-Blocker</span>`);
     }
@@ -2840,11 +2843,14 @@ function buildTestingRegisterDuplicateInsights(payload) {
 
 function buildTestingRegisterManualInsights(payload) {
     const buckets = payload?.manualInsights?.buckets || {};
+    const waves = payload?.manualInsights?.waves || {};
     return {
         total: Number(payload?.manualInsights?.total || 0),
         physical: Number(buckets["physical-manual"]?.count || 0),
         backlog: Number(buckets["automation-backlog"]?.count || 0),
         external: Number(buckets["external-evidence"]?.count || 0),
+        wave1: Number(waves["wave-1"]?.count || 0),
+        wave2: Number(waves["wave-2"]?.count || 0),
     };
 }
 
@@ -3239,9 +3245,10 @@ function renderTestingRegisterOverview(payload) {
             <article class='qa-register-callout qa-register-callout-info'>
                 <div>
                     <strong>Verbleibende Handprüfungen sind jetzt priorisiert</strong>
-                    <p>${escapeHtml(String(manualInsights.physical))} physisch zwingend manuell · ${escapeHtml(String(manualInsights.backlog))} in der nächsten Automatisierungswelle · ${escapeHtml(String(manualInsights.external))} externe Nachweise.</p>
+                    <p>${escapeHtml(String(manualInsights.physical))} physisch zwingend manuell · ${escapeHtml(String(manualInsights.backlog))} im Automatisierungs-Backlog · ${escapeHtml(String(manualInsights.external))} externe Nachweise.</p>
+                    <div class='python-muted-caption'>Backlog-Aufteilung: ${escapeHtml(String(manualInsights.wave1))} in Welle 1 · ${escapeHtml(String(manualInsights.wave2))} in Welle 2.</div>
                 </div>
-                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('manualBacklog', { sort: 'group' })">Automatisierungswelle anzeigen</button>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('manualBacklogWave1', { sort: 'group' })">Welle 1 anzeigen</button>
             </article>
         `
         : "";
@@ -3498,6 +3505,12 @@ function renderTestingRegisterList(payload) {
             return false;
         }
         if (filters.type === "manualBacklog" && String(item.manualClass || "") !== "automation-backlog") {
+            return false;
+        }
+        if (filters.type === "manualBacklogWave1" && String(item.automationWave || "") !== "wave-1") {
+            return false;
+        }
+        if (filters.type === "manualBacklogWave2" && String(item.automationWave || "") !== "wave-2") {
             return false;
         }
         if (filters.type === "manualExternal" && String(item.manualClass || "") !== "external-evidence") {

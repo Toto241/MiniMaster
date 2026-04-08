@@ -135,4 +135,6 @@ class TestQaRuntimeHttpContracts:
         items_by_id = {item["id"]: item for item in payload["items"]}
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
         assert items_by_id["ma-subscription-check"]["manualClass"] == "automation-backlog"
+        assert items_by_id["ma-subscription-check"]["automationWave"] == "wave-1"
+        assert items_by_id["ma-task-reject-ui"]["automationWave"] == "wave-2"
         assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
