@@ -101,4 +101,43 @@ class AccessibilityServiceTest {
         assertFalse(ChildProtectionPolicy.isOutsideAllowedWindow(6 * 60, 22 * 60, 7 * 60))
         assertTrue(ChildProtectionPolicy.isOutsideAllowedWindow(12 * 60, 22 * 60, 7 * 60))
     }
+
+    @Test
+    fun `settings tamper detection reports on third settings access within one minute`() {
+        val first = ChildProtectionPolicy.registerSettingsAccess(
+            previousCount = 0,
+            lastAccessTime = 0L,
+            now = 1_000L,
+        )
+        val second = ChildProtectionPolicy.registerSettingsAccess(
+            previousCount = first.accessCount,
+            lastAccessTime = first.lastAccessTime,
+            now = 20_000L,
+        )
+        val third = ChildProtectionPolicy.registerSettingsAccess(
+            previousCount = second.accessCount,
+            lastAccessTime = second.lastAccessTime,
+            now = 40_000L,
+        )
+
+        assertEquals(1, first.accessCount)
+        assertFalse(first.shouldReport)
+        assertEquals(2, second.accessCount)
+        assertFalse(second.shouldReport)
+        assertEquals(0, third.accessCount)
+        assertTrue(third.shouldReport)
+    }
+
+    @Test
+    fun `settings tamper detection resets the counter outside the time window`() {
+        val previous = ChildProtectionPolicy.registerSettingsAccess(
+            previousCount = 2,
+            lastAccessTime = 1_000L,
+            now = 70_500L,
+        )
+
+        assertEquals(1, previous.accessCount)
+        assertEquals(70_500L, previous.lastAccessTime)
+        assertFalse(previous.shouldReport)
+    }
 }

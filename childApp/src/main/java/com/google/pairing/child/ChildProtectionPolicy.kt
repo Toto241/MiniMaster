@@ -7,6 +7,12 @@ data class ParsedUsageRules(
     val allowedEndMinutes: Int? = null,
 )
 
+data class SettingsTamperState(
+    val accessCount: Int,
+    val lastAccessTime: Long,
+    val shouldReport: Boolean,
+)
+
 object ChildProtectionPolicy {
     fun parseBlockedApps(rawValue: String): Set<String> {
         val trimmed = rawValue.trim()
@@ -100,6 +106,22 @@ object ChildProtectionPolicy {
         }
 
         return !isWithinWindow
+    }
+
+    fun registerSettingsAccess(
+        previousCount: Int,
+        lastAccessTime: Long,
+        now: Long,
+        threshold: Int = 3,
+        windowMillis: Long = 60_000L,
+    ): SettingsTamperState {
+        val nextCount = if (now - lastAccessTime < windowMillis) previousCount + 1 else 1
+        val shouldReport = nextCount >= threshold
+        return SettingsTamperState(
+            accessCount = if (shouldReport) 0 else nextCount,
+            lastAccessTime = now,
+            shouldReport = shouldReport,
+        )
     }
 
     private fun parseClockMinutes(value: String): Int? {

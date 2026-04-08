@@ -254,6 +254,13 @@ describe("web-control browser flows", () => {
     await context.__webControlTestExports.createTask(event);
 
     expect(callableFactory).toHaveBeenCalledWith("createTask");
+    const createTaskCallable = callableFactory.mock.results.find((entry: { type: string; value: unknown }) => entry.type === "return")?.value as jest.Mock | undefined;
+    expect(createTaskCallable).toBeDefined();
+    expect(createTaskCallable).toHaveBeenCalledWith({
+      childId: "child-1",
+      description: "Zimmer aufräumen",
+      deadlineISO: new Date("2026-03-22T10:00").toISOString(),
+    });
   });
 
   it("openRulesModal maps blacklist and daily limit into form fields", () => {
@@ -342,6 +349,13 @@ describe("web-control browser flows", () => {
 
     expect(elements.get("notification")?.textContent).toBe("Alles synchronisiert");
     expect(elements.get("notification")?.className).toBe("notification success");
+  });
+
+  it("renders the task deadline field as a datetime-local picker in the HTML shell", () => {
+    const html = fs.readFileSync(path.join(__dirname, "..", "web-control", "index.html"), "utf8");
+
+    expect(html).toContain('id="task-deadline"');
+    expect(html).toContain('type="datetime-local"');
   });
 
   it("logs into web-control via custom token, updates the UI and starts session monitoring", async () => {
