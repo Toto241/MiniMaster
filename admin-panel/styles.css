@@ -1686,6 +1686,10 @@ input:focus, select:focus, textarea:focus {
     gap: 16px;
 }
 
+.testing-register-panels {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .python-automation-panel {
     border: 1px solid #dbeafe;
     border-radius: 12px;
@@ -2265,7 +2269,7 @@ input:focus, select:focus, textarea:focus {
 
 .python-automation-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
     margin-block-start: 12px;
 }

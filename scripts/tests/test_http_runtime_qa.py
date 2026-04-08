@@ -112,3 +112,15 @@ class TestQaRuntimeHttpContracts:
         assert exc_info.value.code == 400
         payload = json.loads(exc_info.value.read().decode("utf-8"))
         assert payload["error"] == "masterSerial und childSerial sind erforderlich."
+
+    def test_runtime_http_serves_duplicate_coverage_insights_in_testing_register(self, qa_http_server: str):
+        status, headers, payload = _read_json(f"{qa_http_server}/api/testing/register")
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert payload["duplicateInsights"]["count"] >= 1
+
+        items_by_id = {item["id"]: item for item in payload["items"]}
+        assert items_by_id["ma-task-create"]["automationType"] == "automatic"
+        assert items_by_id["ma-task-create"]["source"] == "register-derivative"
+        assert items_by_id["ma-task-create"]["derivedFrom"] == ["doc-create-task"]

@@ -898,6 +898,7 @@ function getPythonAutomationModeHint(type, source = "") {
     if (type === "command") return "Automatisiertes CLI/PowerShell-Gate";
     if (type === "documented") return "Manueller Nachweis anhand dokumentierter Schrittfolge";
     if (type === "manual") return "Manuelle Prüfung mit Operator-Nachweis";
+    if (source === "register-derivative") return "Automatische Ableitung aus bereits vorhandenen QA-Prüffällen, um Doppelprüfungen zu vermeiden";
     if (source === "device-suite") return "Automatische Bewertung aus einer verknüpften Device- oder USB-Suite";
     if (source === "static-analysis") return "Automatische Code-, Build- oder Manifest-Prüfung ohne Geräteausführung";
     if (source === "docs-validation") return "Automatische Prüfung von Reviewer-, Release- oder Store-Dokumentation";
@@ -905,6 +906,7 @@ function getPythonAutomationModeHint(type, source = "") {
 }
 
 function formatTestingRegisterSourceLabel(source) {
+    if (source === "register-derivative") return "Quelle: Abgeleiteter QA-Check";
     if (source === "device-suite") return "Quelle: Device-Suite";
     if (source === "static-analysis") return "Quelle: Statische Analyse";
     if (source === "docs-validation") return "Quelle: Dokument-Check";
@@ -916,6 +918,7 @@ function formatTestingRegisterSourceLabel(source) {
 }
 
 function getTestingRegisterSourceChipClass(source) {
+    if (source === "register-derivative") return "python-automation-chip-auto";
     if (source === "device-suite") return "python-automation-chip-suite";
     if (source === "static-analysis") return "python-automation-chip-static";
     if (source === "docs-validation") return "python-automation-chip-docs";
@@ -1411,6 +1414,9 @@ function renderPythonAutomationCatalog(catalog, run) {
         const evidenceHtml = evidence
             ? `<div class='python-test-detail'><strong>Manueller Nachweis:</strong> ${escapeHtml(formatPythonAutomationEvidenceDetails(evidence) || "Nachweis protokolliert.")}</div>`
             : "";
+        const coverageHtml = Array.isArray(test.derivedFrom) && test.derivedFrom.length > 0
+            ? `<div class='python-test-detail'><strong>Automatisch abgedeckt durch:</strong> ${escapeHtml(test.derivedFrom.join(", "))}</div>`
+            : "";
         const encodedTestId = encodeURIComponent(String(test.id || ""));
 
         return `
@@ -1429,6 +1435,7 @@ function renderPythonAutomationCatalog(catalog, run) {
                     <span class='python-automation-chip ${getPythonAutomationTypeChipClass(test.automationType, test.source)}'>${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}</span>
                 </div>
                 <div class='python-test-detail'><strong>Bewertungsmodus:</strong> ${escapeHtml(getPythonAutomationModeHint(test.automationType, test.source))}</div>
+                ${coverageHtml}
                 <p>${escapeHtml(test.description || "")}</p>
                 <div class='python-test-detail'><strong>Bestanden wenn:</strong> ${escapeHtml(test.successCriteria || "-")}</div>
                 ${test.command ? `<div class='python-test-detail'><strong>Kommando:</strong> ${escapeHtml(test.command)}</div>` : ""}
@@ -1448,6 +1455,7 @@ function renderPythonAutomationCatalog(catalog, run) {
         if (isManualAutomationType(entry.test.automationType)) byType.manual.push(entry);
         else byType.automated.push(entry);
     });
+    const derivedCount = visibleTests.filter(entry => Array.isArray(entry.test?.derivedFrom) && entry.test.derivedFrom.length > 0).length;
 
     const renderGroupSection = entries => {
         const grouped = new Map();
@@ -1526,6 +1534,7 @@ function renderPythonAutomationCatalog(catalog, run) {
         <div class='info' style='margin-block-end: 8px'>
             Sichtbare Testfälle: ${escapeHtml(String(visibleTests.length))} · Automatisiert: ${escapeHtml(String(byType.automated.length))} · Manuell: ${escapeHtml(String(byType.manual.length))}
         </div>
+        ${derivedCount > 0 ? `<div class='python-automation-clarity-box'><strong>${escapeHtml(String(derivedCount))} ehemals manuelle Prüffälle</strong> werden automatisch aus vorhandenen Device-, Dokument- oder Registerprüfungen abgeleitet. Dadurch bleibt der Katalog fachlich vollständig, aber Doppelprüfungen werden transparent reduziert.</div>` : ""}
         ${contentHtml}
     `;
 }
@@ -2684,6 +2693,10 @@ function buildTestingRegisterMetaBadges(item) {
             badges.push(`<span class='python-automation-chip ${getTestingRegisterSourceChipClass(String(item.source || ""))}' ${buildTestingRegisterTooltipAttr(sourceLabel, sourceLabel)}>${escapeTestingRegisterText(sourceLabel.replace(/^Quelle:\s*/, ""))}</span>`);
         }
     }
+    if (Array.isArray(item.derivedFrom) && item.derivedFrom.length > 0) {
+        const duplicateLabel = `Automatisch aus ${item.derivedFrom.length} vorhandenen Prüffall${item.derivedFrom.length === 1 ? "" : "en"} abgedeckt`;
+        badges.push(`<span class='python-automation-chip python-automation-chip-auto' ${buildTestingRegisterTooltipAttr(duplicateLabel, duplicateLabel)}>Abgeleitet</span>`);
+    }
     if (item.blockingForRelease) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr("Blockiert den Release bis zu einem aktuellen, bestaetigten PASS. Veraltete Nachweise gelten hier ebenfalls als offen.", "Release-Blocker")}>Release-Blocker</span>`);
     }
@@ -2813,6 +2826,15 @@ function buildTestingRegisterRiskSummary(payload) {
     };
 }
 
+function buildTestingRegisterDuplicateInsights(payload) {
+    const duplicateEntries = Array.isArray(payload?.duplicateInsights?.entries) ? payload.duplicateInsights.entries : [];
+    return {
+        count: Number(payload?.duplicateInsights?.count || 0),
+        sourceCount: Number(payload?.duplicateInsights?.sourceCount || 0),
+        entries: duplicateEntries,
+    };
+}
+
 function applyTestingRegisterQuickFilter(type, options = {}) {
     const typeEl = document.getElementById("testing-register-type-filter");
     const sortEl = document.getElementById("testing-register-sort");
@@ -2844,6 +2866,12 @@ function getTestingRegisterActionLabel(item) {
 
 function buildTestingRegisterExecutionPath(item) {
     const actionLabel = getTestingRegisterActionLabel(item);
+    if (String(item?.source || "") === "register-derivative") {
+        const sources = Array.isArray(item?.derivedFromTitles) ? item.derivedFromTitles.filter(Boolean) : [];
+        return sources.length > 0
+            ? `Automatisch aus ${sources.join(" / ")} abgeleitet`
+            : "Automatisch aus verknüpften QA-Prüffällen abgeleitet";
+    }
     if (String(item?.action || "") === "suite-run") {
         const suiteRef = String(item?.suiteRef || item?.id || "").trim();
         return suiteRef ? `${actionLabel}: ${suiteRef}` : actionLabel;
@@ -3119,6 +3147,9 @@ function buildTestingRegisterActionTooltip(item) {
 function buildTestingRegisterDetailText(item) {
     const parts = [];
     if (item.details) parts.push(String(item.details));
+    if (Array.isArray(item.derivedFromTitles) && item.derivedFromTitles.length > 0) {
+        parts.push(`Abgedeckt durch: ${item.derivedFromTitles.join(", ")}`);
+    }
     const sourceLabel = formatTestingRegisterSourceLabel(String(item.source || "")).replace(/^Quelle:\s*/, "");
     if (sourceLabel) parts.push(sourceLabel);
     if (item.environment) parts.push(`Umgebung: ${item.environment}`);
@@ -3155,6 +3186,7 @@ function renderTestingRegisterOverview(payload) {
     }
 
     const riskSummary = buildTestingRegisterRiskSummary(payload);
+    const duplicateInsights = buildTestingRegisterDuplicateInsights(payload);
     const alertsHtml = riskSummary.alerts.length > 0
         ? riskSummary.alerts.map(alert => `
             <article class='qa-register-callout qa-register-callout-${escapeHtml(String(alert.tone || "info"))}'>
@@ -3173,6 +3205,19 @@ function renderTestingRegisterOverview(payload) {
                 </div>
             </article>
         `;
+
+    const duplicateHtml = duplicateInsights.count > 0
+        ? `
+            <article class='qa-register-callout qa-register-callout-info'>
+                <div>
+                    <strong>${escapeHtml(String(duplicateInsights.count))} redundante Prüffälle werden automatisch abgedeckt</strong>
+                    <p>Diese ehemals manuellen Prüffälle werden jetzt aus ${escapeHtml(String(duplicateInsights.sourceCount))} bereits vorhandenen automatischen Referenzprüfungen abgeleitet und nicht mehr als isolierte Handprüfung behandelt.</p>
+                    <div class='python-muted-caption'>${escapeHtml(duplicateInsights.entries.slice(0, 4).map(entry => `${String(entry.title || entry.id || "Prüffall")} ← ${(entry.derivedFromTitles || []).join(" / ")}`).join(" · "))}</div>
+                </div>
+                <button class='btn btn-secondary btn-sm' onclick="applyTestingRegisterQuickFilter('automatic', { sort: 'group' })">Abgeleitete Checks anzeigen</button>
+            </article>
+        `
+        : "";
 
     const topBlockersHtml = riskSummary.topBlockers.length > 0
         ? `
@@ -3251,6 +3296,7 @@ function renderTestingRegisterOverview(payload) {
             </div>
             <div class='qa-register-callout-stack'>
                 ${alertsHtml}
+                ${duplicateHtml}
             </div>
             <div class='qa-register-top-blockers'>
                 <div class='qa-register-top-blockers-header'>

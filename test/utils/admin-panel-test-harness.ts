@@ -243,6 +243,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  getTestingRegisterActionLabel,",
     "  buildTestingRegisterExecutionPath,",
     "  buildTestingRegisterDetailText,",
+    "  buildTestingRegisterDuplicateInsights,",
     "  buildQaExecutionGuideData,",
     "  getUsbFormVisibilityState,",
     "  buildUsbTestRunRequestPayload,",
