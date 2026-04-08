@@ -174,6 +174,17 @@ MANUAL_CLASS_AUTOMATION_BACKLOG_IDS = {
     "dt-crash-reporting",
 }
 
+MANUAL_CLASS_AUTOMATION_WAVE1_IDS = {
+    "ma-subscription-check",
+    "ma-subscription-enforce",
+    "ma-offline-handling",
+    "ca-fcm-sync",
+    "dt-parent-panel-login",
+    "dt-admin-panel-login",
+}
+
+MANUAL_CLASS_AUTOMATION_WAVE2_IDS = MANUAL_CLASS_AUTOMATION_BACKLOG_IDS - MANUAL_CLASS_AUTOMATION_WAVE1_IDS
+
 MANUAL_CLASS_PHYSICAL_IDS = {
     "ma-firebase-appcheck",
     "ca-accessibility-active",
@@ -386,6 +397,8 @@ def infer_register_metadata(
     manual_class = ""
     manual_class_label = ""
     manual_class_reason = ""
+    automation_wave = ""
+    automation_wave_label = ""
     if automation_type == "documented":
         manual_class = "external-evidence"
         manual_class_label = "Externer Nachweis"
@@ -393,8 +406,16 @@ def infer_register_metadata(
     elif automation_type == "manual":
         if test_id in MANUAL_CLASS_AUTOMATION_BACKLOG_IDS:
             manual_class = "automation-backlog"
-            manual_class_label = "Nächste Automatisierungswelle"
-            manual_class_reason = "Der Prüffall ist noch manuell, lässt sich aber mit der vorhandenen Infrastruktur voraussichtlich als nächster Schritt automatisieren."
+            if test_id in MANUAL_CLASS_AUTOMATION_WAVE1_IDS:
+                automation_wave = "wave-1"
+                automation_wave_label = "Welle 1"
+                manual_class_label = "Nächste Automatisierungswelle"
+                manual_class_reason = "Der Prüffall ist noch manuell, lässt sich mit der vorhandenen Infrastruktur aber kurzfristig automatisieren und gehört in Welle 1."
+            else:
+                automation_wave = "wave-2"
+                automation_wave_label = "Welle 2"
+                manual_class_label = "Spätere Automatisierungswelle"
+                manual_class_reason = "Der Prüffall ist automatisierbar, benötigt aber mehr Vorarbeit oder Geräte-/Runtime-Stabilisierung und bleibt daher in Welle 2."
         elif test_id in MANUAL_CLASS_PHYSICAL_IDS:
             manual_class = "physical-manual"
             manual_class_label = "Physisch zwingend manuell"
@@ -423,6 +444,8 @@ def infer_register_metadata(
         "manualClass": manual_class,
         "manualClassLabel": manual_class_label,
         "manualClassReason": manual_class_reason,
+        "automationWave": automation_wave,
+        "automationWaveLabel": automation_wave_label,
         "sourceOfTruth": documentation or command or suite_ref or source,
         "linkedSuite": suite_ref,
         "linkedCommand": command,
@@ -2911,12 +2934,21 @@ def summarize_manual_classifications(items: list[dict[str, object]]) -> dict[str
         "automation-backlog": {"label": "Nächste Automatisierungswelle", "count": 0},
         "external-evidence": {"label": "Externer Nachweis", "count": 0},
     }
+    waves = {
+        "wave-1": {"label": "Welle 1", "count": 0},
+        "wave-2": {"label": "Welle 2", "count": 0},
+    }
     entries = []
     for item in manual_items:
         manual_class = str(item.get("manualClass") or "physical-manual")
         if manual_class not in buckets:
             buckets[manual_class] = {"label": str(item.get("manualClassLabel") or manual_class), "count": 0}
         buckets[manual_class]["count"] += 1
+        automation_wave = str(item.get("automationWave") or "")
+        if automation_wave:
+            if automation_wave not in waves:
+                waves[automation_wave] = {"label": str(item.get("automationWaveLabel") or automation_wave), "count": 0}
+            waves[automation_wave]["count"] += 1
         entries.append(
             {
                 "id": str(item.get("id") or ""),
@@ -2924,11 +2956,14 @@ def summarize_manual_classifications(items: list[dict[str, object]]) -> dict[str
                 "manualClass": manual_class,
                 "manualClassLabel": str(item.get("manualClassLabel") or buckets[manual_class]["label"]),
                 "manualClassReason": str(item.get("manualClassReason") or ""),
+                "automationWave": automation_wave,
+                "automationWaveLabel": str(item.get("automationWaveLabel") or waves.get(automation_wave, {}).get("label", "")),
             }
         )
     return {
         "total": len(manual_items),
         "buckets": buckets,
+        "waves": waves,
         "entries": entries,
     }
 

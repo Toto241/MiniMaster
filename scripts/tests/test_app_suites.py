@@ -267,6 +267,8 @@ class TestBuildTestingRegister:
             "manualClass",
             "manualClassLabel",
             "manualClassReason",
+            "automationWave",
+            "automationWaveLabel",
             "sourceOfTruth",
             "linkedSuite",
             "linkedCommand",
@@ -543,6 +545,8 @@ class TestBuildTestingRegister:
 
         assert items_by_id["ca-accessibility-active"]["manualClass"] == "physical-manual"
         assert items_by_id["ma-subscription-check"]["manualClass"] == "automation-backlog"
+        assert items_by_id["ma-subscription-check"]["automationWave"] == "wave-1"
+        assert items_by_id["ma-task-reject-ui"]["automationWave"] == "wave-2"
         assert items_by_id["firebase-auth-enabled"]["manualClass"] == "external-evidence"
 
         manual_insights = result["manualInsights"]
@@ -550,6 +554,8 @@ class TestBuildTestingRegister:
         assert manual_insights["buckets"]["physical-manual"]["count"] >= 1
         assert manual_insights["buckets"]["automation-backlog"]["count"] >= 1
         assert manual_insights["buckets"]["external-evidence"]["count"] >= 1
+        assert manual_insights["waves"]["wave-1"]["count"] >= 1
+        assert manual_insights["waves"]["wave-2"]["count"] >= 1
 
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
         import app

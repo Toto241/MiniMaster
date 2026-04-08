@@ -1904,6 +1904,7 @@ describe("admin-panel helper functions", () => {
       derivedFrom: ["doc-create-task"],
       manualClassLabel: "Nächste Automatisierungswelle",
       manualClassReason: "Soll bald automatisiert werden.",
+      automationWaveLabel: "Welle 1",
     });
     expect(badges).toContain("Prioritaet");
     expect(badges).toContain("Verantwortlich");
@@ -1911,6 +1912,7 @@ describe("admin-panel helper functions", () => {
     expect(badges).toContain("Unsupported");
     expect(badges).toContain("Abgeleitet");
     expect(badges).toContain("Nächste Automatisierungswelle");
+    expect(badges).toContain("Welle 1");
 
     const legend = exports.buildTestingRegisterLegend();
     expect(legend).toContain("Register-Legende");
@@ -1949,6 +1951,10 @@ describe("admin-panel helper functions", () => {
           "automation-backlog": { count: 2 },
           "external-evidence": { count: 2 },
         },
+        waves: {
+          "wave-1": { count: 1 },
+          "wave-2": { count: 1 },
+        },
       },
     });
 
@@ -1957,6 +1963,8 @@ describe("admin-panel helper functions", () => {
       physical: 3,
       backlog: 2,
       external: 2,
+      wave1: 1,
+      wave2: 1,
     });
   });
 
