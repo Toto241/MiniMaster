@@ -37,6 +37,12 @@ function loadWebControl(initialStorage: StorageMap = {}) {
   const storage = new Map(Object.entries(initialStorage));
   const elements = new Map<string, MockElement>();
   [
+    "login-form",
+    "user-info",
+    "main-content",
+    "master-id",
+    "master-imei",
+    "secret-key",
     "dashboard-action-bar",
     "devices-list",
     "task-child-id",
@@ -91,6 +97,9 @@ function loadWebControl(initialStorage: StorageMap = {}) {
   };
 
   const callableFactory = jest.fn((name: string) => {
+    if (name === "generateCustomToken") {
+      return jest.fn(() => Promise.resolve({ data: { customToken: "tok-login" } }));
+    }
     if (name === "setDeviceLocked") {
       return jest.fn(() => Promise.resolve({ data: { success: true } }));
     }
@@ -105,6 +114,13 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     }
     return jest.fn(() => Promise.resolve({ data: {} }));
   });
+
+  const authMock = {
+    onAuthStateChanged: jest.fn(),
+    signInWithCustomToken: jest.fn(() => Promise.resolve()),
+    signOut: jest.fn(() => Promise.resolve()),
+    currentUser: { uid: "m1" },
+  };
 
   const firebaseMock: any = {
     initializeApp: jest.fn(() => ({})),
@@ -122,12 +138,7 @@ function loadWebControl(initialStorage: StorageMap = {}) {
       })),
     })),
     functions: jest.fn(() => ({ httpsCallable: callableFactory })),
-    auth: jest.fn(() => ({
-      onAuthStateChanged: jest.fn(),
-      signInWithCustomToken: jest.fn(() => Promise.resolve()),
-      signOut: jest.fn(() => Promise.resolve()),
-      currentUser: { uid: "m1" },
-    })),
+    auth: jest.fn(() => authMock),
   };
   firebaseMock.firestore.collectionGroup = jest.fn(() => ({
     where: jest.fn().mockReturnThis(),
@@ -170,6 +181,9 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     "  openRulesModal,",
     "  saveRules,",
     "  createSupportTicket,",
+    "  login,",
+    "  logout,",
+    "  showMainContent,",
     "  showTaskAssignment,",
     "  showReviewTasks,",
     "  showSubscription,",
@@ -328,6 +342,61 @@ describe("web-control browser flows", () => {
 
     expect(elements.get("notification")?.textContent).toBe("Alles synchronisiert");
     expect(elements.get("notification")?.className).toBe("notification success");
+  });
+
+  it("logs into web-control via custom token, updates the UI and starts session monitoring", async () => {
+    const { context, elements, storage, firebaseMock } = loadWebControl();
+
+    context.setTimeout = jest.fn(() => 1);
+    context.__webControlTestExports.setDbForTesting({
+      collection: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        onSnapshot: jest.fn(() => jest.fn()),
+      })),
+    });
+    elements.get("master-imei")!.value = "master-imei-1";
+    elements.get("secret-key")!.value = "secret-key-1";
+
+    context.__webControlTestExports.login();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(firebaseMock.auth().signInWithCustomToken).toHaveBeenCalledWith("tok-login");
+    expect(elements.get("login-form")?.style?.display).toBe("none");
+    expect(elements.get("user-info")?.style?.display).toBe("flex");
+    expect(elements.get("main-content")?.style?.display).toBe("block");
+    expect(elements.get("master-id")?.textContent).toBe("m1");
+    expect(storage.get("minimaster-credentials")).toContain("m1");
+    expect(elements.get("notification")?.textContent).toContain("Login successful");
+    expect(context.document.addEventListener).toHaveBeenCalledWith("mousedown", expect.any(Function), { passive: true });
+  });
+
+  it("logs out from web-control, clears credentials and restores the login view", async () => {
+    const { context, elements, storage, firebaseMock } = loadWebControl({
+      "minimaster-credentials": JSON.stringify({ masterImei: "m1" }),
+    });
+
+    context.__webControlTestExports.setCurrentMasterImeiForTesting("m1");
+    elements.get("login-form")!.style = { display: "none" };
+    elements.get("user-info")!.style = { display: "flex" };
+    elements.get("main-content")!.style = { display: "block" };
+    elements.get("master-imei")!.value = "m1";
+    elements.get("secret-key")!.value = "secret";
+
+    context.__webControlTestExports.logout();
+    await Promise.resolve();
+
+    expect(context.__webControlTestExports.getCurrentMasterImeiForTesting()).toBe(null);
+    expect(storage.has("minimaster-credentials")).toBe(false);
+    expect(firebaseMock.auth().signOut).toHaveBeenCalled();
+    expect(elements.get("login-form")?.style?.display).toBe("flex");
+    expect(elements.get("user-info")?.style?.display).toBe("none");
+    expect(elements.get("main-content")?.style?.display).toBe("none");
+    expect(elements.get("master-imei")?.value).toBe("");
+    expect(elements.get("secret-key")?.value).toBe("");
+    expect(elements.get("notification")?.textContent).toContain("Logged out successfully");
   });
 
   it("showTaskAssignment opens the shared task modal with a device selector when multiple children exist", async () => {

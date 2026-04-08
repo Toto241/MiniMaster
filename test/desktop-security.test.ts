@@ -1,6 +1,8 @@
 /// <reference types="jest" />
 
+import * as fs from "fs";
 import { createRequire } from "module";
+import * as path from "path";
 
 const loadDesktopModule = createRequire(__filename);
 
@@ -57,5 +59,37 @@ describe("Desktop CLI security helpers", () => {
 
     expect(desktopMain.sanitizeArg("D:\\Tools\\MiniMaster")).toBe("D:\\Tools\\MiniMaster");
     expect(desktopMain.sanitizeArg("D:\\Tools\\MiniMaster;&del")).toBe("D:\\Tools\\MiniMasterdel");
+  });
+
+  it("creates the operator window with admin panel and operator preload", () => {
+    const electron = loadDesktopModule("electron") as Record<string, any>;
+    const loadFile = jest.fn();
+    const setWindowOpenHandler = jest.fn();
+    electron.BrowserWindow.mockImplementation(() => ({
+      loadFile,
+      webContents: { setWindowOpenHandler },
+    }));
+
+    const desktopMain = loadModule();
+
+    desktopMain.createOperatorWindow();
+
+    expect(electron.BrowserWindow).toHaveBeenCalledWith(expect.objectContaining({
+      title: "MiniMaster Operator Dashboard",
+      webPreferences: expect.objectContaining({
+        preload: expect.stringContaining("operator-preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+      }),
+    }));
+    expect(loadFile).toHaveBeenCalledWith(expect.stringContaining(path.join("admin-panel", "index.html")));
+    expect(setWindowOpenHandler).toHaveBeenCalled();
+  });
+
+  it("keeps the parent launcher wired to the web-control panel", () => {
+    const launcherHtml = fs.readFileSync(path.join(__dirname, "..", "desktop", "launcher.html"), "utf8");
+
+    expect(launcherHtml).toContain("../web-control/index.html");
+    expect(launcherHtml).toContain("Eltern-Panel öffnen");
   });
 });

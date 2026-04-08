@@ -161,21 +161,14 @@ MANUAL_CLASS_AUTOMATION_BACKLOG_IDS = {
     "ma-task-reject-ui",
     "ma-date-picker",
     "ma-fcm-working",
-    "ma-offline-handling",
     "ma-qr-pairing",
     "ca-tamper-detection",
     "dt-auto-update",
     "dt-window-persistence",
-    "dt-parent-panel-login",
-    "dt-admin-panel-login",
     "dt-crash-reporting",
 }
 
-MANUAL_CLASS_AUTOMATION_WAVE1_IDS = {
-    "ma-offline-handling",
-    "dt-parent-panel-login",
-    "dt-admin-panel-login",
-}
+MANUAL_CLASS_AUTOMATION_WAVE1_IDS: set[str] = set()
 
 MANUAL_CLASS_AUTOMATION_WAVE2_IDS = MANUAL_CLASS_AUTOMATION_BACKLOG_IDS - MANUAL_CLASS_AUTOMATION_WAVE1_IDS
 
@@ -1256,10 +1249,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ma-offline-handling",
                 "title": "Offline-Hinweis oder -Caching implementiert",
-                "description": "Prueft, wie die MasterApp bei fehlender Verbindung reagiert und ob Caching/Offline-Hinweise vorhanden sind.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Offline-Szenario fuehrt zu nutzbarer Rueckmeldung oder erwartbarem Cache-Verhalten.",
+                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Die MasterApp zeigt bei fehlgeschlagenem Regeln-Speichern einen sichtbaren Fehlerpfad, waehrend Backend-Offline-Resilienz fuer Regelabruf und Heartbeats separat abgesichert ist.",
+                "automationType": "automatic",
+                "source": "repo-test",
+                "suiteRef": "android-unit-master",
+                "successCriteria": "Android-Unit-Tests pruefen den sichtbaren Fehlerpfad beim Speichern von Usage-Rules; Backend-Regressionen decken getRulesForChild und recordHeartbeat fuer Offline-Resilienz ab.",
             },
             {
                 "id": "ma-qr-pairing",
@@ -1448,18 +1442,20 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "dt-parent-panel-login",
                 "title": "Parent-Panel-Login im Electron-Fenster geprüft",
-                "description": "Prueft den Parent-Panel-Login innerhalb des Electron-Fensters.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Login und Session im Parent Panel funktionieren im Desktop-Container.",
+                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Der Desktop-Launcher verweist auf das Web-Control-Panel, und dessen Login-/Session-Flow wird direkt im Browser-Harness getestet.",
+                "automationType": "automatic",
+                "source": "repo-test",
+                "suiteRef": "web-control-auth-flow",
+                "successCriteria": "Web-Control-Tests decken Custom-Token-Login, Session-Start und Logout ab; Desktop-Tests pruefen den Launcher-Einstieg ins Web-Control-Panel.",
             },
             {
                 "id": "dt-admin-panel-login",
                 "title": "Admin-Panel-Login im Electron-Fenster geprüft",
-                "description": "Prueft den Admin-Panel-Login innerhalb des Electron-Fensters.",
-                "automationType": "manual",
-                "source": "platform-readiness",
-                "successCriteria": "Login und Session im Admin Panel funktionieren im Desktop-Container.",
+                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Das Electron-Operatorfenster laedt das Admin-Panel mit Operator-Preload, und der Login-/Session-Flow wird direkt im Admin-Panel-Code getestet.",
+                "automationType": "automatic",
+                "source": "repo-test",
+                "suiteRef": "admin-panel-auth-flow",
+                "successCriteria": "Desktop-Tests pruefen das Operatorfenster fuer admin-panel/index.html; Admin-Panel-Tests decken Login, Rollenwechsel und Session-Monitoring fuer Admin-Operatoren ab.",
             },
             {
                 "id": "dt-crash-reporting",
