@@ -1806,6 +1806,26 @@ input:focus, select:focus, textarea:focus {
     grid-column: 1 / -1;
 }
 
+.qa-compatibility-box {
+    grid-column: 1 / -1;
+}
+
+.qa-compatibility-toolbar {
+    align-items: center;
+}
+
+.qa-compatibility-summary-grid {
+    margin-block-end: 4px;
+}
+
+.qa-compatibility-table {
+    min-inline-size: 780px;
+}
+
+.qa-compatibility-table td {
+    white-space: normal;
+}
+
 .qa-emulator-form-grid {
     display: grid;
     gap: 8px;
