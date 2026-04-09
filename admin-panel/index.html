@@ -1562,98 +1562,129 @@
                                             <p>Einzelger&auml;t oder Dual-Device Commissioning &uuml;ber Python.</p>
                                         </div>
                                     </div>
-                                    <div class="dsar-form" style="display: grid; gap: 8px; margin-block-start: 8px">
-                                        <label>
-                                            <span>Testtyp</span>
-                                            <select id="suite-usb-test-type">
-                                                <option value="single-master">Einzelger&auml;t: Master-App</option>
-                                                <option value="single-child">Einzelger&auml;t: Kind-App</option>
-                                                <option value="dual-device">Dual-Device Commissioning</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            <span>Master-Serial</span>
-                                            <input type="text" id="suite-usb-master-serial" placeholder="auto oder Serial (z.B. R58M12345)" value="auto" />
-                                        </label>
-                                        <label id="suite-usb-child-serial-row">
-                                            <span>Child-Serial</span>
-                                            <input type="text" id="suite-usb-child-serial" placeholder="Serial des Kind-Ger&auml;ts oder leer f&uuml;r auto" />
-                                            <small class="qa-usb-help">Im Android-Kompatibilit&auml;tsmodus darf das Feld leer bleiben; dann wird automatisch ein passender Emulator bzw. ein Auto-Ziel verwendet.</small>
-                                        </label>
-                                        <label id="suite-usb-dual-scenario-row">
-                                            <span>Dual-Device-Szenario</span>
-                                            <select id="suite-usb-dual-scenario">
-                                                <option value="">Standard-Dual-Device-Lauf</option>
-                                            </select>
-                                            <small id="suite-usb-dual-scenario-help" class="qa-usb-help">Optional: kanonisches Szenario aus dem QA-Katalog wählen, damit Laufhistorie und Fehlerbilder sauber klassifiziert werden.</small>
-                                        </label>
-                                        <label id="suite-usb-dual-profile-row">
-                                            <span>Geräteprofil</span>
-                                            <select id="suite-usb-dual-profile">
-                                                <option value="">Kein Profil erzwungen</option>
-                                            </select>
-                                        </label>
-                                        <label id="suite-usb-fault-modes-row">
-                                            <span>Fault-Modes</span>
-                                            <input type="text" id="suite-usb-fault-modes" placeholder="z. B. network-loss, child-reboot" />
-                                            <small class="qa-usb-help">Mehrere Fault-Modes komma-separiert eintragen. Es werden nur im Katalog bekannte Werte akzeptiert.</small>
-                                        </label>
-                                        <label id="suite-usb-suite-row">
-                                            <span>Suite</span>
-                                            <select id="suite-usb-suite">
-                                                <option value="commissioning" selected>Commissioning</option>
-                                                <option value="default">Alle Tests</option>
-                                            </select>
-                                        </label>
-                                        <label id="suite-usb-compatibility-preset-row">
-                                            <span>Kompatibilitäts-Preset</span>
-                                            <select id="suite-usb-compatibility-preset">
-                                                <option value="active">Alle aktiven Versionen</option>
-                                                <option value="baseline">Nur Baseline</option>
-                                                <option value="full">Nur Full-Coverage</option>
-                                                <option value="canary">Nur Canary/Preview</option>
-                                                <option value="custom">Benutzerdefiniert</option>
-                                            </select>
-                                            <small class="qa-usb-help">Steuert, welche Android-Versionen für den Batch-Lauf geprüft werden.</small>
-                                        </label>
-                                        <label id="suite-usb-android-versions-row">
-                                            <span>Android-Versionen</span>
-                                            <input type="text" id="suite-usb-android-versions" placeholder="z. B. 10, 14, 15" />
-                                            <small class="qa-usb-help">Leer lassen, um das gewählte Preset aus dem QA-Katalog zu verwenden.</small>
-                                        </label>
-                                        <div id="suite-usb-compatibility-tests-row" style="display:none">
+                                    <div class="python-automation-clarity-box qa-usb-launcher-summary-box">
+                                        <strong>Schnellstart</strong>
+                                        <div id="suite-usb-summary" class="qa-usb-summary-grid" style="margin-block-start: 10px">
+                                            <div class="info">USB-Launcher wird vorbereitet...</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="qa-usb-launcher-grid" style="margin-block-start: 12px">
+                                        <section class="qa-usb-launcher-card">
+                                            <h6>1. Laufart wählen</h6>
+                                            <div class="qa-usb-form-grid">
+                                                <label>
+                                                    <span>Testtyp</span>
+                                                    <select id="suite-usb-test-type">
+                                                        <option value="single-master">Einzelger&auml;t: Master-App</option>
+                                                        <option value="single-child">Einzelger&auml;t: Kind-App</option>
+                                                        <option value="dual-device">Dual-Device Commissioning</option>
+                                                    </select>
+                                                </label>
+                                                <label id="suite-usb-suite-row">
+                                                    <span>Suite</span>
+                                                    <select id="suite-usb-suite">
+                                                        <option value="commissioning" selected>Commissioning</option>
+                                                        <option value="default">Alle Tests</option>
+                                                    </select>
+                                                </label>
+                                            </div>
+                                            <div class="setup-actions" style="gap: 8px; flex-wrap: wrap; margin-block-start: 10px">
+                                                <label class="setup-checklist-item python-inline-check">
+                                                    <input type="checkbox" id="suite-usb-install-apk" />
+                                                    APK installieren
+                                                </label>
+                                                <label class="setup-checklist-item python-inline-check" id="suite-usb-skip-activation-row">
+                                                    <input type="checkbox" id="suite-usb-skip-activation" />
+                                                    Aktivierung &uuml;berspringen
+                                                </label>
+                                                <label class="setup-checklist-item python-inline-check" id="suite-usb-parallel-row">
+                                                    <input type="checkbox" id="suite-usb-parallel" />
+                                                    Parallel (Dual-Device)
+                                                </label>
+                                                <label class="setup-checklist-item python-inline-check" id="suite-usb-compatibility-mode-row">
+                                                    <input type="checkbox" id="suite-usb-compatibility-mode" />
+                                                    Android-Kompatibilitätsmatrix als Batch ausführen
+                                                </label>
+                                            </div>
+                                        </section>
+
+                                        <section class="qa-usb-launcher-card">
+                                            <h6>2. Ziele &amp; Szenario</h6>
+                                            <div class="qa-usb-form-grid">
+                                                <label>
+                                                    <span>Master-Serial</span>
+                                                    <input type="text" id="suite-usb-master-serial" placeholder="auto oder Serial (z.B. R58M12345)" value="auto" />
+                                                </label>
+                                                <label id="suite-usb-child-serial-row">
+                                                    <span>Child-Serial</span>
+                                                    <input type="text" id="suite-usb-child-serial" placeholder="Serial des Kind-Ger&auml;ts oder leer f&uuml;r auto" />
+                                                    <small class="qa-usb-help">Im Android-Kompatibilit&auml;tsmodus darf das Feld leer bleiben; dann wird automatisch ein passender Emulator bzw. ein Auto-Ziel verwendet.</small>
+                                                </label>
+                                                <label id="suite-usb-dual-scenario-row">
+                                                    <span>Dual-Device-Szenario</span>
+                                                    <select id="suite-usb-dual-scenario">
+                                                        <option value="">Standard-Dual-Device-Lauf</option>
+                                                    </select>
+                                                    <small id="suite-usb-dual-scenario-help" class="qa-usb-help">Optional: kanonisches Szenario aus dem QA-Katalog wählen, damit Laufhistorie und Fehlerbilder sauber klassifiziert werden.</small>
+                                                </label>
+                                                <label id="suite-usb-dual-profile-row">
+                                                    <span>Geräteprofil</span>
+                                                    <select id="suite-usb-dual-profile">
+                                                        <option value="">Kein Profil erzwungen</option>
+                                                    </select>
+                                                </label>
+                                            </div>
+                                        </section>
+                                    </div>
+
+                                    <details class="qa-collapsible-section" style="margin-block-start: 12px">
+                                        <summary>Feinsteuerung &amp; Fault-Modes</summary>
+                                        <div class="qa-usb-form-grid" style="margin-block-start: 10px">
+                                            <label id="suite-usb-fault-modes-row">
+                                                <span>Fault-Modes</span>
+                                                <input type="text" id="suite-usb-fault-modes" placeholder="z. B. network-loss, child-reboot" />
+                                                <small class="qa-usb-help">Mehrere Fault-Modes komma-separiert eintragen. Es werden nur im Katalog bekannte Werte akzeptiert.</small>
+                                            </label>
+                                        </div>
+                                    </details>
+
+                                    <details class="qa-collapsible-section" style="margin-block-start: 12px">
+                                        <summary>Android-Kompatibilitätsmatrix</summary>
+                                        <div class="qa-usb-form-grid" style="margin-block-start: 10px">
+                                            <label id="suite-usb-compatibility-preset-row">
+                                                <span>Kompatibilitäts-Preset</span>
+                                                <select id="suite-usb-compatibility-preset">
+                                                    <option value="active">Alle aktiven Versionen</option>
+                                                    <option value="baseline">Nur Baseline</option>
+                                                    <option value="full">Nur Full-Coverage</option>
+                                                    <option value="canary">Nur Canary/Preview</option>
+                                                    <option value="custom">Benutzerdefiniert</option>
+                                                </select>
+                                                <small class="qa-usb-help">Steuert, welche Android-Versionen für den Batch-Lauf geprüft werden.</small>
+                                            </label>
+                                            <label id="suite-usb-android-versions-row">
+                                                <span>Android-Versionen</span>
+                                                <input type="text" id="suite-usb-android-versions" placeholder="z. B. 10, 14, 15" />
+                                                <small class="qa-usb-help">Leer lassen, um das gewählte Preset aus dem QA-Katalog zu verwenden.</small>
+                                            </label>
+                                        </div>
+                                        <div id="suite-usb-compatibility-tests-row" style="display:none; margin-block-start: 12px">
                                             <span>Automatisierte Testklassen</span>
-                                            <div id="suite-usb-compatibility-tests" class="data-list" style="max-block-size: 220px; overflow:auto; margin-block-start: 6px">
+                                            <div id="suite-usb-compatibility-tests" class="data-list qa-usb-selection-list" style="margin-block-start: 6px">
                                                 <div class="info">Noch kein QA-Katalog geladen.</div>
                                             </div>
                                             <small class="qa-usb-help">Mehrfachauswahl. Jede ausgewählte Testklasse wird für jede gewählte Android-Version separat ausgeführt.</small>
                                         </div>
-                                        <div id="suite-usb-compatibility-scenarios-row" style="display:none">
+                                        <div id="suite-usb-compatibility-scenarios-row" style="display:none; margin-block-start: 12px">
                                             <span>Dual-Device-Szenarien für Matrixlauf</span>
-                                            <div id="suite-usb-compatibility-scenarios" class="data-list" style="max-block-size: 220px; overflow:auto; margin-block-start: 6px">
+                                            <div id="suite-usb-compatibility-scenarios" class="data-list qa-usb-selection-list" style="margin-block-start: 6px">
                                                 <div class="info">Noch kein QA-Katalog geladen.</div>
                                             </div>
                                             <small class="qa-usb-help">Mehrfachauswahl. Jedes gewählte Szenario wird für jede passende Android-Version als eigener Dual-Device-Lauf ausgeführt.</small>
                                         </div>
-                                        <div class="setup-actions" style="gap: 8px; flex-wrap: wrap">
-                                            <label class="setup-checklist-item python-inline-check">
-                                                <input type="checkbox" id="suite-usb-install-apk" />
-                                                APK installieren
-                                            </label>
-                                            <label class="setup-checklist-item python-inline-check" id="suite-usb-skip-activation-row">
-                                                <input type="checkbox" id="suite-usb-skip-activation" />
-                                                Aktivierung &uuml;berspringen
-                                            </label>
-                                            <label class="setup-checklist-item python-inline-check" id="suite-usb-parallel-row">
-                                                <input type="checkbox" id="suite-usb-parallel" />
-                                                Parallel (Dual-Device)
-                                            </label>
-                                            <label class="setup-checklist-item python-inline-check" id="suite-usb-compatibility-mode-row">
-                                                <input type="checkbox" id="suite-usb-compatibility-mode" />
-                                                Android-Kompatibilitätsmatrix als Batch ausführen
-                                            </label>
-                                        </div>
-                                    </div>
+                                    </details>
+
                                     <div class="setup-actions" style="margin-block-start: 10px">
                                         <button onclick="startUsbTestRun()" class="btn btn-primary" title="USB-Testlauf für das ausgewählte Gerät und die Suite starten">USB-Testlauf starten</button>
                                         <button onclick="startAllAutomatedUsbTests()" class="btn btn-secondary" title="Alle automatisierten Master-, Kind- und Dual-Device-Tests über alle Android-Versionen aus dem QA-Katalog starten">Alle automatisierten Tests starten</button>

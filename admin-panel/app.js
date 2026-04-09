@@ -4035,6 +4035,83 @@ function getCompatibilitySelectionVersions() {
     return getAndroidVersionsForCompatibilityPreset(presetSelect?.value || "active");
 }
 
+function getUsbLauncherSummaryModel() {
+    const testType = String(document.getElementById("suite-usb-test-type")?.value || "single-master");
+    const compatibilityMode = Boolean(document.getElementById("suite-usb-compatibility-mode")?.checked);
+    const suite = String(document.getElementById("suite-usb-suite")?.value || "commissioning");
+    const masterSerial = String(document.getElementById("suite-usb-master-serial")?.value || "auto").trim() || "auto";
+    const childSerial = String(document.getElementById("suite-usb-child-serial")?.value || "").trim();
+    const scenarioId = String(document.getElementById("suite-usb-dual-scenario")?.value || "").trim();
+    const selectedScenarioIds = getCheckedValuesFromContainer("suite-usb-compatibility-scenarios");
+    const selectedTestClasses = getCheckedValuesFromContainer("suite-usb-compatibility-tests");
+    const androidVersions = compatibilityMode ? getCompatibilitySelectionVersions() : [];
+    const options = [
+        Boolean(document.getElementById("suite-usb-install-apk")?.checked) ? "APK-Install" : "bestehende App",
+        Boolean(document.getElementById("suite-usb-skip-activation")?.checked) ? "ohne Aktivierung" : "mit Aktivierung",
+        Boolean(document.getElementById("suite-usb-parallel")?.checked) ? "parallel" : "sequenziell",
+    ];
+
+    const typeLabel = testType === "single-child"
+        ? "Kind-App"
+        : testType === "dual-device"
+            ? "Dual-Device"
+            : "Master-App";
+    const suiteLabel = suite === "default" ? "Alle Tests" : "Commissioning";
+    const targetLabel = testType === "dual-device"
+        ? `Master ${masterSerial} · Child ${childSerial || (compatibilityMode ? "auto" : "fehlt")}`
+        : masterSerial;
+    const scenarioLabel = compatibilityMode
+        ? (testType === "dual-device"
+            ? `${selectedScenarioIds.length || (scenarioId ? 1 : 0)} Szenario(s)`
+            : `${selectedTestClasses.length} Testklasse(n)`)
+        : (scenarioId || "Standardlauf");
+
+    return {
+        modeLabel: compatibilityMode ? `Matrixlauf · ${typeLabel}` : typeLabel,
+        suiteLabel,
+        targetLabel,
+        scenarioLabel,
+        androidLabel: compatibilityMode ? (androidVersions.join(", ") || "keine Version gewählt") : "nicht aktiv",
+        optionLabel: options.join(" · "),
+    };
+}
+
+function renderUsbLauncherSummary() {
+    const summaryEl = document.getElementById("suite-usb-summary");
+    if (!summaryEl) return;
+    const model = getUsbLauncherSummaryModel();
+    summaryEl.innerHTML = `
+        <article class='qa-register-item-card qa-usb-summary-card'>
+            <div class='qa-register-item-grid'>
+                <div>
+                    <span class='qa-register-item-label'>Lauf</span>
+                    <strong>${escapeHtml(model.modeLabel)}</strong>
+                </div>
+                <div>
+                    <span class='qa-register-item-label'>Suite</span>
+                    <strong>${escapeHtml(model.suiteLabel)}</strong>
+                </div>
+                <div>
+                    <span class='qa-register-item-label'>Ziel</span>
+                    <strong>${escapeHtml(model.targetLabel)}</strong>
+                </div>
+                <div>
+                    <span class='qa-register-item-label'>Szenario</span>
+                    <strong>${escapeHtml(model.scenarioLabel)}</strong>
+                </div>
+                <div>
+                    <span class='qa-register-item-label'>Android</span>
+                    <strong>${escapeHtml(model.androidLabel)}</strong>
+                </div>
+                <div>
+                    <span class='qa-register-item-label'>Optionen</span>
+                    <strong>${escapeHtml(model.optionLabel)}</strong>
+                </div>
+            </div>
+        </article>
+    `;
+}
+
 function renderCompatibilitySelectionOptions() {
     const compatibilityToggle = document.getElementById("suite-usb-compatibility-mode");
     const typeSelect = document.getElementById("suite-usb-test-type");
@@ -4047,6 +4124,7 @@ function renderCompatibilitySelectionOptions() {
     if (!compatibilityEnabled) {
         testsContainer.innerHTML = "<div class='info'>Android-Kompatibilitätsmatrix aktivieren, um Tests auszuwählen.</div>";
         scenariosContainer.innerHTML = "<div class='info'>Android-Kompatibilitätsmatrix aktivieren, um Szenarien auszuwählen.</div>";
+        renderUsbLauncherSummary();
         return;
     }
 
@@ -4115,6 +4193,7 @@ function renderCompatibilitySelectionOptions() {
         `).join("")
         : "<div class='info'>Keine kompatiblen Testklassen für die gewählten Android-Versionen gefunden.</div>";
     scenariosContainer.innerHTML = "<div class='info'>Für Einzel-App-Läufe werden Testklassen statt Dual-Device-Szenarien ausgewählt.</div>";
+    renderUsbLauncherSummary();
 }
 
 function buildUsbTestRunRequestPayload(input) {
@@ -4206,6 +4285,7 @@ function updateUsbTestTypeFormState() {
     if (suiteRow) suiteRow.style.display = visibility.showSuite ? "" : "none";
     if (skipActivationRow) skipActivationRow.style.display = visibility.showSkipActivation ? "" : "none";
     syncUsbCompatibilityControls();
+    renderUsbLauncherSummary();
 }
 
 function syncDualDeviceCatalogOptions() {
@@ -4243,6 +4323,8 @@ function syncDualDeviceCatalogOptions() {
             }
         }
 
+
+    renderUsbLauncherSummary();
         if (!scenarioSelect.__qaCatalogBound) {
             scenarioSelect.addEventListener("change", syncDualDeviceCatalogOptions);
             scenarioSelect.__qaCatalogBound = true;
@@ -5160,6 +5242,29 @@ document.addEventListener("DOMContentLoaded", () => {
     if (compatibilityVersionsInput) {
         compatibilityVersionsInput.addEventListener("input", renderCompatibilitySelectionOptions);
     }
+    [
+        "suite-usb-master-serial",
+        "suite-usb-child-serial",
+        "suite-usb-dual-scenario",
+        "suite-usb-dual-profile",
+        "suite-usb-fault-modes",
+        "suite-usb-suite",
+        "suite-usb-install-apk",
+        "suite-usb-skip-activation",
+        "suite-usb-parallel",
+    ].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener(el.tagName === "INPUT" && el.type === "checkbox" ? "change" : "input", renderUsbLauncherSummary);
+        if (el.tagName === "SELECT") {
+            el.addEventListener("change", renderUsbLauncherSummary);
+        }
+    });
+    const compatibilityTestsContainer = document.getElementById("suite-usb-compatibility-tests");
+    const compatibilityScenariosContainer = document.getElementById("suite-usb-compatibility-scenarios");
+    compatibilityTestsContainer?.addEventListener("change", renderUsbLauncherSummary);
+    compatibilityScenariosContainer?.addEventListener("change", renderUsbLauncherSummary);
+    renderUsbLauncherSummary();
     const protocolStatusEl = document.getElementById("python-automation-protocol-status");
     if (protocolStatusEl) {
         protocolStatusEl.addEventListener("change", renderPythonAutomationProtocolRequirements);
