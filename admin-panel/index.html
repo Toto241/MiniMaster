@@ -1164,7 +1164,7 @@
                                 </button>
                             </div>
                             <div class="python-automation-layout testing-register-panels" style="margin-block-start: 12px">
-                                <section class="python-automation-panel">
+                                <section class="python-automation-panel qa-panel-secondary">
                                     <div class="python-automation-panel-header">
                                         <div>
                                             <h5>Automatische Tests</h5>
@@ -1175,7 +1175,7 @@
                                         <div class="info">Noch kein Testregister geladen.</div>
                                     </div>
                                 </section>
-                                <section class="python-automation-panel">
+                                <section class="python-automation-panel qa-panel-secondary">
                                     <div class="python-automation-panel-header">
                                         <div>
                                             <h5>Manuelle Tests &amp; dokumentierte Nachweise</h5>
@@ -1194,8 +1194,7 @@
                                     <div>
                                         <h4>Python-basierte Testzentrale</h4>
                                         <p>
-                                            Hier werden alle bereits identifizierten Prüffälle an einer Stelle gesammelt.
-                                            Der Python-Operator kann sie auswerten, protokollieren und als Laufhistorie nachhalten.
+                                            Primäre Arbeitsfläche für automatische Läufe, aktuelle Ergebnisse und manuelle Nachweise.
                                         </p>
                                     </div>
                                     <div class="python-automation-legend">
@@ -1214,7 +1213,7 @@
                                 </div>
 
                                 <div class="python-automation-layout" style="margin-block-start: 14px">
-                                    <section class="python-automation-panel">
+                                    <section class="python-automation-panel qa-panel-secondary">
                                         <div class="python-automation-panel-header">
                                             <div>
                                                 <h5>1. Testfallkatalog</h5>
@@ -1223,42 +1222,44 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div class="python-automation-separation-hint">
-                                            <strong>Sortierlogik:</strong> Automatisiert = automatisch bewertet + lokale Gate-Kommandos. Manuell = manueller Nachweis + dokumentierter Testplan.
-                                        </div>
-                                        <div class="python-automation-clarity-box">
-                                            <strong>Vollständigkeit &amp; Trennung auf einen Blick:</strong>
-                                            Jede Karte zeigt klar den <em>Bewertungsmodus</em> (Automatisch, Gate-Kommando, Manueller Nachweis, Dokumentierter Testplan) und den aktuellen Status.
-                                            Offene Punkte müssen entweder im automatischen Lauf auf <strong>PASS</strong> gehen oder mit belastbarer Evidenz manuell protokolliert werden.
-                                        </div>
-                                        <div class="python-automation-toolbar">
-                                            <input
-                                                type="text"
-                                                id="python-automation-catalog-search"
-                                                placeholder="Testfälle filtern (Name, ID, Quelle)"
-                                                title="Testfallkatalog nach Name, ID oder Quelle durchsuchen"
-                                            />
-                                            <select id="python-automation-catalog-filter" title="Testfälle nach Automationsart filtern">
-                                                <option value="all">Alle Testfälle</option>
-                                                <option value="open">Nur offene Testfälle</option>
-                                                <option value="automatic">Nur automatische Prüffälle</option>
-                                                <option value="manual">Nur manuelle Nachweise</option>
-                                                <option value="documented">Nur dokumentierte Testpläne</option>
-                                                <option value="command">Nur lokale Gate-Kommandos</option>
-                                            </select>
-                                            <select id="python-automation-catalog-sort" title="Sortierung im Testkatalog wählen">
-                                                <option value="byType">Sortierung: Automatisiert vs Manuell</option>
-                                                <option value="byGroup">Sortierung: Fachgruppe</option>
-                                                <option value="byStatus">Sortierung: Status (offen zuerst)</option>
-                                            </select>
-                                            <label class="setup-checklist-item python-inline-check">
-                                                <input type="checkbox" id="python-automation-show-open-only" />
-                                                Nur offene/fehlgeschlagene Ergebnisse hervorheben
-                                            </label>
-                                        </div>
-                                        <div id="python-automation-catalog" class="data-list" style="margin-block-start: 12px">
-                                            <div class="info">Noch kein Python-Testkatalog geladen.</div>
-                                        </div>
+                                        <details class="qa-collapsible-section qa-collapsible-section-open" open>
+                                            <summary>Katalog und Filter öffnen</summary>
+                                            <div class="python-automation-separation-hint">
+                                                <strong>Sortierlogik:</strong> Automatisiert = automatisch bewertet + lokale Gate-Kommandos. Manuell = manueller Nachweis + dokumentierter Testplan.
+                                            </div>
+                                            <div class="python-automation-clarity-box">
+                                                <strong>Vollständigkeit &amp; Trennung auf einen Blick:</strong>
+                                                Jede Karte zeigt Bewertungsmodus und Status. Offene Punkte müssen automatisch auf <strong>PASS</strong> gehen oder manuell sauber belegt werden.
+                                            </div>
+                                            <div class="python-automation-toolbar">
+                                                <input
+                                                    type="text"
+                                                    id="python-automation-catalog-search"
+                                                    placeholder="Testfälle filtern (Name, ID, Quelle)"
+                                                    title="Testfallkatalog nach Name, ID oder Quelle durchsuchen"
+                                                />
+                                                <select id="python-automation-catalog-filter" title="Testfälle nach Automationsart filtern">
+                                                    <option value="all">Alle Testfälle</option>
+                                                    <option value="open">Nur offene Testfälle</option>
+                                                    <option value="automatic">Nur automatische Prüffälle</option>
+                                                    <option value="manual">Nur manuelle Nachweise</option>
+                                                    <option value="documented">Nur dokumentierte Testpläne</option>
+                                                    <option value="command">Nur lokale Gate-Kommandos</option>
+                                                </select>
+                                                <select id="python-automation-catalog-sort" title="Sortierung im Testkatalog wählen">
+                                                    <option value="byType">Sortierung: Automatisiert vs Manuell</option>
+                                                    <option value="byGroup">Sortierung: Fachgruppe</option>
+                                                    <option value="byStatus">Sortierung: Status (offen zuerst)</option>
+                                                </select>
+                                                <label class="setup-checklist-item python-inline-check">
+                                                    <input type="checkbox" id="python-automation-show-open-only" />
+                                                    Nur offene/fehlgeschlagene Ergebnisse hervorheben
+                                                </label>
+                                            </div>
+                                            <div id="python-automation-catalog" class="data-list" style="margin-block-start: 12px">
+                                                <div class="info">Noch kein Python-Testkatalog geladen.</div>
+                                            </div>
+                                        </details>
                                     </section>
 
                                     <section class="python-automation-panel">
@@ -1327,7 +1328,7 @@
                                         </div>
                                     </section>
 
-                                    <section class="python-automation-panel">
+                                    <section class="python-automation-panel qa-panel-secondary">
                                         <div class="python-automation-panel-header">
                                             <div>
                                                 <h5>4. Protokoll & Historie</h5>
@@ -1336,24 +1337,27 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
-                                            <button onclick="loadPythonAutomationHistory()" class="btn btn-secondary" title="Vergangene Testläufe laden und als Nachweis einsehen">Historie laden</button>
-                                        </div>
-                                        <div class="python-automation-toolbar">
-                                            <input
-                                                type="text"
-                                                id="python-automation-history-search"
-                                                placeholder="Historie filtern (Run-ID, Status, Zeit)"
-                                                title="Laufhistorie nach Run-ID, Status oder Zeitpunkt durchsuchen"
-                                            />
-                                            <label class="setup-checklist-item python-inline-check">
-                                                <input type="checkbox" id="python-automation-history-open-only" />
-                                                Nur Läufe mit offenen Punkten
-                                            </label>
-                                        </div>
-                                        <div id="python-automation-history" class="data-list" style="margin-block-start: 12px">
-                                            <div class="info">Noch keine Laufhistorie geladen.</div>
-                                        </div>
+                                        <details class="qa-collapsible-section">
+                                            <summary>Historie und Filter öffnen</summary>
+                                            <div class="setup-actions" style="margin-block-end: 8px">
+                                                <button onclick="loadPythonAutomationHistory()" class="btn btn-secondary" title="Vergangene Testläufe laden und als Nachweis einsehen">Historie laden</button>
+                                            </div>
+                                            <div class="python-automation-toolbar">
+                                                <input
+                                                    type="text"
+                                                    id="python-automation-history-search"
+                                                    placeholder="Historie filtern (Run-ID, Status, Zeit)"
+                                                    title="Laufhistorie nach Run-ID, Status oder Zeitpunkt durchsuchen"
+                                                />
+                                                <label class="setup-checklist-item python-inline-check">
+                                                    <input type="checkbox" id="python-automation-history-open-only" />
+                                                    Nur Läufe mit offenen Punkten
+                                                </label>
+                                            </div>
+                                            <div id="python-automation-history" class="data-list" style="margin-block-start: 12px">
+                                                <div class="info">Noch keine Laufhistorie geladen.</div>
+                                            </div>
+                                        </details>
                                     </section>
                                 </div>
 
@@ -1406,7 +1410,7 @@
                                         </div>
                                     </section>
 
-                                    <section class="python-automation-panel">
+                                    <section class="python-automation-panel qa-panel-secondary">
                                         <div class="python-automation-panel-header">
                                             <div>
                                                 <h5>6. Nachweis-Historie</h5>
@@ -1415,12 +1419,15 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
-                                            <button onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary" title="Alle gespeicherten manuellen Nachweise laden und anzeigen">Nachweise laden</button>
-                                        </div>
-                                        <div id="python-automation-protocol-history" class="data-list" style="margin-block-start: 12px">
-                                            <div class="info">Noch keine manuellen Nachweise geladen.</div>
-                                        </div>
+                                        <details class="qa-collapsible-section">
+                                            <summary>Nachweis-Historie öffnen</summary>
+                                            <div class="setup-actions" style="margin-block-end: 8px">
+                                                <button onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary" title="Alle gespeicherten manuellen Nachweise laden und anzeigen">Nachweise laden</button>
+                                            </div>
+                                            <div id="python-automation-protocol-history" class="data-list" style="margin-block-start: 12px">
+                                                <div class="info">Noch keine manuellen Nachweise geladen.</div>
+                                            </div>
+                                        </details>
                                     </section>
                                 </div>
                             </div>
@@ -1430,11 +1437,10 @@
                             <h3>Ausführung &amp; Plattform</h3>
                             <p>Tests starten, Geräte- und Emulatorstatus prüfen sowie Artefakte und Kataloge auswerten.</p>
                         </div>
-                        <div id="qa-suite-card" class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div id="qa-suite-card" class="setup-card admin-only qa-workspace-card" style="margin-block-end: 20px">
                             <h3>🔬 Test-Suiten &amp; USB-Automatisierung</h3>
                             <p>
-                                Alle Testsuiten (Backend, Android, USB-Device) aus der Python-Testzentrale.
-                                Suiten werden asynchron ausgef&uuml;hrt &ndash; Ergebnisse k&ouml;nnen per Polling abgerufen werden.
+                                Ausführung, Geräte- und Emulatorbetrieb sowie Artefakte der asynchronen Testsuiten.
                             </p>
 
                             <div class="python-automation-layout qa-platform-layout" style="margin-block-start: 14px">
@@ -1445,25 +1451,30 @@
                                             <p>Android 10 bis 16, Geräteprofile und priorisierte Dual-Device-Szenarien aus dem kanonischen QA-Katalog.</p>
                                         </div>
                                     </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadQaPlatformCatalog()" class="btn btn-secondary" title="QA-Katalog, Android-Matrix und Dual-Device-Szenarien neu laden">QA-Katalog laden</button>
-                                    </div>
-                                    <div id="qa-platform-overview" class="data-list">
-                                        <div class="info">Noch kein QA-Katalog geladen.</div>
-                                    </div>
+                                    <details class="qa-collapsible-section">
+                                        <summary>Plattformkatalog öffnen</summary>
+                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                            <button onclick="loadQaPlatformCatalog()" class="btn btn-secondary" title="QA-Katalog, Android-Matrix und Dual-Device-Szenarien neu laden">QA-Katalog laden</button>
+                                        </div>
+                                        <div id="qa-platform-overview" class="data-list">
+                                            <div class="info">Noch kein QA-Katalog geladen.</div>
+                                        </div>
+                                    </details>
                                 </section>
 
-                                <section class="python-automation-panel">
+                                <section class="python-automation-panel qa-panel-secondary">
                                     <div class="python-automation-panel-header">
                                         <div>
                                             <h5>Emulator-Labor</h5>
                                             <p>SDK-/AVD-Status, Matrixplan und aktive Reservierungen für die PC-basierte Android-Testlandschaft.</p>
                                         </div>
                                     </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadEmulatorLabOverview()" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
-                                    </div>
-                                    <div class="python-automation-group">
+                                    <details class="qa-collapsible-section">
+                                        <summary>Emulator-Labor öffnen</summary>
+                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                            <button onclick="loadEmulatorLabOverview()" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
+                                        </div>
+                                        <div class="python-automation-group">
                                         <h6>Reservierung für Testfenster</h6>
                                         <p class="python-muted-caption">Reserviert ein Android-/Profil-Kombinationsfenster für geplante QA-Läufe.</p>
                                         <div class="dsar-form qa-emulator-form-grid" style="margin-block-start: 10px">
@@ -1495,8 +1506,8 @@
                                         <div class="setup-actions" style="margin-block-start: 10px; margin-block-end: 8px">
                                             <button onclick="createEmulatorReservation()" class="btn btn-primary" title="Neue Reservierung im Emulator-Labor anlegen">Reservierung anlegen</button>
                                         </div>
-                                    </div>
-                                    <div class="python-automation-group">
+                                        </div>
+                                        <div class="python-automation-group">
                                         <h6>AVD bereitstellen</h6>
                                         <p class="python-muted-caption">Legt ein neues AVD passend zu Android-Version und Geräteprofil an.</p>
                                         <div class="dsar-form qa-emulator-form-grid" style="margin-block-start: 10px">
@@ -1520,10 +1531,11 @@
                                         <div class="setup-actions" style="margin-block-start: 10px; margin-block-end: 8px">
                                             <button onclick="createEmulatorAvd()" class="btn btn-secondary" title="Neues AVD passend zu Android-Version und Geräteprofil anlegen">AVD erstellen</button>
                                         </div>
-                                    </div>
-                                    <div id="qa-emulator-lab" class="data-list">
-                                        <div class="info">Noch kein Emulator-Labor geladen.</div>
-                                    </div>
+                                        </div>
+                                        <div id="qa-emulator-lab" class="data-list">
+                                            <div class="info">Noch kein Emulator-Labor geladen.</div>
+                                        </div>
+                                    </details>
                                 </section>
                             </div>
 
@@ -1657,27 +1669,33 @@
                                             <p>Status laufender und vergangener Suite-Ausf&uuml;hrungen.</p>
                                         </div>
                                     </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadSuiteRunHistory()" class="btn btn-secondary" title="Verlauf laufender und vergangener Suite-Ausführungen laden">Historie laden</button>
-                                    </div>
-                                    <div id="suite-active-runs" class="data-list">
-                                        <div class="info">Noch keine Testl&auml;ufe.</div>
-                                    </div>
-                                    <div id="suite-run-history" class="data-list" style="margin-block-start: 10px">
-                                        <div class="info">Noch keine Historie geladen.</div>
-                                    </div>
+                                    <details class="qa-collapsible-section">
+                                        <summary>Laufhistorie öffnen</summary>
+                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                            <button onclick="loadSuiteRunHistory()" class="btn btn-secondary" title="Verlauf laufender und vergangener Suite-Ausführungen laden">Historie laden</button>
+                                        </div>
+                                        <div id="suite-active-runs" class="data-list">
+                                            <div class="info">Noch keine Testl&auml;ufe.</div>
+                                        </div>
+                                        <div id="suite-run-history" class="data-list" style="margin-block-start: 10px">
+                                            <div class="info">Noch keine Historie geladen.</div>
+                                        </div>
+                                    </details>
                                 </section>
 
-                                <section class="python-automation-panel">
+                                <section class="python-automation-panel qa-panel-secondary">
                                     <div class="python-automation-panel-header">
                                         <div>
                                             <h5>Artefakte &amp; Laufspuren</h5>
                                             <p>Zeigt die letzte Dual-Device-Timeline sowie die jüngste manuelle Evidenzlage im QA-Betrieb.</p>
                                         </div>
                                     </div>
-                                    <div id="qa-artifact-overview" class="data-list">
-                                        <div class="info">Noch keine Artefakte geladen.</div>
-                                    </div>
+                                    <details class="qa-collapsible-section">
+                                        <summary>Artefakte und Laufspuren öffnen</summary>
+                                        <div id="qa-artifact-overview" class="data-list">
+                                            <div class="info">Noch keine Artefakte geladen.</div>
+                                        </div>
+                                    </details>
                                 </section>
 
                                 <section class="python-automation-panel qa-suite-catalog-panel">
@@ -1687,24 +1705,27 @@
                                             <p>Alle verf&uuml;gbaren Testsuiten mit Voraussetzungs-Status.</p>
                                         </div>
                                     </div>
-                                    <div class="python-automation-toolbar">
-                                        <select id="suite-group-filter">
-                                            <option value="all">Alle Gruppen</option>
-                                        </select>
-                                        <label class="setup-checklist-item python-inline-check">
-                                            <input type="checkbox" id="suite-ready-only" />
-                                            Nur lauff&auml;hige anzeigen
-                                        </label>
-                                    </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
-                                        <button onclick="loadSuiteCatalog()" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
-                                    </div>
-                                    <p class="qa-suite-catalog-hint">
-                                        Breite Katalogansicht mit klar getrennten Spalten f&uuml;r ID, Beschreibung, Voraussetzungen und Startaktion.
-                                    </p>
-                                    <div id="suite-catalog" class="data-list">
-                                        <div class="info">Noch nicht geladen.</div>
-                                    </div>
+                                    <details class="qa-collapsible-section">
+                                        <summary>Suite-Katalog öffnen</summary>
+                                        <div class="python-automation-toolbar">
+                                            <select id="suite-group-filter">
+                                                <option value="all">Alle Gruppen</option>
+                                            </select>
+                                            <label class="setup-checklist-item python-inline-check">
+                                                <input type="checkbox" id="suite-ready-only" />
+                                                Nur lauff&auml;hige anzeigen
+                                            </label>
+                                        </div>
+                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                            <button onclick="loadSuiteCatalog()" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
+                                        </div>
+                                        <p class="qa-suite-catalog-hint">
+                                            Breite Katalogansicht mit klar getrennten Spalten f&uuml;r ID, Beschreibung, Voraussetzungen und Startaktion.
+                                        </p>
+                                        <div id="suite-catalog" class="data-list">
+                                            <div class="info">Noch nicht geladen.</div>
+                                        </div>
+                                    </details>
                                 </section>
                             </div>
                         </div>

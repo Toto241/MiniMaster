@@ -1605,118 +1605,200 @@ function renderPythonAutomationResult(run) {
     const pending = Array.isArray(run.pending) ? run.pending : [];
     const evalCounts = run.evaluation?.statusCounts || {};
     const cmdCounts = run.commands?.statusCounts || {};
+    const onlyOpenChecks = shouldShowOnlyOpenAutomationChecks();
 
     renderPythonAutomationOverview(pythonCommissioningCatalog, run);
     renderPythonAutomationCatalog(pythonCommissioningCatalog, run);
 
-    const checksRows = checks.map(item => `
-        <tr>
-            <td>${escapeHtml(item.title || "-")}</td>
-            <td>${escapeHtml(formatPythonAutomationStatus(item.status))}</td>
-            <td>${escapeHtml(item.details || "-")}</td>
-        </tr>
-    `).join("");
-
-    const commandRows = commands.length > 0
-        ? commands.map(item => `
-            <tr>
-                <td>${escapeHtml(item.label || "-")}</td>
-                <td>${escapeHtml(item.command || "-")}</td>
-                <td>${escapeHtml(item.status === "pass" ? "✅ PASS" : "❌ FAIL")}</td>
-                <td>${escapeHtml(String(item.code ?? "-"))}</td>
-                <td>${escapeHtml(String(item.durationMs ?? "-"))} ms</td>
-            </tr>
-            <tr>
-                <td colspan='5'>
-                    <details>
-                        <summary>Kommandoausgabe anzeigen</summary>
-                        <pre class='code-block'>${escapeHtml(item.output || "Keine Ausgabe.")}</pre>
-                    </details>
-                </td>
-            </tr>
-        `).join("")
-        : "<tr><td colspan='5'>Keine lokalen Kommandos ausgeführt.</td></tr>";
-
-    const pendingFiltered = shouldShowOnlyOpenAutomationChecks()
+    const pendingFiltered = onlyOpenChecks
         ? pending.filter(item => item.status === "fail" || item.status === "manual_required")
         : pending;
-    const pendingHtml = pendingFiltered.length > 0
-        ? `<ul>${pendingFiltered.map(item => `<li><strong>${escapeHtml(item.title || "Offener Punkt")}</strong>: ${escapeHtml(item.details || "")}</li>`).join("")}</ul>`
-        : "<div class='success-box'>Keine offenen Punkte aus dem Python-Lauf.</div>";
 
     const evCov = run.evidenceCoverage || {};
     const evCounts = evCov.counts || {};
-    const evOverall = evCov.overall || "pass";
     const evScore = typeof evCov.coverageScore === "number" ? evCov.coverageScore : 100;
     const actionSummary = buildPythonAutomationRunActionSummary(run);
-    const evUncoveredRows = Array.isArray(evCov.uncovered) && evCov.uncovered.length > 0
-        ? evCov.uncovered.map(item => `
-            <tr>
-                <td>${escapeHtml(item.testTitle || item.testId || "-")}</td>
-                <td>${escapeHtml(item.automationType || "-")}</td>
-                <td>${escapeHtml(item.groupTitle || "-")}</td>
-                <td><button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.testId || ""))}')">Protokollieren</button></td>
-            </tr>
-        `).join("")
-        : null;
-    const evFailedRows = Array.isArray(evCov.failedEvidence) && evCov.failedEvidence.length > 0
-        ? evCov.failedEvidence.map(item => `
-            <tr>
-                <td>${escapeHtml(item.testTitle || item.testId || "-")}</td>
-                <td>${escapeHtml(item.groupTitle || "-")}</td>
-                <td>${escapeHtml(item.operator || "-")}</td>
-                <td>${escapeHtml(item.details || "-")}</td>
-                <td><button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.testId || ""))}')">Korrigieren</button></td>
-            </tr>
-        `).join("")
-        : null;
 
-    const evidenceSectionHtml = (evCounts.total > 0) ? `
-        <h5 style='margin-block-start: 16px'>Nachweis-Abdeckung (Manuell &amp; Dokumentiert)</h5>
-        <div class='python-result-summary' style='margin-block-end: 10px'>
-            <div class='python-automation-metric'>
-                <strong>${escapeHtml(String(evScore))} %</strong>
-                <span>Nachweis-Score</span>
+    const checksHtml = checks.length > 0
+        ? `
+            <div class='qa-register-card-list'>
+                ${checks.map(item => {
+                    const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
+                    return `
+                        <article class='qa-register-item-card python-result-card'>
+                            <div class='qa-register-item-header'>
+                                <div>
+                                    <h6>${escapeHtml(item.title || "-")}</h6>
+                                </div>
+                                <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(item.status))}</span>
+                            </div>
+                            <p class='qa-register-item-detail'>${escapeHtml(item.details || "Keine Zusatzdetails vorhanden.")}</p>
+                        </article>
+                    `;
+                }).join("")}
             </div>
-            <div class='python-automation-metric'>
-                <strong>${escapeHtml(String(evCounts.covered || 0))}</strong>
-                <span>Abgedeckt</span>
+        `
+        : `<div class='success-box'>${onlyOpenChecks ? "Keine offenen oder manuellen Checks im aktuellen Lauf." : "Keine Checks im aktuellen Lauf vorhanden."}</div>`;
+
+    const commandCardsHtml = commands.length > 0
+        ? `
+            <div class='qa-register-card-list'>
+                ${commands.map(item => {
+                    const passed = item.status === "pass";
+                    return `
+                        <article class='qa-register-item-card python-result-card'>
+                            <div class='qa-register-item-header'>
+                                <div>
+                                    <h6>${escapeHtml(item.label || "-")}</h6>
+                                    <div class='python-muted-caption'>${escapeHtml(item.command || "-")}</div>
+                                </div>
+                                <span class='python-status-badge ${passed ? "python-status-pass" : "python-status-fail"}'>${escapeHtml(passed ? "✅ PASS" : "❌ FAIL")}</span>
+                            </div>
+                            <div class='qa-register-item-grid'>
+                                <div>
+                                    <span class='qa-register-item-label'>Code</span>
+                                    <strong>${escapeHtml(String(item.code ?? "-"))}</strong>
+                                </div>
+                                <div>
+                                    <span class='qa-register-item-label'>Dauer</span>
+                                    <strong>${escapeHtml(String(item.durationMs ?? "-"))} ms</strong>
+                                </div>
+                            </div>
+                            <details class='python-result-detail'>
+                                <summary>Kommandoausgabe</summary>
+                                <pre class='code-block'>${escapeHtml(item.output || "Keine Ausgabe.")}</pre>
+                            </details>
+                        </article>
+                    `;
+                }).join("")}
             </div>
-            <div class='python-automation-metric'>
-                <strong>${escapeHtml(String(evCounts.uncovered || 0))}</strong>
-                <span>Ohne Nachweis</span>
+        `
+        : "<div class='info'>Keine lokalen Kommandos ausgeführt.</div>";
+
+    const pendingHtml = pendingFiltered.length > 0
+        ? `
+            <div class='qa-register-card-list'>
+                ${pendingFiltered.map(item => {
+                    const statusMeta = getPythonAutomationStatusMeta(String(item.status || "manual_required"));
+                    return `
+                        <article class='qa-register-item-card python-result-card'>
+                            <div class='qa-register-item-header'>
+                                <div>
+                                    <h6>${escapeHtml(item.title || "Offener Punkt")}</h6>
+                                </div>
+                                <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "manual_required")))}</span>
+                            </div>
+                            <p class='qa-register-item-detail'>${escapeHtml(item.details || "Weitere Informationen folgen im Protokoll.")}</p>
+                        </article>
+                    `;
+                }).join("")}
             </div>
-            <div class='python-automation-metric'>
-                <strong>${escapeHtml(String(evCounts.failed || 0))}</strong>
-                <span>Nachweis FAIL</span>
+        `
+        : "<div class='success-box'>Keine offenen Punkte aus dem Python-Lauf.</div>";
+
+    const uncoveredCardsHtml = Array.isArray(evCov.uncovered) && evCov.uncovered.length > 0
+        ? `
+            <div class='qa-register-card-list'>
+                ${evCov.uncovered.map(item => `
+                    <article class='qa-register-item-card python-result-card'>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(item.testTitle || item.testId || "-")}</h6>
+                                <div class='python-muted-caption'>${escapeHtml(item.groupTitle || "-")}</div>
+                            </div>
+                            <span class='python-status-badge python-status-manual_required'>Nachweis fehlt</span>
+                        </div>
+                        <div class='qa-register-item-grid'>
+                            <div>
+                                <span class='qa-register-item-label'>Typ</span>
+                                <strong>${escapeHtml(item.automationType || "-")}</strong>
+                            </div>
+                        </div>
+                        <div class='setup-actions'>
+                            <button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.testId || ""))}')">Protokollieren</button>
+                        </div>
+                    </article>
+                `).join("")}
             </div>
-        </div>
-        ${evUncoveredRows ? `
-            <details open>
-                <summary><strong>Fehlende Nachweise (${escapeHtml(String(evCounts.uncovered || 0))})</strong></summary>
-                <table style='margin-block-start: 6px'>
-                    <tr><th>Testfall</th><th>Typ</th><th>Gruppe</th><th>Aktion</th></tr>
-                    ${evUncoveredRows}
-                </table>
-            </details>
-        ` : `<div class='success-box' style='margin-block-end: 8px'>Alle manuellen/dokumentierten Testfälle haben Nachweise.</div>`}
-        ${evFailedRows ? `
-            <details open>
-                <summary><strong>Fehlgeschlagene Nachweise (${escapeHtml(String(evCounts.failed || 0))})</strong></summary>
-                <table style='margin-block-start: 6px'>
-                    <tr><th>Testfall</th><th>Gruppe</th><th>Operator</th><th>Details</th><th>Aktion</th></tr>
-                    ${evFailedRows}
-                </table>
-            </details>
-        ` : ""}
+        `
+        : "<div class='success-box'>Alle manuellen und dokumentierten Testfälle haben Nachweise.</div>";
+
+    const failedEvidenceCardsHtml = Array.isArray(evCov.failedEvidence) && evCov.failedEvidence.length > 0
+        ? `
+            <div class='qa-register-card-list'>
+                ${evCov.failedEvidence.map(item => `
+                    <article class='qa-register-item-card python-result-card'>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(item.testTitle || item.testId || "-")}</h6>
+                                <div class='python-muted-caption'>${escapeHtml(item.groupTitle || "-")}</div>
+                            </div>
+                            <span class='python-status-badge python-status-fail'>Nachweis FAIL</span>
+                        </div>
+                        <div class='qa-register-item-grid'>
+                            <div>
+                                <span class='qa-register-item-label'>Operator</span>
+                                <strong>${escapeHtml(item.operator || "-")}</strong>
+                            </div>
+                        </div>
+                        <p class='qa-register-item-detail'>${escapeHtml(item.details || "Keine Details vorhanden.")}</p>
+                        <div class='setup-actions'>
+                            <button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.testId || ""))}')">Korrigieren</button>
+                        </div>
+                    </article>
+                `).join("")}
+            </div>
+        `
+        : "";
+
+    const evidenceSectionHtml = evCounts.total > 0 ? `
+        <section class='python-result-section'>
+            <div class='qa-workspace-panel-header'>
+                <div>
+                    <h5>Nachweis-Abdeckung</h5>
+                    <p>Manuelle und dokumentierte Testfälle werden separat nachverfolgt.</p>
+                </div>
+                <span class='python-status-badge ${evCounts.failed > 0 ? "python-status-fail" : evCounts.uncovered > 0 ? "python-status-manual_required" : "python-status-pass"}'>${escapeHtml(String(evScore))} % Score</span>
+            </div>
+            <div class='python-result-summary'>
+                <div class='python-automation-metric'>
+                    <strong>${escapeHtml(String(evCounts.covered || 0))}</strong>
+                    <span>Abgedeckt</span>
+                </div>
+                <div class='python-automation-metric'>
+                    <strong>${escapeHtml(String(evCounts.uncovered || 0))}</strong>
+                    <span>Ohne Nachweis</span>
+                </div>
+                <div class='python-automation-metric'>
+                    <strong>${escapeHtml(String(evCounts.failed || 0))}</strong>
+                    <span>Nachweis FAIL</span>
+                </div>
+            </div>
+            <div class='python-result-grid'>
+                <div>
+                    <h6 class='python-result-subtitle'>Fehlende Nachweise</h6>
+                    ${uncoveredCardsHtml}
+                </div>
+                <div>
+                    <h6 class='python-result-subtitle'>Fehlerhafte Nachweise</h6>
+                    ${failedEvidenceCardsHtml || "<div class='success-box'>Keine fehlgeschlagenen Nachweise vorhanden.</div>"}
+                </div>
+            </div>
+        </section>
     ` : "";
 
     const actionSummaryHtml = actionSummary.length > 0
         ? `
-            <h5 style='margin-block-start: 10px'>Nächste Operator-Aktionen</h5>
-            <div class='data-list'>
+            <section class='python-result-section'>
+                <div class='qa-workspace-panel-header'>
+                    <div>
+                        <h5>Nächste Operator-Aktionen</h5>
+                        <p>Diese Schritte bringen den Lauf direkt in einen freigabefähigen Zustand.</p>
+                    </div>
+                </div>
+                <div class='data-list'>
                 ${actionSummary.map(item => `
-                    <div class='python-clarity-box' style='margin-block-end: 8px'>
+                    <div class='python-clarity-box python-result-action-card'>
                         <strong>${escapeHtml(item.title || "Aktion")}</strong><br />
                         ${escapeHtml(item.detail || "")}
                         <div class='setup-actions' style='margin-block-start: 8px'>
@@ -1724,7 +1806,8 @@ function renderPythonAutomationResult(run) {
                         </div>
                     </div>
                 `).join("")}
-            </div>
+                </div>
+            </section>
         `
         : "";
 
@@ -1756,23 +1839,40 @@ function renderPythonAutomationResult(run) {
 
         ${actionSummaryHtml}
 
-        <h5 style='margin-block-start: 10px'>Automatisierte Bewertung</h5>
-        ${shouldShowOnlyOpenAutomationChecks() ? "<p class='python-muted-caption'>Aktiver Filter: Es werden nur offene oder fehlgeschlagene Checks angezeigt.</p>" : ""}
-        <table>
-            <tr><th>Check</th><th>Status</th><th>Details</th></tr>
-            ${checksRows || "<tr><td colspan='3'>Keine Checks vorhanden.</td></tr>"}
-        </table>
+        <div class='python-result-grid'>
+            <section class='python-result-section'>
+                <div class='qa-workspace-panel-header'>
+                    <div>
+                        <h5>${onlyOpenChecks ? "Offene oder manuelle Checks" : "Automatisierte Bewertung"}</h5>
+                        <p>${onlyOpenChecks ? "Der aktive Filter blendet bereits erledigte Checks aus." : "Alle automatisch ausgewerteten Checks des letzten Laufs."}</p>
+                    </div>
+                </div>
+                ${checksHtml}
+            </section>
 
-        <h5 style='margin-block-start: 10px'>Kommandolauf</h5>
-        <table>
-            <tr><th>Schritt</th><th>Befehl</th><th>Status</th><th>Code</th><th>Dauer</th></tr>
-            ${commandRows}
-        </table>
+            <section class='python-result-section'>
+                <div class='qa-workspace-panel-header'>
+                    <div>
+                        <h5>Offene Punkte</h5>
+                        <p>Manuelle Restarbeiten und Folgeaufgaben aus dem Lauf.</p>
+                    </div>
+                </div>
+                ${pendingHtml}
+            </section>
+        </div>
 
         ${evidenceSectionHtml}
 
-        <h5 style='margin-block-start: 10px'>Offene Punkte</h5>
-        ${pendingHtml}
+        <section class='python-result-section'>
+            <div class='qa-workspace-panel-header'>
+                <div>
+                    <h5>Kommandolauf</h5>
+                    <p>Technische Laufdetails bleiben verfügbar, aber untergeordnet.</p>
+                </div>
+            </div>
+            ${commandCardsHtml}
+        </section>
+
     `;
 }
 
@@ -1939,35 +2039,43 @@ function renderPythonAutomationHistory(runs) {
         return;
     }
 
-    const rows = filteredRuns.map((item) => {
+    const cards = filteredRuns.map((item) => {
         const originalIndex = runs.indexOf(item);
         const cmdCounts = item?.commands?.statusCounts || {};
         const evalCounts = item?.evaluation?.statusCounts || {};
+        const statusMeta = getPythonAutomationStatusMeta(String(item?.overall || "not_run"));
         return `
-            <tr>
-                <td>${escapeHtml(item.runId || "-")}</td>
-                <td>${escapeHtml(item.startedAt || "-")}</td>
-                <td>${escapeHtml(formatPythonAutomationStatus(item.overall || ""))}</td>
-                <td>${escapeHtml(String(evalCounts.pass || 0))}/${escapeHtml(String(evalCounts.fail || 0))}/${escapeHtml(String(evalCounts.manual_required || 0))}</td>
-                <td>${escapeHtml(String(cmdCounts.pass || 0))}/${escapeHtml(String(cmdCounts.fail || 0))}</td>
-                <td><button class='btn btn-secondary btn-sm' onclick='showPythonAutomationHistoryRun(${originalIndex})'>Anzeigen</button></td>
-            </tr>
+            <article class='qa-register-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(item.runId || "-")}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(item.startedAt || "-")}</div>
+                    </div>
+                    <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(item.overall || ""))}</span>
+                </div>
+                <div class='qa-register-item-grid'>
+                    <div>
+                        <span class='qa-register-item-label'>Checks</span>
+                        <strong>${escapeHtml(String(evalCounts.pass || 0))}/${escapeHtml(String(evalCounts.fail || 0))}/${escapeHtml(String(evalCounts.manual_required || 0))}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Kommandos</span>
+                        <strong>${escapeHtml(String(cmdCounts.pass || 0))}/${escapeHtml(String(cmdCounts.fail || 0))}</strong>
+                    </div>
+                </div>
+                <div class='qa-register-item-footer'>
+                    <span class='python-muted-caption'>Run öffnen und Details im Ergebnisbereich prüfen</span>
+                    <button class='btn btn-secondary btn-sm' onclick='showPythonAutomationHistoryRun(${originalIndex})'>Anzeigen</button>
+                </div>
+            </article>
         `;
     }).join("");
 
     historyEl.innerHTML = `
         <div class='info' style='margin-block-end: 8px'>${escapeHtml(String(filteredRuns.length))} von ${escapeHtml(String(runs.length))} Lauf/Läufe sichtbar.</div>
-        <table>
-            <tr>
-                <th>Run-ID</th>
-                <th>Start</th>
-                <th>Status</th>
-                <th>Checks (Pass/Fail/Nachweis offen)</th>
-                <th>Kommandos (Pass/Fail)</th>
-                <th>Details</th>
-            </tr>
-            ${rows}
-        </table>
+        <div class='qa-register-card-list'>
+            ${cards}
+        </div>
     `;
 }
 
@@ -2041,17 +2149,34 @@ function renderPythonAutomationEvidenceHistory(entries) {
         return true;
     });
 
-    const rows = filtered.map(entry => {
+    const cards = filtered.map(entry => {
         const encodedTestId = encodeURIComponent(String(entry.testId || ""));
+        const statusMeta = getPythonAutomationStatusMeta(String(entry.status || "not_run"));
         return `
-            <tr>
-                <td>${escapeHtml(formatPythonAutomationTimestamp(entry.createdAt))}</td>
-                <td>${escapeHtml(entry.testTitle || entry.testId || "-")}</td>
-                <td>${escapeHtml(formatPythonAutomationStatus(entry.status || ""))}</td>
-                <td>${escapeHtml(entry.operator || "-")}</td>
-                <td>${escapeHtml(entry.evidenceRef || entry.notes || "-")}</td>
-                <td><button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTestId}')">Oeffnen</button></td>
-            </tr>
+            <article class='qa-register-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(entry.testTitle || entry.testId || "-")}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(formatPythonAutomationTimestamp(entry.createdAt))}</div>
+                    </div>
+                    <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(entry.status || ""))}</span>
+                </div>
+                <div class='qa-register-item-grid'>
+                    <div>
+                        <span class='qa-register-item-label'>Operator</span>
+                        <strong>${escapeHtml(entry.operator || "-")}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Evidenz</span>
+                        <strong>${escapeHtml(entry.evidenceRef || "-")}</strong>
+                    </div>
+                </div>
+                <p class='qa-register-item-detail'>${escapeHtml(entry.notes || "Keine zusätzliche Notiz.")}</p>
+                <div class='qa-register-item-footer'>
+                    <span class='python-muted-caption'>Nachweis in Formular übernehmen</span>
+                    <button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTestId}')">Oeffnen</button>
+                </div>
+            </article>
         `;
     }).join("");
 
@@ -2062,18 +2187,10 @@ function renderPythonAutomationEvidenceHistory(entries) {
     historyEl.innerHTML = `
         ${buildPythonEvidenceFilterToolbar(entries)}
         ${summary}
-        ${rows ? `
-            <table>
-                <tr>
-                    <th>Zeit</th>
-                    <th>Testfall</th>
-                    <th>Status</th>
-                    <th>Operator</th>
-                    <th>Evidenz / Notiz</th>
-                    <th>Aktion</th>
-                </tr>
-                ${rows}
-            </table>
+        ${cards ? `
+            <div class='qa-register-card-list'>
+                ${cards}
+            </div>
         ` : "<div class='info'>Keine Nachweise entsprechen dem aktuellen Filter.</div>"}
     `;
 }
