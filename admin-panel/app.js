@@ -2743,6 +2743,14 @@ function renderSuiteRunCards(runs, emptyLabel) {
                 const statusMeta = getSuiteRunStatusMeta(run);
                 const runId = String(run?.runId || run?.run_id || "");
                 const startedAt = run?.startedAt || run?.started_at || run?.timestamp || "";
+                const resultStatus = String(run?.result?.status || run?.result?.overall_status || run?.status || "").toLowerCase();
+                const legacyBadgeClass = resultStatus === "passed"
+                    ? "pass"
+                    : resultStatus === "skipped"
+                        ? "running"
+                        : String(run?.status || "").toLowerCase() === "running"
+                            ? "running"
+                            : "fail";
                 return `
                     <article class='qa-register-item-card suite-run-card' ${runId ? `id='suite-run-${escapeHtml(runId)}'` : ""}>
                         <div class='qa-register-item-header'>
@@ -2751,6 +2759,7 @@ function renderSuiteRunCards(runs, emptyLabel) {
                                 ${formatSuiteHistoryMeta(run) ? `<div class='python-muted-caption'>${escapeHtml(formatSuiteHistoryMeta(run))}</div>` : ""}
                             </div>
                             <span class='python-status-badge ${statusMeta.className} suite-run-badge'>${escapeHtml(statusMeta.label)}</span>
+                            <span class="badge ${legacyBadgeClass}">${escapeHtml(resultStatus || String(run?.status || ""))}</span>
                         </div>
                         <p class='qa-register-item-detail suite-run-detail'>${escapeHtml(run?.lastEvent?.message || run?.currentPhase || run?.result?.reason || run?.result?.error || run?.error || run?.result?.status || run?.status || "-")}</p>
                         <div class='qa-register-item-footer'>
@@ -2932,7 +2941,9 @@ function setTestingRegisterTypeFilter(type = "all") {
     const advancedEl = document.getElementById("testing-register-advanced-filter");
 
     if (primaryEl) {
-        primaryEl.value = primaryTestingRegisterFilterTypes.has(normalizedType) ? normalizedType : "all";
+        primaryEl.value = advancedEl
+            ? (primaryTestingRegisterFilterTypes.has(normalizedType) ? normalizedType : "all")
+            : normalizedType;
     }
     if (advancedEl) {
         advancedEl.value = primaryTestingRegisterFilterTypes.has(normalizedType) ? "all" : normalizedType;
