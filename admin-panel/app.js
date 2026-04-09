@@ -2667,6 +2667,43 @@ function isPlayStoreTestingRegisterItem(item) {
     return ["playstore", "play-store", "reviewer", "data safety", "privacy policy", "iarc", "store listing", "app access"].some(token => tokens.includes(token));
 }
 
+const primaryTestingRegisterFilterTypes = new Set([
+    "all",
+    "open",
+    "evidenceOpen",
+    "blocking",
+    "automatic",
+    "manual",
+    "playStoreBlocking",
+    "commissioning",
+    "approvals",
+]);
+
+function getTestingRegisterSelectedType() {
+    const advancedFilter = document.getElementById("testing-register-advanced-filter")?.value || "all";
+    if (advancedFilter !== "all") return advancedFilter;
+    return document.getElementById("testing-register-type-filter")?.value || "all";
+}
+
+function setTestingRegisterTypeFilter(type = "all") {
+    const normalizedType = String(type || "all");
+    const primaryEl = document.getElementById("testing-register-type-filter");
+    const advancedEl = document.getElementById("testing-register-advanced-filter");
+
+    if (primaryEl) {
+        primaryEl.value = primaryTestingRegisterFilterTypes.has(normalizedType) ? normalizedType : "all";
+    }
+    if (advancedEl) {
+        advancedEl.value = primaryTestingRegisterFilterTypes.has(normalizedType) ? "all" : normalizedType;
+    }
+}
+
+function resetTestingRegisterAdvancedFilter() {
+    const advancedEl = document.getElementById("testing-register-advanced-filter");
+    if (advancedEl) advancedEl.value = "all";
+    rerenderTestingRegisterFromCache();
+}
+
 function getDashboardTabButton(labelFragment) {
     return Array.from(document.querySelectorAll(".nav-tab")).find(button => String(button.textContent || "").includes(labelFragment));
 }
@@ -2694,8 +2731,7 @@ function openRuntimeSetupView() {
 
 function openQaEvidenceBacklogView() {
     openDashboardTab("qa", "Qualitätssicherung");
-    const typeEl = document.getElementById("testing-register-type-filter");
-    if (typeEl) typeEl.value = "evidenceOpen";
+    setTestingRegisterTypeFilter("evidenceOpen");
     const sortEl = document.getElementById("testing-register-sort");
     if (sortEl) sortEl.value = "severity";
     const searchEl = document.getElementById("testing-register-search");
@@ -2709,8 +2745,7 @@ function openQaEvidenceBacklogView() {
 
 function openQaPlayStoreBlockersView() {
     openDashboardTab("qa", "Qualitätssicherung");
-    const typeEl = document.getElementById("testing-register-type-filter");
-    if (typeEl) typeEl.value = "playStoreBlocking";
+    setTestingRegisterTypeFilter("playStoreBlocking");
     const sortEl = document.getElementById("testing-register-sort");
     if (sortEl) sortEl.value = "severity";
     const searchEl = document.getElementById("testing-register-search");
@@ -2777,7 +2812,7 @@ function buildPythonAutomationRunActionSummary(run = pythonCommissioningLastRun,
 function getTestingRegisterFilters() {
     return {
         search: (document.getElementById("testing-register-search")?.value || "").trim().toLowerCase(),
-        type: document.getElementById("testing-register-type-filter")?.value || "all",
+        type: getTestingRegisterSelectedType(),
         sort: document.getElementById("testing-register-sort")?.value || "status",
     };
 }
@@ -3006,12 +3041,11 @@ function buildTestingRegisterManualInsights(payload) {
 }
 
 function applyTestingRegisterQuickFilter(type, options = {}) {
-    const typeEl = document.getElementById("testing-register-type-filter");
     const sortEl = document.getElementById("testing-register-sort");
     const searchEl = document.getElementById("testing-register-search");
 
-    if (typeEl && type) {
-        typeEl.value = type;
+    if (type) {
+        setTestingRegisterTypeFilter(type);
     }
     if (sortEl && options.sort) {
         sortEl.value = options.sort;
@@ -3509,14 +3543,25 @@ function renderTestingRegisterStorage(storage) {
         return;
     }
 
+    const entries = [
+        { label: "Automatische Commissioning-Läufe", path: storage.commissioningRuns || "-" },
+        { label: "Manuelle Nachweise", path: storage.commissioningEvidence || "-" },
+        { label: "Testsuiten / USB-Läufe", path: storage.suiteRuns || "-" },
+        { label: "Letzte Runner-Zusammenfassung", path: storage.latestSummary || "-" },
+    ];
+
     storageEl.innerHTML = `
-        <div class='python-clarity-box'>
-            <strong>Protokollspeicher:</strong><br />
-            Automatische Commissioning-Läufe: ${escapeHtml(storage.commissioningRuns || "-")}<br />
-            Manuelle Nachweise: ${escapeHtml(storage.commissioningEvidence || "-")}<br />
-            Testsuiten / USB-Läufe: ${escapeHtml(storage.suiteRuns || "-")}<br />
-            Letzte Runner-Zusammenfassung: ${escapeHtml(storage.latestSummary || "-")}
-        </div>
+        <details class='qa-register-storage-details'>
+            <summary>Speicherorte und Artefakte anzeigen</summary>
+            <div class='qa-register-storage-grid'>
+                ${entries.map(entry => `
+                    <div class='qa-register-storage-item'>
+                        <strong>${escapeHtml(entry.label)}</strong>
+                        <span>${escapeHtml(entry.path)}</span>
+                    </div>
+                `).join("")}
+            </div>
+        </details>
     `;
 }
 
@@ -3533,25 +3578,41 @@ function buildTestingRegisterAction(item) {
     return `<button class='btn btn-secondary btn-sm' onclick="runPythonAutomationSuite()" ${tooltip}>Commissioning-Lauf starten</button>`;
 }
 
-function renderTestingRegisterPanelRows(items) {
+function renderTestingRegisterCards(items) {
     return items.map(item => {
         const statusMeta = getPythonAutomationStatusMeta(String(item.status || "not_run"));
         const updatedAt = item.updatedAt ? formatPythonAutomationTimestamp(item.updatedAt) : "noch nicht protokolliert";
         const typeLabel = formatPythonAutomationType(String(item.automationType || "automatic"), String(item.source || ""));
         const detailText = buildTestingRegisterDetailText(item);
         return `
-            <tr>
-                <td><strong>${escapeHtml(item.title || item.id || "-")}</strong><div class='python-muted-caption'>${escapeHtml(item.id || "-")}</div></td>
-                <td>${escapeHtml(formatTestingRegisterGroupTitle(item))}</td>
-            <td><span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"), String(item.source || ""))}'>${escapeHtml(typeLabel)}</span></td>
-                <td>${buildTestingRegisterMetaBadges(item) || "-"}</td>
-                <td><span class='${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span></td>
-                <td>${escapeHtml(buildTestingRegisterExecutionPath(item))}</td>
-                <td>${escapeHtml(String(detailText || "-")).slice(0, 260)}</td>
-                <td>${escapeHtml(updatedAt)}</td>
-                <td><div class='python-muted-caption'>${escapeHtml(item.storage || "-")}</div></td>
-                <td>${buildTestingRegisterAction(item)}</td>
-            </tr>
+            <article class='qa-register-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(item.title || item.id || "-")}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(item.id || "-")} · ${escapeHtml(formatTestingRegisterGroupTitle(item))}</div>
+                    </div>
+                    <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item.status || "not_run")))}</span>
+                </div>
+                <div class='qa-register-item-badges'>
+                    <span class='python-automation-chip ${getPythonAutomationTypeChipClass(String(item.automationType || "automatic"), String(item.source || ""))}'>${escapeHtml(typeLabel)}</span>
+                    ${buildTestingRegisterMetaBadges(item)}
+                </div>
+                <div class='qa-register-item-grid'>
+                    <div>
+                        <span class='qa-register-item-label'>Startweg</span>
+                        <strong>${escapeHtml(buildTestingRegisterExecutionPath(item))}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Letztes Update</span>
+                        <strong>${escapeHtml(updatedAt)}</strong>
+                    </div>
+                </div>
+                <p class='qa-register-item-detail'>${escapeHtml(String(detailText || "-")).slice(0, 260)}</p>
+                <div class='qa-register-item-footer'>
+                    <span class='python-muted-caption'>Ablage: ${escapeHtml(item.storage || "-")}</span>
+                    ${buildTestingRegisterAction(item)}
+                </div>
+            </article>
         `;
     }).join("");
 }
@@ -3564,22 +3625,10 @@ function renderTestingRegisterPanel(listEl, panelItems, visibleCount, totalCount
     }
 
     listEl.innerHTML = `
-        <div class='info' style='margin-block-end: 8px'>${escapeHtml(String(panelItems.length))} sichtbar (${escapeHtml(String(visibleCount))} gefiltert / ${escapeHtml(String(totalCount))} gesamt).</div>
-        <table>
-            <tr>
-                <th>Testfall</th>
-                <th>Gruppe</th>
-                <th>Typ</th>
-                <th>Priorität / Owner</th>
-                <th>Status</th>
-                <th>Startweg</th>
-                <th>Letztes Detail</th>
-                <th>Letztes Update</th>
-                <th>Ablage</th>
-                <th>Aktion</th>
-            </tr>
-            ${renderTestingRegisterPanelRows(panelItems)}
-        </table>
+        <div class='qa-register-panel-summary'>${escapeHtml(String(panelItems.length))} sichtbar (${escapeHtml(String(visibleCount))} gefiltert / ${escapeHtml(String(totalCount))} gesamt).</div>
+        <div class='qa-register-card-list'>
+            ${renderTestingRegisterCards(panelItems)}
+        </div>
     `;
 }
 
@@ -5707,8 +5756,7 @@ function openCommissioningQaView() {
     const qaButton = Array.from(document.querySelectorAll(".nav-tab")).find(button => String(button.textContent || "").includes("Qualitätssicherung"));
     switchTab("qa", qaButton ? { target: qaButton } : null);
 
-    const typeEl = document.getElementById("testing-register-type-filter");
-    if (typeEl) typeEl.value = "approvals";
+    setTestingRegisterTypeFilter("approvals");
     const sortEl = document.getElementById("testing-register-sort");
     if (sortEl) sortEl.value = "severity";
     const searchEl = document.getElementById("testing-register-search");
@@ -5775,6 +5823,7 @@ function buildPrioritizedActionTestInsights(step, payload = testingRegisterPaylo
             title: String(item.title || testId),
             groupTitle: String(item.groupTitle || item.groupId || ""),
             automationType: String(item.automationType || "automatic"),
+            source: String(item.source || ""),
             rawStatus,
             statusLabel: rawStatus === "pass" ? "OK" : "FAIL",
             details: String(item.details || ""),
@@ -5798,6 +5847,87 @@ function buildPrioritizedActionTestInsights(step, payload = testingRegisterPaylo
         summary,
         hasLinkedTests: linkedTests.length > 0,
     };
+}
+
+function openPrioritizedActionRegisterView(encodedStepId) {
+    const stepId = decodeURIComponent(String(encodedStepId || ""));
+    openDashboardTab("qa", "Qualitätssicherung");
+
+    const linkedIds = getPrioritizedActionLinkedTestIds(stepId);
+    const items = Array.isArray(testingRegisterPayload?.items) ? testingRegisterPayload.items : [];
+    const linkedItems = linkedIds.map(testId => items.find(item => String(item?.id || "") === String(testId))).filter(Boolean);
+
+    let targetType = "open";
+    if (stepId.startsWith("playstore-")) {
+        targetType = "playStoreBlocking";
+    } else if (linkedItems.length > 0) {
+        const allAutomatic = linkedItems.every(item => {
+            const type = String(item.automationType || "automatic");
+            return type === "automatic" || type === "command";
+        });
+        const allManual = linkedItems.every(item => {
+            const type = String(item.automationType || "automatic");
+            return type === "manual" || type === "documented";
+        });
+        if (allAutomatic) targetType = "automatic";
+        if (allManual) targetType = "manual";
+    } else if (stepId.startsWith("attestation-")) {
+        targetType = "approvals";
+    } else if (stepId.startsWith("backend-")) {
+        targetType = "commissioning";
+    }
+
+    setTestingRegisterTypeFilter(targetType);
+    const sortEl = document.getElementById("testing-register-sort");
+    if (sortEl) sortEl.value = "severity";
+
+    const searchEl = document.getElementById("testing-register-search");
+    if (searchEl) {
+        searchEl.value = linkedIds.length === 1 ? linkedIds[0] : "";
+    }
+
+    if (testingRegisterPayload) {
+        rerenderTestingRegisterFromCache();
+        document.getElementById("qa-register-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (isPythonOperator) {
+        loadTestingRegister();
+    }
+}
+
+function getPrioritizedActionBucket(step, insights) {
+    const linkedTests = Array.isArray(insights?.linkedTests) ? insights.linkedTests : [];
+    const automaticCount = linkedTests.filter(test => ["automatic", "command"].includes(String(test.automationType || "automatic"))).length;
+    const manualCount = linkedTests.filter(test => ["manual", "documented"].includes(String(test.automationType || "automatic"))).length;
+
+    if (automaticCount > 0 && manualCount === 0) {
+        return { label: "Automatik", className: "python-automation-chip-auto", filter: "automatic" };
+    }
+    if (manualCount > 0 && automaticCount === 0) {
+        return { label: "Manuell", className: "python-automation-chip-manual", filter: "manual" };
+    }
+    if (String(step?.id || "").startsWith("playstore-")) {
+        return { label: "Freigabe", className: "python-automation-chip-manual", filter: "playStoreBlocking" };
+    }
+    if (String(step?.id || "").startsWith("backend-")) {
+        return { label: "Setup", className: "python-automation-chip-command", filter: "commissioning" };
+    }
+    return { label: "Register", className: "python-automation-chip-neutral", filter: "open" };
+}
+
+function getPrioritizedActionPrimaryCta(step, insights) {
+    if (insights?.hasLinkedTests) {
+        return {
+            label: "Im Register öffnen",
+            action: `openPrioritizedActionRegisterView('${encodeURIComponent(String(step?.id || ""))}')`,
+        };
+    }
+    if (String(step?.id || "").startsWith("playstore-")) {
+        return { label: "Play-Store-Readiness", action: "openPlayStoreReadinessView()" };
+    }
+    if (String(step?.id || "").startsWith("backend-")) {
+        return { label: "Zum Setup", action: "openRuntimeSetupView()" };
+    }
+    return { label: "Freigaben prüfen", action: `openPrioritizedActionRegisterView('${encodeURIComponent(String(step?.id || ""))}')` };
 }
 
 function buildPrioritizedActionPlanFromData(validation, platformState, playStoreState, missingAttestations) {
@@ -6064,46 +6194,52 @@ function renderPrioritizedActionPlan() {
         return;
     }
 
-    const topSteps = steps.slice(0, 12);
+    const topSteps = steps.slice(0, 6);
     const html = topSteps.map(step => {
         const insights = buildPrioritizedActionTestInsights(step);
-        const insightsHtml = insights.hasLinkedTests
+        const bucket = getPrioritizedActionBucket(step, insights);
+        const cta = getPrioritizedActionPrimaryCta(step, insights);
+        const linkedTestsHtml = insights.hasLinkedTests
             ? `
-                <div class="priority-plan-tests">
-                    <p><strong>Erkenntnisse:</strong> ${escapeHtml(insights.summary)}</p>
-                    <div class="priority-plan-test-list">
-                        ${insights.linkedTests.map(test => `
-                            <div class="priority-plan-test-item">
-                                <strong>${escapeHtml(test.statusLabel)}</strong>
-                                <span>${escapeHtml(test.title)}</span>
-                                <span class="muted-note">${escapeHtml(formatPythonAutomationType(test.automationType, test.source))}${test.groupTitle ? ` · ${escapeHtml(test.groupTitle)}` : ""}</span>
-                                ${test.details ? `<div class="muted-note">${escapeHtml(test.details)}</div>` : ""}
-                            </div>
-                        `).join("")}
-                    </div>
+                <div class="priority-plan-linked-tests">
+                    ${insights.linkedTests.slice(0, 3).map(test => `
+                        <span class="priority-plan-linked-chip priority-plan-linked-chip-${escapeHtml(String(test.rawStatus || "not_run"))}">
+                            ${escapeHtml(test.statusLabel)} · ${escapeHtml(test.title)}
+                        </span>
+                    `).join("")}
                 </div>
             `
-            : `<div class="priority-plan-tests"><p><strong>Erkenntnisse:</strong> ${escapeHtml(insights.summary)}</p></div>`;
+            : "";
 
         return `
         <div class="priority-plan-item priority-${escapeHtml(step.severity)}">
             <div class="priority-plan-header">
                 <span class="priority-rank">#${step.order}</span>
                 <span class="priority-badge severity-${escapeHtml(step.severity)}">${escapeHtml(step.severity.toUpperCase())}</span>
+                <span class="python-automation-chip ${escapeHtml(bucket.className)}">${escapeHtml(bucket.label)}</span>
                 <strong>${escapeHtml(step.title)}</strong>
             </div>
             <div class="priority-meta">${escapeHtml(step.platform)} · ${escapeHtml(step.category)}</div>
             <p><strong>Warum jetzt:</strong> ${escapeHtml(step.why)}</p>
             <p><strong>Nächster Schritt:</strong> ${escapeHtml(step.action)}</p>
-            ${insightsHtml}
+            <p class="priority-plan-summary"><strong>Registersicht:</strong> ${escapeHtml(insights.summary)}</p>
+            ${linkedTestsHtml}
+            <div class="priority-plan-actions">
+                <button class="btn btn-secondary btn-sm" onclick="${cta.action}">${escapeHtml(cta.label)}</button>
+            </div>
         </div>
     `;
     }).join("");
 
     const hiddenCount = steps.length - topSteps.length;
-    const summary = hiddenCount > 0
-        ? `<p class="muted-note">Es werden die wichtigsten ${topSteps.length} von ${steps.length} offenen Punkten angezeigt. Nach Abarbeitung bitte Bericht aktualisieren.</p>`
-        : `<p class="muted-note">Alle ${steps.length} offenen Punkte sind in Reihenfolge dargestellt.</p>`;
+    const summary = `
+        <div class="priority-plan-overview">
+            <span class="python-automation-chip python-automation-chip-command">${escapeHtml(String(steps.filter(step => String(step.severity || "") === "critical").length))} CRITICAL</span>
+            <span class="python-automation-chip python-automation-chip-manual">${escapeHtml(String(steps.filter(step => String(step.severity || "") === "high").length))} HIGH</span>
+            <span class="python-automation-chip python-automation-chip-neutral">${escapeHtml(String(steps.length))} offen</span>
+            <span class="python-muted-caption">${hiddenCount > 0 ? `Es werden die wichtigsten ${topSteps.length} Punkte angezeigt, ${hiddenCount} weitere bleiben über Filter sichtbar.` : `Alle ${steps.length} offenen Punkte sind eingeblendet.`}</span>
+        </div>
+    `;
 
     container.innerHTML = `
         <div class="priority-plan-list">
@@ -8105,7 +8241,23 @@ document.addEventListener("DOMContentLoaded", async function() {
 
     const testingRegisterTypeEl = document.getElementById("testing-register-type-filter");
     if (testingRegisterTypeEl) {
-        testingRegisterTypeEl.addEventListener("change", rerenderTestingRegisterFromCache);
+        testingRegisterTypeEl.addEventListener("change", () => {
+            const advancedFilterEl = document.getElementById("testing-register-advanced-filter");
+            if (advancedFilterEl && testingRegisterTypeEl.value !== "all") {
+                advancedFilterEl.value = "all";
+            }
+            rerenderTestingRegisterFromCache();
+        });
+    }
+
+    const testingRegisterAdvancedFilterEl = document.getElementById("testing-register-advanced-filter");
+    if (testingRegisterAdvancedFilterEl) {
+        testingRegisterAdvancedFilterEl.addEventListener("change", () => {
+            if (testingRegisterAdvancedFilterEl.value !== "all" && testingRegisterTypeEl) {
+                testingRegisterTypeEl.value = "all";
+            }
+            rerenderTestingRegisterFromCache();
+        });
     }
 
     const testingRegisterSortEl = document.getElementById("testing-register-sort");

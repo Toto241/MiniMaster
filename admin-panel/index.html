@@ -1030,34 +1030,36 @@
                             </div>
                         </div>
 
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Voraussetzungen &amp; Freigaben jetzt in Qualitätssicherung</h3>
-                            <p>
-                                Diese Go-Live-Nachweise werden nicht mehr separat im Plattformen-Panel gepflegt.
-                                Sie sind im Panel <strong>Qualitätssicherung</strong> als QA-Register-Einträge
-                                zusammengeführt, dort nach Automatik vs. manuell sortiert und zentral protokollierbar.
-                            </p>
-                            <div id="commissioning-attestations" class="data-list"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Go-Live Ampel</h3>
-                            <p>
-                                Gesamtstatus der Produktionsbereitschaft. Die Ampel aggregiert Backend-Validierung,
-                                manuelle Freigaben und den Plattform-Reifegrad aller drei Zielplattformen.
-                            </p>
-                            <div id="golive-ampel"></div>
-                            <div id="golive-final-gate" style="margin-block-start: 12px"></div>
-                        </div>
-
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Priorisierte Nächste Schritte</h3>
-                            <p>
-                                Automatisch priorisierte Reihenfolge der noch fehlenden Funktionen und Go-Live-Punkte.
-                                Erst die CRITICAL-Themen schließen, danach HIGH und anschließend MEDIUM.
-                            </p>
-                            <div id="prioritized-action-plan" class="data-list" style="margin-block-start: 12px">
-                                <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
+                        <div id="qa-release-workspace-card" class="setup-card admin-only qa-workspace-card" style="margin-block-end: 20px">
+                            <div class="qa-workspace-header">
+                                <div>
+                                    <h3>Release-Cockpit</h3>
+                                    <p>
+                                        Dieser Bereich bündelt Go-Live-Ampel und Freigaben. Die eigentlichen offenen
+                                        Arbeitsvorräte werden direkt darunter im Testregister bearbeitet.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="qa-workspace-grid qa-workspace-grid-release" style="margin-block-start: 12px">
+                                <section class="qa-workspace-panel">
+                                    <div class="qa-workspace-panel-header">
+                                        <div>
+                                            <h4>Go-Live Ampel</h4>
+                                            <p>Aggregiert Backend-Validierung, QA-Freigaben, Plattform-Reifegrad und Play-Store-Gates.</p>
+                                        </div>
+                                    </div>
+                                    <div id="golive-ampel"></div>
+                                    <div id="golive-final-gate" style="margin-block-start: 12px"></div>
+                                </section>
+                                <section class="qa-workspace-panel">
+                                    <div class="qa-workspace-panel-header">
+                                        <div>
+                                            <h4>Freigaben &amp; Nachweise</h4>
+                                            <p>Alle Go-Live-Nachweise laufen zentral über Qualitätssicherung und das QA-Register.</p>
+                                        </div>
+                                    </div>
+                                    <div id="commissioning-attestations" class="data-list"></div>
+                                </section>
                             </div>
                         </div>
 
@@ -1066,12 +1068,12 @@
                             <p>Zentrale Sicht auf Testbestand, Nachweise, Commissioning-Läufe und manuelle Freigaben.</p>
                         </div>
 
-                        <div id="qa-register-card" class="setup-card admin-only" style="margin-block-end: 20px">
-                            <h3>Gesamt-Testregister</h3>
+                        <div id="qa-register-card" class="setup-card admin-only qa-workspace-card" style="margin-block-end: 20px">
+                            <h3>Testregister &amp; Arbeitsvorrat</h3>
                             <p>
-                                Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle: automatische Suites,
-                                lokale Gates, statische Checks, manuelle Nachweise und dokumentierte Abnahmen.
-                                Hier ist auch ersichtlich, <strong>wo</strong> Ergebnisse gespeichert werden.
+                                Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle und offenen QA-Arbeiten.
+                                Priorisierte Restarbeiten, automatische Prüfungen und manuelle Nachweise werden hier
+                                entlang des tatsächlichen Arbeitsflusses zusammengeführt.
                             </p>
                             <div class="info" style="margin-block-start: 12px">
                                 <strong>Bedienlogik:</strong><br />
@@ -1081,8 +1083,29 @@
                             <div id="testing-register-overview" class="python-automation-overview" style="margin-block-start: 12px">
                                 <div class="info">Noch kein Testregister geladen.</div>
                             </div>
-                            <div id="testing-register-storage" class="data-list" style="margin-block-start: 12px">
-                                <div class="info">Speicherorte werden nach dem Laden des Registers angezeigt.</div>
+                            <div class="qa-register-workspace" style="margin-block-start: 12px">
+                                <section class="qa-register-focus-panel">
+                                    <div class="qa-workspace-panel-header">
+                                        <div>
+                                            <h4>Priorisierte nächste Schritte</h4>
+                                            <p>Bewertbare Punkte aus dem Register, nach Schwere, Zuständigkeit und Startweg verdichtet.</p>
+                                        </div>
+                                    </div>
+                                    <div id="prioritized-action-plan" class="data-list">
+                                        <div class="info">Noch keine Priorisierung berechnet. Bericht aktualisieren oder Assistent ausführen.</div>
+                                    </div>
+                                </section>
+                                <section class="qa-register-focus-panel qa-register-focus-panel-secondary">
+                                    <div class="qa-workspace-panel-header">
+                                        <div>
+                                            <h4>Technikdetails</h4>
+                                            <p>Speicherorte und Artefakte nur bei Bedarf einblenden.</p>
+                                        </div>
+                                    </div>
+                                    <div id="testing-register-storage" class="data-list">
+                                        <div class="info">Speicherorte werden nach dem Laden des Registers angezeigt.</div>
+                                    </div>
+                                </section>
                             </div>
                             <div class="python-automation-toolbar" style="margin-block-start: 12px">
                                 <input
@@ -1091,39 +1114,47 @@
                                     placeholder="Testregister filtern (Name, ID, Gruppe, Quelle)"
                                     title="Gesamtes Testregister nach Name, ID, Gruppe oder Quelle durchsuchen"
                                 />
-                                <select id="testing-register-type-filter" title="Testregister nach Testart filtern">
+                                <select id="testing-register-type-filter" title="Hauptfilter für das Testregister">
                                     <option value="all">Alle Tests</option>
                                     <option value="open">Nur offene Punkte</option>
                                     <option value="evidenceOpen">Nur offene Nachweise</option>
-                                    <option value="playStoreBlocking">Nur Play-Store-/Reviewer-Blocker</option>
-                                    <option value="critical">Nur kritische Punkte</option>
                                     <option value="blocking">Nur offene Release-Blocker</option>
-                                    <option value="stale">Nur veraltete Nachweise</option>
-                                    <option value="withoutSuccess">Nur ohne erfolgreichen Lauf</option>
-                                    <option value="unsupported">Nur Unsupported / Not Yet Mapped</option>
                                     <option value="automatic">Nur automatische Tests</option>
-                                    <option value="deviceSuite">Nur Device-Suite-Checks</option>
-                                    <option value="staticAnalysis">Nur statische Analyse</option>
-                                    <option value="docsValidation">Nur Dokument-Checks</option>
                                     <option value="manual">Nur manuelle / dokumentierte Tests</option>
-                                    <option value="manualPhysical">Nur physisch zwingend manuelle Tests</option>
-                                    <option value="manualBacklog">Nur nächste Automatisierungswelle</option>
-                                    <option value="manualBacklogWave1">Nur Automatisierungswelle 1</option>
-                                    <option value="manualBacklogWave2">Nur Automatisierungswelle 2</option>
-                                    <option value="manualExternal">Nur externe Nachweise</option>
-                                    <option value="suite">Nur Testsuiten</option>
+                                    <option value="playStoreBlocking">Nur Play-Store-/Reviewer-Blocker</option>
                                     <option value="commissioning">Nur Commissioning-/Freigabetests</option>
                                     <option value="approvals">Nur Voraussetzungen &amp; Freigaben</option>
                                 </select>
                                 <select id="testing-register-sort" title="Sortierung im Testregister wählen">
                                     <option value="status">Sortierung: Status / offen zuerst</option>
                                     <option value="severity">Sortierung: Kritisch zuerst</option>
-                                    <option value="owner">Sortierung: Verantwortlich</option>
                                     <option value="group">Sortierung: Gruppe</option>
                                     <option value="updated">Sortierung: Letztes Update</option>
                                 </select>
                                 <button onclick="loadTestingRegister()" class="btn btn-secondary" title="Vollständiges Testregister neu laden">Testregister laden</button>
                             </div>
+                            <details class="qa-register-advanced-filters" style="margin-block-start: 10px">
+                                <summary>Erweiterte Filter</summary>
+                                <div class="python-automation-toolbar qa-register-advanced-toolbar" style="margin-block-start: 10px">
+                                    <select id="testing-register-advanced-filter" title="Spezialfilter für seltene QA-Sichten">
+                                        <option value="all">Kein Spezialfilter</option>
+                                        <option value="critical">Nur kritische Punkte</option>
+                                        <option value="stale">Nur veraltete Nachweise</option>
+                                        <option value="withoutSuccess">Nur ohne erfolgreichen Lauf</option>
+                                        <option value="unsupported">Nur Unsupported / Not Yet Mapped</option>
+                                        <option value="deviceSuite">Nur Device-Suite-Checks</option>
+                                        <option value="staticAnalysis">Nur statische Analyse</option>
+                                        <option value="docsValidation">Nur Dokument-Checks</option>
+                                        <option value="manualPhysical">Nur physisch zwingend manuelle Tests</option>
+                                        <option value="manualBacklog">Nur nächste Automatisierungswelle</option>
+                                        <option value="manualBacklogWave1">Nur Automatisierungswelle 1</option>
+                                        <option value="manualBacklogWave2">Nur Automatisierungswelle 2</option>
+                                        <option value="manualExternal">Nur externe Nachweise</option>
+                                        <option value="suite">Nur Testsuiten</option>
+                                    </select>
+                                    <button onclick="resetTestingRegisterAdvancedFilter()" class="btn btn-secondary" title="Erweiterte Filter zurücksetzen">Spezialfilter zurücksetzen</button>
+                                </div>
+                            </details>
                             <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
                                 <button onclick="runPythonAutomationSuite()" class="btn btn-primary" title="Automatische Commissioning-Pruefungen als Python-Lauf starten">
                                     Automatische Commissioning-Pruefung starten
@@ -1137,7 +1168,7 @@
                                     <div class="python-automation-panel-header">
                                         <div>
                                             <h5>Automatische Tests</h5>
-                                            <p>Python-Automation, lokale Gate-Kommandos und Suite-Checks.</p>
+                                            <p>Python-Automation, lokale Gate-Kommandos, statische Checks und Suite-Starts.</p>
                                         </div>
                                     </div>
                                     <div id="testing-register-list-automatic" class="data-list">
@@ -1148,7 +1179,7 @@
                                     <div class="python-automation-panel-header">
                                         <div>
                                             <h5>Manuelle Tests &amp; dokumentierte Nachweise</h5>
-                                            <p>Manuelle Freigaben, dokumentierte Testplaene und Evidenzprotokolle.</p>
+                                            <p>Freigaben, physische Abnahmen, externe Nachweise und Automatisierungs-Backlog.</p>
                                         </div>
                                     </div>
                                     <div id="testing-register-list-manual" class="data-list">
