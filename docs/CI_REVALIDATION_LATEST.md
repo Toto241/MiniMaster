@@ -1,21 +1,39 @@
 # CI Revalidation Report
 
-Generated: 2026-04-08 20:35:47 +02:00
+Generated: 2026-04-09 12:36:49 +02:00
 Repository: Toto241/MiniMaster
 Rerun requested for latest failures: false
 
 ## CodeQL Security Analysis
 
-- Latest run: [24151956406](https://github.com/Toto241/MiniMaster/actions/runs/24151956406)
-- Latest status: in_progress / pending
-- Head SHA: a30fd7cad0f1408488d125bf8e95b8b8aeeaf1d8
-- Updated at: 04/08/2026 18:33:29
+- Latest run: [24152965514](https://github.com/Toto241/MiniMaster/actions/runs/24152965514)
+- Latest status: completed / failure
+- Head SHA: 360848bf87d10a71b4a97f2fd6236d60d715d6b8
+- Updated at: 04/08/2026 19:05:54
 - Latest success: none in inspected history
 
-Run is not completed yet; annotations are not available.
+### Latest Failure Annotations
+- [Analyze Code (javascript)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] Please verify that the necessary features are enabled: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] Feature flags do not specify a default CLI version. Falling back to the CLI version shipped with the Action. This is 2.25.1.
+- [Analyze Code (javascript)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. As a result, it will not be opted into any experimental features. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (javascript)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] Please verify that the necessary features are enabled: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] Feature flags do not specify a default CLI version. Falling back to the CLI version shipped with the Action. This is 2.25.1.
+- [Analyze Code (java)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. As a result, it will not be opted into any experimental features. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
+- [Analyze Code (java)] This run of the CodeQL Action does not have permission to access the CodeQL Action API endpoints. This could be because the Action is running on a pull request from a fork. If not, please ensure the workflow has at least the 'security-events: read' permission. Details: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings. - https://docs.github.com/rest
 
-Billing blocker detected: pending
-Repository code scanning blocker detected: pending
+Billing blocker detected: no
+Repository code scanning blocker detected: yes
 
 ## Android CI
 
@@ -32,5 +50,5 @@ Billing blocker detected: no
 Repository code scanning blocker detected: no
 
 ## Recommendation
-- At least one tracked workflow run is still pending; wait for completion before drawing final release conclusions from this report.
-- Re-run this script after the pending workflow completes to refresh blocker classification.
+- Enable GitHub code scanning in the repository settings before treating CodeQL as a releasable gate.
+- After enabling it, rerun the workflow and regenerate this report to verify the remaining build-level issues.
