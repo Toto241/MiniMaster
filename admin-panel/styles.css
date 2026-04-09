@@ -1926,6 +1926,66 @@ input:focus, select:focus, textarea:focus {
     gap: 8px;
 }
 
+.qa-usb-launcher-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.qa-usb-launcher-card {
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff, #f8fbff);
+    padding: 14px;
+}
+
+.qa-usb-launcher-card h6 {
+    margin: 0 0 10px;
+    color: #0f172a;
+    font-size: 0.96rem;
+}
+
+.qa-usb-form-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.qa-usb-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: #334155;
+}
+
+.qa-usb-form-grid input,
+.qa-usb-form-grid select {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font: inherit;
+    background: white;
+}
+
+.qa-usb-summary-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.qa-usb-summary-card {
+    padding: 12px;
+}
+
+.qa-usb-summary-box {
+    margin-block-end: 0;
+}
+
+.qa-usb-selection-list {
+    max-block-size: 220px;
+    overflow: auto;
+}
+
 #suite-usb-compatibility-preset-row,
 #suite-usb-android-versions-row {
     display: none;
