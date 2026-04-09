@@ -2297,6 +2297,12 @@ input:focus, select:focus, textarea:focus {
     color: #0f172a;
 }
 
+.suite-catalog-group-meta {
+    margin-block-start: 4px;
+    color: #475569;
+    font-size: 0.82rem;
+}
+
 .suite-catalog-group-count {
     color: #1d4ed8;
     font-size: 0.78rem;
@@ -2307,6 +2313,14 @@ input:focus, select:focus, textarea:focus {
 
 .suite-catalog-list {
     display: grid;
+}
+
+.suite-catalog-card-list {
+    padding: 14px 16px;
+}
+
+.suite-catalog-compact-card {
+    gap: 12px;
 }
 
 .suite-catalog-item {
