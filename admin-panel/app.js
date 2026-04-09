@@ -4035,6 +4035,15 @@ function getCompatibilitySelectionVersions() {
     return getAndroidVersionsForCompatibilityPreset(presetSelect?.value || "active");
 }
 
+function syncUsbCompatibilityPresetFromVersionsInput() {
+    const versionsInput = document.getElementById("suite-usb-android-versions");
+    const presetSelect = document.getElementById("suite-usb-compatibility-preset");
+    if (!versionsInput || !presetSelect) return;
+    if (String(versionsInput.value || "").trim()) {
+        presetSelect.value = "custom";
+    }
+}
+
 function getUsbLauncherSummaryModel() {
     const testType = String(document.getElementById("suite-usb-test-type")?.value || "single-master");
     const compatibilityMode = Boolean(document.getElementById("suite-usb-compatibility-mode")?.checked);
@@ -4062,8 +4071,8 @@ function getUsbLauncherSummaryModel() {
         : masterSerial;
     const scenarioLabel = compatibilityMode
         ? (testType === "dual-device"
-            ? `${selectedScenarioIds.length || (scenarioId ? 1 : 0)} Szenario(s)`
-            : `${selectedTestClasses.length} Testklasse(n)`)
+            ? `${selectedScenarioIds.length || (scenarioId ? 1 : 0)} Szenario(s) ausgewählt`
+            : `${selectedTestClasses.length} Testklasse(n) ausgewählt`)
         : (scenarioId || "Standardlauf");
 
     return {
@@ -5240,7 +5249,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const compatibilityVersionsInput = document.getElementById("suite-usb-android-versions");
     if (compatibilityVersionsInput) {
-        compatibilityVersionsInput.addEventListener("input", renderCompatibilitySelectionOptions);
+        compatibilityVersionsInput.addEventListener("input", () => {
+            syncUsbCompatibilityPresetFromVersionsInput();
+            renderCompatibilitySelectionOptions();
+        });
     }
     [
         "suite-usb-master-serial",
