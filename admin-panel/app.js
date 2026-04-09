@@ -5018,66 +5018,82 @@ function renderSuiteCatalog(suites) {
 
     const groupLabels = { backend: "Backend", android: "Android", device: "Device/USB", ios: "iOS / extern", python: "Python", release: "Release", sonstige: "Sonstige" };
 
-    el.innerHTML = `<div class="suite-catalog-groups">${Object.entries(groupMap).map(([group, items]) => `
-        <section class="suite-catalog-group">
-            <header class="suite-catalog-group-header">
-                <h6>${escapeHtml(groupLabels[group] || group)}</h6>
-                <span class="suite-catalog-group-count">${items.length} Suite${items.length === 1 ? "" : "n"}</span>
-            </header>
-            <div class="suite-catalog-list">${items.map(s => {
-                const suiteId = getSuiteCatalogItemId(s);
-                const subtitle = s.title || "Kein Kurztitel hinterlegt";
-                const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
-                const scopeNote = String(s.scopeNote || "");
-                const isReady = getSuiteCatalogItemReady(s);
-                const isExternalEvidenceSuite = String(s.executionMode || "") === "external-evidence";
-                const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
-                const executionStatus = getSuiteCatalogExecutionStatus(s);
-                const executionField = renderTriStateStatusField(executionStatus.state, "suite-status-field", "suite-status-cell");
-                const latestRun = getLatestSuiteRunIndex().get(suiteId);
-                const latestRunMeta = latestRun
-                    ? `Run ${escapeHtml(String(latestRun.runId || latestRun.run_id || "-"))} · ${escapeHtml(String(latestRun.startedAt || latestRun.started_at || latestRun.timestamp || ""))}`
-                    : "Noch kein Lauf vorhanden";
-                const actionHtml = isExternalEvidenceSuite
-                    ? `
-                        <div class="suite-catalog-action is-external">
-                            <div>
+    el.innerHTML = `<div class="suite-catalog-groups">${Object.entries(groupMap).map(([group, items]) => {
+        const readyCount = items.filter(getSuiteCatalogItemReady).length;
+        const blockedCount = items.length - readyCount;
+        return `
+            <section class="suite-catalog-group">
+                <header class="suite-catalog-group-header">
+                    <div>
+                        <h6>${escapeHtml(groupLabels[group] || group)}</h6>
+                        <div class="suite-catalog-group-meta">${readyCount} bereit · ${blockedCount} blockiert</div>
+                    </div>
+                    <span class="suite-catalog-group-count">${items.length} Suite${items.length === 1 ? "" : "n"}</span>
+                </header>
+                <div class="qa-register-card-list suite-catalog-card-list">${items.map(s => {
+                    const suiteId = getSuiteCatalogItemId(s);
+                    const subtitle = s.title || "Kein Kurztitel hinterlegt";
+                    const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
+                    const scopeNote = String(s.scopeNote || "");
+                    const isReady = getSuiteCatalogItemReady(s);
+                    const isExternalEvidenceSuite = String(s.executionMode || "") === "external-evidence";
+                    const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
+                    const executionStatus = getSuiteCatalogExecutionStatus(s);
+                    const executionField = renderTriStateStatusField(executionStatus.state, "suite-status-field", "suite-status-cell");
+                    const latestRun = getLatestSuiteRunIndex().get(suiteId);
+                    const latestRunMeta = latestRun
+                        ? `Run ${String(latestRun.runId || latestRun.run_id || "-")} · ${String(latestRun.startedAt || latestRun.started_at || latestRun.timestamp || "")}`
+                        : "Noch kein Lauf vorhanden";
+                    const readinessBadgeClass = isReady ? "python-status-pass" : "python-status-fail";
+                    const executionBadgeClass = executionStatus.state === "ok"
+                        ? "python-status-pass"
+                        : executionStatus.state === "fail"
+                            ? "python-status-fail"
+                            : "python-status-manual_required";
+                    const actionHtml = isExternalEvidenceSuite
+                        ? `
+                            <div class="suite-catalog-action is-external">
                                 <button onclick="openPythonAutomationProtocol('${encodeURIComponent(String(s.evidenceTargetId || suiteId))}')" class="btn btn-secondary btn-sm">Extern protokollieren</button>
                                 <div class="suite-catalog-action-note">Externer macOS/Xcode-Lauf. Ergebnis anschließend als Evidenz im QA-Formular festhalten.</div>
                             </div>
-                        </div>
-                    `
-                    : `<div class="suite-catalog-cell suite-catalog-action"><button onclick="startSuiteRun('${encodeURIComponent(suiteId)}')" class="btn btn-secondary btn-sm" ${isReady ? '' : 'disabled'}>Starten</button></div>`;
+                        `
+                        : `<div class="suite-catalog-action"><button onclick="startSuiteRun('${encodeURIComponent(suiteId)}')" class="btn btn-secondary btn-sm" ${isReady ? '' : 'disabled'}>Starten</button></div>`;
 
-                return `
-                    <article class="suite-catalog-item">
-                        <div class="suite-catalog-cell suite-catalog-title">
-                            <span class="suite-catalog-label">Suite</span>
-                            <strong class="suite-catalog-id">${escapeHtml(suiteId)}</strong>
-                            <span class="suite-catalog-subtitle">${escapeHtml(subtitle)}</span>
-                        </div>
-                        <div class="suite-catalog-cell">
-                            <span class="suite-catalog-label">Beschreibung</span>
-                            <div class="suite-catalog-description">${escapeHtml(description)}</div>
+                    return `
+                        <article class="qa-register-item-card suite-catalog-compact-card">
+                            <div class="qa-register-item-header">
+                                <div>
+                                    <h6>${escapeHtml(suiteId)}</h6>
+                                    <div class="python-muted-caption">${escapeHtml(subtitle)}</div>
+                                </div>
+                                <div class="qa-register-item-badges">
+                                    <span class="python-status-badge ${readinessBadgeClass}">${isReady ? 'Bereit' : 'Blockiert'}</span>
+                                    <span class="python-status-badge ${executionBadgeClass}">${escapeHtml(executionStatus.label || 'OPEN')}</span>
+                                </div>
+                            </div>
+                            <p class="qa-register-item-detail">${escapeHtml(description)}</p>
                             ${scopeNote ? `<div class="suite-catalog-scope-note">${escapeHtml(scopeNote)}</div>` : ""}
-                        </div>
-                        <div class="suite-catalog-cell">
-                            <span class="suite-catalog-label">Voraussetzungen</span>
-                            <div class="suite-catalog-prereq">
-                                <span class="badge ${isReady ? 'pass' : 'fail'}">${isReady ? 'Bereit' : 'Blockiert'}</span>
-                                <span class="suite-catalog-prereq-text">${escapeHtml(prereqText)}</span>
+                            <div class="qa-register-item-grid">
+                                <div>
+                                    <span class="qa-register-item-label">Voraussetzungen</span>
+                                    <strong>${escapeHtml(prereqText)}</strong>
+                                </div>
+                                <div>
+                                    <span class="qa-register-item-label">Letzter Lauf</span>
+                                    <strong>${escapeHtml(latestRunMeta)}</strong>
+                                </div>
                             </div>
                             <div class="suite-catalog-status-block">
                                 <span class="suite-catalog-status-label">Teststatus</span>
                                 ${executionField}
-                                <span class="suite-catalog-status-caption">${escapeHtml(executionStatus.detail)} · ${latestRunMeta}</span>
+                                <span class="suite-catalog-status-caption">${escapeHtml(executionStatus.detail)}</span>
                             </div>
-                        </div>
-                        ${actionHtml}
-                    </article>`;
-            }).join("")}</div>
-        </section>
-    `).join("")}</div>`;
+                            ${actionHtml}
+                        </article>`;
+                }).join("")}</div>
+            </section>
+        `;
+    }).join("")}</div>`;
 }
 
 async function startSuiteRun(suiteId) {
