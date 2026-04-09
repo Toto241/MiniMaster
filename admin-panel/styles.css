@@ -1766,6 +1766,32 @@ input:focus, select:focus, textarea:focus {
     padding: 16px;
 }
 
+.qa-panel-secondary {
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    border-color: #cbd5e1;
+}
+
+.qa-collapsible-section {
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px 12px;
+}
+
+.qa-collapsible-section.qa-collapsible-section-open {
+    background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.qa-collapsible-section summary {
+    cursor: pointer;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.qa-collapsible-section[open] summary {
+    margin-block-end: 10px;
+}
+
 .qa-runtime-banner {
     border-radius: 12px;
     padding: 12px 14px;
@@ -2628,6 +2654,65 @@ input:focus, select:focus, textarea:focus {
 
 .python-result-summary .python-automation-metric {
     padding: 12px;
+}
+
+.python-result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin-block: 12px;
+}
+
+.python-result-section {
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff, #f8fbff);
+    padding: 14px;
+    display: grid;
+    gap: 12px;
+    margin-block: 12px;
+}
+
+.python-result-section .qa-workspace-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.python-result-section .qa-workspace-panel-header h5 {
+    margin: 0 0 4px;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.python-result-subtitle {
+    margin: 0 0 8px;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.python-result-card {
+    gap: 12px;
+}
+
+.python-result-card .setup-actions {
+    justify-content: flex-start;
+}
+
+.python-result-action-card {
+    margin-block-end: 8px;
+}
+
+.python-result-detail {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+}
+
+.python-result-detail summary {
+    cursor: pointer;
+    color: #1d4ed8;
+    font-weight: 600;
 }
 
 .python-muted-caption {
