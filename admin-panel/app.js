@@ -4695,6 +4695,81 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
         { title: "AVD Manager", ok: Boolean(payload.avdManagerAvailable), detail: payload.avdManagerAvailable ? "Gefunden" : "Fehlt" },
     ];
 
+    const availableAvdsHtml = availableAvds.length > 0
+        ? `<div class='qa-register-card-list'>${availableAvds.map(name => `
+            <article class='qa-register-item-card qa-emulator-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(name))}</h6>
+                    </div>
+                    <span class='python-status-badge python-status-not_run'>AVD</span>
+                </div>
+                <div class='suite-catalog-action'>
+                    <button type='button' class='btn btn-secondary btn-sm' onclick="startEmulatorAvd('${escapeHtml(String(name))}')">Starten</button>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "Keine AVDs erkannt.";
+
+    const runningEmulatorsHtml = runningEmulators.length > 0
+        ? `<div class='qa-register-card-list'>${runningEmulators.map(item => `
+            <article class='qa-register-item-card qa-emulator-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(item?.serial || "-"))}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(String(item?.model || item?.device || "Emulator"))}</div>
+                    </div>
+                    <span class='python-status-badge ${String(item?.state || '').toLowerCase() === 'device' ? 'python-status-pass' : 'python-status-manual_required'}'>${escapeHtml(String(item?.state || 'unknown'))}</span>
+                </div>
+                <div class='suite-catalog-action'>
+                    <button type='button' class='btn btn-secondary btn-sm' onclick="stopRunningEmulator('${escapeHtml(String(item?.serial || ""))}')">Stoppen</button>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "Keine laufenden Emulatoren erkannt.";
+
+    const reservationsHtml = reservations.length > 0
+        ? `<div class='qa-register-card-list'>${reservations.slice(0, 5).map(item => `
+            <article class='qa-register-item-card qa-emulator-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(item?.androidVersion || '-'))}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(String(item?.profileId || '-'))}</div>
+                    </div>
+                    <span class='python-status-badge python-status-running'>reserviert</span>
+                </div>
+                <p class='qa-register-item-detail'>${escapeHtml(String(item?.owner || '-'))} · ${escapeHtml(String(item?.purpose || '-'))}</p>
+                <div class='suite-catalog-action'>
+                    <button type='button' class='btn btn-secondary btn-sm' onclick="releaseEmulatorReservation('${escapeHtml(String(item?.reservationId || ""))}')">Freigeben</button>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "Keine aktiven Reservierungen.";
+
+    const matrixPlanHtml = matrixPlan.length > 0
+        ? `<div class='qa-register-card-list'>${matrixPlan.slice(0, 8).map(item => `
+            <article class='qa-register-item-card qa-emulator-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(item?.planId || '-'))}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(String(item?.profileDisplayName || item?.profileId || '-'))}</div>
+                    </div>
+                    <span class='python-status-badge python-status-not_run'>${escapeHtml(String(item?.deviceMode || '-'))}</span>
+                </div>
+                <div class='qa-register-item-grid'>
+                    <div>
+                        <span class='qa-register-item-label'>Android</span>
+                        <strong>${escapeHtml(String(item?.androidVersion || '-'))} / API ${escapeHtml(String(item?.apiLevel || '-'))}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Netz</span>
+                        <strong>${escapeHtml(String(item?.networkProfile || '-'))}</strong>
+                    </div>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "Noch kein Matrixplan verfügbar.";
+
     el.innerHTML = `
         <div class='qa-refresh-grid'>
             ${statusCards.map(card => `
@@ -4707,41 +4782,21 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
         <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
             <section class='python-clarity-box'>
                 <strong>Verfügbare AVDs</strong><br />
-                ${availableAvds.length > 0 ? availableAvds.map(name => `<div class='qa-platform-mini-row'><strong>AVD</strong> ${escapeHtml(String(name))}<button type='button' class='btn btn-secondary qa-mini-action-btn' onclick="startEmulatorAvd('${escapeHtml(String(name))}')">Starten</button></div>`).join("") : "Keine AVDs erkannt."}
+                ${availableAvdsHtml}
             </section>
             <section class='python-clarity-box'>
                 <strong>Laufende Emulatoren</strong><br />
-                ${runningEmulators.length > 0 ? runningEmulators.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.serial || "-"))}</strong> ${escapeHtml(String(item?.model || item?.device || "Emulator"))}<span>${escapeHtml(String(item?.state || "unknown"))}</span><button type='button' class='btn btn-secondary qa-mini-action-btn' onclick="stopRunningEmulator('${escapeHtml(String(item?.serial || ""))}')">Stoppen</button></div>`).join("") : "Keine laufenden Emulatoren erkannt."}
+                ${runningEmulatorsHtml}
             </section>
             <section class='python-clarity-box'>
                 <strong>Aktive Reservierungen</strong><br />
-                ${reservations.length > 0 ? reservations.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong> ${escapeHtml(String(item?.profileId || "-"))}<span>${escapeHtml(String(item?.owner || "-"))} · ${escapeHtml(String(item?.purpose || "-"))}</span><button type='button' class='btn btn-secondary qa-mini-action-btn' onclick="releaseEmulatorReservation('${escapeHtml(String(item?.reservationId || ""))}')">Freigeben</button></div>`).join("") : "Keine aktiven Reservierungen."}
+                ${reservationsHtml}
             </section>
         </div>
-        <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
-            <table class='qa-platform-table'>
-                <thead>
-                    <tr>
-                        <th>Plan</th>
-                        <th>Android</th>
-                        <th>Profil</th>
-                        <th>Modus</th>
-                        <th>Netz</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${matrixPlan.slice(0, 8).map(item => `
-                        <tr>
-                            <td>${escapeHtml(String(item?.planId || "-"))}</td>
-                            <td>${escapeHtml(String(item?.androidVersion || "-"))} / API ${escapeHtml(String(item?.apiLevel || "-"))}</td>
-                            <td>${escapeHtml(String(item?.profileDisplayName || item?.profileId || "-"))}</td>
-                            <td>${escapeHtml(String(item?.deviceMode || "-"))}</td>
-                            <td>${escapeHtml(String(item?.networkProfile || "-"))}</td>
-                        </tr>
-                    `).join("") || "<tr><td colspan='5'>Noch kein Matrixplan verfügbar.</td></tr>"}
-                </tbody>
-            </table>
-        </div>
+        <section class='python-clarity-box' style='margin-block-start: 12px'>
+            <strong>Matrixplan</strong><br />
+            ${matrixPlanHtml}
+        </section>
     `;
 }
 
@@ -4913,13 +4968,27 @@ async function loadSuiteDeviceStatus() {
             setQaRefreshSectionState("devices", "success", "Keine Geräte angeschlossen");
             return { ok: true, message: "Keine Geräte angeschlossen." };
         }
-        el.innerHTML = data.devices.map(d => `
-            <div class="data-row" style="display:flex;gap:12px;align-items:center">
-                <span class="badge ${d.state === 'device' ? 'pass' : 'fail'}">${escapeHtml(d.state)}</span>
-                <strong>${escapeHtml(d.serial)}</strong>
-                <span>${escapeHtml(d.model || '')} &middot; Android ${escapeHtml(d.androidVersion || '?')}</span>
+        el.innerHTML = `
+            <div class='qa-register-card-list'>
+                ${data.devices.map(d => `
+                    <article class='qa-register-item-card qa-device-status-card'>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(d.serial)}</h6>
+                                <div class='python-muted-caption'>${escapeHtml(d.model || 'Unbekanntes Gerät')}</div>
+                            </div>
+                            <span class='python-status-badge ${d.state === 'device' ? 'python-status-pass' : 'python-status-fail'}'>${escapeHtml(d.state)}</span>
+                        </div>
+                        <div class='qa-register-item-grid'>
+                            <div>
+                                <span class='qa-register-item-label'>Android</span>
+                                <strong>${escapeHtml(d.androidVersion || '?')}</strong>
+                            </div>
+                        </div>
+                    </article>
+                `).join('')}
             </div>
-        `).join("");
+        `;
         setQaRefreshSectionState("devices", "success", `${data.devices.length} Gerät(e) erkannt`);
         return { ok: true, message: `${data.devices.length} Gerät(e) erkannt.` };
     } catch (err) {
