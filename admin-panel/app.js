@@ -2546,6 +2546,57 @@ function renderQaArtifactsOverview() {
         return;
     }
 
+    const timelineHtml = timeline.length > 0
+        ? `<div class='qa-register-card-list'>${timeline.slice(0, 8).map(item => `
+            <article class='qa-register-item-card qa-artifact-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(item?.phase || "-"))}</h6>
+                    </div>
+                    <span class='python-muted-caption'>${escapeHtml(String(item?.timestamp || "-"))}</span>
+                </div>
+                <p class='qa-register-item-detail'>${escapeHtml(String(item?.message || "-") || "-")}</p>
+            </article>
+        `).join("")}</div>`
+        : "Keine Timeline für Dual-Device-Läufe verfügbar.";
+
+    const evidenceHtml = recentEvidence.length > 0
+        ? `<div class='qa-register-card-list'>${recentEvidence.map(item => {
+            const statusMeta = getPythonAutomationStatusMeta(String(item?.status || "manual_required"));
+            return `
+                <article class='qa-register-item-card qa-artifact-card'>
+                    <div class='qa-register-item-header'>
+                        <div>
+                            <h6>${escapeHtml(String(item?.testTitle || item?.testId || "-"))}</h6>
+                        </div>
+                        <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item?.status || "manual_required")))}</span>
+                    </div>
+                    <div class='qa-register-item-grid'>
+                        <div>
+                            <span class='qa-register-item-label'>Operator</span>
+                            <strong>${escapeHtml(String(item?.operator || "-"))}</strong>
+                        </div>
+                    </div>
+                    <p class='qa-register-item-detail'>${escapeHtml(String(item?.evidenceRef || item?.notes || "-") || "-")}</p>
+                </article>
+            `;
+        }).join("")}</div>`
+        : "Keine manuellen Evidenzartefakte vorhanden.";
+
+    const mappingHtml = linkedMappings.length > 0
+        ? `<div class='qa-register-card-list'>${linkedMappings.map(item => `
+            <article class='qa-register-item-card qa-artifact-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(item?.testClass || "-"))}</h6>
+                    </div>
+                    <span class='python-muted-caption'>${escapeHtml(String(item?.role || "-"))}</span>
+                </div>
+                <p class='qa-register-item-detail'>${escapeHtml(String(item?.testMethod || "-") || "-")}</p>
+            </article>
+        `).join("")}</div>`
+        : "Keine Android-Testbindungen für das gewählte Szenario vorhanden.";
+
     el.innerHTML = `
         <div class='python-automation-toolbar' style='margin-block-end: 12px'>
             <select id='qa-artifact-scenario-filter' onchange='applyQaArtifactFilters()'>
@@ -2567,24 +2618,47 @@ function renderQaArtifactsOverview() {
             <button class='btn btn-secondary btn-sm' onclick='exportSelectedQaArtifact()'>Artefakt exportieren</button>
         </div>
         <div class='qa-platform-mini-grid'>
-            <section class='python-clarity-box'>
-                <strong>Letzter Dual-Device-Lauf</strong><br />
-                ${latestDualRun ? `
-                    <div class='qa-platform-mini-row'>
-                        <strong>${escapeHtml(String(latestDualRun?.scenarioId || latestDualRun?.result?.scenarioId || "ohne Szenario"))}</strong>
-                        <span>Status: ${escapeHtml(String(latestDualRun?.status || latestDualRun?.result?.overallStatus || "-"))}</span>
-                        <span>Profil: ${escapeHtml(String(latestDualRun?.profileId || latestDualRun?.result?.profileId || "-"))}</span>
-                        <span>Fault-Modes: ${escapeHtml(faultModes.join(", ") || "keine")}</span>
+            <article class='qa-register-item-card qa-artifact-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>Letzter Dual-Device-Lauf</h6>
                     </div>
-                ` : "Noch kein Dual-Device-Lauf protokolliert."}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Manuelle Evidenzlage</strong><br />
-                <div class='qa-platform-mini-row'>
-                    <strong>${escapeHtml(String(evidenceEntries.length))} Nachweise</strong>
-                    <span>PASS ${escapeHtml(String(evidenceCounts.pass))} · FAIL ${escapeHtml(String(evidenceCounts.fail))} · Offen ${escapeHtml(String(evidenceCounts.manual_required))}</span>
                 </div>
-            </section>
+                ${latestDualRun ? `
+                    <div class='qa-register-item-grid'>
+                        <div>
+                            <span class='qa-register-item-label'>Szenario</span>
+                            <strong>${escapeHtml(String(latestDualRun?.scenarioId || latestDualRun?.result?.scenarioId || "ohne Szenario"))}</strong>
+                        </div>
+                        <div>
+                            <span class='qa-register-item-label'>Status</span>
+                            <strong>${escapeHtml(String(latestDualRun?.status || latestDualRun?.result?.overallStatus || "-"))}</strong>
+                        </div>
+                        <div>
+                            <span class='qa-register-item-label'>Profil</span>
+                            <strong>${escapeHtml(String(latestDualRun?.profileId || latestDualRun?.result?.profileId || "-"))}</strong>
+                        </div>
+                    </div>
+                    <p class='qa-register-item-detail'>Fault-Modes: ${escapeHtml(faultModes.join(", ") || "keine")}</p>
+                ` : "Noch kein Dual-Device-Lauf protokolliert."}
+            </article>
+            <article class='qa-register-item-card qa-artifact-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>Manuelle Evidenzlage</h6>
+                    </div>
+                </div>
+                <div class='qa-register-item-grid'>
+                    <div>
+                        <span class='qa-register-item-label'>Nachweise</span>
+                        <strong>${escapeHtml(String(evidenceEntries.length))}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>PASS / FAIL / Offen</span>
+                        <strong>${escapeHtml(String(evidenceCounts.pass))} / ${escapeHtml(String(evidenceCounts.fail))} / ${escapeHtml(String(evidenceCounts.manual_required))}</strong>
+                    </div>
+                </div>
+            </article>
         </div>
         <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
             <section class='python-clarity-box qa-compatibility-box'>
@@ -2626,16 +2700,66 @@ function renderQaArtifactsOverview() {
         <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
             <section class='python-clarity-box'>
                 <strong>Dual-Device-Timeline</strong><br />
-                ${timeline.length > 0 ? timeline.slice(0, 8).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.phase || "-"))}</strong><span>${escapeHtml(String(item?.message || "-"))}</span><span>${escapeHtml(String(item?.timestamp || "-"))}</span></div>`).join("") : "Keine Timeline für Dual-Device-Läufe verfügbar."}
+                ${timelineHtml}
             </section>
             <section class='python-clarity-box'>
                 <strong>Letzte Evidenzartefakte</strong><br />
-                ${recentEvidence.length > 0 ? recentEvidence.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.testTitle || item?.testId || "-"))}</strong><span>${escapeHtml(String(item?.status || "-"))} · ${escapeHtml(String(item?.operator || "-"))}</span><span>${escapeHtml(String(item?.evidenceRef || item?.notes || "-"))}</span></div>`).join("") : "Keine manuellen Evidenzartefakte vorhanden."}
+                ${evidenceHtml}
             </section>
             <section class='python-clarity-box'>
                 <strong>Verknüpfte Android-Testabdeckung</strong><br />
-                ${linkedMappings.length > 0 ? linkedMappings.map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.role || "-"))}</strong><span>${escapeHtml(String(item?.testClass || "-"))}</span><span>${escapeHtml(String(item?.testMethod || "-"))}</span></div>`).join("") : "Keine Android-Testbindungen für das gewählte Szenario vorhanden."}
+                ${mappingHtml}
             </section>
+        </div>
+    `;
+}
+
+function getSuiteRunStatusMeta(run) {
+    const lifecycle = String(run?.status || "").toLowerCase();
+    const resultStatus = String(run?.result?.status || run?.result?.overall_status || "").toLowerCase();
+    if (lifecycle === "running") {
+        return { label: "laufend", className: "python-status-running" };
+    }
+    if (lifecycle === "finished" && ["passed", "pass", "ok"].includes(resultStatus)) {
+        return { label: "fertig", className: "python-status-pass" };
+    }
+    if (lifecycle === "finished" && ["skipped", "skip"].includes(resultStatus)) {
+        return { label: "übersprungen", className: "python-status-not_run" };
+    }
+    if (lifecycle === "finished") {
+        return { label: "fehlgeschlagen", className: "python-status-fail" };
+    }
+    return { label: lifecycle || resultStatus || "offen", className: "python-status-not_run" };
+}
+
+function renderSuiteRunCards(runs, emptyLabel) {
+    if (!Array.isArray(runs) || runs.length === 0) {
+        return `<div class='info'>${escapeHtml(emptyLabel || "Keine Testläufe vorhanden.")}</div>`;
+    }
+
+    return `
+        <div class='qa-register-card-list'>
+            ${runs.map(run => {
+                const statusMeta = getSuiteRunStatusMeta(run);
+                const runId = String(run?.runId || run?.run_id || "");
+                const startedAt = run?.startedAt || run?.started_at || run?.timestamp || "";
+                return `
+                    <article class='qa-register-item-card suite-run-card' ${runId ? `id='suite-run-${escapeHtml(runId)}'` : ""}>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(formatSuiteHistoryTitle(run))}</h6>
+                                ${formatSuiteHistoryMeta(run) ? `<div class='python-muted-caption'>${escapeHtml(formatSuiteHistoryMeta(run))}</div>` : ""}
+                            </div>
+                            <span class='python-status-badge ${statusMeta.className} suite-run-badge'>${escapeHtml(statusMeta.label)}</span>
+                        </div>
+                        <p class='qa-register-item-detail suite-run-detail'>${escapeHtml(run?.lastEvent?.message || run?.currentPhase || run?.result?.reason || run?.result?.error || run?.error || run?.result?.status || run?.status || "-")}</p>
+                        <div class='qa-register-item-footer'>
+                            <span class='python-muted-caption'>${escapeHtml(startedAt || "")}</span>
+                            ${runId ? `<code class='suite-run-code'>${escapeHtml(runId)}</code>` : ""}
+                        </div>
+                    </article>
+                `;
+            }).join("")}
         </div>
     `;
 }
@@ -5115,14 +5239,21 @@ function appendSuiteActiveRun(runId, label) {
     const el = document.getElementById("suite-active-runs");
     if (!el) return;
     if (el.querySelector(".info")) el.innerHTML = "";
-    const row = document.createElement("div");
-    row.className = "data-row";
+    const row = document.createElement("article");
+    row.className = "qa-register-item-card suite-run-card";
     row.id = `suite-run-${runId}`;
     row.innerHTML = `
-        <span class="badge running">laufend</span>
-        <strong>${escapeHtml(label)}</strong>
-        <code style="font-size:0.8em">${escapeHtml(runId)}</code>
-        <span class="suite-run-detail">...</span>
+        <div class="qa-register-item-header">
+            <div>
+                <h6>${escapeHtml(label)}</h6>
+            </div>
+            <span class="python-status-badge python-status-running suite-run-badge">laufend</span>
+        </div>
+        <p class="qa-register-item-detail suite-run-detail">...</p>
+        <div class="qa-register-item-footer">
+            <span class="python-muted-caption"></span>
+            <code class="suite-run-code">${escapeHtml(runId)}</code>
+        </div>
     `;
     el.prepend(row);
 }
@@ -5136,8 +5267,9 @@ function pollSuiteRunStatus(runId) {
             if (!res.ok) { clearInterval(_suiteActivePollers[runId]); delete _suiteActivePollers[runId]; return; }
             const row = document.getElementById(`suite-run-${runId}`);
             if (row) {
-                const badge = row.querySelector(".badge");
+                const badge = row.querySelector(".suite-run-badge");
                 const detail = row.querySelector(".suite-run-detail");
+                const footerCaption = row.querySelector(".python-muted-caption");
                 const existingRun = suiteRunHistoryPayload.find(item => String(item?.runId || item?.run_id || "") === String(runId || ""));
                 const mergedRun = {
                     ...(existingRun || {}),
@@ -5145,10 +5277,15 @@ function pollSuiteRunStatus(runId) {
                     suiteId: data.suiteId || data.suite_id || existingRun?.suiteId || existingRun?.suite_id || "",
                 };
                 if (data.status === "running") {
-                    badge.className = "badge running";
-                    badge.textContent = "laufend";
+                    if (badge) {
+                        badge.className = "python-status-badge python-status-running suite-run-badge";
+                        badge.textContent = "laufend";
+                    }
                     if (detail) {
                         detail.textContent = data.lastEvent?.message || data.currentPhase || data.startedAt || "...";
+                    }
+                    if (footerCaption) {
+                        footerCaption.textContent = data.startedAt || existingRun?.startedAt || "";
                     }
                     suiteRunHistoryPayload = [
                         mergedRun,
@@ -5156,14 +5293,16 @@ function pollSuiteRunStatus(runId) {
                     ];
                     renderQaArtifactsOverview();
                 } else {
+                    const statusMeta = getSuiteRunStatusMeta(mergedRun);
                     const resultStatus = data.result?.status || data.result?.overall_status;
-                    const isPass = data.status === "finished" && resultStatus === "passed";
-                    const isSkipped = data.status === "finished" && resultStatus === "skipped";
-                    badge.className = `badge ${isPass ? "pass" : isSkipped ? "running" : data.status === "finished" ? "fail" : "fail"}`;
-                    badge.textContent = data.status === "finished"
-                        ? (isPass ? "fertig" : isSkipped ? "übersprungen" : "fehlgeschlagen")
-                        : data.status;
+                    if (badge) {
+                        badge.className = `python-status-badge ${statusMeta.className} suite-run-badge`;
+                        badge.textContent = statusMeta.label;
+                    }
                     if (detail) detail.textContent = data.result?.reason || data.result?.error || data.error || resultStatus || "";
+                    if (footerCaption) {
+                        footerCaption.textContent = data.startedAt || existingRun?.startedAt || "";
+                    }
                     suiteRunHistoryPayload = [
                         mergedRun,
                         ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || runId || "")),
@@ -5205,17 +5344,7 @@ async function loadSuiteRunHistory() {
             setQaRefreshSectionState("suiteHistory", "success", "Keine Testläufe vorhanden");
             return { ok: true, message: "Keine Testläufe vorhanden." };
         }
-        historyEl.innerHTML = runs.slice(0, 50).map(r => `
-            <div class="data-row" style="display:flex;gap:8px;align-items:center">
-                <span class="badge ${(r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'passed') ? 'pass' : (r.status === 'finished' && (r.result?.status || r.result?.overall_status) === 'skipped') ? 'running' : r.status === 'running' ? 'running' : 'fail'}">${escapeHtml(r.status === 'finished' ? ((r.result?.status || r.result?.overall_status) || r.status) : r.status)}</span>
-                <div style="display:grid;gap:2px;min-inline-size:0">
-                    <strong>${escapeHtml(formatSuiteHistoryTitle(r))}</strong>
-                    ${formatSuiteHistoryMeta(r) ? `<span style="font-size:0.8em;color:#475569">${escapeHtml(formatSuiteHistoryMeta(r))}</span>` : ""}
-                </div>
-                <code style="font-size:0.75em">${escapeHtml(r.runId || r.run_id || '')}</code>
-                <span style="margin-inline-start:auto;font-size:0.85em">${escapeHtml(r.startedAt || r.started_at || r.timestamp || '')}</span>
-            </div>
-        `).join("");
+        historyEl.innerHTML = renderSuiteRunCards(runs.slice(0, 50), "Keine Testläufe in der Historie.");
         loadTestingRegister();
         setQaRefreshSectionState("suiteHistory", "success", `${runs.length} Suite-Läufe geladen`);
         return { ok: true, message: `${runs.length} Suite-Läufe geladen.` };
