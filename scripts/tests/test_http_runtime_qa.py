@@ -101,6 +101,24 @@ class TestQaRuntimeHttpContracts:
         assert calls == [200]
         assert payload == {"runs": [{"runId": "run-1", "status": "finished"}], "count": 200}
 
+    def test_runtime_http_serves_self_healing_status(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
+        app = load_app_module()
+
+        cycle_calls: list[tuple[bool, int, str]] = []
+
+        def fake_cycle(*, auto_fix: bool = True, stale_after_sec: int, triggered_by: str):
+            cycle_calls.append((auto_fix, stale_after_sec, triggered_by))
+            return {"systemHealth": "OK", "detectedIssues": [], "fixesApplied": [], "pendingFixes": [], "validationResults": []}
+
+        monkeypatch.setattr(app, "run_self_healing_cycle", fake_cycle)
+
+        status, headers, payload = _read_json(f"{qa_http_server}/api/qa/self-healing/status?autoFix=true&staleAfterSec=120")
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert cycle_calls == [(False, 120, "http-get")]
+        assert payload["systemHealth"] == "OK"
+
     def test_runtime_http_rejects_invalid_dual_device_requests(self, qa_http_server: str):
         with pytest.raises(HTTPError) as exc_info:
             _read_json(
