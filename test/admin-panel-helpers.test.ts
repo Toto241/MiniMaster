@@ -148,6 +148,81 @@ describe("admin-panel helper functions", () => {
     expect(runButton.textContent).toBe("Python-Testlauf läuft…");
   });
 
+  it("renders bootstrap import preview and follow-up states via DOM nodes", () => {
+    const { exports, elements, storage } = loadAdminPanelTestExports();
+
+    const statusEl = {
+      innerHTML: "stale",
+      textContent: "stale",
+      appendChild: jest.fn(function(this: any, child: any) {
+        const next = String(child?.textContent || child?.innerHTML || "");
+        this.innerHTML += next;
+        this.textContent += next;
+        return child;
+      }),
+      replaceChildren: jest.fn(function(this: any) {
+        this.innerHTML = "";
+        this.textContent = "";
+      }),
+    };
+    elements.set("bootstrap-import-status", statusEl);
+    elements.set("notification", { textContent: "", className: "", style: { display: "none" } });
+    elements.set("command-builder-results", createDomSinkElement());
+
+    exports.showBootstrapImportPreview({
+      apiKey: "key",
+      authDomain: "demo.firebaseapp.com",
+      projectId: "demo-project",
+      storageBucket: "demo.firebasestorage.app",
+      messagingSenderId: "123456",
+      appId: "1:123456:web:abcdef",
+    }, "Datei-Import", { source: "config.json", format: "firebaseConfig" });
+
+    expect(statusEl.replaceChildren).toHaveBeenCalled();
+    expect(statusEl.appendChild).toHaveBeenCalledTimes(1);
+
+    exports.confirmBootstrapImportPreview();
+
+    expect(storage.get("operatorFirebaseConfigOverride")).toContain("demo-project");
+    expect(statusEl.textContent).toContain("Konfiguration übernommen: demo-project.");
+
+    exports.cancelBootstrapImportPreview();
+    expect(statusEl.textContent).toContain("Import-Vorschau verworfen.");
+  });
+
+  it("renders bootstrap config validation and recovery copy states without string templates", async () => {
+    const { exports, elements, context } = loadAdminPanelTestExports();
+
+    const configStatusEl = createDomSinkElement();
+    const recoveryStatusEl = createDomSinkElement();
+    elements.set("bootstrap-config-status", configStatusEl);
+    elements.set("bootstrap-recovery-status", recoveryStatusEl);
+    elements.set("bootstrap-project-id", { value: "your-project-id" });
+    elements.set("bootstrap-api-key", { value: "", addEventListener: jest.fn() });
+    elements.set("bootstrap-auth-domain", { value: "", addEventListener: jest.fn() });
+    elements.set("bootstrap-storage-bucket", { value: "", addEventListener: jest.fn() });
+    elements.set("bootstrap-messaging-sender-id", { value: "", addEventListener: jest.fn() });
+    elements.set("bootstrap-app-id", { value: "", addEventListener: jest.fn() });
+
+    await exports.copyFirebaseRecoveryScript();
+    expect(recoveryStatusEl.textContent).toContain("Bitte zuerst eine echte Firebase Project ID eintragen");
+
+    expect(() => exports.persistBootstrapFirebaseConfig()).toThrow(/Firebase-Konfiguration ungültig/);
+    expect(configStatusEl.textContent).toContain("Firebase-Konfiguration ungültig:");
+
+    exports.renderBootstrapFirebaseConfig({
+      apiKey: "key",
+      authDomain: "demo.firebaseapp.com",
+      projectId: "demo-project",
+      storageBucket: "demo.firebasestorage.app",
+      messagingSenderId: "123456",
+      appId: "1:123456:web:abcdef",
+    });
+
+    expect(configStatusEl.textContent).toContain("Aktive Firebase-Konfiguration: demo-project");
+    expect(context.document.createElement).toHaveBeenCalled();
+  });
+
   it("derives USB form visibility from test type", () => {
     const { exports } = loadAdminPanelTestExports();
 

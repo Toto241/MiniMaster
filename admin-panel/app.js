@@ -412,6 +412,80 @@ function replaceElementWithState(element, variant, message) {
     element.appendChild(createStateBox(variant, message));
 }
 
+function appendElementChildren(element, children = []) {
+    if (!element || !Array.isArray(children)) return;
+    children.filter(Boolean).forEach(child => element.appendChild(child));
+}
+
+function createCodeElement(text) {
+    const codeEl = document.createElement("code");
+    codeEl.textContent = text;
+    return codeEl;
+}
+
+function createBootstrapImportPreviewContent(normalizedConfig, sourceLabel, meta = {}) {
+    const container = document.createElement("div");
+    container.className = "info";
+
+    const title = document.createElement("strong");
+    title.textContent = "Import-Vorschau";
+    container.appendChild(title);
+
+    const list = document.createElement("ul");
+    list.style.margin = "8px 0 0 18px";
+    list.style.padding = "0";
+
+    const items = [
+        { label: "Quelle:", value: meta.source || sourceLabel },
+        { label: "Format:", value: meta.format || "firebaseConfig" },
+        { label: "Project ID:", value: normalizedConfig.projectId, code: true },
+        { label: "App ID:", value: normalizedConfig.appId, code: true },
+    ];
+
+    if (meta.packageName) {
+        items.push({ label: "Package-Quelle:", value: meta.packageName, code: true });
+    }
+
+    items.forEach(item => {
+        const listItem = document.createElement("li");
+        const strong = document.createElement("strong");
+        strong.textContent = item.label;
+        listItem.appendChild(strong);
+        listItem.appendChild(document.createTextNode(" "));
+        listItem.appendChild(item.code ? createCodeElement(item.value) : document.createTextNode(String(item.value || "")));
+        list.appendChild(listItem);
+    });
+    container.appendChild(list);
+
+    const actions = document.createElement("div");
+    actions.className = "phase-actions";
+    actions.style.marginBlockStart = "10px";
+
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = "btn btn-primary";
+    confirmButton.textContent = "Übernehmen";
+    confirmButton.onclick = () => confirmBootstrapImportPreview();
+    actions.appendChild(confirmButton);
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "btn btn-secondary";
+    cancelButton.textContent = "Abbrechen";
+    cancelButton.onclick = () => cancelBootstrapImportPreview();
+    actions.appendChild(cancelButton);
+
+    container.appendChild(actions);
+    return container;
+}
+
+function appendBootstrapRecoveryModeHint(statusEl, message) {
+    if (!statusEl) return;
+    const hint = createStateBox("info", message);
+    hint.style.marginBlockStart = "8px";
+    statusEl.appendChild(hint);
+}
+
 function createQaRuntimeBanner(isOperatorMode) {
     const banner = document.createElement("div");
     banner.className = `qa-runtime-banner ${isOperatorMode ? "is-operator" : "is-readonly"}`;
@@ -7840,43 +7914,20 @@ function showBootstrapImportPreview(config, sourceLabel, meta = {}) {
         sourceLabel,
     };
 
-    const lines = [
-        `<li><strong>Quelle:</strong> ${escapeHtml(meta.source || sourceLabel)}</li>`,
-        `<li><strong>Format:</strong> ${escapeHtml(meta.format || "firebaseConfig")}</li>`,
-        `<li><strong>Project ID:</strong> <code>${escapeHtml(normalizedConfig.projectId)}</code></li>`,
-        `<li><strong>App ID:</strong> <code>${escapeHtml(normalizedConfig.appId)}</code></li>`,
-    ];
-
-    if (meta.packageName) {
-        lines.push(`<li><strong>Package-Quelle:</strong> <code>${escapeHtml(meta.packageName)}</code></li>`);
-    }
-
-    statusEl.innerHTML = `
-        <div class='info'>
-            <strong>Import-Vorschau</strong>
-            <ul style='margin:8px 0 0 18px;padding:0;'>${lines.join("")}</ul>
-            <div class='phase-actions' style='margin-block-start:10px'>
-                <button type='button' class='btn btn-primary' onclick='confirmBootstrapImportPreview()'>Übernehmen</button>
-                <button type='button' class='btn btn-secondary' onclick='cancelBootstrapImportPreview()'>Abbrechen</button>
-            </div>
-        </div>
-    `;
+    clearElementChildren(statusEl);
+    statusEl.appendChild(createBootstrapImportPreviewContent(normalizedConfig, sourceLabel, meta));
 }
 
 function cancelBootstrapImportPreview() {
     pendingBootstrapImport = null;
     const statusEl = getBootstrapImportStatusElement();
-    if (statusEl) {
-        statusEl.innerHTML = "<div class='info'>Import-Vorschau verworfen.</div>";
-    }
+    replaceElementWithState(statusEl, "info", "Import-Vorschau verworfen.");
 }
 
 function confirmBootstrapImportPreview() {
     const statusEl = getBootstrapImportStatusElement();
     if (!pendingBootstrapImport) {
-        if (statusEl) {
-            statusEl.innerHTML = "<div class='error'>Keine Import-Vorschau verfügbar.</div>";
-        }
+        replaceElementWithState(statusEl, "error", "Keine Import-Vorschau verfügbar.");
         return;
     }
 
@@ -7885,13 +7936,9 @@ function confirmBootstrapImportPreview() {
 
     try {
         applyImportedBootstrapFirebaseConfig(config, sourceLabel || "Import");
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='success-box'>Konfiguration übernommen: ${escapeHtml(config.projectId)}.</div>`;
-        }
+        replaceElementWithState(statusEl, "success-box", `Konfiguration übernommen: ${config.projectId}.`);
     } catch (error) {
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='error'>Übernahme fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
-        }
+        replaceElementWithState(statusEl, "error", `Übernahme fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`);
     }
 }
 
@@ -8101,7 +8148,7 @@ async function copyFirebaseRecoveryScript() {
 
     if (isPlaceholderProjectId(projectId)) {
         setRecoveryProgressStep("validate", "error");
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).</div>";
+        replaceElementWithState(statusEl, "error", "Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).");
         return;
     }
 
@@ -8114,10 +8161,10 @@ async function copyFirebaseRecoveryScript() {
     try {
         const script = buildFirebaseRecoveryScript(projectId);
         await copyTextToClipboard(script);
-        if (statusEl) statusEl.innerHTML = "<div class='success-box'>Recovery-Skript kopiert. Im Terminal ausführen und danach auf Speichern &amp; verbinden klicken.</div>";
+        replaceElementWithState(statusEl, "success-box", "Recovery-Skript kopiert. Im Terminal ausführen und danach auf Speichern & verbinden klicken.");
         showNotification("Recovery-Skript wurde kopiert.", "success");
     } catch (error) {
-        if (statusEl) statusEl.innerHTML = `<div class='error'>Kopieren fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
+        replaceElementWithState(statusEl, "error", `Kopieren fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`);
     }
 }
 
@@ -8130,7 +8177,7 @@ async function runFirebaseRecoveryAutopilot() {
 
     if (isPlaceholderProjectId(projectId)) {
         setRecoveryProgressStep("validate", "error");
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).</div>";
+        replaceElementWithState(statusEl, "error", "Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).");
         return;
     }
 
@@ -8140,9 +8187,7 @@ async function runFirebaseRecoveryAutopilot() {
         setRecoveryProgressStep("local", "manual");
         setRecoveryAlive(false, "Manuelle Ausführung");
         await copyFirebaseRecoveryScript();
-        if (statusEl) {
-            statusEl.innerHTML += "<div class='info' style='margin-block-start:8px'>Direkte Ausführung ist in diesem Modus nicht verfügbar. Skript wurde kopiert.</div>";
-        }
+        appendBootstrapRecoveryModeHint(statusEl, "Direkte Ausführung ist in diesem Modus nicht verfügbar. Skript wurde kopiert.");
         return;
     }
 
@@ -8194,7 +8239,7 @@ async function runStartFromScratchAutopilot() {
 
     if (isPlaceholderProjectId(projectId)) {
         setRecoveryProgressStep("validate", "error");
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).</div>";
+        replaceElementWithState(statusEl, "error", "Bitte zuerst eine echte Firebase Project ID eintragen (nicht your-project-id).");
         return;
     }
 
@@ -8210,9 +8255,7 @@ async function runStartFromScratchAutopilot() {
     if ((resetToken || "").trim() !== "RESET") {
         setRecoveryProgressStep("validate", "error");
         setRecoveryAlive(false, "Abgebrochen");
-        if (statusEl) {
-            statusEl.innerHTML = "<div class='info'>Start bei Null abgebrochen (Bestätigung RESET nicht korrekt).</div>";
-        }
+        replaceElementWithState(statusEl, "info", "Start bei Null abgebrochen (Bestätigung RESET nicht korrekt).");
         return;
     }
 
@@ -8222,9 +8265,7 @@ async function runStartFromScratchAutopilot() {
         setRecoveryProgressStep("local", "manual");
         setRecoveryAlive(false, "Manuelle Ausführung");
         await copyFirebaseRecoveryScript();
-        if (statusEl) {
-            statusEl.innerHTML += "<div class='info' style='margin-block-start:8px'>Ein-Klick-Ausführung ist in diesem Modus nicht verfügbar. Recovery-Skript wurde kopiert.</div>";
-        }
+        appendBootstrapRecoveryModeHint(statusEl, "Ein-Klick-Ausführung ist in diesem Modus nicht verfügbar. Recovery-Skript wurde kopiert.");
         return;
     }
 
@@ -8280,16 +8321,16 @@ async function loadBootstrapFirebaseConfigFromUrl() {
     const url = (urlInput?.value || "").trim();
 
     if (!url) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte eine URL für die Konfigurationsdatei eingeben.</div>";
+        replaceElementWithState(statusEl, "error", "Bitte eine URL für die Konfigurationsdatei eingeben.");
         return;
     }
 
     if (!/^https?:\/\//i.test(url)) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Nur http(s)-URLs sind erlaubt.</div>";
+        replaceElementWithState(statusEl, "error", "Nur http(s)-URLs sind erlaubt.");
         return;
     }
 
-    if (statusEl) statusEl.innerHTML = "<div class='info'>Lade Konfiguration aus dem Internet ...</div>";
+    replaceElementWithState(statusEl, "info", "Lade Konfiguration aus dem Internet ...");
 
     try {
         const response = await fetch(url, { cache: "no-store" });
@@ -8325,9 +8366,7 @@ async function loadBootstrapFirebaseConfigFromUrl() {
             format: detectedFormat,
         });
     } catch (error) {
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='error'>Import fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
-        }
+        replaceElementWithState(statusEl, "error", `Import fehlgeschlagen: ${error.message}`);
         console.error("[loadBootstrapFirebaseConfigFromUrl] Fehler:", error);
     }
 }
@@ -8338,16 +8377,16 @@ async function loadBootstrapFirebaseConfigFromFile() {
     const file = fileInput?.files?.[0];
 
     if (!file) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Bitte zuerst eine JSON-Datei auswählen.</div>";
+        replaceElementWithState(statusEl, "error", "Bitte zuerst eine JSON-Datei auswählen.");
         return;
     }
 
     if (file.size > 1024 * 1024) {
-        if (statusEl) statusEl.innerHTML = "<div class='error'>Datei ist zu groß. Bitte eine JSON-Datei bis 1 MB verwenden.</div>";
+        replaceElementWithState(statusEl, "error", "Datei ist zu groß. Bitte eine JSON-Datei bis 1 MB verwenden.");
         return;
     }
 
-    if (statusEl) statusEl.innerHTML = "<div class='info'>Lese lokale JSON-Datei ...</div>";
+    replaceElementWithState(statusEl, "info", "Lese lokale JSON-Datei ...");
 
     try {
         const payloadText = await file.text();
@@ -8380,9 +8419,7 @@ async function loadBootstrapFirebaseConfigFromFile() {
 
         showBootstrapImportPreview(extractedConfig, `Datei-Import (${file.name})`, importMeta);
     } catch (error) {
-        if (statusEl) {
-            statusEl.innerHTML = `<div class='error'>Import fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
-        }
+        replaceElementWithState(statusEl, "error", `Import fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`);
     } finally {
         if (fileInput) fileInput.value = "";
     }
@@ -8407,9 +8444,9 @@ function renderBootstrapFirebaseConfig(config) {
     const statusEl = document.getElementById("bootstrap-config-status");
     if (!statusEl) return;
     if (isPlaceholderFirebaseConfig(values)) {
-        statusEl.innerHTML = "<div class='error'>Firebase-Webkonfiguration ist noch nicht final hinterlegt. Trage die echten Werte ein und speichere sie lokal.</div>";
+        replaceElementWithState(statusEl, "error", "Firebase-Webkonfiguration ist noch nicht final hinterlegt. Trage die echten Werte ein und speichere sie lokal.");
     } else {
-        statusEl.innerHTML = `<div class='success-box'>Aktive Firebase-Konfiguration: ${escapeHtml(values.projectId || "unbekannt")}</div>`;
+        replaceElementWithState(statusEl, "success-box", `Aktive Firebase-Konfiguration: ${values.projectId || "unbekannt"}`);
     }
 }
 
@@ -8460,9 +8497,7 @@ function persistBootstrapFirebaseConfig(showReloadHint = true) {
         if (placeholderFields.length > 0) problems.push("Platzhalter-Werte: " + placeholderFields.join(", "));
         const detail = problems.join(" | ");
         console.error("[Firebase Config] Validierung fehlgeschlagen:", detail);
-        if (statusEl) {
-            statusEl.innerHTML = "<div class='error'>Firebase-Konfiguration ungültig: " + escapeHtml(detail) + "</div>";
-        }
+        replaceElementWithState(statusEl, "error", `Firebase-Konfiguration ungültig: ${detail}`);
         throw new Error("Firebase-Konfiguration ungültig: " + detail);
     }
 
@@ -8470,9 +8505,11 @@ function persistBootstrapFirebaseConfig(showReloadHint = true) {
     firebaseConfig = values;
     updateSetupChecklistState({ "firebase-config": true });
 
-    if (statusEl) {
-        statusEl.innerHTML = `<div class='success-box'>Firebase-Webkonfiguration lokal gespeichert für Projekt ${escapeHtml(values.projectId)}.${showReloadHint ? " Seite neu laden, falls du auf ein neues Projekt umstellst." : ""}</div>`;
-    }
+    replaceElementWithState(
+        statusEl,
+        "success-box",
+        `Firebase-Webkonfiguration lokal gespeichert für Projekt ${values.projectId}.${showReloadHint ? " Seite neu laden, falls du auf ein neues Projekt umstellst." : ""}`,
+    );
     return values;
 }
 
