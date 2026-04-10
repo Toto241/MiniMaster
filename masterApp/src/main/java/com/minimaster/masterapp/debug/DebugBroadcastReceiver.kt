@@ -4,9 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.minimaster.masterapp.BuildConfig
+import com.minimaster.masterapp.defaultMasterCredentialSecureStore
 
 /**
- * Receives diagnostic broadcasts sent exclusively via ADB (android:exported="false").
+ * Receives diagnostic broadcasts from the debug-only manifest receiver.
  *
  * Available actions:
  *  com.minimaster.masterapp.DEBUG_GET_CHALLENGE  – issues a one-time HMAC nonce
@@ -14,14 +16,18 @@ import android.util.Log
  *  com.minimaster.masterapp.DEBUG_DEACTIVATE     – terminates the active session
  *  com.minimaster.masterapp.DEBUG_DUMP_STATE     – dumps app state to logcat
  *
- * The receiver is registered in the manifest with android:exported="false"
- * so it is only reachable via ADB on a connected, unlocked device.
+ * The receiver exists only in debug builds and is registered with android:exported="false".
  */
 class DebugBroadcastReceiver : BroadcastReceiver() {
 
     private val tag = "MINIMASTER_DEBUG"
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (!BuildConfig.DEBUG) {
+            Log.w(tag, "Debug broadcast rejected in non-debug build.")
+            return
+        }
+
         when (intent.action) {
 
             ACTION_GET_CHALLENGE -> {
@@ -55,12 +61,12 @@ class DebugBroadcastReceiver : BroadcastReceiver() {
                     Log.w(tag, "DUMP_STATE rejected: no active debug session.")
                     return
                 }
-                val prefs = context.getSharedPreferences("master_prefs", Context.MODE_PRIVATE)
-                val imei = prefs.getString("imei", "") ?: ""
-                val secretKey = prefs.getString("secret_key", "") ?: ""
-                val legalConsent = prefs.getBoolean("legal_consent_accepted", false)
-                val fcmToken = prefs.getString("fcm_token", "") ?: ""
-                val registrationState = prefs.getString("registration_state", "UNREGISTERED") ?: "UNREGISTERED"
+                val secureStore = defaultMasterCredentialSecureStore(context)
+                val imei = secureStore.getString("master_imei") ?: ""
+                val secretKey = secureStore.getString("secret_key") ?: ""
+                val legalConsent = false
+                val fcmToken = ""
+                val registrationState = if (imei.isBlank()) "UNREGISTERED" else "REGISTERED"
 
                 val json = DebugSessionManager.dumpStateJson(
                     registrationState = registrationState,

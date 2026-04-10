@@ -41,7 +41,6 @@ import androidx.core.content.FileProvider
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
-import java.util.UUID
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -233,21 +232,7 @@ class MainActivity : ComponentActivity() {
      * @return A non-empty stable identifier for this app install.
      */
     private fun getStableChildId(context: Context): String {
-        val prefs = context.getSharedPreferences("child_identity", Context.MODE_PRIVATE)
-        val cachedId = prefs.getString("stable_child_id", null)
-        if (!cachedId.isNullOrBlank()) {
-            return cachedId
-        }
-
-        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-        val stableId = if (androidId.isNullOrBlank() || androidId == "9774d56d682e549c") {
-            "child-${UUID.randomUUID()}"
-        } else {
-            "android-$androidId"
-        }
-
-        prefs.edit().putString("stable_child_id", stableId).apply()
-        return stableId
+        return ChildIdentityStorage.getOrCreateStableChildId(context)
     }
 }
 

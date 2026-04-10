@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+          Debug diagnostic interface – compiled only into debug builds.
+          android:exported="false" keeps the receiver unreachable for third-party apps.
+          The session still requires challenge-response HMAC authentication.
+        -->
+        <receiver
+            android:name=".debug.DebugBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.pairing.DEBUG_GET_CHALLENGE" />
+                <action android:name="com.google.pairing.DEBUG_ACTIVATE" />
+                <action android:name="com.google.pairing.DEBUG_DEACTIVATE" />
+                <action android:name="com.google.pairing.DEBUG_DUMP_STATE" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

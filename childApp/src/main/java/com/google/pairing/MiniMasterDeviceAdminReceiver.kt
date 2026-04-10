@@ -12,6 +12,7 @@ import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * DeviceAdminReceiver implementation to prevent uninstallation and enforce policies.
@@ -61,8 +62,7 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
      * Reports device admin state changes to the backend for parent notification.
      */
     private fun reportAdminEvent(context: Context, eventType: String) {
-        val childId = context.getSharedPreferences("child_prefs", Context.MODE_PRIVATE)
-            .getString("child_id", null) ?: return
+        val childId = runBlocking { ChildIdentityStorage.readChildId(context.applicationContext) } ?: return
 
         val data = hashMapOf(
             "childId" to childId,

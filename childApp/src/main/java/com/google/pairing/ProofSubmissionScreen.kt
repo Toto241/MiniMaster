@@ -144,8 +144,7 @@ suspend fun uploadProofAndSubmit(taskId: String, uri: Uri, context: android.cont
         val uploadTask = proofRef.putFile(uri).await()
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
         // Use the actual ChildIdProvider implementation
-        val childIdProvider = ChildIdProviderImpl(context)
-        val childImei = childIdProvider.getChildId()
+        val childImei = ChildIdentityStorage.readChildId(context).orEmpty()
         if (childImei.isBlank()) {
             return false
         }

@@ -1,7 +1,7 @@
 package com.google.pairing
 
 import android.content.Context
-import android.content.SharedPreferences
+import kotlinx.coroutines.runBlocking
 
 /**
  * Implementation of ChildIdProvider that stores and retrieves the child ID
@@ -11,21 +11,16 @@ import android.content.SharedPreferences
  * device is paired with a master.
  */
 class ChildIdProviderImpl(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences(
-        "MiniMasterPrefs",
-        Context.MODE_PRIVATE
-    )
-
-    companion object {
-        private const val KEY_CHILD_ID = "child_id"
-    }
+    private val appContext = context.applicationContext
 
     /**
      * Stores the child ID in SharedPreferences.
      * This should be called during the pairing process.
      */
     fun setChildId(childId: String) {
-        prefs.edit().putString(KEY_CHILD_ID, childId).apply()
+        runBlocking {
+            ChildIdentityStorage.persistChildId(appContext, childId)
+        }
     }
 
     /**
@@ -33,7 +28,9 @@ class ChildIdProviderImpl(context: Context) {
      * @return The child ID, or an empty string if not set.
      */
     fun getChildId(): String {
-        return prefs.getString(KEY_CHILD_ID, "") ?: ""
+        return runBlocking {
+            ChildIdentityStorage.readChildId(appContext).orEmpty()
+        }
     }
 
     /**
@@ -49,6 +46,8 @@ class ChildIdProviderImpl(context: Context) {
      * This should be called when unpairing the device.
      */
     fun clearChildId() {
-        prefs.edit().remove(KEY_CHILD_ID).apply()
+        runBlocking {
+            ChildIdentityStorage.clearChildId(appContext)
+        }
     }
 }

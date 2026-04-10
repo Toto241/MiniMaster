@@ -45,10 +45,24 @@ class MasterCredentialsRepository @Inject constructor(
      */
     val getCredentials: Flow<Pair<String?, String?>> = dataStore.data
         .map { preferences ->
-            val imei = preferences[PreferencesKeys.MASTER_IMEI]
-                ?: secureStore.getString("master_imei")
-            val secret = preferences[PreferencesKeys.SECRET_KEY]
-                ?: secureStore.getString("secret_key")
+            val legacyImei = preferences[PreferencesKeys.MASTER_IMEI]
+            val legacySecret = preferences[PreferencesKeys.SECRET_KEY]
+            val secureImei = secureStore.getString("master_imei")
+            val secureSecret = secureStore.getString("secret_key")
+
+            val imei = secureImei ?: legacyImei
+            val secret = secureSecret ?: legacySecret
+
+            if (legacyImei != null || legacySecret != null) {
+                if (imei != null || secret != null) {
+                    secureStore.putCredentials(imei.orEmpty(), secret.orEmpty())
+                }
+                dataStore.edit { mutablePreferences ->
+                    mutablePreferences.remove(PreferencesKeys.MASTER_IMEI)
+                    mutablePreferences.remove(PreferencesKeys.SECRET_KEY)
+                }
+            }
+
             imei to secret
         }
 
@@ -62,8 +76,8 @@ class MasterCredentialsRepository @Inject constructor(
         secureStore.putCredentials(imei, secretKey)
 
         dataStore.edit { preferences ->
-            preferences[PreferencesKeys.MASTER_IMEI] = imei
-            preferences[PreferencesKeys.SECRET_KEY] = secretKey
+            preferences.remove(PreferencesKeys.MASTER_IMEI)
+            preferences.remove(PreferencesKeys.SECRET_KEY)
         }
     }
 }
