@@ -4707,12 +4707,12 @@ function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
     if (!el) return;
 
     if (!isPythonOperator) {
-        el.innerHTML = "<div class='info'>QA-Plattformdaten sind nur im Python-Operator verfügbar.</div>";
+        replaceElementWithState(el, "info", "QA-Plattformdaten sind nur im Python-Operator verfügbar.");
         return;
     }
 
     if (!payload) {
-        el.innerHTML = "<div class='info'>Noch kein QA-Katalog geladen.</div>";
+        replaceElementWithState(el, "info", "Noch kein QA-Katalog geladen.");
         return;
     }
 
@@ -4805,12 +4805,12 @@ function renderEmulatorLabOverview(payload = emulatorLabPayload) {
     if (!el) return;
 
     if (!isPythonOperator) {
-        el.innerHTML = "<div class='info'>Emulatorstatus ist nur im Python-Operator verfügbar.</div>";
+        replaceElementWithState(el, "info", "Emulatorstatus ist nur im Python-Operator verfügbar.");
         return;
     }
 
     if (!payload) {
-        el.innerHTML = "<div class='info'>Noch kein Emulator-Labor geladen.</div>";
+        replaceElementWithState(el, "info", "Noch kein Emulator-Labor geladen.");
         return;
     }
 
@@ -5023,7 +5023,7 @@ async function loadQaPlatformCatalog() {
         setQaRefreshSectionState("qaPlatform", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    el.innerHTML = "<div class='loading'>Lade QA-Katalog...</div>";
+    replaceElementWithState(el, "loading", "Lade QA-Katalog...");
     setQaRefreshSectionState("qaPlatform", "loading", "Lädt…");
     try {
         const res = await fetch("/api/qa/catalog");
@@ -5057,7 +5057,7 @@ async function loadEmulatorLabOverview() {
         setQaRefreshSectionState("emulators", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    el.innerHTML = "<div class='loading'>Lade Emulator-Labor...</div>";
+    replaceElementWithState(el, "loading", "Lade Emulator-Labor...");
     setQaRefreshSectionState("emulators", "loading", "Lädt…");
     try {
         const res = await fetch("/api/qa/emulators");
@@ -5079,23 +5079,23 @@ async function loadSuiteDeviceStatus() {
     const el = document.getElementById("suite-device-status");
     if (!el) return { ok: false, message: "Gerätestatus-Container fehlt." };
     if (!isPythonOperator) {
-        el.innerHTML = "<div class='info'>Geraetestatus ist nur im Python-Operator verfuegbar.</div>";
+        replaceElementWithState(el, "info", "Geraetestatus ist nur im Python-Operator verfuegbar.");
         setQaRefreshSectionState("devices", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    el.innerHTML = "<div class='loading'>Lade Geraetestatus...</div>";
+    replaceElementWithState(el, "loading", "Lade Geraetestatus...");
     setQaRefreshSectionState("devices", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites/devices");
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
         if (!data.adbAvailable) {
-            el.innerHTML = "<div class='error'>ADB ist nicht verfuegbar. Bitte Android SDK installieren.</div>";
+            replaceElementWithState(el, "error", "ADB ist nicht verfuegbar. Bitte Android SDK installieren.");
             setQaRefreshSectionState("devices", "error", "ADB nicht verfügbar");
             return { ok: false, message: "ADB nicht verfügbar." };
         }
         if (!data.devices || data.devices.length === 0) {
-            el.innerHTML = "<div class='info'>Keine Geraete angeschlossen.</div>";
+            replaceElementWithState(el, "info", "Keine Geraete angeschlossen.");
             setQaRefreshSectionState("devices", "success", "Keine Geräte angeschlossen");
             return { ok: true, message: "Keine Geräte angeschlossen." };
         }
@@ -5123,7 +5123,7 @@ async function loadSuiteDeviceStatus() {
         setQaRefreshSectionState("devices", "success", `${data.devices.length} Gerät(e) erkannt`);
         return { ok: true, message: `${data.devices.length} Gerät(e) erkannt.` };
     } catch (err) {
-        el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
         setQaRefreshSectionState("devices", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }

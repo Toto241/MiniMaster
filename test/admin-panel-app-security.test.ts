@@ -28,6 +28,11 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "loadPythonAutomationEvidenceHistory")).not.toContain("historyEl.innerHTML");
     expect(extractFunctionBody(source, "renderQaArtifactsOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadSuiteRunHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "renderQaPlatformOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "renderEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "loadQaPlatformCatalog")).not.toContain("el.innerHTML = \"<div class='loading'>");
+    expect(extractFunctionBody(source, "loadEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='loading'>");
+    expect(extractFunctionBody(source, "loadSuiteDeviceStatus")).not.toContain("el.innerHTML = \"<div class='info'>");
   });
 
   it("contains dedicated DOM helpers for the QA runtime render paths", () => {
