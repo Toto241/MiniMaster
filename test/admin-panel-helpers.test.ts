@@ -1,5 +1,22 @@
 import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
+function createDomSinkElement() {
+  return {
+    innerHTML: "",
+    textContent: "",
+    appendChild: jest.fn(function(this: any, child: any) {
+      const next = String(child?.textContent || child?.innerHTML || "");
+      this.innerHTML += next;
+      this.textContent += next;
+      return child;
+    }),
+    replaceChildren: jest.fn(function(this: any) {
+      this.innerHTML = "";
+      this.textContent = "";
+    }),
+  };
+}
+
 describe("admin-panel helper functions", () => {
   it("sanitizes ADB serials and APK paths safely", () => {
     const { exports } = loadAdminPanelTestExports();
@@ -55,7 +72,7 @@ describe("admin-panel helper functions", () => {
   it("renders the QA runtime banner for read-only and operator mode", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
-    const banner = { innerHTML: "" };
+    const banner = createDomSinkElement();
     const qaSection = {
       classList: { toggle: jest.fn() },
       querySelectorAll: jest.fn(() => []),
@@ -74,6 +91,61 @@ describe("admin-panel helper functions", () => {
 
     expect(banner.innerHTML).toContain("Python-Operator aktiv");
     expect(qaSection.classList.toggle).toHaveBeenCalledWith("qa-runtime-section-disabled", false);
+  });
+
+  it("renders the QA refresh status without relying on string templating", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const container = {
+      innerHTML: "stale",
+      textContent: "stale",
+      appendChild: jest.fn(),
+      replaceChildren: jest.fn(),
+    };
+    elements.set("qa-refresh-status", container);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.resetQaRefreshStateForTests();
+    exports.setQaRefreshStateForTests({
+      lastSummary: "2/2 Bereiche geladen.",
+      lastReason: "manuell",
+      lastStartedAt: "2026-04-10T10:00:00.000Z",
+      lastCompletedAt: "2026-04-10T10:01:00.000Z",
+      sections: {
+        catalog: { state: "success", message: "Aktuell geladen", updatedAt: "2026-04-10T10:01:00.000Z" },
+      },
+    });
+
+    exports.renderQaRefreshStatus();
+
+    expect(container.replaceChildren).toHaveBeenCalled();
+    expect(container.appendChild).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders the python run state via DOM nodes", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const stateEl = {
+      className: "",
+      appendChild: jest.fn(),
+      replaceChildren: jest.fn(),
+      textContent: "",
+    };
+    const runButton = { disabled: false, textContent: "" };
+    elements.set("python-automation-run-state", stateEl);
+    elements.set("python-automation-run-btn", runButton);
+
+    exports.updatePythonAutomationRunState({
+      isRunning: true,
+      message: "Automatischer Testlauf läuft…",
+      detail: "Seit 30 Sekunden",
+    });
+
+    expect(stateEl.className).toContain("python-run-state-running");
+    expect(stateEl.replaceChildren).toHaveBeenCalled();
+    expect(stateEl.appendChild).toHaveBeenCalledTimes(1);
+    expect(runButton.disabled).toBe(true);
+    expect(runButton.textContent).toBe("Python-Testlauf läuft…");
   });
 
   it("derives USB form visibility from test type", () => {
@@ -176,8 +248,8 @@ describe("admin-panel helper functions", () => {
   it("renders protocol editor requirements and documented-only controls", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
-    const selectedEl = { innerHTML: "" };
-    const requirementsEl = { innerHTML: "" };
+    const selectedEl = createDomSinkElement();
+    const requirementsEl = createDomSinkElement();
     const docRowEl = { style: { display: "none" } };
     const statusEl = { value: "fail" };
     const operatorEl = { value: "", };

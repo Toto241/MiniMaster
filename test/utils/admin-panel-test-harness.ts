@@ -31,16 +31,63 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     let textContent = "";
     const classes = new Set<string>();
     const listeners = new Map<string, Array<(event?: any) => void>>();
+    const children: any[] = [];
+
+    const renderText = (node: any): string => {
+      if (node == null) return "";
+      if (typeof node === "string") return node;
+      if (typeof node.textContent === "string" && (!Array.isArray(node.children) || node.children.length === 0)) {
+        return node.textContent;
+      }
+      if (Array.isArray(node.children)) {
+        return node.children.map(renderText).join("");
+      }
+      return "";
+    };
+
+    const renderNode = (node: any): string => {
+      if (node == null) return "";
+      if (typeof node === "string") return escapeForHtml(node);
+      const tagName = String(node.tagName || "div").toLowerCase();
+      const className = String(node.className || "").trim();
+      const childHtml = typeof node.innerHTML === "string" && node.innerHTML.length > 0
+        ? node.innerHTML
+        : Array.isArray(node.children) && node.children.length > 0
+          ? node.children.map(renderNode).join("")
+          : escapeForHtml(String(node.textContent || ""));
+      return `<${tagName}${className ? ` class="${escapeForHtml(className)}"` : ""}>${childHtml}</${tagName}>`;
+    };
+
+    const syncFromChildren = () => {
+      innerHTML = children.map(renderNode).join("");
+      textContent = children.map(renderText).join("");
+    };
 
     return {
       tagName: tag.toUpperCase(),
+      className: "",
       style: {},
       dataset: {},
       value: "",
       checked: false,
       disabled: false,
-      appendChild: jest.fn(),
-      prepend: jest.fn(),
+      get children() {
+        return children;
+      },
+      appendChild: jest.fn((child: any) => {
+        children.push(child);
+        syncFromChildren();
+        return child;
+      }),
+      prepend: jest.fn((child: any) => {
+        children.unshift(child);
+        syncFromChildren();
+        return child;
+      }),
+      replaceChildren: jest.fn((...nextChildren: any[]) => {
+        children.splice(0, children.length, ...nextChildren);
+        syncFromChildren();
+      }),
       remove: jest.fn(),
       querySelectorAll: jest.fn(() => []),
       querySelector: jest.fn(() => ({
@@ -83,13 +130,15 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
       },
       set innerHTML(value: string) {
         innerHTML = value;
+        children.splice(0, children.length);
       },
       get textContent() {
         return textContent;
       },
       set textContent(value: string) {
-        textContent = value;
-        innerHTML = escapeForHtml(String(value ?? ""));
+        textContent = String(value ?? "");
+        innerHTML = escapeForHtml(textContent);
+        children.splice(0, children.length);
       },
     };
   };
@@ -98,6 +147,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     addEventListener: jest.fn(),
     getElementById: jest.fn((id: string) => elements.get(id) || null),
     createElement: jest.fn((tag: string) => createMockElement(tag)),
+    createTextNode: jest.fn((text: string) => ({ nodeType: 3, textContent: String(text ?? "") })),
     body: {
       appendChild: jest.fn(),
       removeChild: jest.fn(),
@@ -188,6 +238,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  loadPythonAutomationEvidenceHistory,",
     "  renderQaRuntimeModeBanner,",
     "  applyQaRuntimeInteractionState,",
+    "  updatePythonAutomationRunState,",
     "  initializeAuthBindings,",
     "  initializeAuthStateObserver,",
     "  handleLogin,",
@@ -268,6 +319,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  setQaPlatformCatalogPayloadForTests: (value) => { qaPlatformCatalogPayload = value; },",
     "  setQaArtifactFiltersForTests: ({ scenarioFilter = '', selectedRunId = '' } = {}) => { qaArtifactScenarioFilter = scenarioFilter; qaArtifactSelectedRunId = selectedRunId; },",
     "  setPythonEvidenceFiltersForTests: ({ status = '', testId = '' } = {}) => { pythonEvidenceFilterStatus = status; pythonEvidenceFilterTestId = testId; },",
+    "  setQaRefreshStateForTests: (value) => { qaRefreshState = { ...qaRefreshState, ...(value || {}), sections: { ...((qaRefreshState && qaRefreshState.sections) || {}), ...(((value || {}).sections) || {}) } }; },",
     "  resetQaRefreshStateForTests: () => { qaRefreshState = { sections: {}, lastStartedAt: '', lastCompletedAt: '', lastReason: '', lastSummary: '' }; qaDashboardLoadPromise = null; },",
     "  commissioningAttestationItems,",
     "  defaultCommandBuilderConfig,",

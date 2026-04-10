@@ -383,43 +383,154 @@ function formatQaRefreshTimestamp(value) {
     return parsed.toLocaleString("de-DE");
 }
 
+function clearElementChildren(element) {
+    if (!element) return;
+    if (typeof element.replaceChildren === "function") {
+        element.replaceChildren();
+        return;
+    }
+    element.textContent = "";
+}
+
+function createInfoBox(message) {
+    const box = document.createElement("div");
+    box.className = "info";
+    box.textContent = message;
+    return box;
+}
+
+function createQaRuntimeBanner(isOperatorMode) {
+    const banner = document.createElement("div");
+    banner.className = `qa-runtime-banner ${isOperatorMode ? "is-operator" : "is-readonly"}`;
+
+    const title = document.createElement("strong");
+    title.textContent = isOperatorMode ? "Python-Operator aktiv." : "Read-only QA-Ansicht.";
+    banner.appendChild(title);
+
+    const description = document.createElement("span");
+    description.textContent = isOperatorMode
+        ? " QA-Register, Suite-Läufe, Emulator-Labor und Artefakte können vollständig geladen und ausgeführt werden."
+        : " Ohne Python-Operator sind laufzeitabhängige QA-Bereiche nur eingeschränkt verfügbar. Sichtbar bleiben Dokumentation, Zusammenfassungen und bereits geladene Zustände.";
+    banner.appendChild(description);
+
+    return banner;
+}
+
+function createPythonRequirementSummary(lines) {
+    const fragment = document.createElement("div");
+
+    const title = document.createElement("strong");
+    title.textContent = "Nachweisregeln";
+    fragment.appendChild(title);
+
+    const caption = document.createElement("span");
+    caption.className = "python-muted-caption";
+    caption.textContent = lines.join(" · ");
+    fragment.appendChild(caption);
+
+    return fragment;
+}
+
+function createPythonRunStateContent(message, detail) {
+    const wrapper = document.createElement("div");
+
+    const dot = document.createElement("span");
+    dot.className = "python-run-state-dot";
+    dot.setAttribute("aria-hidden", "true");
+    wrapper.appendChild(dot);
+
+    const textWrapper = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = message;
+    textWrapper.appendChild(title);
+
+    if (detail) {
+        const detailEl = document.createElement("div");
+        detailEl.className = "python-muted-caption";
+        detailEl.textContent = detail;
+        textWrapper.appendChild(detailEl);
+    }
+
+    wrapper.appendChild(textWrapper);
+    return wrapper;
+}
+
+function createQaRefreshCard(label, detail, updatedAt, stateClass) {
+    const card = document.createElement("article");
+    card.className = `qa-refresh-card ${stateClass}`.trim();
+
+    const title = document.createElement("strong");
+    title.textContent = label;
+    card.appendChild(title);
+
+    const detailEl = document.createElement("span");
+    detailEl.textContent = detail;
+    card.appendChild(detailEl);
+
+    const meta = document.createElement("div");
+    meta.className = "qa-refresh-meta";
+    meta.textContent = `Zuletzt: ${updatedAt}`;
+    card.appendChild(meta);
+
+    return card;
+}
+
+function createQaRefreshSummary(summary, startedAt, completedAt, reason) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "python-clarity-box";
+
+    const title = document.createElement("strong");
+    title.textContent = "Gesamtsicht:";
+    wrapper.appendChild(title);
+
+    const summaryText = document.createElement("span");
+    summaryText.textContent = ` ${summary}`;
+    wrapper.appendChild(summaryText);
+
+    const meta = document.createElement("span");
+    meta.className = "qa-refresh-meta";
+    meta.textContent = `${startedAt} · ${completedAt} · Anlass: ${reason}`;
+    wrapper.appendChild(meta);
+
+    return wrapper;
+}
+
 function renderQaRefreshStatus() {
     const container = document.getElementById("qa-refresh-status");
     if (!container) return;
 
+    clearElementChildren(container);
+
     if (!isPythonOperator) {
-        container.innerHTML = "<div class='info'>Vollständige QA-Synchronisierung ist nur im Python-Operator verfügbar.</div>";
+        container.appendChild(createInfoBox("Vollständige QA-Synchronisierung ist nur im Python-Operator verfügbar."));
         return;
     }
 
     const sectionKeys = Object.keys(qaRefreshSectionLabels);
-    const cardsHtml = sectionKeys.map(key => {
+    const cards = sectionKeys.map(key => {
         const entry = qaRefreshState.sections[key] || {};
         const state = String(entry.state || "idle");
         const stateClass = state === "success" ? "is-success" : state === "error" ? "is-error" : state === "loading" ? "is-loading" : "";
         const label = qaRefreshSectionLabels[key] || key;
         const detail = entry.message || (state === "success" ? "Aktuell geladen" : state === "error" ? "Fehler beim Laden" : state === "loading" ? "Lädt gerade" : "Noch nicht geladen");
-        return `
-            <article class='qa-refresh-card ${stateClass}'>
-                <strong>${escapeHtml(label)}</strong>
-                <span>${escapeHtml(detail)}</span>
-                <div class='qa-refresh-meta'>Zuletzt: ${escapeHtml(formatQaRefreshTimestamp(entry.updatedAt || ""))}</div>
-            </article>
-        `;
-    }).join("");
+        return createQaRefreshCard(label, detail, formatQaRefreshTimestamp(entry.updatedAt || ""), stateClass);
+    });
 
     const startedAt = qaRefreshState.lastStartedAt ? `Letzter Start: ${formatQaRefreshTimestamp(qaRefreshState.lastStartedAt)}` : "Noch kein QA-Refresh gestartet";
     const completedAt = qaRefreshState.lastCompletedAt ? `Letzter Abschluss: ${formatQaRefreshTimestamp(qaRefreshState.lastCompletedAt)}` : "Noch kein QA-Refresh abgeschlossen";
 
-    container.innerHTML = `
-        <div class='python-clarity-box'>
-            <strong>Gesamtsicht:</strong> ${escapeHtml(qaRefreshState.lastSummary || "Noch keine QA-Synchronisierung ausgeführt.")}<br />
-            <span class='qa-refresh-meta'>${escapeHtml(startedAt)} · ${escapeHtml(completedAt)} · Anlass: ${escapeHtml(qaRefreshState.lastReason || "-")}</span>
-        </div>
-        <div class='qa-refresh-grid' style='margin-block-start: 12px'>
-            ${cardsHtml}
-        </div>
-    `;
+    container.appendChild(createQaRefreshSummary(
+        qaRefreshState.lastSummary || "Noch keine QA-Synchronisierung ausgeführt.",
+        startedAt,
+        completedAt,
+        qaRefreshState.lastReason || "-"
+    ));
+
+    const grid = document.createElement("div");
+    grid.className = "qa-refresh-grid";
+    grid.style.marginBlockStart = "12px";
+    cards.forEach(card => grid.appendChild(card));
+    container.appendChild(grid);
 }
 
 function setQaRefreshSectionState(sectionKey, state, message = "") {
@@ -997,16 +1108,11 @@ function updatePythonAutomationRunState({ isRunning, message, detail }) {
     const runButton = document.getElementById("python-automation-run-btn");
     if (!stateEl) return;
 
-    const safeMessage = escapeHtml(message || (isRunning ? "Automatischer Testlauf läuft…" : "Kein automatischer Testlauf aktiv."));
-    const safeDetail = escapeHtml(detail || "");
+    const safeMessage = message || (isRunning ? "Automatischer Testlauf läuft…" : "Kein automatischer Testlauf aktiv.");
+    const safeDetail = detail || "";
     stateEl.className = `python-run-state ${isRunning ? "python-run-state-running" : "python-run-state-idle"}`;
-    stateEl.innerHTML = `
-        <span class="python-run-state-dot" aria-hidden="true"></span>
-        <div>
-            <strong>${safeMessage}</strong>
-            ${safeDetail ? `<div class="python-muted-caption">${safeDetail}</div>` : ""}
-        </div>
-    `;
+    clearElementChildren(stateEl);
+    stateEl.appendChild(createPythonRunStateContent(safeMessage, safeDetail));
 
     if (runButton) {
         runButton.disabled = Boolean(isRunning);
@@ -1078,31 +1184,32 @@ function renderPythonAutomationProtocolRequirements() {
     const requirementsEl = document.getElementById("python-automation-protocol-requirements");
     if (!requirementsEl) return;
 
+    clearElementChildren(requirementsEl);
+
     const selected = findPythonAutomationTestById(pythonCommissioningSelectedTestId);
     if (!selected) {
-        requirementsEl.innerHTML = "Bitte zuerst einen manuellen oder dokumentierten Testfall auswählen.";
+        requirementsEl.textContent = "Bitte zuerst einen manuellen oder dokumentierten Testfall auswählen.";
         return;
     }
 
     const status = document.getElementById("python-automation-protocol-status")?.value || "pass";
     const requirements = getPythonEvidenceRequirements(selected, status);
-    requirementsEl.innerHTML = `
-        <strong>Nachweisregeln</strong><br />
-        <span class='python-muted-caption'>${escapeHtml(requirements.lines.join(" · "))}</span>
-    `;
+    requirementsEl.appendChild(createPythonRequirementSummary(requirements.lines));
 }
 
 function renderQaRuntimeModeBanner() {
     const banner = document.getElementById("qa-runtime-mode-banner");
     if (!banner) return;
 
+    clearElementChildren(banner);
+
     if (isPythonOperator) {
-        banner.innerHTML = "<div class='qa-runtime-banner is-operator'><strong>Python-Operator aktiv.</strong> QA-Register, Suite-Läufe, Emulator-Labor und Artefakte können vollständig geladen und ausgeführt werden.</div>";
+        banner.appendChild(createQaRuntimeBanner(true));
         applyQaRuntimeInteractionState();
         return;
     }
 
-    banner.innerHTML = "<div class='qa-runtime-banner is-readonly'><strong>Read-only QA-Ansicht.</strong> Ohne Python-Operator sind laufzeitabhängige QA-Bereiche nur eingeschränkt verfügbar. Sichtbar bleiben Dokumentation, Zusammenfassungen und bereits geladene Zustände.</div>";
+    banner.appendChild(createQaRuntimeBanner(false));
     applyQaRuntimeInteractionState();
 }
 
