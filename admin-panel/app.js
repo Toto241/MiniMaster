@@ -1674,12 +1674,12 @@ async function loadPythonAutomationCatalog() {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
         renderQaExecutionGuide(null, testingRegisterPayload, suiteCatalogPayload);
-        catalogEl.innerHTML = "<div class='info'>Der Python-Testkatalog ist nur im Python-Operator verfügbar.</div>";
+        replaceElementWithState(catalogEl, "info", "Der Python-Testkatalog ist nur im Python-Operator verfügbar.");
         setQaRefreshSectionState("catalog", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
-    catalogEl.innerHTML = "<div class='loading'>Lade Python-Testkatalog...</div>";
+    replaceElementWithState(catalogEl, "loading", "Lade Python-Testkatalog...");
     setQaRefreshSectionState("catalog", "loading", "Lädt…");
     try {
         const response = await fetch("/api/commissioning/catalog", {
@@ -1701,7 +1701,7 @@ async function loadPythonAutomationCatalog() {
         pythonCommissioningCatalog = null;
         renderPythonAutomationOverview(null, pythonCommissioningLastRun);
         renderQaExecutionGuide(null, testingRegisterPayload, suiteCatalogPayload);
-        catalogEl.innerHTML = `<div class='error'>Testkatalog konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        replaceElementWithState(catalogEl, "error", `Testkatalog konnte nicht geladen werden: ${error.message}`);
         setQaRefreshSectionState("catalog", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }
@@ -1712,7 +1712,7 @@ function renderPythonAutomationResult(run) {
     if (!resultEl) return;
 
     if (!run) {
-        resultEl.innerHTML = "<div class='info'>Noch kein Python-Automationslauf ausgeführt.</div>";
+        replaceElementWithState(resultEl, "info", "Noch kein Python-Automationslauf ausgeführt.");
         return;
     }
 
@@ -2115,7 +2115,7 @@ async function runPythonAutomationSuite() {
             detail: `${error.message || "Unbekannter Fehler"} · Laufzeit ${getPythonRunElapsedText()}.`,
         });
         pythonAutomationRunStartedAtMs = null;
-        resultEl.innerHTML = `<div class='error'>Python-Automationslauf fehlgeschlagen: ${escapeHtml(error.message)}</div>`;
+        replaceElementWithState(resultEl, "error", `Python-Automationslauf fehlgeschlagen: ${error.message}`);
         loadTestingRegister();
         showNotification("Python-Automationslauf fehlgeschlagen: " + error.message, "error");
     }
@@ -2128,7 +2128,7 @@ function renderPythonAutomationHistory(runs) {
     pythonCommissioningHistoryRuns = Array.isArray(runs) ? runs : [];
 
     if (!Array.isArray(runs) || runs.length === 0) {
-        historyEl.innerHTML = "<div class='info'>Noch keine Läufe protokolliert.</div>";
+        replaceElementWithState(historyEl, "info", "Noch keine Läufe protokolliert.");
         if (!pythonCommissioningLastRun) {
             renderPythonAutomationOverview(pythonCommissioningCatalog, null);
             renderPythonAutomationCatalog(pythonCommissioningCatalog, null);
@@ -2155,7 +2155,7 @@ function renderPythonAutomationHistory(runs) {
     });
 
     if (filteredRuns.length === 0) {
-        historyEl.innerHTML = "<div class='info'>Keine Läufe passen auf die aktuellen Filter.</div>";
+        replaceElementWithState(historyEl, "info", "Keine Läufe passen auf die aktuellen Filter.");
         return;
     }
 

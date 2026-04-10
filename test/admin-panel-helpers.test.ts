@@ -500,6 +500,57 @@ describe("admin-panel helper functions", () => {
     expect(historyEl.innerHTML).toContain("Nachweis-Historie konnte nicht geladen werden: Nachweise fehlen");
   });
 
+  it("renders python automation catalog state messages via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const catalogEl = createDomSinkElement();
+    elements.set("python-automation-catalog", catalogEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    await exports.loadPythonAutomationCatalog();
+    expect(catalogEl.replaceChildren).toHaveBeenCalled();
+    expect(catalogEl.innerHTML).toContain("Der Python-Testkatalog ist nur im Python-Operator verfügbar");
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Katalog fehlt" }),
+    });
+    exports.setPythonOperatorRuntimeForTests(true);
+    await exports.loadPythonAutomationCatalog();
+    expect(catalogEl.innerHTML).toContain("Testkatalog konnte nicht geladen werden: Katalog fehlt");
+  });
+
+  it("renders empty python automation result via DOM helper", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const resultEl = createDomSinkElement();
+    elements.set("python-automation-results", resultEl);
+
+    exports.renderPythonAutomationResult(null);
+
+    expect(resultEl.replaceChildren).toHaveBeenCalled();
+    expect(resultEl.innerHTML).toContain("Noch kein Python-Automationslauf ausgeführt");
+  });
+
+  it("renders python automation history empty and filtered-empty states via DOM helpers", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const historyEl = createDomSinkElement();
+    elements.set("python-automation-history", historyEl);
+
+    exports.renderPythonAutomationHistory([]);
+    expect(historyEl.replaceChildren).toHaveBeenCalled();
+    expect(historyEl.innerHTML).toContain("Noch keine Läufe protokolliert");
+
+    elements.set("python-automation-history-search", { value: "kein-treffer" });
+    elements.set("python-automation-history-open-only", { checked: false });
+    exports.renderPythonAutomationHistory([
+      { runId: "run-1", overall: "pass", startedAt: "2026-04-10T10:00:00Z", finishedAt: "2026-04-10T10:10:00Z", evaluation: { statusCounts: {} }, commands: { statusCounts: {} } },
+    ]);
+
+    expect(historyEl.innerHTML).toContain("Keine Läufe passen auf die aktuellen Filter");
+  });
+
   it("loads empty suite history into the dedicated history container", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
