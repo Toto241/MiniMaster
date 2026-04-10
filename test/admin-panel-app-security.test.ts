@@ -46,6 +46,14 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "loadSuiteDeviceStatus")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadSuiteCatalog")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "renderSuiteCatalog")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "showBootstrapImportPreview")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "cancelBootstrapImportPreview")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "confirmBootstrapImportPreview")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "copyFirebaseRecoveryScript")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "loadBootstrapFirebaseConfigFromUrl")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "loadBootstrapFirebaseConfigFromFile")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "renderBootstrapFirebaseConfig")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "persistBootstrapFirebaseConfig")).not.toContain("innerHTML");
   });
 
   it("contains dedicated DOM helpers for the QA runtime render paths", () => {
