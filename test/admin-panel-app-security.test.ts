@@ -21,6 +21,9 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "renderPythonAutomationProtocolRequirements")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "renderQaRuntimeModeBanner")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "renderPythonAutomationProtocolEditor")).not.toContain("summaryEl.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "loadPythonAutomationCatalog")).not.toContain("catalogEl.innerHTML");
+    expect(extractFunctionBody(source, "renderPythonAutomationResult")).not.toContain("resultEl.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "renderPythonAutomationHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadPythonAutomationHistory")).not.toContain("historyEl.innerHTML");
     expect(extractFunctionBody(source, "loadPythonAutomationEvidenceHistory")).not.toContain("historyEl.innerHTML");
   });
