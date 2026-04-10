@@ -318,6 +318,8 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  buildUsbTestRunRequestPayload,",
     "  updateUsbTestTypeFormState,",
     "  loadSuiteRunHistory,",
+    "  loadSuiteCatalog,",
+    "  renderSuiteCatalog,",
     "  setPythonOperatorRuntimeForTests: (value) => { isPythonOperator = Boolean(value); },",
     "  setAuthForTests: (value) => { auth = value; authBindingsInitialized = false; authStateObserverInitialized = false; },",
     "  setPythonCommissioningCatalogForTests: (value) => { pythonCommissioningCatalog = value; },",

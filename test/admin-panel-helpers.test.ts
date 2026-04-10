@@ -638,6 +638,31 @@ describe("admin-panel helper functions", () => {
     expect(historyEl.innerHTML).toContain("Backend nicht erreichbar");
   });
 
+  it("renders suite catalog read-only, error and empty states via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const catalogEl = createDomSinkElement();
+    elements.set("suite-catalog", catalogEl);
+    elements.set("suite-group-filter", { value: "all", innerHTML: "" });
+    elements.set("suite-ready-only", { checked: false });
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    await exports.loadSuiteCatalog();
+    expect(catalogEl.replaceChildren).toHaveBeenCalled();
+    expect(catalogEl.innerHTML).toContain("Suite-Katalog ist nur im Python-Operator verfuegbar");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Katalogfehler" }),
+    });
+    exports.setPythonOperatorRuntimeForTests(true);
+    await exports.loadSuiteCatalog();
+    expect(catalogEl.innerHTML).toContain("Katalogfehler");
+
+    exports.renderSuiteCatalog([]);
+    expect(catalogEl.innerHTML).toContain("Keine Suiten gefunden");
+  });
+
   it("renders QA platform overview read-only and empty states via DOM helpers", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 

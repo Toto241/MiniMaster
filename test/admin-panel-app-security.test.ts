@@ -33,6 +33,8 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "loadQaPlatformCatalog")).not.toContain("el.innerHTML = \"<div class='loading'>");
     expect(extractFunctionBody(source, "loadEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='loading'>");
     expect(extractFunctionBody(source, "loadSuiteDeviceStatus")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "loadSuiteCatalog")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "renderSuiteCatalog")).not.toContain("el.innerHTML = \"<div class='info'>");
   });
 
   it("contains dedicated DOM helpers for the QA runtime render paths", () => {
