@@ -20,6 +20,9 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "updatePythonAutomationRunState")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "renderPythonAutomationProtocolRequirements")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "renderQaRuntimeModeBanner")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "renderPythonAutomationProtocolEditor")).not.toContain("summaryEl.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "loadPythonAutomationHistory")).not.toContain("historyEl.innerHTML");
+    expect(extractFunctionBody(source, "loadPythonAutomationEvidenceHistory")).not.toContain("historyEl.innerHTML");
   });
 
   it("contains dedicated DOM helpers for the QA runtime render paths", () => {
@@ -27,5 +30,6 @@ describe("admin-panel app security regressions", () => {
     expect(source).toContain("function createQaRefreshCard");
     expect(source).toContain("function createPythonRunStateContent");
     expect(source).toContain("function clearElementChildren");
+    expect(source).toContain("function replaceElementWithState");
   });
 });

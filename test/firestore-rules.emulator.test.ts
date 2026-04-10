@@ -346,4 +346,44 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
       })
     );
   });
+
+  it("allows the owning child to write valid usage history entries", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+
+    const db = env.authenticatedContext("child-1").firestore();
+    await assertSucceeds(
+      setDoc(doc(db, "children", "child-1", "usageHistory", "2026-04-10"), {
+        date: "2026-04-10",
+        totalUsageMillis: 12345,
+      })
+    );
+  });
+
+  it("denies malformed usage history writes even for the owning child", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+
+    const db = env.authenticatedContext("child-1").firestore();
+    await assertFails(
+      setDoc(doc(db, "children", "child-1", "usageHistory", "2026-04-11"), {
+        date: "2026-04-11",
+        totalUsageMillis: "a lot",
+        extraField: true,
+      })
+    );
+  });
+
+  it("denies direct client writes to tamper events", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+
+    const db = env.authenticatedContext("child-1").firestore();
+    await assertFails(
+      setDoc(doc(db, "children", "child-1", "tamperEvents", "tamper-1"), {
+        eventType: "accessibility_disabled",
+        createdAt: "2026-04-10T10:15:00.000Z",
+      })
+    );
+  });
 });

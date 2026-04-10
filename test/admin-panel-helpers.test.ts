@@ -296,6 +296,32 @@ describe("admin-panel helper functions", () => {
     expect(requirementsEl.innerHTML).toContain("Für FAIL oder Nacharbeit sind Notizen Pflicht");
   });
 
+  it("shows a DOM-based empty state when no protocol target is selected", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const selectedEl = createDomSinkElement();
+    const requirementsEl = createDomSinkElement();
+    const docRowEl = { style: { display: "flex" } };
+    elements.set("python-automation-protocol-selected", selectedEl);
+    elements.set("python-automation-protocol-requirements", requirementsEl);
+    elements.set("python-automation-protocol-doc-row", docRowEl);
+    elements.set("python-automation-protocol-status", { value: "pass" });
+    elements.set("python-automation-protocol-operator", { value: "prefilled" });
+    elements.set("python-automation-protocol-evidence-ref", { value: "prefilled" });
+    elements.set("python-automation-protocol-notes", { value: "prefilled" });
+    elements.set("python-automation-protocol-doc-check", { checked: true });
+
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    exports.setPythonAutomationSelectedTestIdForTests(null);
+
+    exports.renderPythonAutomationProtocolEditor();
+
+    expect(selectedEl.replaceChildren).toHaveBeenCalled();
+    expect(selectedEl.innerHTML).toContain("Noch kein Testfall fuer die Protokollierung ausgewaehlt");
+    expect(docRowEl.style.display).toBe("none");
+  });
+
   it("updates USB form rows based on selected test type", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
@@ -432,6 +458,46 @@ describe("admin-panel helper functions", () => {
     expect(result).toMatchObject({ ok: false, message: "Nur im Python-Operator verfügbar." });
     expect(historyEl.innerHTML).toContain("Historie ist nur im Python-Operator verfuegbar");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("renders python automation history state messages via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const historyEl = createDomSinkElement();
+    elements.set("python-automation-history", historyEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    await exports.loadPythonAutomationHistory();
+    expect(historyEl.replaceChildren).toHaveBeenCalled();
+    expect(historyEl.innerHTML).toContain("Historie ist nur im Python-Operator verfügbar");
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Backend nicht erreichbar" }),
+    });
+    exports.setPythonOperatorRuntimeForTests(true);
+    await exports.loadPythonAutomationHistory();
+    expect(historyEl.innerHTML).toContain("Historie konnte nicht geladen werden: Backend nicht erreichbar");
+  });
+
+  it("renders python evidence history state messages via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const historyEl = createDomSinkElement();
+    elements.set("python-automation-protocol-history", historyEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    await exports.loadPythonAutomationEvidenceHistory();
+    expect(historyEl.replaceChildren).toHaveBeenCalled();
+    expect(historyEl.innerHTML).toContain("Nachweis-Historie ist nur im Python-Operator verfuegbar");
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Nachweise fehlen" }),
+    });
+    exports.setPythonOperatorRuntimeForTests(true);
+    await exports.loadPythonAutomationEvidenceHistory();
+    expect(historyEl.innerHTML).toContain("Nachweis-Historie konnte nicht geladen werden: Nachweise fehlen");
   });
 
   it("loads empty suite history into the dedicated history container", async () => {
