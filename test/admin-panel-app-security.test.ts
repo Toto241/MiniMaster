@@ -20,6 +20,9 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "updatePythonAutomationRunState")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "renderPythonAutomationProtocolRequirements")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "renderQaRuntimeModeBanner")).not.toContain("innerHTML");
+    expect(extractFunctionBody(source, "renderPythonAutomationOverview")).not.toContain("overviewEl.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "renderPythonAutomationCatalog")).not.toContain("catalogEl.innerHTML = \"<div class='info'>Noch kein Python-Testkatalog geladen.");
+    expect(extractFunctionBody(source, "renderPythonAutomationCatalog")).not.toContain("catalogEl.innerHTML = \"<div class='info'>Keine Testfälle passen auf die aktuellen Filter.");
     expect(extractFunctionBody(source, "renderPythonAutomationProtocolEditor")).not.toContain("summaryEl.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadPythonAutomationCatalog")).not.toContain("catalogEl.innerHTML");
     expect(extractFunctionBody(source, "renderPythonAutomationResult")).not.toContain("resultEl.innerHTML = \"<div class='info'>");
@@ -30,6 +33,14 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "loadSuiteRunHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "renderQaPlatformOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "renderEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "renderTestingRegisterOverview")).not.toContain("overviewEl.innerHTML = \"<div class='info'>Noch kein Testregister geladen.");
+    expect(extractFunctionBody(source, "renderTestingRegisterStorage")).not.toContain("storageEl.innerHTML = \"<div class='info'>Speicherorte werden nach dem Laden des Registers angezeigt.");
+    expect(extractFunctionBody(source, "renderTestingRegisterList")).not.toContain("automaticListEl.innerHTML = emptyHtml");
+    expect(extractFunctionBody(source, "renderTestingRegisterList")).not.toContain("manualListEl.innerHTML = emptyHtml");
+    expect(extractFunctionBody(source, "renderTestingRegisterList")).not.toContain("automaticListEl.innerHTML = emptyFilterHtml");
+    expect(extractFunctionBody(source, "renderTestingRegisterList")).not.toContain("manualListEl.innerHTML = emptyFilterHtml");
+    expect(extractFunctionBody(source, "loadTestingRegister")).not.toContain("automaticListEl.innerHTML = loadingHtml");
+    expect(extractFunctionBody(source, "loadTestingRegister")).not.toContain("manualListEl.innerHTML = loadingHtml");
     expect(extractFunctionBody(source, "loadQaPlatformCatalog")).not.toContain("el.innerHTML = \"<div class='loading'>");
     expect(extractFunctionBody(source, "loadEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='loading'>");
     expect(extractFunctionBody(source, "loadSuiteDeviceStatus")).not.toContain("el.innerHTML = \"<div class='info'>");
