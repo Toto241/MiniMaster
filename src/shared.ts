@@ -61,7 +61,13 @@ export async function requireMasterOwnership(context: CallableContext, childId: 
 
 // ==================== RATE LIMITING ====================
 
+// Cloud Functions instances are ephemeral and horizontally scaled.
+// This in-memory limiter is therefore only a best-effort fallback, mainly useful
+// for local development, emulator runs, and reducing accidental bursts on a single instance.
+// Strict multi-instance throttling requires a shared backend limiter.
+
 const rateLimitStore: Map<string, { count: number; windowStart: number }> = new Map();
+let hasLoggedBestEffortRateLimit = false;
 
 export function checkRateLimit(
   userId: string,
@@ -69,6 +75,14 @@ export function checkRateLimit(
   maxRequests: number = 30,
   windowMs: number = 60000
 ): void {
+  if (!hasLoggedBestEffortRateLimit && process.env.NODE_ENV === "production") {
+    hasLoggedBestEffortRateLimit = true;
+    functions.logger.warn(
+      "Using best-effort in-memory rate limiting. Configure a shared backend limiter for strict cross-instance enforcement.",
+      { action }
+    );
+  }
+
   const key = `${action}:${userId}`;
   const now = Date.now();
   const entry = rateLimitStore.get(key);

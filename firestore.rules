@@ -38,14 +38,7 @@ service cloud.firestore {
     // Admins and support agents can read all tickets and update their status
     match /supportTickets/{ticketId} {
       allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isSupportOrAdmin());
-      allow create: if isSignedIn()
-        && request.resource.data.masterImei == request.auth.uid
-        && request.resource.data.keys().hasOnly(['masterImei', 'problemDescription', 'status', 'createdAt', 'updatedAt'])
-        && request.resource.data.problemDescription is string
-        && request.resource.data.problemDescription.size() > 0
-        && request.resource.data.problemDescription.size() < 5000
-        && request.resource.data.status == 'open';
-      allow update: if isSupportOrAdmin();
+      allow create, update, delete: if false; // Support tickets are managed via callable functions / Admin SDK only.
 
       match /conversationHistory/{messageId} {
         allow read: if isSignedIn() && (
@@ -61,12 +54,7 @@ service cloud.firestore {
     // Admins and support agents can read all grants
     match /supportAccessGrants/{grantId} {
       allow read: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isSupportOrAdmin());
-      allow create: if isSignedIn()
-        && request.resource.data.masterImei == request.auth.uid
-        && request.resource.data.keys().hasOnly(['masterImei', 'ticketId', 'grantedAt', 'expiresAt', 'status'])
-        && request.resource.data.ticketId is string
-        && request.resource.data.status == 'active';
-      allow update: if isSignedIn() && (request.auth.uid == resource.data.masterImei || isSupportOrAdmin());
+      allow create, update, delete: if false; // Grants are issued and revoked server-side only.
     }
 
     // --- MASTERS COLLECTION ---

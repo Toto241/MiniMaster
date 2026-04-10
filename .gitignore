@@ -41,6 +41,18 @@ Thumbs.db
 *.tmp
 .tmp_*
 tmp_*
+*.log
+coverage_report.txt
+test_output.txt
+test-output.txt
+test-json.txt
+
+# Python local environments and bytecode
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Swift / Xcode build artefacts
 **/.build/

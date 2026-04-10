@@ -15,7 +15,7 @@
 
     <application
         android:name=".MasterApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -42,21 +42,6 @@
             </intent-filter>
         </service>
 
-        <!--
-          Debug diagnostic interface – only reachable via ADB (USB + USB-debugging).
-          android:exported="false" prevents any external app from sending these broadcasts.
-          The session requires challenge-response HMAC authentication (see DebugSessionManager).
-        -->
-            <receiver
-                android:name=".debug.DebugBroadcastReceiver"
-                android:exported="true">
-            <intent-filter>
-                <action android:name="com.minimaster.masterapp.DEBUG_GET_CHALLENGE" />
-                <action android:name="com.minimaster.masterapp.DEBUG_ACTIVATE" />
-                <action android:name="com.minimaster.masterapp.DEBUG_DEACTIVATE" />
-                <action android:name="com.minimaster.masterapp.DEBUG_DUMP_STATE" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>

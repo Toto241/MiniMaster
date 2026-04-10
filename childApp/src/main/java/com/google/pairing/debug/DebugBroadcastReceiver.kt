@@ -4,9 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.google.pairing.BuildConfig
+import com.google.pairing.ChildIdentityStorage
+import kotlinx.coroutines.runBlocking
 
 /**
- * Receives diagnostic broadcasts sent exclusively via ADB (android:exported="false").
+ * Receives diagnostic broadcasts from the debug-only manifest receiver.
  *
  * Available actions:
  *  com.google.pairing.DEBUG_GET_CHALLENGE  – issues a one-time HMAC nonce
@@ -14,14 +17,18 @@ import android.util.Log
  *  com.google.pairing.DEBUG_DEACTIVATE     – terminates the active session
  *  com.google.pairing.DEBUG_DUMP_STATE     – dumps app state to logcat
  *
- * The receiver is registered in the manifest with android:exported="false"
- * so it is only reachable via ADB on a connected, unlocked device.
+ * The receiver exists only in debug builds and is registered with android:exported="false".
  */
 class DebugBroadcastReceiver : BroadcastReceiver() {
 
     private val tag = "MINIMASTER_DEBUG_CHILD"
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (!BuildConfig.DEBUG) {
+            Log.w(tag, "Debug broadcast rejected in non-debug build.")
+            return
+        }
+
         when (intent.action) {
 
             ACTION_GET_CHALLENGE -> {
@@ -62,8 +69,7 @@ class DebugBroadcastReceiver : BroadcastReceiver() {
                 val rulesPrefs = context.getSharedPreferences("accessibility_rules", Context.MODE_PRIVATE)
                 val blockedApps = rulesPrefs.getStringSet("blocked_apps", emptySet()) ?: emptySet()
 
-                val childPrefs = context.getSharedPreferences("child_prefs", Context.MODE_PRIVATE)
-                val childId = childPrefs.getString("child_id", null)
+                val childId = runBlocking { ChildIdentityStorage.readChildId(context) }
                 val pairingState = if (childId != null) "PAIRED(last4:${childId.takeLast(4)})" else "UNPAIRED"
 
                 val json = DebugSessionManager.dumpStateJson(

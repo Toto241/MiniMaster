@@ -3,12 +3,9 @@ package com.google.pairing
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-// Remove preferencesDataStore import if Context.dataStore extension is no longer used directly here
-// import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,17 +20,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class ChildIdRepository @Inject constructor(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    @ApplicationContext private val context: Context
 ) {
-
-    /**
-     * A private object to hold the keys for the values stored in DataStore.
-     * This helps prevent typos and centralizes key management.
-     */
-    private object PreferencesKeys {
-        val CHILD_ID = stringPreferencesKey("child_id")
-    }
-
     /**
      * Saves the provided child ID to DataStore. This is a suspend function,
      * ensuring it is called from a coroutine and does not block the main thread.
@@ -41,9 +30,7 @@ class ChildIdRepository @Inject constructor(
      * @param id The unique identifier of the child device to save.
      */
     suspend fun saveChildId(id: String) {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.CHILD_ID] = id
-        }
+        ChildIdentityStorage.persistChildId(context, id, dataStore)
     }
 
     /**
@@ -56,7 +43,8 @@ class ChildIdRepository @Inject constructor(
      */
     fun getChildId(): Flow<String?> {
         return dataStore.data.map { preferences ->
-            preferences[PreferencesKeys.CHILD_ID]
+            preferences[androidx.datastore.preferences.core.stringPreferencesKey("child_id")]
+                ?: ChildIdentityStorage.readChildId(context, dataStore)
         }
     }
 }

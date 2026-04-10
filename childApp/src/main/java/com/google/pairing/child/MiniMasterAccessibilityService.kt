@@ -18,12 +18,14 @@ import com.google.pairing.LockScreen
 import com.google.pairing.MainActivity
 import com.google.pairing.R
 import com.google.pairing.AppLogger
+import com.google.pairing.ChildIdentityStorage
 import com.google.pairing.TaskStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -456,8 +458,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
      * Reports a tamper attempt to the backend so that the parent is notified.
      */
     private fun reportTamperEvent(eventType: String) {
-        val childId = getSharedPreferences("child_prefs", Context.MODE_PRIVATE)
-            .getString("child_id", null) ?: return
+        val childId = runBlocking { ChildIdentityStorage.readChildId(this@MiniMasterAccessibilityService) } ?: return
 
         val data = hashMapOf(
             "childId" to childId,
@@ -524,7 +525,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     }
 
     private fun reportUsageToBackend() {
-        val childId = getSharedPreferences("child_prefs", Context.MODE_PRIVATE).getString("child_id", null)
+        val childId = runBlocking { ChildIdentityStorage.readChildId(this@MiniMasterAccessibilityService) }
         if (childId == null) return
 
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)

@@ -7,6 +7,42 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function clearElement(element) {
+    while (element.firstChild) {
+        element.removeChild(element.firstChild);
+    }
+}
+
+function createStatusMessage(className, message) {
+    const wrapper = document.createElement('div');
+    wrapper.className = className;
+    wrapper.textContent = String(message);
+    return wrapper;
+}
+
+function renderStatsCards(statsContainer, cards) {
+    clearElement(statsContainer);
+
+    cards.forEach(({ title, value, color }) => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        card.appendChild(heading);
+
+        const valueEl = document.createElement('div');
+        valueEl.className = 'value';
+        valueEl.textContent = String(value);
+        if (color) {
+            valueEl.style.color = color;
+        }
+        card.appendChild(valueEl);
+
+        statsContainer.appendChild(card);
+    });
+}
+
 let currentPage = 1;
 const pageSize = 50;
 let lastDoc = null;
@@ -62,24 +98,12 @@ async function loadStats() {
         });
 
         const statsContainer = document.getElementById('statsContainer');
-        statsContainer.innerHTML = `
-            <div class="stat-card">
-                <h3>Total Events (24h)</h3>
-                <div class="value">${total}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Successful</h3>
-                <div class="value" style="color: #4CAF50;">${successCount}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Failed</h3>
-                <div class="value" style="color: #f44336;">${failureCount}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Denied</h3>
-                <div class="value" style="color: #ff9800;">${deniedCount}</div>
-            </div>
-        `;
+        renderStatsCards(statsContainer, [
+            { title: 'Total Events (24h)', value: total },
+            { title: 'Successful', value: successCount, color: '#4CAF50' },
+            { title: 'Failed', value: failureCount, color: '#f44336' },
+            { title: 'Denied', value: deniedCount, color: '#ff9800' },
+        ]);
     } catch (error) {
         console.error('Error loading stats:', error);
     }
@@ -443,9 +467,10 @@ function showLoading(show) {
  */
 function showError(message) {
     const errorContainer = document.getElementById('errorContainer');
-    errorContainer.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+    clearElement(errorContainer);
+    errorContainer.appendChild(createStatusMessage('error-message', message));
     setTimeout(() => {
-        errorContainer.innerHTML = '';
+        clearElement(errorContainer);
     }, 5000);
 }
 
@@ -454,7 +479,7 @@ function showError(message) {
  */
 function clearError() {
     const errorContainer = document.getElementById('errorContainer');
-    errorContainer.innerHTML = '';
+    clearElement(errorContainer);
 }
 
 /**
@@ -462,7 +487,16 @@ function clearError() {
  */
 function showNoResults() {
     const tbody = document.getElementById('logsBody');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #666;">No logs found matching the current filters.</td></tr>';
+    clearElement(tbody);
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 7;
+    cell.style.textAlign = 'center';
+    cell.style.padding = '40px';
+    cell.style.color = '#666';
+    cell.textContent = 'No logs found matching the current filters.';
+    row.appendChild(cell);
+    tbody.appendChild(row);
     updatePaginationControls(0);
 }
 

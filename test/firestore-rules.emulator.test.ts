@@ -157,6 +157,43 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
     );
   });
 
+  it("denies direct client creation of support tickets", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+    const db = env.authenticatedContext("master-1", { role: "master" }).firestore();
+
+    await assertFails(
+      setDoc(doc(db, "supportTickets", "ticket-1"), {
+        masterImei: "master-1",
+        problemDescription: "Direkter Schreibversuch",
+        status: "open",
+      })
+    );
+  });
+
+  it("denies direct client updates of support access grants", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+
+    await env.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, "supportAccessGrants", "grant-1"), {
+        masterImei: "master-1",
+        ticketId: "ticket-1",
+        status: "active",
+      });
+    });
+
+    const db = env.authenticatedContext("master-1", { role: "master" }).firestore();
+    await assertFails(
+      setDoc(doc(db, "supportAccessGrants", "grant-1"), {
+        masterImei: "master-1",
+        ticketId: "ticket-1",
+        status: "revoked",
+      }, { merge: true })
+    );
+  });
+
   it("allows the owning child to read its own tasks", async () => {
     const env = ensureEmulator();
     if (!env) return;

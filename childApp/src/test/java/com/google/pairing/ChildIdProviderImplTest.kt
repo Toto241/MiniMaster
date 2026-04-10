@@ -1,6 +1,8 @@
 package com.google.pairing
 
 import androidx.test.core.app.ApplicationProvider
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,6 +23,13 @@ class ChildIdProviderImplTest {
             .edit()
             .clear()
             .commit()
+        context.getSharedPreferences("child_prefs", android.content.Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+        runBlocking {
+            context.childIdentityDataStore.edit { preferences -> preferences.clear() }
+        }
         provider = ChildIdProviderImpl(context)
     }
 
