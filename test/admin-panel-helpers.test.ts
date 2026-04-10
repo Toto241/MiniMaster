@@ -368,7 +368,7 @@ describe("admin-panel helper functions", () => {
   it("renders QA artifacts overview with dual-device run, evidence and android mappings", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
-    const overview = { innerHTML: "" };
+    const overview = createDomSinkElement();
     elements.set("qa-artifact-overview", overview);
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -421,7 +421,7 @@ describe("admin-panel helper functions", () => {
   it("shows read-only artifact overview when python runtime is unavailable", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
-    const overview = { innerHTML: "" };
+    const overview = createDomSinkElement();
     elements.set("qa-artifact-overview", overview);
 
     exports.setPythonOperatorRuntimeForTests(false);
@@ -433,7 +433,7 @@ describe("admin-panel helper functions", () => {
   it("shows empty artifact overview when no runs or evidence exist in operator mode", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
-    const overview = { innerHTML: "" };
+    const overview = createDomSinkElement();
     elements.set("qa-artifact-overview", overview);
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -449,7 +449,7 @@ describe("admin-panel helper functions", () => {
   it("reports suite history as unavailable in read-only runtime", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
-    const historyEl = { innerHTML: "" };
+    const historyEl = createDomSinkElement();
     elements.set("suite-run-history", historyEl);
 
     exports.setPythonOperatorRuntimeForTests(false);
@@ -554,7 +554,7 @@ describe("admin-panel helper functions", () => {
   it("loads empty suite history into the dedicated history container", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
-    const historyEl = { innerHTML: "" };
+    const historyEl = createDomSinkElement();
     const activeRunsEl = { innerHTML: "aktive Läufe bleiben unberührt" };
     elements.set("suite-run-history", historyEl);
     elements.set("suite-active-runs", activeRunsEl);
@@ -576,7 +576,7 @@ describe("admin-panel helper functions", () => {
   it("renders populated suite history entries with status mapping", async () => {
     const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
 
-    const historyEl = { innerHTML: "" };
+    const historyEl = createDomSinkElement();
     elements.set("suite-run-history", historyEl);
     context.loadTestingRegister = jest.fn();
     context.rerenderSuiteCatalogFromCache = jest.fn();
@@ -621,7 +621,7 @@ describe("admin-panel helper functions", () => {
   it("renders suite history load errors into the history container", async () => {
     const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
 
-    const historyEl = { innerHTML: "" };
+    const historyEl = createDomSinkElement();
     elements.set("suite-run-history", historyEl);
     context.renderQaArtifactsOverview = jest.fn();
     context.rerenderSuiteCatalogFromCache = jest.fn();

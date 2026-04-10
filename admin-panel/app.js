@@ -2636,7 +2636,7 @@ function renderQaArtifactsOverview() {
     if (!el) return;
 
     if (!isPythonOperator) {
-        el.innerHTML = "<div class='info'>Artefakte und Laufspuren sind nur im Python-Operator verfügbar.</div>";
+        replaceElementWithState(el, "info", "Artefakte und Laufspuren sind nur im Python-Operator verfügbar.");
         return;
     }
 
@@ -2662,7 +2662,7 @@ function renderQaArtifactsOverview() {
     const faultModes = Array.isArray(latestDualRun?.result?.faultModes) ? latestDualRun.result.faultModes : [];
 
     if (!latestDualRun && !selectedCompatibilityRun && evidenceEntries.length === 0) {
-        el.innerHTML = "<div class='info'>Noch keine Artefakte oder Laufspuren vorhanden.</div>";
+        replaceElementWithState(el, "info", "Noch keine Artefakte oder Laufspuren vorhanden.");
         return;
     }
 
@@ -5541,11 +5541,11 @@ async function loadSuiteRunHistory() {
     const historyEl = document.getElementById("suite-run-history");
     if (!historyEl) return { ok: false, message: "Suite-Historien-Container fehlt." };
     if (!isPythonOperator) {
-        historyEl.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfuegbar.</div>";
+        replaceElementWithState(historyEl, "info", "Historie ist nur im Python-Operator verfuegbar.");
         setQaRefreshSectionState("suiteHistory", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    historyEl.innerHTML = "<div class='loading'>Lade Historie...</div>";
+    replaceElementWithState(historyEl, "loading", "Lade Historie...");
     setQaRefreshSectionState("suiteHistory", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites/history");
@@ -5556,7 +5556,7 @@ async function loadSuiteRunHistory() {
         renderQaArtifactsOverview();
         rerenderSuiteCatalogFromCache();
         if (runs.length === 0) {
-            historyEl.innerHTML = "<div class='info'>Keine Testlaeufe in der Historie.</div>";
+            replaceElementWithState(historyEl, "info", "Keine Testlaeufe in der Historie.");
             setQaRefreshSectionState("suiteHistory", "success", "Keine Testläufe vorhanden");
             return { ok: true, message: "Keine Testläufe vorhanden." };
         }
@@ -5565,7 +5565,7 @@ async function loadSuiteRunHistory() {
         setQaRefreshSectionState("suiteHistory", "success", `${runs.length} Suite-Läufe geladen`);
         return { ok: true, message: `${runs.length} Suite-Läufe geladen.` };
     } catch (err) {
-        historyEl.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        replaceElementWithState(historyEl, "error", String(err.message || "Fehler beim Laden"));
         setQaRefreshSectionState("suiteHistory", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }
