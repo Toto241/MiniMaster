@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { setDoc, doc, getDoc, updateDoc } from "firebase/firestore";
+import { setDoc, doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 
 describe("Firestore Security Rules - Emulator Enforcement", () => {
   let testEnv: RulesTestEnvironment | null = null;
@@ -260,8 +260,8 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
     const db = env.authenticatedContext("child-1").firestore();
     await assertSucceeds(
       updateDoc(doc(db, "children", "child-1", "commands", "cmd-ack"), {
-        status: "acked",
-        ackedAt: "2026-04-10T10:05:00.000Z",
+        status: "applied",
+        ackedAt: Timestamp.fromDate(new Date("2026-04-10T10:05:00.000Z")),
       })
     );
   });
@@ -283,8 +283,31 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
     const db = env.authenticatedContext("child-1").firestore();
     await assertFails(
       updateDoc(doc(db, "children", "child-1", "commands", "cmd-bad"), {
-        status: "acked",
+        status: "applied",
         type: "unlock-device",
+      })
+    );
+  });
+
+  it("denies command acknowledgement with invalid status or field types", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+
+    await env.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, "children", "child-1", "commands", "cmd-invalid-types"), {
+        status: "pending",
+        ackedAt: null,
+        errorCode: null,
+        type: "lock_state",
+      });
+    });
+
+    const db = env.authenticatedContext("child-1").firestore();
+    await assertFails(
+      updateDoc(doc(db, "children", "child-1", "commands", "cmd-invalid-types"), {
+        status: "acked",
+        ackedAt: "not-a-timestamp",
       })
     );
   });
@@ -301,7 +324,7 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
         payload: { totalUsageMillis: 1234 },
         idempotencyKey: "idem-1",
         senderPlatform: "android",
-        createdAt: "2026-04-10T10:10:00.000Z",
+        createdAt: Timestamp.fromDate(new Date("2026-04-10T10:10:00.000Z")),
       })
     );
   });
@@ -317,6 +340,23 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
         eventType: "tamper_event",
         payload: { severity: "high" },
         idempotencyKey: "idem-2",
+        senderPlatform: "android",
+        createdAt: Timestamp.fromDate(new Date("2026-04-10T10:10:00.000Z")),
+      })
+    );
+  });
+
+  it("denies events with invalid types or malformed createdAt", async () => {
+    const env = ensureEmulator();
+    if (!env) return;
+
+    const db = env.authenticatedContext("child-1").firestore();
+    await assertFails(
+      setDoc(doc(db, "children", "child-1", "events", "evt-invalid"), {
+        eventId: "evt-invalid",
+        eventType: "unexpected_event",
+        payload: "not-a-map",
+        idempotencyKey: "idem-invalid",
         senderPlatform: "android",
         createdAt: "2026-04-10T10:10:00.000Z",
       })
@@ -335,7 +375,7 @@ describe("Firestore Security Rules - Emulator Enforcement", () => {
         payload: { severity: "high" },
         idempotencyKey: "idem-locked",
         senderPlatform: "android",
-        createdAt: "2026-04-10T10:12:00.000Z",
+        createdAt: Timestamp.fromDate(new Date("2026-04-10T10:12:00.000Z")),
       });
     });
 
