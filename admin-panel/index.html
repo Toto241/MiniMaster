@@ -1717,6 +1717,42 @@
                                 <section class="python-automation-panel qa-panel-secondary">
                                     <div class="python-automation-panel-header">
                                         <div>
+                                            <h5>System Health Dashboard</h5>
+                                            <p>Kontinuierliche Überwachung, Agentenaktivität und Error Explorer für den Self-Healing-Laufzeitpfad.</p>
+                                        </div>
+                                    </div>
+                                    <details class="qa-collapsible-section" open>
+                                        <summary>Self-Healing öffnen</summary>
+                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                            <button id="qa-self-healing-run-btn" onclick="runQaSelfHealingCycle()" class="btn btn-primary" title="Self-Healing-Zyklus jetzt ausführen">Self-Healing jetzt ausführen</button>
+                                            <label class="setup-checklist-item python-inline-check">
+                                                <input type="checkbox" id="qa-self-healing-auto-fix" />
+                                                Sichere Auto-Fixes aktivieren
+                                            </label>
+                                        </div>
+                                        <div id="qa-self-healing-summary" class="data-list">
+                                            <div class="info">Noch kein Self-Healing-Zyklus ausgeführt.</div>
+                                        </div>
+                                        <div class="qa-self-healing-grid" style="margin-block-start: 10px">
+                                            <section class="python-clarity-box">
+                                                <strong>Agent Activity Panel</strong>
+                                                <div id="qa-self-healing-activity" class="data-list" style="margin-block-start: 8px">
+                                                    <div class="info">Noch keine Agentenaktivität vorhanden.</div>
+                                                </div>
+                                            </section>
+                                            <section class="python-clarity-box">
+                                                <strong>Error Explorer</strong>
+                                                <div id="qa-self-healing-errors" class="data-list" style="margin-block-start: 8px">
+                                                    <div class="info">Noch keine Probleme erkannt.</div>
+                                                </div>
+                                            </section>
+                                        </div>
+                                    </details>
+                                </section>
+
+                                <section class="python-automation-panel qa-panel-secondary">
+                                    <div class="python-automation-panel-header">
+                                        <div>
                                             <h5>Artefakte &amp; Laufspuren</h5>
                                             <p>Zeigt die letzte Dual-Device-Timeline sowie die jüngste manuelle Evidenzlage im QA-Betrieb.</p>
                                         </div>

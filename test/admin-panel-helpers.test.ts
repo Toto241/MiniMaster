@@ -223,6 +223,46 @@ describe("admin-panel helper functions", () => {
     expect(context.document.createElement).toHaveBeenCalled();
   });
 
+  it("renders the self-healing dashboard payload with escaped issue content", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const summaryEl = createDomSinkElement();
+    const activityEl = createDomSinkElement();
+    const errorEl = createDomSinkElement();
+    elements.set("qa-self-healing-summary", summaryEl);
+    elements.set("qa-self-healing-activity", activityEl);
+    elements.set("qa-self-healing-errors", errorEl);
+
+    exports.renderQaSelfHealingStatus({
+      systemHealth: "DEGRADED",
+      triggeredBy: "http-post",
+      generatedAt: "2026-04-10T10:00:00.000Z",
+      detectedIssues: [
+        {
+          id: "stale-run:run-1",
+          title: "<script>alert(1)</script>",
+          message: "Run hängt",
+          severity: "HIGH",
+          severityRank: 1,
+          fixType: "AUTO_FIX",
+          rootCause: "Kein Terminalstatus",
+          reproduction: "Run starten und offen lassen",
+          exactLocation: "suite-run:active:run-1",
+        },
+      ],
+      fixesApplied: [{ runId: "run-1", action: "mark-stale-run-error" }],
+      pendingFixes: [],
+      validationResults: [{ runId: "run-1", status: "passed", details: "Keine Restprobleme erkannt." }],
+      agentActivities: [{ agent: "gap-closer", action: "mark-stale-run-error", target: "run-1", result: "success", details: "Run beendet" }],
+      monitor: { enabled: true, intervalSec: 60 },
+    });
+
+    expect(summaryEl.innerHTML).toContain("Self-Healing aktiv, Restprobleme vorhanden");
+    expect(activityEl.innerHTML).toContain("gap-closer");
+    expect(errorEl.innerHTML).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(errorEl.innerHTML).toContain("AUTO_FIX");
+  });
+
   it("derives USB form visibility from test type", () => {
     const { exports } = loadAdminPanelTestExports();
 

@@ -39,7 +39,9 @@ def suite_log_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Weist SUITE_RUN_LOG_FILE auf ein Temp-Verzeichnis."""
     import app
     log_file = tmp_path / "suite_runs.jsonl"
+    self_healing_log_file = tmp_path / "self_healing_cycles.jsonl"
     monkeypatch.setattr(app, "SUITE_RUN_LOG_FILE", log_file)
+    monkeypatch.setattr(app, "SELF_HEALING_LOG_FILE", self_healing_log_file)
     monkeypatch.setattr(app, "LOG_DIR", tmp_path)
     return log_file
 
@@ -233,6 +235,18 @@ class TestMiniMasterAdminHandlerRoutes:
             },
         )
 
+    def test_do_get_self_healing_status_forwards_parameters(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/qa/self-healing/status?autoFix=true&staleAfterSec=120")
+        cycle_mock = MagicMock(return_value={"systemHealth": "OK", "detectedIssues": []})
+        monkeypatch.setattr(app, "run_self_healing_cycle", cycle_mock)
+
+        app.MiniMasterAdminHandler.do_GET(handler)
+
+        cycle_mock.assert_called_once_with(auto_fix=False, stale_after_sec=120, triggered_by="http-get")
+        handler._write_json.assert_called_once_with(HTTPStatus.OK, {"systemHealth": "OK", "detectedIssues": []})
+
     def test_do_post_dual_device_queues_run_with_scenario_profile_and_fault_modes(self, monkeypatch: pytest.MonkeyPatch):
         import app
 
@@ -313,6 +327,19 @@ class TestMiniMasterAdminHandlerRoutes:
             queued = app._active_suite_runs["compat-fedcba123456"]
         assert queued["type"] == "android-compatibility"
         assert queued["androidVersions"] == ["10", "14"]
+
+    def test_do_post_self_healing_runs_cycle(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/qa/self-healing/run")
+        handler._read_json_body.return_value = {"autoFix": False, "staleAfterSec": 300}
+        cycle_mock = MagicMock(return_value={"systemHealth": "DEGRADED", "fixesApplied": []})
+        monkeypatch.setattr(app, "run_self_healing_cycle", cycle_mock)
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        cycle_mock.assert_called_once_with(auto_fix=False, stale_after_sec=300, triggered_by="http-post")
+        handler._write_json.assert_called_once_with(HTTPStatus.OK, {"systemHealth": "DEGRADED", "fixesApplied": []})
 
     def test_do_post_android_compatibility_keeps_selected_tests_and_scenarios(self, monkeypatch: pytest.MonkeyPatch):
         import app
@@ -1496,6 +1523,74 @@ class TestRunAndroidAutomationSweepBackground:
         assert run_state["result"]["executionMode"] == "all-automated"
         assert len(run_state["result"]["subRuns"]) == 3
         assert [item["executionMode"] for item in run_state["result"]["subRuns"]] == ["single-master", "single-child", "dual-device"]
+
+
+class TestSelfHealingCycle:
+    def test_marks_stale_active_run_as_error_and_logs_fix(self, suite_log_file):
+        import app
+
+        with app._active_suite_lock:
+            app._active_suite_runs["stale-run-1"] = {
+                "runId": "stale-run-1",
+                "suiteId": "backend-lint",
+                "status": "running",
+                "startedAt": "2026-04-10T08:00:00Z",
+                "timeline": [],
+                "result": None,
+            }
+
+        cycle = app.run_self_healing_cycle(auto_fix=True, stale_after_sec=60)
+
+        assert cycle["systemHealth"] == "DEGRADED"
+        assert any(item["action"] == "mark-stale-run-error" for item in cycle["fixesApplied"])
+        with app._active_suite_lock:
+            healed_run = app._active_suite_runs["stale-run-1"]
+        assert healed_run["status"] == "error"
+        assert healed_run["currentPhase"] == "error"
+        assert healed_run["finishedAt"]
+        assert "Self-Healing" in str(healed_run["error"])
+
+    def test_rewrites_history_entries_with_missing_integrity_fields(self, suite_log_file):
+        import app
+
+        suite_log_file.write_text(
+            json.dumps({
+                "runId": "history-run-1",
+                "suiteId": "backend-jest",
+                "result": {"overallStatus": "passed", "status": "passed"},
+                "timestamp": "2026-04-10T09:00:00Z",
+            }, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        cycle = app.run_self_healing_cycle(auto_fix=True, stale_after_sec=60)
+        rewritten_entries = [json.loads(line) for line in suite_log_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+        assert any(item["runId"] == "history-run-1" for item in cycle["fixesApplied"])
+        assert rewritten_entries[0]["type"] == "suite"
+        assert rewritten_entries[0]["status"] == "finished"
+        assert rewritten_entries[0]["startedAt"] == "2026-04-10T09:00:00Z"
+        assert rewritten_entries[0]["finishedAt"] == "2026-04-10T09:00:00Z"
+
+    def test_reports_manual_fix_for_finished_run_without_result(self, suite_log_file):
+        import app
+
+        suite_log_file.write_text(
+            json.dumps({
+                "runId": "history-run-2",
+                "suiteId": "backend-jest",
+                "status": "finished",
+                "timestamp": "2026-04-10T09:30:00Z",
+            }, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        cycle = app.run_self_healing_cycle(auto_fix=True, stale_after_sec=60)
+
+        pending = [item for item in cycle["pendingFixes"] if item["runId"] == "history-run-2"]
+        assert pending
+        assert pending[0]["fixType"] == "MANUAL_FIX_REQUIRED"
+        assert "suite_runs.jsonl" in pending[0]["manualPlan"]
 
 
 # ═══════════════════════════════════════════════════════════════════

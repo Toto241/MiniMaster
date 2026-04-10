@@ -230,6 +230,8 @@ let qaArtifactScenarioFilter = "";
 let qaCompatibilitySelectedRunId = "";
 let qaCompatibilityModeFilter = "all";
 let qaDashboardLoadPromise = null;
+let qaSelfHealingPayload = null;
+let qaSelfHealingPollHandle = null;
 let qaRefreshState = {
     lastStartedAt: "",
     lastCompletedAt: "",
@@ -645,6 +647,7 @@ function getQaDashboardSectionLoaders() {
         ["catalog", loadPythonAutomationCatalog],
         ["history", loadPythonAutomationHistory],
         ["evidence", loadPythonAutomationEvidenceHistory],
+        ["selfHealing", () => loadQaSelfHealingStatus()],
         ["register", loadTestingRegister],
         ["qaPlatform", loadQaPlatformCatalog],
         ["emulators", loadEmulatorLabOverview],
@@ -2965,6 +2968,214 @@ function renderSuiteRunCards(runs, emptyLabel) {
             }).join("")}
         </div>
     `;
+}
+
+function getQaSelfHealingHealthMeta(payload = qaSelfHealingPayload) {
+    const systemHealth = String(payload?.systemHealth || "OK").toUpperCase();
+    if (systemHealth === "CRITICAL") {
+        return { className: "health-red", label: "Kritische Self-Healing-Probleme" };
+    }
+    if (systemHealth === "DEGRADED") {
+        return { className: "health-yellow", label: "Self-Healing aktiv, Restprobleme vorhanden" };
+    }
+    return { className: "health-green", label: "Self-Healing stabil" };
+}
+
+function renderQaSelfHealingStatus(payload = qaSelfHealingPayload) {
+    const summaryEl = document.getElementById("qa-self-healing-summary");
+    const activityEl = document.getElementById("qa-self-healing-activity");
+    const errorEl = document.getElementById("qa-self-healing-errors");
+    if (!summaryEl || !activityEl || !errorEl) return;
+
+    if (!payload) {
+        replaceElementWithState(summaryEl, "info", "Noch kein Self-Healing-Zyklus ausgeführt.");
+        replaceElementWithState(activityEl, "info", "Noch keine Agentenaktivität vorhanden.");
+        replaceElementWithState(errorEl, "info", "Noch keine Probleme erkannt.");
+        return;
+    }
+
+    const detectedIssues = Array.isArray(payload.detectedIssues) ? payload.detectedIssues : [];
+    const fixesApplied = Array.isArray(payload.fixesApplied) ? payload.fixesApplied : [];
+    const pendingFixes = Array.isArray(payload.pendingFixes) ? payload.pendingFixes : [];
+    const validationResults = Array.isArray(payload.validationResults) ? payload.validationResults : [];
+    const agentActivities = Array.isArray(payload.agentActivities) ? payload.agentActivities : [];
+    const monitor = payload.monitor || {};
+    const healthMeta = getQaSelfHealingHealthMeta(payload);
+
+    summaryEl.innerHTML = `
+        <div class='health-banner ${healthMeta.className}'>
+            <div class='health-main'>
+                <div class='health-indicator'><span class='health-dot'></span><span class='health-label'>${escapeHtml(healthMeta.label)}</span></div>
+                <div class='health-details'>
+                    <span class='health-item'><span class='h-dot h-dot-${String(payload.systemHealth || "OK").toLowerCase() === "critical" ? "red" : String(payload.systemHealth || "OK").toLowerCase() === "degraded" ? "yellow" : "green"}'></span>Status: ${escapeHtml(String(payload.systemHealth || "OK"))}</span>
+                    <span class='health-item'><span class='h-dot h-dot-yellow'></span>Issues: ${escapeHtml(String(detectedIssues.length))}</span>
+                    <span class='health-item'><span class='h-dot h-dot-green'></span>Auto-Fixes: ${escapeHtml(String(fixesApplied.length))}</span>
+                    <span class='health-item'><span class='h-dot h-dot-red'></span>Offen: ${escapeHtml(String(pendingFixes.length))}</span>
+                    <span class='health-item'><span class='h-dot h-dot-green'></span>Validierungen: ${escapeHtml(String(validationResults.length))}</span>
+                </div>
+            </div>
+        </div>
+        <div class='qa-refresh-grid' style='margin-block-start: 12px'>
+            <article class='qa-refresh-card ${pendingFixes.length > 0 ? "is-error" : fixesApplied.length > 0 ? "is-loading" : "is-success"}'>
+                <strong>Monitor</strong>
+                <div class='qa-refresh-meta'>Trigger: ${escapeHtml(String(payload.triggeredBy || "-"))}</div>
+                <div class='qa-refresh-meta'>Letzter Lauf: ${escapeHtml(formatQaRefreshTimestamp(payload.generatedAt || monitor.lastCompletedAt || ""))}</div>
+                <div class='qa-refresh-meta'>Intervall: ${escapeHtml(String(monitor.intervalSec || 30))}s · Aktiv: ${monitor.enabled ? "ja" : "nein"}</div>
+            </article>
+            <article class='qa-refresh-card ${detectedIssues.length > 0 ? "is-loading" : "is-success"}'>
+                <strong>Root Cause Scan</strong>
+                <div class='qa-refresh-meta'>Erkannte Probleme: ${escapeHtml(String(detectedIssues.length))}</div>
+                <div class='qa-refresh-meta'>Schweregrade: ${escapeHtml(detectedIssues.map(item => String(item?.severity || "")).filter(Boolean).slice(0, 4).join(", ") || "keine")}</div>
+            </article>
+            <article class='qa-refresh-card ${fixesApplied.length > 0 ? "is-success" : "is-loading"}'>
+                <strong>Auto-Fix</strong>
+                <div class='qa-refresh-meta'>Angewendet: ${escapeHtml(String(fixesApplied.length))}</div>
+                <div class='qa-refresh-meta'>Pending: ${escapeHtml(String(pendingFixes.length))}</div>
+            </article>
+        </div>
+    `;
+
+    if (agentActivities.length === 0) {
+        replaceElementWithState(activityEl, "info", "Noch keine Agentenaktivität vorhanden.");
+    } else {
+        activityEl.innerHTML = `
+            <div class='qa-register-card-list'>
+                ${agentActivities.slice(0, 12).map(item => `
+                    <article class='qa-register-item-card'>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(String(item.agent || "agent"))}</h6>
+                                <div class='python-muted-caption'>${escapeHtml(String(item.timestamp || ""))}</div>
+                            </div>
+                            <span class='category-badge'>${escapeHtml(String(item.result || "offen"))}</span>
+                        </div>
+                        <p class='qa-register-item-detail'>${escapeHtml(String(item.action || "Aktion"))} → ${escapeHtml(String(item.target || "-"))}</p>
+                        ${item.details ? `<div class='qa-refresh-meta'>${escapeHtml(String(item.details || ""))}</div>` : ""}
+                        ${item.error ? `<div class='qa-refresh-meta'>Fehler: ${escapeHtml(String(item.error || ""))}</div>` : ""}
+                    </article>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    if (detectedIssues.length === 0 && pendingFixes.length === 0) {
+        replaceElementWithState(errorEl, "success-box", "Keine offenen Self-Healing-Probleme erkannt.");
+    } else {
+        const combinedIssues = [...pendingFixes, ...detectedIssues.filter(issue => !pendingFixes.some(pending => pending.id === issue.id))]
+            .sort((left, right) => Number(left?.severityRank || 99) - Number(right?.severityRank || 99));
+        errorEl.innerHTML = `
+            <div class='qa-register-card-list'>
+                ${combinedIssues.slice(0, 20).map(issue => `
+                    <article class='qa-register-item-card'>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(String(issue.title || issue.id || "Problem"))}</h6>
+                                <div class='python-muted-caption'>${escapeHtml(String(issue.exactLocation || issue.runId || "-"))}</div>
+                            </div>
+                            <div class='qa-register-item-badges'>
+                                <span class='severity-badge ${escapeHtml(String(issue.severity || "low").toLowerCase())}'>${escapeHtml(String(issue.severity || "LOW"))}</span>
+                                <span class='category-badge'>${escapeHtml(String(issue.fixType || "AUTO_FIX"))}</span>
+                            </div>
+                        </div>
+                        <p class='qa-register-item-detail'>${escapeHtml(String(issue.message || issue.rootCause || ""))}</p>
+                        ${issue.rootCause ? `<div class='qa-refresh-meta'>Ursache: ${escapeHtml(String(issue.rootCause || ""))}</div>` : ""}
+                        ${issue.reproduction ? `<div class='qa-refresh-meta'>Reproduktion: ${escapeHtml(String(issue.reproduction || ""))}</div>` : ""}
+                        ${issue.manualPlan ? `<div class='qa-refresh-meta'>Fix-Plan: ${escapeHtml(String(issue.manualPlan || ""))}</div>` : ""}
+                    </article>
+                `).join("")}
+            </div>
+        `;
+    }
+}
+
+async function loadQaSelfHealingStatus() {
+    const summaryEl = document.getElementById("qa-self-healing-summary");
+    const activityEl = document.getElementById("qa-self-healing-activity");
+    const errorEl = document.getElementById("qa-self-healing-errors");
+    if (!summaryEl || !activityEl || !errorEl) {
+        return { ok: false, message: "Self-Healing-Container fehlt." };
+    }
+    if (!isPythonOperator) {
+        replaceElementWithState(summaryEl, "info", "Self-Healing ist nur im Python-Operator verfuegbar.");
+        replaceElementWithState(activityEl, "info", "Agentenaktivität ist nur im Python-Operator verfuegbar.");
+        replaceElementWithState(errorEl, "info", "Error Explorer ist nur im Python-Operator verfuegbar.");
+        setQaRefreshSectionState("selfHealing", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
+    }
+
+    replaceElementWithState(summaryEl, "loading", "Self-Healing-Status wird geladen...");
+    replaceElementWithState(activityEl, "loading", "Agentenaktivität wird geladen...");
+    replaceElementWithState(errorEl, "loading", "Error Explorer wird geladen...");
+    setQaRefreshSectionState("selfHealing", "loading", "Prüft…");
+
+    try {
+        const response = await fetch("/api/qa/self-healing/status");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Self-Healing-Status konnte nicht geladen werden.");
+        }
+        qaSelfHealingPayload = payload;
+        renderQaSelfHealingStatus(payload);
+        setQaRefreshSectionState("selfHealing", payload.pendingFixes?.length ? "error" : payload.fixesApplied?.length ? "loading" : "success", `Health: ${String(payload.systemHealth || "OK")}`);
+        return { ok: true, message: `Health: ${String(payload.systemHealth || "OK")}` };
+    } catch (error) {
+        replaceElementWithState(summaryEl, "error", `Self-Healing fehlgeschlagen: ${error.message}`);
+        replaceElementWithState(activityEl, "info", "Keine Agentenaktivität verfügbar.");
+        replaceElementWithState(errorEl, "error", `Error Explorer fehlgeschlagen: ${error.message}`);
+        setQaRefreshSectionState("selfHealing", "error", error.message || "Fehler beim Laden");
+        return { ok: false, message: error.message || "Fehler beim Laden" };
+    }
+}
+
+async function runQaSelfHealingCycle() {
+    if (!isPythonOperator) {
+        showNotification("Self-Healing ist nur im Python-Operator verfügbar.", "error");
+        return;
+    }
+
+    const button = document.getElementById("qa-self-healing-run-btn");
+    const autoFix = Boolean(document.getElementById("qa-self-healing-auto-fix")?.checked);
+    if (button) button.disabled = true;
+    try {
+        const response = await fetch("/api/qa/self-healing/run", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            body: JSON.stringify({ autoFix }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Self-Healing-Zyklus konnte nicht gestartet werden.");
+        }
+        qaSelfHealingPayload = payload;
+        renderQaSelfHealingStatus(payload);
+        showNotification(`Self-Healing abgeschlossen: ${String(payload.systemHealth || "OK")}.`, payload.pendingFixes?.length ? "error" : "success");
+        loadSuiteRunHistory();
+    } catch (error) {
+        showNotification("Self-Healing fehlgeschlagen: " + error.message, "error");
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+function startQaSelfHealingPolling() {
+    if (qaSelfHealingPollHandle) {
+        clearInterval(qaSelfHealingPollHandle);
+        qaSelfHealingPollHandle = null;
+    }
+    if (!isPythonOperator) {
+        renderQaSelfHealingStatus(null);
+        return;
+    }
+
+    const execute = () => {
+        loadQaSelfHealingStatus().catch(() => undefined);
+    };
+
+    execute();
+    qaSelfHealingPollHandle = setInterval(execute, 30000);
 }
 
 function getLatestFailedSuiteRun() {
@@ -8801,6 +9012,7 @@ function refreshCommissioningReport() {
 document.addEventListener("DOMContentLoaded", async function() {
     await detectPythonOperatorRuntime();
     renderQaRuntimeModeBanner();
+    startQaSelfHealingPolling();
     renderBootstrapFirebaseConfig(firebaseConfig);
     setupBootstrapConfigLiveSync();
     renderCommandBuilderConfig(loadCommandBuilderConfig());

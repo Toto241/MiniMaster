@@ -3408,6 +3408,615 @@ def run_command(request: CommandRequest, timeout_sec: int | None = None) -> dict
 _active_suite_runs: dict[str, dict[str, object]] = {}
 _active_suite_lock = threading.Lock()
 SUITE_RUN_LOG_FILE = LOG_DIR / "suite_runs.jsonl"
+SELF_HEALING_LOG_FILE = LOG_DIR / "self_healing_cycles.jsonl"
+SELF_HEALING_HISTORY_LIMIT = 25
+SELF_HEALING_MAX_ISSUES = 100
+SELF_HEALING_STALE_AFTER_SEC = int(os.environ.get("MINIMASTER_SELF_HEALING_STALE_AFTER_SEC", "900"))
+SELF_HEALING_MONITOR_INTERVAL_SEC = int(os.environ.get("MINIMASTER_SELF_HEALING_INTERVAL_SEC", "60"))
+_self_healing_cycle_lock = threading.Lock()
+_self_healing_monitor_lock = threading.Lock()
+_self_healing_monitor_thread: threading.Thread | None = None
+_self_healing_monitor_stop_event = threading.Event()
+_self_healing_monitor_state: dict[str, object] = {
+    "enabled": False,
+    "intervalSec": SELF_HEALING_MONITOR_INTERVAL_SEC,
+    "lastStartedAt": None,
+    "lastCompletedAt": None,
+    "lastOutcome": "idle",
+    "lastSystemHealth": "OK",
+}
+
+
+def _current_timestamp_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _deep_copy_json_compatible(value: object) -> object:
+    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
+
+
+def _load_jsonl_entries(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        return []
+    entries: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            entries.append(parsed)
+    return entries
+
+
+def _write_jsonl_entries(path: Path, entries: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _append_self_healing_cycle_log(entry: dict[str, object]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with SELF_HEALING_LOG_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def load_self_healing_history(limit: int = SELF_HEALING_HISTORY_LIMIT) -> list[dict[str, object]]:
+    entries = _load_jsonl_entries(SELF_HEALING_LOG_FILE)
+    return list(reversed(entries[-limit:]))
+
+
+def _infer_suite_run_type(run: dict[str, object]) -> str:
+    explicit = str(run.get("type") or "").strip()
+    if explicit:
+        return explicit
+    if str(run.get("suiteId") or run.get("suite_id") or "").strip():
+        return "suite"
+    if str(run.get("appId") or run.get("app_id") or "").strip():
+        return "usb-test"
+    if run.get("executionMode") or run.get("androidVersions") or run.get("selectedScenarioIds"):
+        return "android-compatibility"
+    if str(run.get("masterSerial") or run.get("childSerial") or "").strip():
+        return "dual-device"
+    return "suite"
+
+
+def _result_status_from_run(run: dict[str, object]) -> str:
+    result = as_dict(run.get("result"))
+    for key in ("overallStatus", "overall_status", "status"):
+        value = str(result.get(key) or "").strip().lower()
+        if value:
+            return value
+    return ""
+
+
+def _normalize_lifecycle_status(run: dict[str, object]) -> str:
+    lifecycle = str(run.get("status") or "").strip().lower()
+    if lifecycle:
+        return lifecycle
+    result_status = _result_status_from_run(run)
+    if result_status in {"passed", "pass", "ok", "failed", "fail", "error", "errored", "skipped", "skip"}:
+        return "finished"
+    if str(run.get("error") or "").strip():
+        return "error"
+    return "queued"
+
+
+def _reference_timestamp_for_run(run: dict[str, object]) -> datetime | None:
+    for key in ("startedAt", "started_at", "timestamp", "finishedAt", "finished_at"):
+        parsed = parse_iso_timestamp(run.get(key))
+        if parsed is not None:
+            return parsed
+    last_event = as_dict(run.get("lastEvent"))
+    if last_event:
+        parsed = parse_iso_timestamp(last_event.get("timestamp"))
+        if parsed is not None:
+            return parsed
+    timeline = cast(list[object], run.get("timeline") or [])
+    for item in reversed(timeline):
+        if not isinstance(item, dict):
+            continue
+        parsed = parse_iso_timestamp(item.get("timestamp"))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _last_timeline_event(run: dict[str, object]) -> dict[str, object] | None:
+    timeline = cast(list[object], run.get("timeline") or [])
+    for item in reversed(timeline):
+        if isinstance(item, dict):
+            return cast(dict[str, object], item)
+    return None
+
+
+def _build_issue(
+    *,
+    issue_id: str,
+    run: dict[str, object],
+    source: str,
+    severity: str,
+    fix_type: str,
+    title: str,
+    message: str,
+    root_cause: str,
+    reproduction: str,
+    affected_systems: list[str],
+    fix_action: str | None = None,
+    exact_location: str | None = None,
+) -> dict[str, object]:
+    run_id = str(run.get("runId") or run.get("run_id") or "unbekannt")
+    return {
+        "id": issue_id,
+        "runId": run_id,
+        "source": source,
+        "severity": severity.upper(),
+        "severityRank": severity_rank(severity),
+        "fixType": fix_type,
+        "title": title,
+        "message": message,
+        "rootCause": root_cause,
+        "reproduction": reproduction,
+        "affectedSystems": affected_systems,
+        "exactLocation": exact_location or f"suite-run:{source}:{run_id}",
+        "fixAction": fix_action,
+        "runType": _infer_suite_run_type(run),
+    }
+
+
+def _detect_suite_run_integrity_issues(
+    run: dict[str, object],
+    *,
+    source: str,
+    now: datetime,
+    stale_after_sec: int,
+) -> list[dict[str, object]]:
+    issues: list[dict[str, object]] = []
+    lifecycle = _normalize_lifecycle_status(run)
+    result_status = _result_status_from_run(run)
+    run_id = str(run.get("runId") or run.get("run_id") or "unbekannt")
+    started_at = parse_iso_timestamp(run.get("startedAt") or run.get("started_at"))
+    finished_at = parse_iso_timestamp(run.get("finishedAt") or run.get("finished_at"))
+    last_event = as_dict(run.get("lastEvent")) or _last_timeline_event(run) or {}
+    reference_timestamp = _reference_timestamp_for_run(run)
+    age_sec = (now - reference_timestamp).total_seconds() if reference_timestamp is not None else None
+
+    if lifecycle in {"queued", "running", "pending"} and age_sec is not None and age_sec >= stale_after_sec:
+        issues.append(_build_issue(
+            issue_id=f"stale-run:{run_id}",
+            run=run,
+            source=source,
+            severity="high",
+            fix_type="AUTO_FIX",
+            title="Hängender TestRun erkannt",
+            message=(
+                f"Run {run_id} ist seit {int(age_sec)}s im Status {lifecycle} und hat keinen Terminalstatus erreicht."
+            ),
+            root_cause="Der Lauf blieb in einem nicht-terminalen Zustand hängen; typischerweise fehlender Abschluss nach Runner-/ADB-/Emulatorfehler.",
+            reproduction="QA-Suite starten und danach den Lauf ohne Terminalstatus in Historie/Status-API beobachten.",
+            affected_systems=["python-admin", "qa-runtime", "suite-runs"],
+            fix_action="mark-stale-run-error",
+        ))
+
+    if started_at is None and reference_timestamp is not None and lifecycle in {"running", "finished", "error"}:
+        issues.append(_build_issue(
+            issue_id=f"missing-started-at:{run_id}",
+            run=run,
+            source=source,
+            severity="low",
+            fix_type="AUTO_FIX",
+            title="Startzeit fehlt",
+            message=f"Run {run_id} hat keine startedAt-Markierung.",
+            root_cause="Persistenz inkonsistent: Startzeit wurde beim Schreiben des Run-Datensatzes nicht gesetzt oder später verloren.",
+            reproduction="Historieneintrag ohne startedAt in /api/suites/history prüfen.",
+            affected_systems=["python-admin", "suite-runs"],
+            fix_action="derive-started-at",
+        ))
+
+    if not str(run.get("status") or "").strip() and lifecycle != "queued":
+        issues.append(_build_issue(
+            issue_id=f"missing-status:{run_id}",
+            run=run,
+            source=source,
+            severity="low",
+            fix_type="AUTO_FIX",
+            title="Lifecycle-Status fehlt",
+            message=f"Run {run_id} besitzt kein persistiertes status-Feld.",
+            root_cause="Ältere oder verkürzte Logeinträge enthalten nur Resultat-/Zeitstempel, aber keinen normalisierten Lifecycle-Status.",
+            reproduction="Historieneintrag ohne status laden; die UI muss den Status indirekt aus result ableiten.",
+            affected_systems=["python-admin", "admin-panel", "suite-runs"],
+            fix_action="infer-lifecycle-status",
+        ))
+
+    if finished_at is None and lifecycle in {"finished", "error"}:
+        issues.append(_build_issue(
+            issue_id=f"missing-finished-at:{run_id}",
+            run=run,
+            source=source,
+            severity="medium",
+            fix_type="AUTO_FIX",
+            title="Abschlusszeit fehlt",
+            message=f"Terminaler Run {run_id} besitzt keine finishedAt-Markierung.",
+            root_cause="Persistenz inkonsistent: Terminalstatus wurde geschrieben, aber Abschlusszeit fehlt in History/Active-Run.",
+            reproduction="Historie oder Status-API eines fertigen Laufs ohne finishedAt prüfen.",
+            affected_systems=["python-admin", "suite-runs", "admin-panel"],
+            fix_action="derive-finished-at",
+        ))
+
+    if last_event and not str(run.get("currentPhase") or "").strip():
+        issues.append(_build_issue(
+            issue_id=f"missing-current-phase:{run_id}",
+            run=run,
+            source=source,
+            severity="low",
+            fix_type="AUTO_FIX",
+            title="Aktuelle Phase fehlt",
+            message=f"Run {run_id} enthält Timeline-Events, aber kein currentPhase-Feld.",
+            root_cause="UI-relevantes Verdichtungsfeld wurde nicht aus Timeline/lastEvent gespiegelt.",
+            reproduction="Run mit Timeline laden, currentPhase ist leer, lastEvent jedoch gesetzt.",
+            affected_systems=["python-admin", "admin-panel"],
+            fix_action="derive-current-phase",
+        ))
+
+    if _last_timeline_event(run) is not None and not as_dict(run.get("lastEvent")):
+        issues.append(_build_issue(
+            issue_id=f"missing-last-event:{run_id}",
+            run=run,
+            source=source,
+            severity="low",
+            fix_type="AUTO_FIX",
+            title="Letztes Event fehlt",
+            message=f"Run {run_id} enthält eine Timeline, aber kein lastEvent-Feld.",
+            root_cause="Verdichtungsfeld lastEvent wurde nicht persistiert oder beim Rewrite verloren.",
+            reproduction="Run mit Timeline in Status-API prüfen; letztes Event ist nur in timeline vorhanden.",
+            affected_systems=["python-admin", "admin-panel"],
+            fix_action="derive-last-event",
+        ))
+
+    if not str(run.get("type") or "").strip():
+        issues.append(_build_issue(
+            issue_id=f"missing-run-type:{run_id}",
+            run=run,
+            source=source,
+            severity="low",
+            fix_type="AUTO_FIX",
+            title="Run-Typ fehlt",
+            message=f"Run {run_id} besitzt kein type-Feld fuer die UI- und Integritätsauswertung.",
+            root_cause="Ältere oder inkonsistente Run-Logs ohne normalisiertes Type-Feld.",
+            reproduction="Historie eines älteren Laufes laden und type-Feld prüfen.",
+            affected_systems=["python-admin", "admin-panel", "suite-runs"],
+            fix_action="infer-run-type",
+        ))
+
+    if lifecycle == "finished" and not result_status and not as_dict(run.get("result")):
+        issues.append(_build_issue(
+            issue_id=f"missing-result:{run_id}",
+            run=run,
+            source=source,
+            severity="medium",
+            fix_type="MANUAL_FIX_REQUIRED",
+            title="Ergebnisdaten fehlen",
+            message=f"Run {run_id} ist terminal, enthält aber keine verwertbaren Ergebnisdaten.",
+            root_cause="Der Runner hat den Lauf als beendet markiert, ohne Ergebnisobjekt oder Fehlerbegründung zu persistieren.",
+            reproduction="Historieneintrag mit status=finished und leerem result prüfen.",
+            affected_systems=["python-admin", "suite-runs", "admin-panel"],
+        ))
+
+    return issues
+
+
+def _apply_self_healing_fix(run: dict[str, object], issue: dict[str, object], *, now_iso: str) -> tuple[bool, str]:
+    fix_action = str(issue.get("fixAction") or "").strip()
+    if not fix_action:
+        return False, "Kein Auto-Fix definiert."
+
+    timeline = cast(list[dict[str, object]], run.setdefault("timeline", []))
+    last_event = _last_timeline_event(run)
+
+    if fix_action == "mark-stale-run-error":
+        reason = (
+            "Self-Healing hat den Lauf beendet, weil er ohne Fortschritt im Status "
+            f"{_normalize_lifecycle_status(run)} hängen blieb."
+        )
+        run["status"] = "error"
+        run["currentPhase"] = "error"
+        run["finishedAt"] = now_iso
+        run["error"] = reason
+        run["result"] = {
+            **as_dict(run.get("result")),
+            "status": "error",
+            "overallStatus": "error",
+            "reason": reason,
+            "error": reason,
+        }
+        event = {
+            "phase": "self-healing",
+            "status": "error",
+            "message": reason,
+            "timestamp": now_iso,
+        }
+        timeline.append(event)
+        run["lastEvent"] = event
+        return True, reason
+
+    if fix_action == "derive-started-at":
+        reference = _reference_timestamp_for_run(run)
+        if reference is None:
+            return False, "Keine Referenzzeit fuer startedAt gefunden."
+        run["startedAt"] = reference.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return True, "startedAt aus vorhandenen Laufdaten rekonstruiert."
+
+    if fix_action == "infer-lifecycle-status":
+        run["status"] = _normalize_lifecycle_status(run)
+        return True, f"status als {run['status']} gesetzt."
+
+    if fix_action == "derive-finished-at":
+        reference = parse_iso_timestamp(last_event.get("timestamp") if last_event else None) or _reference_timestamp_for_run(run)
+        if reference is None:
+            reference = datetime.now(timezone.utc)
+        run["finishedAt"] = reference.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return True, "finishedAt aus Event-/Zeitstempel rekonstruiert."
+
+    if fix_action == "derive-current-phase":
+        if last_event is None:
+            return False, "Kein Timeline- oder lastEvent-Eintrag vorhanden."
+        run["currentPhase"] = str(last_event.get("phase") or last_event.get("status") or "running")
+        return True, "currentPhase aus letztem Event rekonstruiert."
+
+    if fix_action == "derive-last-event":
+        if last_event is None:
+            return False, "Keine Timeline fuer Rekonstruktion vorhanden."
+        run["lastEvent"] = dict(last_event)
+        return True, "lastEvent aus Timeline rekonstruiert."
+
+    if fix_action == "infer-run-type":
+        run["type"] = _infer_suite_run_type(run)
+        return True, f"Run-Typ als {run['type']} gesetzt."
+
+    return False, f"Unbekannte Auto-Fix-Aktion: {fix_action}"
+
+
+def _record_self_healing_attempt(run: dict[str, object], issue: dict[str, object], *, now_iso: str, outcome: str, details: str) -> None:
+    attempts = cast(list[dict[str, object]], run.setdefault("selfHealingAttempts", []))
+    attempts.append({
+        "timestamp": now_iso,
+        "agent": "gap-closer",
+        "issueId": issue.get("id"),
+        "action": issue.get("fixAction") or issue.get("fixType"),
+        "outcome": outcome,
+        "details": details,
+    })
+    run["lastSelfHealingAt"] = now_iso
+
+
+def _build_validation_entry(run: dict[str, object], status: str, details: str) -> dict[str, object]:
+    return {
+        "timestamp": _current_timestamp_iso(),
+        "runId": str(run.get("runId") or run.get("run_id") or "unbekannt"),
+        "status": status,
+        "details": details,
+    }
+
+
+def _build_activity_entry(agent: str, action: str, target: str, result: str, *, error: str = "", details: str = "") -> dict[str, object]:
+    return {
+        "timestamp": _current_timestamp_iso(),
+        "agent": agent,
+        "action": action,
+        "target": target,
+        "result": result,
+        "error": error,
+        "details": details,
+    }
+
+
+def _system_health_from_cycle(pending_fixes: list[dict[str, object]], fixes_applied: list[dict[str, object]]) -> str:
+    if any(str(item.get("severity") or "").upper() in {"HIGH", "CRITICAL"} for item in pending_fixes):
+        return "CRITICAL"
+    if pending_fixes or fixes_applied:
+        return "DEGRADED"
+    return "OK"
+
+
+def _get_self_healing_monitor_state() -> dict[str, object]:
+    with _self_healing_monitor_lock:
+        return dict(_self_healing_monitor_state)
+
+
+def run_self_healing_cycle(*, auto_fix: bool = True, stale_after_sec: int = SELF_HEALING_STALE_AFTER_SEC, triggered_by: str = "manual") -> dict[str, object]:
+    with _self_healing_cycle_lock:
+        now = datetime.now(timezone.utc)
+        now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        detected_issues: list[dict[str, object]] = []
+        fixes_applied: list[dict[str, object]] = []
+        pending_fixes: list[dict[str, object]] = []
+        validation_results: list[dict[str, object]] = []
+        agent_activities: list[dict[str, object]] = []
+
+        with _active_suite_lock:
+            active_runs_snapshot = {
+                run_id: cast(dict[str, object], _deep_copy_json_compatible(run_state))
+                for run_id, run_state in _active_suite_runs.items()
+            }
+
+        history_entries = _load_jsonl_entries(SUITE_RUN_LOG_FILE)
+        history_changed = False
+
+        for run_id, run in active_runs_snapshot.items():
+            issues = _detect_suite_run_integrity_issues(run, source="active", now=now, stale_after_sec=stale_after_sec)
+            detected_issues.extend(issues)
+            changed = False
+            for issue in issues[:SELF_HEALING_MAX_ISSUES]:
+                if auto_fix and issue.get("fixType") == "AUTO_FIX":
+                    applied, details = _apply_self_healing_fix(run, issue, now_iso=now_iso)
+                    _record_self_healing_attempt(run, issue, now_iso=now_iso, outcome="applied" if applied else "skipped", details=details)
+                    agent_activities.append(_build_activity_entry(
+                        "gap-closer",
+                        str(issue.get("fixAction") or "auto-fix"),
+                        str(issue.get("runId") or run_id),
+                        "success" if applied else "skipped",
+                        details=details,
+                    ))
+                    if applied:
+                        changed = True
+                        fixes_applied.append({
+                            "runId": issue.get("runId"),
+                            "issueId": issue.get("id"),
+                            "action": issue.get("fixAction"),
+                            "details": details,
+                            "source": "active",
+                        })
+                    else:
+                        pending_fixes.append({
+                            **issue,
+                            "manualPlan": details,
+                        })
+                else:
+                    pending_fixes.append({
+                        **issue,
+                        "manualPlan": (
+                            "Prüfe den Run-Datensatz in python_admin/logs/suite_runs.jsonl und ergänze fehlende Ergebnis-/Lifecycle-Daten manuell."
+                        ),
+                    })
+
+            remaining = _detect_suite_run_integrity_issues(run, source="active", now=now, stale_after_sec=stale_after_sec)
+            validation_results.append(_build_validation_entry(
+                run,
+                "passed" if not remaining else "failed",
+                "Keine Restprobleme erkannt." if not remaining else f"{len(remaining)} Restproblem(e) verbleiben.",
+            ))
+
+            if changed:
+                with _active_suite_lock:
+                    _active_suite_runs[run_id] = cast(dict[str, object], _deep_copy_json_compatible(run))
+                if _normalize_lifecycle_status(run) in {"finished", "error"}:
+                    _persist_active_suite_run(run_id)
+
+        normalized_history_entries: list[dict[str, object]] = []
+        for entry in history_entries:
+            run = cast(dict[str, object], _deep_copy_json_compatible(entry))
+            issues = _detect_suite_run_integrity_issues(run, source="history", now=now, stale_after_sec=stale_after_sec)
+            detected_issues.extend(issues)
+            changed = False
+            for issue in issues[:SELF_HEALING_MAX_ISSUES]:
+                if auto_fix and issue.get("fixType") == "AUTO_FIX":
+                    applied, details = _apply_self_healing_fix(run, issue, now_iso=now_iso)
+                    _record_self_healing_attempt(run, issue, now_iso=now_iso, outcome="applied" if applied else "skipped", details=details)
+                    agent_activities.append(_build_activity_entry(
+                        "gap-closer",
+                        str(issue.get("fixAction") or "auto-fix"),
+                        str(issue.get("runId") or "history-entry"),
+                        "success" if applied else "skipped",
+                        details=details,
+                    ))
+                    if applied:
+                        changed = True
+                        history_changed = True
+                        fixes_applied.append({
+                            "runId": issue.get("runId"),
+                            "issueId": issue.get("id"),
+                            "action": issue.get("fixAction"),
+                            "details": details,
+                            "source": "history",
+                        })
+                    else:
+                        pending_fixes.append({
+                            **issue,
+                            "manualPlan": details,
+                        })
+                else:
+                    pending_fixes.append({
+                        **issue,
+                        "manualPlan": (
+                            "Historieneintrag manuell prüfen und Ergebnis-/Lifecycle-Daten in python_admin/logs/suite_runs.jsonl korrigieren."
+                        ),
+                    })
+
+            remaining = _detect_suite_run_integrity_issues(run, source="history", now=now, stale_after_sec=stale_after_sec)
+            validation_results.append(_build_validation_entry(
+                run,
+                "passed" if not remaining else "failed",
+                "Historieneintrag konsistent." if not remaining else f"{len(remaining)} Restproblem(e) in Historie.",
+            ))
+            normalized_history_entries.append(run if changed else entry)
+
+        if history_changed:
+            _write_jsonl_entries(SUITE_RUN_LOG_FILE, normalized_history_entries)
+
+        root_causes = [
+            {
+                "issueId": issue.get("id"),
+                "runId": issue.get("runId"),
+                "severity": issue.get("severity"),
+                "exactLocation": issue.get("exactLocation"),
+                "rootCause": issue.get("rootCause"),
+                "reproduction": issue.get("reproduction"),
+                "affectedSystems": issue.get("affectedSystems"),
+            }
+            for issue in detected_issues[:SELF_HEALING_MAX_ISSUES]
+        ]
+
+        system_health = _system_health_from_cycle(pending_fixes, fixes_applied)
+        cycle = {
+            "generatedAt": now_iso,
+            "triggeredBy": triggered_by,
+            "detectedIssues": detected_issues[:SELF_HEALING_MAX_ISSUES],
+            "rootCauses": root_causes,
+            "fixesApplied": fixes_applied,
+            "pendingFixes": pending_fixes[:SELF_HEALING_MAX_ISSUES],
+            "validationResults": validation_results,
+            "systemHealth": system_health,
+            "agentActivities": agent_activities,
+            "monitor": _get_self_healing_monitor_state(),
+        }
+        _append_self_healing_cycle_log(cycle)
+        with _self_healing_monitor_lock:
+            _self_healing_monitor_state["lastCompletedAt"] = now_iso
+            _self_healing_monitor_state["lastOutcome"] = "completed"
+            _self_healing_monitor_state["lastSystemHealth"] = system_health
+        return cycle
+
+
+def _self_healing_monitor_loop() -> None:
+    while not _self_healing_monitor_stop_event.wait(SELF_HEALING_MONITOR_INTERVAL_SEC):
+        started_at = _current_timestamp_iso()
+        with _self_healing_monitor_lock:
+            _self_healing_monitor_state["lastStartedAt"] = started_at
+            _self_healing_monitor_state["enabled"] = True
+            _self_healing_monitor_state["lastOutcome"] = "running"
+        try:
+            run_self_healing_cycle(auto_fix=True, triggered_by="monitor")
+        except Exception as exc:  # pragma: no cover - defensive background runtime
+            with _self_healing_monitor_lock:
+                _self_healing_monitor_state["lastCompletedAt"] = _current_timestamp_iso()
+                _self_healing_monitor_state["lastOutcome"] = f"error: {exc}"
+                _self_healing_monitor_state["lastSystemHealth"] = "CRITICAL"
+
+
+def ensure_self_healing_monitor_running() -> None:
+    global _self_healing_monitor_thread
+    with _self_healing_monitor_lock:
+        if _self_healing_monitor_thread is not None and _self_healing_monitor_thread.is_alive():
+            return
+        _self_healing_monitor_stop_event.clear()
+        _self_healing_monitor_state["enabled"] = True
+        _self_healing_monitor_state["intervalSec"] = SELF_HEALING_MONITOR_INTERVAL_SEC
+        _self_healing_monitor_thread = threading.Thread(target=_self_healing_monitor_loop, daemon=True, name="self-healing-monitor")
+        _self_healing_monitor_thread.start()
+
+
+def stop_self_healing_monitor() -> None:
+    global _self_healing_monitor_thread
+    with _self_healing_monitor_lock:
+        _self_healing_monitor_state["enabled"] = False
+        _self_healing_monitor_stop_event.set()
+        thread = _self_healing_monitor_thread
+        _self_healing_monitor_thread = None
+    if thread is not None and thread.is_alive():
+        thread.join(timeout=2)
 
 
 def get_suite_catalog() -> dict[str, object]:
@@ -4230,6 +4839,19 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 "count": limit,
             })
 
+        if parsed.path == "/api/qa/self-healing/status":
+            query = parse_qs(parsed.query)
+            stale_after_sec = parse_int(
+                query.get("staleAfterSec", [SELF_HEALING_STALE_AFTER_SEC])[0],
+                SELF_HEALING_STALE_AFTER_SEC,
+                min_value=60,
+                max_value=86400,
+            )
+            return self._write_json(
+                HTTPStatus.OK,
+                run_self_healing_cycle(auto_fix=False, stale_after_sec=stale_after_sec, triggered_by="http-get"),
+            )
+
         if parsed.path.startswith("/api/suites/status/"):
             run_id = parsed.path.split("/api/suites/status/", 1)[1].strip("/")
             status = get_suite_run_status(run_id)
@@ -4259,6 +4881,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_android_compatibility_test()
         if parsed.path == "/api/suites/android-automation-sweep":
             return self._handle_android_automation_sweep()
+        if parsed.path == "/api/qa/self-healing/run":
+            return self._handle_run_self_healing_cycle()
         if parsed.path == "/api/qa/emulators/reservations":
             return self._handle_create_emulator_reservation()
         if parsed.path == "/api/qa/emulators/start":
@@ -4334,6 +4958,23 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "suiteId fehlt."})
             strict_skips = bool_from_payload(payload.get("strictSkips"), default=False)
             result = start_suite_run(suite_id, strict_skips=strict_skips)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_run_self_healing_cycle(self) -> None:
+        try:
+            payload = self._read_json_body()
+            auto_fix = bool_from_payload(payload.get("autoFix"), default=True)
+            stale_after_sec = parse_int(
+                payload.get("staleAfterSec"),
+                SELF_HEALING_STALE_AFTER_SEC,
+                min_value=60,
+                max_value=86400,
+            )
+            result = run_self_healing_cycle(auto_fix=auto_fix, stale_after_sec=stale_after_sec, triggered_by="http-post")
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
@@ -4675,6 +5316,7 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
 
 def main(argv: Iterable[str] | None = None) -> int:
     _ = list(argv or sys.argv[1:])
+    ensure_self_healing_monitor_running()
     server = ThreadingHTTPServer((DEFAULT_HOST, DEFAULT_PORT), MiniMasterAdminHandler)
     print(f"MiniMaster Python Admin läuft auf http://{DEFAULT_HOST}:{DEFAULT_PORT}/admin-panel/")
     try:
@@ -4682,6 +5324,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("\nServer wird beendet…")
     finally:
+        stop_self_healing_monitor()
         server.server_close()
     return 0
 
