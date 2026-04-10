@@ -399,6 +399,19 @@ function createInfoBox(message) {
     return box;
 }
 
+function createStateBox(variant, message) {
+    const box = document.createElement("div");
+    box.className = variant;
+    box.textContent = message;
+    return box;
+}
+
+function replaceElementWithState(element, variant, message) {
+    if (!element) return;
+    clearElementChildren(element);
+    element.appendChild(createStateBox(variant, message));
+}
+
 function createQaRuntimeBanner(isOperatorMode) {
     const banner = document.createElement("div");
     banner.className = `qa-runtime-banner ${isOperatorMode ? "is-operator" : "is-readonly"}`;
@@ -1279,7 +1292,7 @@ function renderPythonAutomationProtocolEditor() {
     ensurePythonAutomationSelectedTest();
     const selected = findPythonAutomationTestById(pythonCommissioningSelectedTestId);
     if (!selected) {
-        summaryEl.innerHTML = "<div class='info'>Noch kein Testfall fuer die Protokollierung ausgewaehlt.</div>";
+        replaceElementWithState(summaryEl, "info", "Noch kein Testfall fuer die Protokollierung ausgewaehlt.");
         clearPythonAutomationProtocolForm();
         if (docRowEl) docRowEl.style.display = "none";
         renderPythonAutomationProtocolRequirements();
@@ -2202,12 +2215,12 @@ async function loadPythonAutomationHistory() {
     if (!historyEl) return { ok: false, message: "Historie-Container fehlt." };
 
     if (!isPythonOperator) {
-        historyEl.innerHTML = "<div class='info'>Historie ist nur im Python-Operator verfügbar.</div>";
+        replaceElementWithState(historyEl, "info", "Historie ist nur im Python-Operator verfügbar.");
         setQaRefreshSectionState("history", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
-    historyEl.innerHTML = "<div class='loading'>Lade Laufhistorie...</div>";
+    replaceElementWithState(historyEl, "loading", "Lade Laufhistorie...");
     setQaRefreshSectionState("history", "loading", "Lädt…");
     try {
         const response = await fetch("/api/commissioning/history?limit=10", {
@@ -2226,7 +2239,7 @@ async function loadPythonAutomationHistory() {
         setQaRefreshSectionState("history", "success", `${runs.length} Lauf/Läufe geladen`);
         return { ok: true, message: `${runs.length} Lauf/Läufe geladen.` };
     } catch (error) {
-        historyEl.innerHTML = `<div class='error'>Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        replaceElementWithState(historyEl, "error", `Historie konnte nicht geladen werden: ${error.message}`);
         setQaRefreshSectionState("history", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }
@@ -2355,12 +2368,12 @@ async function loadPythonAutomationEvidenceHistory() {
     if (!historyEl) return { ok: false, message: "Nachweis-Container fehlt." };
 
     if (!isPythonOperator) {
-        historyEl.innerHTML = "<div class='info'>Nachweis-Historie ist nur im Python-Operator verfuegbar.</div>";
+        replaceElementWithState(historyEl, "info", "Nachweis-Historie ist nur im Python-Operator verfuegbar.");
         setQaRefreshSectionState("evidence", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
-    historyEl.innerHTML = "<div class='loading'>Lade Nachweis-Historie...</div>";
+    replaceElementWithState(historyEl, "loading", "Lade Nachweis-Historie...");
     setQaRefreshSectionState("evidence", "loading", "Lädt…");
     try {
         const response = await fetch("/api/commissioning/evidence?limit=80", {
@@ -2380,7 +2393,7 @@ async function loadPythonAutomationEvidenceHistory() {
         setQaRefreshSectionState("evidence", "success", `${pythonCommissioningEvidenceHistory.length} Nachweise geladen`);
         return { ok: true, message: `${pythonCommissioningEvidenceHistory.length} Nachweise geladen.` };
     } catch (error) {
-        historyEl.innerHTML = `<div class='error'>Nachweis-Historie konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+        replaceElementWithState(historyEl, "error", `Nachweis-Historie konnte nicht geladen werden: ${error.message}`);
         setQaRefreshSectionState("evidence", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }

@@ -168,14 +168,20 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/children/$(childId));
       }
 
-      allow read: if isSignedIn() && (getChildForHistory().data.masterImei == request.auth.uid || childId == request.auth.uid || isAdmin());
-      allow write: if isSignedIn() && childId == request.auth.uid; // Only child can report usage
+      function isChildHistoryWriter() {
+        return isSignedIn() && childId == request.auth.uid;
+      }
 
-      // Validate usage history data structure
-      allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['date', 'totalUsageMillis', 'updatedAt'])
-        && request.resource.data.date is string
-        && request.resource.data.totalUsageMillis is number;
+      function isValidUsageHistorySchema() {
+        return request.resource.data.keys().hasOnly(['date', 'totalUsageMillis', 'updatedAt'])
+          && request.resource.data.date is string
+          && request.resource.data.totalUsageMillis is number
+          && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
+      }
+
+      allow read: if isSignedIn() && (getChildForHistory().data.masterImei == request.auth.uid || childId == request.auth.uid || isAdmin());
+      allow create, update: if isChildHistoryWriter() && isValidUsageHistorySchema();
+      allow delete: if false;
     }
 
     // --- TAMPER EVENTS COLLECTION (nested under children) ---
