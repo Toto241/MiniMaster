@@ -679,6 +679,24 @@ describe("admin-panel helper functions", () => {
     expect(overviewEl.innerHTML).toContain("Noch kein QA-Katalog geladen");
   });
 
+  it("renders QA platform catalog load errors via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const overviewEl = createDomSinkElement();
+    elements.set("qa-platform-overview", overviewEl);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "QA-Katalog fehlt" }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    const result = await exports.loadQaPlatformCatalog();
+
+    expect(result).toMatchObject({ ok: false, message: "QA-Katalog fehlt" });
+    expect(overviewEl.innerHTML).toContain("QA-Katalog fehlt");
+  });
+
   it("renders emulator overview read-only and empty states via DOM helpers", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
@@ -693,6 +711,24 @@ describe("admin-panel helper functions", () => {
     exports.setPythonOperatorRuntimeForTests(true);
     exports.renderEmulatorLabOverview(null);
     expect(emulatorEl.innerHTML).toContain("Noch kein Emulator-Labor geladen");
+  });
+
+  it("renders emulator lab load errors via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const emulatorEl = createDomSinkElement();
+    elements.set("qa-emulator-lab", emulatorEl);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Emulatordaten fehlen" }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    const result = await exports.loadEmulatorLabOverview();
+
+    expect(result).toMatchObject({ ok: false, message: "Emulatordaten fehlen" });
+    expect(emulatorEl.innerHTML).toContain("Emulatordaten fehlen");
   });
 
   it("renders suite device status read-only, adb-missing and empty states via DOM helpers", async () => {

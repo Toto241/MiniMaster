@@ -5039,7 +5039,7 @@ async function loadQaPlatformCatalog() {
         return { ok: true, message: `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen.` };
     } catch (err) {
         qaPlatformCatalogPayload = null;
-        renderQaPlatformOverview(null);
+        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
         renderQaArtifactsOverview();
         syncDualDeviceCatalogOptions();
         syncEmulatorReservationOptions();
@@ -5069,7 +5069,7 @@ async function loadEmulatorLabOverview() {
         return { ok: true, message: `${Number(data.availableAvdCount || 0)} AVD(s), ${Number(data.reservationCount || 0)} Reservierungen.` };
     } catch (err) {
         emulatorLabPayload = null;
-        renderEmulatorLabOverview(null);
+        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
         setQaRefreshSectionState("emulators", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }
