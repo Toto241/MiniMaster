@@ -205,6 +205,14 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/children/$(childId));
       }
 
+      function isValidCommandAckUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'ackedAt', 'errorCode'])
+          && request.resource.data.status is string
+          && request.resource.data.status in ['applied', 'failed']
+          && (!('ackedAt' in request.resource.data) || request.resource.data.ackedAt == null || request.resource.data.ackedAt is timestamp)
+          && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null || request.resource.data.errorCode is string);
+      }
+
       // Master or child device can read; admin for support
       allow read: if isSignedIn() && (
         getChildForCmd().data.masterImei == request.auth.uid ||
@@ -218,8 +226,7 @@ service cloud.firestore {
       // Only the child device itself may update status (ack)
       allow update: if isSignedIn()
         && childId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'ackedAt', 'errorCode']);
+        && isValidCommandAckUpdate();
 
       allow delete: if false;
     }
@@ -232,6 +239,20 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/children/$(childId));
       }
 
+      function isValidEventDocument() {
+        return request.resource.data.keys().hasOnly([
+            'eventId', 'eventType', 'payload', 'idempotencyKey',
+            'senderPlatform', 'createdAt'
+          ])
+          && request.resource.data.eventId is string
+          && request.resource.data.eventType is string
+          && request.resource.data.eventType in ['usage_report', 'tamper_event', 'command_ack', 'heartbeat', 'policy_applied']
+          && request.resource.data.payload is map
+          && request.resource.data.idempotencyKey is string
+          && request.resource.data.senderPlatform in ['android', 'ios']
+          && request.resource.data.createdAt is timestamp;
+      }
+
       // Master or admin can read events
       allow read: if isSignedIn() && (
         getChildForEvent().data.masterImei == request.auth.uid ||
@@ -241,13 +262,7 @@ service cloud.firestore {
       // Only the child device itself may publish events
       allow create: if isSignedIn()
         && childId == request.auth.uid
-        && request.resource.data.keys().hasOnly([
-            'eventId', 'eventType', 'payload', 'idempotencyKey',
-            'senderPlatform', 'createdAt'
-          ])
-        && request.resource.data.eventType is string
-        && request.resource.data.idempotencyKey is string
-        && request.resource.data.senderPlatform in ['android', 'ios'];
+        && isValidEventDocument();
 
       allow update, delete: if false; // Events are immutable
     }
