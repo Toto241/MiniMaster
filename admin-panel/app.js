@@ -5171,11 +5171,11 @@ async function loadSuiteCatalog() {
     const el = document.getElementById("suite-catalog");
     if (!el) return { ok: false, message: "Suite-Katalog-Container fehlt." };
     if (!isPythonOperator) {
-        el.innerHTML = "<div class='info'>Suite-Katalog ist nur im Python-Operator verfuegbar.</div>";
+        replaceElementWithState(el, "info", "Suite-Katalog ist nur im Python-Operator verfuegbar.");
         setQaRefreshSectionState("suites", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    el.innerHTML = "<div class='loading'>Lade Katalog...</div>";
+    replaceElementWithState(el, "loading", "Lade Katalog...");
     setQaRefreshSectionState("suites", "loading", "Lädt…");
     try {
         const res = await fetch("/api/suites");
@@ -5185,7 +5185,7 @@ async function loadSuiteCatalog() {
         setQaRefreshSectionState("suites", "success", `${(data.suites || []).length} Suite(s) geladen`);
         return { ok: true, message: `${(data.suites || []).length} Suite(s) geladen.` };
     } catch (err) {
-        el.innerHTML = `<div class='error'>${escapeHtml(err.message)}</div>`;
+        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
         setQaRefreshSectionState("suites", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }
@@ -5205,7 +5205,7 @@ function renderSuiteCatalog(suites) {
     if (readyOnly) filtered = filtered.filter(s => getSuiteCatalogItemReady(s));
 
     if (filtered.length === 0) {
-        el.innerHTML = "<div class='info'>Keine Suiten gefunden.</div>";
+        replaceElementWithState(el, "info", "Keine Suiten gefunden.");
         return;
     }
 
