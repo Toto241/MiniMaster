@@ -520,6 +520,50 @@ describe("admin-panel helper functions", () => {
     expect(catalogEl.innerHTML).toContain("Testkatalog konnte nicht geladen werden: Katalog fehlt");
   });
 
+  it("renders python automation overview empty state via DOM helper", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const overviewEl = createDomSinkElement();
+    elements.set("python-automation-overview", overviewEl);
+
+    exports.renderPythonAutomationOverview(null, null);
+
+    expect(overviewEl.replaceChildren).toHaveBeenCalled();
+    expect(overviewEl.innerHTML).toContain("Noch keine Python-Testfallübersicht verfügbar");
+  });
+
+  it("renders python automation catalog empty and filtered-empty states via DOM helpers", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const catalogEl = createDomSinkElement();
+    elements.set("python-automation-catalog", catalogEl);
+
+    exports.renderPythonAutomationCatalog(null, null);
+    expect(catalogEl.replaceChildren).toHaveBeenCalled();
+    expect(catalogEl.innerHTML).toContain("Noch kein Python-Testkatalog geladen");
+
+    elements.set("python-automation-catalog-mode", { value: "all" });
+    elements.set("python-automation-catalog-sort", { value: "byGroup" });
+    elements.set("python-automation-catalog-search", { value: "kein-treffer" });
+    elements.set("python-automation-open-only", { checked: false });
+
+    exports.renderPythonAutomationCatalog({
+      groups: [{
+        title: "Smoke",
+        tests: [{
+          id: "android-smoke",
+          title: "Android Smoke",
+          description: "Grundcheck",
+          source: "android",
+          automationType: "automated",
+          successCriteria: "Pass",
+        }],
+      }],
+    }, null);
+
+    expect(catalogEl.innerHTML).toContain("Keine Testfälle passen auf die aktuellen Filter");
+  });
+
   it("renders empty python automation result via DOM helper", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
@@ -729,6 +773,93 @@ describe("admin-panel helper functions", () => {
 
     expect(result).toMatchObject({ ok: false, message: "Emulatordaten fehlen" });
     expect(emulatorEl.innerHTML).toContain("Emulatordaten fehlen");
+  });
+
+  it("renders testing register overview and storage empty states via DOM helpers", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const overviewEl = createDomSinkElement();
+    const storageEl = createDomSinkElement();
+    elements.set("testing-register-overview", overviewEl);
+    elements.set("testing-register-storage", storageEl);
+
+    exports.renderTestingRegisterOverview(null);
+    exports.renderTestingRegisterStorage(null);
+
+    expect(overviewEl.replaceChildren).toHaveBeenCalled();
+    expect(overviewEl.innerHTML).toContain("Noch kein Testregister geladen");
+    expect(storageEl.replaceChildren).toHaveBeenCalled();
+    expect(storageEl.innerHTML).toContain("Speicherorte werden nach dem Laden des Registers angezeigt");
+  });
+
+  it("renders testing register list empty and filtered-empty states via DOM helpers", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const automaticListEl = createDomSinkElement();
+    const manualListEl = createDomSinkElement();
+    elements.set("testing-register-list-automatic", automaticListEl);
+    elements.set("testing-register-list-manual", manualListEl);
+    elements.set("testing-register-type-filter", { value: "all" });
+    elements.set("testing-register-sort-filter", { value: "status" });
+    elements.set("testing-register-search", { value: "" });
+
+    exports.renderTestingRegisterList(null);
+    expect(automaticListEl.replaceChildren).toHaveBeenCalled();
+    expect(manualListEl.replaceChildren).toHaveBeenCalled();
+    expect(automaticListEl.innerHTML).toContain("Noch kein Testregister geladen");
+    expect(manualListEl.innerHTML).toContain("Noch kein Testregister geladen");
+
+    elements.set("testing-register-search", { value: "kein-treffer" });
+    exports.renderTestingRegisterList({
+      items: [{
+        id: "register-1",
+        title: "ADB Smoke",
+        groupTitle: "Device",
+        source: "device-suite",
+        details: "ADB Verbindung",
+        owner: "qa",
+        environment: "lab",
+        linkedSuite: "smoke",
+        linkedCommand: "adb devices",
+        status: "pass",
+        automationType: "automatic",
+        entryKind: "suite",
+      }],
+    });
+
+    expect(automaticListEl.innerHTML).toContain("Keine Testfälle passen auf die aktuellen Filter");
+    expect(manualListEl.innerHTML).toContain("Keine Testfälle passen auf die aktuellen Filter");
+  });
+
+  it("renders testing register load states via DOM helpers", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const automaticListEl = createDomSinkElement();
+    const manualListEl = createDomSinkElement();
+    const overviewEl = createDomSinkElement();
+    const storageEl = createDomSinkElement();
+    elements.set("testing-register-list-automatic", automaticListEl);
+    elements.set("testing-register-list-manual", manualListEl);
+    elements.set("testing-register-overview", overviewEl);
+    elements.set("testing-register-storage", storageEl);
+    context.renderQaExecutionGuide = jest.fn();
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    const readonlyResult = await exports.loadTestingRegister();
+    expect(readonlyResult).toMatchObject({ ok: false, message: "Nur im Python-Operator verfügbar." });
+    expect(automaticListEl.innerHTML).toContain("Das Testregister ist nur im Python-Operator verfügbar");
+    expect(manualListEl.innerHTML).toContain("Das Testregister ist nur im Python-Operator verfügbar");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: "Registerfehler" }),
+    });
+    exports.setPythonOperatorRuntimeForTests(true);
+    const errorResult = await exports.loadTestingRegister();
+
+    expect(errorResult).toMatchObject({ ok: false, message: "Registerfehler" });
+    expect(automaticListEl.innerHTML).toContain("Testregister konnte nicht geladen werden: Registerfehler");
+    expect(manualListEl.innerHTML).toContain("Testregister konnte nicht geladen werden: Registerfehler");
   });
 
   it("renders suite device status read-only, adb-missing and empty states via DOM helpers", async () => {

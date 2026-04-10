@@ -1426,7 +1426,7 @@ function renderPythonAutomationOverview(catalog, run) {
     if (!overviewEl) return;
 
     if (!catalog?.summary) {
-        overviewEl.innerHTML = "<div class='info'>Noch keine Python-Testfallübersicht verfügbar.</div>";
+        replaceElementWithState(overviewEl, "info", "Noch keine Python-Testfallübersicht verfügbar.");
         return;
     }
 
@@ -1473,7 +1473,7 @@ function renderPythonAutomationCatalog(catalog, run) {
     if (!catalogEl) return;
 
     if (!catalog?.groups?.length) {
-        catalogEl.innerHTML = "<div class='info'>Noch kein Python-Testkatalog geladen.</div>";
+        replaceElementWithState(catalogEl, "info", "Noch kein Python-Testkatalog geladen.");
         return;
     }
 
@@ -1522,7 +1522,7 @@ function renderPythonAutomationCatalog(catalog, run) {
     });
 
     if (visibleTests.length === 0) {
-        catalogEl.innerHTML = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
+        replaceElementWithState(catalogEl, "info", "Keine Testfälle passen auf die aktuellen Filter.");
         return;
     }
 
@@ -3762,7 +3762,7 @@ function renderTestingRegisterOverview(payload) {
 
     const summary = payload?.summary;
     if (!summary) {
-        overviewEl.innerHTML = "<div class='info'>Noch kein Testregister geladen.</div>";
+        replaceElementWithState(overviewEl, "info", "Noch kein Testregister geladen.");
         return;
     }
 
@@ -3911,7 +3911,7 @@ function renderTestingRegisterStorage(storage) {
     if (!storageEl) return;
 
     if (!storage) {
-        storageEl.innerHTML = "<div class='info'>Speicherorte werden nach dem Laden des Registers angezeigt.</div>";
+        replaceElementWithState(storageEl, "info", "Speicherorte werden nach dem Laden des Registers angezeigt.");
         return;
     }
 
@@ -3992,7 +3992,7 @@ function renderTestingRegisterCards(items) {
 function renderTestingRegisterPanel(listEl, panelItems, visibleCount, totalCount, emptyLabel) {
     if (!listEl) return;
     if (panelItems.length === 0) {
-        listEl.innerHTML = `<div class='info'>${escapeHtml(emptyLabel)}</div>`;
+        replaceElementWithState(listEl, "info", emptyLabel);
         return;
     }
 
@@ -4011,9 +4011,8 @@ function renderTestingRegisterList(payload) {
 
     const items = Array.isArray(payload?.items) ? payload.items : [];
     if (items.length === 0) {
-        const emptyHtml = "<div class='info'>Noch kein Testregister geladen.</div>";
-        automaticListEl.innerHTML = emptyHtml;
-        manualListEl.innerHTML = emptyHtml;
+        replaceElementWithState(automaticListEl, "info", "Noch kein Testregister geladen.");
+        replaceElementWithState(manualListEl, "info", "Noch kein Testregister geladen.");
         return;
     }
 
@@ -4132,9 +4131,8 @@ function renderTestingRegisterList(payload) {
     });
 
     if (visibleItems.length === 0) {
-        const emptyFilterHtml = "<div class='info'>Keine Testfälle passen auf die aktuellen Filter.</div>";
-        automaticListEl.innerHTML = emptyFilterHtml;
-        manualListEl.innerHTML = emptyFilterHtml;
+        replaceElementWithState(automaticListEl, "info", "Keine Testfälle passen auf die aktuellen Filter.");
+        replaceElementWithState(manualListEl, "info", "Keine Testfälle passen auf die aktuellen Filter.");
         return;
     }
 
@@ -4173,16 +4171,14 @@ async function loadTestingRegister() {
         renderTestingRegisterOverview(null);
         renderTestingRegisterStorage(null);
         renderQaExecutionGuide(pythonCommissioningCatalog, null, suiteCatalogPayload);
-        const infoHtml = "<div class='info'>Das Testregister ist nur im Python-Operator verfügbar.</div>";
-        automaticListEl.innerHTML = infoHtml;
-        manualListEl.innerHTML = infoHtml;
+        replaceElementWithState(automaticListEl, "info", "Das Testregister ist nur im Python-Operator verfügbar.");
+        replaceElementWithState(manualListEl, "info", "Das Testregister ist nur im Python-Operator verfügbar.");
         setQaRefreshSectionState("register", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
 
-    const loadingHtml = "<div class='loading'>Lade Gesamt-Testregister...</div>";
-    automaticListEl.innerHTML = loadingHtml;
-    manualListEl.innerHTML = loadingHtml;
+    replaceElementWithState(automaticListEl, "loading", "Lade Gesamt-Testregister...");
+    replaceElementWithState(manualListEl, "loading", "Lade Gesamt-Testregister...");
     setQaRefreshSectionState("register", "loading", "Lädt…");
     try {
         const response = await fetch("/api/testing/register", {
@@ -4201,9 +4197,8 @@ async function loadTestingRegister() {
         renderTestingRegisterOverview(null);
         renderTestingRegisterStorage(null);
         renderQaExecutionGuide(pythonCommissioningCatalog, null, suiteCatalogPayload);
-        const errorHtml = `<div class='error'>Testregister konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
-        automaticListEl.innerHTML = errorHtml;
-        manualListEl.innerHTML = errorHtml;
+        replaceElementWithState(automaticListEl, "error", `Testregister konnte nicht geladen werden: ${error.message}`);
+        replaceElementWithState(manualListEl, "error", `Testregister konnte nicht geladen werden: ${error.message}`);
         setQaRefreshSectionState("register", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }
