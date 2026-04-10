@@ -26,6 +26,8 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "renderPythonAutomationHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadPythonAutomationHistory")).not.toContain("historyEl.innerHTML");
     expect(extractFunctionBody(source, "loadPythonAutomationEvidenceHistory")).not.toContain("historyEl.innerHTML");
+    expect(extractFunctionBody(source, "renderQaArtifactsOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
+    expect(extractFunctionBody(source, "loadSuiteRunHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
   });
 
   it("contains dedicated DOM helpers for the QA runtime render paths", () => {
