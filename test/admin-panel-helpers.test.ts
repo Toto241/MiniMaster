@@ -638,6 +638,65 @@ describe("admin-panel helper functions", () => {
     expect(historyEl.innerHTML).toContain("Backend nicht erreichbar");
   });
 
+  it("renders QA platform overview read-only and empty states via DOM helpers", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const overviewEl = createDomSinkElement();
+    elements.set("qa-platform-overview", overviewEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    exports.renderQaPlatformOverview(null);
+    expect(overviewEl.replaceChildren).toHaveBeenCalled();
+    expect(overviewEl.innerHTML).toContain("QA-Plattformdaten sind nur im Python-Operator verfügbar");
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.renderQaPlatformOverview(null);
+    expect(overviewEl.innerHTML).toContain("Noch kein QA-Katalog geladen");
+  });
+
+  it("renders emulator overview read-only and empty states via DOM helpers", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const emulatorEl = createDomSinkElement();
+    elements.set("qa-emulator-lab", emulatorEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    exports.renderEmulatorLabOverview(null);
+    expect(emulatorEl.replaceChildren).toHaveBeenCalled();
+    expect(emulatorEl.innerHTML).toContain("Emulatorstatus ist nur im Python-Operator verfügbar");
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.renderEmulatorLabOverview(null);
+    expect(emulatorEl.innerHTML).toContain("Noch kein Emulator-Labor geladen");
+  });
+
+  it("renders suite device status read-only, adb-missing and empty states via DOM helpers", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const deviceEl = createDomSinkElement();
+    elements.set("suite-device-status", deviceEl);
+
+    exports.setPythonOperatorRuntimeForTests(false);
+    await exports.loadSuiteDeviceStatus();
+    expect(deviceEl.replaceChildren).toHaveBeenCalled();
+    expect(deviceEl.innerHTML).toContain("Geraetestatus ist nur im Python-Operator verfuegbar");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ adbAvailable: false }),
+    });
+    exports.setPythonOperatorRuntimeForTests(true);
+    await exports.loadSuiteDeviceStatus();
+    expect(deviceEl.innerHTML).toContain("ADB ist nicht verfuegbar");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ adbAvailable: true, devices: [] }),
+    });
+    await exports.loadSuiteDeviceStatus();
+    expect(deviceEl.innerHTML).toContain("Keine Geraete angeschlossen");
+  });
+
   it("builds PowerShell deploy scripts with project scoping", () => {
     const { exports } = loadAdminPanelTestExports();
 
