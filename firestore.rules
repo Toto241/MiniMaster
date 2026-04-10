@@ -328,5 +328,36 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.masterImei == request.auth.uid || isAdmin() || isAuditor());
       allow write: if false; // Only Cloud Functions can record or flag re-consent
     }
+
+    // --- DETERMINISTIC DECISIONING COLLECTIONS ---
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isAuditor());
+      allow write: if false;
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isAuditor());
+      allow write: if false;
+    }
+
+    match /rules/{ruleDocId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isAuditor());
+      allow write: if false;
+    }
+
+    match /events/{eventId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isAuditor());
+      allow write: if false;
+    }
+
+    match /suggestions/{suggestionId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isAuditor());
+      allow write: if false;
+    }
+
+    match /decision_traces/{traceId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isAuditor());
+      allow write: if false;
+    }
   }
 }

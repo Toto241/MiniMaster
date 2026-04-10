@@ -7,6 +7,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
+import { syncLegacyUsageRulesToCanonicalRules } from "./controllers/decisioning";
 
 const MAX_APP_BLACKLIST_ENTRIES = 200;
 const MAX_APP_BLACKLIST_VALUE_LENGTH = 4096;
@@ -229,6 +230,8 @@ export const setUsageRules = functions.https.onCall(
         usageRules: usageRules,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      await syncLegacyUsageRulesToCanonicalRules(masterId, childId, usageRules as Record<string, unknown>);
 
       await AuditLogger.logSuccess(
         "rules.update_usage", context, `children/${childId}`, "rule",

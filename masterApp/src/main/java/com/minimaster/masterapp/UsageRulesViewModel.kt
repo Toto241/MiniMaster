@@ -4,13 +4,13 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.functions.FirebaseFunctions
+import com.minimaster.masterapp.core.rules.UsageRuleDraft
+import com.minimaster.masterapp.data.repositories.UsageRuleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class UsageRulesState(
@@ -25,7 +25,7 @@ data class UsageRulesState(
 
 @HiltViewModel
 class UsageRulesViewModel @Inject constructor(
-    private val functions: FirebaseFunctions,
+    private val usageRuleRepository: UsageRuleRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -75,34 +75,10 @@ class UsageRulesViewModel @Inject constructor(
             _state.value = _state.value.copy(isSaving = true, error = null)
 
             val current = _state.value
-            val usageRules = mutableMapOf<String, Any>()
-
-            if (current.dailyLimitMinutes > 0) {
-                usageRules["dailyLimitSeconds"] = current.dailyLimitMinutes * 60
-            }
-
-            if (current.allowedStartTime.isNotEmpty() && current.allowedEndTime.isNotEmpty()) {
-                usageRules["allowedHours"] = mapOf(
-                    "start" to current.allowedStartTime,
-                    "end" to current.allowedEndTime
-                )
-            }
-
-            if (current.perAppLimits.isNotEmpty()) {
-                val appLimitsSeconds = mutableMapOf<String, Any>()
-                current.perAppLimits.forEach { (pkg, minutes) ->
-                    appLimitsSeconds[pkg] = minutes * 60
-                }
-                usageRules["appLimits"] = appLimitsSeconds
-            }
-
-            val data = hashMapOf(
-                "childId" to childId,
-                "usageRules" to usageRules
-            )
+            val draft = UsageRuleDraft.fromState(current)
 
             try {
-                functions.getHttpsCallable("setUsageRules").call(data).await()
+                usageRuleRepository.saveRules(childId, draft)
                 _state.value = _state.value.copy(isSaving = false, saveSuccess = true)
                 Log.d(TAG, "Usage rules saved for child $childId")
             } catch (e: Exception) {

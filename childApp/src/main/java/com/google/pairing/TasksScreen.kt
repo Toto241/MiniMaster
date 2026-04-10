@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.google.pairing.ui.DecisionTracePanel
 import java.util.Locale
 
 /**
@@ -48,6 +49,8 @@ fun TasksScreen(
         .fillMaxSize()
         .padding(16.dp)) {
         Text(stringResource(R.string.your_tasks_title), style = MaterialTheme.typography.h4)
+        Spacer(modifier = Modifier.height(16.dp))
+        DecisionTracePanel()
         Spacer(modifier = Modifier.height(16.dp))
         if (tasks.isEmpty()) {
             Text(stringResource(R.string.no_tasks_for_now))

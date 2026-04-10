@@ -30,6 +30,14 @@ export {
   reportTamperEvent,
 } from "./src/device";
 
+// Deterministic decisioning layer
+export {
+  ingestEvent,
+  getRules,
+  generateSuggestion,
+  logDecision,
+} from "./src/controllers/decisioning";
+
 // Cross-Platform Control-Plane (Android + iOS bidirectional interface)
 export {
   registerDeviceEndpoint,

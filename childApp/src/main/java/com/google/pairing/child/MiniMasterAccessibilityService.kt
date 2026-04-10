@@ -20,6 +20,16 @@ import com.google.pairing.R
 import com.google.pairing.AppLogger
 import com.google.pairing.ChildIdentityStorage
 import com.google.pairing.TaskStatus
+import com.google.pairing.core.engine.RuleEngine
+import com.google.pairing.core.enforcement.AndroidEnforcementManager
+import com.google.pairing.core.events.DeviceEvent
+import com.google.pairing.core.events.DeviceEventType
+import com.google.pairing.core.events.EventDispatcher
+import com.google.pairing.data.providers.RuleSnapshotProvider
+import com.google.pairing.data.repositories.LocalDecisionTraceRepository
+import com.google.pairing.data.repositories.PendingDeviceEventRepository
+import com.google.pairing.services.BackendSyncGateway
+import com.google.pairing.services.EventProcessingPipeline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,6 +72,10 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                     // Start the timer for unlocking
                     unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // minutes to milliseconds
                     Log.d(TAG, "Task approved. Unlocking for $unlockDuration minutes. End time: $unlockEndTime")
+                    processDeterministicEvent(
+                        DeviceEventType.DEVICE_UNLOCKED,
+                        mapOf("unlockDurationMinutes" to unlockDuration.toString())
+                    )
                 } else if (currentTaskStatus != TaskStatus.APPROVED) {
                     // Reset the timer if status is not APPROVED
                     unlockEndTime = 0
@@ -116,6 +130,27 @@ class MiniMasterAccessibilityService : AccessibilityService() {
 
     // Injected in a real app, but for PoC we instantiate lazily or get from entry point
     private val functions by lazy { FirebaseFunctions.getInstance() }
+    private val decisionTraceRepository by lazy { LocalDecisionTraceRepository(this) }
+    private val pendingDeviceEventRepository by lazy { PendingDeviceEventRepository(this) }
+    private val eventProcessingPipeline by lazy {
+        EventProcessingPipeline(
+            eventDispatcher = EventDispatcher(),
+            ruleSnapshotProvider = RuleSnapshotProvider(this),
+            ruleEngine = RuleEngine(),
+            enforcementManager = AndroidEnforcementManager(
+                onBlockApp = { packageName -> blockApplication(packageName) },
+                onNotify = { reason ->
+                    AppLogger.logInfo(TAG, "Benachrichtigung aus Regelpipeline", mapOf("reason" to reason))
+                },
+            ),
+            decisionTraceRepository = decisionTraceRepository,
+            backendSyncGateway = BackendSyncGateway(functions, decisionTraceRepository, pendingDeviceEventRepository),
+            deviceIdProvider = {
+                runBlocking { ChildIdentityStorage.readChildId(this@MiniMasterAccessibilityService) }
+                    ?: ChildIdentityStorage.getOrCreateStableChildId(this@MiniMasterAccessibilityService)
+            },
+        )
+    }
     /**
      * A [Runnable] that periodically checks the foreground app and for rule updates.
      */
@@ -257,10 +292,10 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             return // Task lock takes precedence
         }
 
-        // 2. Standard blocking logic (Blacklist / Time Limits)
-        if (blockedApps.contains(packageName)) {
-            blockApplication(packageName)
-        }
+        processDeterministicEvent(
+            DeviceEventType.APP_OPENED,
+            mapOf("packageName" to packageName)
+        )
         // Force immediate check when app changes
         checkUsageLimits()
         logAppUsage(packageName)
@@ -304,6 +339,22 @@ class MiniMasterAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             Log.i(TAG, "App usage logged: $packageName")
             // In a real app, this would call a function to send data to a backend.
+        }
+    }
+
+    private fun processDeterministicEvent(type: DeviceEventType, payload: Map<String, String>) {
+        serviceScope.launch {
+            try {
+                eventProcessingPipeline.process(
+                    DeviceEvent(
+                        type = type,
+                        payload = payload,
+                        timestamp = System.currentTimeMillis(),
+                    )
+                )
+            } catch (error: Exception) {
+                Log.e(TAG, "Deterministic event processing failed for $type", error)
+            }
         }
     }
 
@@ -550,16 +601,24 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     }
 
     private fun checkUsageLimits() {
+        val foregroundPackage = currentForegroundApp ?: return
         if (ChildProtectionPolicy.shouldBlockForUsage(
-                packageName = currentForegroundApp,
+                packageName = foregroundPackage,
                 ownPackageName = packageName,
                 dailyLimitMillis = dailyLimitMillis,
                 currentDayUsageMillis = currentDayUsageMillis,
                 perAppLimitsMillis = perAppLimitsMillis,
                 perAppUsageMillis = perAppUsageMillis,
             )) {
-            Log.i(TAG, "Usage limit exceeded for $currentForegroundApp")
-            blockApplication(currentForegroundApp!!)
+            Log.i(TAG, "Usage limit exceeded for $foregroundPackage")
+            val scope = if (perAppLimitsMillis.containsKey(foregroundPackage)) "per_app" else "daily"
+            processDeterministicEvent(
+                DeviceEventType.TIME_LIMIT_REACHED,
+                mapOf(
+                    "packageName" to foregroundPackage,
+                    "scope" to scope,
+                )
+            )
         }
     }
 
@@ -579,7 +638,13 @@ class MiniMasterAccessibilityService : AccessibilityService() {
                 allowedEndMinutes = allowedEndMinutes,
             ) && ChildProtectionPolicy.isManagedUserApp(currentForegroundApp, packageName)) {
             Log.i(TAG, "Outside allowed time window ($allowedStartHour:$allowedStartMinute - $allowedEndHour:$allowedEndMinute)")
-            blockApplication(currentForegroundApp!!)
+            processDeterministicEvent(
+                DeviceEventType.APP_OPENED,
+                mapOf(
+                    "packageName" to (currentForegroundApp ?: return),
+                    "windowViolation" to "true",
+                )
+            )
         }
     }
 
