@@ -76,7 +76,29 @@ describe("Storage Security Rules - Emulator Enforcement", () => {
     if (!storage) return;
 
     await assertSucceeds(
-      storage.ref("children/child-1/photos/proof.jpg").putString("image-bytes", "raw", {
+      storage.ref("proofs/child-1/task-1/proof.jpg").putString("image-bytes", "raw", {
+        contentType: "image/jpeg",
+      })
+    );
+  });
+
+  it("denies proof uploads by the owning master", async () => {
+    const storage = getStorage("master-1", { role: "master" });
+    if (!storage) return;
+
+    await assertFails(
+      storage.ref("proofs/child-1/task-1/master-upload.jpg").putString("image-bytes", "raw", {
+        contentType: "image/jpeg",
+      })
+    );
+  });
+
+  it("denies proof uploads by admins", async () => {
+    const storage = getStorage("operator-1", { role: "admin" });
+    if (!storage) return;
+
+    await assertFails(
+      storage.ref("proofs/child-1/task-1/admin-upload.jpg").putString("image-bytes", "raw", {
         contentType: "image/jpeg",
       })
     );

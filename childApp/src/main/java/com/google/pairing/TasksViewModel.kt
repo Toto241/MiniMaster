@@ -122,7 +122,9 @@ class TasksViewModel @Inject constructor(
 
             try {
                 // 1. Upload image to Firebase Storage
-                val photoRef = storage.reference.child("proofs/$childId/$taskId.jpg")
+                val photoRef = storage.reference.child(
+                    TaskProofStoragePath.build(childId, taskId, System.currentTimeMillis())
+                )
                 photoRef.putFile(photoUri).await()
                 val downloadUrl = photoRef.downloadUrl.await().toString()
                 Log.d(TAG, "Photo uploaded: $downloadUrl")

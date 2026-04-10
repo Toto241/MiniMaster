@@ -138,16 +138,15 @@ fun ProofSubmissionScreen(
  */
 suspend fun uploadProofAndSubmit(taskId: String, uri: Uri, context: android.content.Context): Boolean {
     val storageRef = FirebaseStorage.getInstance().reference
-    val proofRef = storageRef.child("task_proofs/${taskId}/${System.currentTimeMillis()}.jpg")
+    val childImei = ChildIdentityStorage.readChildId(context).orEmpty()
+    if (childImei.isBlank()) {
+        return false
+    }
+    val proofRef = storageRef.child(TaskProofStoragePath.build(childImei, taskId, System.currentTimeMillis()))
 
     return try {
         val uploadTask = proofRef.putFile(uri).await()
         val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
-        // Use the actual ChildIdProvider implementation
-        val childImei = ChildIdentityStorage.readChildId(context).orEmpty()
-        if (childImei.isBlank()) {
-            return false
-        }
 
         // Call the Cloud Function
         val data = hashMapOf(
