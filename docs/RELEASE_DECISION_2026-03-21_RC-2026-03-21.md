@@ -1,6 +1,6 @@
 # Release Decision - RC-2026-03-21
 
-Status: working decision record for the current candidate.
+**Status:** Working decision record for the current candidate.
 
 ## Release Candidate
 
@@ -14,22 +14,22 @@ Status: working decision record for the current candidate.
 
 ## Mandatory Input Artifacts
 
-1. docs/RELEASE_EVIDENCE_REGISTER.md
-2. docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md
-3. docs/READINESS_SCORECARD_2026-03-19.md
+1. [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
+2. [COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md)
+3. [READINESS_SCORECARD_2026-03-19.md](READINESS_SCORECARD_2026-03-19.md)
 4. RUNBOOK.md
-5. docs/COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md (baseline)
+5. [COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md](COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md) (baseline)
 
 ## Gate Summary
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Lokale Repo-Qualitaet ist grün und repo-seitige CI-Fixes sind umgesetzt; die Revalidation vom 2026-04-16 zeigt aber fuer CodeQL und Android CI einen bestaetigten GitHub-Actions-Billing-/Spending-Limit-Blocker. |
-| Functional Commissioning | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Mehrere commissioning checks offen |
-| Security and Identity | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Firebase key rotation/restrictions offen |
-| Compliance | Pass | docs/RELEASE_EVIDENCE_REGISTER.md | Dokumentierte Compliance-Evidenz vorhanden |
-| Play Store Submission Readiness | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | Data Safety/IARC/Permissions/App Access offen |
-| Operational Readiness | Fail | docs/RELEASE_EVIDENCE_REGISTER.md | On-call roster in Vorbereitung (Template vorhanden), commissioning weiterhin offen |
+| Technical Quality (build/lint/test) | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Lokale Repo-Qualitaet ist grün und repo-seitige CI-Fixes sind umgesetzt; die Revalidation vom 2026-04-16 zeigt aber fuer CodeQL und Android CI einen bestaetigten GitHub-Actions-Billing-/Spending-Limit-Blocker. |
+| Functional Commissioning | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Mehrere commissioning checks offen |
+| Security and Identity | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Firebase key rotation/restrictions offen |
+| Compliance | Pass | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Dokumentierte Compliance-Evidenz vorhanden |
+| Play Store Submission Readiness | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Data Safety/IARC/Permissions/App Access offen |
+| Operational Readiness | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | On-call roster in Vorbereitung (Template vorhanden), commissioning weiterhin offen |
 
 ## Open Issues
 
@@ -47,13 +47,13 @@ Status: working decision record for the current candidate.
 | Play Console Data Safety | Open | Product/Ops | offen | No |
 | IARC rating | Open | Product/Ops | offen | No |
 | Store listing finalized | Open | Product/Ops | offen | No |
-| Permissions declaration | In progress - operative Vorlage vorhanden (`docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`), finale Play-Console-Einreichung offen | Compliance Owner | offen | No |
-| App access guide attached | In progress - reviewer guide draft vorhanden (`docs/APP_ACCESS_REVIEWER_GUIDE.md`), Play Console Verlinkung offen | Product/Ops | offen | No |
+| Permissions declaration | Open - operative Vorlage vorhanden ([PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md)), finale Play-Console-Einreichung offen | Compliance Owner | offen | No |
+| App access guide attached | Open - reviewer guide draft vorhanden ([APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)), Play Console Verlinkung offen | Product/Ops | offen | No |
 | CodeQL result linked | Open - Rerun [24323887350](https://github.com/Toto241/MiniMaster/actions/runs/24323887350) ist wegen GitHub-Actions-Billing/Spending-Limit fehlgeschlagen; aktueller gruener Nachweis nach Repo-Fix fehlt | Engineering Owner | offen | No |
 | Android CI build evidence linked | Open - Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) ist wegen GitHub-Actions-Billing/Spending-Limit fehlgeschlagen; aktueller gruener Nachweis fehlt | Engineering Owner | offen | No |
 | Deployment result linked | Open - lokale Deploy-Pruefung ergab vorhandene Firebase-CLI/Projektbindung, aber keine produktiven Runtime-Secrets im Workspace; finaler Deploy wurde daher nicht aus dieser Umgebung ausgefuehrt | Engineering Owner | offen | No |
 | Physical commissioning executed | Open | QA/Operations | offen | No |
-| On-call roster assigned | In progress - roster template vorhanden (`docs/ONCALL_ESCALATION_ROSTER.md`), Kontakte/Sign-off offen | Operations Lead | offen | No |
+| On-call roster assigned | Open - roster template vorhanden ([ONCALL_ESCALATION_ROSTER.md](ONCALL_ESCALATION_ROSTER.md)), Kontakte/Sign-off offen | Operations Lead | offen | No |
 
 ## Decision
 
@@ -82,29 +82,30 @@ Reason: Mandatory gates are not passed and multiple before-go-live blockers are 
 
 | Item | Owner | Priority | Due Date |
 | ----- | ----- | ----- | ----- |
-| P0/P1-Ausfuehrung nach [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) abarbeiten | Engineering + Product/Ops + Security + QA + Operations | P0 | offen |
+| P0/P1-Ausfuehrung nach [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) abarbeiten | Engineering + Product/Ops + Security + QA + Operations | P0 | offen |
 | Frischen CodeQL-/Android-CI-/Deploy-Nachweis im Evidence Register verlinken | Engineering | P0 | offen |
 | Operative Restpunkte aus Evidence Register schliessen | Product/Ops + Security + QA + Operations | P0 | offen |
 
 ## Next 24h Decision Path
 
-1. P0-1 bis P0-3 aus [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) schliessen.
+1. P0-1 bis P0-3 aus [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) schliessen.
 2. Security/Store/Commissioning/On-call Restpunkte mit Nachweis schliessen.
 3. Evidence Register aktualisieren.
 4. Re-Entscheidung durch Release Manager dokumentieren.
 
 ### Switch Rule
 
-- Wenn alle P0-Blocker geschlossen und nachgewiesen sind: von **No-Go** auf **Conditional Go** wechseln.
-- Wenn mindestens ein P0-Blocker offen bleibt: **No-Go** beibehalten.
+- Wenn alle Gates bestanden sind, hoechstens ein P1 offen bleibt und dafuer eine dokumentierte Risk Acceptance mit Due Date vorliegt: von **No-Go** auf **Conditional Go** wechseln.
+- Wenn alle Gates bestanden sind und keine P0-Punkte offen bleiben: von **No-Go** auf **Go** wechseln.
+- Wenn ein Gate fehlschlaegt oder ein P0-Blocker offen bleibt: **No-Go** beibehalten.
 
 ## Immediate Operator Actions (After Billing Fix)
 
-0. Priorisierte Restarbeiten nach [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) abarbeiten.
+0. Priorisierte Restarbeiten nach [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) abarbeiten.
 1. GitHub Actions Billing/Spending-Limit im Account beheben.
 2. Danach VS Code Task ausfuehren: `CI: Revalidate Release Gates (+ Rerun Failed)`
 3. Anschliessend VS Code Task ausfuehren: `CI: Revalidate Release Gates`
-4. [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) aktualisieren.
+4. [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) aktualisieren.
 5. Re-Decision und Sign-off in diesem Dokument aktualisieren.
 
 Expected result:
