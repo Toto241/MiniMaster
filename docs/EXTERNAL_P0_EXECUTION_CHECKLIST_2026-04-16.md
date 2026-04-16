@@ -1,6 +1,6 @@
 # External P0 Execution Checklist (2026-04-16)
 
-Status: operator-facing execution checklist for all remaining external P0 release blockers.
+**Status:** Operator-facing execution checklist for all remaining external P0 release blockers.
 
 Purpose:
 
@@ -36,12 +36,12 @@ Steps:
 Done evidence:
 
 1. Screenshot or exported confirmation from Billing & plans.
-2. Fresh [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) without billing blocker.
+2. Fresh [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md) without billing blocker.
 
 Update after done:
 
-1. [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md)
-2. [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md)
+1. [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
+2. [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md)
 
 ## 3. P0-2 Re-run CodeQL and Android CI
 
@@ -55,7 +55,7 @@ Steps:
 
 Done evidence:
 
-1. Fresh success links for CodeQL and Android CI in [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md).
+1. Fresh success links for CodeQL and Android CI in [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md).
 
 Stop rule:
 
@@ -67,13 +67,13 @@ Owner: Engineering
 
 Steps:
 
-1. Copy fresh CodeQL run link into [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
-2. Copy fresh Android CI run link into [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+1. Copy fresh CodeQL run link into [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
+2. Copy fresh Android CI run link into [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
 3. Set technical gate status from blocked/in-progress to pass only if both runs are green.
 
 Done evidence:
 
-1. Updated [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) section 3.1.
+1. Updated [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) section 3.1.
 
 ## 5. P0-4 Final Deploy
 
@@ -101,7 +101,7 @@ Done evidence:
 
 1. Deploy command timestamp.
 2. Deploy output snapshot.
-3. Deployment reference in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+3. Deployment reference in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
 
 ## 6. P0-5 Firebase Key Rotation
 
@@ -109,7 +109,7 @@ Owner: Security Owner
 
 Source runbook:
 
-1. [docs/FIREBASE_KEY_ROTATION_RUNBOOK.md](docs/FIREBASE_KEY_ROTATION_RUNBOOK.md)
+1. [FIREBASE_KEY_ROTATION_RUNBOOK.md](FIREBASE_KEY_ROTATION_RUNBOOK.md)
 
 Steps:
 
@@ -123,7 +123,7 @@ Done evidence:
 
 1. Screenshot/export from Firebase or GCP Console.
 2. Old key revoked timestamp.
-3. Evidence entry in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+3. Evidence entry in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
 
 ## 7. P0-6 Play Console Package
 
@@ -131,10 +131,10 @@ Owners: Product/Ops + Compliance
 
 Sub-packets:
 
-1. Data Safety: use [docs/PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](docs/PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md)
-2. Store Listing and IARC: use [docs/STORE_LISTING_AND_IARC_READINESS.md](docs/STORE_LISTING_AND_IARC_READINESS.md)
-3. Permissions Declaration: use [docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md)
-4. App Access: use [docs/APP_ACCESS_REVIEWER_GUIDE.md](docs/APP_ACCESS_REVIEWER_GUIDE.md)
+1. Data Safety: use [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md)
+2. Store Listing and IARC: use [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md)
+3. Permissions Declaration: use [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md)
+4. App Access: use [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)
 
 Done evidence:
 
@@ -153,7 +153,7 @@ Owner: QA/Operations
 
 Source checklist:
 
-1. [docs/PHYSICAL_COMMISSIONING_CHECKLIST.md](docs/PHYSICAL_COMMISSIONING_CHECKLIST.md)
+1. [PHYSICAL_COMMISSIONING_CHECKLIST.md](PHYSICAL_COMMISSIONING_CHECKLIST.md)
 
 Steps:
 
@@ -165,7 +165,7 @@ Done evidence:
 
 1. Completed checklist.
 2. Sign-off attached.
-3. Evidence linked in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+3. Evidence linked in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
 
 ## 9. P0-8 On-call and Reachability
 
@@ -173,7 +173,7 @@ Owner: Operations Lead
 
 Source template:
 
-1. [docs/ONCALL_ESCALATION_ROSTER.md](docs/ONCALL_ESCALATION_ROSTER.md)
+1. [ONCALL_ESCALATION_ROSTER.md](ONCALL_ESCALATION_ROSTER.md)
 
 Steps:
 
@@ -195,8 +195,8 @@ Owner: Release Manager
 Steps:
 
 1. Review all completed P0 artifacts.
-2. Update [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
-3. Update [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md).
+2. Update [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
+3. Update [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md).
 4. Switch from No-Go only if all P0 items are evidenced.
 
 Done evidence:

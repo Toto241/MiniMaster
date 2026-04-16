@@ -1,10 +1,12 @@
 # Google Play Store Listing & IARC Rating Guide
 
-**Status:** Pre-submission checklist
+**Status:** Draft ready; external inputs and localization review pending before submission
 **Timeline:** Submit IARC form this week; listing content over next 2 weeks
 **Apps:**
 - Parent App: `com.minimaster.masterapp`
 - Child App: `com.google.pairing`
+
+**Companion docs:** [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md), [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 
 ---
 
@@ -109,7 +111,7 @@ This app requires:
 Questions? Issues?
 • Check in-app FAQ
 • Email: EXTERNAL_INPUT_REQUIRED (replace with the real production support contact before submission)
-• Privacy: See privacy policy in app settings
+• Privacy: See privacy policy in app settings and link the hosted policy from [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -125,7 +127,7 @@ Version: 2.2.0 · © 2026 MiniMaster Development
 🛡️ Tamper detection + offline enforcement capability
 ```
 
-**Note:** Include link to privacy policy in "More details" section.
+**Note:** Include link to the hosted policy derived from [PRIVACY_POLICY.md](PRIVACY_POLICY.md) in "More details".
 
 ---
 
@@ -394,7 +396,7 @@ A: Yes (account creation, device info, app usage tracking)
 | **Content Rating** | PEGI 3 / ESRB E / USK 0+ | PEGI 3 / ESRB E / USK 0+ |
 | **Private/Public** | Public | Public |
 | **Availability** | All countries (initially DE/AT/CH pilot) | All countries (initially DE/AT/CH pilot) |
-| **Languages** | German (primary), English | German (primary), English |
+| **Languages** | German (submission target), English master copy | German (submission target), English master copy |
 
 ### D.2 Pre-Launch Checklist
 
@@ -466,7 +468,8 @@ A: Yes (account creation, device info, app usage tracking)
 
 ### E.2 Translation Status
 
-- ✅ German descriptions provided above
+- ✅ English master copy provided above
+- ☐ German submission copy still needs final translation/review before store submission
 - ✅ Privacy Policy (German version required before submission)
 - ✅ App UI localized (Android Compose supports i18n)
 - ☐ Support documentation (German if customer support planned)
@@ -505,7 +508,8 @@ A: Yes (account creation, device info, app usage tracking)
 - IARC Questionnaire: https://support.google.com/googleplay/android-developer/answer/188189
 - Play Store Listing Best Practices: https://support.google.com/googleplay/android-developer/answer/9887622
 - Data Safety Form: https://support.google.com/googleplay/android-developer/answer/9859152
+- Companion docs in repo: [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md), [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)
 
 ---
 
-**Ready to submit: Copy listings to Play Console Data Safety + Listing pages**
+**Next step after external inputs are filled: copy the finalized listing package into Play Console listing pages and align it with [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md).**
