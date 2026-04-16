@@ -1,6 +1,8 @@
 # Play Permissions Declaration Checklist
 
-Status: operativer Arbeitsstand fuer die Play-Console-Einreichung der sensitiven Berechtigungen.
+**Status:** In progress; operative Vorlage vorhanden, finale Play-Console-Einreichung noch offen.
+
+**Companion docs:** [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md), [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 
 ## 1. Ziel
 
@@ -20,9 +22,9 @@ Diese Checkliste sammelt alle benoetigten Nachweise fuer die Google Play Permiss
 
 | Permission / API | Warum benoetigt | User Benefit | Nachweis im Repo | Play Console Status | Owner |
 | ----- | ----- | ----- | ----- | ----- | ----- |
-| Accessibility Service | Erzwingung von App-Sperrregeln und Block-Overlay auf dem Child-Geraet | Eltern koennen gesperrte Apps und Regeln technisch durchsetzen | ACCESSIBILITY_SERVICE_GUIDE.md, childApp/src/ | ⬜ Not submitted | Compliance Owner |
-| Usage Access (PACKAGE_USAGE_STATS) | Erkennung von App-Nutzungszeiten fuer Zeitlimits und Regelverletzungen | Zeitlimits und Nutzungsregeln funktionieren nachvollziehbar | docs/CHILDAPP_LOCK_LOGIC.md, childApp/src/ | ⬜ Not submitted | Compliance Owner |
-| Draw over other apps (SYSTEM_ALERT_WINDOW) | Anzeige eines Sperr-Overlays bei blockierten Apps | Kind sieht klare Sperrbegruendung statt App-Inhalt | ACCESSIBILITY_SERVICE_GUIDE.md, childApp/src/ | ⬜ Not submitted | Compliance Owner |
+| Accessibility Service | Erzwingung von App-Sperrregeln und Block-Overlay auf dem Child-Geraet | Eltern koennen gesperrte Apps und Regeln technisch durchsetzen | [ACCESSIBILITY_SERVICE_GUIDE.md](../ACCESSIBILITY_SERVICE_GUIDE.md), [childApp/src/](../childApp/src/) | ⬜ Not submitted | Compliance Owner |
+| Usage Access (PACKAGE_USAGE_STATS) | Erkennung von App-Nutzungszeiten fuer Zeitlimits und Regelverletzungen | Zeitlimits und Nutzungsregeln funktionieren nachvollziehbar | [CHILDAPP_LOCK_LOGIC.md](CHILDAPP_LOCK_LOGIC.md), [childApp/src/](../childApp/src/) | ⬜ Not submitted | Compliance Owner |
+| Draw over other apps (SYSTEM_ALERT_WINDOW) | Anzeige eines Sperr-Overlays bei blockierten Apps | Kind sieht klare Sperrbegruendung statt App-Inhalt | [ACCESSIBILITY_SERVICE_GUIDE.md](../ACCESSIBILITY_SERVICE_GUIDE.md), [childApp/src/](../childApp/src/) | ⬜ Not submitted | Compliance Owner |
 
 ### 3.1 Copy-Paste Texte fuer Play Console
 
@@ -46,9 +48,9 @@ Data handling note:
 | Artefakt | Beschreibung | Status | Link/Ort |
 | ----- | ----- | ----- | ----- |
 | Screencast Permissions Flow | Video: Aktivierung der Berechtigungen + echter Enforcement-Flow | ⬜ | _(to add)_ |
-| Reviewer Login/App Access | Testkonto oder reproduzierbare Reviewer-Schritte | 🔄 | docs/APP_ACCESS_REVIEWER_GUIDE.md |
-| Privacy/Disclosure Text | Klare Offenlegung in App und Store Listing | 🔄 | docs/STORE_LISTING_AND_IARC_READINESS.md |
-| Enforcement Proof | Nachweis: Regel gesetzt -> App blockiert | ⬜ | docs/PHYSICAL_COMMISSIONING_CHECKLIST.md |
+| Reviewer Login/App Access | Testkonto oder reproduzierbare Reviewer-Schritte | 🔄 | [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md) |
+| Privacy/Disclosure Text | Klare Offenlegung in App und Store Listing | 🔄 | [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md) |
+| Enforcement Proof | Nachweis: Regel gesetzt -> App blockiert | ⬜ | [PHYSICAL_COMMISSIONING_CHECKLIST.md](PHYSICAL_COMMISSIONING_CHECKLIST.md) |
 
 ## 5. Submission Steps
 
@@ -56,7 +58,7 @@ Data handling note:
 2. Fuer jede deklarierte Permission den Zwecktext aus Abschnitt 3.1 eintragen.
 3. Screencast und Reviewer-Hinweise verlinken/hochladen.
 4. Submission absenden und Review-Status dokumentieren.
-5. Freigabestatus in docs/RELEASE_EVIDENCE_REGISTER.md aktualisieren.
+5. Freigabestatus in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) aktualisieren.
 
 ## 6. Submission Evidence Log
 
@@ -81,4 +83,4 @@ Data handling note:
 Done erst wenn:
 - Alle relevanten Permission-Eintraege in Play Console auf submitted/reviewed stehen.
 - Reviewer-Artefakte verlinkt sind.
-- Status in docs/RELEASE_EVIDENCE_REGISTER.md von offen auf erledigt gesetzt wurde.
+- Status in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) von offen auf erledigt gesetzt wurde.
