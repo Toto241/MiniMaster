@@ -23,8 +23,9 @@ Der Stand ist:
 
 ### Still open
 
-- Frischer CodeQL-Nachweis nach Workflow-Fix.
-- Frischer Android-CI-Nachweis nach Workflow-Fix.
+- GitHub-Actions-Billing/Spending-Limit beheben; aktuelle Revalidation blockiert CodeQL und Android CI vor Jobstart.
+- Frischer CodeQL-Nachweis nach Billing-Fix.
+- Frischer Android-CI-Nachweis nach Billing-Fix.
 - Finaler Deploy-Nachweis.
 - Firebase-Key-Rotation in der Console.
 - Play Console Submission-Paket.
@@ -37,14 +38,15 @@ Diese Punkte muessen vor jeder Freigabeentscheidung mindestens auf Conditional G
 
 | P0 | Aufgabe | Owner | Done-Nachweis | Abhaengigkeit |
 | --- | --- | --- | --- | --- |
-| P0-1 | CodeQL und Android CI nach Repo-Fix neu ausfuehren | Engineering | Aktuelle Runs in `completed/success` und in [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) dokumentiert | GitHub Actions verfuegbar |
-| P0-2 | Release-Evidence mit aktuellen CI-Run-Links aktualisieren | Engineering | [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) zeigt aktuelle gruene Run-Links | P0-1 |
-| P0-3 | Finalen Deploy-Nachweis erzeugen | Engineering | Deploy-Referenz in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) eingetragen | P0-1 |
-| P0-4 | Firebase-Key-Rotation und Restriktionen abschliessen | Security Owner | Key-ID alt/neu, Revocation-Zeitpunkt, Console-Nachweis im Evidence Register | Firebase Console Zugriff |
-| P0-5 | Play Console Paket einreichen: Data Safety, IARC, Permissions, App Access | Product/Ops + Compliance | Screenshots/URLs und Status im Evidence Register | Play Console Zugriff |
-| P0-6 | Physische Commissioning-Checks auf Geraet/Emulator abschliessen | QA/Operations | Ausgefuellte Checkliste mit Sign-off | Reale Testumgebung |
-| P0-7 | On-call Roster final benennen und Reachability-Test dokumentieren | Operations Lead | Vollstaendige Namen/Kontakte + Reachability-Evidence | Operative Owner verfuegbar |
-| P0-8 | Re-Decision auf Conditional Go oder Go dokumentieren | Release Manager | Aktualisierte [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | P0-1 bis P0-7 |
+| P0-1 | GitHub-Actions-Billing/Spending-Limit beheben | Repo Owner | Revalidation ohne Billing-Blocker in [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | GitHub Account/Org Zugriff |
+| P0-2 | CodeQL und Android CI nach Billing-Fix neu ausfuehren | Engineering | Aktuelle Runs in `completed/success` und in [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) dokumentiert | P0-1 |
+| P0-3 | Release-Evidence mit aktuellen CI-Run-Links aktualisieren | Engineering | [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) zeigt aktuelle gruene Run-Links | P0-2 |
+| P0-4 | Finalen Deploy-Nachweis erzeugen | Engineering | Deploy-Referenz in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) eingetragen | P0-2 |
+| P0-5 | Firebase-Key-Rotation und Restriktionen abschliessen | Security Owner | Key-ID alt/neu, Revocation-Zeitpunkt, Console-Nachweis im Evidence Register | Firebase Console Zugriff |
+| P0-6 | Play Console Paket einreichen: Data Safety, IARC, Permissions, App Access | Product/Ops + Compliance | Screenshots/URLs und Status im Evidence Register | Play Console Zugriff |
+| P0-7 | Physische Commissioning-Checks auf Geraet/Emulator abschliessen | QA/Operations | Ausgefuellte Checkliste mit Sign-off | Reale Testumgebung |
+| P0-8 | On-call Roster final benennen und Reachability-Test dokumentieren | Operations Lead | Vollstaendige Namen/Kontakte + Reachability-Evidence | Operative Owner verfuegbar |
+| P0-9 | Re-Decision auf Conditional Go oder Go dokumentieren | Release Manager | Aktualisierte [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | P0-1 bis P0-8 |
 
 ## 4. P1 Required Before Broad Rollout
 
@@ -58,15 +60,15 @@ Diese Punkte blockieren nicht den naechsten Nachweiszyklus, sollten aber vor ein
 
 ## 5. Execution Order
 
-1. P0-1 bis P0-3 als technischer Nachweisblock.
-2. P0-4 und P0-5 als Console-/Store-Block.
-3. P0-6 und P0-7 als Betriebsblock.
-4. P0-8 als Re-Decision.
+1. P0-1 bis P0-4 als technischer Nachweisblock.
+2. P0-5 und P0-6 als Console-/Store-Block.
+3. P0-7 und P0-8 als Betriebsblock.
+4. P0-9 als Re-Decision.
 5. Danach P1-1 bis P1-3 fuer Rollout-Haertung.
 
 ## 6. Stop Rules
 
-- Wenn CodeQL oder Android CI nach Repo-Fix nicht grün werden, bleibt der Status No-Go.
+- Wenn Billing/Spending-Limit, CodeQL oder Android CI nicht grün werden, bleibt der Status No-Go.
 - Wenn Key-Rotation, Play Console Paket, Commissioning oder On-call ungeprueft bleiben, bleibt der Status No-Go.
 - Conditional Go ist erst zulaessig, wenn alle P0-Punkte geschlossen und verlinkt sind.
 

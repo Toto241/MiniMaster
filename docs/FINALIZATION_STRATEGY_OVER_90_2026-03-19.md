@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD060 -->
+
 # Finalization Strategy >90% (2026-03-19)
 
 Status: execution strategy to raise repository finalization maturity above 90%.
