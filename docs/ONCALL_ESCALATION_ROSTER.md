@@ -1,6 +1,6 @@
 # On-call and Escalation Roster
 
-Status: in progress - template exists, contact assignment pending.
+**Status:** In progress; template exists, contact assignment pending.
 Owner: Operations Lead
 
 ## 0. Release Gate Mapping
@@ -21,7 +21,7 @@ Completion rule:
 
 - Template and escalation logic exist.
 - External inputs are still missing for named owners, paging channels, bridge URL, and reachability proof.
-- This file should be completed together with [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) and [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md).
+- This file should be completed together with [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) and [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md).
 
 ## 1. Coverage Window
 
@@ -82,10 +82,10 @@ Reachability check:
 
 ## 4. Mandatory Runbooks
 
-- RUNBOOK.md
-- docs/FIREBASE_KEY_ROTATION_RUNBOOK.md
-- docs/PHYSICAL_COMMISSIONING_CHECKLIST.md
-- docs/APP_ACCESS_REVIEWER_GUIDE.md
+- [RUNBOOK.md](../RUNBOOK.md)
+- [FIREBASE_KEY_ROTATION_RUNBOOK.md](FIREBASE_KEY_ROTATION_RUNBOOK.md)
+- [PHYSICAL_COMMISSIONING_CHECKLIST.md](PHYSICAL_COMMISSIONING_CHECKLIST.md)
+- [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)
 
 ## 5. Paging and Communications
 
@@ -138,7 +138,7 @@ Before this file can be considered done, collect all of the following:
 2. One tested paging path and one tested bridge path.
 3. Reachability timestamp recorded in section 9.
 4. Signed confirmation from Operations, Engineering, and Security.
-5. Matching status update in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+5. Matching status update in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
 
 ## 8. Sign-off
 
@@ -152,7 +152,7 @@ Before this file can be considered done, collect all of the following:
 
 | Evidence item | Value |
 | --- | --- |
-| Final roster location | docs/ONCALL_ESCALATION_ROSTER.md |
+| Final roster location | [ONCALL_ESCALATION_ROSTER.md](ONCALL_ESCALATION_ROSTER.md) |
 | Reachability test timestamp | EXTERNAL_INPUT_REQUIRED |
 | Pager test result screenshot/log | EXTERNAL_INPUT_REQUIRED |
 | Bridge test screenshot/log | EXTERNAL_INPUT_REQUIRED |

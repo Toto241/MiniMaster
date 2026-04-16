@@ -1,6 +1,6 @@
 # App Access Reviewer Guide (Google Play)
 
-Status: in progress - draft exists, final Play Console submission pending.
+**Status:** In progress; draft exists, final Play Console submission pending.
 Owner: Product/Ops
 
 ## 0. Release Gate Mapping
@@ -21,7 +21,7 @@ Completion rule:
 
 - Draft is present and usable as the reviewer-facing baseline.
 - External inputs are still missing for credentials, named contacts, Play Console URL, screenshots, and sign-off.
-- Current technical references should be taken from [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) and [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md).
+- Current technical references should be taken from [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) and [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md).
 
 ## 1. Purpose
 
@@ -177,7 +177,7 @@ Before this document can move from draft to done, attach all of the following:
 2. One screenshot of the Play Console app-access form before submission.
 3. One screenshot after submission with visible timestamp.
 4. Final contact roster for reviewer follow-up.
-5. Link update in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md).
+5. Link update in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).
 
 ## 9. Submission Checklist
 
@@ -201,7 +201,7 @@ Before this document can move from draft to done, attach all of the following:
 Notes:
 
 - Save screenshots before and after pressing submit.
-- Add this evidence in docs/RELEASE_EVIDENCE_REGISTER.md under "Before Go-Live: Operative Restpunkte".
+- Add this evidence in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) under "Before Go-Live: Operative Restpunkte".
 
 ## 11. Finalization Sign-off
 

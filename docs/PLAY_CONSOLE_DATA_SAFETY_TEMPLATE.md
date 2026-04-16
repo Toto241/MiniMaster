@@ -1,13 +1,13 @@
 # Google Play Console — Data Safety Form (Pre-Filled)
 
-**Status:** Ready to submit to Google Play Console
+**Status:** Draft ready; external inputs pending before Google Play Console submission
 **App:** MiniMaster Parent Control Suite
 **Package IDs:**
 - Parent App: `com.minimaster.masterapp`
 - Child App: `com.google.pairing`
 
 **Timeline:** Submit this week to avoid review delays
-**References:** Privacy Policy + COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md
+**References:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md), [COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md](COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md), [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 
 ---
 
@@ -19,7 +19,7 @@
 
 **Explanation:**
 MiniMaster is a parental control application that:
-- Requires parent authentication (Firebase Auth or legacy IMEI/secret key) to access child device data
+- Requires parent authentication (Firebase Auth; legacy IMEI/secret key remains only as a frozen compatibility path for older pairings)
 - Synchronizes real-time enforcement rules (app lockdown, usage schedules) via Firebase Cloud Messaging
 - Stores task assignments and completion proofs (optional photos) in Firestore
 - Tracks child device usage via periodic heartbeat worker
@@ -33,7 +33,7 @@ MiniMaster is a parental control application that:
 | Data Type | Collected | Purpose | Retention | Shared? |
 |-----------|----------|---------|-----------|---------|
 | **Account credentials** (email/password) | ✅ YES | Firebase Auth to parent app | Until account deletion (DSAR) | ❌ No |
-| **IMEI / Device ID** | ✅ YES | Legacy auth + pairing flow | Until pairing reset (DSAR) | ❌ No |
+| **IMEI / Device ID** | ✅ YES | Legacy compatibility for older pairings + device identification during pairing | Until pairing reset (DSAR) | ❌ No |
 | **Phone number** (optional) | ✅ YES | Recovery / Support contact | Until account deletion (DSAR) | ❌ No |
 | **Payment info** | ✅ YES (Play Billing) | Subscription payment (premium features) | 30 days post-cancellation | ❌ No (Google Play only) |
 | **User ID / Account ID** | ✅ YES | Internal auth + Firestore document key | Until account deletion | ❌ No |
@@ -211,7 +211,7 @@ MiniMaster is a parental control application that:
 
 ### 5.2 Privacy Policy Link
 
-**Location:** `docs/PRIVACY_POLICY.md` (in repo)
+**Location:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md) (in repo)
 **Link for Play Console:** `https://[your-domain]/privacy` (to be hosted)
 
 **Key sections included:**
@@ -299,9 +299,10 @@ MiniMaster is a parental control application that:
 ## References
 
 - Attached: [COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md](COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md)
+- Companion docs: [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md), [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)
 - Play Console Docs: https://support.google.com/googleplay/android-developer/answer/9859152
 - Google Play Policies: https://play.google.com/console/about/policies/
 
 ---
 
-**Ready to copy+paste into Google Play Console → Data Safety form.**
+**Ready for final review and external completion before copy/paste into Google Play Console → Data Safety form.**
