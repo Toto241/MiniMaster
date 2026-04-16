@@ -1,13 +1,13 @@
 # Google Play Console — Data Safety Form (Pre-Filled)
 
-**Status:** Ready to submit to Google Play Console  
-**App:** MiniMaster Parent Control Suite  
-**Package IDs:** 
+**Status:** Ready to submit to Google Play Console
+**App:** MiniMaster Parent Control Suite
+**Package IDs:**
 - Parent App: `com.minimaster.masterapp`
 - Child App: `com.google.pairing`
 
-**Timeline:** Submit this week to avoid review delays  
-**References:** Privacy Policy + COMPILE_EVIDENCE_BUNDLE_2026-03-19.md
+**Timeline:** Submit this week to avoid review delays
+**References:** Privacy Policy + COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md
 
 ---
 
@@ -38,9 +38,9 @@ MiniMaster is a parental control application that:
 | **Payment info** | ✅ YES (Play Billing) | Subscription payment (premium features) | 30 days post-cancellation | ❌ No (Google Play only) |
 | **User ID / Account ID** | ✅ YES | Internal auth + Firestore document key | Until account deletion | ❌ No |
 
-**✅ Data encrypted in transit (HTTPS + TLS 1.2+)**  
-**✅ Data encrypted at rest (Firebase Firestore encryption)**  
-**✅ DSAR/Export: `exportUserData()` cloud function returns full user data within 30 days**  
+**✅ Data encrypted in transit (HTTPS + TLS 1.2+)**
+**✅ Data encrypted at rest (Firebase Firestore encryption)**
+**✅ DSAR/Export: `exportUserData()` cloud function returns full user data within 30 days**
 **✅ Deletion: `deleteUserAccount()` purges all personal data + completes within 30 days**
 
 ---
@@ -211,7 +211,7 @@ MiniMaster is a parental control application that:
 
 ### 5.2 Privacy Policy Link
 
-**Location:** `docs/PRIVACY_POLICY.md` (in repo)  
+**Location:** `docs/PRIVACY_POLICY.md` (in repo)
 **Link for Play Console:** `https://[your-domain]/privacy` (to be hosted)
 
 **Key sections included:**
@@ -258,7 +258,7 @@ MiniMaster is a parental control application that:
 - [ ] **App name & package ID** filled in
   - `com.minimaster.masterapp` (Parent App)
   - `com.google.pairing` (Child App)
-  
+
 - [ ] **Select "Parental Control"** as app category (if available)
 
 - [ ] **Data types section:**
