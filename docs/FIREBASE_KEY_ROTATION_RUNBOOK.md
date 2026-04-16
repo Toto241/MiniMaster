@@ -31,7 +31,7 @@ MiniMaster uses Firebase Admin SDK in Cloud Functions to manage authentication, 
   - Check GitHub Actions: no running `firebase deploy`
   - Stagger key rotation: deploy new functions **after** old key is revoked
 
-- [ ] **Firebase Console access** ready (GCP Project: `minimaster-2026`)
+- [ ] **Firebase Console access** ready (GCP Project: `minimaster-28fbd`)
   - [ ] Able to access Service Accounts page
   - [ ] Able to view/manage keys
   - [ ] Able to manage Firestore security rules
@@ -44,15 +44,15 @@ MiniMaster uses Firebase Admin SDK in Cloud Functions to manage authentication, 
 
 ## Step 1: Generate New Service Account Key
 
-**Location:** Cloud Console → Project `minimaster-2026` → Service Accounts
+**Location:** Cloud Console → Project `minimaster-28fbd` → Service Accounts
 
 ### 1a. Navigate to Service Account
 
 ```
 GCP Cloud Console
-├─ Select Project: "minimaster-2026"
+├─ Select Project: "minimaster-28fbd"
 ├─ IAM & Admin → Service Accounts
-└─ Find: "firebase-adminsdk-{hash}@minimaster-2026.iam.gserviceaccount.com"
+└─ Find: "firebase-adminsdk-{hash}@minimaster-28fbd.iam.gserviceaccount.com"
 ```
 
 ### 1b. Create New Key (JSON format)
@@ -105,7 +105,7 @@ firebase deploy --only functions
 // Quick smoke test in Cloud Functions logs
 // Expected: New key authenticates successfully
 console.log("Service account project:", admin.app().options.projectId);
-// Should output: "minimaster-2026"
+// Should output: "minimaster-28fbd"
 ```
 
 ### 2c. Test All Key Endpoints
@@ -224,7 +224,7 @@ service cloud.firestore {
     // Admin SDK (service account) can always read/write
     match /{document=**} {
       allow read, write: if request.auth.uid != null
-                         || request.auth.token.iss == "https://securetoken.google.com/minimaster-2026";
+                         || request.auth.token.iss == "https://securetoken.google.com/minimaster-28fbd";
     }
   }
 }
@@ -273,7 +273,7 @@ Set recurring calendar event:
 1. **Immediately revoke new key**
    ```bash
    gcloud iam service-accounts keys delete [NEW_KEY_ID] \
-     --iam-account=firebase-adminsdk-...@minimaster-2026.iam.gserviceaccount.com
+    --iam-account=firebase-adminsdk-...@minimaster-28fbd.iam.gserviceaccount.com
    ```
 
 2. **Restore old key in GitHub Secrets**

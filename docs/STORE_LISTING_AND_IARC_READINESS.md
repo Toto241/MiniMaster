@@ -1,8 +1,8 @@
 # Google Play Store Listing & IARC Rating Guide
 
-**Status:** Pre-submission checklist  
-**Timeline:** Submit IARC form this week; listing content over next 2 weeks  
-**Apps:** 
+**Status:** Pre-submission checklist
+**Timeline:** Submit IARC form this week; listing content over next 2 weeks
+**Apps:**
 - Parent App: `com.minimaster.masterapp`
 - Child App: `com.google.pairing`
 
@@ -108,7 +108,7 @@ This app requires:
 
 Questions? Issues?
 • Check in-app FAQ
-• Email: support@minimaster.local (or your support contact)
+• Email: EXTERNAL_INPUT_REQUIRED (replace with the real production support contact before submission)
 • Privacy: See privacy policy in app settings
 
 ═══════════════════════════════════════════════════════════════════
@@ -237,7 +237,7 @@ Version: 2.2.0 · © 2026 MiniMaster Development
 
 ### B.1 Icon Requirements
 
-**Dimensions:** 512×512 px (or higher, up to 4096×4096)  
+**Dimensions:** 512×512 px (or higher, up to 4096×4096)
 **Format:** PNG with transparency recommended
 
 **Design Guidelines:**
@@ -298,7 +298,7 @@ Version: 2.2.0 · © 2026 MiniMaster Development
 
 ### B.3 Feature Graphics
 
-**Dimensions:** 1024×500 px  
+**Dimensions:** 1024×500 px
 **Format:** PNG or webp
 
 **Content Options:**
@@ -313,7 +313,7 @@ Version: 2.2.0 · © 2026 MiniMaster Development
 
 ### C.1 What is IARC?
 
-IARC = International Age Rating Coalition  
+IARC = International Age Rating Coalition
 - Automatically rates app for **PEGI** (Europe), **ESRB** (US/Canada), **USK** (Germany), **ClassInd** (Brazil)
 - Takes ~5 minutes to fill questionnaire
 - Google Play Console will auto-generate ratings

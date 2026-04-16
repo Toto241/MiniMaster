@@ -2,6 +2,8 @@
 
 Status: current execution list after repo-side fixes were completed on 2026-04-06.
 
+Operator execution companion: [docs/EXTERNAL_P0_EXECUTION_CHECKLIST_2026-04-16.md](docs/EXTERNAL_P0_EXECUTION_CHECKLIST_2026-04-16.md)
+
 ## 1. Purpose
 
 Dieses Dokument ersetzt keine fachlichen Nachweise, sondern priorisiert die verbleibenden Arbeiten in eine harte Ausfuehrungsreihenfolge.
