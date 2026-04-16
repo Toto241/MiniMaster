@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD024 MD060 -->
+
 # Security Baseline Checklist
 
 Status: security baseline assessment for operator-facing web and desktop surfaces.

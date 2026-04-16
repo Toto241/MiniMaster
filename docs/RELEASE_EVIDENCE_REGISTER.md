@@ -2,7 +2,7 @@
 
 Status: consolidated evidence register for release candidate approval.
 
-Current synthesis note (2026-04-06): Repo-side remediation is complete and the local workspace is clean. Remaining blockers are external evidence and go-live operations. See [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md).
+Current synthesis note (2026-04-16): Repo-side remediation remains complete. Current blockers are the confirmed GitHub Actions billing/spending-limit failure for CodeQL and Android CI, the missing final deploy evidence, and external go-live operations. A local deploy was not executed from this workspace because Firebase CLI/project access is present, but runtime secrets/config for a production-grade Functions deploy are not available locally (`.env` / `.runtimeconfig.json` absent). See [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) and [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md).
 
 ## 1. Purpose
 
@@ -30,9 +30,9 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-03-21 |
 | Deploy workflow config validation | `.github/workflows/deploy.yml`: korrekte Projekt-ID `minimaster-28fbd` + Secrets→`.env` Mapping dokumentiert | ✅ | Documented | 2026-03-21 |
 | Static readiness checks | scripts/static_readiness_checks.py: 20/20 checks passed (100%) (python scripts/test_automation.py --suite static-readiness) | ✅ | Automated | 2026-04-05 |
-| CodeQL security scan (0 high/critical) | Aktuelle Revalidation zeigt einen noch laufenden Run [24011366991](https://github.com/Toto241/MiniMaster/actions/runs/24011366991); nach Repo-Fix ist ein frischer erfolgreicher Nachweis noch ausstehend, siehe [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | ⬜ | Engineering | 2026-04-06 |
-| Android build (if applicable) | Letzter Erfolg: [24000686837](https://github.com/Toto241/MiniMaster/actions/runs/24000686837); letzter Fehlschlag [24011366972](https://github.com/Toto241/MiniMaster/actions/runs/24011366972) basiert auf vor dem Repo-Fix gemeldeten veralteten Action-Versionen, frischer Nachweis ausstehend | ⬜ | Engineering | 2026-04-06 |
-| Deployment result | _(pending final deploy — deploy.yml jetzt mit korrekter Projekt-ID minimaster-28fbd)_ | ⬜ | | |
+| CodeQL security scan (0 high/critical) | Revalidation vom 2026-04-16 zeigt fuer Rerun [24323887350](https://github.com/Toto241/MiniMaster/actions/runs/24323887350) `completed / failure`; laut [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) wurde der Job wegen GitHub-Actions-Billing/Spending-Limit nicht gestartet, Code-Scanning-Blocker ist nicht mehr aktiv | ⛔ | Engineering | 2026-04-16 |
+| Android build (if applicable) | Revalidation vom 2026-04-16 zeigt fuer Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) `completed / failure`; laut [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) wurde der Job wegen GitHub-Actions-Billing/Spending-Limit nicht gestartet | ⛔ | Engineering | 2026-04-16 |
+| Deployment result | Lokale Deploy-Bereitschaft am 2026-04-16 geprüft: Firebase CLI, Projektbindung und Login sind vorhanden, aber belastbarer Final-Deploy aus diesem Workspace nicht ausgeführt, weil produktive Runtime-Secrets/-Config lokal nicht vorliegen (`.env` / `.runtimeconfig.json` fehlen) | ⛔ | Engineering | 2026-04-16 |
 
 ### 3.2 Functional Commissioning Gate
 
@@ -104,9 +104,9 @@ Aktuelle Priorisierung siehe: [docs/RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](
 | Store Listing DE vollständig (Text + Screenshots) | Finaler Store-Listing-Entwurf + Asset-Paket | ⬜ | Product/Ops | offen |
 | Permissions Declaration einreichen (Accessibility/Usage/Overlay) | Arbeitsstand dokumentiert in `docs/PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md`; finale Einreichbestaetigung aus Play Console noch offen | ⬜ | Compliance Owner | offen |
 | App-Access-Anleitung in Play Console hinterlegen | Link/Screenshot zur Reviewer-Anleitung (operationalisierter Draft in `docs/APP_ACCESS_REVIEWER_GUIDE.md`; Play Console Verlinkung noch offen) | ⬜ | Product/Ops | offen |
-| GitHub Actions Billing/Spending-Limit bereinigen | Kein aktiver Billing-Blocker mehr laut [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md); Punkt als erledigt dokumentieren und nicht weiter als Release-Blocker fuehren | ✅ | Repo Owner | 2026-04-05 |
-| CodeQL-Ergebnis verlinken | Frischer Nachweis nach Repo-Fix offen; aktueller Pending-Run: [24011366991](https://github.com/Toto241/MiniMaster/actions/runs/24011366991) | ⬜ | Engineering Owner | offen |
-| Android CI Build-Nachweis verlinken | Frischer Nachweis nach Repo-Fix offen; letzter Fehlschlag basiert auf vor Fix gemeldeten veralteten Action-Versionen | ⬜ | Engineering Owner | offen |
+| GitHub Actions Billing/Spending-Limit bereinigen | Aktuelle Revalidation zeigt fuer CodeQL und Android CI erneut einen Billing-/Spending-Limit-Blocker; die Jobs wurden nicht gestartet, siehe [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | ⬜ | Repo Owner | offen |
+| CodeQL-Ergebnis verlinken | Frischer Rerun [24323887350](https://github.com/Toto241/MiniMaster/actions/runs/24323887350) ist mit Billing-Blocker fehlgeschlagen; belastbarer gruener Nachweis fehlt weiter, siehe [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | ⬜ | Engineering Owner | offen |
+| Android CI Build-Nachweis verlinken | Frischer Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) ist mit Billing-Blocker fehlgeschlagen; belastbarer gruener Nachweis fehlt weiter, siehe [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | ⬜ | Engineering Owner | offen |
 | Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST | ⬜ | QA/Operations | offen |
 | On-call/Eskalations-Roster verbindlich benennen | Roster mit Namen, Kontakt, Vertretung (operationalisierte Vorlage in `docs/ONCALL_ESCALATION_ROSTER.md`; Inhalte offen) | ⬜ | Operations Lead | offen |
 
