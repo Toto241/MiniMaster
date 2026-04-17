@@ -1,6 +1,8 @@
 # Release Decision Template
 
-Status: mandatory template for every release candidate go/no-go decision.
+**Status:** Mandatory template for every release candidate go/no-go decision.
+
+**Companion docs:** [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md), [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md), [RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md](RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md), [COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md](COMPLETE_ACCEPTANCE_PROCESS_2026-03-19.md)
 
 ## Release Candidate
 
@@ -14,11 +16,11 @@ Status: mandatory template for every release candidate go/no-go decision.
 
 ### Mandatory Input Artifacts
 
-1. `docs/RELEASE_EVIDENCE_REGISTER.md` (inkl. Abschnitt "Before Go-Live: Operative Restpunkte")
-2. `docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md`
-3. `docs/READINESS_SCORECARD_2026-03-19.md`
-4. `docs/RUNBOOK.md` (inkl. Release Cutover Checklist)
-5. Optional: `docs/COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md` als Baseline-Nachweis
+1. [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) (inkl. Abschnitt "Before Go-Live: Operative Restpunkte")
+2. [COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md)
+3. [READINESS_SCORECARD_2026-03-19.md](READINESS_SCORECARD_2026-03-19.md)
+4. [RUNBOOK.md](../RUNBOOK.md) (inkl. Release Cutover Checklist)
+5. Optional: [COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md](COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md) als Baseline-Nachweis
 
 ## Gate Summary
 
@@ -94,6 +96,6 @@ Status: mandatory template for every release candidate go/no-go decision.
 
 1. Copy this template for each release candidate.
 2. Fill all fields before the go/no-go board meeting.
-3. Pull all blocker states from `docs/RELEASE_EVIDENCE_REGISTER.md` and keep both documents in sync.
+3. Pull all blocker states from [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) and keep both documents in sync.
 4. Archive the completed template with the release artifacts.
 5. Use consistent naming: `RELEASE_DECISION_<date>_<candidate-id>.md`

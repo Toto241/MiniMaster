@@ -2,7 +2,7 @@
 
 # Finalization Strategy >90% (2026-03-19)
 
-Status: execution strategy to raise repository finalization maturity above 90%.
+**Status:** Execution strategy to raise repository finalization maturity above 90%.
 
 Update 2: repository total is now 94/100. The remaining work is no longer "reach 90+ overall", but "push every relevant single metric above 90%".
 
@@ -257,17 +257,17 @@ All work package deliverables are tracked through the following artifacts:
 
 | WP | Deliverable | Location |
 |----|------------|----------|
-| WP-01 | CI Runbook | [docs/CI_RUNBOOK.md](CI_RUNBOOK.md) |
+| WP-01 | CI Runbook | [CI_RUNBOOK.md](CI_RUNBOOK.md) |
 | WP-01 | CI artifact archiving | [.github/workflows/ci.yml](../.github/workflows/ci.yml) (backend-quality-gate artifact) |
 | WP-02 | Legacy Auth Usage Monitor | [admin-panel/app.js](../admin-panel/app.js) (`loadLegacyAuthUsage`) + [admin-panel/index.html](../admin-panel/index.html) |
-| WP-02 | Migration Cutover Plan | [docs/LEGACY_AUTH_CUTOVER_PLAN.md](LEGACY_AUTH_CUTOVER_PLAN.md) |
-| WP-03 | Enforcement Test Matrix | [docs/CHILD_ENFORCEMENT_TEST_MATRIX.md](CHILD_ENFORCEMENT_TEST_MATRIX.md) |
-| WP-04 | Country Readiness Packets | [docs/COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md) |
-| WP-05 | Release Evidence Register | [docs/RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) |
-| WP-06 | Security Baseline Checklist | [docs/SECURITY_BASELINE_CHECKLIST.md](SECURITY_BASELINE_CHECKLIST.md) |
+| WP-02 | Migration Cutover Plan | [LEGACY_AUTH_CUTOVER_PLAN.md](LEGACY_AUTH_CUTOVER_PLAN.md) |
+| WP-03 | Enforcement Test Matrix | [CHILD_ENFORCEMENT_TEST_MATRIX.md](CHILD_ENFORCEMENT_TEST_MATRIX.md) |
+| WP-04 | Country Readiness Packets | [COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md) |
+| WP-05 | Release Evidence Register | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) |
+| WP-06 | Security Baseline Checklist | [SECURITY_BASELINE_CHECKLIST.md](SECURITY_BASELINE_CHECKLIST.md) |
 | WP-06 | SRI on external scripts | [web-control/index.html](../web-control/index.html) + [admin-panel/index.html](../admin-panel/index.html) |
-| WP-07 | Release Decision Template | [docs/RELEASE_DECISION_TEMPLATE.md](RELEASE_DECISION_TEMPLATE.md) |
-| WP-07 | Readiness Scorecard | [docs/READINESS_SCORECARD_2026-03-19.md](READINESS_SCORECARD_2026-03-19.md) |
+| WP-07 | Release Decision Template | [RELEASE_DECISION_TEMPLATE.md](RELEASE_DECISION_TEMPLATE.md) |
+| WP-07 | Readiness Scorecard | [READINESS_SCORECARD_2026-03-19.md](READINESS_SCORECARD_2026-03-19.md) |
 
 ## 10. Current Position After Reaching 94/100
 

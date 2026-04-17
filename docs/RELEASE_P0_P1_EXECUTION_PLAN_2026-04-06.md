@@ -1,8 +1,8 @@
 # Release P0/P1 Execution Plan (2026-04-06)
 
-Status: current execution list after repo-side fixes were completed on 2026-04-06.
+**Status:** Current execution list after repo-side fixes were completed on 2026-04-06.
 
-Operator execution companion: [docs/EXTERNAL_P0_EXECUTION_CHECKLIST_2026-04-16.md](docs/EXTERNAL_P0_EXECUTION_CHECKLIST_2026-04-16.md)
+**Companion docs:** [EXTERNAL_P0_EXECUTION_CHECKLIST_2026-04-16.md](EXTERNAL_P0_EXECUTION_CHECKLIST_2026-04-16.md), [RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md](RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md), [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md)
 
 ## 1. Purpose
 
@@ -40,15 +40,15 @@ Diese Punkte muessen vor jeder Freigabeentscheidung mindestens auf Conditional G
 
 | P0 | Aufgabe | Owner | Done-Nachweis | Abhaengigkeit |
 | --- | --- | --- | --- | --- |
-| P0-1 | GitHub-Actions-Billing/Spending-Limit beheben | Repo Owner | Revalidation ohne Billing-Blocker in [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) | GitHub Account/Org Zugriff |
-| P0-2 | CodeQL und Android CI nach Billing-Fix neu ausfuehren | Engineering | Aktuelle Runs in `completed/success` und in [docs/CI_REVALIDATION_LATEST.md](docs/CI_REVALIDATION_LATEST.md) dokumentiert | P0-1 |
-| P0-3 | Release-Evidence mit aktuellen CI-Run-Links aktualisieren | Engineering | [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) zeigt aktuelle gruene Run-Links | P0-2 |
-| P0-4 | Finalen Deploy-Nachweis erzeugen | Engineering | Deploy-Referenz in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) eingetragen | P0-2 |
+| P0-1 | GitHub-Actions-Billing/Spending-Limit beheben | Repo Owner | Revalidation ohne Billing-Blocker in [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md) | GitHub Account/Org Zugriff |
+| P0-2 | CodeQL und Android CI nach Billing-Fix neu ausfuehren | Engineering | Aktuelle Runs in `completed/success` und in [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md) dokumentiert | P0-1 |
+| P0-3 | Release-Evidence mit aktuellen CI-Run-Links aktualisieren | Engineering | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) zeigt aktuelle gruene Run-Links | P0-2 |
+| P0-4 | Finalen Deploy-Nachweis erzeugen | Engineering | Deploy-Referenz in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) eingetragen | P0-2 |
 | P0-5 | Firebase-Key-Rotation und Restriktionen abschliessen | Security Owner | Key-ID alt/neu, Revocation-Zeitpunkt, Console-Nachweis im Evidence Register | Firebase Console Zugriff |
 | P0-6 | Play Console Paket einreichen: Data Safety, IARC, Permissions, App Access | Product/Ops + Compliance | Screenshots/URLs und Status im Evidence Register | Play Console Zugriff |
 | P0-7 | Physische Commissioning-Checks auf Geraet/Emulator abschliessen | QA/Operations | Ausgefuellte Checkliste mit Sign-off | Reale Testumgebung |
 | P0-8 | On-call Roster final benennen und Reachability-Test dokumentieren | Operations Lead | Vollstaendige Namen/Kontakte + Reachability-Evidence | Operative Owner verfuegbar |
-| P0-9 | Re-Decision auf Conditional Go oder Go dokumentieren | Release Manager | Aktualisierte [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | P0-1 bis P0-8 |
+| P0-9 | Re-Decision auf Conditional Go oder Go dokumentieren | Release Manager | Aktualisierte [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | P0-1 bis P0-8 |
 
 ## 4. P1 Required Before Broad Rollout
 
@@ -72,12 +72,12 @@ Diese Punkte blockieren nicht den naechsten Nachweiszyklus, sollten aber vor ein
 
 - Wenn Billing/Spending-Limit, CodeQL oder Android CI nicht grün werden, bleibt der Status No-Go.
 - Wenn Key-Rotation, Play Console Paket, Commissioning oder On-call ungeprueft bleiben, bleibt der Status No-Go.
-- Conditional Go ist erst zulaessig, wenn alle P0-Punkte geschlossen und verlinkt sind.
+- Conditional Go ist erst zulaessig, wenn alle Gates bestanden sind, hoechstens ein P1 offen bleibt und dafuer eine dokumentierte Risk Acceptance mit Due Date vorliegt.
 
 ## 7. Completion Target
 
 Dieses Dokument ist abgearbeitet, wenn:
 
 1. alle P0-Zeilen geschlossen sind,
-2. die Nachweise in [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md) eingetragen sind,
-3. die Re-Decision in [docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](docs/RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) aktualisiert wurde.
+2. die Nachweise in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) eingetragen sind,
+3. die Re-Decision in [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) aktualisiert wurde.
