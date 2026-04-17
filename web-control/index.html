@@ -36,6 +36,51 @@
             </div>
         </header>
 
+        <section id="legal-gate" class="legal-gate" style="display: none;">
+            <div class="legal-gate-card">
+                <p class="legal-gate-eyebrow">Legal Gate</p>
+                <h2 id="legal-gate-title">Legal configuration required</h2>
+                <p id="legal-gate-message" class="legal-gate-message">
+                    Choose the app language and country of use before the control panel can unlock the dashboard.
+                </p>
+
+                <div id="legal-context-form" class="legal-context-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="legal-language-select">App language</label>
+                        <select id="legal-language-select" title="App-Sprache für die rechtlichen Dokumente auswählen"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="legal-country-select">Country of use</label>
+                        <select id="legal-country-select" title="Einsatzland für die rechtlichen Dokumente auswählen"></select>
+                    </div>
+                    <div class="legal-context-summary" id="legal-context-summary"></div>
+                    <div class="legal-actions">
+                        <button id="legal-context-continue" class="btn btn-primary" onclick="continueLegalSetup()" title="Sprach- und Länderauswahl speichern und rechtliche Prüfung starten">Continue</button>
+                    </div>
+                </div>
+
+                <div id="legal-consent-view" class="legal-consent-view" style="display: none;">
+                    <div class="legal-links">
+                        <button id="legal-terms-link" class="btn btn-secondary" onclick="openLegalTerms()" title="Aktuelle AGB öffnen">Open Terms</button>
+                        <button id="legal-privacy-link" class="btn btn-secondary" onclick="openLegalPrivacy()" title="Aktuelle Datenschutzerklärung öffnen">Open Privacy Policy</button>
+                    </div>
+                    <label class="legal-checkbox-row" title="Bestätigung der aktuellen AGB-Version">
+                        <input type="checkbox" id="legal-terms-checkbox">
+                        <span id="legal-terms-label">I accept the current Terms.</span>
+                    </label>
+                    <label class="legal-checkbox-row" title="Bestätigung der aktuellen Datenschutzerklärung">
+                        <input type="checkbox" id="legal-privacy-checkbox">
+                        <span id="legal-privacy-label">I accept the current Privacy Policy.</span>
+                    </label>
+                    <div class="legal-context-summary" id="legal-policy-meta"></div>
+                    <div class="legal-actions">
+                        <button id="legal-accept-btn" class="btn btn-primary" onclick="acceptLegalConsent()" title="Zustimmen und Dashboard freischalten">Accept and continue</button>
+                        <button id="legal-retry-btn" class="btn btn-secondary" onclick="retryLegalGate()" title="Rechtliche Prüfung erneut versuchen">Retry</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <main class="main-content" id="main-content" style="display: none;">
             <div class="dashboard">
                 <div class="action-bar" id="dashboard-action-bar">

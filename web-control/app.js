@@ -14,6 +14,60 @@ function escapeHtml(text) {
 }
 
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
+const LEGAL_PREFS_STORAGE_KEY = "minimaster-legal-context";
+const WEB_CONTROL_APP_VERSION = "web-control";
+
+const LEGAL_LANGUAGE_OPTIONS = [
+    { tag: "en", label: "English" },
+    { tag: "de", label: "Deutsch" },
+    { tag: "fr", label: "Francais" },
+    { tag: "zh-CN", label: "Chinese (Simplified)" },
+    { tag: "es", label: "Espanol" },
+    { tag: "pt-BR", label: "Portugues (Brasil)" },
+    { tag: "hi", label: "Hindi" },
+    { tag: "ar", label: "Arabic" },
+    { tag: "id", label: "Indonesian" },
+    { tag: "ja", label: "Japanese" },
+    { tag: "ru", label: "Russian" },
+    { tag: "tr", label: "Turkish" },
+    { tag: "it", label: "Italian" },
+    { tag: "ko", label: "Korean" },
+    { tag: "vi", label: "Vietnamese" },
+    { tag: "pl", label: "Polish" },
+    { tag: "nl", label: "Dutch" },
+    { tag: "th", label: "Thai" },
+    { tag: "uk", label: "Ukrainian" },
+    { tag: "fa", label: "Persian" },
+    { tag: "bn", label: "Bengali" },
+    { tag: "ur", label: "Urdu" },
+    { tag: "sw", label: "Swahili" },
+    { tag: "he", label: "Hebrew" },
+    { tag: "ro", label: "Romanian" },
+    { tag: "cs", label: "Czech" },
+    { tag: "sv", label: "Swedish" },
+    { tag: "no", label: "Norwegian" },
+    { tag: "da", label: "Danish" },
+    { tag: "fi", label: "Finnish" },
+    { tag: "el", label: "Greek" },
+    { tag: "hu", label: "Hungarian" },
+];
+
+const LEGAL_COUNTRY_OPTIONS = [
+    { code: "US", label: "United States" },
+    { code: "DE", label: "Deutschland" },
+    { code: "FR", label: "France" },
+    { code: "GB", label: "United Kingdom" },
+    { code: "CA", label: "Canada" },
+    { code: "BR", label: "Brasil" },
+    { code: "MX", label: "Mexico" },
+    { code: "IN", label: "India" },
+    { code: "JP", label: "Japan" },
+    { code: "KR", label: "South Korea" },
+    { code: "ID", label: "Indonesia" },
+    { code: "ZA", label: "South Africa" },
+    { code: "AE", label: "United Arab Emirates" },
+    { code: "SA", label: "Saudi Arabia" },
+];
 
 // ==================== SESSION TIMEOUT ====================
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
@@ -94,6 +148,11 @@ let currentMasterImei = null;
 let devicesListener = null; // Firestore listener for real-time updates
 let usageChartInstance = null;
 let cachedDevices = [];
+let legalGateState = {
+    status: "idle",
+    context: null,
+    policies: null,
+};
 
 function getDashboardChromeElements() {
     return [
@@ -113,6 +172,266 @@ function hideSecondarySections() {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
+}
+
+function getLegalGateElements() {
+    return {
+        gate: document.getElementById('legal-gate'),
+        title: document.getElementById('legal-gate-title'),
+        message: document.getElementById('legal-gate-message'),
+        contextForm: document.getElementById('legal-context-form'),
+        consentView: document.getElementById('legal-consent-view'),
+        languageSelect: document.getElementById('legal-language-select'),
+        countrySelect: document.getElementById('legal-country-select'),
+        contextSummary: document.getElementById('legal-context-summary'),
+        policyMeta: document.getElementById('legal-policy-meta'),
+        termsLabel: document.getElementById('legal-terms-label'),
+        privacyLabel: document.getElementById('legal-privacy-label'),
+        termsCheckbox: document.getElementById('legal-terms-checkbox'),
+        privacyCheckbox: document.getElementById('legal-privacy-checkbox'),
+        termsLink: document.getElementById('legal-terms-link'),
+        privacyLink: document.getElementById('legal-privacy-link'),
+        acceptBtn: document.getElementById('legal-accept-btn'),
+        retryBtn: document.getElementById('legal-retry-btn'),
+    };
+}
+
+function buildLegalLocale(languageTag, countryCode) {
+    const rawLanguage = String(languageTag || 'en').trim();
+    const normalizedLanguage = rawLanguage.split('-')[0] || 'en';
+    const normalizedCountry = String(countryCode || 'US').trim().toUpperCase() || 'US';
+    return normalizedLanguage + '-' + normalizedCountry;
+}
+
+function getBrowserDefaultLegalContext() {
+    const browserLocale = String((navigator && navigator.language) || 'en-US');
+    const parts = browserLocale.replace('_', '-').split('-');
+    const languageTag = parts[0] || 'en';
+    const countryCode = (parts[1] || 'US').toUpperCase();
+    return { languageTag, countryCode };
+}
+
+function loadSavedLegalContext() {
+    try {
+        const raw = localStorage.getItem(LEGAL_PREFS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        const languageTag = typeof parsed.languageTag === 'string' ? parsed.languageTag.trim() : '';
+        const countryCode = typeof parsed.countryCode === 'string' ? parsed.countryCode.trim().toUpperCase() : '';
+        if (!languageTag || !countryCode) return null;
+        return { languageTag, countryCode, locale: buildLegalLocale(languageTag, countryCode) };
+    } catch (error) {
+        console.warn('Failed to parse stored legal context:', error);
+        return null;
+    }
+}
+
+function saveLegalContext(languageTag, countryCode) {
+    const context = {
+        languageTag: String(languageTag || 'en').trim(),
+        countryCode: String(countryCode || 'US').trim().toUpperCase(),
+    };
+    localStorage.setItem(LEGAL_PREFS_STORAGE_KEY, JSON.stringify(context));
+    return {
+        languageTag: context.languageTag,
+        countryCode: context.countryCode,
+        locale: buildLegalLocale(context.languageTag, context.countryCode),
+    };
+}
+
+function populateLegalContextSelectors() {
+    const { languageSelect, countrySelect } = getLegalGateElements();
+    if (!languageSelect || !countrySelect) return;
+
+    languageSelect.innerHTML = LEGAL_LANGUAGE_OPTIONS
+        .map((option) => '<option value="' + escapeHtml(option.tag) + '">' + escapeHtml(option.label) + '</option>')
+        .join('');
+    countrySelect.innerHTML = LEGAL_COUNTRY_OPTIONS
+        .map((option) => '<option value="' + escapeHtml(option.code) + '">' + escapeHtml(option.label) + '</option>')
+        .join('');
+
+    const saved = loadSavedLegalContext() || getBrowserDefaultLegalContext();
+    languageSelect.value = saved.languageTag;
+    countrySelect.value = saved.countryCode;
+    updateLegalContextSummary(saved.languageTag, saved.countryCode);
+}
+
+function updateLegalContextSummary(languageTag, countryCode) {
+    const { contextSummary } = getLegalGateElements();
+    if (!contextSummary) return;
+    const locale = buildLegalLocale(languageTag, countryCode);
+    contextSummary.textContent = 'Country: ' + String(countryCode || '').toUpperCase() + ' | Locale: ' + locale;
+}
+
+function setLegalGateVisible(visible) {
+    const { gate } = getLegalGateElements();
+    if (gate) gate.style.display = visible ? 'block' : 'none';
+}
+
+function resetDashboardAccess() {
+    stopSessionMonitoring();
+    setDashboardChromeVisible(false);
+    hideSecondarySections();
+    document.getElementById('main-content').style.display = 'none';
+    const devicesList = document.getElementById('devices-list');
+    if (devicesList) devicesList.innerHTML = '<div class="loading">Waiting for legal approval...</div>';
+    if (devicesListener) {
+        devicesListener();
+        devicesListener = null;
+    }
+}
+
+function unlockDashboard() {
+    setLegalGateVisible(false);
+    document.getElementById('main-content').style.display = 'block';
+    setDashboardChromeVisible(true);
+    showDashboard();
+    loadDevices();
+    startSessionMonitoring();
+}
+
+function showLegalContextSetup(message) {
+    const { title, message: messageEl, contextForm, consentView, termsCheckbox, privacyCheckbox } = getLegalGateElements();
+    resetDashboardAccess();
+    populateLegalContextSelectors();
+    if (termsCheckbox) termsCheckbox.checked = false;
+    if (privacyCheckbox) privacyCheckbox.checked = false;
+    if (title) title.textContent = 'Choose legal language and country';
+    if (messageEl) {
+        messageEl.textContent = message || 'Select the language and country of use before the control panel can access account data.';
+    }
+    if (contextForm) contextForm.style.display = 'flex';
+    if (consentView) consentView.style.display = 'none';
+    setLegalGateVisible(true);
+    legalGateState = { status: 'needs-context', context: null, policies: null };
+}
+
+function showLegalLoading(message) {
+    const { title, message: messageEl, contextForm, consentView } = getLegalGateElements();
+    resetDashboardAccess();
+    if (title) title.textContent = 'Checking legal status';
+    if (messageEl) messageEl.textContent = message || 'Verifying the active legal terms for this account...';
+    if (contextForm) contextForm.style.display = 'none';
+    if (consentView) consentView.style.display = 'none';
+    setLegalGateVisible(true);
+}
+
+function showLegalError(message) {
+    const { title, message: messageEl, contextForm, consentView, policyMeta } = getLegalGateElements();
+    resetDashboardAccess();
+    if (title) title.textContent = 'Legal verification failed';
+    if (messageEl) messageEl.textContent = message || 'The control panel could not verify the legal consent status.';
+    if (contextForm) contextForm.style.display = 'none';
+    if (consentView) consentView.style.display = 'flex';
+    if (policyMeta) policyMeta.textContent = 'Use Retry after checking your network, App Check and legal configuration.';
+    setLegalConsentButtonsEnabled(false);
+    setLegalGateVisible(true);
+    legalGateState.status = 'error';
+}
+
+function setLegalConsentButtonsEnabled(enabled) {
+    const { acceptBtn, retryBtn, termsCheckbox, privacyCheckbox, termsLink, privacyLink } = getLegalGateElements();
+    if (acceptBtn) acceptBtn.disabled = !enabled;
+    if (retryBtn) retryBtn.disabled = false;
+    if (termsCheckbox) termsCheckbox.disabled = !enabled;
+    if (privacyCheckbox) privacyCheckbox.disabled = !enabled;
+    if (termsLink) termsLink.disabled = !enabled;
+    if (privacyLink) privacyLink.disabled = !enabled;
+}
+
+function updateLegalConsentView(payload, context) {
+    const { title, message: messageEl, contextForm, consentView, termsLabel, privacyLabel, policyMeta, termsCheckbox, privacyCheckbox } = getLegalGateElements();
+    if (title) title.textContent = 'Updated legal consent required';
+    if (messageEl) {
+        messageEl.textContent = 'Review the active Terms and Privacy Policy for ' + context.countryCode + ' before the dashboard unlocks.';
+    }
+    if (contextForm) contextForm.style.display = 'none';
+    if (consentView) consentView.style.display = 'flex';
+    if (termsCheckbox) termsCheckbox.checked = false;
+    if (privacyCheckbox) privacyCheckbox.checked = false;
+    if (termsLabel) termsLabel.textContent = 'I accept Terms version ' + payload.terms.version + '.';
+    if (privacyLabel) privacyLabel.textContent = 'I accept Privacy version ' + payload.privacy.version + '.';
+    if (policyMeta) {
+        policyMeta.textContent = 'Country: ' + context.countryCode + ' | Locale: ' + context.locale + ' | Terms ' + payload.terms.version + ' | Privacy ' + payload.privacy.version;
+    }
+    setLegalConsentButtonsEnabled(true);
+    setLegalGateVisible(true);
+}
+
+function getLegalTermsUrl() {
+    return legalGateState.policies?.terms?.contentUrl || '';
+}
+
+function getLegalPrivacyUrl() {
+    return legalGateState.policies?.privacy?.contentUrl || '';
+}
+
+function openLegalUrl(url) {
+    if (!url) {
+        showNotification('No legal document URL available.', 'error');
+        return;
+    }
+    if (window && typeof window.open === 'function') {
+        window.open(url, '_blank', 'noopener');
+    }
+}
+
+function ensureLegalSelection() {
+    const { languageSelect, countrySelect } = getLegalGateElements();
+    const languageTag = String(languageSelect?.value || '').trim();
+    const countryCode = String(countrySelect?.value || '').trim().toUpperCase();
+    if (!languageTag || !countryCode) {
+        throw new Error('Please select both app language and country of use.');
+    }
+    return saveLegalContext(languageTag, countryCode);
+}
+
+async function evaluateLegalGate(context) {
+    if (!currentMasterImei || !functions) return;
+    legalGateState = { status: 'checking', context, policies: null };
+    showLegalLoading('Verifying the active legal terms for ' + context.countryCode + '...');
+
+    try {
+        const result = await functions.httpsCallable('needsLegalReconsent')({
+            country: context.countryCode,
+            locale: context.locale,
+        });
+        const data = result && result.data ? result.data : {};
+        if (data.requiresReconsent) {
+            legalGateState = { status: 'required', context, policies: data };
+            updateLegalConsentView(data, context);
+            showNotification('Updated legal consent is required before the dashboard can unlock.', 'info');
+            return;
+        }
+
+        legalGateState = { status: 'ready', context, policies: data };
+        unlockDashboard();
+    } catch (error) {
+        console.error('Legal gate check failed:', error);
+        showLegalError('Legal verification failed: ' + (error && error.message ? error.message : 'Unknown error'));
+    }
+}
+
+async function handleAuthenticatedUser(user) {
+    if (!user) return;
+
+    currentMasterImei = user.uid;
+    localStorage.setItem('minimaster-credentials', JSON.stringify({
+        masterImei: currentMasterImei
+    }));
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('master-id').textContent = currentMasterImei;
+
+    const savedContext = loadSavedLegalContext();
+    if (!savedContext) {
+        showLegalContextSetup();
+        return;
+    }
+
+    updateLegalContextSummary(savedContext.languageTag, savedContext.countryCode);
+    await evaluateLegalGate(savedContext);
 }
 
 /**
@@ -139,12 +458,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            currentMasterImei = user.uid;
-            localStorage.setItem('minimaster-credentials', JSON.stringify({
-                masterImei: currentMasterImei
-            }));
-            showMainContent();
-            loadDevices();
+            handleAuthenticatedUser(user).catch(error => {
+                console.error('Auth session handling error:', error);
+                showLegalError('Legal session initialization failed: ' + error.message);
+            });
         });
 
         console.log('Firebase initialized successfully.');
@@ -180,16 +497,6 @@ function login() {
             return firebase.auth().signInWithCustomToken(customToken);
         })
         .then(() => {
-            currentMasterImei = firebase.auth().currentUser ? firebase.auth().currentUser.uid : masterImei;
-
-            // Save canonical master id for next session
-            localStorage.setItem('minimaster-credentials', JSON.stringify({
-                masterImei: currentMasterImei
-            }));
-
-            showMainContent();
-            loadDevices();
-            startSessionMonitoring();
             showNotification('Login successful!', 'success');
         })
         .catch(error => {
@@ -222,6 +529,7 @@ function logout() {
     document.getElementById('login-form').style.display = 'flex';
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('main-content').style.display = 'none';
+    setLegalGateVisible(false);
 
     showNotification('Logged out successfully.', 'info');
 }
@@ -235,6 +543,67 @@ function showMainContent() {
     document.getElementById('user-info').style.display = 'flex';
     document.getElementById('main-content').style.display = 'block';
     document.getElementById('master-id').textContent = currentMasterImei;
+    setDashboardChromeVisible(true);
+    setLegalGateVisible(false);
+}
+
+function continueLegalSetup() {
+    try {
+        const context = ensureLegalSelection();
+        updateLegalContextSummary(context.languageTag, context.countryCode);
+        return evaluateLegalGate(context);
+    } catch (error) {
+        showNotification(error.message || 'Legal setup is incomplete.', 'error');
+        return Promise.resolve();
+    }
+}
+
+function retryLegalGate() {
+    const context = legalGateState.context || loadSavedLegalContext();
+    if (!context) {
+        showLegalContextSetup();
+        return Promise.resolve();
+    }
+    return evaluateLegalGate(context);
+}
+
+function openLegalTerms() {
+    openLegalUrl(getLegalTermsUrl());
+}
+
+function openLegalPrivacy() {
+    openLegalUrl(getLegalPrivacyUrl());
+}
+
+async function acceptLegalConsent() {
+    const { termsCheckbox, privacyCheckbox } = getLegalGateElements();
+    if (!termsCheckbox?.checked || !privacyCheckbox?.checked) {
+        showNotification('Please accept both legal documents before continuing.', 'error');
+        return;
+    }
+    if (!legalGateState.context || !legalGateState.policies) {
+        showNotification('Legal policy data is missing. Please retry.', 'error');
+        return;
+    }
+
+    setLegalConsentButtonsEnabled(false);
+
+    try {
+        await functions.httpsCallable('recordLegalConsent')({
+            country: legalGateState.context.countryCode,
+            locale: legalGateState.context.locale,
+            termsVersion: legalGateState.policies.terms.version,
+            privacyVersion: legalGateState.policies.privacy.version,
+            consentSource: 'web_control',
+            appVersion: WEB_CONTROL_APP_VERSION,
+        });
+        legalGateState.status = 'ready';
+        unlockDashboard();
+        showNotification('Legal consent stored successfully.', 'success');
+    } catch (error) {
+        console.error('Legal consent save failed:', error);
+        showLegalError('Saving legal consent failed: ' + (error && error.message ? error.message : 'Unknown error'));
+    }
 }
 
 // --- Device Management Functions ---
