@@ -1,5 +1,9 @@
 # Legal Rollout Checklist by Country
 
+**Status:** Operational legal rollout checklist per target country.
+
+**Companion docs:** [LEGAL_COUNTRY_COMPLIANCE_MATRIX.md](LEGAL_COUNTRY_COMPLIANCE_MATRIX.md), [COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md), [LEGAL_VERSIONING_RECONSENT_SPEC.md](LEGAL_VERSIONING_RECONSENT_SPEC.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
+
 ## Ziel
 
 Operative Checkliste, um pro Land eine rechtssichere Einfuehrung von MiniMaster zu steuern.

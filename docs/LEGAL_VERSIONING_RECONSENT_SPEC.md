@@ -1,6 +1,8 @@
 # Legal Versioning, Country Rollout and Re-Consent Spec
 
-Stand: 2026-03-18
+**Status:** Technical specification for legal versioning, country rollout and re-consent flows. Baseline dated 2026-03-18.
+
+**Companion docs:** [LEGAL_COUNTRY_COMPLIANCE_MATRIX.md](LEGAL_COUNTRY_COMPLIANCE_MATRIX.md), [LEGAL_ROLLOUT_CHECKLIST.md](LEGAL_ROLLOUT_CHECKLIST.md), [COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 
 ## Ziel
 
