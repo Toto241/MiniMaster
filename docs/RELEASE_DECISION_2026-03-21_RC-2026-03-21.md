@@ -24,7 +24,7 @@
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Lokale Repo-Qualitaet ist grün und repo-seitige CI-Fixes sind umgesetzt; die Revalidation vom 2026-04-16 zeigt aber fuer CodeQL und Android CI einen bestaetigten GitHub-Actions-Billing-/Spending-Limit-Blocker. |
+| Technical Quality (build/lint/test) | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Lokale Repo-Qualitaet ist grün und repo-seitige CI-Fixes sind umgesetzt; die neu angestossene Revalidation vom 2026-04-17 zeigt fuer CodeQL und Android CI aktuell `queued / pending`, die finale externe Blocker-Klassifikation steht noch aus. |
 | Functional Commissioning | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Mehrere commissioning checks offen |
 | Security and Identity | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Firebase key rotation/restrictions offen |
 | Compliance | Pass | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Dokumentierte Compliance-Evidenz vorhanden |
@@ -49,8 +49,8 @@
 | Store listing finalized | Open | Product/Ops | offen | No |
 | Permissions declaration | Open - operative Vorlage vorhanden ([PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md)), finale Play-Console-Einreichung offen | Compliance Owner | offen | No |
 | App access guide attached | Open - reviewer guide draft vorhanden ([APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)), Play Console Verlinkung offen | Product/Ops | offen | No |
-| CodeQL result linked | Open - Rerun [24323887350](https://github.com/Toto241/MiniMaster/actions/runs/24323887350) ist wegen GitHub-Actions-Billing/Spending-Limit fehlgeschlagen; aktueller gruener Nachweis nach Repo-Fix fehlt | Engineering Owner | offen | No |
-| Android CI build evidence linked | Open - Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) ist wegen GitHub-Actions-Billing/Spending-Limit fehlgeschlagen; aktueller gruener Nachweis fehlt | Engineering Owner | offen | No |
+| CodeQL result linked | Open - Rerun [24559307544](https://github.com/Toto241/MiniMaster/actions/runs/24559307544) laeuft aktuell noch (`queued / pending`); ein aktueller gruener Nachweis fehlt bis zum Abschluss weiter | Engineering Owner | offen | No |
+| Android CI build evidence linked | Open - Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) laeuft aktuell noch (`queued / pending`); ein aktueller gruener Nachweis fehlt bis zum Abschluss weiter | Engineering Owner | offen | No |
 | Deployment result linked | Open - lokale Deploy-Pruefung ergab vorhandene Firebase-CLI/Projektbindung, aber keine produktiven Runtime-Secrets im Workspace; finaler Deploy wurde daher nicht aus dieser Umgebung ausgefuehrt | Engineering Owner | offen | No |
 | Physical commissioning executed | Open | QA/Operations | offen | No |
 | On-call roster assigned | Open - roster template vorhanden ([ONCALL_ESCALATION_ROSTER.md](ONCALL_ESCALATION_ROSTER.md)), Kontakte/Sign-off offen | Operations Lead | offen | No |
