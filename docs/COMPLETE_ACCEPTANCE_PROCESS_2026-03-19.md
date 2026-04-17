@@ -1,6 +1,8 @@
 # Complete Acceptance Process (2026-03-19)
 
-Status: end-to-end acceptance process for release candidate approval and production go/no-go.
+**Status:** End-to-end acceptance process for release candidate approval and production go/no-go.
+
+**Companion docs:** [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md), [RELEASE_DECISION_TEMPLATE.md](RELEASE_DECISION_TEMPLATE.md), [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md), [COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md)
 
 ## 1. Process Objective
 
@@ -156,7 +158,7 @@ Activities:
 Required evidence:
 
 1. Play Console screenshots/links for all five items.
-2. Cross-check with `docs/RELEASE_EVIDENCE_REGISTER.md` section "Before Go-Live: Operative Restpunkte".
+2. Cross-check with [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) section "Before Go-Live: Operative Restpunkte".
 
 Exit criteria:
 
@@ -285,8 +287,8 @@ Approvals:
 
 This acceptance process is complementary to:
 
-1. Commissioning checklist: [docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](docs/COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md)
-2. Release evidence register (source of truth): [docs/RELEASE_EVIDENCE_REGISTER.md](docs/RELEASE_EVIDENCE_REGISTER.md)
-3. Release decision template: [docs/RELEASE_DECISION_TEMPLATE.md](docs/RELEASE_DECISION_TEMPLATE.md)
-4. Finalization strategy: [docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md](docs/FINALIZATION_STRATEGY_OVER_90_2026-03-19.md)
+1. Commissioning checklist: [COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md](COMMISSIONING_ACCEPTANCE_CHECKLIST_2026-03-19.md)
+2. Release evidence register (source of truth): [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
+3. Release decision template: [RELEASE_DECISION_TEMPLATE.md](RELEASE_DECISION_TEMPLATE.md)
+4. Finalization strategy: [FINALIZATION_STRATEGY_OVER_90_2026-03-19.md](FINALIZATION_STRATEGY_OVER_90_2026-03-19.md)
 5. Runbook baseline: [RUNBOOK.md](../RUNBOOK.md)
