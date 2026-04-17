@@ -1,5 +1,9 @@
 # Legal Country Compliance Matrix
 
+**Status:** Reference matrix for per-country legal compliance topics before production launch.
+
+**Companion docs:** [COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md), [LEGAL_ROLLOUT_CHECKLIST.md](LEGAL_ROLLOUT_CHECKLIST.md), [LEGAL_VERSIONING_RECONSENT_SPEC.md](LEGAL_VERSIONING_RECONSENT_SPEC.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
+
 ## Zweck
 
 Diese Matrix strukturiert die rechtlichen Themen, die pro Land vor Produktivstart bewertet und umgesetzt werden muessen.

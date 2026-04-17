@@ -1,6 +1,8 @@
 # Country Go/No-Go Readiness Packets
 
-Status: structured go/no-go assessment for initial rollout countries.
+**Status:** Structured go/no-go assessment for initial rollout countries.
+
+**Companion docs:** [LEGAL_COUNTRY_COMPLIANCE_MATRIX.md](LEGAL_COUNTRY_COMPLIANCE_MATRIX.md), [LEGAL_ROLLOUT_CHECKLIST.md](LEGAL_ROLLOUT_CHECKLIST.md), [LEGAL_VERSIONING_RECONSENT_SPEC.md](LEGAL_VERSIONING_RECONSENT_SPEC.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 
 ## 1. Purpose
 
@@ -18,7 +20,7 @@ Each country packet must contain the following sections with pass/fail status.
 
 | Item | Status | Evidence | Notes |
 |------|--------|----------|-------|
-| AGB (Terms) in German | ✅ Pass | `legalPolicies/terms_DE_de-DE_*` | Template in docs/AGB_TEMPLATE_DE.md |
+| AGB (Terms) in German | ✅ Pass | `legalPolicies/terms_DE_de-DE_*` | Template in [AGB_TEMPLATE_DE.md](AGB_TEMPLATE_DE.md) |
 | Datenschutzerklärung in German | ✅ Pass | `legalPolicies/privacy_DE_de-DE_*` | DSGVO-compliant |
 | Age-appropriate consent flow (under 16) | ✅ Pass | Parental role enforced by design | Parent registers, child has no direct account |
 | DSAR process (Art. 15-22 DSGVO) | ✅ Pass | `exportUserData` + `deleteUserAccount` functions | Tested in Admin Panel Compliance tab |
