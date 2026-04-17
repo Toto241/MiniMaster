@@ -2,7 +2,7 @@
 
 **Status:** Consolidated evidence register for release candidate approval.
 
-Current synthesis note (2026-04-16): Repo-side remediation remains complete. Current blockers are the confirmed GitHub Actions billing/spending-limit failure for CodeQL and Android CI, the missing final deploy evidence, and external go-live operations. A local deploy was not executed from this workspace because Firebase CLI/project access is present, but runtime secrets/config for a production-grade Functions deploy are not available locally (`.env` / `.runtimeconfig.json` absent). See [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) and [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md).
+Current synthesis note (2026-04-17): Repo-side remediation remains complete. The previously confirmed Web-Control legal/re-consent gap is now closed repo-side and backed by a green targeted browser test run (`npx jest test/web-control-ui.test.ts --runInBand`, 19/19 passed on 2026-04-17). Current release blockers remain unchanged: the confirmed GitHub Actions billing/spending-limit failure for CodeQL and Android CI, the missing final deploy evidence, and external go-live operations. A local deploy was not executed from this workspace because Firebase CLI/project access is present, but runtime secrets/config for a production-grade Functions deploy are not available locally (`.env` / `.runtimeconfig.json` absent). See [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) and [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md).
 
 ## 1. Purpose
 
@@ -58,7 +58,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | --------------- | --------------- | -------- | ------------- | ------ |
 | DSAR export test evidence | test/branch-coverage-boost.test.ts (exportUserData tests) | ✅ | Automated | 2026-03-19 |
 | Audit trail evidence | AuditLogger in all functions, test/enforcement-automation.test.ts | ✅ | Automated | 2026-03-19 |
-| Legal consent versioning test | [LEGAL_VERSIONING_RECONSENT_SPEC.md](LEGAL_VERSIONING_RECONSENT_SPEC.md) | ✅ | Documented | 2026-03-19 |
+| Legal consent versioning test | [LEGAL_VERSIONING_RECONSENT_SPEC.md](LEGAL_VERSIONING_RECONSENT_SPEC.md) plus targeted Web-Control regression evidence in `test/web-control-ui.test.ts` (login/session-restore blocked until consent, re-consent required path, consent persistence via `recordLegalConsent`) | ✅ | Automated + Documented | 2026-04-17 |
 | Country readiness packet (DE) | [COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md) | ✅ | Documented | 2026-03-19 |
 
 ### 3.5 Operational Readiness Gate
