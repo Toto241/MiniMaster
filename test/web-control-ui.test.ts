@@ -13,6 +13,7 @@ type MockElement = {
   dataset?: Record<string, string>;
   checked?: boolean;
   className?: string;
+  disabled?: boolean;
   getContext?: jest.Mock;
 };
 
@@ -26,6 +27,7 @@ function createElement(id?: string): MockElement {
     dataset: {},
     checked: false,
     className: "",
+    disabled: false,
     getContext: jest.fn(() => ({})),
   };
 }
@@ -63,6 +65,23 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     "subscription-section",
     "support-section",
     "subscription-status-card",
+    "legal-gate",
+    "legal-gate-title",
+    "legal-gate-message",
+    "legal-context-form",
+    "legal-consent-view",
+    "legal-language-select",
+    "legal-country-select",
+    "legal-context-summary",
+    "legal-policy-meta",
+    "legal-terms-label",
+    "legal-privacy-label",
+    "legal-terms-checkbox",
+    "legal-privacy-checkbox",
+    "legal-terms-link",
+    "legal-privacy-link",
+    "legal-accept-btn",
+    "legal-retry-btn",
   ].forEach((id) => elements.set(id, createElement(id)));
 
   const domContentLoadedHandlers: Array<() => void> = [];
@@ -162,6 +181,7 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     firebase: firebaseMock,
     Chart: chartMock,
     navigator: { userAgent: "Mozilla/5.0 (Macintosh)", clipboard: { writeText: jest.fn() } },
+    open: jest.fn(),
     setTimeout: jest.fn((fn: (...args: any[]) => void) => { fn(); return 1; }),
     clearTimeout,
     Promise,
@@ -190,6 +210,13 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     "  showSupport,",
     "  showDashboard,",
     "  showNotification,",
+    "  buildLegalLocale,",
+    "  loadSavedLegalContext,",
+    "  saveLegalContext,",
+    "  continueLegalSetup,",
+    "  retryLegalGate,",
+    "  acceptLegalConsent,",
+    "  handleAuthenticatedUserForTesting: handleAuthenticatedUser,",
     "  setFunctionsForTesting: function(mock) { functions = mock; },",
     "  setDbForTesting: function(mock) { db = mock; },",
     "  setCurrentMasterImeiForTesting: function(value) { currentMasterImei = value; },",
@@ -199,7 +226,7 @@ function loadWebControl(initialStorage: StorageMap = {}) {
 
   vm.runInNewContext(source + exportTrailer, context, { filename: "web-control/app.js" });
 
-  return { context, elements, storage, callableFactory, firebaseMock, documentMock };
+  return { context, elements, storage, callableFactory, firebaseMock, documentMock, authMock, domContentLoadedHandlers };
 }
 
 describe("web-control browser flows", () => {
@@ -358,8 +385,24 @@ describe("web-control browser flows", () => {
     expect(html).toContain("type=\"datetime-local\"");
   });
 
-  it("logs into web-control via custom token, updates the UI and starts session monitoring", async () => {
-    const { context, elements, storage, firebaseMock } = loadWebControl();
+  it("builds a legal locale from language tag and country code", () => {
+    const { context } = loadWebControl();
+
+    expect(context.__webControlTestExports.buildLegalLocale("pt-BR", "de")).toBe("pt-DE");
+    expect(context.__webControlTestExports.buildLegalLocale("", "")).toBe("en-US");
+  });
+
+  it("logs into web-control via custom token and blocks on legal context selection first", async () => {
+    const { context, elements, storage, firebaseMock, authMock, domContentLoadedHandlers } = loadWebControl({
+      operatorFirebaseConfigOverride: JSON.stringify({
+        apiKey: "key-1",
+        authDomain: "demo.firebaseapp.com",
+        projectId: "demo-project",
+        storageBucket: "demo.firebasestorage.app",
+        messagingSenderId: "123456",
+        appId: "1:123:web:abc",
+      }),
+    });
 
     context.setTimeout = jest.fn(() => 1);
     context.__webControlTestExports.setDbForTesting({
@@ -368,6 +411,7 @@ describe("web-control browser flows", () => {
         onSnapshot: jest.fn(() => jest.fn()),
       })),
     });
+    domContentLoadedHandlers[0]?.();
     elements.get("master-imei")!.value = "master-imei-1";
     elements.get("secret-key")!.value = "secret-key-1";
 
@@ -377,14 +421,114 @@ describe("web-control browser flows", () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    const authHandler = authMock.onAuthStateChanged.mock.calls[0][0] as (user: any) => Promise<void> | void;
+    await authHandler({ uid: "m1" });
+
     expect(firebaseMock.auth().signInWithCustomToken).toHaveBeenCalledWith("tok-login");
     expect(elements.get("login-form")?.style?.display).toBe("none");
     expect(elements.get("user-info")?.style?.display).toBe("flex");
-    expect(elements.get("main-content")?.style?.display).toBe("block");
+    expect(elements.get("main-content")?.style?.display).toBe("none");
+    expect(elements.get("legal-gate")?.style?.display).toBe("block");
+    expect(elements.get("legal-context-form")?.style?.display).toBe("flex");
     expect(elements.get("master-id")?.textContent).toBe("m1");
     expect(storage.get("minimaster-credentials")).toContain("m1");
     expect(elements.get("notification")?.textContent).toContain("Login successful");
-    expect(context.document.addEventListener).toHaveBeenCalledWith("mousedown", expect.any(Function), { passive: true });
+  });
+
+  it("blocks restored sessions until legal context is selected", async () => {
+    const { authMock, elements, domContentLoadedHandlers } = loadWebControl({
+      operatorFirebaseConfigOverride: JSON.stringify({
+        apiKey: "key-1",
+        authDomain: "demo.firebaseapp.com",
+        projectId: "demo-project",
+        storageBucket: "demo.firebasestorage.app",
+        messagingSenderId: "123456",
+        appId: "1:123:web:abc",
+      }),
+    });
+    domContentLoadedHandlers[0]?.();
+    const authHandler = authMock.onAuthStateChanged.mock.calls[0][0] as (user: any) => Promise<void> | void;
+
+    await authHandler({ uid: "master-legal" });
+
+    expect(elements.get("legal-gate")?.style?.display).toBe("block");
+    expect(elements.get("legal-context-form")?.style?.display).toBe("flex");
+    expect(elements.get("main-content")?.style?.display).toBe("none");
+  });
+
+  it("continues from legal context setup into re-consent when backend requires it", async () => {
+    const { context, elements } = loadWebControl();
+    const needsCallable = jest.fn((payload: any) => {
+      expect(payload).toEqual({ country: "DE", locale: "de-DE" });
+      return Promise.resolve({
+        data: {
+          requiresReconsent: true,
+          terms: { version: "2026.04.17", contentUrl: "https://example.com/terms" },
+          privacy: { version: "2026.04.17", contentUrl: "https://example.com/privacy" },
+        },
+      });
+    });
+    context.__webControlTestExports.setFunctionsForTesting({
+      httpsCallable: jest.fn((name: string) => {
+        if (name === "needsLegalReconsent") return needsCallable;
+        return jest.fn();
+      }),
+    });
+    context.__webControlTestExports.setCurrentMasterImeiForTesting("master-1");
+    elements.get("legal-language-select")!.value = "de";
+    elements.get("legal-country-select")!.value = "DE";
+
+    await context.__webControlTestExports.continueLegalSetup();
+
+    expect(elements.get("legal-consent-view")?.style?.display).toBe("flex");
+    expect(elements.get("legal-terms-label")?.textContent).toContain("2026.04.17");
+    expect(elements.get("main-content")?.style?.display).toBe("none");
+  });
+
+  it("stores legal consent and unlocks the dashboard only after accepting both documents", async () => {
+    const { context, elements } = loadWebControl();
+    context.setTimeout = jest.fn(() => 1);
+    const needsCallable = jest.fn(() => Promise.resolve({
+      data: {
+        requiresReconsent: true,
+        terms: { version: "2026.04.17", contentUrl: "https://example.com/terms" },
+        privacy: { version: "2026.04.17", contentUrl: "https://example.com/privacy" },
+      },
+    }));
+    const recordCallable = jest.fn(() => Promise.resolve({ data: { success: true } }));
+    context.__webControlTestExports.setFunctionsForTesting({
+      httpsCallable: jest.fn((name: string) => {
+        if (name === "needsLegalReconsent") return needsCallable;
+        if (name === "recordLegalConsent") return recordCallable;
+        return jest.fn();
+      }),
+    });
+    context.__webControlTestExports.setDbForTesting({
+      collection: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        onSnapshot: jest.fn(() => jest.fn()),
+      })),
+    });
+    context.__webControlTestExports.setCurrentMasterImeiForTesting("master-1");
+    elements.get("legal-language-select")!.value = "de";
+    elements.get("legal-country-select")!.value = "DE";
+
+    await context.__webControlTestExports.continueLegalSetup();
+    elements.get("legal-terms-checkbox")!.checked = true;
+    elements.get("legal-privacy-checkbox")!.checked = true;
+
+    await context.__webControlTestExports.acceptLegalConsent();
+
+    expect(recordCallable).toHaveBeenCalledWith({
+      country: "DE",
+      locale: "de-DE",
+      termsVersion: "2026.04.17",
+      privacyVersion: "2026.04.17",
+      consentSource: "web_control",
+      appVersion: "web-control",
+    });
+    expect(elements.get("main-content")?.style?.display).toBe("block");
+    expect(elements.get("legal-gate")?.style?.display).toBe("none");
   });
 
   it("logs out from web-control, clears credentials and restores the login view", async () => {
