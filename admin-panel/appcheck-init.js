@@ -24,25 +24,44 @@
 
 (function() {
     const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
-    const siteKey = globalSiteKey || localStorage.getItem("minimasterAppCheckSiteKey");
+    let storageSiteKey = null;
+    try {
+        storageSiteKey = typeof localStorage !== "undefined"
+            ? localStorage.getItem("minimasterAppCheckSiteKey")
+            : null;
+    } catch (storageError) {
+        // localStorage kann in privaten Modi / strikten CSPs werfen
+        console.warn("App Check: Zugriff auf localStorage nicht möglich:", storageError);
+    }
+    const siteKey = globalSiteKey || storageSiteKey;
 
     if (!siteKey) {
-        console.info("Firebase App Check site key not configured for admin-panel. Skipping activation.");
+        console.info(
+            "App Check inaktiv: Kein reCAPTCHA-Site-Key konfiguriert. " +
+            "Setze window.MINIMASTER_APP_CHECK_SITE_KEY (z. B. via Bootstrap-Dialog) oder " +
+            "localStorage.minimasterAppCheckSiteKey. Details: docs/FIREBASE_APP_CHECK_SETUP.md"
+        );
         return;
     }
 
-    // Wait for Firebase to be initialized
     if (typeof firebase === "undefined") {
-        console.error("Firebase is not loaded. Make sure to include Firebase SDK before App Check.");
+        console.error("App Check: Firebase Compat-SDK nicht geladen – Skript-Reihenfolge in index.html prüfen.");
         return;
     }
 
-    // Initialize App Check
+    if (typeof firebase.appCheck !== "function") {
+        console.error(
+            "App Check: firebase.appCheck() nicht verfügbar. " +
+            "firebase-app-check-compat.js fehlt im <head>."
+        );
+        return;
+    }
+
     try {
         const appCheck = firebase.appCheck();
         appCheck.activate(siteKey, true);
-        console.log("Firebase App Check initialized for admin-panel.");
+        console.log("Firebase App Check aktiviert (admin-panel).");
     } catch (error) {
-        console.error("Failed to initialize Firebase App Check:", error);
+        console.error("App Check Aktivierung fehlgeschlagen:", error);
     }
 })();
