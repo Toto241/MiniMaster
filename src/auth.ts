@@ -31,7 +31,7 @@ function getAdminRecoveryToken(): string {
  * `MINIMASTER_ADMIN_RECOVERY_TOKEN` erlaubt mehrere gleichzeitig gültige Tokens
  * während eines Rotations-Overlap-Fensters.
  */
-function getAdminRecoveryTokens(): string[] {
+export function getAdminRecoveryTokens(): string[] {
   const raw = getAdminRecoveryToken();
   if (!raw) return [];
   return raw
@@ -45,7 +45,7 @@ function getAdminRecoveryTokens(): string[] {
  * Wird im Health-Endpoint zurückgegeben, damit das Admin-Panel eine
  * Rotations-Erinnerung anzeigen kann (Empfehlung: ≤ 90 Tage).
  */
-function getAdminRecoveryTokenRotatedAt(): string {
+export function getAdminRecoveryTokenRotatedAt(): string {
   return String(
     process.env.ADMIN_RECOVERY_TOKEN_ROTATED_AT ||
     process.env.MINIMASTER_ADMIN_RECOVERY_TOKEN_ROTATED_AT ||
@@ -57,7 +57,7 @@ function getAdminRecoveryTokenRotatedAt(): string {
  * Berechnet das Alter (in Tagen) der letzten Token-Rotation.
  * Liefert `null`, wenn kein gültiges ISO-Datum konfiguriert ist.
  */
-function getAdminRecoveryTokenAgeDays(): number | null {
+export function getAdminRecoveryTokenAgeDays(): number | null {
   const raw = getAdminRecoveryTokenRotatedAt();
   if (!raw) return null;
   const ts = Date.parse(raw);
@@ -67,7 +67,7 @@ function getAdminRecoveryTokenAgeDays(): number | null {
   return Math.floor(ageMs / (24 * 60 * 60 * 1000));
 }
 
-const ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS = 90;
+export const ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS = 90;
 
 function getCurrentProjectId(): string | null {
   const directProjectId = String(process.env.GCLOUD_PROJECT || "").trim();

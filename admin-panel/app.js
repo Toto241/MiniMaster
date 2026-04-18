@@ -10583,6 +10583,7 @@ function initializeSetupAssistant() {
     renderCommandCatalog(firebaseConfig.projectId);
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
+    initOperatorReadinessCard();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
@@ -10592,6 +10593,192 @@ function initializeSetupAssistant() {
                 askOperatorAssistant();
             }
         });
+    }
+}
+
+// ==================== OPERATOR READINESS CARD ====================
+//
+// Backend-driven Inbetriebnahme-Status.  Calls the Cloud Function
+// `getOperatorSetupStatus` and renders a consolidated readiness view plus
+// the persisted manual-checklist (Apple/Play/Firebase/Legal/Validation).
+// Each manual item is toggleable via `setOperatorSetupChecklistItem`.
+
+let lastOperatorReadinessSnapshot = null;
+
+function initOperatorReadinessCard() {
+    const refreshBtn = document.getElementById("btn-refresh-operator-readiness");
+    const downloadBtn = document.getElementById("btn-download-operator-readiness");
+    if (!refreshBtn) return;
+    refreshBtn.addEventListener("click", () => loadOperatorReadiness());
+    if (downloadBtn) {
+        downloadBtn.addEventListener("click", () => downloadOperatorReadiness());
+    }
+}
+
+async function loadOperatorReadiness() {
+    const summaryEl = document.getElementById("operator-readiness-summary");
+    const contentEl = document.getElementById("operator-readiness-content");
+    const downloadBtn = document.getElementById("btn-download-operator-readiness");
+    if (!contentEl || !summaryEl) return;
+    summaryEl.textContent = "lädt …";
+    contentEl.innerHTML = "<p class=\"muted\">Status wird geladen …</p>";
+
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("getOperatorSetupStatus");
+        const result = await callable({});
+        const data = result && result.data ? result.data : null;
+        if (!data) throw new Error("Leere Antwort vom Backend");
+        lastOperatorReadinessSnapshot = data;
+        if (downloadBtn) downloadBtn.disabled = false;
+        renderOperatorReadiness(data);
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        summaryEl.textContent = "Fehler";
+        summaryEl.className = "status-badge status-error";
+        contentEl.innerHTML = `<p class="error">Status konnte nicht geladen werden: ${escapeHtml(msg)}</p>`;
+    }
+}
+
+function downloadOperatorReadiness() {
+    if (!lastOperatorReadinessSnapshot) return;
+    const blob = new Blob([JSON.stringify(lastOperatorReadinessSnapshot, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    a.href = url;
+    a.download = `operator-readiness-${ts}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+function renderOperatorReadiness(data) {
+    const summaryEl = document.getElementById("operator-readiness-summary");
+    const contentEl = document.getElementById("operator-readiness-content");
+    if (!contentEl || !summaryEl) return;
+
+    const readiness = String(data.readiness || "unknown");
+    const badgeClass = readiness === "ready" ? "status-ok"
+        : readiness === "near-ready" ? "status-warning"
+            : "status-error";
+    const readinessLabel = readiness === "ready" ? "✅ bereit"
+        : readiness === "near-ready" ? "⚠️ fast bereit"
+            : "❌ nicht bereit";
+    summaryEl.textContent = `${readinessLabel} (${(data.blockers || []).length} Blocker)`;
+    summaryEl.className = `status-badge ${badgeClass}`;
+
+    const secretsRows = Object.entries(data.secrets || {}).map(([k, v]) => `
+        <tr>
+            <td>${escapeHtml(k)}</td>
+            <td>${v ? "✅ gesetzt" : "❌ fehlt"}</td>
+        </tr>
+    `).join("");
+
+    const firestoreRows = Object.entries(data.firestore || {}).map(([k, v]) => `
+        <tr>
+            <td>${escapeHtml(k)}</td>
+            <td>${v === "ok" ? "✅" : "❌"} ${escapeHtml(v)}</td>
+        </tr>
+    `).join("");
+
+    const blockersHtml = (data.blockers || []).length === 0
+        ? "<p class=\"status-ok\">Keine offenen Backend-Blocker.</p>"
+        : `<ul class="blocker-list">${(data.blockers || []).map(b => `<li>${escapeHtml(b)}</li>`).join("")}</ul>`;
+
+    const recovery = data.recoveryToken || {};
+    const rtdn = data.rtdn || {};
+    const checklist = data.manualChecklist || { items: [], requiredTotal: 0, requiredDone: 0, progressPct: 0 };
+
+    const grouped = {};
+    (checklist.items || []).forEach(item => {
+        const cat = item.category || "ops";
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(item);
+    });
+    const categoryLabel = {
+        "google-play": "🟢 Google Play",
+        "apple": "🍎 Apple",
+        "firebase": "🔥 Firebase / GCP",
+        "legal": "📜 Recht & DSGVO",
+        "ops": "🛠️ Betrieb",
+        "validation": "🧪 Validierung",
+    };
+
+    const checklistHtml = Object.entries(grouped).map(([cat, items]) => `
+        <fieldset class="manual-checklist-group">
+            <legend>${escapeHtml(categoryLabel[cat] || cat)}</legend>
+            ${items.map(item => `
+                <div class="manual-checklist-item ${item.done ? "is-done" : ""}">
+                    <label>
+                        <input type="checkbox"
+                               data-checklist-item="${escapeHtml(item.id)}"
+                               ${item.done ? "checked" : ""}
+                               ${item.required ? "" : "data-optional=\"true\""} />
+                        <span>${escapeHtml(item.label)}${item.required ? "" : " <em>(optional)</em>"}</span>
+                    </label>
+                    ${item.hint ? `<small class="muted">${escapeHtml(item.hint)}</small>` : ""}
+                    ${item.done && item.doneAt ? `<small class="muted">erledigt: ${escapeHtml(String(item.doneAt))}${item.doneBy ? " von " + escapeHtml(item.doneBy) : ""}</small>` : ""}
+                </div>
+            `).join("")}
+        </fieldset>
+    `).join("");
+
+    contentEl.innerHTML = `
+        <div class="readiness-grid">
+            <div class="readiness-block">
+                <h4>Projekt</h4>
+                <p><strong>Project ID:</strong> ${escapeHtml(data.projectId || "—")}</p>
+                <p><strong>Stand:</strong> ${escapeHtml(data.timestamp || "")}</p>
+                <p><strong>Storage:</strong> ${data.storage && data.storage.status === "ok" ? "✅" : "❌"} ${escapeHtml(data.storage && data.storage.bucket || "—")}</p>
+                <p><strong>RTDN-Topic:</strong> ${rtdn.topicConfigured ? "✅" : "⚠️ Default"} <code>${escapeHtml(rtdn.topic || "")}</code></p>
+                <p><strong>Recovery-Token:</strong> ${recovery.status === "ok" ? "✅" : recovery.status === "overdue" ? "⚠️ überfällig" : "❌ fehlt"} ${recovery.tokenCount ? `(${recovery.tokenCount} Token, Alter ${recovery.ageDays === null ? "?" : recovery.ageDays + " Tage"})` : ""}</p>
+            </div>
+            <div class="readiness-block">
+                <h4>Secrets</h4>
+                <table class="readiness-table"><tbody>${secretsRows}</tbody></table>
+            </div>
+            <div class="readiness-block">
+                <h4>Firestore-Erreichbarkeit</h4>
+                <table class="readiness-table"><tbody>${firestoreRows}</tbody></table>
+            </div>
+            <div class="readiness-block">
+                <h4>Backend-Blocker</h4>
+                ${blockersHtml}
+            </div>
+        </div>
+
+        <div class="manual-checklist-section" style="margin-block-start:20px">
+            <h4>Externe / manuelle Inbetriebnahme-Punkte (${checklist.requiredDone}/${checklist.requiredTotal} erledigt — ${checklist.progressPct}%)</h4>
+            <progress max="100" value="${checklist.progressPct}" style="width:100%"></progress>
+            <p class="muted">Diese Punkte sind extern (Apple/Play/Firebase-Konsole/Recht) und werden durch Operator-Bestätigung im Backend persistiert (<code>operatorConfig/setupChecklist</code>).</p>
+            ${checklistHtml}
+        </div>
+    `;
+
+    contentEl.querySelectorAll("input[data-checklist-item]").forEach(cb => {
+        cb.addEventListener("change", (ev) => onManualChecklistToggle(ev.target));
+    });
+}
+
+async function onManualChecklistToggle(input) {
+    const itemId = input.getAttribute("data-checklist-item");
+    if (!itemId) return;
+    const done = !!input.checked;
+    input.disabled = true;
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("setOperatorSetupChecklistItem");
+        await callable({ itemId, done });
+        // refresh the whole card so progress + readiness recompute
+        await loadOperatorReadiness();
+    } catch (err) {
+        input.checked = !done;
+        const msg = err && err.message ? err.message : String(err);
+        alert(`Aktualisierung fehlgeschlagen: ${msg}`);
+    } finally {
+        input.disabled = false;
     }
 }
 
