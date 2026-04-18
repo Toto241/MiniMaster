@@ -1,5 +1,5 @@
-const APP_CACHE_NAME = "minimaster-admin-panel-v3";
-const RUNTIME_CACHE_NAME = "minimaster-admin-panel-runtime-v3";
+const APP_CACHE_NAME = "minimaster-admin-panel-v4";
+const RUNTIME_CACHE_NAME = "minimaster-admin-panel-runtime-v4";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +10,10 @@ const APP_ASSETS = [
   "./logs.html",
   "./logs.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./modules/index.js",
+  "./modules/core/registry.js",
+  "./modules/core/sanitize.js"
 ];
 
 self.addEventListener("install", (event) => {
