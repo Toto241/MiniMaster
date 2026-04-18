@@ -142,7 +142,24 @@ async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
 async function generateAiCompletion(prompt: string): Promise<AiGenerationResult> {
   // Keep tests deterministic and isolated from external model providers.
   if (process.env.NODE_ENV === "test") {
-    // Security guard: test-stub should never be used in production
+    // Security guard: test-stub MUST never be served from a real Cloud Functions runtime.
+    // K_SERVICE is set in 2nd-gen functions, FUNCTION_TARGET/FUNCTION_NAME in 1st-gen,
+    // GAE_SERVICE in legacy GAE. Local Jest never sets any of these.
+    const isManagedRuntime = Boolean(
+      process.env.K_SERVICE ||
+      process.env.FUNCTION_TARGET ||
+      process.env.FUNCTION_NAME ||
+      process.env.GAE_SERVICE
+    );
+    if (isManagedRuntime) {
+      functions.logger.error(
+        "AI test-stub blocked: NODE_ENV=test darf nicht in einer Cloud-Functions-Runtime aktiv sein."
+      );
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "AI provider misconfigured: test-stub mode is not allowed in production runtime."
+      );
+    }
     if (process.env.FIREBASE_CONFIG) {
       functions.logger.warn(
         "WARNING: TEST_STUB mode detected with FIREBASE_CONFIG set. AI will return stub responses. " +
