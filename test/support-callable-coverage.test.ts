@@ -108,6 +108,12 @@ function resetState() {
         appBlacklist: ["com.test.app"], usageRules: ["rule1"],
         lastSeen: { toDate: () => new Date("2026-03-25T10:00:00Z") },
         updatedAt: { toDate: () => new Date("2026-03-25T11:00:00Z") },
+        networkType: "WIFI",
+        batteryLevelPct: 87.6,
+        isCharging: true,
+        storageFreeBytes: 1024 * 1024 * 512,
+        osVersion: "Android 14",
+        appVersion: "1.4.2",
       },
     },
     supportTickets: {
@@ -531,6 +537,30 @@ describe("getDebugInfo", () => {
     expect(res.snapshot).toBeDefined();
     expect(res.snapshot.appStatus).toBeDefined();
     expect(res.snapshot.networkDiagnostics).toBeDefined();
+    // Erweiterte Diagnose-Felder (Whitelist-sanitisiert)
+    expect(res.snapshot.networkDiagnostics.networkType).toBe("wifi"); // normalized to lowercase
+    expect(res.snapshot.deviceTelemetry).toBeDefined();
+    expect(res.snapshot.deviceTelemetry.batteryLevelPct).toBe(88); // 87.6 → rounded
+    expect(res.snapshot.deviceTelemetry.isCharging).toBe(true);
+    expect(res.snapshot.deviceTelemetry.storageFreeBytes).toBe(1024 * 1024 * 512);
+    expect(res.snapshot.deviceTelemetry.osVersion).toBe("Android 14");
+    expect(res.snapshot.deviceTelemetry.appVersion).toBe("1.4.2");
+  });
+
+  it("normalisiert ungültige Diagnose-Werte (Whitelist-Sanitizer)", async () => {
+    state.children.c1.networkType = "5G_FUNNY";
+    state.children.c1.batteryLevelPct = -42;
+    state.children.c1.storageFreeBytes = "viel" as unknown as number;
+    state.children.c1.osVersion = "x".repeat(80);
+    state.children.c1.appVersion = "";
+    state.supportTickets["ticket-open"].debugAccessGrantId = "grant-active";
+    const wrapped = testEnv.wrap(fns.getDebugInfo);
+    const res = await wrapped({ ticketId: "ticket-open" }, asMaster);
+    expect(res.snapshot.networkDiagnostics.networkType).toBe("unknown");
+    expect(res.snapshot.deviceTelemetry.batteryLevelPct).toBe(0);
+    expect(res.snapshot.deviceTelemetry.storageFreeBytes).toBeNull();
+    expect(res.snapshot.deviceTelemetry.osVersion).toHaveLength(32);
+    expect(res.snapshot.deviceTelemetry.appVersion).toBeNull();
   });
 
   it("erlaubt Support-Zugriff auf fremdes Ticket", async () => {

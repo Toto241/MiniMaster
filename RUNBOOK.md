@@ -207,3 +207,87 @@ Required secrets / credentials should be maintained outside the repository:
 For CI/CD-specific repository secrets and their exact names, use the deploy guide: [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md).
 
 Never commit service account JSON files, `google-services.json`, API keys or copied console tokens.
+
+## Recovery-Token Rotation (ADMIN_RECOVERY_TOKEN) — Quartals-SOP
+
+Der `ADMIN_RECOVERY_TOKEN` schützt Notfall-Operationen (z. B. `resetOperatorAccounts`).
+Rotation MUSS mindestens alle 90 Tage erfolgen; Verzögerungen werden vom
+`getOperatorSetupStatus`-Endpunkt als `recoveryToken.status = "overdue"` markiert
+und im Admin-Panel-Tab "⚙️ Einrichtung" rot angezeigt.
+
+### Ablauf (alle ~10 min)
+
+1. **Pre-Check (Operator-Workstation, PowerShell)**
+
+   ```powershell
+   .\scripts\operator-setup.ps1 -Action status -ProjectId <PROJECT> `
+     -IdToken (firebase auth:print-id-token) `
+     -OutFile pre-rotation.json
+   ```
+
+   Erwartet: `recoveryToken.tokenCount >= 1`, `status` ∈ {ok, near-due, overdue}.
+
+2. **Rotation ausführen**
+
+   ```powershell
+   .\scripts\operator-setup.ps1 -Action rotate-token -ProjectId <PROJECT>
+   ```
+
+   Skript erzeugt 32 Bytes Entropie (URL-safe Base64), schreibt sie in den
+   Secret Manager (`ADMIN_RECOVERY_TOKEN`) und setzt `ADMIN_RECOVERY_TOKEN_ROTATED_AT`
+   auf das aktuelle Datum (ISO-yyyy-MM-dd).
+
+3. **Overlap-Phase (max. 24 h)**
+
+   Der bestehende Token bleibt parallel via Komma-getrennter Liste in
+   `ADMIN_RECOVERY_TOKEN` gültig, bis alle Operatoren das neue Token verteilt
+   haben. Auth-Helper akzeptiert jedes Element (`getAdminRecoveryTokens()`).
+
+4. **Functions Re-Deploy** (damit neue Secret-Version greift)
+
+   ```powershell
+   firebase --project <PROJECT> deploy --only functions:resetOperatorAccounts
+   ```
+
+5. **Smoke-Test**
+
+   ```powershell
+   .\scripts\operator-setup.ps1 -Action status -ProjectId <PROJECT> `
+     -IdToken (firebase auth:print-id-token)
+   ```
+
+   Erwartet: `recoveryToken.status = "ok"`, `tokenAgeDays = 0`.
+
+6. **Old-Token-Removal** (24–72 h später)
+
+   `ADMIN_RECOVERY_TOKEN` Secret-Version mit nur dem neuen Token überschreiben:
+
+   ```powershell
+   .\scripts\operator-setup.ps1 -Action set-secret -SecretName ADMIN_RECOVERY_TOKEN -ProjectId <PROJECT>
+   # interaktiv: nur den NEUEN Token-Wert eingeben
+   ```
+
+7. **Audit-Eintrag**
+
+   Im Admin-Panel-Tab "⚙️ Einrichtung" Checklist-Punkt
+   `recovery_token_rotated_q<N>_<YYYY>` togglen oder via:
+
+   ```powershell
+   .\scripts\operator-setup.ps1 -Action mark `
+     -ItemId recovery_token_rotation -Done $true `
+     -Note "Q2/2026 - rotiert von <Operator>" `
+     -ProjectId <PROJECT> -IdToken (firebase auth:print-id-token)
+   ```
+
+### Notfall-Rotation (Token kompromittiert)
+
+- Schritte 2 + 4 + 6 SOFORT hintereinander (keine Overlap-Phase).
+- Audit-Log-Review: `audit_logs` mit `action = "admin.reset_operator_accounts"`
+  in den letzten 7 Tagen prüfen (Admin-Panel → Logs → Filter Action).
+- Incident-Record nach `IMPLEMENTATION_CHECKLIST.md → Sicherheits-Risiken`.
+
+### Verantwortlich
+
+- **Primär:** Lead-Operator (siehe On-Call-Roster)
+- **Backup:** Sicherheitsbeauftragter
+- **Eskalation bei Failure:** Geschäftsführung + alle Co-Operatoren via Out-of-Band-Kanal

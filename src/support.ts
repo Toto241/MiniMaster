@@ -58,6 +58,24 @@ type DebugSnapshot = {
   };
   networkDiagnostics: {
     fcmTokenPresent: boolean;
+    /**
+     * Coarse-grained connectivity class as reported by the child app.
+     * Allowed values: "wifi" | "cellular" | "none" | "unknown".
+     * Other values are normalized to "unknown" by sanitizeDebugSnapshot.
+     */
+    networkType: "wifi" | "cellular" | "none" | "unknown";
+  };
+  deviceTelemetry: {
+    /** 0..100 integer percentage; null when not reported. */
+    batteryLevelPct: number | null;
+    /** true if device reports charging state. */
+    isCharging: boolean;
+    /** Free internal storage in bytes; null when not reported. */
+    storageFreeBytes: number | null;
+    /** Coarse OS version string (e.g. "Android 14", "iOS 17.4"). Truncated to 32 chars. */
+    osVersion: string | null;
+    /** App version string (semver). Truncated to 32 chars. */
+    appVersion: string | null;
   };
   recentTamperEvents: number;
   recentUsageReports: number;
@@ -588,6 +606,14 @@ async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> 
     },
     networkDiagnostics: {
       fcmTokenPresent: typeof childData.fcmToken === "string" && childData.fcmToken.length > 0,
+      networkType: childData.networkType,
+    },
+    deviceTelemetry: {
+      batteryLevelPct: childData.batteryLevelPct,
+      isCharging: Boolean(childData.isCharging),
+      storageFreeBytes: childData.storageFreeBytes,
+      osVersion: childData.osVersion,
+      appVersion: childData.appVersion,
     },
     recentTamperEvents,
     recentUsageReports,
@@ -605,6 +631,29 @@ function sanitizeDebugSnapshot(input: Partial<DebugSnapshot>): DebugSnapshot {
   const appStatus = input.appStatus || {} as DebugSnapshot["appStatus"];
   const activityData = input.activityData || {} as DebugSnapshot["activityData"];
   const networkDiagnostics = input.networkDiagnostics || {} as DebugSnapshot["networkDiagnostics"];
+  const deviceTelemetry = input.deviceTelemetry || {} as DebugSnapshot["deviceTelemetry"];
+
+  const allowedNetworkTypes = new Set(["wifi", "cellular", "none", "unknown"]);
+  const rawNetworkType = typeof networkDiagnostics.networkType === "string"
+    ? networkDiagnostics.networkType.toLowerCase()
+    : "unknown";
+  const normalizedNetworkType = allowedNetworkTypes.has(rawNetworkType)
+    ? rawNetworkType as DebugSnapshot["networkDiagnostics"]["networkType"]
+    : "unknown";
+
+  const clampPct = (v: unknown): number | null => {
+    if (typeof v !== "number" || !Number.isFinite(v)) return null;
+    return Math.max(0, Math.min(100, Math.round(v)));
+  };
+  const sanitizeBytes = (v: unknown): number | null => {
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) return null;
+    return Math.floor(v);
+  };
+  const truncStr = (v: unknown, max: number): string | null => {
+    if (typeof v !== "string" || v.length === 0) return null;
+    return v.length > max ? v.slice(0, max) : v;
+  };
+
   return {
     appStatus: {
       isLocked: Boolean(appStatus.isLocked),
@@ -617,6 +666,14 @@ function sanitizeDebugSnapshot(input: Partial<DebugSnapshot>): DebugSnapshot {
     },
     networkDiagnostics: {
       fcmTokenPresent: Boolean(networkDiagnostics.fcmTokenPresent),
+      networkType: normalizedNetworkType,
+    },
+    deviceTelemetry: {
+      batteryLevelPct: clampPct(deviceTelemetry.batteryLevelPct),
+      isCharging: Boolean(deviceTelemetry.isCharging),
+      storageFreeBytes: sanitizeBytes(deviceTelemetry.storageFreeBytes),
+      osVersion: truncStr(deviceTelemetry.osVersion, 32),
+      appVersion: truncStr(deviceTelemetry.appVersion, 32),
     },
     recentTamperEvents: Number.isFinite(input.recentTamperEvents) ? Number(input.recentTamperEvents) : 0,
     recentUsageReports: Number.isFinite(input.recentUsageReports) ? Number(input.recentUsageReports) : 0,
