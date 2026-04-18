@@ -96,10 +96,95 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(apkPath("readme.md", "fallback.apk")).toBe("fallback.apk");
   });
 
-  it("modules/index.js bootstrappt registry + sanitize gemeinsam", () => {
+  it("modules/index.js bootstrappt registry + sanitize + command + format gemeinsam", () => {
     load(path.join(MODULES_DIR, "index.js"));
-    expect(globalScope.MM.list().sort()).toEqual(["sanitize"]);
+    expect(globalScope.MM.list().sort()).toEqual(["command", "format", "sanitize"]);
     expect(typeof globalScope.MM.bootstrappedAt).toBe("number");
+  });
+
+  it("command.js registriert sich und baut PowerShell-Skripte mit Stop-Preference", () => {
+    load(path.join(MODULES_DIR, "core", "command.js"));
+    const cmd = globalScope.MM.command;
+    expect(cmd).toBeDefined();
+    expect(cmd.buildPowerShellScript("Get-ChildItem", undefined)).toBe(
+      [
+        '$ErrorActionPreference = "Stop"',
+        "Get-ChildItem",
+      ].join("\n"),
+    );
+    expect(cmd.buildPowerShellScript("Get-ChildItem", "D:\\Tools\\MiniMaster")).toBe(
+      [
+        '$ErrorActionPreference = "Stop"',
+        'Set-Location -Path "D:\\Tools\\MiniMaster"',
+        "Get-ChildItem",
+      ].join("\n"),
+    );
+  });
+
+  it("command.js encode/decode ist roundtrip-stabil und URL-sicher", () => {
+    load(path.join(MODULES_DIR, "core", "command.js"));
+    const cmd = globalScope.MM.command;
+    const payload = { id: "abc", text: "hallo & welt", list: [1, 2, 3] };
+    const encoded = cmd.encodePayload(payload);
+    expect(encoded).not.toMatch(/[\s&"']/);
+    expect(cmd.decodePayload(encoded)).toEqual(payload);
+  });
+
+  it("command.js liefert identische Ergebnisse wie app.js (Paritaet)", () => {
+    load(path.join(MODULES_DIR, "core", "command.js"));
+    const cmd = globalScope.MM.command;
+    // Nutze die existierenden Originalfunktionen aus app.js via Test-Harness.
+    // Lazy-Require, um den schweren Harness-Setup-Overhead nur fuer diesen Test zu zahlen.
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const samples = [
+      { command: "Get-ChildItem", cwd: undefined },
+      { command: "npm test", cwd: "D:\\Tools\\MiniMaster" },
+      { command: 'Write-Host "hi"', cwd: "C:/with spaces/path" },
+    ];
+    for (const sample of samples) {
+      expect(cmd.buildPowerShellScript(sample.command, sample.cwd)).toBe(
+        appJs.buildPowerShellScript(sample.command, sample.cwd),
+      );
+    }
+
+    const payloads = [
+      { a: 1 },
+      { msg: "umlauts: aeoeue", n: 42 },
+      { list: [1, "two", { nested: true }] },
+    ];
+    for (const p of payloads) {
+      expect(cmd.encodePayload(p)).toBe(appJs.encodeCommandPayload(p));
+      expect(cmd.decodePayload(appJs.encodeCommandPayload(p))).toEqual(p);
+    }
+  });
+
+  it("format.js timestamp-Helper geben Fallbacks zurueck und akzeptieren ISO-Eingaben", () => {
+    load(path.join(MODULES_DIR, "core", "format.js"));
+    const fmt = globalScope.MM.format;
+    expect(fmt).toBeDefined();
+    expect(fmt.qaRefreshTimestamp(undefined)).toBe("noch nicht");
+    expect(fmt.qaRefreshTimestamp("")).toBe("noch nicht");
+    expect(fmt.pythonAutomationTimestamp(null)).toBe("noch nicht protokolliert");
+    expect(fmt.timestamp("not-a-date", "fallback")).toBe("not-a-date");
+    // valides Datum -> nicht leer und nicht der Fallback
+    const formatted = fmt.timestamp("2026-04-18T10:00:00Z", "fallback");
+    expect(formatted).not.toBe("fallback");
+    expect(formatted.length).toBeGreaterThan(0);
+  });
+
+  it("format.pythonAutomationTimestamp ist paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "format.js"));
+    const fmt = globalScope.MM.format;
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+    const samples = [undefined, null, "", "2026-04-18T10:00:00Z", "broken"];
+    for (const value of samples) {
+      expect(fmt.pythonAutomationTimestamp(value)).toBe(
+        appJs.formatPythonAutomationTimestamp(value),
+      );
+    }
   });
 
   it("Registry verweigert ungueltige Eintraege (Defensive)", () => {
@@ -129,5 +214,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/index.js");
     expect(sw).toContain("./modules/core/registry.js");
     expect(sw).toContain("./modules/core/sanitize.js");
+    expect(sw).toContain("./modules/core/command.js");
+    expect(sw).toContain("./modules/core/format.js");
   });
 });

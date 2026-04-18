@@ -13,7 +13,9 @@ const APP_ASSETS = [
   "./icon.svg",
   "./modules/index.js",
   "./modules/core/registry.js",
-  "./modules/core/sanitize.js"
+  "./modules/core/sanitize.js",
+  "./modules/core/command.js",
+  "./modules/core/format.js"
 ];
 
 self.addEventListener("install", (event) => {
