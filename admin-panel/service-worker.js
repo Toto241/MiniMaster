@@ -34,7 +34,8 @@ const APP_ASSETS = [
   "./modules/tabs/effective-platform-state.js",
   "./modules/tabs/commissioning-qa.js",
   "./modules/tabs/python-automation-actions.js",
-  "./modules/tabs/testing-register-insights.js"
+  "./modules/tabs/testing-register-insights.js",
+  "./modules/tabs/testing-register-priorities.js"
 ];
 
 self.addEventListener("install", (event) => {

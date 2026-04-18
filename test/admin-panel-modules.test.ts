@@ -123,6 +123,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "sanitize",
       "security",
       "testingRegisterInsights",
+      "testingRegisterPriorities",
     ]);
     expect(typeof globalScope.MM.bootstrappedAt).toBe("number");
   });
@@ -1394,6 +1395,73 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(coerced.total).toBe(9);
     expect(coerced.physical).toBe(2);
   });
+
+  it("testing-register-priorities.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 13)", () => {
+    load(path.join(MODULES_DIR, "tabs", "testing-register-priorities.js"));
+    const trp = globalScope.MM.testingRegisterPriorities;
+    expect(trp).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // Status-Priority
+    const statuses = ["fail", "manual_required", "not_run", "pass", "unknown", undefined];
+    for (const s of statuses) {
+      expect(trp.statusPriority(s)).toBe(appJs.getTestingRegisterStatusPriority(s));
+    }
+    // Konkret
+    expect(trp.statusPriority("fail")).toBe(0);
+    expect(trp.statusPriority("pass")).toBe(3);
+    expect(trp.statusPriority("xyz")).toBe(4);
+
+    // Severity-Priority
+    const sevs = ["critical", "high", "medium", "low", "info", undefined];
+    for (const s of sevs) {
+      expect(trp.severityPriority(s)).toBe(appJs.getTestingRegisterSeverityPriority(s));
+    }
+    expect(trp.severityPriority("critical")).toBe(0);
+    expect(trp.severityPriority("low")).toBe(3);
+
+    // formatGroupTitle
+    expect(trp.formatGroupTitle({ groupTitle: "Auth", groupId: "x" })).toBe("Auth");
+    expect(trp.formatGroupTitle({ groupTitle: "X", groupId: "repo-tests-unsupported" })).toBe("Unsupported: X");
+    expect(trp.formatGroupTitle({ groupTitle: "Y", groupId: "g", blockingForRelease: true })).toBe("Release: Y");
+    expect(trp.formatGroupTitle({})).toBe("-");
+    // Paritaet
+    const cases = [
+      {},
+      { groupTitle: "Auth" },
+      { groupTitle: "X", groupId: "repo-tests-unsupported" },
+      { groupTitle: "Y", blockingForRelease: true },
+      { groupTitle: "Z", groupId: "repo-tests-unsupported", blockingForRelease: true },
+    ];
+    for (const c of cases) {
+      expect(trp.formatGroupTitle(c)).toBe(appJs.formatTestingRegisterGroupTitle(c));
+    }
+
+    // actionLabel - alle Pfade
+    expect(trp.actionLabel({ action: "suite-run" })).toBe("Suite-Start");
+    expect(trp.actionLabel({ action: "protocol" })).toBe("Nachweis-Protokoll");
+    expect(trp.actionLabel({ action: "external-protocol" })).toBe("Externer Lauf + Nachweis");
+    expect(trp.actionLabel({ source: "repo-test" })).toBe("Repository-Tests pr\u00fcfen");
+    expect(trp.actionLabel({ source: "docs-validation" })).toBe("Dokument-Check ausf\u00fchren");
+    expect(trp.actionLabel({ source: "static-analysis" })).toBe("Static-Checks ausf\u00fchren");
+    expect(trp.actionLabel({})).toBe("Python-Commissioning-Lauf");
+    expect(trp.actionLabel(null)).toBe("Python-Commissioning-Lauf");
+    // Paritaet
+    const labelCases = [
+      {}, null,
+      { action: "suite-run" },
+      { action: "protocol" },
+      { action: "external-protocol" },
+      { source: "repo-test" },
+      { source: "docs-validation" },
+      { source: "static-analysis" },
+      { action: "suite-run", source: "repo-test" }, // action gewinnt
+    ];
+    for (const c of labelCases) {
+      expect(trp.actionLabel(c)).toBe(appJs.getTestingRegisterActionLabel(c));
+    }
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1437,6 +1505,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/commissioning-qa.js");
     expect(sw).toContain("./modules/tabs/python-automation-actions.js");
     expect(sw).toContain("./modules/tabs/testing-register-insights.js");
+    expect(sw).toContain("./modules/tabs/testing-register-priorities.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -1475,7 +1544,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(22);
+    expect(sandboxGlobal.MM.list().length).toBe(23);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
