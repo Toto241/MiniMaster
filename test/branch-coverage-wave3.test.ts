@@ -943,7 +943,7 @@ describe("tasks.ts branch coverage", () => {
       const wrapped = testEnv.wrap(fns.completeTask);
       const res = await wrapped({
         taskId: "task4",
-        photoUrl: "https://firebasestorage.googleapis.com/v0/b/test-bucket/o/photo.jpg",
+        photoUrl: "https://firebasestorage.googleapis.com/v0/b/test-bucket/o/children%2Fc1%2Fphotos%2Fphoto.jpg",
       }, asChild);
       expect(res.success).toBe(true);
     });
@@ -973,8 +973,24 @@ describe("tasks.ts branch coverage", () => {
       const wrapped = testEnv.wrap(fns.completeTask);
       await expect(wrapped({
         taskId: "task5",
-        photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/p.jpg",
+        photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fp.jpg",
       }, asChild)).rejects.toThrow(/cannot transition/);
+    });
+
+    it("rejects photoUrl pointing to another child's storage path", async () => {
+      const wrapped = testEnv.wrap(fns.completeTask);
+      await expect(wrapped({
+        taskId: "task4",
+        photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fother-child%2Fphotos%2Fp.jpg",
+      }, asChild)).rejects.toThrow(/calling child's own storage path/);
+    });
+
+    it("rejects photoUrl without an object path segment", async () => {
+      const wrapped = testEnv.wrap(fns.completeTask);
+      await expect(wrapped({
+        taskId: "task4",
+        photoUrl: "https://firebasestorage.googleapis.com/some-other-endpoint",
+      }, asChild)).rejects.toThrow(/Storage object path/);
     });
   });
 });

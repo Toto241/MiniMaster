@@ -106,7 +106,7 @@ describe("task state machine", () => {
     getMock.mockResolvedValue({ exists: true, data: () => ({ status: "pending" }) });
     updateMock.mockResolvedValue(undefined);
     const wrapped = testEnv.wrap(fns.completeTask);
-    const res = await wrapped({ taskId: "t1", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/proof.jpg" }, asChild);
+    const res = await wrapped({ taskId: "t1", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/children%2Fc1%2Fphotos%2Fproof.jpg" }, asChild);
     expect(res).toEqual({ success: true });
     expect(updateMock).toHaveBeenCalled();
   });
@@ -114,7 +114,7 @@ describe("task state machine", () => {
   it("completeTask rejects invalid current status", async () => {
     getMock.mockResolvedValue({ exists: true, data: () => ({ status: "approved" }) });
     const wrapped = testEnv.wrap(fns.completeTask);
-    await expect(wrapped({ taskId: "t1", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/proof.jpg" }, asChild)).rejects.toThrow(/cannot transition/);
+    await expect(wrapped({ taskId: "t1", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/children%2Fc1%2Fphotos%2Fproof.jpg" }, asChild)).rejects.toThrow(/cannot transition/);
   });
 
   it("completeTask rejects non-Firebase photo URLs", async () => {
@@ -131,7 +131,7 @@ describe("task state machine", () => {
   it("completeTask throws not-found when task does not exist", async () => {
     getMock.mockResolvedValue({ exists: false });
     const wrapped = testEnv.wrap(fns.completeTask);
-    await expect(wrapped({ taskId: "missing", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/proof.jpg" }, asChild)).rejects.toThrow(/does not exist/);
+    await expect(wrapped({ taskId: "missing", photoUrl: "https://firebasestorage.googleapis.com/v0/b/minimaster/o/children%2Fc1%2Fphotos%2Fproof.jpg" }, asChild)).rejects.toThrow(/does not exist/);
   });
 
   it("approveTask enforces pending_approval", async () => {
