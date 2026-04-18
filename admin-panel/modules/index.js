@@ -19,6 +19,8 @@ import "./tabs/firebase-deployment.js";
 import "./tabs/commissioning-pending.js";
 import "./tabs/operator-config.js";
 import "./tabs/operator-effective.js";
+import "./tabs/operator-assistant.js";
+import "./tabs/platform-qa-readiness.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
