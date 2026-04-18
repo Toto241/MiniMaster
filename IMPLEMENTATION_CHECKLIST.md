@@ -36,6 +36,7 @@
 - [x] **ARCHITECTURE.md C4-Status**: Verbindlicher textueller Kontext + korrigierte Status-Notiz zu parent-panel/child-panel (sind funktionsfähige Support-/Debug-Consent-Panels, keine Skeletons)
 - [x] **Photo-Proof Path-Scoping** (`src/tasks.ts` `completeTask`): URL-Object-Pfad wird URL-decodiert und gegen Allowlist `children/{childId}/photos/` bzw. `proofs/{childId}/` geprüft. Cross-Child-Pfade → `permission-denied`, fehlendes `/o/<path>` → `invalid-argument`. Tests in `branch-coverage-wave3` (5 Bestand + 2 neue Negativfälle), `wave5/6/7`, `tasks-and-device-extra`, `enforcement-automation`, `integration/task-lifecycle` migriert. Build grün ✅, photoUrl-relevante Suiten 0 Regressionen.
 - [x] **Debug-Snapshot Whitelist (`sanitizeDebugSnapshot`)**: Defense-in-Depth Filter in `src/support.ts` vor JSON.stringify (AI-Prompt) und Firestore-Persistierung. Erlaubt nur die deklarierten Felder (Counts/Booleans/ISO-Timestamps), eliminiert versehentliche Leaks falls `DebugSnapshot`-Typ erweitert wird. 80/80 Support-Tests grün ✅, Build grün ✅.
+- [x] **Test-Mock-Drift Cleanup (Baseline-Failures behoben)**: `db().batch()` und kettbares `where()` in `enforcement-automation.test.ts`, `tasks-and-device-extra.test.ts`, `branch-coverage-device.test.ts` ergänzt (DecisioningRepository.replaceRulesForDevice braucht beides). `auth.test.ts`: TDZ-ReferenceError auf `mockDbObj` durch lazy `require("../index")` in `beforeAll` behoben. **Vollständige Jest-Suite jetzt grün: 62/62 Suites, 2048/2048 Tests** ✅.
 
 ---
 

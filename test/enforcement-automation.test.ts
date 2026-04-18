@@ -42,7 +42,15 @@ const mockAuth: any = {
   ),
 };
 
-const mockDbObj = { collection: jest.fn() };
+const mockDbObj = {
+  collection: jest.fn(),
+  batch: jest.fn(() => ({
+    set: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    commit: jest.fn(() => Promise.resolve()),
+  })),
+};
 jest.mock("../firebase", () => ({
   db: jest.fn(() => mockDbObj),
   auth: jest.fn(() => mockAuth),

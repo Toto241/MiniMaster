@@ -59,8 +59,22 @@ beforeEach(() => {
     collection: subCollectionMock
   });
   jest.spyOn(db, "collection").mockImplementation((..._args: unknown[]) => {
-    return { doc: docMock, add: jest.fn().mockResolvedValue({ id: "mock-audit-id" }) } as any;
+    const collectionMock: any = {
+      doc: docMock,
+      add: jest.fn().mockResolvedValue({ id: "mock-audit-id" }),
+      where: jest.fn(() => collectionMock),
+      orderBy: jest.fn(() => collectionMock),
+      limit: jest.fn(() => collectionMock),
+      get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
+    };
+    return collectionMock;
   });
+  (db as any).batch = jest.fn(() => ({
+    set: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    commit: jest.fn(() => Promise.resolve()),
+  }));
 });
 
 afterEach(() => jest.restoreAllMocks());
