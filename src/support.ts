@@ -576,7 +576,7 @@ async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> 
   const appBlacklist = Array.isArray(childData.appBlacklist) ? childData.appBlacklist : [];
   const usageRules = Array.isArray(childData.usageRules) ? childData.usageRules : [];
 
-  return {
+  return sanitizeDebugSnapshot({
     appStatus: {
       isLocked: Boolean(childData.isLocked),
       appBlacklistCount: appBlacklist.length,
@@ -592,6 +592,35 @@ async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> 
     recentTamperEvents,
     recentUsageReports,
     fetchedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Defense-in-depth Whitelist-Filter: stellt sicher, dass nur die ausdrücklich
+ * deklarierten Felder den Snapshot verlassen — auch wenn der DebugSnapshot-Typ
+ * später erweitert wird oder Aufrufer versehentlich zusätzliche Felder anhängen.
+ * Wird vor JSON.stringify (AI-Prompt) und vor Firestore-Persistierung angewandt.
+ */
+function sanitizeDebugSnapshot(input: Partial<DebugSnapshot>): DebugSnapshot {
+  const appStatus = input.appStatus || {} as DebugSnapshot["appStatus"];
+  const activityData = input.activityData || {} as DebugSnapshot["activityData"];
+  const networkDiagnostics = input.networkDiagnostics || {} as DebugSnapshot["networkDiagnostics"];
+  return {
+    appStatus: {
+      isLocked: Boolean(appStatus.isLocked),
+      appBlacklistCount: Number.isFinite(appStatus.appBlacklistCount) ? Number(appStatus.appBlacklistCount) : 0,
+      usageRulesCount: Number.isFinite(appStatus.usageRulesCount) ? Number(appStatus.usageRulesCount) : 0,
+    },
+    activityData: {
+      lastSeen: typeof activityData.lastSeen === "string" ? activityData.lastSeen : null,
+      updatedAt: typeof activityData.updatedAt === "string" ? activityData.updatedAt : null,
+    },
+    networkDiagnostics: {
+      fcmTokenPresent: Boolean(networkDiagnostics.fcmTokenPresent),
+    },
+    recentTamperEvents: Number.isFinite(input.recentTamperEvents) ? Number(input.recentTamperEvents) : 0,
+    recentUsageReports: Number.isFinite(input.recentUsageReports) ? Number(input.recentUsageReports) : 0,
+    fetchedAt: typeof input.fetchedAt === "string" ? input.fetchedAt : new Date().toISOString(),
   };
 }
 
