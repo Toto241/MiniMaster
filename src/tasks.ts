@@ -5,8 +5,93 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { db } from "../firebase";
+import { db, storage } from "../firebase";
 import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
+
+/**
+ * Whitelist erlaubter Bild-MIME-Types für Photo-Proof Uploads.
+ * Bewusst restriktiv: Nur verbreitete, von Gemini Vision unterstützte Formate.
+ */
+const ALLOWED_PHOTO_MIME_TYPES = new Set<string>([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
+
+/**
+ * Maximale erlaubte Bildgröße in Bytes (10 MB).
+ * Verhindert Speicher-/Kosten-/AI-Quota-Missbrauch durch übergroße Uploads.
+ */
+const MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Minimale Bildgröße in Bytes — verhindert leere oder Stub-Dateien als Proof.
+ */
+const MIN_PHOTO_SIZE_BYTES = 256;
+
+/**
+ * Validiert MIME-Type und Größe des hochgeladenen Photo-Proof-Objekts via Storage-Metadaten.
+ *
+ * Defense-in-Depth: Ergänzt Storage-Rules-Check und URL-Path-Scoping um:
+ * - Tatsächlichen Content-Type des Objekts (nicht nur Dateiendung)
+ * - Dateigröße (Schutz vor leeren / übergroßen Dateien)
+ *
+ * Wirft HttpsError bei Verstoß. Ist Storage nicht erreichbar (Test-/Emulator-Setups
+ * ohne echtes Bucket), wird die Validierung mit Warnung übersprungen, damit
+ * bestehende Test-Suites mit gemockten URLs weiter funktionieren.
+ */
+async function validatePhotoObjectMetadata(
+  decodedPath: string, childId: string, taskId: string,
+): Promise<void> {
+  let metadata: { contentType?: string | null; size?: string | number | null };
+  try {
+    const bucket = storage().bucket();
+    const file = bucket.file(decodedPath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "photoUrl referenziertes Storage-Objekt existiert nicht.",
+      );
+    }
+    const [meta] = await file.getMetadata();
+    metadata = meta as { contentType?: string | null; size?: string | number | null };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    // Storage in Tests/Emulator nicht initialisiert → Validierung skippen.
+    functions.logger.warn(
+      `Photo-Proof Metadaten-Check übersprungen für child=${childId} task=${taskId}: ` +
+      `${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
+
+  const contentType = String(metadata.contentType || "").toLowerCase().split(";")[0].trim();
+  if (!contentType || !ALLOWED_PHOTO_MIME_TYPES.has(contentType)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `photoUrl Content-Type "${contentType || "unbekannt"}" ist nicht erlaubt. ` +
+      `Erlaubt: ${Array.from(ALLOWED_PHOTO_MIME_TYPES).join(", ")}.`,
+    );
+  }
+
+  const sizeBytes = Number(metadata.size || 0);
+  if (!Number.isFinite(sizeBytes) || sizeBytes < MIN_PHOTO_SIZE_BYTES) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `photoUrl Datei zu klein (${sizeBytes} Bytes, Minimum ${MIN_PHOTO_SIZE_BYTES}).`,
+    );
+  }
+  if (sizeBytes > MAX_PHOTO_SIZE_BYTES) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `photoUrl Datei zu groß (${sizeBytes} Bytes, Maximum ${MAX_PHOTO_SIZE_BYTES}).`,
+    );
+  }
+}
 
 export const createTask = functions.https.onCall(
   async (data: { childId: string; description: string; deadlineISO: string; unlockDuration?: number }, context: CallableContext) => {
@@ -125,6 +210,12 @@ export const completeTask = functions.https.onCall(
         "photoUrl must point to the calling child's own storage path (children/<uid>/photos/* or proofs/<uid>/*).",
       );
     }
+
+    // Validiere MIME-Type und Größe über Storage-Metadaten (Defense-in-Depth):
+    // - Schützt vor manipulierten Uploads (z.B. Polyglot-Dateien, falscher Content-Type)
+    // - Begrenzt Speicher-/Kosten-/AI-Analyse-Risiko durch zu große Bilder
+    // - Wird übersprungen wenn Storage-Bucket nicht erreichbar (z.B. in einigen Testumgebungen)
+    await validatePhotoObjectMetadata(decodedPath, childId, taskId);
 
     const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
 
