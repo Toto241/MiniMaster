@@ -14494,11 +14494,13 @@ function confirmFinalGoLive() {
 // ==================== MM MODULE FACADE (Plan B Schritt 1) ====================
 // Substituiert oben deklarierte Funktionen durch ihre Modul-Pendants aus
 // admin-panel/modules/core/*.js, sobald window.MM verfuegbar ist.
+// WICHTIG: Wird in DOMContentLoaded installiert, weil <script type="module">
+// (modules/index.js) deferred laedt und damit erst NACH dem klassischen
+// blockierenden <script src="app.js"> ausgefuehrt wird. Vorher waere window.MM
+// nicht verfuegbar und der Swap wuerde still scheitern.
 // Defensiv: Jede Substitution ist optional. Faellt sie aus, bleibt das Original
 // in app.js wirksam (Defense-in-Depth gegen Modul-Load-Fehler / SW-Cache-Race).
-// Reassignment ist moeglich, weil app.js im Browser als Non-strict Global Script
-// laeuft und Top-Level-Funktionsdeklarationen dort var-aehnlich gebunden sind.
-(function installMMFacade() {
+function _mmInstallFacade() {
     try {
         if (typeof window === "undefined") return;
         const MM = window.MM;
@@ -14522,13 +14524,14 @@ function confirmFinalGoLive() {
         }
         if (MM.command) {
             swap("buildPowerShellScript", MM.command.buildPowerShellScript);
-            swap("encodePayload", MM.command.encodePayload);
-            swap("decodePayload", MM.command.decodePayload);
+            swap("encodeCommandPayload", MM.command.encodePayload);
+            swap("decodeCommandPayload", MM.command.decodePayload);
         }
         if (MM.format) {
-            swap("timestamp", MM.format.timestamp);
-            swap("qaRefreshTimestamp", MM.format.qaRefreshTimestamp);
-            swap("pythonAutomationTimestamp", MM.format.pythonAutomationTimestamp);
+            swap("formatQaRefreshTimestamp", MM.format.qaRefreshTimestamp);
+            swap("formatPythonAutomationTimestamp", MM.format.pythonAutomationTimestamp);
+            // MM.format.timestamp hat in app.js keinen globalen Top-Level-Namen,
+            // wird ausschliesslich indirekt ueber die beiden Aliase verwendet.
         }
         if (MM.automationMeta) {
             swap("formatPythonAutomationStatus", MM.automationMeta.formatStatus);
@@ -14570,4 +14573,14 @@ function confirmFinalGoLive() {
     } catch (error) {
         try { console.warn("[MM] Fassaden-Installation fehlgeschlagen:", error); } catch (_e) { /* noop */ }
     }
-})();
+}
+
+if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", _mmInstallFacade, { once: true });
+    } else {
+        // HTML bereits geparst (z.B. async Reload). Module sind bereits geladen,
+        // weil sie ebenfalls deferred sind und in DOM-Reihenfolge ausgefuehrt wurden.
+        _mmInstallFacade();
+    }
+}
