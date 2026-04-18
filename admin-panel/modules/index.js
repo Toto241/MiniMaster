@@ -11,6 +11,8 @@ import "./core/encoding.js";
 import "./core/error-codes.js";
 import "./core/error-codes.js";
 import "./core/security.js";
+import "./core/firebase-config.js";
+import "./core/dates.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {

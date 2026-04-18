@@ -103,8 +103,10 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(globalScope.MM.list().sort()).toEqual([
       "automationMeta",
       "command",
+      "dates",
       "encoding",
       "errorCodes",
+      "firebaseConfig",
       "format",
       "sanitize",
       "security",
@@ -336,6 +338,120 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(fp).toMatch(/^[a-f0-9]{12}\.\.\.[a-f0-9]{8}$/);
   });
 
+  it("firebase-config.js Bootstrap-Helfer sind paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "firebase-config.js"));
+    const fc = globalScope.MM.firebaseConfig;
+    expect(fc).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const validConfig = {
+      apiKey: "AIzaSy-real",
+      authDomain: "demo.firebaseapp.com",
+      projectId: "demo-1234",
+      storageBucket: "demo-1234.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef",
+    };
+    const placeholderConfig = {
+      apiKey: "your-api-key",
+      authDomain: "your-project.firebaseapp.com",
+      projectId: "your-project",
+      storageBucket: "your-project.appspot.com",
+      messagingSenderId: "0",
+      appId: "your-app-id",
+    };
+    const incompleteConfig = { apiKey: "x" };
+
+    const configSamples = [null, undefined, {}, validConfig, placeholderConfig, incompleteConfig];
+    for (const cfg of configSamples) {
+      expect(fc.hasComplete(cfg)).toBe(appJs.hasCompleteFirebaseConfig(cfg));
+      expect(fc.isPlaceholder(cfg)).toBe(appJs.isPlaceholderFirebaseConfig(cfg));
+      expect(fc.normalizeBootstrap(cfg)).toEqual(appJs.normalizeBootstrapFirebaseConfig(cfg));
+    }
+
+    const textSamples = [
+      "",
+      "kein json hier",
+      JSON.stringify(validConfig),
+      `const firebaseConfig = ${JSON.stringify(validConfig).replace(/"([A-Za-z]+)":/g, "$1:")};`,
+      "{ broken: ",
+    ];
+    for (const text of textSamples) {
+      expect(fc.extractFromText(text)).toEqual(appJs.extractFirebaseConfigFromText(text));
+    }
+
+    const googleServices = {
+      project_info: {
+        project_id: "demo-1234",
+        storage_bucket: "demo-1234.appspot.com",
+        project_number: "1234567890",
+      },
+      client: [
+        {
+          client_info: {
+            android_client_info: { package_name: "com.example.other" },
+            mobilesdk_app_id: "1:1234567890:android:other",
+          },
+          api_key: [{ current_key: "AIzaOther" }],
+        },
+        {
+          client_info: {
+            android_client_info: { package_name: "com.google.pairing" },
+            mobilesdk_app_id: "1:1234567890:android:pairing",
+          },
+          api_key: [{ current_key: "AIzaPairing" }],
+        },
+      ],
+    };
+    const meta1: any = {};
+    const meta2: any = {};
+    expect(fc.extractFromGoogleServices(googleServices, meta1))
+      .toEqual(appJs.extractFirebaseConfigFromGoogleServices(googleServices, meta2));
+    expect(meta1).toEqual(meta2);
+    expect(fc.extractFromGoogleServices(null)).toBeNull();
+    expect(fc.extractFromGoogleServices({ project_info: googleServices.project_info, client: [] })).toBeNull();
+
+    const projectIds = ["", "  ", "your-project-id", "  YOUR-PROJECT-foo  ", "real-project"];
+    for (const pid of projectIds) {
+      expect(fc.isPlaceholderProjectId(pid)).toBe(appJs.isPlaceholderProjectId(pid));
+    }
+  });
+
+  it("dates.js toDateSafe ist paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "dates.js"));
+    const d = globalScope.MM.dates;
+    expect(d).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const fixedDate = new Date("2026-04-18T10:00:00Z");
+    const samples: any[] = [
+      null,
+      undefined,
+      "",
+      0,
+      "2026-04-18T10:00:00Z",
+      1700000000000,
+      "kein-datum",
+      fixedDate,
+      { seconds: 1700000000, nanoseconds: 500000000 },
+      { _seconds: 1700000000, _nanoseconds: 500000000 },
+      { toDate: () => fixedDate },
+      { foo: "bar" },
+    ];
+    for (const value of samples) {
+      const a = d.toDateSafe(value);
+      const b = appJs.toDateSafe(value);
+      if (a === null) {
+        expect(b).toBeNull();
+      } else {
+        expect(b).not.toBeNull();
+        expect(a.getTime()).toBe(b.getTime());
+      }
+    }
+  });
+
   it("Registry verweigert ungueltige Eintraege (Defensive)", () => {
     const registry = load(path.join(MODULES_DIR, "core", "registry.js"));
     expect(() => registry.register("", {})).toThrow(/nicht-leerer String/);
@@ -369,5 +485,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/encoding.js");
     expect(sw).toContain("./modules/core/error-codes.js");
     expect(sw).toContain("./modules/core/security.js");
+    expect(sw).toContain("./modules/core/firebase-config.js");
+    expect(sw).toContain("./modules/core/dates.js");
   });
 });
