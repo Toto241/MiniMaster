@@ -111,6 +111,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "firebaseDeployment",
       "format",
       "legalPlaystore",
+      "operatorConfig",
       "qaTestingRegister",
       "sanitize",
       "security",
@@ -745,6 +746,84 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(cp.coveredPrefixes).toContain("QA-Freigabe offen:");
     expect(cp.coveredPrefixes).toContain("Play-Store-Readiness:");
   });
+
+  it("operator-config.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 5)", () => {
+    // Modul importiert intern aus core/firebase-config.js; vorab laden
+    load(path.join(MODULES_DIR, "core", "registry.js"));
+    load(path.join(MODULES_DIR, "core", "firebase-config.js"));
+    load(path.join(MODULES_DIR, "tabs", "operator-config.js"));
+    const oc = globalScope.MM.operatorConfig;
+    expect(oc).toBeDefined();
+    expect(typeof oc.buildGuidance).toBe("function");
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const cases = [
+      // 1. Beides leer
+      { config: { cloud: { projectId: "" }, ai: {} }, bootstrap: {} },
+      // 2. Nur Bootstrap-Project
+      { config: { cloud: { projectId: "" }, ai: {} }, bootstrap: { projectId: "boot-prod", apiKey: "k", authDomain: "a", storageBucket: "s", messagingSenderId: "m", appId: "x" } },
+      // 3. Match Project, AI komplett gemini mit projectId-keyref
+      {
+        config: {
+          cloud: { projectId: "mm-prod" },
+          ai: { provider: "gemini", model: "gemini-1.5", keyRef: "projects/mm-prod/secrets/k", systemPrompt: "Du bist Helfer." },
+        },
+        bootstrap: { projectId: "mm-prod", apiKey: "k", authDomain: "a", storageBucket: "s", messagingSenderId: "m", appId: "x" },
+      },
+      // 4. Project-ID-Mismatch
+      {
+        config: {
+          cloud: { projectId: "mm-prod" },
+          ai: { provider: "openai", model: "gpt-x", keyRef: "k", systemPrompt: "p" },
+        },
+        bootstrap: { projectId: "boot-prod" },
+      },
+      // 5. Gemini-keyref ohne project
+      {
+        config: {
+          cloud: { projectId: "mm-prod" },
+          ai: { provider: "Gemini", model: "g", keyRef: "global-secret", systemPrompt: "p" },
+        },
+        bootstrap: { projectId: "mm-prod" },
+      },
+      // 6. Teilweise AI
+      {
+        config: {
+          cloud: { projectId: "mm-prod" },
+          ai: { provider: "gemini", model: "", keyRef: "k", systemPrompt: "" },
+        },
+        bootstrap: { projectId: "mm-prod" },
+      },
+      // 7. null/undefined defensive
+      { config: null, bootstrap: null },
+    ];
+
+    for (const c of cases) {
+      const got = oc.buildGuidance(c.config, c.bootstrap);
+      const expected = appJs.buildOperatorConfigGuidance(c.config, c.bootstrap);
+      expect(got).toEqual(expected);
+    }
+
+    // Konkrete Inhalte fuer Fall 3 (alles ok)
+    const ok = oc.buildGuidance(cases[2].config, cases[2].bootstrap);
+    expect(ok.isReady).toBe(true);
+    expect(ok.projectId).toBe("mm-prod");
+    expect(ok.bootstrapProjectId).toBe("mm-prod");
+    expect(ok.aiProvider).toBe("gemini");
+    expect(ok.items).toHaveLength(2); // cloud + ai
+
+    // Fall 5: zusaetzlicher keyref-mismatch
+    const mism = oc.buildGuidance(cases[4].config, cases[4].bootstrap);
+    expect(mism.items.find((i: any) => i.id === "ai-keyref-project-mismatch")).toBeTruthy();
+    expect(mism.isReady).toBe(false);
+
+    // Fall 7: defensive Null
+    const def = oc.buildGuidance(null, null);
+    expect(def.projectId).toBe("");
+    expect(def.bootstrapProjectId).toBe("");
+    expect(def.items.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -779,6 +858,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
     expect(sw).toContain("./modules/tabs/firebase-deployment.js");
     expect(sw).toContain("./modules/tabs/commissioning-pending.js");
+    expect(sw).toContain("./modules/tabs/operator-config.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -817,7 +897,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(13);
+    expect(sandboxGlobal.MM.list().length).toBe(14);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
