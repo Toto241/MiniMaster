@@ -82,8 +82,8 @@ The job was not started because recent account payments have failed or your spen
 
 - [ ] **F6 CSP-Refactor**: ~80+ Inline-`onclick`/`style` in `admin-panel/index.html` zu `addEventListener`/CSS-Klassen migrieren. Erfordert Anpassung der DOM-Snapshot-Tests.
 - [ ] **Legacy `secretKey` Cutover**: Backend-Migration + koordinierte Mobile-Client-Versionierung
-- [ ] **Recovery-Token Rotation — operationelles Runbook**: Quartals-Rotations-SOP dokumentieren (Code/Health-Endpoint sind erledigt, siehe Durchgeführt-Sektion)
-- [ ] **Debug-Snapshot Felder erweitern** (optional): zusätzliche diagnostische Felder prüfen (z.B. Battery, NetworkType) — Whitelist-Filter `sanitizeDebugSnapshot` ist bereits implementiert
+- [x] **Recovery-Token Rotation — operationelles Runbook**: Quartals-Rotations-SOP in [RUNBOOK.md](RUNBOOK.md) dokumentiert (Pre-Check, Rotation via `scripts/operator-setup.ps1 rotate-token`, Overlap-Phase, Re-Deploy, Smoke-Test, Old-Token-Removal, Audit; plus Notfall-Rotation bei Kompromittierung).
+- [x] **Debug-Snapshot Felder erweitert** (`src/support.ts`): `DebugSnapshot` um `networkDiagnostics.networkType` (wifi/cellular/none/unknown, sanitisiert/lowercased) und `deviceTelemetry` (`batteryLevelPct` 0-100 clamped, `isCharging`, `storageFreeBytes`, `osVersion`/`appVersion` truncated 32 chars) erweitert; Whitelist-Sanitizer `sanitizeDebugSnapshot` normalisiert ungültige Werte (Test deckt invalid networkType, negative Battery, falscher Typ, überlange Strings ab). Suite 2088/2088 grün ✅, Coverage 87.40/90.31/94.48/94.30 % ✅.
 - [ ] **iOS Family Controls Picker**: Nativer Picker im `iosMasterApp` (Beta → Release)
 - [ ] **Electron Build-Pipeline**: `desktop/`-Bundling + Code-Signing
 - [ ] **Photo-Proof EXIF-Strip** (optional): Client-seitiges EXIF-Stripping (Geo-Daten) ergänzen — MIME/Größe/Path-Scoping sind erledigt
