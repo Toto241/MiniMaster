@@ -4,6 +4,8 @@
 
 import "./core/registry.js";
 import "./core/sanitize.js";
+import "./core/command.js";
+import "./core/format.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
