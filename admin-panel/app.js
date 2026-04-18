@@ -11800,11 +11800,48 @@ async function viewTicketDetails(ticketId) {
                 html += `<button onclick="viewTicketUserData(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-primary">View User Data (Grant)</button>`;
             }
         }
+
+        if (currentUserRole === "admin" || currentUserRole === "support") {
+            const debugLabel = ticket.accessGranted && ticket.debugAccessGrantId
+                ? "🤖 KI-Reanalyse mit Debug-Daten"
+                : "🤖 KI-Reanalyse anstoßen";
+            html += `<button onclick="reanalyzeTicketWithAi(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-secondary" title="Ruft analyzeWithDebugData auf. Nutzt Debug-Snapshot, sofern Master Debug-Modus freigegeben hat.">${debugLabel}</button>`;
+        }
         html += `</div>`;
+        html += `<div id="ticket-ai-reanalyze-status" class="info" style="margin-block-start:10px;display:none"></div>`;
 
         modalContent.innerHTML = html;
     } catch (error) {
         modalContent.innerHTML = `<div class='error'>Error loading ticket details: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+async function reanalyzeTicketWithAi(ticketId) {
+    const statusEl = document.getElementById("ticket-ai-reanalyze-status");
+    if (statusEl) {
+        statusEl.style.display = "block";
+        statusEl.innerHTML = "<div class='loading'>KI-Reanalyse läuft (analyzeWithDebugData)...</div>";
+    }
+    if (!functions || typeof functions.httpsCallable !== "function") {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>Firebase Functions nicht initialisiert.</div>";
+        return;
+    }
+    try {
+        const callable = functions.httpsCallable("analyzeWithDebugData");
+        const result = await callable({ ticketId });
+        const payload = result?.data || {};
+        const confidencePct = typeof payload.confidence === "number"
+            ? `${Math.round(payload.confidence * 100)}%`
+            : "n/a";
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='success-box'>✅ KI-Reanalyse abgeschlossen. Status: <strong>${escapeHtml(String(payload.status || "ok"))}</strong> · Confidence: <strong>${escapeHtml(confidencePct)}</strong></div>`;
+        }
+        showNotification("KI-Reanalyse erfolgreich.", "success");
+    } catch (error) {
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>KI-Reanalyse fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
+        }
+        showNotification("KI-Reanalyse fehlgeschlagen: " + (error?.message || ""), "error");
     }
 }
 
