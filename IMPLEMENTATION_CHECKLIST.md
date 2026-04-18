@@ -39,6 +39,7 @@
 - [x] **Test-Mock-Drift Cleanup (Baseline-Failures behoben)**: `db().batch()` und kettbares `where()` in `enforcement-automation.test.ts`, `tasks-and-device-extra.test.ts`, `branch-coverage-device.test.ts` ergänzt (DecisioningRepository.replaceRulesForDevice braucht beides). `auth.test.ts`: TDZ-ReferenceError auf `mockDbObj` durch lazy `require("../index")` in `beforeAll` behoben. **Vollständige Jest-Suite jetzt grün: 62/62 Suites, 2048/2048 Tests** ✅.
 - [x] **Coverage-Schwellwerte angehoben** (`jest.config.cjs`): branches 50→85, functions 70→88, lines 65→90, statements 65→90. Tatsächliche Ist-Werte: 88.62 / 90.96 / 94.77 / 94.72 % — ~5pp Margin gegen Regression. CI-Gate verhärtet, alle 62 Suites bestehen Threshold-Check ✅.
 - [x] **Recovery-Token Rotation** (`src/auth.ts`): Multi-Token-Support per Komma-Liste in `ADMIN_RECOVERY_TOKEN` (Rolling-Rotation mit Overlap-Fenster), Rotations-Datum via `ADMIN_RECOVERY_TOKEN_ROTATED_AT` (ISO), Health-Endpoint liefert `recoveryTokenCount` / `recoveryTokenAgeDays` / `recoveryTokenRotationOverdue` (>90 Tage). Admin-Panel-Reset-Flow zeigt entsprechende Warnung im Statusfeld. Bei Reset mit überfälligem Token wird `functions.logger.warn` getriggert. 207/207 Auth-Tests grün ✅, gesamte Suite 2048/2048 ✅, Build grün ✅.
+- [x] **Photo-Proof MIME/Größe-Validierung** (`src/tasks.ts` `completeTask`): Nach Path-Scoping prüft `validatePhotoObjectMetadata` per Storage-Admin-SDK den tatsächlichen `contentType` (Whitelist: jpeg/png/webp/heic/heif) und die Dateigröße (256 B ≤ size ≤ 10 MB) sowie Existenz des Objekts. Defense-in-Depth gegen manipulierte Uploads, Polyglot-Dateien und Speicher-/Kosten-Missbrauch. 4 neue Tests in `branch-coverage-wave3` (MIME, Max-Size, Min-Size, Object-Missing) + Test-Mock auf gemeinsamen `mockBucket` umgestellt. **Suite 2052/2052 Tests grün** ✅, Coverage-Thresholds gehalten ✅, Build grün ✅.
 
 ---
 
@@ -82,7 +83,7 @@ The job was not started because recent account payments have failed or your spen
 - [ ] **Debug-Snapshot Felder erweitern** (optional): zusätzliche diagnostische Felder prüfen (z.B. Battery, NetworkType) — Whitelist-Filter `sanitizeDebugSnapshot` ist bereits implementiert
 - [ ] **iOS Family Controls Picker**: Nativer Picker im `iosMasterApp` (Beta → Release)
 - [ ] **Electron Build-Pipeline**: `desktop/`-Bundling + Code-Signing
-- [ ] **Photo-Proof Validation – Erweiterung**: EXIF-/MIME-/Größenprüfung beim Upload (Path-Scoping ist erledigt, siehe Durchgeführt-Sektion)
+- [ ] **Photo-Proof EXIF-Strip** (optional): Client-seitiges EXIF-Stripping (Geo-Daten) ergänzen — MIME/Größe/Path-Scoping sind erledigt
 - [ ] **Subscription Scheduler**: Periodische Verifikation + Renewal-Webhooks (Play Billing v6)
 - [ ] **Offline-Policy Cache (childApp)**: Konfliktauflösung bei längerer Offline-Phase
 - [ ] **Coverage-Schwellwerte weiter erhöhen** (optional): Aktuell 85/88/90/90 — Ziel 90/92/95/95 wenn nächste Code-Erweiterungen mit Tests landen

@@ -18,12 +18,28 @@ jest.mock("firebase-admin/messaging", () => ({
 
 jest.mock("firebase-admin/storage", () => ({
   getStorage: jest.fn(() => ({
-    bucket: jest.fn(() => ({
-      name: "test-bucket",
-      getMetadata: jest.fn().mockResolvedValue([{ name: "test-bucket" }]),
-    })),
+    bucket: jest.fn(() => mockBucket),
   })),
 }));
+
+// Default-Mock: liefert konfigurierbares File-Verhalten für alle Tests.
+// Per-Test kann via mockBucketFileMetadata.* überschrieben werden.
+const mockBucketFileMetadata = {
+  exists: true,
+  contentType: "image/jpeg" as string | null,
+  size: 1024 * 100, // 100 KB → bestanden Default
+};
+const mockBucket = {
+  name: "test-bucket",
+  getMetadata: jest.fn().mockResolvedValue([{ name: "test-bucket" }]),
+  file: jest.fn(() => ({
+    exists: jest.fn().mockResolvedValue([mockBucketFileMetadata.exists]),
+    getMetadata: jest.fn().mockResolvedValue([{
+      contentType: mockBucketFileMetadata.contentType,
+      size: String(mockBucketFileMetadata.size),
+    }]),
+  })),
+};
 
 const mockAuth: any = {
   getUser: jest.fn().mockResolvedValue({ uid: "m1", customClaims: { role: "master" } }),
@@ -48,10 +64,7 @@ jest.mock("../firebase", () => ({
   db: jest.fn(() => mockDbObj),
   auth: jest.fn(() => mockAuth),
   storage: jest.fn(() => ({
-    bucket: jest.fn(() => ({
-      name: "test-bucket",
-      getMetadata: jest.fn().mockResolvedValue([{ name: "test-bucket" }]),
-    })),
+    bucket: jest.fn(() => mockBucket),
   })),
 }));
 
@@ -991,6 +1004,62 @@ describe("tasks.ts branch coverage", () => {
         taskId: "task4",
         photoUrl: "https://firebasestorage.googleapis.com/some-other-endpoint",
       }, asChild)).rejects.toThrow(/Storage object path/);
+    });
+
+    it("rejects photoUrl whose Storage object has disallowed MIME type", async () => {
+      const original = mockBucketFileMetadata.contentType;
+      mockBucketFileMetadata.contentType = "application/pdf";
+      try {
+        const wrapped = testEnv.wrap(fns.completeTask);
+        await expect(wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Ffile.pdf",
+        }, asChild)).rejects.toThrow(/Content-Type/);
+      } finally {
+        mockBucketFileMetadata.contentType = original;
+      }
+    });
+
+    it("rejects photoUrl whose Storage object exceeds maximum size", async () => {
+      const originalSize = mockBucketFileMetadata.size;
+      mockBucketFileMetadata.size = 11 * 1024 * 1024; // 11 MB > 10 MB Limit
+      try {
+        const wrapped = testEnv.wrap(fns.completeTask);
+        await expect(wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fbig.jpg",
+        }, asChild)).rejects.toThrow(/zu groß/);
+      } finally {
+        mockBucketFileMetadata.size = originalSize;
+      }
+    });
+
+    it("rejects photoUrl whose Storage object is below minimum size", async () => {
+      const originalSize = mockBucketFileMetadata.size;
+      mockBucketFileMetadata.size = 100; // < 256 Bytes Minimum
+      try {
+        const wrapped = testEnv.wrap(fns.completeTask);
+        await expect(wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Ftiny.jpg",
+        }, asChild)).rejects.toThrow(/zu klein/);
+      } finally {
+        mockBucketFileMetadata.size = originalSize;
+      }
+    });
+
+    it("rejects photoUrl when Storage object does not exist", async () => {
+      const originalExists = mockBucketFileMetadata.exists;
+      mockBucketFileMetadata.exists = false;
+      try {
+        const wrapped = testEnv.wrap(fns.completeTask);
+        await expect(wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fghost.jpg",
+        }, asChild)).rejects.toThrow(/existiert nicht/);
+      } finally {
+        mockBucketFileMetadata.exists = originalExists;
+      }
     });
   });
 });
