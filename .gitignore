@@ -46,6 +46,13 @@ coverage_report.txt
 test_output.txt
 test-output.txt
 test-json.txt
+# Ad-hoc Jest/PowerShell debug dumps (Welle 0 Cleanup)
+wave*-errors.txt
+wave*-failures.txt
+wave*-json.txt
+test/wave*-errors.txt
+test/wave*-failures.txt
+test/wave*-json.txt
 
 # Python local environments and bytecode
 .venv/
