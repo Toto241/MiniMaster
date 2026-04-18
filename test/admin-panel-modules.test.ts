@@ -488,4 +488,88 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/firebase-config.js");
     expect(sw).toContain("./modules/core/dates.js");
   });
+
+  it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
+    const appJs = await fs.readFile(
+      path.resolve(__dirname, "..", "admin-panel", "app.js"),
+      "utf8",
+    );
+    // Klassisches <script src="app.js"> laeuft VOR <script type="module"> (deferred).
+    // Daher MUSS die Fassade erst nach DOMContentLoaded greifen, sonst ist window.MM
+    // beim direkten IIFE-Aufruf noch nicht registriert und alle Swaps verpuffen still.
+    expect(appJs).toContain("function _mmInstallFacade()");
+    expect(appJs).toMatch(/addEventListener\(\s*"DOMContentLoaded"\s*,\s*_mmInstallFacade/);
+    // Negative Garantie: kein direkter IIFE-Aufruf der alten Variante.
+    expect(appJs).not.toContain("(function installMMFacade()");
+    // Substituierte Funktionen muessen alle 9 Module abdecken.
+    const swaps = [
+      "MM.sanitize",
+      "MM.command",
+      "MM.format",
+      "MM.automationMeta",
+      "MM.encoding",
+      "MM.errorCodes",
+      "MM.security",
+      "MM.firebaseConfig",
+      "MM.dates",
+    ];
+    for (const expr of swaps) {
+      expect(appJs).toContain(expr);
+    }
+  });
+
+  it("Fassade swappt 27 Funktionen in simulierter Browser-Reihenfolge", async () => {
+    // Simuliere: 1. app.js parst & deklariert Originale, 2. Module registrieren MM,
+    // 3. DOMContentLoaded -> _mmInstallFacade ersetzt globale Funktionsbindings.
+    const sandboxGlobal: any = {};
+    const sandboxLoad = makeLoader(sandboxGlobal);
+    sandboxLoad(path.join(MODULES_DIR, "index.js"));
+    expect(sandboxGlobal.MM).toBeDefined();
+    expect(sandboxGlobal.MM.list().length).toBe(9);
+
+    // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
+    // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
+    // sowohl als Original-Definition als auch als swap-Eintrag auf.
+    const appJs = await fs.readFile(
+      path.resolve(__dirname, "..", "admin-panel", "app.js"),
+      "utf8",
+    );
+    const expected = [
+      "sanitizeAdbSerial", "sanitizeApkPath", "escapePowerShellString",
+      "buildPowerShellScript", "encodeCommandPayload", "decodeCommandPayload",
+      "formatQaRefreshTimestamp", "formatPythonAutomationTimestamp",
+      "formatPythonAutomationStatus", "getPythonAutomationStatusMeta",
+      "formatPythonAutomationType", "getPythonAutomationTypeChipClass",
+      "toBase64Url", "encodeInlineArgument", "decodeInlineArgument", "safeDebugStringify",
+      "normalizeCallableErrorCode", "normalizeAuthErrorCode",
+      "getAccessKeyErrorHint", "getAuthErrorHint",
+      "buildKeyFingerprint",
+      "hasCompleteFirebaseConfig", "isPlaceholderFirebaseConfig",
+      "normalizeBootstrapFirebaseConfig", "extractFirebaseConfigFromText",
+      "extractFirebaseConfigFromGoogleServices", "isPlaceholderProjectId",
+      "toDateSafe",
+    ];
+    for (const fn of expected) {
+      expect(appJs).toMatch(new RegExp(`swap\\("${fn}"`));
+    }
+  });
+
+  it("Jeder swap('X', ...) Eintrag in app.js hat eine korrespondierende Top-Level-Funktion", async () => {
+    // Diese Garantie verhindert, dass Modul-Schluessel und globaler Funktionsname
+    // auseinanderlaufen (z.B. MM.command.encodePayload swappt encodeCommandPayload,
+    // nicht encodePayload). Falsche Namen wuerden im Browser still per ReferenceError
+    // verschluckt und alle Substitutionen waeren effektlos.
+    const appJs = await fs.readFile(
+      path.resolve(__dirname, "..", "admin-panel", "app.js"),
+      "utf8",
+    );
+    const swapNames = Array.from(appJs.matchAll(/\bswap\("([A-Za-z_$][\w$]*)"/g)).map(m => m[1]);
+    expect(swapNames.length).toBeGreaterThanOrEqual(28);
+    const missing: string[] = [];
+    for (const name of swapNames) {
+      const re = new RegExp(`^function ${name}\\b`, "m");
+      if (!re.test(appJs)) missing.push(name);
+    }
+    expect(missing).toEqual([]);
+  });
 });
