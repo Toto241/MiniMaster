@@ -221,16 +221,35 @@ async function loadLogs() {
 }
 
 /**
- * Show log details in modal
+ * Mask PII fields for default display. Operator can opt-in via toggle in modal.
  */
-function showDetails(logData) {
-    const modal = document.getElementById('detailsModal');
-    const detailsElement = document.getElementById('logDetails');
+function maskUserId(value) {
+    if (value == null) return null;
+    const str = String(value);
+    if (str.length <= 10) return str.length > 0 ? str.charAt(0) + '***' : '';
+    return str.substring(0, 6) + '…' + str.substring(str.length - 4);
+}
 
-    // Format the log data for display
+function maskIp(value) {
+    if (value == null) return null;
+    const str = String(value);
+    if (str.includes(':')) return '[ipv6 masked]';
+    const parts = str.split('.');
+    if (parts.length === 4) return parts[0] + '.x.x.x';
+    return '[ip masked]';
+}
+
+function maskUserAgent(value) {
+    if (value == null) return null;
+    const str = String(value);
+    if (str.length === 0) return str;
+    return '[user-agent masked, ' + str.length + ' chars]';
+}
+
+function buildDetailsView(logData, revealPii) {
     const formattedData = {
         timestamp: logData.timestamp?.toDate ? logData.timestamp.toDate().toISOString() : logData.timestamp,
-        userId: logData.userId,
+        userId: revealPii ? logData.userId : maskUserId(logData.userId),
         userRole: logData.userRole,
         action: logData.action,
         resource: logData.resource,
@@ -239,11 +258,54 @@ function showDetails(logData) {
         metadata: logData.metadata || {},
         errorMessage: logData.errorMessage || null,
         duration: logData.duration ? `${logData.duration}ms` : null,
-        ipAddress: logData.ipAddress || null,
-        userAgent: logData.userAgent || null
+        ipAddress: revealPii ? (logData.ipAddress || null) : maskIp(logData.ipAddress),
+        userAgent: revealPii ? (logData.userAgent || null) : maskUserAgent(logData.userAgent),
     };
+    return JSON.stringify(formattedData, null, 2);
+}
 
-    detailsElement.textContent = JSON.stringify(formattedData, null, 2);
+/**
+ * Show log details in modal
+ */
+function showDetails(logData) {
+    const modal = document.getElementById('detailsModal');
+    const detailsElement = document.getElementById('logDetails');
+
+    // Inject (or reuse) PII reveal toggle right above the <pre> element
+    let toggleWrapper = document.getElementById('logPiiToggleWrapper');
+    if (!toggleWrapper) {
+        toggleWrapper = document.createElement('label');
+        toggleWrapper.id = 'logPiiToggleWrapper';
+        toggleWrapper.style.cssText = 'display:flex;gap:8px;align-items:center;margin:8px 0;font-size:13px;color:#475569;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = 'logPiiToggle';
+        const text = document.createElement('span');
+        text.textContent = 'PII (User-ID, IP, User-Agent) anzeigen – nur bei dokumentierter Notwendigkeit';
+        toggleWrapper.appendChild(cb);
+        toggleWrapper.appendChild(text);
+        detailsElement.parentNode.insertBefore(toggleWrapper, detailsElement);
+        cb.addEventListener('change', () => {
+            detailsElement.textContent = buildDetailsView(logData, cb.checked);
+            try {
+                if (cb.checked && firebase?.auth?.().currentUser) {
+                    console.info('audit-log: PII reveal toggled by', firebase.auth().currentUser.uid);
+                }
+            } catch (_) { /* noop */ }
+        });
+    } else {
+        // Reset toggle when reopening modal for a different entry
+        const cb = document.getElementById('logPiiToggle');
+        if (cb) cb.checked = false;
+        // Re-bind change handler against new logData
+        const fresh = cb.cloneNode(true);
+        cb.parentNode.replaceChild(fresh, cb);
+        fresh.addEventListener('change', () => {
+            detailsElement.textContent = buildDetailsView(logData, fresh.checked);
+        });
+    }
+
+    detailsElement.textContent = buildDetailsView(logData, false);
     modal.style.display = 'block';
 }
 
