@@ -122,6 +122,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "qaTestingRegister",
       "sanitize",
       "security",
+      "testingRegisterInsights",
     ]);
     expect(typeof globalScope.MM.bootstrappedAt).toBe("number");
   });
@@ -1329,6 +1330,70 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(typeof noop).toBe("function");
     noop(); // soll nicht werfen
   });
+
+  it("testing-register-insights.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 12)", () => {
+    load(path.join(MODULES_DIR, "tabs", "testing-register-insights.js"));
+    const tri = globalScope.MM.testingRegisterInsights;
+    expect(tri).toBeDefined();
+    expect(typeof tri.buildDuplicates).toBe("function");
+    expect(typeof tri.buildManual).toBe("function");
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // Duplicates: defensiv
+    expect(tri.buildDuplicates(null)).toEqual({ count: 0, sourceCount: 0, entries: [] });
+    expect(tri.buildDuplicates({})).toEqual({ count: 0, sourceCount: 0, entries: [] });
+    expect(tri.buildDuplicates({ duplicateInsights: { entries: "nope" as any } }).entries).toEqual([]);
+
+    // Duplicates: voll
+    const dupPayload = {
+      duplicateInsights: {
+        count: 3,
+        sourceCount: 7,
+        entries: [{ id: "a" }, { id: "b" }],
+      },
+    };
+    const dup = tri.buildDuplicates(dupPayload);
+    expect(dup).toEqual({ count: 3, sourceCount: 7, entries: dupPayload.duplicateInsights.entries });
+    // Paritaet
+    expect(dup).toEqual(appJs.buildTestingRegisterDuplicateInsights(dupPayload));
+
+    // Manual: defensiv
+    expect(tri.buildManual(null)).toEqual({
+      total: 0, physical: 0, backlog: 0, external: 0, wave1: 0, wave2: 0,
+    });
+
+    // Manual: voll
+    const manPayload = {
+      manualInsights: {
+        total: 12,
+        buckets: {
+          "physical-manual": { count: 4 },
+          "automation-backlog": { count: 5 },
+          "external-evidence": { count: 3 },
+        },
+        waves: {
+          "wave-1": { count: 7 },
+          "wave-2": { count: 5 },
+        },
+      },
+    };
+    const man = tri.buildManual(manPayload);
+    expect(man).toEqual({ total: 12, physical: 4, backlog: 5, external: 3, wave1: 7, wave2: 5 });
+    // Paritaet
+    expect(man).toEqual(appJs.buildTestingRegisterManualInsights(manPayload));
+
+    // Manual: Number-Coercion ueber String-Werte
+    const coerced = tri.buildManual({
+      manualInsights: {
+        total: "9",
+        buckets: { "physical-manual": { count: "2" } },
+        waves: {},
+      },
+    });
+    expect(coerced.total).toBe(9);
+    expect(coerced.physical).toBe(2);
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1371,6 +1436,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/effective-platform-state.js");
     expect(sw).toContain("./modules/tabs/commissioning-qa.js");
     expect(sw).toContain("./modules/tabs/python-automation-actions.js");
+    expect(sw).toContain("./modules/tabs/testing-register-insights.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -1409,7 +1475,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(21);
+    expect(sandboxGlobal.MM.list().length).toBe(22);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
