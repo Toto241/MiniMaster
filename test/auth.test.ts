@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import fft from "firebase-functions-test";
-import * as myFunctions from "../index";
 
 const testEnv = fft();
 
@@ -36,6 +36,13 @@ jest.mock("firebase-admin", () => ({
     },
   },
 }));
+
+let myFunctions: any;
+
+beforeAll(() => {
+  // Lazy require AFTER jest.mock factories are registered to avoid TDZ on mockDbObj.
+  myFunctions = require("../index");
+});
 
 describe("generateCustomToken", () => {
   afterAll(() => {

@@ -157,22 +157,21 @@ beforeEach(() => {
         state[coll] = collData;
         return Promise.resolve({ id });
       }),
-      where: jest.fn((_field: string, _op: string, value: any) => ({
-        limit: jest.fn().mockReturnValue({
-          get: jest.fn(() => {
-            const matches = Object.entries(collData)
-              .filter(([, d]: [string, any]) => d?.[_field] === value)
-              .map(([id, data]) => ({ id, data: () => data, ref: { id } }));
-            return Promise.resolve({ empty: matches.length === 0, size: matches.length, docs: matches });
-          }),
-        }),
-        get: jest.fn(() => {
+      where: jest.fn((_field: string, _op: string, value: any) => {
+        const buildSnapshot = () => {
           const matches = Object.entries(collData)
             .filter(([, d]: [string, any]) => d?.[_field] === value)
             .map(([id, data]) => ({ id, data: () => data, ref: { id } }));
           return Promise.resolve({ empty: matches.length === 0, size: matches.length, docs: matches });
-        }),
-      })),
+        };
+        const chained: any = {
+          limit: jest.fn(() => ({ get: jest.fn(buildSnapshot) })),
+          get: jest.fn(buildSnapshot),
+          where: jest.fn(() => chained),
+          orderBy: jest.fn(() => chained),
+        };
+        return chained;
+      }),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       get: jest.fn(() => {
@@ -185,6 +184,7 @@ beforeEach(() => {
   });
 
   (db as any).batch = jest.fn(() => ({
+    set: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     commit: jest.fn().mockResolvedValue(undefined),
