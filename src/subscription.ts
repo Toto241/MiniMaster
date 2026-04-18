@@ -495,3 +495,166 @@ export const onPlayBillingNotification = functions.pubsub
     }
     return null;
   });
+
+/**
+ * Default maximum number of subscriptions to re-verify per scheduled run.
+ * Keeps Play Developer API quota usage bounded (default 200k req/day project-wide).
+ */
+const REVERIFY_DEFAULT_BATCH = 50;
+
+/**
+ * Google Play subscription resource (subset relevant for re-verification).
+ * @see https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions
+ */
+type PlaySubscriptionResource = {
+  expiryTimeMillis?: string | number;
+  paymentState?: number;          // 0=Pending, 1=Received, 2=Free trial, 3=Pending deferred
+  cancelReason?: number;          // 0=user, 1=system, 2=replaced, 3=developer
+  autoRenewing?: boolean;
+  userCancellationTimeMillis?: string | number;
+};
+
+/**
+ * Computes a Firestore update from a Play Developer API subscription
+ * response. Returns null when no observable change is needed.
+ *
+ * Mapping rules:
+ *  - expiryTimeMillis < now            → status=expired, isPremium=false
+ *  - cancelReason set AND expiry future → status=canceled (user keeps access until expiry)
+ *  - paymentState=0 (pending)          → status=on_hold, isPremium=false
+ *  - autoRenewing=false AND active     → keep active but flag autoRenewing=false
+ *  - otherwise (paid + future expiry)  → status=active, expiresAt=<expiry>, isPremium=true
+ */
+export function computeReverifyUpdate(
+  remote: PlaySubscriptionResource,
+  nowMs: number
+): Record<string, unknown> | null {
+  const expiryMs = Number(remote.expiryTimeMillis ?? 0);
+  if (!expiryMs || Number.isNaN(expiryMs)) return null;
+
+  const update: Record<string, unknown> = {
+    "subscription.lastReverifiedAt": admin.firestore.Timestamp.fromMillis(nowMs),
+    "subscription.autoRenewing": remote.autoRenewing === true,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (expiryMs <= nowMs) {
+    update["subscription.status"] = "expired";
+    update["subscription.expiredAt"] = admin.firestore.Timestamp.fromMillis(nowMs);
+    update["isPremium"] = false;
+    return update;
+  }
+
+  update["subscription.expiresAt"] = admin.firestore.Timestamp.fromMillis(expiryMs);
+
+  if (remote.paymentState === 0) {
+    update["subscription.status"] = "on_hold";
+    update["isPremium"] = false;
+    return update;
+  }
+
+  if (typeof remote.cancelReason === "number") {
+    update["subscription.status"] = "canceled";
+    update["subscription.cancelReason"] = remote.cancelReason;
+    if (remote.userCancellationTimeMillis) {
+      update["subscription.canceledAt"] = admin.firestore.Timestamp.fromMillis(
+        Number(remote.userCancellationTimeMillis)
+      );
+    }
+    // User retains access until expiry — keep premium until expiry tick.
+    update["isPremium"] = true;
+    return update;
+  }
+
+  update["subscription.status"] = "active";
+  update["isPremium"] = true;
+  return update;
+}
+
+/**
+ * Periodic Play API re-verification. Iterates active/grace masters with a
+ * stored purchaseToken and reconciles their Firestore state against the
+ * authoritative Play Developer API response (catches silent refunds,
+ * payment failures, and cancellations missed by RTDN).
+ *
+ * Returns a summary so the scheduled wrapper and tests can assert on it.
+ */
+export async function reverifyActiveSubscriptionsRun(
+  packageName: string,
+  maxBatch: number = REVERIFY_DEFAULT_BATCH
+): Promise<{ scanned: number; updated: number; skipped: number; errors: number }> {
+  const nowMs = Date.now();
+  const candidates = await db().collection("masters")
+    .where("subscription.status", "in", ["active", "grace_period"])
+    .limit(Math.max(1, maxBatch))
+    .get();
+
+  let scanned = 0;
+  let updated = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  if (candidates.empty) return { scanned, updated, skipped, errors };
+
+  const authClient = new google.auth.GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+  const androidpublisher = google.androidpublisher({ version: "v3", auth: authClient });
+
+  for (const doc of candidates.docs) {
+    const data = doc.data() || {};
+    const sub = data.subscription || {};
+    if (!sub.purchaseToken || !sub.type) {
+      skipped++;
+      continue;
+    }
+    scanned++;
+    try {
+      const res = await androidpublisher.purchases.subscriptions.get({
+        packageName,
+        subscriptionId: sub.type,
+        token: sub.purchaseToken,
+      });
+      const remote = (res?.data || {}) as PlaySubscriptionResource;
+      const update = computeReverifyUpdate(remote, nowMs);
+      if (!update) {
+        skipped++;
+        continue;
+      }
+      await doc.ref.update(update);
+      updated++;
+      functions.logger.info("Reverified subscription", {
+        masterId: doc.id,
+        newStatus: update["subscription.status"],
+      });
+    } catch (err) {
+      errors++;
+      functions.logger.warn("Reverify failed for master", {
+        masterId: doc.id,
+        error: (err as Error)?.message,
+      });
+    }
+  }
+
+  return { scanned, updated, skipped, errors };
+}
+
+/**
+ * Scheduled trigger: runs reverifyActiveSubscriptionsRun daily at 03:15
+ * Europe/Berlin (after the midnight expiry sweep). Package name is
+ * configurable via PLAY_PACKAGE_NAME (defaults to com.minimaster.masterapp).
+ */
+export const reverifyActiveSubscriptions = functions.pubsub
+  .schedule("15 3 * * *")
+  .timeZone("Europe/Berlin")
+  .onRun(async () => {
+    const packageName = process.env.PLAY_PACKAGE_NAME || "com.minimaster.masterapp";
+    const batchSize = Number(process.env.REVERIFY_BATCH || REVERIFY_DEFAULT_BATCH);
+    try {
+      const summary = await reverifyActiveSubscriptionsRun(packageName, batchSize);
+      functions.logger.info("Reverify run complete", summary);
+    } catch (err) {
+      functions.logger.error("Reverify run failed", err);
+    }
+    return null;
+  });
