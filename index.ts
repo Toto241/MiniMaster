@@ -53,6 +53,7 @@ export { createTask, completeTask, approveTask, rejectTask } from "./src/tasks";
 // Subscriptions
 export {
   verifyPurchase, getSubscriptionStatus, revokeSubscription, checkExpiredSubscriptions,
+  onPlayBillingNotification,
 } from "./src/subscription";
 
 // Support & AI
