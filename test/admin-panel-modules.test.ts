@@ -105,6 +105,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "command",
       "commissioningPending",
       "commissioningQa",
+      "cryptoDebug",
       "dates",
       "effectivePlatformState",
       "encoding",
@@ -1462,6 +1463,59 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       expect(trp.actionLabel(c)).toBe(appJs.getTestingRegisterActionLabel(c));
     }
   });
+
+  it("crypto-debug.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 14)", () => {
+    load(path.join(MODULES_DIR, "core", "crypto-debug.js"));
+    const cd = globalScope.MM.cryptoDebug;
+    expect(cd).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // toBase64Url
+    expect(cd.toBase64Url([])).toBe("");
+    // bytes [0xff, 0xff] -> "//8=" -> base64url "__8"
+    expect(cd.toBase64Url([0xff, 0xff])).toBe("__8");
+    // bytes [0x3e, 0x3f] -> "Pj8=" -> "Pj8"
+    expect(cd.toBase64Url([0x3e, 0x3f])).toBe("Pj8");
+    // Paritaet (Uint8Array)
+    const bytes = new Uint8Array([1, 2, 3, 250, 251, 252]);
+    expect(cd.toBase64Url(bytes)).toBe(appJs.toBase64Url(bytes));
+
+    // buildKeyFingerprint
+    expect(cd.buildKeyFingerprint("")).toBe("unbekannt");
+    expect(cd.buildKeyFingerprint("not-hex")).toBe("unbekannt");
+    expect(cd.buildKeyFingerprint("a".repeat(63))).toBe("unbekannt");
+    const valid = "a".repeat(56) + "b".repeat(8);
+    expect(cd.buildKeyFingerprint(valid)).toBe("aaaaaaaaaaaa...bbbbbbbb");
+    // case-insensitiv & trim
+    expect(cd.buildKeyFingerprint("  " + valid.toUpperCase() + "  ")).toBe("aaaaaaaaaaaa...bbbbbbbb");
+    // Paritaet
+    expect(cd.buildKeyFingerprint(valid)).toBe(appJs.buildKeyFingerprint(valid));
+    expect(cd.buildKeyFingerprint("xyz")).toBe(appJs.buildKeyFingerprint("xyz"));
+
+    // safeDebugStringify
+    expect(cd.safeDebugStringify({ a: 1, b: "x" })).toBe(JSON.stringify({ a: 1, b: "x" }, null, 2));
+    expect(cd.safeDebugStringify(null)).toBe("null");
+    expect(cd.safeDebugStringify(42)).toBe("42");
+    // Circular -> Fallback auf String(value)
+    const circular: any = { name: "x" };
+    circular.self = circular;
+    const out = cd.safeDebugStringify(circular);
+    expect(typeof out).toBe("string");
+    expect(out).toBe(appJs.safeDebugStringify(circular));
+
+    // getPriorityWeight
+    expect(cd.getPriorityWeight("critical")).toBe(300);
+    expect(cd.getPriorityWeight("high")).toBe(200);
+    expect(cd.getPriorityWeight("medium")).toBe(100);
+    expect(cd.getPriorityWeight("low")).toBe(50);
+    expect(cd.getPriorityWeight("anything")).toBe(50);
+    expect(cd.getPriorityWeight(undefined)).toBe(50);
+    // Paritaet
+    for (const s of ["critical", "high", "medium", "low", "info", undefined]) {
+      expect(cd.getPriorityWeight(s)).toBe(appJs.getPriorityWeight(s));
+    }
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1493,6 +1547,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/firebase-config.js");
     expect(sw).toContain("./modules/core/dates.js");
     expect(sw).toContain("./modules/core/event-delegation.js");
+    expect(sw).toContain("./modules/core/crypto-debug.js");
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
     expect(sw).toContain("./modules/tabs/firebase-deployment.js");
@@ -1544,7 +1599,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(23);
+    expect(sandboxGlobal.MM.list().length).toBe(24);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
