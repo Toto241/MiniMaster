@@ -100,6 +100,32 @@ export const completeTask = functions.https.onCall(
       throw new functions.https.HttpsError("invalid-argument", "photoUrl exceeds maximum allowed length.");
     }
 
+    // Verify the photo is stored under a path scoped to the calling child.
+    // Mirrors storage.rules: writes only allowed under children/{childId}/photos/* or proofs/{childId}/*
+    // This prevents a child from registering a photoUrl pointing to another child's storage path
+    // even if Storage rules are misconfigured or temporarily relaxed.
+    const objectMatch = photoUrl.match(/\/o\/([^?]+)/);
+    if (!objectMatch) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "photoUrl must reference a Firebase Storage object path (.../o/<path>).",
+      );
+    }
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(objectMatch[1]);
+    } catch (_err) {
+      throw new functions.https.HttpsError("invalid-argument", "photoUrl object path is not properly URL-encoded.");
+    }
+    const allowedPrefixes = [`children/${childId}/photos/`, `proofs/${childId}/`];
+    const pathAllowed = allowedPrefixes.some((prefix) => decodedPath.startsWith(prefix));
+    if (!pathAllowed) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "photoUrl must point to the calling child's own storage path (children/<uid>/photos/* or proofs/<uid>/*).",
+      );
+    }
+
     const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
 
     try {

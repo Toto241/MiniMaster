@@ -1262,7 +1262,7 @@ describe("tasks catch blocks and edges", () => {
     const wrapped = testEnv.wrap(fns.completeTask);
     await expect(wrapped({
       taskId: "t1",
-      photoUrl: "https://firebasestorage.googleapis.com/test.jpg",
+      photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Ftest.jpg",
     }, asChild)).rejects.toThrow(/cannot transition/i);
   });
 

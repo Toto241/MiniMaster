@@ -34,6 +34,7 @@
 - [x] **Test-Hardening Cloud Functions**: Hard-Fail in `src/support.ts` (`generateAiCompletion`) wenn Test-Stub-Pfad in Functions-Runtime aktiv (NODE_ENV=test + K_SERVICE/FUNCTION_TARGET/FUNCTION_NAME/GAE_SERVICE)
 - [x] **Test-Stabilität admin-panel-qa-flows**: `replaceElementWithState` defensive (HTML-escaped Fallback für Test-Mocks ohne `appendChild`); `selfHealing`-Drift in Sektionscount/Mock korrigiert
 - [x] **ARCHITECTURE.md C4-Status**: Verbindlicher textueller Kontext + korrigierte Status-Notiz zu parent-panel/child-panel (sind funktionsfähige Support-/Debug-Consent-Panels, keine Skeletons)
+- [x] **Photo-Proof Path-Scoping** (`src/tasks.ts` `completeTask`): URL-Object-Pfad wird URL-decodiert und gegen Allowlist `children/{childId}/photos/` bzw. `proofs/{childId}/` geprüft. Cross-Child-Pfade → `permission-denied`, fehlendes `/o/<path>` → `invalid-argument`. Tests in `branch-coverage-wave3` (5 Bestand + 2 neue Negativfälle), `wave5/6/7`, `tasks-and-device-extra`, `enforcement-automation`, `integration/task-lifecycle` migriert. Build grün ✅, photoUrl-relevante Suiten 0 Regressionen.
 
 ---
 
@@ -77,7 +78,7 @@ The job was not started because recent account payments have failed or your spen
 - [ ] **Debug-Snapshot Minimierung**: Felder-Whitelist in `analyzeWithDebugData` schärfen
 - [ ] **iOS Family Controls Picker**: Nativer Picker im `iosMasterApp` (Beta → Release)
 - [ ] **Electron Build-Pipeline**: `desktop/`-Bundling + Code-Signing
-- [ ] **Photo-Proof Validation**: Backend-seitige EXIF-/MIME-/Größenprüfung beim Upload
+- [ ] **Photo-Proof Validation – Erweiterung**: EXIF-/MIME-/Größenprüfung beim Upload (Path-Scoping ist erledigt, siehe Durchgeführt-Sektion)
 - [ ] **Subscription Scheduler**: Periodische Verifikation + Renewal-Webhooks (Play Billing v6)
 - [ ] **Offline-Policy Cache (childApp)**: Konfliktauflösung bei längerer Offline-Phase
 - [ ] **Coverage-Schwellwerte erhöhen**: Aktuell global lines/statements 65 % → Ziel 75 %

@@ -1204,7 +1204,7 @@ describe("completeTask edge cases", () => {
     const wrapped = testEnv.wrap(fns.completeTask);
     await expect(wrapped({
       taskId: "t1",
-      photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/photo.jpg",
+      photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fphoto.jpg",
     }, asChild)).rejects.toThrow(/Task cannot transition/);
   });
 
