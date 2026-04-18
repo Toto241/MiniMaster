@@ -15,7 +15,11 @@ const APP_ASSETS = [
   "./modules/core/registry.js",
   "./modules/core/sanitize.js",
   "./modules/core/command.js",
-  "./modules/core/format.js"
+  "./modules/core/format.js",
+  "./modules/core/automation-meta.js",
+  "./modules/core/encoding.js",
+  "./modules/core/error-codes.js",
+  "./modules/core/security.js"
 ];
 
 self.addEventListener("install", (event) => {
