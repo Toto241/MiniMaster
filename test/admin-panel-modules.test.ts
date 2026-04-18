@@ -109,6 +109,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "firebaseConfig",
       "format",
       "legalPlaystore",
+      "qaTestingRegister",
       "sanitize",
       "security",
     ]);
@@ -550,6 +551,97 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       privacyUrl: sample.privacyUrl,
     });
   });
+
+  it("qa-testing-register.js Pure Helfer sind paritaetisch zu app.js (Welle 2 Step 2)", () => {
+    load(path.join(MODULES_DIR, "tabs", "qa-testing-register.js"));
+    const qa = globalScope.MM.qaTestingRegister;
+    expect(qa).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // Direkte Paritaet zu im Harness exportierten Originalen
+    const statuses = ["fail", "manual_required", "not_run", "pass", "", null, undefined, "unknown"];
+    for (const s of statuses) {
+      expect(qa.isOpenStatus(s)).toBe(appJs.isOpenTestingRegisterStatus(s));
+      expect(qa.statusPriority(s)).toBe(appJs.getTestingRegisterStatusPriority(s));
+    }
+    const severities = ["critical", "high", "medium", "low", "", null, undefined, "trivial"];
+    for (const sev of severities) {
+      expect(qa.severityPriority(sev)).toBe(appJs.getTestingRegisterSeverityPriority(sev));
+    }
+    const items = [
+      { id: "x", title: "Privacy Policy URL fehlt", groupTitle: "Recht" },
+      { id: "y", details: "Reviewer access guide" },
+      { id: "z", title: "Backups testen", groupTitle: "Daten" },
+      { id: "store", groupId: "play-store", title: "Listing pruefen" },
+      { id: "iarc-1", title: "IARC Altersfreigabe" },
+      null,
+      {},
+    ];
+    for (const item of items) {
+      expect(qa.isPlayStoreItem(item)).toBe(appJs.isPlayStoreTestingRegisterItem(item));
+      expect(qa.formatGroupTitle(item || {})).toBe(appJs.formatTestingRegisterGroupTitle(item || {}));
+    }
+
+    // Konstanten-Set
+    expect(qa.openStatuses).toEqual(["fail", "manual_required", "not_run"]);
+    expect(qa.primaryFilterTypes.has("playStoreBlocking")).toBe(true);
+    expect(qa.primaryFilterTypes.has("unknown-mode")).toBe(false);
+
+    // formatSourceLabel + sourceChipClass (Implementations-Spiegelung)
+    const sources = [
+      "register-derivative", "repo-test", "device-suite", "static-analysis",
+      "docs-validation", "playstore-readiness", "command", "manual", "docs",
+      "custom-x", "", null, undefined,
+    ];
+    expect(qa.formatSourceLabel("manual")).toBe("Quelle: Manueller Nachweis");
+    expect(qa.formatSourceLabel("custom-x")).toBe("Quelle: custom-x");
+    expect(qa.formatSourceLabel("")).toBe("");
+    for (const src of sources) {
+      const label = qa.formatSourceLabel(src);
+      expect(typeof label).toBe("string");
+      const chip = qa.sourceChipClass(src);
+      expect(chip.startsWith("python-automation-chip-")).toBe(true);
+    }
+
+    // itemById
+    const payload = { items: [{ id: "a" }, { id: "b" }, { id: "c" }] };
+    expect(qa.itemById("b", payload)).toEqual({ id: "b" });
+    expect(qa.itemById("nope", payload)).toBeNull();
+    expect(qa.itemById("a", null)).toBeNull();
+    expect(qa.itemById(null, payload)).toBeNull();
+
+    // isReleaseBlockerOpen
+    expect(qa.isReleaseBlockerOpen(null)).toBe(false);
+    expect(qa.isReleaseBlockerOpen({ blockingForRelease: false })).toBe(false);
+    expect(qa.isReleaseBlockerOpen({ blockingForRelease: true, hasSuccessfulRun: true, status: "pass" })).toBe(false);
+    expect(qa.isReleaseBlockerOpen({ blockingForRelease: true, hasSuccessfulRun: true, status: "fail" })).toBe(true);
+    expect(qa.isReleaseBlockerOpen({ blockingForRelease: true, hasSuccessfulRun: false, status: "pass" })).toBe(true);
+    expect(qa.isReleaseBlockerOpen({ blockingForRelease: true, hasSuccessfulRun: true, status: "pass", staleEvidence: true })).toBe(true);
+
+    // parseTimestamp + formatAge mit injizierbarem Now
+    expect(qa.parseTimestamp("")).toBeNull();
+    expect(qa.parseTimestamp("kein-datum")).toBeNull();
+    const parsedTs = qa.parseTimestamp("2026-04-18T00:00:00.000Z");
+    expect(parsedTs).not.toBeNull();
+    // Cross-Realm: instanceof Date schlaegt im VM-Kontext fehl, daher Duck-Type-Check.
+    expect(typeof parsedTs.getTime).toBe("function");
+    expect(parsedTs.getTime()).toBe(new Date("2026-04-18T00:00:00.000Z").getTime());
+
+    const NOW = new Date("2026-04-18T12:00:00.000Z").getTime();
+    expect(qa.formatAge("", NOW)).toBe("noch kein Zeitstempel");
+    expect(qa.formatAge("2026-04-18T08:00:00.000Z", NOW)).toBe("heute aktualisiert");
+    expect(qa.formatAge("2026-04-17T06:00:00.000Z", NOW)).toBe("vor 1 Tag aktualisiert");
+    expect(qa.formatAge("2026-04-10T00:00:00.000Z", NOW)).toBe("vor 8 Tagen aktualisiert");
+    expect(qa.formatAge("2026-03-10T00:00:00.000Z", NOW)).toBe("vor 1 Monat aktualisiert");
+    expect(qa.formatAge("2025-10-01T00:00:00.000Z", NOW)).toBe("vor 6 Monaten aktualisiert");
+
+    // escapeText
+    expect(qa.escapeText("<a href=\"x\">'&'</a>")).toBe("&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;");
+    expect(qa.escapeText(null)).toBe("");
+    expect(qa.escapeText(undefined)).toBe("");
+    expect(qa.escapeText(42 as unknown as string)).toBe("42");
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -581,6 +673,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/firebase-config.js");
     expect(sw).toContain("./modules/core/dates.js");
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
+    expect(sw).toContain("./modules/tabs/qa-testing-register.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -619,7 +712,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(10);
+    expect(sandboxGlobal.MM.list().length).toBe(11);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js

@@ -22,7 +22,8 @@ const APP_ASSETS = [
   "./modules/core/security.js",
   "./modules/core/firebase-config.js",
   "./modules/core/dates.js",
-  "./modules/tabs/legal-playstore.js"
+  "./modules/tabs/legal-playstore.js",
+  "./modules/tabs/qa-testing-register.js"
 ];
 
 self.addEventListener("install", (event) => {
