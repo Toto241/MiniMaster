@@ -25,6 +25,50 @@ function getAdminRecoveryToken(): string {
   return String(process.env.ADMIN_RECOVERY_TOKEN || process.env.MINIMASTER_ADMIN_RECOVERY_TOKEN || "").trim();
 }
 
+/**
+ * Liefert alle aktuell akzeptierten Recovery-Tokens.
+ * Unterstützt rolling rotation: Komma-getrennte Liste in `ADMIN_RECOVERY_TOKEN` /
+ * `MINIMASTER_ADMIN_RECOVERY_TOKEN` erlaubt mehrere gleichzeitig gültige Tokens
+ * während eines Rotations-Overlap-Fensters.
+ */
+function getAdminRecoveryTokens(): string[] {
+  const raw = getAdminRecoveryToken();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * ISO-Datum (oder leer), an dem das letzte Recovery-Token zuletzt rotiert wurde.
+ * Wird im Health-Endpoint zurückgegeben, damit das Admin-Panel eine
+ * Rotations-Erinnerung anzeigen kann (Empfehlung: ≤ 90 Tage).
+ */
+function getAdminRecoveryTokenRotatedAt(): string {
+  return String(
+    process.env.ADMIN_RECOVERY_TOKEN_ROTATED_AT ||
+    process.env.MINIMASTER_ADMIN_RECOVERY_TOKEN_ROTATED_AT ||
+    ""
+  ).trim();
+}
+
+/**
+ * Berechnet das Alter (in Tagen) der letzten Token-Rotation.
+ * Liefert `null`, wenn kein gültiges ISO-Datum konfiguriert ist.
+ */
+function getAdminRecoveryTokenAgeDays(): number | null {
+  const raw = getAdminRecoveryTokenRotatedAt();
+  if (!raw) return null;
+  const ts = Date.parse(raw);
+  if (Number.isNaN(ts)) return null;
+  const ageMs = Date.now() - ts;
+  if (ageMs < 0) return 0;
+  return Math.floor(ageMs / (24 * 60 * 60 * 1000));
+}
+
+const ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS = 90;
+
 function getCurrentProjectId(): string | null {
   const directProjectId = String(process.env.GCLOUD_PROJECT || "").trim();
   if (directProjectId) {
@@ -532,12 +576,12 @@ export const resetAllAuthUsers = functions.https.onCall(
 
     const resetEnabled = isOperatorResetEnabled();
 
-    const recoveryTokenConfig = getAdminRecoveryToken();
+    const recoveryTokens = getAdminRecoveryTokens();
     const recoveryTokenData = typeof data?.recoveryToken === "string" ? data.recoveryToken.trim() : "";
     const recoveryTokenAllowed =
-      recoveryTokenConfig.length > 0 &&
+      recoveryTokens.length > 0 &&
       recoveryTokenData.length > 0 &&
-      safeSecretEquals(recoveryTokenConfig, recoveryTokenData);
+      recoveryTokens.some((expected) => safeSecretEquals(expected, recoveryTokenData));
 
     const callerRole = context.auth && typeof context.auth.token.role === "string" ? context.auth.token.role : "";
     if (!resetEnabled) {
@@ -586,6 +630,18 @@ export const resetAllAuthUsers = functions.https.onCall(
       includeCurrentSessionUser,
       recoveryTokenUsed: recoveryTokenAllowed,
     });
+
+    if (recoveryTokenAllowed) {
+      const ageDays = getAdminRecoveryTokenAgeDays();
+      if (ageDays !== null && ageDays > ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS) {
+        functions.logger.warn(
+          "Recovery-Token-Rotation überfällig: Token wurde vor mehr als " +
+          `${ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS} Tagen rotiert (aktuell ${ageDays} Tage). ` +
+          "Bitte ADMIN_RECOVERY_TOKEN rotieren und ADMIN_RECOVERY_TOKEN_ROTATED_AT aktualisieren.",
+          { requestId, ageDays }
+        );
+      }
+    }
 
     const callerUid = context.auth?.uid || "recovery-token";
 
@@ -740,7 +796,13 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
         : `srv-health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const resetEnabled = isOperatorResetEnabled();
-    const recoveryTokenConfigured = getAdminRecoveryToken().length > 0;
+    const recoveryTokens = getAdminRecoveryTokens();
+    const recoveryTokenConfigured = recoveryTokens.length > 0;
+    const recoveryTokenCount = recoveryTokens.length;
+    const recoveryTokenRotatedAt = getAdminRecoveryTokenRotatedAt() || null;
+    const recoveryTokenAgeDays = getAdminRecoveryTokenAgeDays();
+    const recoveryTokenRotationOverdue =
+      recoveryTokenAgeDays !== null && recoveryTokenAgeDays > ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS;
     const resetGuardStatus = getResetGuardStatus();
 
     const callerRole = typeof context.auth.token.role === "string" ? context.auth.token.role : "none";
@@ -749,6 +811,11 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
       requestId,
       resetEnabled,
       recoveryTokenConfigured,
+      recoveryTokenCount,
+      recoveryTokenRotatedAt,
+      recoveryTokenAgeDays,
+      recoveryTokenRotationOverdue,
+      recoveryTokenRotationWarnDays: ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS,
       projectId: resetGuardStatus.projectId,
       allowedProjectsConfigured: resetGuardStatus.allowedProjectsConfigured,
       projectAllowedForReset: resetGuardStatus.projectAllowedForReset,

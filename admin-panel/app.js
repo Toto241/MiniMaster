@@ -10062,11 +10062,26 @@ async function checkResetAllUsersHealth() {
         const data = result?.data || {};
         const resetEnabled = Boolean(data.resetEnabled);
         const recoveryTokenConfigured = Boolean(data.recoveryTokenConfigured);
+        const recoveryTokenCount = Number(data.recoveryTokenCount || 0);
+        const recoveryTokenAgeDays = data.recoveryTokenAgeDays;
+        const recoveryTokenRotationOverdue = Boolean(data.recoveryTokenRotationOverdue);
+        const recoveryTokenRotationWarnDays = Number(data.recoveryTokenRotationWarnDays || 90);
         const callerRole = escapeHtml(String(data.callerRole || "none"));
         const backendRequestId = escapeHtml(String(data.requestId || requestId));
-        const recoveryHint = recoveryTokenConfigured
-            ? "Recovery-Token ist konfiguriert."
-            : "Kein Recovery-Token konfiguriert.";
+        let recoveryHint;
+        if (!recoveryTokenConfigured) {
+            recoveryHint = "Kein Recovery-Token konfiguriert.";
+        } else if (recoveryTokenRotationOverdue) {
+            recoveryHint =
+                `⚠️ Recovery-Token-Rotation überfällig: zuletzt vor ${recoveryTokenAgeDays} Tagen rotiert ` +
+                `(Empfehlung: ≤ ${recoveryTokenRotationWarnDays} Tage). Bitte ADMIN_RECOVERY_TOKEN rotieren ` +
+                "und ADMIN_RECOVERY_TOKEN_ROTATED_AT aktualisieren.";
+        } else if (recoveryTokenCount > 1) {
+            recoveryHint =
+                `Recovery-Token konfiguriert (${recoveryTokenCount} aktive Tokens, Rotations-Overlap aktiv).`;
+        } else {
+            recoveryHint = "Recovery-Token ist konfiguriert.";
+        }
 
         const resetBtn = document.getElementById("btn-reset-all-users-onboarding");
         // Backend erlaubt jeden authentifizierten User wenn resetEnabled=true.
