@@ -1,18 +1,22 @@
 # Architecture Document
 
-> **Note:** This document is a work in progress. It is missing a formal C4 context diagram and detailed sequence diagrams for key user flows.
+> **Status (2026-04):** Formelle C4-Diagramme (Container, Component) und detaillierte UML-Sequenzdiagramme für Pairing, Task-Lifecycle, Photo-Proof, Subscription-Renewal und Support-Grant fehlen noch. Bis zur Erstellung dient die textuelle Variante in Abschnitt 1 als verbindliche Architekturreferenz; Diagramme sind als Backlog-Item geführt (siehe `IMPLEMENTATION_CHECKLIST.md`).
 
 This document outlines the high-level architecture of the Mini-Master application suite.
 
 ## 1. High-Level Diagram (C4 - Context)
 
-A context diagram should be placed here, showing the main components and their interactions:
+Bis ein formales C4-Diagramm gepflegt ist, gilt folgender textueller Kontext als verbindlich:
 
-- **Parent User** -> `masterApp`
-- **Child User** -> `childApp`
-- `masterApp` <-> **Firebase Backend**
-- `childApp` <-> **Firebase Backend**
-- **Firebase Backend** <-> **Google Play API**
+- **Parent User** -> `masterApp` (Android, Kotlin/Compose) bzw. `iosMasterApp` (Swift, Family Controls — Beta)
+- **Child User** -> `childApp` (Android, Accessibility Service) bzw. `iosChildApp` (Swift, Screen Time API — Beta)
+- **Operator / Support** -> `admin-panel` (PWA, Firebase Auth + App Check) bzw. `desktop` (Electron-Wrapper)
+- `masterApp` / `childApp` / `admin-panel` <-> **Firebase Backend** (Auth, Firestore, Storage, Cloud Functions, FCM/APNs, App Check)
+- **Firebase Backend** <-> **Google Play Billing API** (Subscription-Verifikation)
+- **Firebase Backend** <-> **Apple App Store Server API** (geplant, derzeit Stub)
+- **Firebase Backend** <-> **AI-Provider** (Gemini/OpenAI über `src/ai-config.ts`, opt-in pro Operator)
+
+> Hinweis: `parent-panel/` und `child-panel/` enthalten nur HTML-Skeletons und sind aktuell **nicht** Teil der produktiven Topologie. Eine Entscheidung "ausbauen vs. entfernen" steht noch aus.
 
 ## 2. Component Breakdown (Current State vs Intended)
 
