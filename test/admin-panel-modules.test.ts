@@ -107,6 +107,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "encoding",
       "errorCodes",
       "firebaseConfig",
+      "firebaseDeployment",
       "format",
       "legalPlaystore",
       "qaTestingRegister",
@@ -642,6 +643,58 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(qa.escapeText(undefined)).toBe("");
     expect(qa.escapeText(42 as unknown as string)).toBe("42");
   });
+
+  it("firebase-deployment.js Pure Helfer sind paritaetisch zu app.js (Welle 2 Step 3)", () => {
+    load(path.join(MODULES_DIR, "tabs", "firebase-deployment.js"));
+    const fd = globalScope.MM.firebaseDeployment;
+    expect(fd).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // buildRecoveryCommands
+    const projectIds = ["mm-prod", "test-project-123", "x", ""];
+    for (const pid of projectIds) {
+      expect(fd.buildRecoveryCommands(pid)).toEqual(appJs.buildFirebaseRecoveryCommands(pid));
+      expect(fd.buildRecoveryScript(pid)).toBe(appJs.buildFirebaseRecoveryScript(pid));
+    }
+    expect(fd.buildRecoveryCommands("mm-prod")).toEqual([
+      "npm install",
+      "firebase use mm-prod",
+      "firebase deploy --only firestore:rules,firestore:indexes,storage",
+      "firebase deploy --only functions",
+    ]);
+    expect(fd.buildRecoveryScript("mm-prod").split("\n")).toHaveLength(4);
+
+    // buildDeployCommand
+    expect(fd.buildDeployCommand("mm-prod")).toBe(appJs.buildDeployCommand("mm-prod"));
+    expect(fd.buildDeployCommand("")).toBe(appJs.buildDeployCommand(""));
+    expect(fd.buildDeployCommand(null)).toBe(appJs.buildDeployCommand(null));
+    expect(fd.buildDeployCommand(undefined)).toBe(appJs.buildDeployCommand(undefined));
+    expect(fd.buildDeployCommand("  spaced  ")).toBe(appJs.buildDeployCommand("  spaced  "));
+    expect(fd.buildDeployCommand("mm-prod")).toBe(
+      "firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project mm-prod",
+    );
+    expect(fd.buildDeployCommand("")).toBe(
+      "firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting",
+    );
+
+    // isRetryableQueueConflict
+    const cases: Array<[string, string, number, boolean]> = [
+      ["firebase deploy --only functions", "HTTP Error: 409", 1, true],
+      ["firebase deploy --only functions", "Unable to queue the operation", 2, true],
+      ["firebase deploy --only functions", "OK", 0, false],
+      ["firebase deploy --only functions", "Some other error", 1, false],
+      ["npm install", "HTTP Error: 409", 1, false],
+      ["", "HTTP Error: 409", 1, false],
+      ["FIREBASE DEPLOY", "http error: 409", 1, true],
+    ];
+    for (const [cmd, out, code, expected] of cases) {
+      expect(fd.isRetryableQueueConflict(cmd, out, code)).toBe(expected);
+      expect(fd.isRetryableQueueConflict(cmd, out, code)).toBe(
+        appJs.isRetryableFirebaseQueueConflict(cmd, out, code),
+      );
+    }
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -674,6 +727,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/dates.js");
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
+    expect(sw).toContain("./modules/tabs/firebase-deployment.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -712,7 +766,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(11);
+    expect(sandboxGlobal.MM.list().length).toBe(12);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
