@@ -14490,3 +14490,84 @@ function confirmFinalGoLive() {
             "<div class='success-box'><p>✅ <strong>Go-Live bestätigt</strong> am " + escapeHtml(ts) + "</p></div>";
     }
 }
+
+// ==================== MM MODULE FACADE (Plan B Schritt 1) ====================
+// Substituiert oben deklarierte Funktionen durch ihre Modul-Pendants aus
+// admin-panel/modules/core/*.js, sobald window.MM verfuegbar ist.
+// Defensiv: Jede Substitution ist optional. Faellt sie aus, bleibt das Original
+// in app.js wirksam (Defense-in-Depth gegen Modul-Load-Fehler / SW-Cache-Race).
+// Reassignment ist moeglich, weil app.js im Browser als Non-strict Global Script
+// laeuft und Top-Level-Funktionsdeklarationen dort var-aehnlich gebunden sind.
+(function installMMFacade() {
+    try {
+        if (typeof window === "undefined") return;
+        const MM = window.MM;
+        if (!MM || typeof MM !== "object") return;
+
+        const swap = (currentName, replacement) => {
+            if (typeof replacement !== "function") return;
+            try {
+                // eslint-disable-next-line no-eval
+                eval(`${currentName} = replacement;`);
+            } catch (_error) {
+                // Reassignment kann in seltenen Konstellationen fehlschlagen
+                // (z.B. Strict Mode via spaeterem Module-Wrapper). Original bleibt.
+            }
+        };
+
+        if (MM.sanitize) {
+            swap("sanitizeAdbSerial", MM.sanitize.adbSerial);
+            swap("sanitizeApkPath", MM.sanitize.apkPath);
+            swap("escapePowerShellString", MM.sanitize.powerShellString);
+        }
+        if (MM.command) {
+            swap("buildPowerShellScript", MM.command.buildPowerShellScript);
+            swap("encodePayload", MM.command.encodePayload);
+            swap("decodePayload", MM.command.decodePayload);
+        }
+        if (MM.format) {
+            swap("timestamp", MM.format.timestamp);
+            swap("qaRefreshTimestamp", MM.format.qaRefreshTimestamp);
+            swap("pythonAutomationTimestamp", MM.format.pythonAutomationTimestamp);
+        }
+        if (MM.automationMeta) {
+            swap("formatPythonAutomationStatus", MM.automationMeta.formatStatus);
+            swap("getPythonAutomationStatusMeta", MM.automationMeta.getStatusMeta);
+            swap("formatPythonAutomationType", MM.automationMeta.formatType);
+            swap("getPythonAutomationTypeChipClass", MM.automationMeta.getTypeChipClass);
+        }
+        if (MM.encoding) {
+            swap("toBase64Url", MM.encoding.toBase64Url);
+            swap("encodeInlineArgument", MM.encoding.encodeInlineArgument);
+            swap("decodeInlineArgument", MM.encoding.decodeInlineArgument);
+            swap("safeDebugStringify", MM.encoding.safeDebugStringify);
+        }
+        if (MM.errorCodes) {
+            swap("normalizeCallableErrorCode", MM.errorCodes.normalizeCallable);
+            swap("normalizeAuthErrorCode", MM.errorCodes.normalizeAuth);
+            swap("getAccessKeyErrorHint", MM.errorCodes.accessKeyHint);
+            swap("getAuthErrorHint", MM.errorCodes.authHint);
+        }
+        if (MM.security) {
+            swap("buildKeyFingerprint", MM.security.buildKeyFingerprint);
+        }
+        if (MM.firebaseConfig) {
+            swap("hasCompleteFirebaseConfig", MM.firebaseConfig.hasComplete);
+            swap("isPlaceholderFirebaseConfig", MM.firebaseConfig.isPlaceholder);
+            swap("normalizeBootstrapFirebaseConfig", MM.firebaseConfig.normalizeBootstrap);
+            swap("extractFirebaseConfigFromText", MM.firebaseConfig.extractFromText);
+            swap("extractFirebaseConfigFromGoogleServices", MM.firebaseConfig.extractFromGoogleServices);
+            swap("isPlaceholderProjectId", MM.firebaseConfig.isPlaceholderProjectId);
+        }
+        if (MM.dates) {
+            swap("toDateSafe", MM.dates.toDateSafe);
+        }
+
+        try {
+            window.MM.facadeInstalledAt = Date.now();
+            console.info("[MM] Fassade installiert (" + (window.MM.list ? window.MM.list().length : "?") + " Module).");
+        } catch (_error) { /* noop */ }
+    } catch (error) {
+        try { console.warn("[MM] Fassaden-Installation fehlgeschlagen:", error); } catch (_e) { /* noop */ }
+    }
+})();

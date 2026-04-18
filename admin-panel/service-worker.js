@@ -19,7 +19,9 @@ const APP_ASSETS = [
   "./modules/core/automation-meta.js",
   "./modules/core/encoding.js",
   "./modules/core/error-codes.js",
-  "./modules/core/security.js"
+  "./modules/core/security.js",
+  "./modules/core/firebase-config.js",
+  "./modules/core/dates.js"
 ];
 
 self.addEventListener("install", (event) => {
