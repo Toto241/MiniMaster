@@ -16,6 +16,7 @@ import "./core/dates.js";
 import "./tabs/legal-playstore.js";
 import "./tabs/qa-testing-register.js";
 import "./tabs/firebase-deployment.js";
+import "./tabs/commissioning-pending.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
