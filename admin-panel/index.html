@@ -878,6 +878,30 @@
                     <div id="tab-setup" class="tab-content" style="display: none">
                         <h2>⚙️ Einrichtung &amp; Inbetriebnahme</h2>
 
+                        <!-- ==================== Operator-Readiness ==================== -->
+                        <div class="setup-card" id="operator-readiness-card" style="margin-block-start: 20px">
+                            <h3>🚦 Inbetriebnahme-Status (live)</h3>
+                            <p>
+                                Konsolidierter Backend-Status: Secrets, Storage, Firestore,
+                                Recovery-Token-Rotation, RTDN-Topic und manuelle externe Prüfpunkte
+                                (Apple, Google Play, Firebase-Konsole, Recht, Validierung).
+                                Aktualisiert direkt aus der Cloud-Function
+                                <code>getOperatorSetupStatus</code>.
+                            </p>
+                            <div style="display:flex; gap:10px; margin-block-start:10px; flex-wrap:wrap">
+                                <button id="btn-refresh-operator-readiness" class="primary-btn" type="button">
+                                    🔄 Status aktualisieren
+                                </button>
+                                <button id="btn-download-operator-readiness" class="secondary-btn" type="button" disabled>
+                                    💾 JSON herunterladen
+                                </button>
+                                <span id="operator-readiness-summary" class="status-badge" aria-live="polite">noch nicht geladen</span>
+                            </div>
+                            <div id="operator-readiness-content" style="margin-block-start:15px">
+                                <p class="muted">Klicken Sie auf „Status aktualisieren", um den aktuellen Inbetriebnahme-Status abzurufen.</p>
+                            </div>
+                        </div>
+
                         <div
                             class="setup-card"
                             style="margin-block-start: 20px"

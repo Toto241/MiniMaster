@@ -4305,3 +4305,67 @@ input:focus, select:focus, textarea:focus {
     .ai-error-header { flex-direction: column; }
     .fix-history-entry { flex-direction: column; }
 }
+
+/* ==================== Operator Readiness Card ==================== */
+#operator-readiness-card .readiness-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-block-start: 10px;
+}
+#operator-readiness-card .readiness-block {
+    background: var(--surface-2, #f7f7fa);
+    border: 1px solid var(--border, #e3e3e9);
+    border-radius: 8px;
+    padding: 12px;
+}
+#operator-readiness-card .readiness-block h4 {
+    margin: 0 0 8px 0;
+    font-size: 0.95rem;
+}
+#operator-readiness-card .readiness-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+#operator-readiness-card .readiness-table td {
+    padding: 4px 6px;
+    border-bottom: 1px dashed var(--border, #e3e3e9);
+}
+#operator-readiness-card .blocker-list {
+    margin: 0;
+    padding-inline-start: 18px;
+    color: var(--danger, #b00020);
+}
+#operator-readiness-card .manual-checklist-group {
+    border: 1px solid var(--border, #e3e3e9);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-block: 10px;
+}
+#operator-readiness-card .manual-checklist-group legend {
+    font-weight: 600;
+    padding: 0 6px;
+}
+#operator-readiness-card .manual-checklist-item {
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border, #ececef);
+}
+#operator-readiness-card .manual-checklist-item:last-child { border-bottom: none; }
+#operator-readiness-card .manual-checklist-item.is-done { opacity: 0.7; }
+#operator-readiness-card .manual-checklist-item small.muted {
+    display: block;
+    margin-inline-start: 26px;
+    color: var(--muted, #6b6b78);
+    font-size: 0.78rem;
+}
+#operator-readiness-card .status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: #eee;
+}
+#operator-readiness-card .status-badge.status-ok { background: #d6f5d6; color: #1a6e1a; }
+#operator-readiness-card .status-badge.status-warning { background: #fff3cd; color: #8a6d00; }
+#operator-readiness-card .status-badge.status-error { background: #fde2e2; color: #a01818; }

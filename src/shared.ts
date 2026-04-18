@@ -163,7 +163,8 @@ export type AuditAction =
   | "subscription.trial_started"
   | "subscription.trial_expired"
   | "system.heartbeat"
-  | "system.error";
+  | "system.error"
+  | "operator.setup_checklist_update";
 
 export interface AuditLog {
   timestamp: admin.firestore.Timestamp;

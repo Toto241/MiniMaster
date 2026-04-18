@@ -80,3 +80,9 @@ export {
   analyzeSystemErrors, executeAutoFix,
 } from "./src/admin";
 
+// Operator-Setup ("Inbetriebnahme") – Admin-Panel + PowerShell-Tooling
+export {
+  getOperatorSetupStatus,
+  setOperatorSetupChecklistItem,
+} from "./src/operator-setup";
+
