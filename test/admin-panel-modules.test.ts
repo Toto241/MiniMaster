@@ -41,6 +41,8 @@ function makeLoader(globalScope: any) {
       console,
       window: globalScope,
       globalThis: globalScope,
+      btoa: (str: string) => Buffer.from(str, "binary").toString("base64"),
+      atob: (str: string) => Buffer.from(str, "base64").toString("binary"),
       __loadRelative: (spec: string) => {
         const next = path.resolve(dir, spec);
         return load(next);
@@ -96,9 +98,17 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(apkPath("readme.md", "fallback.apk")).toBe("fallback.apk");
   });
 
-  it("modules/index.js bootstrappt registry + sanitize + command + format gemeinsam", () => {
+  it("modules/index.js bootstrappt registry + sanitize + command + format + automationMeta + encoding gemeinsam", () => {
     load(path.join(MODULES_DIR, "index.js"));
-    expect(globalScope.MM.list().sort()).toEqual(["command", "format", "sanitize"]);
+    expect(globalScope.MM.list().sort()).toEqual([
+      "automationMeta",
+      "command",
+      "encoding",
+      "errorCodes",
+      "format",
+      "sanitize",
+      "security",
+    ]);
     expect(typeof globalScope.MM.bootstrappedAt).toBe("number");
   });
 
@@ -187,6 +197,145 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     }
   });
 
+  it("automation-meta.js Status- und Typ-Helfer sind paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "automation-meta.js"));
+    const meta = globalScope.MM.automationMeta;
+    expect(meta).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const statusSamples = ["pass", "manual_required", "fail", "not_run", "weird", undefined];
+    for (const status of statusSamples) {
+      expect(meta.status(status)).toBe(appJs.formatPythonAutomationStatus(status));
+      expect(meta.statusMeta(status)).toEqual(appJs.getPythonAutomationStatusMeta(status));
+    }
+
+    const typeSamples: Array<[string, string]> = [
+      ["command", ""],
+      ["documented", ""],
+      ["manual", ""],
+      ["", "repo-test"],
+      ["", "device-suite"],
+      ["", "static-analysis"],
+      ["", "docs-validation"],
+      ["", "playstore-readiness"],
+      ["unknown", "unknown-source"],
+    ];
+    for (const [type, source] of typeSamples) {
+      expect(meta.type(type, source)).toBe(appJs.formatPythonAutomationType(type, source));
+      expect(meta.typeChipClass(type, source)).toBe(
+        appJs.getPythonAutomationTypeChipClass(type, source),
+      );
+    }
+  });
+
+  it("encoding.js Helfer sind paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "encoding.js"));
+    const enc = globalScope.MM.encoding;
+    expect(enc).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const inlineSamples = [undefined, null, "", "abc", "hallo welt 'X'", "&=?#"];
+    for (const value of inlineSamples) {
+      expect(enc.encodeInlineArgument(value)).toBe(appJs.encodeInlineArgument(value));
+      const encoded = enc.encodeInlineArgument(value);
+      expect(enc.decodeInlineArgument(encoded)).toBe(appJs.decodeInlineArgument(encoded));
+    }
+
+    const debugSamples: any[] = [
+      undefined,
+      null,
+      42,
+      "string",
+      { a: 1, b: [2, 3] },
+    ];
+    for (const value of debugSamples) {
+      expect(enc.safeDebugStringify(value)).toBe(appJs.safeDebugStringify(value));
+    }
+    // toBase64Url: simple bytes -> URL-safe ohne Padding/Plus/Slash
+    const bytes = new Uint8Array([0xff, 0xfb, 0x00, 0x10, 0x20]);
+    expect(enc.toBase64Url(bytes)).toBe(appJs.toBase64Url(bytes));
+    expect(enc.toBase64Url(bytes)).not.toMatch(/[+/=]/);
+  });
+
+  it("error-codes.js Normalisierung und Hint-Maps sind paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "error-codes.js"));
+    const ec = globalScope.MM.errorCodes;
+    expect(ec).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const codeSamples = [
+      undefined,
+      null,
+      {},
+      { code: "" },
+      { code: "PERMISSION-DENIED" },
+      { code: "functions/permission-denied" },
+      { code: "auth/wrong-password" },
+      { code: "  unauthenticated  " },
+    ];
+    for (const sample of codeSamples) {
+      expect(ec.normalizeCallable(sample)).toBe(appJs.normalizeCallableErrorCode(sample));
+      expect(ec.normalizeAuth(sample)).toBe(appJs.normalizeAuthErrorCode(sample));
+    }
+
+    const accessKeyCases: Array<[any, string | undefined]> = [
+      [{ code: "invalid-argument" }, undefined],
+      [{ code: "permission-denied" }, undefined],
+      [{ code: "deadline-exceeded" }, undefined],
+      [{ code: "internal" }, undefined],
+      [{ code: "totally-unknown" }, undefined],
+      [{}, "Unexpected token at position 1"],
+      [{ code: "not-found" }, "JSON parse error"],
+    ];
+    for (const [error, fallback] of accessKeyCases) {
+      expect(ec.accessKeyHint(error, fallback)).toEqual(
+        appJs.getAccessKeyErrorHint(error, fallback),
+      );
+    }
+
+    const authCases: Array<[any, string | undefined, string | undefined]> = [
+      [{ code: "auth/wrong-password" }, undefined, "login"],
+      [{ code: "auth/email-already-in-use" }, undefined, "registration"],
+      [{ code: "permission-denied" }, undefined, "providerCheck"],
+      [{ code: "totally-unknown" }, undefined, "reset"],
+      [{ code: "totally-unknown" }, undefined, "unknownScope"],
+      [{}, "Unexpected token in JSON", "login"],
+    ];
+    for (const [error, fallback, scope] of authCases) {
+      expect(ec.authHint(error, fallback, scope)).toEqual(
+        appJs.getAuthErrorHint(error, fallback, scope),
+      );
+    }
+  });
+
+  it("security.js buildKeyFingerprint ist paritaetisch zu app.js", () => {
+    load(path.join(MODULES_DIR, "core", "security.js"));
+    const sec = globalScope.MM.security;
+    expect(sec).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    const samples = [
+      "",
+      undefined,
+      null,
+      "TOO-SHORT",
+      "GGGG".repeat(16), // 64 chars but invalid hex
+      "a".repeat(64),
+      "ABCDEF1234567890".repeat(4), // 64 hex chars, mixed case
+      "  " + "f".repeat(64) + "  ",
+    ];
+    for (const value of samples) {
+      expect(sec.buildKeyFingerprint(value)).toBe(appJs.buildKeyFingerprint(value));
+    }
+    // Pruefe das Format des gueltigen Fingerprints exemplarisch.
+    const fp = sec.buildKeyFingerprint("a".repeat(64));
+    expect(fp).toMatch(/^[a-f0-9]{12}\.\.\.[a-f0-9]{8}$/);
+  });
+
   it("Registry verweigert ungueltige Eintraege (Defensive)", () => {
     const registry = load(path.join(MODULES_DIR, "core", "registry.js"));
     expect(() => registry.register("", {})).toThrow(/nicht-leerer String/);
@@ -216,5 +365,9 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/sanitize.js");
     expect(sw).toContain("./modules/core/command.js");
     expect(sw).toContain("./modules/core/format.js");
+    expect(sw).toContain("./modules/core/automation-meta.js");
+    expect(sw).toContain("./modules/core/encoding.js");
+    expect(sw).toContain("./modules/core/error-codes.js");
+    expect(sw).toContain("./modules/core/security.js");
   });
 });
