@@ -103,6 +103,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(globalScope.MM.list().sort()).toEqual([
       "automationMeta",
       "command",
+      "commissioningPending",
       "dates",
       "encoding",
       "errorCodes",
@@ -695,6 +696,55 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       );
     }
   });
+
+  it("commissioning-pending.js Pure Helfer sind paritaetisch zu app.js (Welle 2 Step 4)", () => {
+    load(path.join(MODULES_DIR, "tabs", "commissioning-pending.js"));
+    const cp = globalScope.MM.commissioningPending;
+    expect(cp).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // isCoveredCommissioningPendingItem ist im Harness NICHT exportiert -
+    // Implementations-Spiegelung gegen die im Original definierten Strings
+    // (Z.8775-8787 in admin-panel/app.js).
+    expect(cp.isCoveredItem("Cloud Project ID setzen.")).toBe(true);
+    expect(cp.isCoveredItem("KI-Runtime-Konfiguration vervollst\u00e4ndigen.")).toBe(true);
+    expect(cp.isCoveredItem("KI-Konfiguration im Runtime-Block vollst\u00e4ndig ausf\u00fcllen (apiKey).")).toBe(true);
+    expect(cp.isCoveredItem("QA-Freigabe offen: Datensicherung")).toBe(true);
+    expect(cp.isCoveredItem("QA-Nachweis offen: Backup-Drill")).toBe(true);
+    expect(cp.isCoveredItem("Play-Store-Readiness: Privacy Policy URL fehlt")).toBe(true);
+    expect(cp.isCoveredItem("  Cloud Project ID setzen.  ")).toBe(true); // trim
+    expect(cp.isCoveredItem("Firebase-Webkonfiguration lokal speichern.")).toBe(false);
+    expect(cp.isCoveredItem("Operator-PIN festlegen.")).toBe(false);
+    expect(cp.isCoveredItem("")).toBe(false);
+    expect(cp.isCoveredItem("   ")).toBe(false);
+    expect(cp.isCoveredItem(null)).toBe(false);
+    expect(cp.isCoveredItem(undefined)).toBe(false);
+
+    // filterVisibleCommissioningPendingItems IST im Harness exportiert -
+    // Paritaet direkt pruefbar.
+    const all = [
+      "Cloud Project ID setzen.",
+      "Firebase-Webkonfiguration lokal speichern.",
+      "QA-Freigabe offen: Datensicherung",
+      "Operator-PIN festlegen.",
+      "Play-Store-Readiness: Privacy Policy URL fehlt",
+    ];
+    expect(cp.filterVisibleItems(all)).toEqual(appJs.filterVisibleCommissioningPendingItems(all));
+    expect(cp.filterVisibleItems(all)).toEqual([
+      "Firebase-Webkonfiguration lokal speichern.",
+      "Operator-PIN festlegen.",
+    ]);
+    expect(cp.filterVisibleItems(null)).toEqual([]);
+    expect(cp.filterVisibleItems(undefined)).toEqual([]);
+    expect(cp.filterVisibleItems("not-array" as unknown as string[])).toEqual([]);
+    expect(cp.filterVisibleItems([])).toEqual([]);
+
+    // Konstanten
+    expect(cp.coveredExact.has("Cloud Project ID setzen.")).toBe(true);
+    expect(cp.coveredPrefixes).toContain("QA-Freigabe offen:");
+    expect(cp.coveredPrefixes).toContain("Play-Store-Readiness:");
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -728,6 +778,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
     expect(sw).toContain("./modules/tabs/firebase-deployment.js");
+    expect(sw).toContain("./modules/tabs/commissioning-pending.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -766,7 +817,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(12);
+    expect(sandboxGlobal.MM.list().length).toBe(13);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
