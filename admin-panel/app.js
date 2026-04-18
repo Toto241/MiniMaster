@@ -410,8 +410,21 @@ function createStateBox(variant, message) {
 
 function replaceElementWithState(element, variant, message) {
     if (!element) return;
-    clearElementChildren(element);
-    element.appendChild(createStateBox(variant, message));
+    const safeVariant = String(variant || "info").replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeMessage = String(message == null ? "" : message)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    // Prefer real DOM mutation when available (production browser path).
+    if (typeof element.appendChild === "function") {
+        clearElementChildren(element);
+        element.appendChild(createStateBox(safeVariant, String(message == null ? "" : message)));
+        return;
+    }
+    // Fallback for lightweight test doubles that only expose innerHTML.
+    element.innerHTML = `<div class="${safeVariant}">${safeMessage}</div>`;
 }
 
 function appendElementChildren(element, children = []) {
@@ -11329,7 +11342,7 @@ async function loadErrorSummaries() {
         html += "</table>";
         container.innerHTML = html;
     } catch (error) {
-        container.innerHTML = "<div class='error'>Error loading error summaries: " + error.message + "</div>";
+        container.innerHTML = `<div class='error'>Error loading error summaries: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -11386,7 +11399,7 @@ async function loadUsers(direction) {
         }
     } catch (error) {
         console.error("Error loading users:", error);
-        userListElement.innerHTML = "<div class='error'>Error loading users: " + error.message + "</div>";
+        userListElement.innerHTML = `<div class='error'>Error loading users: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -11436,7 +11449,7 @@ function searchUsers() {
         userListElement.innerHTML = html;
         showNotification(`Found ${results.length} user(s) matching "${query}".`, "success");
     }).catch(error => {
-        userListElement.innerHTML = "<div class='error'>Error searching users: " + error.message + "</div>";
+        userListElement.innerHTML = `<div class='error'>Error searching users: ${escapeHtml(error.message)}</div>`;
     });
 }
 
@@ -11627,7 +11640,7 @@ async function loadSubscriptions(direction) {
             paginationEl.innerHTML = `<button onclick="loadSubscriptions('next')" class="btn btn-secondary">Next Page</button>`;
         }
     } catch (error) {
-        subListElement.innerHTML = "<div class='error'>Error loading subscriptions: " + error.message + "</div>";
+        subListElement.innerHTML = `<div class='error'>Error loading subscriptions: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -11712,7 +11725,7 @@ async function loadSupportTickets(direction) {
             paginationEl.innerHTML = `<button onclick="loadSupportTickets('next')" class="btn btn-secondary">Next Page</button>`;
         }
     } catch (error) {
-        ticketsListElement.innerHTML = "<div class='error'>Error loading support tickets: " + error.message + "</div>";
+        ticketsListElement.innerHTML = `<div class='error'>Error loading support tickets: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -11791,7 +11804,7 @@ async function viewTicketDetails(ticketId) {
 
         modalContent.innerHTML = html;
     } catch (error) {
-        modalContent.innerHTML = `<div class='error'>Error loading ticket details: ${error.message}</div>`;
+        modalContent.innerHTML = `<div class='error'>Error loading ticket details: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -11930,7 +11943,7 @@ async function triggerDsarExportForUser(masterId) {
         autoMarkP0Check("commissioningCompliance", "commissioningEvidence", `[${new Date().toLocaleString("de-DE")}] DSAR-Export erfolgreich für ${masterId}.`);
         showNotification("DSAR export completed.", "success");
     } catch (error) {
-        resultEl.innerHTML = `<div class='error'>Error exporting data: ${error.message}</div>`;
+        resultEl.innerHTML = `<div class='error'>Error exporting data: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -12005,7 +12018,7 @@ async function exportAuditLogs() {
         `;
         autoMarkP0Check("commissioningCompliance", "commissioningEvidence", `[${new Date().toLocaleString("de-DE")}] Audit-Export erfolgreich (${startDate} bis ${endDate}, ${logs.length} Einträge).`);
     } catch (error) {
-        resultEl.innerHTML = `<div class='error'>Error exporting audit logs: ${error.message}</div>`;
+        resultEl.innerHTML = `<div class='error'>Error exporting audit logs: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -12065,7 +12078,7 @@ async function loadLegacyAuthUsage() {
             <table><tr><th>Datum</th><th>Aufrufe</th></tr>${dayRows || "<tr><td colspan='2'>Keine Daten</td></tr>"}</table>
         `;
     } catch (error) {
-        resultEl.innerHTML = `<div class='error'>Fehler beim Laden: ${error.message}</div>`;
+        resultEl.innerHTML = `<div class='error'>Fehler beim Laden: ${escapeHtml(error.message)}</div>`;
     }
 }
 

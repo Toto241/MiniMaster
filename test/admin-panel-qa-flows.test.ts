@@ -7,7 +7,7 @@ describe("admin-panel QA flow integration", () => {
     const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
 
     const historyEl = { innerHTML: "" };
-    const refreshEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
     elements.set("python-automation-protocol-history", historyEl);
     elements.set("qa-refresh-status", refreshEl);
 
@@ -54,10 +54,10 @@ describe("admin-panel QA flow integration", () => {
   });
 
   it("renders evidence history load failures into the QA view", async () => {
-    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
 
     const historyEl = { innerHTML: "" };
-    const refreshEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
     elements.set("python-automation-protocol-history", historyEl);
     elements.set("qa-refresh-status", refreshEl);
 
@@ -284,7 +284,7 @@ describe("admin-panel QA flow integration", () => {
   it("orchestrates QA dashboard loading across all sections and summarizes partial failures", async () => {
     const { exports, elements, context } = loadAdminPanelTestExports();
 
-    const refreshEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
     elements.set("qa-refresh-status", refreshEl);
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -293,6 +293,7 @@ describe("admin-panel QA flow integration", () => {
     context.loadPythonAutomationCatalog = jest.fn().mockResolvedValue({ ok: true, message: "catalog ok" });
     context.loadPythonAutomationHistory = jest.fn().mockResolvedValue({ ok: true, message: "history ok" });
     context.loadPythonAutomationEvidenceHistory = jest.fn().mockResolvedValue({ ok: true, message: "evidence ok" });
+    context.loadQaSelfHealingStatus = jest.fn().mockResolvedValue({ ok: true, message: "self-healing ok" });
     context.loadTestingRegister = jest.fn().mockRejectedValue(new Error("register stale"));
     context.loadQaPlatformCatalog = jest.fn().mockRejectedValue(new Error("qa catalog missing"));
     context.loadEmulatorLabOverview = jest.fn().mockResolvedValue({ ok: true, message: "emulators ok" });
@@ -302,11 +303,11 @@ describe("admin-panel QA flow integration", () => {
 
     const result = await exports.loadQaDashboardData("smoke-refresh");
 
-    expect(result).toHaveLength(9);
+    expect(result).toHaveLength(10);
     expect(context.loadPythonAutomationCatalog).toHaveBeenCalled();
     expect(context.loadQaPlatformCatalog).toHaveBeenCalled();
     expect(refreshEl.innerHTML).toContain("Anlass: smoke-refresh");
-    expect(refreshEl.innerHTML).toContain("7/9 QA-Bereiche geladen, 2 mit Fehler");
+    expect(refreshEl.innerHTML).toContain("8/10 QA-Bereiche geladen, 2 mit Fehler");
     expect(refreshEl.innerHTML).toContain("register stale");
     expect(refreshEl.innerHTML).toContain("qa catalog missing");
     expect(result).toEqual(expect.arrayContaining([
@@ -320,11 +321,12 @@ describe("admin-panel QA flow integration", () => {
 
     const sections = exports.getQaDashboardSectionLoaders();
 
-    expect(sections).toHaveLength(9);
+    expect(sections).toHaveLength(10);
     expect(sections.map((entry: [string, unknown]) => entry[0])).toEqual([
       "catalog",
       "history",
       "evidence",
+      "selfHealing",
       "register",
       "qaPlatform",
       "emulators",

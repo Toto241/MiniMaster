@@ -75,3 +75,56 @@ exports.getUsers = functions.https.onCall(async (data, context) => {
 3.  Implement the main dashboard, conditionally rendered based on the `admin` claim.
 4.  Use Firebase SDK to fetch data (protected by the new Firestore Rules).
 5.  Implement UI components for data display and management actions.
+
+## 6. Aktueller Funktionsumfang (Stand 2026-04)
+
+Die Abschnitte 1–5 beschreiben den ursprünglichen Entwurf. Das tatsächlich produktive Operator-Panel ist seitdem deutlich gewachsen. Diese Sektion dokumentiert den realen Stand auf Basis von [admin-panel/index.html](../admin-panel/index.html), [admin-panel/app.js](../admin-panel/app.js), [admin-panel/logs.js](../admin-panel/logs.js) und [firestore.rules](../firestore.rules).
+
+### 6.1 Rollen & Auth
+- **Firebase Email/Password Login** mit Custom-Claim-basierter RBAC. Drei Rollen: `admin`, `support`, `auditor`. UI-Restriktionen werden clientseitig per `applyRoleRestrictions()` durchgesetzt; Backend-Enforcement liegt zusätzlich in [src/auth.ts](../src/auth.ts).
+- **Operator-Bootstrap-Dialog** (`bootstrapFirstAdmin`, `redeemOperatorAccessKey`) – einmaliger Self-Service-Pfad zur Initialerstellung des ersten Admin-Accounts via vorgenerierten Access-Key.
+- **Inaktivitäts-Logout** nach 30 min ohne Interaktion (Session-Timer in [admin-panel/app.js](../admin-panel/app.js)).
+- **Recovery-Pfad** für gesperrte/verlorene Operator-Accounts (`resetAllAuthUsers`, `resetAllAuthUsersHealth`, `resetOperatorAccounts`) – in Production über Env-Flags (`ENABLE_OPERATOR_ACCOUNT_RESET`, `ADMIN_RECOVERY_TOKEN`) hart abgesichert.
+
+### 6.2 App Check Integration
+- `firebase-app-check-compat.js` + [admin-panel/appcheck-init.js](../admin-panel/appcheck-init.js) liefern reCAPTCHA-v3-basierte Token-Validierung.
+- Site-Key wird via `window.MINIMASTER_APP_CHECK_SITE_KEY` (Bootstrap) oder `localStorage.minimasterAppCheckSiteKey` gesetzt. Ohne Site-Key bleibt App Check inaktiv (klare Konsolen-Diagnose).
+
+### 6.3 Funktionale Bereiche (Top-Level-Tabs)
+| Bereich | Zweck | Wichtigste Backend-Endpunkte |
+|---|---|---|
+| **Operator-Cockpit** | P0-Übersicht, Health-Check, AI-Analyse von Tickets/Errors | `adminHealthCheck`, `aiExplainProblem`, `analyzeSystemErrors`, `executeAutoFix` |
+| **Support-Tickets** | Ticket-Verwaltung mit Debug-Snapshot | `getTicketUserData`, `grantSupportAccess`*, `analyzeWithDebugData`* |
+| **User-Management** | Master-/Child-Liste, Detailansicht, Sperren/Löschen | `setUserRole`, `setAdminClaim`, `revokeUserTokens`, `deleteUserAccount`, `exportUserData`, `revokeSubscription` |
+| **Operator-Verwaltung** | Operator-Access-Keys erzeugen/einlösen, Rollen pflegen | `createOperatorAccessKey`, `redeemOperatorAccessKey`, `setUserRole` |
+| **QA-Dashboard** | 10 Sektionen: Catalog, History, Evidence, **Self-Healing**, Register, QA-Platform, Emulators, Suites, Suite-History, Devices | `loadPythonAutomationCatalog`, `loadQaSelfHealingStatus`, `loadTestingRegister`, `loadEmulatorLabOverview`, `loadSuiteCatalog`, … |
+| **Commissioning** | Inbetriebnahme-Katalog, Run, Evidence-Historie | REST `/api/commissioning/{catalog,run,history,evidence}` (Python-Operator) |
+| **Compliance / Legal** | Aktive Policies, Re-Consent-Trigger | `getActiveLegalPolicies`, `needsLegalReconsent`, `publishLegalPolicy`, `markLegalReconsentRequired` |
+| **Knowledge Base** | AI-Wissensbasis pflegen + Gemini-Verbindungstest | `getKnowledgeBase`, `updateKnowledgeBase`, `testGeminiConnection` |
+| **System-Tools** | FCM-Test, Scheduled-Jobs manuell auslösen | `sendTestFcmMessage`, `triggerScheduledJob` |
+| **Audit-Logs** ([logs.html](../admin-panel/logs.html)) | Filter-/Pagination-fähige Audit-Log-Ansicht mit PII-Masking | direkter Firestore-Zugriff auf `audit_logs` (Rules-gesichert) |
+
+\* Backend-Endpunkte vorhanden, UI-Anbindung im Admin-Panel noch nicht produktiv (siehe Finding F1).
+
+### 6.4 PWA / Offline
+- [admin-panel/manifest.webmanifest](../admin-panel/manifest.webmanifest): vollständige PWA-Manifest-Felder (`id`, `scope`, `lang`, `dir`, `description`, `orientation`).
+- [admin-panel/service-worker.js](../admin-panel/service-worker.js): Cache-Version `v3`, Network-First für Same-Origin, `/api/*` durchgereicht, Offline-Fallback auf `index.html`.
+- [admin-panel/pwa-register.js](../admin-panel/pwa-register.js): Update-Banner mit User-Bestätigung („Jetzt aktualisieren / Später") statt blindem Reload.
+
+### 6.5 Sicherheit (aktueller Stand)
+- **CSP** (siehe [firebase.json](../firebase.json) Hosting-Header): strikt mit `script-src 'self' https://www.gstatic.com`, **ohne** `'unsafe-inline'` für Skripte. Inline-Event-Handler (`onclick="…"`) im HTML sind eine offene Migrations-Schuld (Finding F6).
+- **innerHTML-Hygiene** wird durch automatisierte Tests ([test/admin-panel-app-security.test.ts](../test/admin-panel-app-security.test.ts), [test/admin-panel-logs-security.test.ts](../test/admin-panel-logs-security.test.ts)) für ausgewählte QA-Render-Helfer durchgesetzt. Punktuelle `innerHTML`-Nutzung in app.js bleibt für andere Pfade (Finding F7).
+- **PII-Masking** im Audit-Log-Detail-Modal (default maskiert, Opt-in-Toggle) – siehe [admin-panel/logs.js](../admin-panel/logs.js).
+- **SRI** ist für die Firebase-CDN-Bundles gesetzt; für `firebase-app-check-compat.js` steht der SRI-Hash noch aus (TODO-Marker im HTML).
+
+### 6.6 Test-Harness
+- [test/utils/admin-panel-test-harness.ts](../test/utils/admin-panel-test-harness.ts) instanziiert `app.js` in einer VM-Sandbox und stellt `createMockElement` für DOM-mutierende Render-Funktionen bereit.
+- Render-Funktionen, die `appendChild` nutzen (z. B. `renderQaRefreshStatus`), benötigen in Tests echte Mock-Elemente via `context.document.createElement('div')`. Reine `innerHTML`-Senken (`{ innerHTML: "" }`) reichen nur für stringbasierte Render-Pfade.
+
+### 6.7 Bekannte offene Punkte
+- **F1** – UI-Anbindung der Backend-Endpunkte `grantSupportAccess`, `revokeSupportAccess`, `grantDebugAccess`, `analyzeWithDebugData`.
+- **F6** – Inline-`onclick`/`style` in [admin-panel/index.html](../admin-panel/index.html) auf `addEventListener`-Pattern migrieren (CSP-Konformität).
+- **F7** – Verbleibende `innerHTML`-Stellen in app.js auditieren und konsequent über `escapeHtml`/`escapeHtmlText` führen.
+- **App Check Site-Key** – produktive Werte müssen extern gesetzt werden (Firebase Konsole + Bootstrap-Dialog).
+- **PNG/Maskable Icons** – derzeit nur SVG; für vollständige PWA-Icons sind PNG-Assets in mehreren Größen nachzuliefern.
+
