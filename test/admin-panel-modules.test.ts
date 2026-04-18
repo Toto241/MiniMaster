@@ -113,6 +113,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "eventDelegation",
       "firebaseConfig",
       "firebaseDeployment",
+      "firebaseRecovery",
       "format",
       "legalPlaystore",
       "operatorAssistant",
@@ -1516,6 +1517,60 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       expect(cd.getPriorityWeight(s)).toBe(appJs.getPriorityWeight(s));
     }
   });
+
+  it("firebase-recovery.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 15)", () => {
+    load(path.join(MODULES_DIR, "tabs", "firebase-recovery.js"));
+    const fr = globalScope.MM.firebaseRecovery;
+    expect(fr).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // buildCommands: 4 Zeilen, projectId interpoliert
+    const cmds = fr.buildCommands("my-proj");
+    expect(cmds).toEqual([
+      "npm install",
+      "firebase use my-proj",
+      "firebase deploy --only firestore:rules,firestore:indexes,storage",
+      "firebase deploy --only functions",
+    ]);
+    // Paritaet
+    expect(cmds).toEqual(appJs.buildFirebaseRecoveryCommands("my-proj"));
+
+    // buildScript = join("\n")
+    const script = fr.buildScript("p2");
+    expect(script).toBe(fr.buildCommands("p2").join("\n"));
+    expect(script).toBe(appJs.buildFirebaseRecoveryScript("p2"));
+
+    // isRetryableConflict
+    // code 0 -> nie retry
+    expect(fr.isRetryableConflict("firebase deploy", "HTTP Error: 409", 0)).toBe(false);
+    // command nicht firebase deploy
+    expect(fr.isRetryableConflict("npm install", "HTTP Error: 409", 1)).toBe(false);
+    // ohne 409/queue
+    expect(fr.isRetryableConflict("firebase deploy", "permission denied", 1)).toBe(false);
+    // 409 -> retry
+    expect(fr.isRetryableConflict("firebase deploy --only functions", "HTTP Error: 409 - conflict", 1)).toBe(true);
+    // queue-Hinweis -> retry
+    expect(fr.isRetryableConflict("firebase deploy", "Unable to queue the operation", 7)).toBe(true);
+    // Case-Insensitivitaet
+    expect(fr.isRetryableConflict("FIREBASE DEPLOY", "http error: 409", 1)).toBe(true);
+    // null defensiv
+    expect(fr.isRetryableConflict(null, null, 1)).toBe(false);
+
+    // Paritaets-Tabelle
+    const cases = [
+      ["firebase deploy", "HTTP Error: 409", 0],
+      ["firebase deploy", "HTTP Error: 409", 1],
+      ["firebase deploy", "Unable to queue the operation", 1],
+      ["npm install", "HTTP Error: 409", 1],
+      ["firebase deploy", "permission denied", 1],
+      ["FIREBASE DEPLOY", "http error: 409", 1],
+      [null, null, 1],
+    ];
+    for (const [c, o, code] of cases) {
+      expect(fr.isRetryableConflict(c, o, code)).toBe(appJs.isRetryableFirebaseQueueConflict(c, o, code));
+    }
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1551,6 +1606,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
     expect(sw).toContain("./modules/tabs/firebase-deployment.js");
+    expect(sw).toContain("./modules/tabs/firebase-recovery.js");
     expect(sw).toContain("./modules/tabs/commissioning-pending.js");
     expect(sw).toContain("./modules/tabs/operator-config.js");
     expect(sw).toContain("./modules/tabs/operator-effective.js");
@@ -1599,7 +1655,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(24);
+    expect(sandboxGlobal.MM.list().length).toBe(25);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js

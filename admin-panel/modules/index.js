@@ -18,6 +18,7 @@ import "./core/crypto-debug.js";
 import "./tabs/legal-playstore.js";
 import "./tabs/qa-testing-register.js";
 import "./tabs/firebase-deployment.js";
+import "./tabs/firebase-recovery.js";
 import "./tabs/commissioning-pending.js";
 import "./tabs/operator-config.js";
 import "./tabs/operator-effective.js";

@@ -27,6 +27,7 @@ const APP_ASSETS = [
   "./modules/tabs/legal-playstore.js",
   "./modules/tabs/qa-testing-register.js",
   "./modules/tabs/firebase-deployment.js",
+  "./modules/tabs/firebase-recovery.js",
   "./modules/tabs/commissioning-pending.js",
   "./modules/tabs/operator-config.js",
   "./modules/tabs/operator-effective.js",
