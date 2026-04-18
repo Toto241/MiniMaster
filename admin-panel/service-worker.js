@@ -1,11 +1,12 @@
-const APP_CACHE_NAME = "minimaster-admin-panel-v2";
-const RUNTIME_CACHE_NAME = "minimaster-admin-panel-runtime-v2";
+const APP_CACHE_NAME = "minimaster-admin-panel-v3";
+const RUNTIME_CACHE_NAME = "minimaster-admin-panel-runtime-v3";
 const APP_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./appcheck-init.js",
+  "./pwa-register.js",
   "./logs.html",
   "./logs.js",
   "./manifest.webmanifest",
