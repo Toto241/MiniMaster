@@ -25,6 +25,7 @@ import "./tabs/platform-qa-readiness.js";
 import "./tabs/effective-platform-state.js";
 import "./tabs/commissioning-qa.js";
 import "./tabs/python-automation-actions.js";
+import "./tabs/testing-register-insights.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
