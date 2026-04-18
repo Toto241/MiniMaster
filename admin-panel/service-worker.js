@@ -27,7 +27,9 @@ const APP_ASSETS = [
   "./modules/tabs/firebase-deployment.js",
   "./modules/tabs/commissioning-pending.js",
   "./modules/tabs/operator-config.js",
-  "./modules/tabs/operator-effective.js"
+  "./modules/tabs/operator-effective.js",
+  "./modules/tabs/operator-assistant.js",
+  "./modules/tabs/platform-qa-readiness.js"
 ];
 
 self.addEventListener("install", (event) => {

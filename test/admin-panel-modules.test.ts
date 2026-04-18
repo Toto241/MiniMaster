@@ -111,8 +111,10 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "firebaseDeployment",
       "format",
       "legalPlaystore",
+      "operatorAssistant",
       "operatorConfig",
       "operatorEffective",
+      "platformQaReadiness",
       "qaTestingRegister",
       "sanitize",
       "security",
@@ -907,6 +909,144 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(padded.ai.endpoint).toBe("https://x");
     expect(padded.ai.systemPrompt.length).toBeGreaterThan(20);
   });
+
+  it("operator-assistant.js Pure Helfer (Welle 2 Step 7)", () => {
+    load(path.join(MODULES_DIR, "tabs", "operator-assistant.js"));
+    const oa = globalScope.MM.operatorAssistant;
+    expect(oa).toBeDefined();
+    expect(typeof oa.generate).toBe("function");
+    expect(typeof oa.classify).toBe("function");
+    expect(Array.isArray(oa.topics)).toBe(true);
+    expect(oa.topics).toHaveLength(13);
+
+    // Hinweis: Keywords koennen sich ueberlappen (z.B. "config" aus firebase
+    // matcht auch "configuration" aus runtime). Wir pruefen daher nur, dass
+    // jedes Keyword UEBERHAUPT klassifiziert wird (kein null), nicht zu
+    // welchem Topic - das verhalten ist deterministisch durch Reihenfolge.
+    for (const topic of oa.topics) {
+      for (const kw of topic.keywords) {
+        const got = oa.classify(`Hilfe zu ${kw} bitte`);
+        expect(got).not.toBeNull();
+      }
+    }
+
+    // Konkrete Treffer
+    expect(oa.generate("Wie pruefe ich Admin-Claims?")).toMatch(/Admin-Rechte/);
+    expect(oa.generate("Firebase config laden")).toMatch(/Firebase-Integration/);
+    expect(oa.generate("Wann mache ich go live?")).toMatch(/Inbetriebnahme im Panel/);
+    expect(oa.generate("DSAR Audit-Log Export")).toMatch(/Compliance-Flow/);
+    expect(oa.generate("Pairing Token erneuern")).toMatch(/Pairing-/);
+    expect(oa.generate("Performance Metrik")).toMatch(/Performance:/);
+
+    // Reihenfolge: "config" (firebase) vor "configuration" (runtime), aber
+    // "runtime" allein muss runtime liefern; "configuration" enthaelt "config"
+    // -> firebase-Topic gewinnt deterministisch (gleich wie Original-If-Kette)
+    expect(oa.classify("configuration").id).toBe("firebase");
+    expect(oa.classify("runtime").id).toBe("runtime");
+    expect(oa.classify("cloud-dienst").id).toBe("runtime");
+
+    // Fallback
+    const fb = oa.generate("Voellig fremder Begriff xyz");
+    expect(fb).toBe(oa.fallback);
+    expect(fb).toMatch(/^Empfohlener Ablauf/);
+
+    // Defensive
+    expect(oa.classify("")).toBeNull();
+    expect(oa.classify(null)).toBeNull();
+    expect(oa.classify(undefined)).toBeNull();
+    expect(oa.generate("")).toBe(oa.fallback);
+    expect(oa.generate(null)).toBe(oa.fallback);
+
+    // Case-Insensitiv
+    expect(oa.classify("ADMIN").id).toBe("admin");
+    expect(oa.classify("Firestore").id).toBe("firestore");
+
+    // Umlaute (Geraet)
+    expect(oa.classify("Ger\u00e4te \u00fcbersicht").id).toBe("device");
+
+    // Topics-Form
+    for (const t of oa.topics) {
+      expect(typeof t.id).toBe("string");
+      expect(Array.isArray(t.keywords)).toBe(true);
+      expect(t.keywords.length).toBeGreaterThan(0);
+      expect(typeof t.answer).toBe("string");
+      expect(t.answer.length).toBeGreaterThan(20);
+    }
+  });
+
+  it("platform-qa-readiness.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 8)", () => {
+    load(path.join(MODULES_DIR, "tabs", "platform-qa-readiness.js"));
+    const pq = globalScope.MM.platformQaReadiness;
+    expect(pq).toBeDefined();
+    expect(typeof pq.buildSummary).toBe("function");
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // Empty
+    const empty = pq.buildSummary({ items: [] });
+    expect(empty.hasData).toBe(false);
+    expect(empty.totals.totalAll).toBe(0);
+    expect(empty.platformStatus.masterApp.percent).toBe(0);
+    expect(empty.platformStatus.masterApp.label).toMatch(/MasterApp/);
+
+    // Mit Items: 2 master critical (1 pass), 1 master high (pass),
+    // 1 master low (fail), 2 child low (1 pass), 0 desktop
+    const payload = {
+      items: [
+        { id: "x1", groupId: "functional-readiness-masterapp", severity: "critical", status: "pass" },
+        { id: "x2", groupId: "static-readiness-masterapp", severity: "critical", status: "fail" },
+        { id: "x3", groupId: "functional-readiness-masterapp", severity: "high", status: "pass" },
+        { id: "x4", groupId: "functional-readiness-masterapp", severity: "low", status: "fail" },
+        { id: "y1", groupId: "functional-readiness-childapp", severity: "low", status: "pass" },
+        { id: "y2", groupId: "static-readiness-childapp", severity: "low", status: "fail" },
+        { id: "z1", groupId: "irrelevant-group", severity: "critical", status: "pass" },
+      ],
+    };
+    const summary = pq.buildSummary(payload);
+
+    // Direkte Paritaet zur Original-Implementierung
+    expect(summary).toEqual(appJs.buildPlatformQaReadinessSummary(payload));
+
+    // Konkretes
+    expect(summary.hasData).toBe(true);
+    expect(summary.totals).toEqual({
+      totalAll: 6,
+      doneAll: 3,
+      totalCritical: 2,
+      doneCritical: 1,
+      totalHigh: 1,
+      doneHigh: 1,
+    });
+    expect(summary.platformStatus.masterApp).toEqual({
+      label: "MasterApp (Eltern-Android)",
+      total: 4,
+      done: 2,
+      critical: 2,
+      criticalDone: 1,
+      high: 1,
+      highDone: 1,
+      percent: 50,
+      source: "qa-register",
+    });
+    expect(summary.platformStatus.childApp.percent).toBe(50);
+    expect(summary.platformStatus.desktop.total).toBe(0);
+    expect(summary.platformStatus.desktop.percent).toBe(0);
+
+    // Defensive
+    expect(pq.buildSummary(null).hasData).toBe(false);
+    expect(pq.buildSummary({}).hasData).toBe(false);
+    expect(pq.buildSummary({ items: "not-array" as any }).hasData).toBe(false);
+
+    // Injizierbare Groups
+    const customGroups = {
+      onlyMaster: { label: "Only Master", groupIds: ["functional-readiness-masterapp"] },
+    };
+    const custom = pq.buildSummary(payload, customGroups);
+    expect(Object.keys(custom.platformStatus)).toEqual(["onlyMaster"]);
+    expect(custom.platformStatus.onlyMaster.total).toBe(3);
+    expect(custom.platformStatus.onlyMaster.done).toBe(2);
+    expect(custom.totals.totalAll).toBe(3);
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -943,6 +1083,8 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/commissioning-pending.js");
     expect(sw).toContain("./modules/tabs/operator-config.js");
     expect(sw).toContain("./modules/tabs/operator-effective.js");
+    expect(sw).toContain("./modules/tabs/operator-assistant.js");
+    expect(sw).toContain("./modules/tabs/platform-qa-readiness.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -981,7 +1123,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(15);
+    expect(sandboxGlobal.MM.list().length).toBe(17);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
