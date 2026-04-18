@@ -162,6 +162,7 @@ export type AuditAction =
   | "subscription.activated"
   | "subscription.trial_started"
   | "subscription.trial_expired"
+  | "subscription.reverify"
   | "system.heartbeat"
   | "system.error"
   | "operator.setup_checklist_update";
