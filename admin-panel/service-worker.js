@@ -22,6 +22,7 @@ const APP_ASSETS = [
   "./modules/core/security.js",
   "./modules/core/firebase-config.js",
   "./modules/core/dates.js",
+  "./modules/core/event-delegation.js",
   "./modules/tabs/legal-playstore.js",
   "./modules/tabs/qa-testing-register.js",
   "./modules/tabs/firebase-deployment.js",
@@ -31,7 +32,8 @@ const APP_ASSETS = [
   "./modules/tabs/operator-assistant.js",
   "./modules/tabs/platform-qa-readiness.js",
   "./modules/tabs/effective-platform-state.js",
-  "./modules/tabs/commissioning-qa.js"
+  "./modules/tabs/commissioning-qa.js",
+  "./modules/tabs/python-automation-actions.js"
 ];
 
 self.addEventListener("install", (event) => {
