@@ -18,6 +18,7 @@ import "./tabs/qa-testing-register.js";
 import "./tabs/firebase-deployment.js";
 import "./tabs/commissioning-pending.js";
 import "./tabs/operator-config.js";
+import "./tabs/operator-effective.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {

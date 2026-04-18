@@ -112,6 +112,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "format",
       "legalPlaystore",
       "operatorConfig",
+      "operatorEffective",
       "qaTestingRegister",
       "sanitize",
       "security",
@@ -824,6 +825,88 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(def.bootstrapProjectId).toBe("");
     expect(def.items.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("operator-effective.js Pure Helfer (Welle 2 Step 6)", () => {
+    load(path.join(MODULES_DIR, "core", "registry.js"));
+    load(path.join(MODULES_DIR, "core", "firebase-config.js"));
+    load(path.join(MODULES_DIR, "tabs", "operator-effective.js"));
+    const oe = globalScope.MM.operatorEffective;
+    expect(oe).toBeDefined();
+    expect(typeof oe.buildEffective).toBe("function");
+    expect(oe.defaults.cloud.region).toBe("europe-west1");
+    expect(oe.defaults.ai.provider).toBe("gemini");
+
+    // 1. Komplett leer -> alle Defaults
+    const empty = oe.buildEffective(null, null);
+    expect(empty.cloud.projectId).toBe("");
+    expect(empty.cloud.region).toBe("europe-west1");
+    expect(empty.cloud.appCheckMode).toBe("enforced");
+    expect(empty.cloud.releaseChannel).toBe("prod");
+    expect(empty.ai.provider).toBe("gemini");
+    expect(empty.ai.model).toBe("gemini-3.0-flash");
+    expect(empty.ai.temperature).toBe(0.3);
+    expect(empty.ai.endpoint).toBe("");
+    expect(empty.ai.keyRef).toBe(""); // ohne projectId keine Empfehlung
+
+    // 2. Nur Bootstrap-projectId -> wird in cloud.projectId uebernommen
+    const fromBootstrap = oe.buildEffective(
+      {},
+      { projectId: "boot-prod", apiKey: "k", authDomain: "a", storageBucket: "s", messagingSenderId: "m", appId: "x" },
+    );
+    expect(fromBootstrap.cloud.projectId).toBe("boot-prod");
+    expect(fromBootstrap.ai.keyRef).toBe(
+      "projects/boot-prod/secrets/gemini-api-key/versions/latest",
+    );
+
+    // 3. Runtime-projectId hat Vorrang vor Bootstrap
+    const withRuntime = oe.buildEffective(
+      { cloud: { projectId: "runtime-prod" }, ai: {} },
+      { projectId: "boot-prod" },
+    );
+    expect(withRuntime.cloud.projectId).toBe("runtime-prod");
+    expect(withRuntime.ai.keyRef).toBe(
+      "projects/runtime-prod/secrets/gemini-api-key/versions/latest",
+    );
+
+    // 4. Placeholder-projectId (your-project) wird ignoriert
+    const placeholder = oe.buildEffective(
+      { cloud: { projectId: "your-project-id" }, ai: {} },
+      { projectId: "boot-prod" },
+    );
+    expect(placeholder.cloud.projectId).toBe("boot-prod");
+
+    // 5. Custom keyRef bleibt erhalten
+    const withKey = oe.buildEffective(
+      { cloud: { projectId: "p1" }, ai: { keyRef: "custom-secret-ref" } },
+      null,
+    );
+    expect(withKey.ai.keyRef).toBe("custom-secret-ref");
+
+    // 6. Invalid temperature faellt auf default
+    const badTemp = oe.buildEffective(
+      { cloud: {}, ai: { temperature: "not-a-number" } },
+      null,
+    );
+    expect(badTemp.ai.temperature).toBe(0.3);
+    const validTemp = oe.buildEffective(
+      { cloud: {}, ai: { temperature: "0.7" } },
+      null,
+    );
+    expect(validTemp.ai.temperature).toBe(0.7);
+
+    // 7. Trim und Default-Fallbacks fuer Strings
+    const padded = oe.buildEffective(
+      { cloud: { region: "  ", appCheckMode: "audit", releaseChannel: "  " }, ai: { provider: "  ", model: "  ", systemPrompt: "  ", endpoint: "  https://x  " } },
+      null,
+    );
+    expect(padded.cloud.region).toBe("europe-west1");
+    expect(padded.cloud.appCheckMode).toBe("audit");
+    expect(padded.cloud.releaseChannel).toBe("prod");
+    expect(padded.ai.provider).toBe("gemini");
+    expect(padded.ai.model).toBe("gemini-3.0-flash");
+    expect(padded.ai.endpoint).toBe("https://x");
+    expect(padded.ai.systemPrompt.length).toBeGreaterThan(20);
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -859,6 +942,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/firebase-deployment.js");
     expect(sw).toContain("./modules/tabs/commissioning-pending.js");
     expect(sw).toContain("./modules/tabs/operator-config.js");
+    expect(sw).toContain("./modules/tabs/operator-effective.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -897,7 +981,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(14);
+    expect(sandboxGlobal.MM.list().length).toBe(15);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
