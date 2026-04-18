@@ -16,7 +16,7 @@ Bis ein formales C4-Diagramm gepflegt ist, gilt folgender textueller Kontext als
 - **Firebase Backend** <-> **Apple App Store Server API** (geplant, derzeit Stub)
 - **Firebase Backend** <-> **AI-Provider** (Gemini/OpenAI über `src/ai-config.ts`, opt-in pro Operator)
 
-> Hinweis: `parent-panel/` und `child-panel/` enthalten nur HTML-Skeletons und sind aktuell **nicht** Teil der produktiven Topologie. Eine Entscheidung "ausbauen vs. entfernen" steht noch aus.
+> Hinweis: `parent-panel/` und `child-panel/` sind schlanke Single-Page-Web-Panels für **Support-Ticketing und Debug-Consent**. Beide nutzen Firebase Auth (Custom Token via `generateCustomToken`), App Check und rufen `createSupportTicket`, `grantDebugAccess`/`skipDebugMode` sowie `processUserReplyMessage` auf. Sie ersetzen keine native App-Funktionalität, sondern stellen einen browserbasierten Notfall- und Support-Kanal bereit.
 
 ## 2. Component Breakdown (Current State vs Intended)
 
