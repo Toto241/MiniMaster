@@ -37,6 +37,7 @@
 - [x] **Photo-Proof Path-Scoping** (`src/tasks.ts` `completeTask`): URL-Object-Pfad wird URL-decodiert und gegen Allowlist `children/{childId}/photos/` bzw. `proofs/{childId}/` geprüft. Cross-Child-Pfade → `permission-denied`, fehlendes `/o/<path>` → `invalid-argument`. Tests in `branch-coverage-wave3` (5 Bestand + 2 neue Negativfälle), `wave5/6/7`, `tasks-and-device-extra`, `enforcement-automation`, `integration/task-lifecycle` migriert. Build grün ✅, photoUrl-relevante Suiten 0 Regressionen.
 - [x] **Debug-Snapshot Whitelist (`sanitizeDebugSnapshot`)**: Defense-in-Depth Filter in `src/support.ts` vor JSON.stringify (AI-Prompt) und Firestore-Persistierung. Erlaubt nur die deklarierten Felder (Counts/Booleans/ISO-Timestamps), eliminiert versehentliche Leaks falls `DebugSnapshot`-Typ erweitert wird. 80/80 Support-Tests grün ✅, Build grün ✅.
 - [x] **Test-Mock-Drift Cleanup (Baseline-Failures behoben)**: `db().batch()` und kettbares `where()` in `enforcement-automation.test.ts`, `tasks-and-device-extra.test.ts`, `branch-coverage-device.test.ts` ergänzt (DecisioningRepository.replaceRulesForDevice braucht beides). `auth.test.ts`: TDZ-ReferenceError auf `mockDbObj` durch lazy `require("../index")` in `beforeAll` behoben. **Vollständige Jest-Suite jetzt grün: 62/62 Suites, 2048/2048 Tests** ✅.
+- [x] **Coverage-Schwellwerte angehoben** (`jest.config.cjs`): branches 50→85, functions 70→88, lines 65→90, statements 65→90. Tatsächliche Ist-Werte: 88.62 / 90.96 / 94.77 / 94.72 % — ~5pp Margin gegen Regression. CI-Gate verhärtet, alle 62 Suites bestehen Threshold-Check ✅.
 
 ---
 
@@ -83,7 +84,7 @@ The job was not started because recent account payments have failed or your spen
 - [ ] **Photo-Proof Validation – Erweiterung**: EXIF-/MIME-/Größenprüfung beim Upload (Path-Scoping ist erledigt, siehe Durchgeführt-Sektion)
 - [ ] **Subscription Scheduler**: Periodische Verifikation + Renewal-Webhooks (Play Billing v6)
 - [ ] **Offline-Policy Cache (childApp)**: Konfliktauflösung bei längerer Offline-Phase
-- [ ] **Coverage-Schwellwerte erhöhen**: Aktuell global lines/statements 65 % → Ziel 75 %
+- [ ] **Coverage-Schwellwerte weiter erhöhen** (optional): Aktuell 85/88/90/90 — Ziel 90/92/95/95 wenn nächste Code-Erweiterungen mit Tests landen
 
 ### [DOKU]
 
