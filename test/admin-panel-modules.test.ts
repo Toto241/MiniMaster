@@ -105,6 +105,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "command",
       "commissioningPending",
       "dates",
+      "effectivePlatformState",
       "encoding",
       "errorCodes",
       "firebaseConfig",
@@ -1047,6 +1048,51 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(custom.platformStatus.onlyMaster.done).toBe(2);
     expect(custom.totals.totalAll).toBe(3);
   });
+
+  it("effective-platform-state.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 9)", () => {
+    load(path.join(MODULES_DIR, "tabs", "effective-platform-state.js"));
+    const eps = globalScope.MM.effectivePlatformState;
+    expect(eps).toBeDefined();
+    expect(typeof eps.buildEffective).toBe("function");
+    expect(eps.defaultMapping).toBeDefined();
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // Empty payload - keine Veraenderung
+    expect(eps.buildEffective({}, { items: [] })).toEqual({});
+    expect(eps.buildEffective(null, null)).toEqual({});
+
+    // Existing-Truthy bleibt erhalten, keine Ueberschreibung
+    const preset = { "ma-pairing-works": "manual-set" };
+    const out1 = eps.buildEffective(preset, { items: [] });
+    expect(out1["ma-pairing-works"]).toBe("manual-set");
+
+    // Pass setzt Legacy-Key
+    const payload = {
+      items: [
+        { id: "ma-pairing-works", status: "pass" },
+        { id: "static-ma-appcheck", status: "pass" },
+        { id: "ma-fcm-working", status: "fail" },
+        { id: "ca-overlay-secure", status: "pass" },
+      ],
+    };
+    const out2 = eps.buildEffective({}, payload);
+    expect(out2["ma-pairing-works"]).toBe(true);
+    // OR-Logik: einer von beiden QA-IDs reicht
+    expect(out2["ma-firebase-appcheck"]).toBe(true);
+    // Fail setzt nicht
+    expect(out2["ma-fcm-working"]).toBeUndefined();
+    expect(out2["ca-overlay-secure"]).toBe(true);
+
+    // Direkte Paritaet zur Original-Implementierung
+    expect(out2).toEqual(appJs.buildEffectivePlatformState({}, payload));
+
+    // Custom-Mapping injizierbar
+    const custom = { foo: ["only-id"] };
+    const customOut = eps.buildEffective({}, { items: [{ id: "only-id", status: "pass" }] }, custom);
+    expect(customOut.foo).toBe(true);
+    expect(Object.keys(customOut)).toEqual(["foo"]);
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1085,6 +1131,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/operator-effective.js");
     expect(sw).toContain("./modules/tabs/operator-assistant.js");
     expect(sw).toContain("./modules/tabs/platform-qa-readiness.js");
+    expect(sw).toContain("./modules/tabs/effective-platform-state.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -1123,7 +1170,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(17);
+    expect(sandboxGlobal.MM.list().length).toBe(18);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js

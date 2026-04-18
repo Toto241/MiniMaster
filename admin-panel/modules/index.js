@@ -21,6 +21,7 @@ import "./tabs/operator-config.js";
 import "./tabs/operator-effective.js";
 import "./tabs/operator-assistant.js";
 import "./tabs/platform-qa-readiness.js";
+import "./tabs/effective-platform-state.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
