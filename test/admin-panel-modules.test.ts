@@ -104,6 +104,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "automationMeta",
       "command",
       "commissioningPending",
+      "commissioningQa",
       "dates",
       "effectivePlatformState",
       "encoding",
@@ -1093,6 +1094,82 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(customOut.foo).toBe(true);
     expect(Object.keys(customOut)).toEqual(["foo"]);
   });
+
+  it("commissioning-qa.js Pure Helfer (Welle 2 Step 10)", () => {
+    load(path.join(MODULES_DIR, "tabs", "commissioning-qa.js"));
+    const cq = globalScope.MM.commissioningQa;
+    expect(cq).toBeDefined();
+    expect(typeof cq.summarizeApprovals).toBe("function");
+    expect(typeof cq.buildValidationSummary).toBe("function");
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // summarizeApprovals: leer & defensiv
+    expect(cq.summarizeApprovals(null)).toEqual({
+      items: [],
+      confirmed: [],
+      open: [],
+      totalCount: 0,
+      confirmedCount: 0,
+      openCount: 0,
+    });
+    expect(cq.summarizeApprovals("nope" as any).totalCount).toBe(0);
+
+    // summarizeApprovals: gemischt
+    const items = [
+      { id: "a", status: "pass" },
+      { id: "b", status: "fail" },
+      { id: "c", status: "not_run" },
+      { id: "d", status: "pass" },
+      { id: "e" }, // status undefined => open
+    ];
+    const sum = cq.summarizeApprovals(items);
+    expect(sum.totalCount).toBe(5);
+    expect(sum.confirmedCount).toBe(2);
+    expect(sum.openCount).toBe(3);
+    expect(sum.confirmed.map((x: any) => x.id)).toEqual(["a", "d"]);
+    expect(sum.open.map((x: any) => x.id)).toEqual(["b", "c", "e"]);
+
+    // buildValidationSummary: empty -> null
+    expect(cq.buildValidationSummary([])).toBeNull();
+    expect(cq.buildValidationSummary(null)).toBeNull();
+
+    // buildValidationSummary: aggregierend + Paritaet zur Original-Implementierung
+    const results = [
+      { check: "Admin Authentication", status: "ok" },
+      { check: "Firestore Collection: users", status: "ok" },
+      { check: "Firestore Collection: tasks", status: "ok" },
+      { check: "Function (createTask)", status: "ok" },
+      { check: "Function (issueToken)", status: "warn" },
+      { check: "Backend Storage Health", status: "ok" },
+      { check: "AI Secret Configuration", status: "error" },
+      { check: "Shared Web-Control Firebase Config", status: "ok" },
+    ];
+    const v = cq.buildValidationSummary(results);
+    expect(v.ok).toBe(6);
+    expect(v.warn).toBe(1);
+    expect(v.errorCount).toBe(1);
+    expect(v.checks.adminAuthOk).toBe(true);
+    expect(v.checks.firestoreAccessOk).toBe(true);
+    expect(v.checks.functionsReachable).toBe(true);
+    expect(v.checks.storageHealthOk).toBe(true);
+    expect(v.checks.aiConfigured).toBe(false);
+    expect(v.checks.webControlConfigReady).toBe(true);
+
+    // Direkte Paritaet
+    expect(v).toEqual(appJs.buildValidationSummaryFromResults(results));
+
+    // Failure-Pfade in checks
+    const failResults = [
+      { check: "Firestore Collection: users", status: "ok" },
+      { check: "Firestore Collection: tasks", status: "error" },
+      { check: "Function (foo)", status: "error" },
+    ];
+    const v2 = cq.buildValidationSummary(failResults);
+    expect(v2.checks.firestoreAccessOk).toBe(false);
+    expect(v2.checks.functionsReachable).toBe(false);
+    expect(v2).toEqual(appJs.buildValidationSummaryFromResults(failResults));
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1132,6 +1209,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/operator-assistant.js");
     expect(sw).toContain("./modules/tabs/platform-qa-readiness.js");
     expect(sw).toContain("./modules/tabs/effective-platform-state.js");
+    expect(sw).toContain("./modules/tabs/commissioning-qa.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -1170,7 +1248,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(18);
+    expect(sandboxGlobal.MM.list().length).toBe(19);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js

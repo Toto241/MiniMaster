@@ -30,7 +30,8 @@ const APP_ASSETS = [
   "./modules/tabs/operator-effective.js",
   "./modules/tabs/operator-assistant.js",
   "./modules/tabs/platform-qa-readiness.js",
-  "./modules/tabs/effective-platform-state.js"
+  "./modules/tabs/effective-platform-state.js",
+  "./modules/tabs/commissioning-qa.js"
 ];
 
 self.addEventListener("install", (event) => {
