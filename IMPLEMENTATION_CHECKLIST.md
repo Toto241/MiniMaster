@@ -38,6 +38,7 @@
 - [x] **Debug-Snapshot Whitelist (`sanitizeDebugSnapshot`)**: Defense-in-Depth Filter in `src/support.ts` vor JSON.stringify (AI-Prompt) und Firestore-Persistierung. Erlaubt nur die deklarierten Felder (Counts/Booleans/ISO-Timestamps), eliminiert versehentliche Leaks falls `DebugSnapshot`-Typ erweitert wird. 80/80 Support-Tests grün ✅, Build grün ✅.
 - [x] **Test-Mock-Drift Cleanup (Baseline-Failures behoben)**: `db().batch()` und kettbares `where()` in `enforcement-automation.test.ts`, `tasks-and-device-extra.test.ts`, `branch-coverage-device.test.ts` ergänzt (DecisioningRepository.replaceRulesForDevice braucht beides). `auth.test.ts`: TDZ-ReferenceError auf `mockDbObj` durch lazy `require("../index")` in `beforeAll` behoben. **Vollständige Jest-Suite jetzt grün: 62/62 Suites, 2048/2048 Tests** ✅.
 - [x] **Coverage-Schwellwerte angehoben** (`jest.config.cjs`): branches 50→85, functions 70→88, lines 65→90, statements 65→90. Tatsächliche Ist-Werte: 88.62 / 90.96 / 94.77 / 94.72 % — ~5pp Margin gegen Regression. CI-Gate verhärtet, alle 62 Suites bestehen Threshold-Check ✅.
+- [x] **Recovery-Token Rotation** (`src/auth.ts`): Multi-Token-Support per Komma-Liste in `ADMIN_RECOVERY_TOKEN` (Rolling-Rotation mit Overlap-Fenster), Rotations-Datum via `ADMIN_RECOVERY_TOKEN_ROTATED_AT` (ISO), Health-Endpoint liefert `recoveryTokenCount` / `recoveryTokenAgeDays` / `recoveryTokenRotationOverdue` (>90 Tage). Admin-Panel-Reset-Flow zeigt entsprechende Warnung im Statusfeld. Bei Reset mit überfälligem Token wird `functions.logger.warn` getriggert. 207/207 Auth-Tests grün ✅, gesamte Suite 2048/2048 ✅, Build grün ✅.
 
 ---
 
@@ -77,7 +78,7 @@ The job was not started because recent account payments have failed or your spen
 
 - [ ] **F6 CSP-Refactor**: ~80+ Inline-`onclick`/`style` in `admin-panel/index.html` zu `addEventListener`/CSS-Klassen migrieren. Erfordert Anpassung der DOM-Snapshot-Tests.
 - [ ] **Legacy `secretKey` Cutover**: Backend-Migration + koordinierte Mobile-Client-Versionierung
-- [ ] **Recovery-Token Rotation**: Operative Rotation + UI-Hinweis in Reset-Flow
+- [ ] **Recovery-Token Rotation — operationelles Runbook**: Quartals-Rotations-SOP dokumentieren (Code/Health-Endpoint sind erledigt, siehe Durchgeführt-Sektion)
 - [ ] **Debug-Snapshot Felder erweitern** (optional): zusätzliche diagnostische Felder prüfen (z.B. Battery, NetworkType) — Whitelist-Filter `sanitizeDebugSnapshot` ist bereits implementiert
 - [ ] **iOS Family Controls Picker**: Nativer Picker im `iosMasterApp` (Beta → Release)
 - [ ] **Electron Build-Pipeline**: `desktop/`-Bundling + Code-Signing
