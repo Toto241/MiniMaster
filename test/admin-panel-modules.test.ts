@@ -109,6 +109,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "effectivePlatformState",
       "encoding",
       "errorCodes",
+      "eventDelegation",
       "firebaseConfig",
       "firebaseDeployment",
       "format",
@@ -117,6 +118,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "operatorConfig",
       "operatorEffective",
       "platformQaReadiness",
+      "pythonAutomationActions",
       "qaTestingRegister",
       "sanitize",
       "security",
@@ -1170,6 +1172,163 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(v2.checks.functionsReachable).toBe(false);
     expect(v2).toEqual(appJs.buildValidationSummaryFromResults(failResults));
   });
+
+  it("python-automation-actions.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 11)", () => {
+    load(path.join(MODULES_DIR, "tabs", "python-automation-actions.js"));
+    const paa = globalScope.MM.pythonAutomationActions;
+    expect(paa).toBeDefined();
+    expect(typeof paa.buildActions).toBe("function");
+    expect(typeof paa.isOpenStatus).toBe("function");
+    expect(typeof paa.isPlayStoreItem).toBe("function");
+    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
+    const { exports: appJs } = loadAdminPanelTestExports();
+
+    // Predicates
+    expect(paa.isOpenStatus("fail")).toBe(true);
+    expect(paa.isOpenStatus("manual_required")).toBe(true);
+    expect(paa.isOpenStatus("not_run")).toBe(true);
+    expect(paa.isOpenStatus("pass")).toBe(false);
+    expect(paa.isOpenStatus(undefined)).toBe(true); // default not_run
+
+    expect(paa.isPlayStoreItem({ groupId: "playstore-checks" })).toBe(true);
+    expect(paa.isPlayStoreItem({ title: "Reviewer Notes" })).toBe(true);
+    expect(paa.isPlayStoreItem({ details: "Privacy Policy URL" })).toBe(true);
+    expect(paa.isPlayStoreItem({ id: "store-listing-screens", details: "store listing screenshots required" })).toBe(true);
+    expect(paa.isPlayStoreItem({ groupId: "unrelated" })).toBe(false);
+    expect(paa.isPlayStoreItem(null)).toBe(false);
+
+    // buildActions: null run -> []
+    expect(paa.buildActions(null)).toEqual([]);
+
+    // No issues -> []
+    expect(paa.buildActions({ evaluation: { checks: [] } }, { items: [] })).toEqual([]);
+
+    // Runtime + Evidence + Play-Store
+    const run = {
+      evaluation: {
+        checks: [
+          { id: "cloud-project-id", title: "Cloud Project ID", status: "fail" },
+          { id: "ai-runtime-config", title: "AI Runtime Config", status: "not_run" },
+          { id: "app-check-mode", title: "App Check Mode", status: "pass" },
+          { id: "other-check", title: "Other", status: "fail" },
+        ],
+      },
+      evidenceCoverage: { counts: { uncovered: 2, failed: 1 } },
+    };
+    const payload = {
+      items: [
+        { id: "playstore-listing", groupId: "playstore", status: "fail" },
+        { id: "iarc-cert", groupId: "release", title: "IARC Certificate", status: "manual_required" },
+        { id: "playstore-done", groupId: "playstore", status: "pass" }, // closed -> nicht zaehlen
+        { id: "unrelated", status: "fail" },
+      ],
+    };
+    const actions = paa.buildActions(run, payload);
+    expect(actions.map((a: any) => a.id)).toEqual(["runtime", "evidence", "playstore"]);
+    expect(actions[0].detail).toContain("Cloud Project ID");
+    expect(actions[0].detail).toContain("AI Runtime Config");
+    expect(actions[0].detail).not.toContain("App Check Mode"); // pass
+    expect(actions[1].detail).toContain("3"); // 2+1
+    expect(actions[2].detail).toContain("2"); // 2 offene playstore items
+
+    // Direkte Paritaet zur Original-Implementierung
+    expect(actions).toEqual(appJs.buildPythonAutomationRunActionSummary(run, payload));
+
+    // Nur Evidence offen
+    const evOnly = paa.buildActions({ evaluation: { checks: [] }, evidenceCoverage: { counts: { uncovered: 1, failed: 0 } } }, { items: [] });
+    expect(evOnly.map((a: any) => a.id)).toEqual(["evidence"]);
+  });
+
+  it("event-delegation.js delegiert Klicks ueber data-action (Welle 3 Vorbereitung)", () => {
+    load(path.join(MODULES_DIR, "core", "event-delegation.js"));
+    const ed = globalScope.MM.eventDelegation;
+    expect(ed).toBeDefined();
+    expect(typeof ed.createDelegatedClickHandler).toBe("function");
+    expect(typeof ed.attachDelegatedClicks).toBe("function");
+
+    // jsdom-aehnliche Mock-Knoten
+    const calls: string[] = [];
+    const lookup: Record<string, (this: any, ev: any) => void> = {
+      doFoo() { calls.push("foo"); },
+      doBar(this: any) { calls.push("bar:" + (this?.dataset?.action || "?")); },
+    };
+
+    function makeNode(action?: string) {
+      const node: any = {
+        dataset: action ? { action } : {},
+        getAttribute(name: string) { return name === "data-action" ? (action || null) : null; },
+        // closest gibt sich selbst zurueck wenn das Attribut passt
+        closest(selector: string) {
+          if (selector === "[data-action]" && action) return node;
+          return null;
+        },
+      };
+      return node;
+    }
+
+    const handler = ed.createDelegatedClickHandler({ lookup });
+
+    // Match -> Handler laeuft, preventDefault wird aufgerufen
+    let prevented = false;
+    const evMatch = {
+      target: makeNode("doFoo"),
+      preventDefault() { prevented = true; },
+    };
+    expect(handler(evMatch)).toBe(true);
+    expect(calls).toEqual(["foo"]);
+    expect(prevented).toBe(true);
+
+    // this-Bindung an Target
+    const evBar = {
+      target: makeNode("doBar"),
+      preventDefault() { /* noop */ },
+    };
+    handler(evBar);
+    expect(calls).toEqual(["foo", "bar:doBar"]);
+
+    // No data-action -> nichts passiert, kein preventDefault
+    let prevented2 = false;
+    const evNone = {
+      target: makeNode(),
+      preventDefault() { prevented2 = true; },
+    };
+    expect(handler(evNone)).toBe(false);
+    expect(prevented2).toBe(false);
+
+    // Unknown handler-Name -> ignoriert (defensiv)
+    const evUnknown = {
+      target: makeNode("doMissing"),
+      preventDefault() { /* noop */ },
+    };
+    expect(handler(evUnknown)).toBe(false);
+
+    // Custom-Attribut
+    const handler2 = ed.createDelegatedClickHandler({ lookup, attribute: "data-cmd" });
+    const node2: any = {
+      getAttribute(name: string) { return name === "data-cmd" ? "doFoo" : null; },
+      closest(selector: string) { return selector === "[data-cmd]" ? node2 : null; },
+    };
+    handler2({ target: node2, preventDefault() {} });
+    expect(calls).toContain("foo");
+
+    // attachDelegatedClicks gibt detach zurueck (mit fake root)
+    let added = 0;
+    let removed = 0;
+    const fakeRoot: any = {
+      addEventListener() { added++; },
+      removeEventListener() { removed++; },
+    };
+    const detach = ed.attachDelegatedClicks(fakeRoot, { lookup });
+    expect(added).toBe(1);
+    expect(typeof detach).toBe("function");
+    detach();
+    expect(removed).toBe(1);
+
+    // Falscher root -> noop
+    const noop = ed.attachDelegatedClicks(null);
+    expect(typeof noop).toBe("function");
+    noop(); // soll nicht werfen
+  });
 });
 
 describe("admin-panel module wiring", () => {
@@ -1200,6 +1359,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/security.js");
     expect(sw).toContain("./modules/core/firebase-config.js");
     expect(sw).toContain("./modules/core/dates.js");
+    expect(sw).toContain("./modules/core/event-delegation.js");
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
     expect(sw).toContain("./modules/tabs/firebase-deployment.js");
@@ -1210,6 +1370,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/tabs/platform-qa-readiness.js");
     expect(sw).toContain("./modules/tabs/effective-platform-state.js");
     expect(sw).toContain("./modules/tabs/commissioning-qa.js");
+    expect(sw).toContain("./modules/tabs/python-automation-actions.js");
   });
 
   it("MM-Fassade in app.js wird via DOMContentLoaded installiert (Browser-Reihenfolge)", async () => {
@@ -1248,7 +1409,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(19);
+    expect(sandboxGlobal.MM.list().length).toBe(21);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js

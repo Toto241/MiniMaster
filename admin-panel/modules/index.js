@@ -13,6 +13,7 @@ import "./core/error-codes.js";
 import "./core/security.js";
 import "./core/firebase-config.js";
 import "./core/dates.js";
+import "./core/event-delegation.js";
 import "./tabs/legal-playstore.js";
 import "./tabs/qa-testing-register.js";
 import "./tabs/firebase-deployment.js";
@@ -23,6 +24,7 @@ import "./tabs/operator-assistant.js";
 import "./tabs/platform-qa-readiness.js";
 import "./tabs/effective-platform-state.js";
 import "./tabs/commissioning-qa.js";
+import "./tabs/python-automation-actions.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
