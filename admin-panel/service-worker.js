@@ -23,6 +23,7 @@ const APP_ASSETS = [
   "./modules/core/firebase-config.js",
   "./modules/core/dates.js",
   "./modules/core/event-delegation.js",
+  "./modules/core/nav-bootstrap.js",
   "./modules/core/crypto-debug.js",
   "./modules/tabs/legal-playstore.js",
   "./modules/tabs/qa-testing-register.js",

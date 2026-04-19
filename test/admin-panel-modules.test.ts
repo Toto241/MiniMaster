@@ -116,6 +116,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "firebaseRecovery",
       "format",
       "legalPlaystore",
+      "navBootstrap",
       "operatorAssistant",
       "operatorConfig",
       "operatorEffective",
@@ -1334,6 +1335,89 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     noop(); // soll nicht werfen
   });
 
+  it("nav-bootstrap.js verdrahtet Tab-Wechsel und Logout per Event-Delegation (F6 Stufe 1)", () => {
+    // Document-Stub: getElementById findet nav + logout, beide verbinden sich.
+    const navListeners: Array<(ev: any) => void> = [];
+    const logoutListeners: Array<(ev: any) => void> = [];
+    const nav = {
+      addEventListener(type: string, fn: (ev: any) => void) {
+        if (type === "click") navListeners.push(fn);
+      },
+    };
+    const logoutBtn = {
+      addEventListener(type: string, fn: (ev: any) => void) {
+        if (type === "click") logoutListeners.push(fn);
+      },
+    };
+    const docListeners: Array<{ type: string; fn: () => void }> = [];
+    const fakeDocument: any = {
+      readyState: "complete",
+      getElementById(id: string) {
+        if (id === "dashboard-nav") return nav;
+        if (id === "logout-btn") return logoutBtn;
+        return null;
+      },
+      addEventListener(type: string, fn: () => void) { docListeners.push({ type, fn }); },
+    };
+
+    const switchCalls: Array<{ tab: string; targetTag: string }> = [];
+    const logoutCalls: number[] = [];
+    globalScope.document = fakeDocument;
+    globalScope.switchTab = (tab: string, evt: any) => {
+      switchCalls.push({ tab, targetTag: evt?.target?.tagName || "?" });
+    };
+    globalScope.logout = () => { logoutCalls.push(Date.now()); };
+
+    load(path.join(MODULES_DIR, "core", "registry.js"));
+    load(path.join(MODULES_DIR, "core", "nav-bootstrap.js"));
+
+    expect(globalScope.MM.navBootstrap).toBeDefined();
+    expect(navListeners.length).toBe(1);
+    expect(logoutListeners.length).toBe(1);
+
+    // Klick auf Nav-Tab "users" -> switchTab("users", { target: button })
+    const buttonNode: any = {
+      tagName: "BUTTON",
+      getAttribute(name: string) { return name === "data-tab" ? "users" : null; },
+      closest(selector: string) { return selector === "[data-tab]" ? buttonNode : null; },
+    };
+    navListeners[0]({ target: buttonNode });
+    expect(switchCalls).toEqual([{ tab: "users", targetTag: "BUTTON" }]);
+
+    // Klick irgendwo im Nav ohne data-tab -> ignoriert
+    navListeners[0]({ target: { closest: () => null } });
+    expect(switchCalls.length).toBe(1);
+
+    // Klick auf Logout
+    let prevented = false;
+    const logoutNode: any = {
+      getAttribute(name: string) { return name === "data-action" ? "logout" : null; },
+      closest(selector: string) { return selector === "[data-action='logout']" ? logoutNode : null; },
+    };
+    logoutListeners[0]({ target: logoutNode, preventDefault() { prevented = true; } });
+    expect(logoutCalls.length).toBe(1);
+    expect(prevented).toBe(true);
+
+    // Idempotenz: erneutes _bind() bindet nicht doppelt
+    globalScope.MM.navBootstrap.bind();
+    expect(navListeners.length).toBe(1);
+  });
+
+  it("index.html bindet alle Top-Level-Navigations-Tabs per data-tab statt onclick", async () => {
+    const html = await fs.readFile(
+      path.resolve(__dirname, "..", "admin-panel", "index.html"), "utf8"
+    );
+    const navMatch = html.match(/<nav id="dashboard-nav"[\s\S]*?<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![0];
+    expect(nav).not.toMatch(/onclick="switchTab/);
+    const dataTabs = (nav.match(/data-tab="/g) || []).length;
+    expect(dataTabs).toBeGreaterThanOrEqual(14);
+    // Logout-Button verwendet data-action statt onclick
+    expect(html).toMatch(/id="logout-btn"[\s\S]*?data-action="logout"/);
+    expect(html).not.toMatch(/id="logout-btn"[\s\S]*?onclick="logout/);
+  });
+
   it("testing-register-insights.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 12)", () => {
     load(path.join(MODULES_DIR, "tabs", "testing-register-insights.js"));
     const tri = globalScope.MM.testingRegisterInsights;
@@ -1602,6 +1686,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/firebase-config.js");
     expect(sw).toContain("./modules/core/dates.js");
     expect(sw).toContain("./modules/core/event-delegation.js");
+    expect(sw).toContain("./modules/core/nav-bootstrap.js");
     expect(sw).toContain("./modules/core/crypto-debug.js");
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
@@ -1655,7 +1740,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(25);
+    expect(sandboxGlobal.MM.list().length).toBe(26);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js

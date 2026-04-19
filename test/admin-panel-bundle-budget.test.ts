@@ -12,6 +12,9 @@ import * as path from "path";
  *   - Bytes: 683723
  *   - Top-Level-Funktionsdeklarationen: 473
  *   - Inline onclick="..." in index.html: 115
+ *
+ * Stand F6 CSP-Refactor Stufe 1 (Nav + Logout):
+ *   - Inline onclick="..." in index.html: 100 (von ~119)
  */
 
 const APP_JS = "admin-panel/app.js";
@@ -19,7 +22,7 @@ const INDEX_HTML = "admin-panel/index.html";
 
 const MAX_APP_JS_BYTES = 720_000;
 const MAX_TOP_LEVEL_FUNCTIONS = 500;
-const MAX_INLINE_ONCLICK = 130;
+const MAX_INLINE_ONCLICK = 110;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
 const INLINE_ONCLICK_REGEX = /\bonclick\s*=/g;
