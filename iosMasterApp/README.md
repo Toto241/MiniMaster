@@ -38,7 +38,7 @@ Sources/MiniMasterParent/
 │   ├── ChildDevice.swift               # Device-Daten + Status
 │   └── TaskItem.swift                  # Task mit Status/AI-Analyse
 ├── Services/
-│   ├── AuthService.swift               # Firebase Auth + Keychain
+│   ├── AuthService.swift               # Firebase Auth + CustomToken-Session
 │   ├── CloudFunctionsClient.swift      # Alle callable functions
 │   └── SubscriptionService.swift       # StoreKit2 + Verify
 ├── ViewModels/
@@ -57,8 +57,9 @@ Sources/MiniMasterParent/
 Diese App ruft folgende Firebase Cloud Functions auf:
 
 ### Authentifizierung
-- `registerMasterDevice(name)` → `{ imei, secretKey }`
-- `login(imei, secretKey, appVersion)` → `{ customToken }`
+- `registerMasterDevice(imei, deviceName?)` → `{ masterId, customToken }`
+- Kein separater Legacy-`login(imei, secretKey, ...)`-Schritt mehr im iOS-Client.
+- Cold-Start nutzt FirebaseAuth-Sessionpersistenz statt lokaler `secretKey`-Speicherung.
 
 ### Pairing
 - `generatePairingLink()` → `{ token, expiresAt }`
@@ -85,11 +86,11 @@ Diese App ruft folgende Firebase Cloud Functions auf:
 **Master Device (selbst)**
 ```
 masters/{masterImei}
-├── name: String
-├── email: String
-├── secretKey: String (Keychain!)
-├── registeredAt: Timestamp
-└── subscriptionTier: String
+├── imei: String
+├── uid: String
+├── role: "master"
+├── createdAt: Timestamp
+└── subscription: { status, parentAppLimit, childLimit }
 ```
 
 **Kind-Geräte**
@@ -116,10 +117,11 @@ children/{childId}/tasks/{taskId}
 
 ## Development-Tipps
 
-### Keychain-Debugging
+### Auth-Debugging
 ```swift
 // In AuthService anschauen:
-let credentials = KeychainHelper.shared.load(key: "master_imei")
+let currentUser = Auth.auth().currentUser
+let masterId = currentUser?.uid
 ```
 
 ### Firestore Listener
