@@ -573,14 +573,20 @@ class TestMiniMasterAdminHandlerRoutes:
             {"error": "masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich."},
         )
 
-    def test_do_post_android_automation_sweep_queues_catalog_driven_run(self, monkeypatch: pytest.MonkeyPatch):
+    def test_do_post_android_automation_sweep_queues_catalog_driven_run(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         import app
 
         handler = self._make_handler("/api/suites/android-automation-sweep")
+        master_apk = tmp_path / "master.apk"
+        child_apk = tmp_path / "child.apk"
+        master_apk.write_text("master", encoding="utf-8")
+        child_apk.write_text("child", encoding="utf-8")
         handler._read_json_body.return_value = {
             "installApk": True,
             "skipActivation": True,
             "parallel": True,
+            "masterApkPath": str(master_apk),
+            "childApkPath": str(child_apk),
         }
 
         fake_thread = MagicMock()
@@ -680,7 +686,7 @@ class TestMiniMasterAdminHandlerRoutes:
 
         handler = self._make_handler("/api/suites/android-automation-sweep")
         handler._read_json_body.return_value = {
-            "installApk": True,
+            "installApk": False,
             "skipActivation": True,
             "parallel": True,
         }
@@ -706,6 +712,86 @@ class TestMiniMasterAdminHandlerRoutes:
         handler._write_json.assert_called_once_with(
             HTTPStatus.BAD_REQUEST,
             {"error": expected_error},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+        with app._active_suite_lock:
+            assert app._active_suite_runs == {}
+
+    def test_do_post_android_automation_sweep_rejects_missing_master_apk_without_side_effects(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        import app
+
+        missing_master_apk = tmp_path / "does-not-exist-master.apk"
+        existing_child_apk = tmp_path / "child.apk"
+        existing_child_apk.write_text("child", encoding="utf-8")
+
+        handler = self._make_handler("/api/suites/android-automation-sweep")
+        handler._read_json_body.return_value = {
+            "installApk": True,
+            "masterApkPath": str(missing_master_apk),
+            "childApkPath": str(existing_child_apk),
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+
+        monkeypatch.setattr(app, "_build_android_automation_sweep_plan", lambda: {
+            "androidVersions": ["10", "14"],
+            "masterTestClasses": ["master.PairingTest"],
+            "childTestClasses": ["child.PairingTest"],
+            "selectedScenarioIds": ["pairing"],
+        })
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.BAD_REQUEST,
+            {"error": f"Master-APK-Datei nicht gefunden: {missing_master_apk}"},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+        with app._active_suite_lock:
+            assert app._active_suite_runs == {}
+
+    def test_do_post_android_automation_sweep_rejects_missing_child_apk_without_side_effects(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        import app
+
+        existing_master_apk = tmp_path / "master.apk"
+        existing_master_apk.write_text("master", encoding="utf-8")
+        missing_child_apk = tmp_path / "does-not-exist-child.apk"
+
+        handler = self._make_handler("/api/suites/android-automation-sweep")
+        handler._read_json_body.return_value = {
+            "installApk": True,
+            "masterApkPath": str(existing_master_apk),
+            "childApkPath": str(missing_child_apk),
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+
+        monkeypatch.setattr(app, "_build_android_automation_sweep_plan", lambda: {
+            "androidVersions": ["10", "14"],
+            "masterTestClasses": ["master.PairingTest"],
+            "childTestClasses": ["child.PairingTest"],
+            "selectedScenarioIds": ["pairing"],
+        })
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.BAD_REQUEST,
+            {"error": f"Child-APK-Datei nicht gefunden: {missing_child_apk}"},
         )
         create_job_mock.assert_not_called()
         enqueue_job_mock.assert_not_called()

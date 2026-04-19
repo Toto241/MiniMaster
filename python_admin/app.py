@@ -2887,6 +2887,24 @@ def repo_relative_path(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
 
 
+def resolve_repo_relative_file(raw_path: str) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if not candidate.is_absolute():
+        candidate = (REPO_ROOT / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+    return candidate
+
+
+def validate_required_apk_file(raw_path: str, *, field_name: str, display_name: str) -> None:
+    normalized_path = str(raw_path or "").strip()
+    if not normalized_path:
+        raise ValueError(f"{field_name} ist erforderlich, wenn installApk=true.")
+    candidate = resolve_repo_relative_file(normalized_path)
+    if not candidate.exists() or not candidate.is_file():
+        raise ValueError(f"{display_name} nicht gefunden: {normalized_path}")
+
+
 def normalize_repo_test_id(relative_path: str) -> str:
     return "repo-" + relative_path.replace("/", "-").replace(".", "-").replace("_", "-")
 
@@ -6337,6 +6355,17 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 "apk_path": str(payload.get("apkPath") or "").strip(),
                 "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
             }
+            if bool(kwargs["install_apk"]):
+                validate_required_apk_file(
+                    str(kwargs["master_apk_path"]),
+                    field_name="masterApkPath",
+                    display_name="Master-APK-Datei",
+                )
+                validate_required_apk_file(
+                    str(kwargs["child_apk_path"]),
+                    field_name="childApkPath",
+                    display_name="Child-APK-Datei",
+                )
             if not cast(list[str], kwargs["android_versions"]):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "Keine aktiven Android-Versionen im QA-Katalog gefunden."})
             hard_blocker = _android_automation_sweep_hard_blocker()
