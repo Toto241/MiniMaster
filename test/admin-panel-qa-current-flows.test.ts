@@ -119,4 +119,64 @@ describe("admin-panel current QA flows", () => {
     expect(historyEl.innerHTML).toContain("android-unit-master");
     expect(refreshEl.innerHTML).toContain("Suite-Läufe geladen");
   });
+
+  it("filters the testing register by level, role, Android version and execution profile", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const automaticListEl = { innerHTML: "" };
+    const manualListEl = { innerHTML: "" };
+    elements.set("testing-register-list-automatic", automaticListEl);
+    elements.set("testing-register-list-manual", manualListEl);
+    elements.set("testing-register-type-filter", { value: "all" });
+    elements.set("testing-register-sort", { value: "status" });
+    elements.set("testing-register-search", { value: "" });
+    elements.set("testing-register-level-filter", { value: "system" });
+    elements.set("testing-register-role-filter", { value: "both" });
+    elements.set("testing-register-android-filter", { value: "14" });
+    elements.set("testing-register-profile-filter", { value: "standard" });
+
+    exports.renderTestingRegisterList({
+      items: [
+        {
+          id: "sys-dual-1",
+          title: "Offline/Online Resync",
+          groupTitle: "Dual Device",
+          groupId: "dual-device",
+          entryKind: "suite",
+          automationType: "automatic",
+          source: "suite",
+          status: "pass",
+          severity: "high",
+          owner: "Engineering",
+          testLevel: "system",
+          testLevelLabel: "Systemtests",
+          appRole: "both",
+          appRoleLabel: "Beide Apps",
+          androidVersions: ["14", "15"],
+          executionProfiles: ["standard", "full"],
+        },
+        {
+          id: "mod-parent-1",
+          title: "Master ViewModel",
+          groupTitle: "MasterApp",
+          groupId: "master",
+          entryKind: "repo-test",
+          automationType: "automatic",
+          source: "repo-test",
+          status: "pass",
+          severity: "medium",
+          owner: "Engineering",
+          testLevel: "module",
+          testLevelLabel: "Modultests",
+          appRole: "parent",
+          appRoleLabel: "Eltern-App",
+          androidVersions: ["14"],
+          executionProfiles: ["minimal", "standard", "full"],
+        },
+      ],
+    });
+
+    expect(automaticListEl.innerHTML).toContain("sys-dual-1");
+    expect(automaticListEl.innerHTML).not.toContain("mod-parent-1");
+  });
 });

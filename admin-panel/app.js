@@ -2959,6 +2959,12 @@ function buildSelectedQaTestItemClipboardPayload(format = "compact") {
         `Typ: ${selected.kind}`,
         `Status: ${selected.statusLabel}`,
         `Quelle: ${selected.sourceLabel}`,
+        `Testebene: ${selected.raw?.testLevelLabel || selected.raw?.testLevel || "-"}`,
+        `App-Rolle: ${selected.raw?.appRoleLabel || selected.raw?.appRole || "-"}`,
+        `Android: ${Array.isArray(selected.raw?.androidVersions) && selected.raw.androidVersions.length > 0 ? selected.raw.androidVersions.join(", ") : "-"}`,
+        `Profile: ${Array.isArray(selected.raw?.executionProfiles) && selected.raw.executionProfiles.length > 0 ? selected.raw.executionProfiles.join(", ") : "-"}`,
+        `Gerät A: ${selected.raw?.deviceRoleA || "-"}`,
+        `Gerät B: ${selected.raw?.deviceRoleB || "-"}`,
         `Zusammenfassung: ${selected.summary || "-"}`,
         `Detail: ${selected.detail || "-"}`,
         `Zeitpunkt: ${selected.updatedAt ? formatQaRefreshTimestamp(selected.updatedAt) : "-"}`,
@@ -3303,6 +3309,10 @@ function getTestingRegisterFilters() {
         search: (document.getElementById("testing-register-search")?.value || "").trim().toLowerCase(),
         type: getTestingRegisterSelectedType(),
         sort: document.getElementById("testing-register-sort")?.value || "status",
+        level: document.getElementById("testing-register-level-filter")?.value || "all",
+        role: document.getElementById("testing-register-role-filter")?.value || "all",
+        android: document.getElementById("testing-register-android-filter")?.value || "all",
+        profile: document.getElementById("testing-register-profile-filter")?.value || "all",
     };
 }
 
@@ -3356,6 +3366,12 @@ function buildTestingRegisterTooltipAttr(text, ariaLabel) {
 
 function buildTestingRegisterMetaBadges(item) {
     const badges = [];
+    if (item.testLevelLabel) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-suite' ${buildTestingRegisterTooltipAttr(`Testebene: ${String(item.testLevelLabel)}`, `Testebene ${String(item.testLevelLabel)}`)}>${escapeTestingRegisterText(String(item.testLevelLabel))}</span>`);
+    }
+    if (item.appRoleLabel) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr(`App-Rolle: ${String(item.appRoleLabel)}`, `App-Rolle ${String(item.appRoleLabel)}`)}>${escapeTestingRegisterText(String(item.appRoleLabel))}</span>`);
+    }
     if (item.severity) {
         badges.push(`<span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr(`Prioritaet: ${String(item.severity)}`, `Prioritaet ${String(item.severity)}`)}>${escapeTestingRegisterText(String(item.severity).toUpperCase())}</span>`);
     }
@@ -3374,6 +3390,9 @@ function buildTestingRegisterMetaBadges(item) {
     }
     if (item.manualClassLabel) {
         badges.push(`<span class='python-automation-chip python-automation-chip-manual' ${buildTestingRegisterTooltipAttr(String(item.manualClassReason || item.manualClassLabel), String(item.manualClassLabel))}>${escapeTestingRegisterText(String(item.manualClassLabel))}</span>`);
+    }
+    if (Array.isArray(item.executionProfiles) && item.executionProfiles.length > 0) {
+        badges.push(`<span class='python-automation-chip python-automation-chip-static' ${buildTestingRegisterTooltipAttr(`Ausführungsprofile: ${item.executionProfiles.join(", ")}`, `Ausführungsprofile ${item.executionProfiles.join(", ")}`)}>${escapeTestingRegisterText(item.executionProfiles.join(" / "))}</span>`);
     }
     if (item.automationWaveLabel) {
         badges.push(`<span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr(`Automatisierungsplanung: ${String(item.automationWaveLabel)}`, `Automatisierungsplanung ${String(item.automationWaveLabel)}`)}>${escapeTestingRegisterText(String(item.automationWaveLabel))}</span>`);
@@ -3394,6 +3413,8 @@ function buildTestingRegisterLegend() {
     return `
         <div class='python-muted-caption' style='margin-block-start: 10px'>
             Register-Legende:
+            <span class='python-automation-chip python-automation-chip-suite' ${buildTestingRegisterTooltipAttr("Vier Testebenen: Software, Modul, Integration, System", "Testebene")}>Testebene</span>
+            <span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr("Zielrolle: Eltern-App, Kinder-App, beide Apps oder Plattform", "App-Rolle")}>App-Rolle</span>
             <span class='python-automation-chip python-automation-chip-command' ${buildTestingRegisterTooltipAttr("Prioritaet des Testfalls", "Prioritaet")}>CRITICAL/HIGH</span>
             <span class='python-automation-chip python-automation-chip-documented' ${buildTestingRegisterTooltipAttr("Fachlich oder technisch verantwortliche Rolle", "Owner")}>Owner</span>
             <span class='python-automation-chip python-automation-chip-suite' ${buildTestingRegisterTooltipAttr("Automatische Bewertung aus einer verknüpften Device- oder Repo-Suite", "Device-Suite")}>Device-Suite</span>
@@ -3673,6 +3694,11 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
             linkedTests: [],
             command: String(item?.command || ""),
             storage: String(payload?.storage?.suiteRuns || ""),
+            testLevel: String(item?.testLevel || ""),
+            testLevelLabel: String(item?.testLevelLabel || ""),
+            appRole: String(item?.appRole || ""),
+            appRoleLabel: String(item?.appRoleLabel || ""),
+            executionProfiles: Array.isArray(item?.executionProfiles) ? item.executionProfiles : [],
         });
     });
 
@@ -3788,6 +3814,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                                 <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
                             </div>
                             <div class='python-muted-caption'>Suite-ID: ${escapeHtml(suite.suiteId || "-")} · Verknüpfte Testfälle: ${escapeHtml(String(suite.linkedCount || 0))}</div>
+                            <div class='python-muted-caption'>${escapeHtml([suite.testLevelLabel || suite.testLevel, suite.appRoleLabel || suite.appRole, Array.isArray(suite.executionProfiles) ? suite.executionProfiles.join("/") : ""].filter(Boolean).join(" · "))}</div>
                             <div class='python-muted-caption'>${escapeHtml((suite.samples && suite.samples.length > 0) ? suite.samples.join(" · ") : "Noch keine verknüpften Registereinträge sichtbar.")}</div>
                         </div>
                     `;
@@ -3867,6 +3894,12 @@ function buildTestingRegisterActionTooltip(item) {
 function buildTestingRegisterDetailText(item) {
     const parts = [];
     if (item.details) parts.push(String(item.details));
+    if (item.testLevelLabel) parts.push(`Ebene: ${item.testLevelLabel}`);
+    if (item.appRoleLabel) parts.push(`Rolle: ${item.appRoleLabel}`);
+    if (Array.isArray(item.androidVersions) && item.androidVersions.length > 0) parts.push(`Android: ${item.androidVersions.join(", ")}`);
+    if (Array.isArray(item.executionProfiles) && item.executionProfiles.length > 0) parts.push(`Profile: ${item.executionProfiles.join(", ")}`);
+    if (item.deviceMode) parts.push(`Gerätemodus: ${item.deviceMode}`);
+    if (item.deviceRoleA || item.deviceRoleB) parts.push(`Geräte: ${item.deviceRoleA || "-"}${item.deviceRoleB ? ` ↔ ${item.deviceRoleB}` : ""}`);
     if (Array.isArray(item.derivedFromTitles) && item.derivedFromTitles.length > 0) {
         parts.push(`Abgedeckt durch: ${item.derivedFromTitles.join(", ")}`);
     }
@@ -3910,6 +3943,12 @@ function renderTestingRegisterOverview(payload) {
     const riskSummary = buildTestingRegisterRiskSummary(payload);
     const duplicateInsights = buildTestingRegisterDuplicateInsights(payload);
     const manualInsights = buildTestingRegisterManualInsights(payload);
+    const levelCounts = {
+        software: Number(summary.software || 0),
+        module: Number(summary.module || 0),
+        integration: Number(summary.integration || 0),
+        system: Number(summary.system || 0),
+    };
     const alertsHtml = riskSummary.alerts.length > 0
         ? riskSummary.alerts.map(alert => `
             <article class='qa-register-callout qa-register-callout-${escapeHtml(String(alert.tone || "info"))}'>
@@ -4016,6 +4055,22 @@ function renderTestingRegisterOverview(payload) {
         <div class='python-automation-metric'>
             <strong>${escapeHtml(String(summary.unsupported || 0))}</strong>
             <span>Unsupported</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(levelCounts.software))}</strong>
+            <span>Softwaretests</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(levelCounts.module))}</strong>
+            <span>Modultests</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(levelCounts.integration))}</strong>
+            <span>Integrationstests</span>
+        </div>
+        <div class='python-automation-metric'>
+            <strong>${escapeHtml(String(levelCounts.system))}</strong>
+            <span>Systemtests</span>
         </div>
         <div class='qa-register-insights'>
             <div class='qa-register-freshness qa-register-freshness-${escapeHtml(riskSummary.freshnessTone)}'>
@@ -4165,6 +4220,10 @@ function renderTestingRegisterList(payload) {
         const severity = String(item.severity || "");
         const hasOpenEvidence = Boolean(item.evidenceRequired) && (status === "manual_required" || status === "fail" || item.staleEvidence || !item.hasSuccessfulRun);
         const playStoreItem = isPlayStoreTestingRegisterItem(item);
+        const level = String(item.testLevel || "");
+        const role = String(item.appRole || "");
+        const androidVersions = Array.isArray(item.androidVersions) ? item.androidVersions.map(value => String(value)) : [];
+        const executionProfiles = Array.isArray(item.executionProfiles) ? item.executionProfiles.map(value => String(value)) : [];
         const haystack = [
             String(item.id || ""),
             String(item.title || ""),
@@ -4173,6 +4232,10 @@ function renderTestingRegisterList(payload) {
             String(item.details || ""),
             String(item.owner || ""),
             String(item.environment || ""),
+            String(item.testLevelLabel || ""),
+            String(item.appRoleLabel || ""),
+            androidVersions.join(" "),
+            executionProfiles.join(" "),
             String(item.linkedSuite || ""),
             String(item.linkedCommand || ""),
             String(item.knownConstraints || ""),
@@ -4239,6 +4302,18 @@ function renderTestingRegisterList(payload) {
             return false;
         }
         if (filters.type === "approvals" && String(item.groupId || "") !== "service-approvals") {
+            return false;
+        }
+        if (filters.level !== "all" && level !== filters.level) {
+            return false;
+        }
+        if (filters.role !== "all" && role !== filters.role) {
+            return false;
+        }
+        if (filters.android !== "all" && !androidVersions.includes(filters.android)) {
+            return false;
+        }
+        if (filters.profile !== "all" && !executionProfiles.includes(filters.profile)) {
             return false;
         }
         if (filters.search && !haystack.includes(filters.search)) {

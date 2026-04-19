@@ -78,12 +78,19 @@ describe("admin-panel current QA helpers", () => {
           title: "Android Unit Master",
           group: "android",
           prereqsMet: true,
+          testLevel: "module",
+          testLevelLabel: "Modultests",
+          appRole: "parent",
+          appRoleLabel: "Eltern-App",
+          executionProfiles: ["minimal", "standard", "full"],
         },
       ],
     );
 
     expect(JSON.stringify(guideData)).toContain("android-unit-master");
     expect(JSON.stringify(guideData)).toContain("pass");
+    expect(JSON.stringify(guideData)).toContain("Modultests");
+    expect(JSON.stringify(guideData)).toContain("Eltern-App");
   });
 
   it("loads suite guide data via /api/suites and feeds renderQaExecutionGuide", async () => {
@@ -138,6 +145,12 @@ describe("admin-panel current QA helpers", () => {
           status: "fail",
           groupTitle: "QA",
           automationType: "manual",
+          testLevel: "system",
+          testLevelLabel: "Systemtests",
+          appRole: "both",
+          appRoleLabel: "Beide Apps",
+          androidVersions: ["14", "15"],
+          executionProfiles: ["standard", "full"],
         },
       ],
     });

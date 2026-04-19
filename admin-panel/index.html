@@ -1077,6 +1077,36 @@
                             <details class="qa-register-advanced-filters mm-u033">
                                 <summary>Erweiterte Filter</summary>
                                 <div class="python-automation-toolbar qa-register-advanced-toolbar mm-u033">
+                                    <select id="testing-register-level-filter" title="Nach Testebene filtern">
+                                        <option value="all">Alle Testebenen</option>
+                                        <option value="software">Softwaretests</option>
+                                        <option value="module">Modultests</option>
+                                        <option value="integration">Integrationstests</option>
+                                        <option value="system">Systemtests</option>
+                                    </select>
+                                    <select id="testing-register-role-filter" title="Nach App-Rolle filtern">
+                                        <option value="all">Alle Rollen</option>
+                                        <option value="parent">Nur Eltern-App</option>
+                                        <option value="child">Nur Kinder-App</option>
+                                        <option value="both">Nur beide Apps / Interaktion</option>
+                                        <option value="platform">Nur Plattform / QA</option>
+                                    </select>
+                                    <select id="testing-register-android-filter" title="Nach Android-Version filtern">
+                                        <option value="all">Alle Android-Versionen</option>
+                                        <option value="10">Android 10</option>
+                                        <option value="11">Android 11</option>
+                                        <option value="12">Android 12</option>
+                                        <option value="13">Android 13</option>
+                                        <option value="14">Android 14</option>
+                                        <option value="15">Android 15</option>
+                                        <option value="16">Android 16</option>
+                                    </select>
+                                    <select id="testing-register-profile-filter" title="Nach Ausführungsprofil filtern">
+                                        <option value="all">Alle Ausführungsprofile</option>
+                                        <option value="minimal">Minimalprofil</option>
+                                        <option value="standard">Standardprofil</option>
+                                        <option value="full">Vollprofil</option>
+                                    </select>
                                     <select id="testing-register-advanced-filter" title="Spezialfilter für seltene QA-Sichten">
                                         <option value="all">Kein Spezialfilter</option>
                                         <option value="critical">Nur kritische Punkte</option>
