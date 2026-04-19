@@ -34,6 +34,7 @@ from test_automation import (  # noqa: E402
 )
 from qa_catalog import (  # noqa: E402
     build_qa_catalog,
+    build_suite_entries,
     load_android_scenario_mappings,
     load_android_version_matrix,
     load_device_profiles,
@@ -327,6 +328,10 @@ def infer_register_metadata(
     documentation: str = "",
     command: str = "",
     prereq_reason: str = "",
+    android_versions: list[str] | None = None,
+    execution_profiles: list[str] | None = None,
+    device_mode: str = "",
+    source_path: str = "",
 ) -> dict[str, object]:
     owner = "Engineering"
     severity = "medium"
@@ -334,6 +339,9 @@ def infer_register_metadata(
     evidence_required = automation_type in {"manual", "documented"}
     environment = "local"
     known_constraints = ""
+    normalized_android_versions = [str(item).strip() for item in (android_versions or []) if str(item).strip()]
+    normalized_execution_profiles = [str(item).strip() for item in (execution_profiles or []) if str(item).strip()]
+    location_key = f"{documentation} {source_path}".lower()
 
     group_key = f"{group_id} {group_title} {source}".lower()
     if any(token in group_key for token in ("security", "rules", "compliance", "legal", "audit")):
@@ -370,6 +378,65 @@ def infer_register_metadata(
         environment = "release"
     elif "ios" in group_key:
         environment = "ios"
+
+    test_level = "integration"
+    if entry_kind == "suite":
+        if suite_ref.startswith(("backend-", "python-", "release-")):
+            test_level = "software"
+        elif suite_ref.startswith("android-unit"):
+            test_level = "module"
+        elif suite_ref.startswith(("android-usb", "android-e2e")):
+            test_level = "system"
+        elif suite_ref.startswith("android-connected"):
+            test_level = "integration"
+        elif suite_ref.startswith("android-"):
+            test_level = "integration"
+    elif source_path.startswith("test/system/") or "/androidtest/" in location_key and any(token in location_key for token in ("commissioning", "e2e", "deeplink")):
+        test_level = "system"
+    elif source_path.startswith("test/integration/") or "/androidtest/" in location_key:
+        test_level = "integration"
+    elif source_path.startswith("test/module/") or "/src/test/" in location_key:
+        test_level = "module"
+    elif any(token in group_key for token in ("runtime", "validation", "python qa", "release")):
+        test_level = "software"
+
+    app_role = "both"
+    role_key = f"{suite_ref} {group_key} {location_key}"
+    if any(token in role_key for token in ("master", "parent")):
+        app_role = "parent"
+    elif any(token in role_key for token in ("child", "pairing")):
+        app_role = "child"
+    elif entry_kind == "suite" and suite_ref.startswith(("backend-", "python-", "release-")):
+        app_role = "platform"
+    elif source_path.startswith("scripts/tests/"):
+        app_role = "platform"
+
+    test_level_label = {
+        "software": "Softwaretests",
+        "module": "Modultests",
+        "integration": "Integrationstests",
+        "system": "Systemtests",
+    }.get(test_level, "Integrationstests")
+    app_role_label = {
+        "parent": "Eltern-App",
+        "child": "Kinder-App",
+        "both": "Beide Apps",
+        "platform": "Plattform / QA",
+    }.get(app_role, "Beide Apps")
+
+    if not normalized_execution_profiles:
+        if test_level in {"software", "module"}:
+            normalized_execution_profiles.append("minimal")
+        if test_level in {"integration", "system"}:
+            normalized_execution_profiles.append("standard")
+        normalized_execution_profiles.append("full")
+    deduped_execution_profiles: list[str] = []
+    for profile_id in normalized_execution_profiles:
+        if profile_id and profile_id not in deduped_execution_profiles:
+            deduped_execution_profiles.append(profile_id)
+
+    device_role_a = "parent" if app_role in {"parent", "both"} and device_mode == "dual-device" else app_role
+    device_role_b = "child" if app_role == "both" and device_mode == "dual-device" else ""
 
     if suite_ref in {"android-connected-master", "android-connected-child", "android-usb-master", "android-usb-child", "android-e2e-shell", "android-e2e-shell-script"}:
         known_constraints = "Erfordert verbundenes Android-Geraet oder Emulator via adb."
@@ -427,6 +494,15 @@ def infer_register_metadata(
         "evidenceRequired": evidence_required,
         "environment": environment,
         "knownConstraints": known_constraints,
+        "testLevel": test_level,
+        "testLevelLabel": test_level_label,
+        "appRole": app_role,
+        "appRoleLabel": app_role_label,
+        "androidVersions": normalized_android_versions,
+        "executionProfiles": deduped_execution_profiles,
+        "deviceMode": device_mode,
+        "deviceRoleA": device_role_a,
+        "deviceRoleB": device_role_b,
         "lastVerifiedAt": updated_at or "",
         "lastSuccessfulAt": updated_at if status == "pass" else "",
         "hasSuccessfulRun": status == "pass",
@@ -3050,6 +3126,10 @@ def build_repo_test_inventory_entries(
                     documentation=relative_path,
                     command=str(suite_meta.get("command") or ""),
                     prereq_reason=str(suite_meta.get("prereqReason") or ""),
+                    android_versions=list(cast(list[str], suite_meta.get("androidVersions") or [])),
+                    execution_profiles=list(cast(list[str], suite_meta.get("executionProfiles") or [])),
+                    device_mode=str(suite_meta.get("deviceMode") or "host"),
+                    source_path=relative_path,
                 ),
             }
         )
@@ -3211,6 +3291,9 @@ def build_testing_register() -> dict[str, object]:
                     documentation=str(test.get("documentation") or ""),
                     command=str(test.get("command") or suite_meta.get("command") or ""),
                     prereq_reason=str(suite_meta.get("prereqReason") or ""),
+                    android_versions=list(cast(list[str], suite_meta.get("androidVersions") or [])),
+                    execution_profiles=list(cast(list[str], suite_meta.get("executionProfiles") or [])),
+                    device_mode=str(suite_meta.get("deviceMode") or "host"),
                 ),
             }
             items.append(item)
@@ -3269,6 +3352,9 @@ def build_testing_register() -> dict[str, object]:
                     documentation=str(suite.get("documentation") or ""),
                     command=str(suite.get("command") or ""),
                     prereq_reason=str(suite.get("prereqReason") or ""),
+                    android_versions=list(cast(list[str], suite.get("androidVersions") or [])),
+                    execution_profiles=list(cast(list[str], suite.get("executionProfiles") or [])),
+                    device_mode=str(suite.get("deviceMode") or "host"),
                 ),
             }
         )
@@ -3289,6 +3375,10 @@ def build_testing_register() -> dict[str, object]:
         "stale": sum(1 for item in items if item.get("staleEvidence")),
         "withoutSuccess": sum(1 for item in items if not item.get("hasSuccessfulRun")),
         "unsupported": sum(1 for item in items if item.get("groupId") == "repo-tests-unsupported"),
+        "software": sum(1 for item in items if item.get("testLevel") == "software"),
+        "module": sum(1 for item in items if item.get("testLevel") == "module"),
+        "integration": sum(1 for item in items if item.get("testLevel") == "integration"),
+        "system": sum(1 for item in items if item.get("testLevel") == "system"),
     }
 
     duplicate_insights = summarize_testing_register_duplicates(items)
@@ -4675,6 +4765,11 @@ def stop_self_healing_monitor() -> None:
 def get_suite_catalog() -> dict[str, object]:
     """Gibt den vollständigen Suite-Katalog als JSON-Struktur zurück."""
     suites_list: list[dict[str, object]] = []
+    suite_meta_index = {
+        str(entry.get("id") or ""): entry
+        for entry in build_suite_entries(load_android_version_matrix(), suites=TA_SUITES)
+        if str(entry.get("id") or "")
+    }
     for suite in TA_SUITES:
         ok, reason = ta_check_prereqs(suite.required_prereqs)
         scope = "host"
@@ -4692,6 +4787,8 @@ def get_suite_catalog() -> dict[str, object]:
         elif suite.group == "release":
             scope = "release"
 
+        suite_meta = suite_meta_index.get(suite.suite_id, {})
+
         suites_list.append({
             "suiteId": suite.suite_id,
             "title": suite.title,
@@ -4703,6 +4800,15 @@ def get_suite_catalog() -> dict[str, object]:
             "prereqsMet": ok,
             "prereqReason": reason,
             "timeoutSec": suite.timeout_sec,
+            "testLevel": str(suite_meta.get("testLevel") or "integration"),
+            "testLevelLabel": str(suite_meta.get("testLevelLabel") or "Integrationstests"),
+            "appRole": str(suite_meta.get("appRole") or "both"),
+            "appRoleLabel": str(suite_meta.get("appRoleLabel") or "Beide Apps"),
+            "deviceMode": str(suite_meta.get("deviceMode") or ("single-device" if scope == "device" else "host")),
+            "androidVersions": list(cast(list[str], suite_meta.get("androidVersions") or [])),
+            "executionProfiles": list(cast(list[str], suite_meta.get("executionProfiles") or [])),
+            "deviceRoleA": str(suite_meta.get("deviceRoleA") or ""),
+            "deviceRoleB": str(suite_meta.get("deviceRoleB") or ""),
         })
 
     suites_list.extend(dict(entry) for entry in EXTERNAL_QA_SUITES)

@@ -1,0 +1,32 @@
+[
+  {
+    "profileId": "minimal",
+    "displayName": "Minimalprofil",
+    "description": "Schneller lokaler Lauf mit repräsentativen Software-, Modul- und Kern-Integrationspfaden.",
+    "deviceMode": "mixed",
+    "targetLevels": ["software", "module", "integration"],
+    "androidVersions": ["10", "14", "16"],
+    "requiresDualDevice": false,
+    "cost": "low"
+  },
+  {
+    "profileId": "standard",
+    "displayName": "Standardprofil",
+    "description": "Tägliche Qualitätssicherung mit kritischen Android-Kombinationen, Integrationspfaden und ausgewählten Zwei-Geräte-Szenarien.",
+    "deviceMode": "mixed",
+    "targetLevels": ["software", "module", "integration", "system"],
+    "androidVersions": ["10", "12", "14", "15", "16"],
+    "requiresDualDevice": true,
+    "cost": "medium"
+  },
+  {
+    "profileId": "full",
+    "displayName": "Vollprofil",
+    "description": "Breite Matrix über Android 10 bis 16 inklusive Dual-Device- und Systemtests für intensive Prüfungen.",
+    "deviceMode": "mixed",
+    "targetLevels": ["software", "module", "integration", "system"],
+    "androidVersions": ["10", "11", "12", "13", "14", "15", "16"],
+    "requiresDualDevice": true,
+    "cost": "high"
+  }
+]

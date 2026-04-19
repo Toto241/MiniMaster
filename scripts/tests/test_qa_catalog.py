@@ -16,11 +16,17 @@ class TestQaCatalog:
         assert result["catalogMaturity"] == "seed"
         assert "androidMatrix" in result
         assert "deviceProfiles" in result
+        assert "executionProfiles" in result
         assert "dualDeviceScenarios" in result
         assert "androidScenarioMappings" in result
         assert "suiteEntries" in result
         assert "inventoryEntries" in result
         assert "automationBacklog" in result
+
+    def test_execution_profiles_cover_minimal_standard_full(self):
+        result = build_qa_catalog()
+
+        assert [entry["profileId"] for entry in result["executionProfiles"]] == ["minimal", "standard", "full"]
 
     def test_android_matrix_covers_versions_10_to_16(self):
         matrix = load_android_version_matrix()
@@ -41,6 +47,10 @@ class TestQaCatalog:
         assert suite_entries["android-connected-master"]["deviceMode"] == "single-device"
         assert suite_entries["android-e2e-shell-script"]["deviceMode"] == "dual-device"
         assert suite_entries["backend-jest"]["deviceMode"] == "host"
+        assert suite_entries["android-unit-master"]["testLevel"] == "module"
+        assert suite_entries["android-e2e-shell-script"]["testLevel"] == "system"
+        assert suite_entries["android-unit-master"]["appRole"] == "parent"
+        assert "full" in suite_entries["android-e2e-shell-script"]["executionProfiles"]
 
     def test_android_scenario_mappings_reference_known_scenarios(self):
         result = build_qa_catalog()
