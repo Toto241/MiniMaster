@@ -139,3 +139,239 @@ The Cloud Functions backend is split into domain modules under `src/`:
 
 ---
 *This document reflects current prototype boundaries. Update when migration or enforcement engine designs are approved.*
+
+## Sequenzdiagramme
+
+### Pairing (Master ↔ Child)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant M as MasterApp
+  participant CF as Cloud Functions
+  participant FS as Firestore
+  participant C as ChildApp
+  M->>CF: createPairingCode(masterImei)
+  CF->>FS: pairingCodes/{code} {masterImei, expiresAt}
+  CF-->>M: { code, ttl }
+  C->>CF: redeemPairingCode(code, childImei, fcmToken)
+  CF->>FS: get pairingCodes/{code}
+  CF->>FS: write children/{childImei} {masterImei, fcmToken}
+  CF->>FS: delete pairingCodes/{code}
+  CF-->>C: { masterImei }
+```
+
+### Task Lifecycle (Erstellung → Foto-Proof → AI-Verifikation → Approval)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant M as MasterApp
+  participant CF as Cloud Functions
+  participant FS as Firestore
+  participant ST as Storage
+  participant AI as Gemini Vision
+  participant C as ChildApp
+  M->>CF: createTask({childId, description, deadline})
+  CF->>FS: tasks/{taskId} status=open
+  CF-->>C: FCM push (newTask)
+  C->>ST: putObject children/{childId}/tasks/{taskId}/proof.jpg
+  C->>CF: completeTask({taskId, photoUrl})
+  CF->>ST: getMetadata + read first 64KB
+  Note right of CF: validatePhotoObjectMetadata<br/>+ detectExifGpsTag
+  CF->>AI: verifyTaskPhoto(prompt, photo)
+  AI-->>CF: {confidence}
+  alt confidence ≥ threshold
+    CF->>FS: tasks/{taskId} status=pending_approval
+    CF-->>M: FCM push (review)
+  else low confidence
+    CF->>FS: tasks/{taskId} status=rejected_ai
+  end
+  M->>CF: approveTask | rejectTask
+  CF->>FS: tasks/{taskId} status=approved|rejected
+```
+
+### Photo-Proof Validation Detail
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant CF as completeTask
+  participant ST as Storage
+  participant V as validatePhotoObjectMetadata
+  CF->>V: validate(photoPath)
+  V->>ST: file.exists()
+  V->>ST: file.getMetadata()
+  Note right of V: Whitelist MIME-Type<br/>+ Size 256B–10MB
+  V->>ST: createReadStream(0, 65535)
+  Note right of V: detectExifGpsTag(head)<br/>(Defense-in-Depth)
+  alt EXIF GPS detected
+    V-->>CF: HttpsError invalid-argument
+  else clean
+    V-->>CF: ok
+  end
+```
+
+### Subscription Renewal (RTDN + Periodic Reverify)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Play as Google Play
+  participant PS as Pub/Sub Topic
+  participant CF as onPlayBillingNotification
+  participant Sched as reverifyActiveSubscriptions (03:15)
+  participant API as Play Developer API
+  participant FS as Firestore
+  Play->>PS: RTDN (RENEWED|CANCELED|...)
+  PS->>CF: Pub/Sub message
+  CF->>FS: query masters where subscription.purchaseToken == X
+  CF->>FS: update master.subscription.status / isPremium
+  Note over Sched,API: Daily 03:15 Europe/Berlin
+  Sched->>FS: query active|grace_period (limit batch)
+  loop für jeden Master mit purchaseToken
+    Sched->>API: purchases.subscriptions.get
+    API-->>Sched: {expiryTimeMillis, paymentState, cancelReason}
+    Sched->>FS: computeReverifyUpdate → master update
+  end
+```
+
+### Support Grant (Ticket → Debug-Snapshot → AI-Lösung)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User (Master)
+  participant AP as Admin-Panel
+  participant CF as Cloud Functions
+  participant FS as Firestore
+  participant AI as Gemini Pro
+  U->>CF: createSupportTicket({problem})
+  CF->>FS: supportTickets/{id} status=awaiting_user_feedback
+  CF->>FS: supportAccessGrants/{gid} status=requested
+  AP->>CF: grantSupportAccess({ticketId, scopes:[diagnostic_logs]})
+  CF->>FS: supportAccessGrants/{gid} status=active, expiresAt
+  CF->>FS: supportTickets/{id} accessGranted=true
+  CF->>FS: collectDebugSnapshot(masterImei)
+  Note right of CF: sanitizeDebugSnapshot<br/>(Whitelist + Telemetry)
+  CF->>AI: runAiAnalysisRound(prompt, snapshot)
+  AI-->>CF: {solution, confidence}
+  alt confidence ≥ 0.75
+    CF->>FS: supportTickets/{id} status=solved
+  else weiter Runde / Eskalation
+    CF->>FS: conversationRound++ / aiAttemptFailures++
+  end
+  Note over CF,FS: cleanupExpiredGrants täglich → status=expired
+```
+
+### Admin Recovery / Reset Operator Accounts
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Op as Operator (CLI)
+  participant CF as resetOperatorAccounts
+  participant SM as Secret Manager
+  participant FS as Firestore
+  Op->>CF: invoke({recoveryToken, projectId})
+  CF->>SM: read ADMIN_RECOVERY_TOKEN[]
+  CF->>CF: getAdminRecoveryTokens() includes token?
+  alt valid + projectId allowed
+    CF->>FS: batch reset operatorConfig/* + audit log
+    CF-->>Op: { reset: N }
+  else
+    CF-->>Op: HttpsError permission-denied
+  end
+  Note over CF,SM: Quartals-Rotation per scripts/operator-setup.ps1<br/>(Overlap-Phase Komma-Liste)
+```
+
+## C4-Diagramme
+
+### Level 1 — System Context
+
+```mermaid
+C4Context
+  title MiniMaster — System Context
+  Person(parent, "Eltern (Master)", "Verwaltet Kinder, Aufgaben, Belohnungen")
+  Person(child, "Kind (Child)", "Erfüllt Aufgaben, lädt Foto-Proof hoch")
+  Person(operator, "Betreiber (Admin)", "Wartung, Support, Inbetriebnahme")
+  Person(support, "Support-Agent", "Diagnose mit Grant-basiertem Zugriff")
+  System(mm, "MiniMaster", "Aufgaben + Bildschirmzeit-Verwaltung mit Photo-Proof")
+  System_Ext(google_play, "Google Play Billing", "Abonnement-Abrechnung + RTDN")
+  System_Ext(apple_iap, "Apple In-App Purchase", "Abonnement-Abrechnung iOS")
+  System_Ext(gemini, "Gemini API", "Vision + Text-LLM")
+  System_Ext(fcm, "Firebase Cloud Messaging", "Push-Benachrichtigungen")
+  Rel(parent, mm, "Bedient via MasterApp")
+  Rel(child, mm, "Bedient via ChildApp")
+  Rel(operator, mm, "Bedient via Admin-Panel")
+  Rel(support, mm, "Bedient via Admin-Panel (Grant-scoped)")
+  Rel(mm, google_play, "verifyPurchase, RTDN-Abo, Reverify")
+  Rel(mm, apple_iap, "Receipt-Validation (geplant)")
+  Rel(mm, gemini, "Photo-Verification + Support-AI")
+  Rel(mm, fcm, "Push-Benachrichtigungen")
+```
+
+### Level 2 — Container
+
+```mermaid
+C4Container
+  title MiniMaster — Container
+  Person(parent, "Master")
+  Person(child, "Child")
+  Person(operator, "Operator")
+  System_Boundary(mm, "MiniMaster") {
+    Container(masterApp, "MasterApp", "Android Kotlin / iOS Swift", "Aufgaben-CRUD, Belohnungen, Photo-Approval")
+    Container(childApp, "ChildApp", "Android Kotlin / iOS Swift", "Foto-Proof-Upload, Bildschirmzeit-Lock")
+    Container(adminPanel, "Admin-Panel", "Web (HTML/JS)", "Operator-UI, Logs, Setup-Cockpit")
+    Container(functions, "Cloud Functions", "Node.js 22 / TS", "Auth, Tasks, Subscriptions, Support, RTDN, Reverify")
+    ContainerDb(firestore, "Firestore", "NoSQL", "masters, children, tasks, subscriptions, supportTickets, audit_logs, operatorConfig")
+    ContainerDb(storage, "Cloud Storage", "Object Store", "Photo-Proofs (children/{id}/tasks/{id}/proof.jpg)")
+    Container(secrets, "Secret Manager", "GCP", "GEMINI_API_KEY, ADMIN_RECOVERY_TOKEN[]")
+    Container(pubsub, "Pub/Sub", "GCP", "play-billing-notifications Topic")
+  }
+  System_Ext(play, "Google Play")
+  System_Ext(gemini, "Gemini API")
+  System_Ext(fcm, "FCM")
+  Rel(parent, masterApp, "HTTPS")
+  Rel(child, childApp, "HTTPS")
+  Rel(operator, adminPanel, "HTTPS")
+  Rel(masterApp, functions, "Callable")
+  Rel(childApp, functions, "Callable")
+  Rel(adminPanel, functions, "Callable (admin-only)")
+  Rel(functions, firestore, "Read/Write")
+  Rel(functions, storage, "Metadata + EXIF-Scan (64KB)")
+  Rel(functions, secrets, "Read at runtime")
+  Rel(functions, gemini, "HTTPS REST")
+  Rel(functions, fcm, "Send")
+  Rel(play, pubsub, "RTDN publish")
+  Rel(pubsub, functions, "onPlayBillingNotification")
+  Rel(functions, play, "Reverify (purchases.subscriptions.get)")
+```
+
+### Level 3 — Component (Cloud Functions)
+
+```mermaid
+C4Component
+  title Cloud Functions — Components
+  Container_Boundary(functions, "Cloud Functions (Node.js 22)") {
+    Component(auth, "auth.ts", "TS", "Pairing, Login, Recovery-Token-Helpers")
+    Component(tasks, "tasks.ts", "TS", "createTask, completeTask, approve/reject; validatePhotoObjectMetadata + detectExifGpsTag")
+    Component(sub, "subscription.ts", "TS", "verifyPurchase, RTDN-Webhook, Reverify-Scheduler")
+    Component(support, "support.ts", "TS", "Tickets, Grants, AI-Analyse, sanitizeDebugSnapshot")
+    Component(opsetup, "operator-setup.ts", "TS", "getOperatorSetupStatus, setOperatorSetupChecklistItem")
+    Component(shared, "shared.ts", "TS", "AuditLogger, requireAuth/Admin, AppCheck, RateLimit")
+  }
+  ContainerDb(fs, "Firestore")
+  ContainerDb(st, "Storage")
+  Rel(auth, shared, "uses")
+  Rel(tasks, shared, "uses")
+  Rel(sub, shared, "uses")
+  Rel(support, shared, "uses")
+  Rel(opsetup, shared, "uses")
+  Rel(opsetup, auth, "Recovery-Token Status")
+  Rel(tasks, st, "Metadata + EXIF-Scan")
+  Rel(tasks, fs, "tasks/*")
+  Rel(sub, fs, "masters/*/subscription")
+  Rel(support, fs, "supportTickets/*, supportAccessGrants/*")
+  Rel(opsetup, fs, "operatorConfig/setupChecklist")
+```

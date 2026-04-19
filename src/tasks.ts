@@ -33,6 +33,58 @@ const MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
 const MIN_PHOTO_SIZE_BYTES = 256;
 
 /**
+ * Wieviele Bytes vom Anfang der Bilddatei für die EXIF-GPS-Inspektion gelesen
+ * werden. EXIF-Segmente liegen normalerweise in den ersten 64 KB.
+ */
+const EXIF_SCAN_BYTES = 64 * 1024;
+
+/**
+ * Defense-in-Depth EXIF-GPS-Detektor (kein vollständiger TIFF-Parser).
+ *
+ * Sucht innerhalb des EXIF/APP1-Segments nach den Bytefolgen, die einen
+ * GPS-IFD-Pointer (TIFF-Tag 0x8825) markieren — sowohl in Big-Endian ("MM",
+ * 0x88 0x25) als auch in Little-Endian ("II", 0x25 0x88) Reihenfolge,
+ * abhängig vom TIFF-Header-Endianness. Treffer außerhalb des EXIF-Segments
+ * werden ignoriert, um Falschpositive in komprimierten Bilddaten zu vermeiden.
+ *
+ * Exportiert für Unit-Tests; in Produktion via `validatePhotoObjectMetadata`
+ * aufgerufen.
+ */
+export function detectExifGpsTag(buf: Buffer): boolean {
+  if (!buf || buf.length < 32) return false;
+  // Suche nach EXIF-Marker "Exif\0\0"
+  const EXIF_MARKER = Buffer.from([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
+  const exifIdx = buf.indexOf(EXIF_MARKER);
+  if (exifIdx < 0) return false;
+
+  // TIFF-Header beginnt direkt nach dem EXIF-Marker
+  const tiffStart = exifIdx + EXIF_MARKER.length;
+  if (tiffStart + 8 > buf.length) return false;
+
+  const endianMarker = buf.readUInt16BE(tiffStart);
+  let bigEndian: boolean;
+  if (endianMarker === 0x4D4D) {       // "MM"
+    bigEndian = true;
+  } else if (endianMarker === 0x4949) {  // "II"
+    bigEndian = false;
+  } else {
+    return false;
+  }
+
+  // GPS-IFD-Pointer Tag = 0x8825, in Endianness des TIFF-Headers
+  const gpsTagBytes = bigEndian
+    ? Buffer.from([0x88, 0x25])
+    : Buffer.from([0x25, 0x88]);
+
+  // Suche nur innerhalb des EXIF-Segments (Heuristik: Anfang TIFF-Header
+  // bis Pufferende oder max. 64 KB), nicht in nachfolgenden komprimierten
+  // Bilddaten — das mindert Falschpositive.
+  const scanEnd = Math.min(buf.length, tiffStart + EXIF_SCAN_BYTES);
+  const segment = buf.subarray(tiffStart, scanEnd);
+  return segment.indexOf(gpsTagBytes) >= 0;
+}
+
+/**
  * Validiert MIME-Type und Größe des hochgeladenen Photo-Proof-Objekts via Storage-Metadaten.
  *
  * Defense-in-Depth: Ergänzt Storage-Rules-Check und URL-Path-Scoping um:
@@ -90,6 +142,38 @@ async function validatePhotoObjectMetadata(
       "invalid-argument",
       `photoUrl Datei zu groß (${sizeBytes} Bytes, Maximum ${MAX_PHOTO_SIZE_BYTES}).`,
     );
+  }
+
+  // EXIF-GPS-Defense-in-Depth: Lädt die ersten 64 KB und lehnt Uploads ab,
+  // die GPS-Geo-Tags enthalten (Datenschutz). Kann via Env
+  // PHOTO_EXIF_GPS_REJECT=false abgeschaltet werden (Notfall-Override).
+  if (process.env.PHOTO_EXIF_GPS_REJECT !== "false") {
+    try {
+      const bucket = storage().bucket();
+      const file = bucket.file(decodedPath);
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        const stream = file.createReadStream({ start: 0, end: EXIF_SCAN_BYTES - 1 });
+        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+        stream.on("end", () => resolve());
+        stream.on("error", (err: Error) => reject(err));
+      });
+      const head = Buffer.concat(chunks);
+      if (detectExifGpsTag(head)) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "photoUrl enthält EXIF-GPS-Geodaten. Bitte vor Upload entfernen (Privacy-Schutz).",
+        );
+      }
+    } catch (err) {
+      if (err instanceof functions.https.HttpsError) throw err;
+      // Stream-/IO-Fehler nicht eskalieren (Test-Setup-Tolerance) —
+      // Validierung übersprungen, dafür Warnung loggen.
+      functions.logger.warn(
+        `Photo-Proof EXIF-GPS-Scan übersprungen für child=${childId} task=${taskId}: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }
 

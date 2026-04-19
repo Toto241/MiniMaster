@@ -4,17 +4,68 @@
   "version": "1.0.0",
   "description": "MiniMaster desktop launcher packaging config",
   "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish=never",
+    "dist:win": "electron-builder --win --publish=never",
+    "dist:mac": "electron-builder --mac --publish=never",
+    "dist:linux": "electron-builder --linux --publish=never",
+    "dist:all": "electron-builder -mwl --publish=never"
+  },
   "build": {
     "appId": "com.minimaster.desktop",
     "productName": "MiniMaster Desktop",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "main.js",
       "preload.js",
       "operator-preload.js",
-      "launcher.html"
-    ]
+      "launcher.html",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64", "arm64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "publisherName": "MiniMaster",
+      "signtoolOptions": {
+        "publisherName": "MiniMaster"
+      }
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "writeUpdateInfo": false
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64", "arm64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "category": "Utility"
+    }
   },
   "devDependencies": {
+    "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   }
 }

@@ -291,3 +291,160 @@ und im Admin-Panel-Tab "⚙️ Einrichtung" rot angezeigt.
 - **Primär:** Lead-Operator (siehe On-Call-Roster)
 - **Backup:** Sicherheitsbeauftragter
 - **Eskalation bei Failure:** Geschäftsführung + alle Co-Operatoren via Out-of-Band-Kanal
+
+## Rollback-Drill-Protokoll
+
+Übungs-Szenario zur Validierung der Rollback-Fähigkeit. Wird vierteljährlich
+vom Lead-Operator durchgeführt. Ergebnisse werden in `audit_logs` mit
+`action = "ops.rollback_drill"` festgehalten.
+
+### Drill-Schritte (Staging)
+
+1. **Pre-Snapshot**
+
+   ```powershell
+   firebase --project minimaster-staging firestore:export gs://minimaster-staging-backups/drill-$(Get-Date -Format yyyyMMdd-HHmm)
+   .\scripts\operator-setup.ps1 -Action status -ProjectId minimaster-staging -OutFile drill-pre.json
+   ```
+
+2. **Bewusste Fehl-Deployment-Simulation** — Functions-Version mit
+   absichtlichem `throw new Error("DRILL")` in `verifyPurchase` deployen:
+
+   ```powershell
+   firebase --project minimaster-staging deploy --only functions:verifyPurchase
+   ```
+
+3. **Detection-Latenz messen** — Zeit bis Alerting (Cloud Monitoring → Slack)
+   in `drill-results.csv` eintragen. Ziel: ≤ 5 min.
+
+4. **Rollback** über Functions-Version oder `gcloud functions deploy --source=<previous-tag>`:
+
+   ```powershell
+   gcloud functions deploy verifyPurchase --source=. --project minimaster-staging --gen2=false
+   ```
+
+5. **Post-Validation** — Smoke-Test des verifyPurchase-Pfads, Status-Re-Check:
+
+   ```powershell
+   .\scripts\operator-setup.ps1 -Action status -ProjectId minimaster-staging -OutFile drill-post.json
+   ```
+
+6. **Datenbank-Restore-Verifikation** (jährlich): Pre-Snapshot in Disposable-
+   Projekt importieren und Stichprobe von 100 Mastern + Children gegen
+   Original-Snapshot diffen.
+
+### Akzeptanzkriterien
+
+- Detection-Latenz ≤ 5 min
+- Rollback-Latenz ≤ 10 min ab Detection
+- Keine Datenverluste in `masters` / `children` / `tasks` / `subscriptions`
+- Audit-Log enthält `ops.rollback_drill` mit `outcome=pass|fail` und Metriken
+
+### Versagensfall (drill = fail)
+
+- Incident-Ticket mit P1 anlegen
+- Root-Cause-Analyse innerhalb 48 h
+- Korrekturmaßnahme bis zum nächsten Quartals-Drill umgesetzt
+
+---
+
+## On-Call-Roster (Template)
+
+| Woche                | Primary             | Secondary           | Eskalation       |
+|----------------------|---------------------|---------------------|------------------|
+| Woche 1 (Mo–So)      | <Operator A>        | <Operator B>        | Geschäftsführung |
+| Woche 2              | <Operator B>        | <Operator C>        | Geschäftsführung |
+| Woche 3              | <Operator C>        | <Operator A>        | Geschäftsführung |
+| Woche 4              | <Operator A>        | <Operator B>        | Geschäftsführung |
+
+**Ablöse:** Sonntag 18:00 Europe/Berlin per Out-of-Band-Kanal (Signal/PagerDuty).
+
+**Erreichbarkeitsschwelle Primary:** ≤ 15 min für P1, ≤ 1 h für P2.
+
+**Verantwortungsbereich:**
+- Live-Monitoring der Cloud-Functions-Fehlerrate
+- RTDN-Pub/Sub-Backlog (`backlog_size > 100 für > 10 min` → P2)
+- Subscription-Reverify-Fehlerrate (> 5 % über 24 h → P3)
+- Recovery-Token-Audit (siehe Quartals-SOP)
+- Eskalation an Externe (Firebase-Support / Play-Support) bei Plattform-Outages
+
+Roster-Änderungen werden im Admin-Panel-Tab "⚙️ Einrichtung" via Checklist-Punkt
+`oncall_roster_updated_<YYYY-MM>` dokumentiert (audit-logged).
+
+## Desktop Build & Code-Signing
+
+### Lokal (unsigniert, dev)
+
+```pwsh
+cd desktop
+npm install
+npm run dist          # alle Targets (current OS)
+npm run dist:win      # Windows nsis + portable
+npm run dist:mac      # macOS dmg + zip
+npm run dist:linux    # Linux AppImage + deb
+```
+
+Artefakte landen unter `desktop/release/`.
+
+### CI (GitHub Actions)
+
+Workflow: [`.github/workflows/desktop-ci.yml`](.github/workflows/desktop-ci.yml)
+
+- **Trigger:** Tag-Push `desktop-v*` oder manuell via `workflow_dispatch`
+- **Matrix:** windows-latest · macos-latest · ubuntu-latest
+- **Eingang `sign=true`** aktiviert Code-Signing, sofern Secrets gesetzt:
+
+| Secret | Plattform | Inhalt |
+|---|---|---|
+| `WIN_CSC_LINK` | Windows | Base64-kodiertes `.pfx` |
+| `MAC_CSC_LINK` | macOS | Base64-kodiertes `.p12` |
+| `CSC_KEY_PASSWORD` | beide | Passwort des Zertifikats |
+| `APPLE_ID` | macOS | Apple-ID für Notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | macOS | App-spezifisches Passwort |
+| `APPLE_TEAM_ID` | macOS | Apple Team-ID |
+
+Ohne Secrets baut die Pipeline unsignierte Dev-Artefakte (für interne Tests).
+
+### Release-SOP
+
+1. `desktop/package.json` → `version` erhöhen
+2. Tag setzen: `git tag desktop-v1.0.1 && git push origin desktop-v1.0.1`
+3. Workflow läuft automatisch, lädt Artefakte als Build-Artifact hoch
+4. Manuelles Release in GitHub anlegen, Artefakte anhängen
+5. Smoke-Test auf einer sauberen VM pro OS
+
+## Offline-Policy-Cache (childApp)
+
+### Strategie
+
+Pure-Kotlin Modul [`OfflinePolicyCache`](childApp/src/main/java/com/google/pairing/child/OfflinePolicyCache.kt)
+in `com.google.pairing.child` ohne Android-Abhängigkeiten (testbar via JVM-Unit-Tests).
+
+| Phase | Dauer (Default) | Verhalten |
+|---|---|---|
+| FRESH | < 6 h | Cache wird angewendet |
+| STALE_BUT_USABLE | 6–72 h | Cache wird angewendet, Pull-Versuch parallel |
+| EXPIRED_SAFE_MODE | > 72 h | Safe-Mode JSON wird durchgesetzt (nur Notruf-Apps etc.) |
+
+Schwellwerte sind pro Profil über die Repository-Schicht überschreibbar.
+
+### Conflict-Resolution
+
+| Lokal | Remote | Outcome |
+|---|---|---|
+| null | beliebig | REPLACE_WITH_REMOTE |
+| version=4 | version=5 | REPLACE_WITH_REMOTE (Server gewinnt) |
+| version=5 | version=4 | KEEP_LOCAL (Schutz vor Replay) |
+| version=5, applied=2000 | version=5, applied=1000 | TIE_PREFER_OLDER (deterministisch) |
+| identisch | identisch | KEEP_LOCAL |
+
+Tests: [`OfflinePolicyCacheTest`](childApp/src/test/java/com/google/pairing/child/OfflinePolicyCacheTest.kt) (12 Cases).
+
+### Wire-up (folgt in eigener Iteration)
+
+1. `CommandSyncRepository` schreibt nach erfolgreichem `applyPolicy` in DataStore-/SharedPreferences-Slot
+   `cached_policy_v1` (JSON: `policyVersion`, `appliedAtEpochMs`, `sourceEpochMs`, `payloadJson`).
+2. Beim `MiniMasterAccessibilityService`-Start wird `OfflinePolicyCache.selectEnforcedPolicy(...)` als
+   Fallback verwendet, falls der Server unerreichbar ist.
+3. Periodischer WorkManager-Job (15 min) versucht Re-Sync, wenn `assessFreshness != FRESH`.
+4. Safe-Mode-Payload wird beim Pairing einmalig vom Server gepullt und als „letzte sichere Konfiguration" persistiert.
