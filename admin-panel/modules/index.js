@@ -15,6 +15,7 @@ import "./core/firebase-config.js";
 import "./core/dates.js";
 import "./core/event-delegation.js";
 import "./core/nav-bootstrap.js";
+import "./core/global-action-bootstrap.js";
 import "./core/crypto-debug.js";
 import "./tabs/legal-playstore.js";
 import "./tabs/qa-testing-register.js";

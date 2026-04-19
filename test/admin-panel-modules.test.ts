@@ -115,6 +115,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "firebaseDeployment",
       "firebaseRecovery",
       "format",
+      "globalActionBootstrap",
       "legalPlaystore",
       "navBootstrap",
       "operatorAssistant",
@@ -1418,6 +1419,105 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(html).not.toMatch(/id="logout-btn"[\s\S]*?onclick="logout/);
   });
 
+  it("global-action-bootstrap.js delegiert data-action -> window.fn (F6 Stufe 2)", () => {
+    const docListeners: Array<{ type: string; fn: (ev: any) => void }> = [];
+    const fakeDocument: any = {
+      readyState: "complete",
+      addEventListener(type: string, fn: (ev: any) => void) { docListeners.push({ type, fn }); },
+    };
+    globalScope.document = fakeDocument;
+    const calls: Array<{ name: string; args: any[] }> = [];
+    globalScope.triggerJob = (...args: any[]) => calls.push({ name: "triggerJob", args });
+    globalScope.saveBootstrapFirebaseConfig = () => calls.push({ name: "saveBootstrapFirebaseConfig", args: [] });
+    globalScope.logout = () => calls.push({ name: "logout", args: [] });
+
+    load(path.join(MODULES_DIR, "core", "registry.js"));
+    load(path.join(MODULES_DIR, "core", "global-action-bootstrap.js"));
+
+    const gab = globalScope.MM.globalActionBootstrap;
+    expect(gab).toBeDefined();
+    const click = docListeners.find(d => d.type === "click");
+    expect(click).toBeDefined();
+
+    function makeNode(action: string | null, args?: string) {
+      const node: any = {
+        getAttribute(name: string) {
+          if (name === "data-action") return action;
+          if (name === "data-args") return args || null;
+          return null;
+        },
+        closest(selector: string) {
+          if (selector === "[data-action]" && action) return node;
+          return null;
+        },
+      };
+      return node;
+    }
+
+    // ohne args: einfacher Aufruf, preventDefault wird aufgerufen
+    let prevented = false;
+    click!.fn({ target: makeNode("saveBootstrapFirebaseConfig"), preventDefault() { prevented = true; } });
+    expect(prevented).toBe(true);
+    expect(calls).toEqual([{ name: "saveBootstrapFirebaseConfig", args: [] }]);
+
+    // mit JSON-Args
+    click!.fn({ target: makeNode("triggerJob", '["checkExpiredSubscriptions"]'), preventDefault() {} });
+    expect(calls[1]).toEqual({ name: "triggerJob", args: ["checkExpiredSubscriptions"] });
+
+    // reservierte Aktion "logout" wird ignoriert (nav-bootstrap macht das)
+    click!.fn({ target: makeNode("logout"), preventDefault() {} });
+    expect(calls.find(c => c.name === "logout")).toBeUndefined();
+
+    // Klick ohne data-action -> noop
+    let prev2 = false;
+    click!.fn({ target: { closest: () => null }, preventDefault() { prev2 = true; } });
+    expect(prev2).toBe(false);
+
+    // unbekannte Aktion -> noop, kein throw
+    expect(() => click!.fn({
+      target: makeNode("doesNotExist"),
+      preventDefault() {},
+    })).not.toThrow();
+
+    // _parseArgs Defensive: invalides JSON -> als String-Arg
+    expect(gab._parseArgs(null)).toEqual([]);
+    expect(gab._parseArgs("")).toEqual([]);
+    expect(gab._parseArgs('"hello"')).toEqual(["hello"]);
+    expect(gab._parseArgs("[1,2,3]")).toEqual([1, 2, 3]);
+    expect(gab._parseArgs("not json")).toEqual(["not json"]);
+
+    // Idempotenz: bind() bindet nicht doppelt
+    gab.bind();
+    expect(docListeners.filter(d => d.type === "click").length).toBe(1);
+  });
+
+  it("index.html migriert Bootstrap-Firebase, Modal-Close und Jobs auf data-action (F6 Stufe 2)", async () => {
+    const html = await fs.readFile(
+      path.resolve(__dirname, "..", "admin-panel", "index.html"), "utf8"
+    );
+    // Bootstrap-Firebase-Block: keine onclick mehr fuer diese Funktionen
+    for (const fn of [
+      "loadBootstrapFirebaseConfigFromUrl",
+      "loadBootstrapFirebaseConfigFromFile",
+      "saveBootstrapFirebaseConfig",
+      "reloadWithBootstrapConfig",
+      "copyFirebaseRecoveryScript",
+      "runFirebaseRecoveryAutopilot",
+      "runStartFromScratchAutopilot",
+      "closeUserDetailsModal",
+      "closeDeviceDetailsModal",
+      "closeTicketDetailsModal",
+    ]) {
+      expect(html).not.toMatch(new RegExp(`onclick="${fn}\\(`));
+      expect(html).toMatch(new RegExp(`data-action="${fn}"`));
+    }
+    // Jobs-Block: triggerJob mit data-args
+    expect(html).not.toMatch(/onclick="triggerJob\(/);
+    expect(html).toMatch(/data-action="triggerJob" data-args='\["checkExpiredSubscriptions"\]'/);
+    expect(html).toMatch(/data-action="triggerJob" data-args='\["cleanupExpiredGrants"\]'/);
+    expect(html).toMatch(/data-action="triggerJob" data-args='\["sendDailyErrorReport"\]'/);
+  });
+
   it("testing-register-insights.js Pure Helfer ist paritaetisch zu app.js (Welle 2 Step 12)", () => {
     load(path.join(MODULES_DIR, "tabs", "testing-register-insights.js"));
     const tri = globalScope.MM.testingRegisterInsights;
@@ -1687,6 +1787,7 @@ describe("admin-panel module wiring", () => {
     expect(sw).toContain("./modules/core/dates.js");
     expect(sw).toContain("./modules/core/event-delegation.js");
     expect(sw).toContain("./modules/core/nav-bootstrap.js");
+    expect(sw).toContain("./modules/core/global-action-bootstrap.js");
     expect(sw).toContain("./modules/core/crypto-debug.js");
     expect(sw).toContain("./modules/tabs/legal-playstore.js");
     expect(sw).toContain("./modules/tabs/qa-testing-register.js");
@@ -1740,7 +1841,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(26);
+    expect(sandboxGlobal.MM.list().length).toBe(27);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
