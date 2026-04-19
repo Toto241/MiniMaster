@@ -235,6 +235,7 @@
       <div class="inline">
         <button class="btn btn-primary" type="button" onclick="authenticateForTickets()" title="Mit Master IMEI und Secret Key beim System anmelden">Authentifizieren</button>
         <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
+        <button id="secure-web-control-btn" class="btn btn-green" type="button" onclick="openSecureWebControl()" title="Web-Control mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Web-Control mit Sitzung öffnen</button>
       </div>
 
       <div class="form-grid">
@@ -342,6 +343,12 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
     }
 
+    function updateSecureWebControlButtonState() {
+      const button = document.getElementById("secure-web-control-btn");
+      if (!button) return;
+      button.disabled = !(functions && auth && currentMasterImei);
+    }
+
     function escapeHtml(value) {
       return String(value || "")
         .replace(/&/g, "&amp;")
@@ -384,6 +391,49 @@
       return true;
     }
 
+    async function openSecureWebControl() {
+      try {
+        if (!functions || !auth || !currentMasterImei) {
+          setStatus("ticket-auth-status", "Bitte zuerst im Eltern-Panel authentifizieren.", "error");
+          return false;
+        }
+        if (!ensureAppCheckConfigured(app, "ticket-auth-status")) {
+          return false;
+        }
+
+        setStatus("ticket-auth-status", "Erzeuge sicheren Web-Control-Link...", "");
+        const createBootstrapFn = functions.httpsCallable("createMasterWebBootstrapToken");
+        const result = await createBootstrapFn({ target: "web-control" });
+        const payload = result && result.data ? result.data : {};
+        const bootstrapToken = typeof payload.bootstrapToken === "string" ? payload.bootstrapToken.trim() : "";
+        const targetPath = typeof payload.targetPath === "string" && payload.targetPath.trim()
+          ? payload.targetPath.trim()
+          : "/web-control/index.html";
+        const queryParamName = typeof payload.queryParamName === "string" && payload.queryParamName.trim()
+          ? payload.queryParamName.trim()
+          : "bootstrapToken";
+
+        if (!bootstrapToken) {
+          throw new Error("Bootstrap-Token fehlt in der Serverantwort.");
+        }
+
+        const targetUrl = new URL(targetPath, window.location.href || "https://minimaster.app/parent-panel/index.html");
+        targetUrl.searchParams.set(queryParamName, bootstrapToken);
+        const nextLocation = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
+
+        setStatus("ticket-auth-status", "Öffne Web-Control mit bestehender Sitzung...", "success");
+        if (window.location && typeof window.location.assign === "function") {
+          window.location.assign(nextLocation);
+        } else if (window.location) {
+          window.location.href = nextLocation;
+        }
+        return true;
+      } catch (error) {
+        setStatus("ticket-auth-status", "Sicherer Web-Control-Start fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
+        return false;
+      }
+    }
+
     function initFirebase() {
       const config = loadFirebaseConfig();
       if (!config || !config.projectId || String(config.projectId).includes("your-")) {
@@ -402,13 +452,20 @@
         if (user) {
           currentMasterImei = user.uid;
           setStatus("ticket-auth-status", "Authentifiziert als " + user.uid, "success");
+          updateSecureWebControlButtonState();
           loadOwnTickets();
+          return;
         }
+
+        currentMasterImei = null;
+        updateSecureWebControlButtonState();
       });
 
       tryBootstrapTicketAuthFromUrl().catch((error) => {
         setStatus("ticket-auth-status", "Sicherer Web-Link fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
       });
+
+      updateSecureWebControlButtonState();
     }
 
     async function authenticateForTickets() {
@@ -609,6 +666,7 @@
 
     initFirebase();
     window.authenticateForTickets = authenticateForTickets;
+    window.openSecureWebControl = openSecureWebControl;
     window.handleDebugConsent = handleDebugConsent;
     window.submitTicketReply = submitTicketReply;
     window.submitSupportTicket = submitSupportTicket;
