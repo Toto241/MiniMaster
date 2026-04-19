@@ -335,6 +335,39 @@
         .replace(/'/g, "&#39;");
     }
 
+    function getMasterWebBootstrapTokenFromLocation() {
+      try {
+        if (!window.location || !window.location.search) return "";
+        return new URLSearchParams(window.location.search).get("bootstrapToken") || "";
+      } catch {
+        return "";
+      }
+    }
+
+    function clearMasterWebBootstrapTokenFromLocation() {
+      try {
+        if (!window.location || !window.history || typeof window.history.replaceState !== "function") return;
+        const url = new URL(window.location.href || window.location.search, "https://minimaster.app");
+        url.searchParams.delete("bootstrapToken");
+        window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}` || window.location.pathname || "/");
+      } catch {
+        // noop
+      }
+    }
+
+    async function tryBootstrapTicketAuthFromUrl() {
+      const bootstrapToken = getMasterWebBootstrapTokenFromLocation();
+      if (!bootstrapToken || !functions || !auth) {
+        return false;
+      }
+      setStatus("ticket-auth-status", "Authentifiziere über sicheren Web-Link...", "");
+      const redeemFn = functions.httpsCallable("redeemMasterWebBootstrapToken");
+      const tokenResult = await redeemFn({ bootstrapToken });
+      clearMasterWebBootstrapTokenFromLocation();
+      await auth.signInWithCustomToken(tokenResult.data.customToken);
+      return true;
+    }
+
     function initFirebase() {
       const config = loadFirebaseConfig();
       if (!config || !config.projectId || String(config.projectId).includes("your-")) {
@@ -355,6 +388,10 @@
           setStatus("ticket-auth-status", "Authentifiziert als " + user.uid, "success");
           loadOwnTickets();
         }
+      });
+
+      tryBootstrapTicketAuthFromUrl().catch((error) => {
+        setStatus("ticket-auth-status", "Sicherer Web-Link fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
       });
     }
 

@@ -119,6 +119,9 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     if (name === "generateCustomToken") {
       return jest.fn(() => Promise.resolve({ data: { customToken: "tok-login" } }));
     }
+    if (name === "redeemMasterWebBootstrapToken") {
+      return jest.fn(() => Promise.resolve({ data: { customToken: "tok-bootstrap", masterId: "m-bridge" } }));
+    }
     if (name === "setDeviceLocked") {
       return jest.fn(() => Promise.resolve({ data: { success: true } }));
     }
@@ -181,6 +184,10 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     firebase: firebaseMock,
     Chart: chartMock,
     navigator: { userAgent: "Mozilla/5.0 (Macintosh)", clipboard: { writeText: jest.fn() } },
+    location: { search: "", href: "https://minimaster.app/web-control/index.html", pathname: "/web-control/index.html" },
+    history: { replaceState: jest.fn() },
+    URL,
+    URLSearchParams,
     open: jest.fn(),
     setTimeout: jest.fn((fn: (...args: any[]) => void) => { fn(); return 1; }),
     clearTimeout,
@@ -433,6 +440,34 @@ describe("web-control browser flows", () => {
     expect(elements.get("master-id")?.textContent).toBe("m1");
     expect(storage.get("minimaster-credentials")).toContain("m1");
     expect(elements.get("notification")?.textContent).toContain("Login successful");
+  });
+
+  it("redeems a one-time web bootstrap token from the URL before legacy login", async () => {
+    const { context, authMock, callableFactory, domContentLoadedHandlers } = loadWebControl({
+      operatorFirebaseConfigOverride: JSON.stringify({
+        apiKey: "key-1",
+        authDomain: "demo.firebaseapp.com",
+        projectId: "demo-project",
+        storageBucket: "demo.firebasestorage.app",
+        messagingSenderId: "123456",
+        appId: "1:123:web:abc",
+      }),
+    });
+
+    context.location.search = "?bootstrapToken=bridge-token";
+    context.location.href = "https://minimaster.app/web-control/index.html?bootstrapToken=bridge-token";
+
+    domContentLoadedHandlers[0]?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(callableFactory).toHaveBeenCalledWith("redeemMasterWebBootstrapToken");
+    const redeemCallable = callableFactory.mock.results.find((entry: { type: string; value: unknown }) => entry.type === "return" && (entry.value as jest.Mock).mock.calls[0]?.[0]?.bootstrapToken === "bridge-token")?.value as jest.Mock | undefined;
+    expect(redeemCallable).toBeDefined();
+    expect(authMock.signInWithCustomToken).toHaveBeenCalledWith("tok-bootstrap");
+    expect(context.history.replaceState).toHaveBeenCalled();
   });
 
   it("blocks restored sessions until legal context is selected", async () => {

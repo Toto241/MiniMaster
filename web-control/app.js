@@ -16,6 +16,7 @@ function escapeHtml(text) {
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 const LEGAL_PREFS_STORAGE_KEY = "minimaster-legal-context";
 const WEB_CONTROL_APP_VERSION = "web-control";
+const MASTER_WEB_BOOTSTRAP_QUERY_PARAM = "bootstrapToken";
 
 const LEGAL_LANGUAGE_OPTIONS = [
     { tag: "en", label: "English" },
@@ -120,6 +121,41 @@ function hasCompleteFirebaseConfig(config) {
     return requiredKeys.every(key => typeof config[key] === 'string' && config[key].trim().length > 0);
 }
 
+
+function getMasterWebBootstrapTokenFromLocation() {
+    try {
+        if (!window.location || !window.location.search) return "";
+        return new URLSearchParams(window.location.search).get(MASTER_WEB_BOOTSTRAP_QUERY_PARAM) || "";
+    } catch {
+        return "";
+    }
+}
+
+function clearMasterWebBootstrapTokenFromLocation() {
+    try {
+        if (!window.location || !window.history || typeof window.history.replaceState !== "function") return;
+        const url = new URL(window.location.href || window.location.search, "https://minimaster.app");
+        url.searchParams.delete(MASTER_WEB_BOOTSTRAP_QUERY_PARAM);
+        const nextPath = `${url.pathname}${url.search}${url.hash}`;
+        window.history.replaceState({}, document.title, nextPath || window.location.pathname || "/");
+    } catch {
+        // noop – token will naturally disappear on next navigation
+    }
+}
+
+async function tryBootstrapLoginFromUrl() {
+    const bootstrapToken = getMasterWebBootstrapTokenFromLocation();
+    if (!bootstrapToken || !functions || typeof firebase === "undefined") {
+        return false;
+    }
+
+    showNotification("Authenticating via secure web link...", "info");
+    const redeemBootstrapToken = functions.httpsCallable("redeemMasterWebBootstrapToken");
+    const result = await redeemBootstrapToken({ bootstrapToken });
+    clearMasterWebBootstrapTokenFromLocation();
+    await firebase.auth().signInWithCustomToken(result.data.customToken);
+    return true;
+}
 function isPlaceholderFirebaseConfig(config) {
     if (!hasCompleteFirebaseConfig(config)) return true;
     return Object.values(config).some(value =>
@@ -462,6 +498,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Auth session handling error:', error);
                 showLegalError('Legal session initialization failed: ' + error.message);
             });
+        });
+
+        tryBootstrapLoginFromUrl().catch(error => {
+            console.error('Web bootstrap login error:', error);
+            showNotification('Secure web link login failed: ' + error.message, 'error');
         });
 
         console.log('Firebase initialized successfully.');

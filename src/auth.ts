@@ -6,12 +6,18 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { createHash, timingSafeEqual } from "crypto";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
 import { requireAdmin, AuditLogger, checkRateLimit, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
 
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
+const MASTER_WEB_BOOTSTRAP_QUERY_PARAM = "bootstrapToken";
+const DEFAULT_MASTER_WEB_BOOTSTRAP_TTL_MINUTES = 10;
+const MAX_MASTER_WEB_BOOTSTRAP_TTL_MINUTES = 30;
+const VALID_MASTER_WEB_BOOTSTRAP_TARGETS = ["web-control", "parent-panel", "child-panel"] as const;
+
+type MasterWebBootstrapTarget = (typeof VALID_MASTER_WEB_BOOTSTRAP_TARGETS)[number];
 
 function isOperatorResetEnabled(): boolean {
   return (
@@ -260,6 +266,209 @@ async function deleteAllOperatorAccessKeys(): Promise<number> {
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
+
+function normalizeMasterWebBootstrapTarget(raw: unknown): MasterWebBootstrapTarget {
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (VALID_MASTER_WEB_BOOTSTRAP_TARGETS.includes(value as MasterWebBootstrapTarget)) {
+    return value as MasterWebBootstrapTarget;
+  }
+  return "web-control";
+}
+
+function buildMasterWebBootstrapPath(target: MasterWebBootstrapTarget): string {
+  switch (target) {
+    case "parent-panel":
+      return "/parent-panel/index.html";
+    case "child-panel":
+      return "/child-panel/index.html";
+    case "web-control":
+    default:
+      return "/web-control/index.html";
+  }
+}
+
+async function ensureMasterClaims(masterId: string): Promise<Record<string, unknown>> {
+  const authUser = await auth().getUser(masterId).catch(async (error: { code?: string }) => {
+    if (error?.code === "auth/user-not-found") {
+      return auth().createUser({ uid: masterId });
+    }
+    throw error;
+  });
+
+  const claims = {
+    ...(authUser.customClaims || {}),
+    role: "master",
+    masterImei: masterId,
+  };
+
+  await auth().setCustomUserClaims(masterId, claims);
+  return claims;
+}
+
+/**
+ * Creates a short-lived, one-time bootstrap token that can be redeemed by a browser
+ * to establish a Firebase session for the same master account.
+ * Additive bridge for web-control / parent-panel / child-panel while legacy login
+ * still exists as rollback path.
+ */
+export const createMasterWebBootstrapToken = functions.https.onCall(
+  async (data: { target?: string; ttlMinutes?: number }, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
+    }
+    validateAppCheck(context, true);
+
+    const masterId = context.auth.uid;
+    const target = normalizeMasterWebBootstrapTarget(data?.target);
+    const ttlMinutes = Number.isFinite(data?.ttlMinutes)
+      ? Number(data.ttlMinutes)
+      : DEFAULT_MASTER_WEB_BOOTSTRAP_TTL_MINUTES;
+
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > MAX_MASTER_WEB_BOOTSTRAP_TTL_MINUTES) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `ttlMinutes muss zwischen 1 und ${MAX_MASTER_WEB_BOOTSTRAP_TTL_MINUTES} liegen.`
+      );
+    }
+
+    checkRateLimit(masterId, "auth.create_master_web_bootstrap_token", 5, 15 * 60 * 1000);
+
+    const masterDoc = await db().collection("masters").doc(masterId).get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    const rawToken = `mwb_${randomBytes(24).toString("base64url")}`;
+    const keyHash = sha256Hex(rawToken);
+    const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + ttlMinutes * 60 * 1000);
+    const docRef = db().collection("masterWebBootstrapTokens").doc();
+
+    await docRef.set({
+      keyHash,
+      masterId,
+      target,
+      createdByUid: masterId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
+      usedAt: null,
+      redeemedByUid: null,
+    });
+
+    await AuditLogger.logSuccess(
+      "auth.login",
+      context,
+      `masterWebBootstrapTokens/${docRef.id}`,
+      "user",
+      { channel: "master_web_bootstrap", masterId, target, ttlMinutes }
+    );
+
+    return {
+      bootstrapToken: rawToken,
+      expiresAtMs: expiresAt.toMillis(),
+      target,
+      targetPath: buildMasterWebBootstrapPath(target),
+      queryParamName: MASTER_WEB_BOOTSTRAP_QUERY_PARAM,
+    };
+  }
+);
+
+/**
+ * Redeems a short-lived one-time browser bootstrap token and returns a Firebase custom token
+ * for the bound master account.
+ */
+export const redeemMasterWebBootstrapToken = functions.https.onCall(
+  async (data: { bootstrapToken?: string }, context: CallableContext) => {
+    validateAppCheck(context, true);
+
+    const rawToken = typeof data?.bootstrapToken === "string" ? data.bootstrapToken.trim() : "";
+    if (!rawToken.startsWith("mwb_") || rawToken.length < 20) {
+      throw new functions.https.HttpsError("invalid-argument", "Ungültiger Bootstrap-Token.");
+    }
+
+    const keyHash = sha256Hex(rawToken);
+    checkRateLimit(keyHash.slice(0, 16), "auth.redeem_master_web_bootstrap_token", 10, 15 * 60 * 1000);
+
+    try {
+      const querySnapshot = await db()
+        .collection("masterWebBootstrapTokens")
+        .where("keyHash", "==", keyHash)
+        .limit(1)
+        .get();
+
+      if (querySnapshot.empty) {
+        throw new functions.https.HttpsError("permission-denied", "Bootstrap-Token ist ungültig oder wurde widerrufen.");
+      }
+
+      const tokenRef = querySnapshot.docs[0].ref;
+
+      const redeemed = await db().runTransaction(async (tx) => {
+        const tokenDoc = await tx.get(tokenRef);
+        if (!tokenDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "Bootstrap-Token nicht gefunden.");
+        }
+
+        const payload = tokenDoc.data() || {};
+        const masterId = typeof payload.masterId === "string" ? payload.masterId : "";
+        const target = normalizeMasterWebBootstrapTarget(payload.target);
+        const usedAt = payload.usedAt || null;
+        const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
+
+        if (!masterId) {
+          throw new functions.https.HttpsError("internal", "Bootstrap-Token ist beschädigt (masterId).");
+        }
+        if (usedAt) {
+          throw new functions.https.HttpsError("failed-precondition", "Dieser Bootstrap-Token wurde bereits eingelöst.");
+        }
+        if (!expiresAt || expiresAt.toMillis() < Date.now()) {
+          throw new functions.https.HttpsError("deadline-exceeded", "Dieser Bootstrap-Token ist abgelaufen.");
+        }
+
+        tx.update(tokenRef, {
+          usedAt: admin.firestore.FieldValue.serverTimestamp(),
+          redeemedByUid: context.auth?.uid || null,
+        });
+
+        return { masterId, target };
+      });
+
+      const claims = await ensureMasterClaims(redeemed.masterId);
+      const customToken = await auth().createCustomToken(redeemed.masterId, claims);
+
+      await AuditLogger.log(
+        "auth.login",
+        redeemed.masterId,
+        "master",
+        `masters/${redeemed.masterId}`,
+        "user",
+        "success",
+        { channel: "master_web_bootstrap", target: redeemed.target }
+      );
+
+      functions.logger.info("Master web bootstrap redeemed.", {
+        masterId: redeemed.masterId,
+        target: redeemed.target,
+      });
+
+      return {
+        masterId: redeemed.masterId,
+        customToken,
+        target: redeemed.target,
+      };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "auth.login",
+        context,
+        "masterWebBootstrapTokens/redeem",
+        "user",
+        error as Error,
+        { channel: "master_web_bootstrap" }
+      );
+
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError("internal", "Bootstrap-Login fehlgeschlagen.", error);
+    }
+  }
+);
 
 /**
  * Creates an operator access key record that can be redeemed exactly once.
