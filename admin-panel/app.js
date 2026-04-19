@@ -6068,6 +6068,20 @@ function downloadRolloutBundleScript(projectId) {
     }
 }
 
+// F6 CSP-Refactor Stufe 4: Wrapper ohne Argument fuer data-action-Delegation.
+// Resolven die Projekt-ID zur Klick-Zeit aus Operator-Config oder Firebase-Config,
+// damit die Buttons in admin-panel/index.html ohne dynamische Inline-Expression
+// auskommen.
+function copyRolloutBundleScriptFromForm() {
+    const projectId = (getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId || "");
+    return copyRolloutBundleScript(projectId);
+}
+
+function downloadRolloutBundleScriptFromForm() {
+    const projectId = (getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId || "");
+    return downloadRolloutBundleScript(projectId);
+}
+
 function buildCommandCatalog(projectId) {
     const values = getCommandBuilderFormValues();
     const activeProjectId = (projectId || firebaseConfig.projectId || "").trim();
