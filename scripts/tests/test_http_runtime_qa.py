@@ -119,6 +119,45 @@ class TestQaRuntimeHttpContracts:
         assert cycle_calls == [(False, 120, "http-get")]
         assert payload["systemHealth"] == "OK"
 
+    def test_runtime_http_queues_self_healing_run(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
+        app = load_app_module()
+
+        create_job_calls: list[dict[str, object]] = []
+        enqueue_calls: list[str] = []
+
+        def fake_create_job(**kwargs):
+            create_job_calls.append(kwargs)
+            return {"jobId": "job-self-healing-http"}
+
+        def fake_enqueue_job(job_id: str):
+            enqueue_calls.append(job_id)
+            return {"jobId": job_id, "status": "queued"}
+
+        monkeypatch.setattr(app, "create_job", fake_create_job)
+        monkeypatch.setattr(app, "enqueue_job", fake_enqueue_job)
+
+        status, headers, payload = _read_json(
+            f"{qa_http_server}/api/qa/self-healing/run",
+            method="POST",
+            body={"autoFix": False, "staleAfterSec": 300},
+        )
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert create_job_calls == [{
+            "job_type": "system",
+            "payload": {
+                "action": "self-healing-cycle",
+                "autoFix": False,
+                "staleAfterSec": 300,
+                "triggeredBy": "http-post",
+            },
+            "label": "Self-Healing-Zyklus",
+            "priority": 15,
+        }]
+        assert enqueue_calls == ["job-self-healing-http"]
+        assert payload == {"jobId": "job-self-healing-http", "status": "queued"}
+
     def test_runtime_http_serves_release_workspace_payload(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
         app = load_app_module()
 

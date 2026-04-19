@@ -423,13 +423,54 @@ class TestMiniMasterAdminHandlerRoutes:
 
         handler = self._make_handler("/api/qa/self-healing/run")
         handler._read_json_body.return_value = {"autoFix": False, "staleAfterSec": 300}
-        cycle_mock = MagicMock(return_value={"systemHealth": "DEGRADED", "fixesApplied": []})
+        create_job_mock = MagicMock(return_value={"jobId": "job-self-healing-1"})
+        enqueue_job_mock = MagicMock()
+        cycle_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
         monkeypatch.setattr(app, "run_self_healing_cycle", cycle_mock)
 
         app.MiniMasterAdminHandler.do_POST(handler)
 
+        create_job_mock.assert_called_once_with(
+            job_type="system",
+            payload={
+                "action": "self-healing-cycle",
+                "autoFix": False,
+                "staleAfterSec": 300,
+                "triggeredBy": "http-post",
+            },
+            label="Self-Healing-Zyklus",
+            priority=15,
+        )
+        enqueue_job_mock.assert_called_once_with("job-self-healing-1")
+        cycle_mock.assert_not_called()
+        handler._write_json.assert_called_once_with(HTTPStatus.OK, {"jobId": "job-self-healing-1", "status": "queued"})
+
+    def test_execute_job_action_runs_self_healing_cycle_and_completes_job(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        cycle_mock = MagicMock(return_value={"systemHealth": "OK", "fixesApplied": [], "pendingFixes": []})
+        monkeypatch.setattr(app, "run_self_healing_cycle", cycle_mock)
+
+        job = app.create_job(
+            job_type="system",
+            payload={
+                "action": "self-healing-cycle",
+                "autoFix": False,
+                "staleAfterSec": 300,
+                "triggeredBy": "http-post",
+            },
+            label="Self-Healing-Zyklus",
+        )
+
+        app._execute_job_action(str(job["jobId"]))
+
         cycle_mock.assert_called_once_with(auto_fix=False, stale_after_sec=300, triggered_by="http-post")
-        handler._write_json.assert_called_once_with(HTTPStatus.OK, {"systemHealth": "DEGRADED", "fixesApplied": []})
+        completed = app.get_job_by_id(str(job["jobId"]))
+        assert completed is not None
+        assert completed["status"] == "success"
+        assert completed["result"]["systemHealth"] == "OK"
 
     def test_do_post_android_compatibility_keeps_selected_tests_and_scenarios(self, monkeypatch: pytest.MonkeyPatch):
         import app

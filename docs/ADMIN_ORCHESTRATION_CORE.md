@@ -2,7 +2,7 @@
 
 ## Zweck
 
-Der Python-Operator erweitert den bestehenden QA- und Admin-Leitstand um einen zentralen Job-Lifecycle. Testläufe, Agentenanalysen und Emulator-Aktionen werden darüber einheitlich eingereiht, ausgeführt, protokolliert und im Admin-Panel sichtbar gemacht.
+Der Python-Operator erweitert den bestehenden QA- und Admin-Leitstand um einen zentralen Job-Lifecycle. Testläufe, Self-Healing-Ausführungen, Agentenanalysen und Emulator-Aktionen werden darüber einheitlich eingereiht, ausgeführt, protokolliert und im Admin-Panel sichtbar gemacht.
 
 ## Kernmodule
 
@@ -74,7 +74,7 @@ Agentenläufe werden als `agent`-Jobs ausgeführt. Das Resultat enthält:
 1. UI oder HTTP-API erzeugt einen Job.
 2. Der Job wird in die In-Memory-Queue eingereiht und in `python_admin/logs/job_runs.jsonl` protokolliert.
 3. Der Worker verarbeitet den Job seriell.
-4. Bestehende Runner für Suite-, USB-, Dual-Device- oder Emulator-Flows bleiben erhalten und werden über den Job-Lifecycle aufgerufen.
+4. Bestehende Runner für Suite-, Self-Healing-, USB-, Dual-Device- oder Emulator-Flows bleiben erhalten und werden über den Job-Lifecycle aufgerufen.
 5. Fehlgeschlagene Jobs erzeugen zentrale Fehlerobjekte.
 6. Das Admin-Panel zeigt Jobs, Queue, Fehler und Agentenstatus im QA Release Workspace.
 7. Fehler können kompakt oder im Debug-Format kopiert und direkt zur Agenten-Analyse eingereiht werden.
@@ -89,6 +89,7 @@ Agentenläufe werden als `agent`-Jobs ausgeführt. Das Resultat enthält:
 - `POST /api/jobs/retry`
 - `POST /api/jobs/cancel`
 - `POST /api/agents/run`
+- `POST /api/qa/self-healing/run`
 - bestehende Suite- und Emulator-Endpunkte bleiben erhalten und erzeugen nun Jobs
 
 ## Windows-Emulator-Skript
@@ -109,3 +110,4 @@ pwsh -File scripts/qa-emulator-automation.ps1 -Action stop -Serial emulator-5554
 - Kein verteilter Worker und keine harte Persistenz über mehrere Operator-Instanzen.
 - Agent-Core ist deterministisch und lokal; keine echte LLM-Anbindung in diesem Pfad.
 - Emulator-Jobs werden asynchron eingereiht; Statusänderungen sind im Release-Workspace und Job-Register sichtbar, nicht als synchroner HTTP-Blocker.
+- Der manuelle Self-Healing-POST läuft asynchron als System-Job; GET-Status, Monitor und Release-Workspace-Aggregation bleiben in dieser Ausbaustufe direkte Diagnosepfade.
