@@ -138,6 +138,53 @@ class TestGetQaCatalog:
         assert all(item["priority"] in {"P0", "P1"} for item in result["criticalBacklog"])
 
 
+class TestQaReleaseWorkspace:
+    def test_builds_release_workspace_with_five_agents_and_sorted_blockers(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "build_testing_register", lambda: {
+            "items": [
+                {
+                    "id": "manual-proof",
+                    "title": "Manual Proof",
+                    "status": "manual_required",
+                    "blockingForRelease": True,
+                    "staleEvidence": True,
+                    "action": "protocol",
+                    "severity": "medium",
+                },
+                {
+                    "id": "failed-suite",
+                    "title": "Failed Suite",
+                    "status": "fail",
+                    "blockingForRelease": True,
+                    "suiteRef": "android-unit-master",
+                    "action": "suite-run",
+                    "severity": "high",
+                },
+            ],
+            "summary": {"blocking": 2},
+        })
+        monkeypatch.setattr(app, "get_qa_catalog", lambda: {"criticalBacklog": [{"id": "p0"}]})
+        monkeypatch.setattr(app, "get_emulator_lab_overview", lambda: {"summary": {"runningCount": 1, "reservationCount": 2, "busyReservationCount": 1, "problemCount": 0}})
+        monkeypatch.setattr(app, "run_self_healing_cycle", lambda **_kwargs: {"systemHealth": "DEGRADED", "pendingFixes": [{"id": "issue-1", "severity": "HIGH"}], "fixesApplied": [], "agentActivities": []})
+        monkeypatch.setattr(app, "load_suite_run_history", lambda _limit=20: [
+            {"runId": "run-1", "suiteId": "android-unit-master", "status": "finished", "result": {"status": "failed", "reason": "boom"}},
+        ])
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+            app._active_suite_runs["run-queued"] = {"runId": "run-queued", "suiteId": "android-unit-child", "status": "queued"}
+
+        payload = app.build_qa_release_workspace()
+
+        assert payload["summary"]["blockingCount"] == 2
+        assert payload["blockers"][0]["id"] == "failed-suite"
+        assert payload["queue"][0]["runId"] == "run-queued"
+        assert len(payload["agentWorkspace"]["agents"]) == 5
+        assert payload["agentWorkspace"]["agents"][-1]["role"] == "synthesizer"
+
+
 class TestAndroidAutomationSweepPlan:
     def test_collects_all_active_tests_and_dual_scenarios(self, monkeypatch: pytest.MonkeyPatch):
         import app

@@ -123,6 +123,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "operatorEffective",
       "platformQaReadiness",
       "pythonAutomationActions",
+      "qaReleaseWorkspace",
       "qaTestingRegister",
       "sanitize",
       "security",
@@ -215,6 +216,33 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
         appJs.formatPythonAutomationTimestamp(value),
       );
     }
+  });
+
+  it("qa-release-workspace module builds deterministic blocker ordering and clipboard payloads", () => {
+    load(path.join(MODULES_DIR, "tabs", "qa-release-workspace.js"));
+    const workspace = globalScope.MM.qaReleaseWorkspace;
+
+    const payload = {
+      generatedAt: "2026-04-19T12:00:00Z",
+      blockers: [
+        { id: "manual-proof", title: "Manual Proof", status: "manual_required", severity: "medium", groupTitle: "Manual", action: "protocol", documentation: "docs/manual.md", details: "Need proof" },
+        { id: "failed-suite", title: "Failed Suite", status: "fail", severity: "high", groupTitle: "Suites", action: "suite-run", suiteRef: "android-unit-master", details: "Runner failed" },
+      ],
+      summary: { blockingCount: 2, systemHealth: "DEGRADED" },
+      recentFailures: [],
+      queue: [],
+      agentWorkspace: { agents: [], synthesis: null },
+      health: { systemHealth: "DEGRADED" },
+      emulators: { summary: { runningCount: 1 } },
+    };
+
+    const viewModel = workspace.buildViewModel(payload);
+    expect(viewModel.blockers[0].id).toBe("failed-suite");
+    expect(viewModel.blockers[0].nextAction).toMatchObject({ kind: "suite-run", suiteId: "android-unit-master" });
+    expect(viewModel.blockers[1].nextAction).toMatchObject({ kind: "protocol", testId: "manual-proof" });
+    expect(workspace.findBlocker(payload, "manual-proof").title).toBe("Manual Proof");
+    expect(workspace.buildClipboardPayload(viewModel.blockers[0], "github")).toContain("## Failed Suite");
+    expect(workspace.buildClipboardPayload(viewModel.blockers[1], "ai")).toContain("Analysiere folgenden MiniMaster Release-Blocker");
   });
 
   it("automation-meta.js Status- und Typ-Helfer sind paritaetisch zu app.js", () => {
@@ -1834,17 +1862,17 @@ describe("admin-panel module wiring", () => {
     }
   });
 
-  it("Fassade swappt 27 Funktionen in simulierter Browser-Reihenfolge", async () => {
+  it("Fassade swappt 28 Funktionen in simulierter Browser-Reihenfolge", async () => {
     // Simuliere: 1. app.js parst & deklariert Originale, 2. Module registrieren MM,
     // 3. DOMContentLoaded -> _mmInstallFacade ersetzt globale Funktionsbindings.
     const sandboxGlobal: any = {};
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(27);
+    expect(sandboxGlobal.MM.list().length).toBe(28);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
-    // Wir pruefen das hier rein deklarativ: jede der 27 Funktionen taucht im app.js
+    // Wir pruefen das hier rein deklarativ: jede der geswappten Funktionen taucht im app.js
     // sowohl als Original-Definition als auch als swap-Eintrag auf.
     const appJs = await fs.readFile(
       path.resolve(__dirname, "..", "admin-panel", "app.js"),
