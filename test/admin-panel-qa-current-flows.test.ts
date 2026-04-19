@@ -1,6 +1,12 @@
 import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
 describe("admin-panel current QA flows", () => {
+  const createNotificationElement = () => ({
+    textContent: "",
+    className: "",
+    style: { display: "none" },
+  });
+
   it("loads evidence history and updates the visible dependent QA views", async () => {
     const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
 
@@ -183,11 +189,7 @@ describe("admin-panel current QA flows", () => {
   it("routes android USB suites through the dedicated QA endpoint", async () => {
     const { exports, fetchMock, elements } = loadAdminPanelTestExports();
 
-    elements.set("notification", {
-      textContent: "",
-      className: "",
-      style: { display: "none" },
-    });
+    elements.set("notification", createNotificationElement());
 
     fetchMock.mockResolvedValue({
       ok: true,
@@ -207,5 +209,67 @@ describe("admin-panel current QA flows", () => {
         suite: "commissioning",
       }),
     });
+  });
+
+  it("routes dual-device suites through the dedicated QA endpoint when distinct serials are configured", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterDeviceSerial: "emulator-5554",
+        childDeviceSerial: "emulator-5556",
+      }),
+    });
+
+    elements.set("notification", createNotificationElement());
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ runId: "dual-run-1" }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+
+    await exports.startSuiteRun("android-e2e-shell-script");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/suites/dual-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        masterSerial: "emulator-5554",
+        childSerial: "emulator-5556",
+      }),
+    });
+  });
+
+  it("blocks dual-device suite starts when both configured serials are identical", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterDeviceSerial: "emulator-5554",
+        childDeviceSerial: "emulator-5554",
+      }),
+    });
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+
+    await exports.startSuiteRun("android-e2e-shell-script");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notificationEl.textContent).toContain("Master- und Child-ADB-Serial müssen unterschiedlich sein.");
+    expect(notificationEl.className).toBe("notification error");
+  });
+
+  it("rejects invalid dual-device serial configuration before building the request", () => {
+    const { exports } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterDeviceSerial: "emulator-5554",
+        childDeviceSerial: "child serial with spaces",
+      }),
+    });
+
+    expect(() => exports.buildSuiteRunRequest("android-e2e-shell-script")).toThrow(
+      "Die konfigurierte Child-ADB-Serial ist ungültig.",
+    );
   });
 });

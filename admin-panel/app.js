@@ -3575,6 +3575,9 @@ function getTestingRegisterActionLabel(item) {
         if (suiteRef === "android-usb-master" || suiteRef === "android-usb-child") {
             return "USB-Start";
         }
+        if (suiteRef === "android-e2e-shell" || suiteRef === "android-e2e-shell-script") {
+            return "Dual-Start";
+        }
         return "Suite-Start";
     }
     if (action === "protocol") return "Nachweis-Protokoll";
@@ -4144,9 +4147,12 @@ function buildTestingRegisterAction(item) {
     if (item.action === "suite-run") {
         const suiteId = encodeURIComponent(String(item.suiteRef || item.id || ""));
         const disabled = item.prereqsMet === false ? "disabled" : "";
-        const buttonLabel = String(item.suiteRef || item.id || "").trim().startsWith("android-usb-")
+        const suiteRef = String(item.suiteRef || item.id || "").trim();
+        const buttonLabel = suiteRef.startsWith("android-usb-")
             ? "USB-Lauf starten"
-            : "Suite starten";
+            : (suiteRef === "android-e2e-shell" || suiteRef === "android-e2e-shell-script")
+                ? "Dual-Device-Lauf starten"
+                : "Suite starten";
         return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled} ${tooltip}>${buttonLabel}</button>`;
     }
     if (item.action === "protocol") {
@@ -4467,6 +4473,21 @@ async function startSuiteRun(suiteId) {
     }
 }
 
+function getSuiteRunDeviceConfig() {
+    const values = loadCommandBuilderConfig();
+    const rawMasterDeviceSerial = String(values?.masterDeviceSerial || "").trim();
+    const rawChildDeviceSerial = String(values?.childDeviceSerial || "").trim();
+    const masterDeviceSerial = sanitizeAdbSerial(rawMasterDeviceSerial);
+    const childDeviceSerial = sanitizeAdbSerial(rawChildDeviceSerial);
+
+    return {
+        rawMasterDeviceSerial,
+        rawChildDeviceSerial,
+        masterDeviceSerial,
+        childDeviceSerial,
+    };
+}
+
 function buildSuiteRunRequest(suiteId) {
     const normalizedSuiteId = String(suiteId || "").trim();
     if (normalizedSuiteId === "android-usb-master") {
@@ -4495,6 +4516,42 @@ function buildSuiteRunRequest(suiteId) {
             historyType: "usb-test",
             displayLabel: "USB Kinder-App",
             notificationLabel: "USB-Lauf 'android-usb-child'",
+        };
+    }
+    if (normalizedSuiteId === "android-e2e-shell" || normalizedSuiteId === "android-e2e-shell-script") {
+        const {
+            rawMasterDeviceSerial,
+            rawChildDeviceSerial,
+            masterDeviceSerial,
+            childDeviceSerial,
+        } = getSuiteRunDeviceConfig();
+
+        if (!rawMasterDeviceSerial) {
+            throw new Error("Für Dual-Device-Suiten muss eine Master-ADB-Serial in der Befehlszentrale gepflegt sein.");
+        }
+        if (!masterDeviceSerial) {
+            throw new Error("Die konfigurierte Master-ADB-Serial ist ungültig.");
+        }
+        if (!rawChildDeviceSerial) {
+            throw new Error("Für Dual-Device-Suiten muss eine Child-ADB-Serial in der Befehlszentrale gepflegt sein.");
+        }
+        if (!childDeviceSerial) {
+            throw new Error("Die konfigurierte Child-ADB-Serial ist ungültig.");
+        }
+        if (masterDeviceSerial === childDeviceSerial) {
+            throw new Error("Master- und Child-ADB-Serial müssen unterschiedlich sein.");
+        }
+
+        return {
+            endpoint: "/api/suites/dual-device",
+            body: {
+                masterSerial: masterDeviceSerial,
+                childSerial: childDeviceSerial,
+            },
+            historySuiteId: normalizedSuiteId,
+            historyType: "dual-device",
+            displayLabel: "Dual-Device Eltern+Kind",
+            notificationLabel: `Dual-Device-Lauf '${normalizedSuiteId}'`,
         };
     }
     return {

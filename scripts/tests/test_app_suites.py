@@ -350,15 +350,15 @@ class TestMiniMasterAdminHandlerRoutes:
             "parallel": True,
         }
 
-        fake_thread = MagicMock()
-        fake_thread.start = MagicMock()
-        thread_cls = MagicMock(return_value=fake_thread)
+        create_job_mock = MagicMock(return_value={"jobId": "dual-abcdef123456"})
+        enqueue_job_mock = MagicMock()
 
         class _FakeUuid:
             hex = "abcdef1234567890"
 
-        monkeypatch.setattr(app.threading, "Thread", thread_cls)
         monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
 
         with app._active_suite_lock:
             app._active_suite_runs.clear()
@@ -369,13 +369,64 @@ class TestMiniMasterAdminHandlerRoutes:
             HTTPStatus.OK,
             {"runId": "dual-abcdef123456", "status": "queued"},
         )
-        thread_cls.assert_called_once()
-        fake_thread.start.assert_called_once_with()
+        create_job_mock.assert_called_once_with(
+            explicit_job_id="dual-abcdef123456",
+            job_type="test",
+            payload={
+                "action": "dual-device",
+                "kwargs": {
+                    "master_serial": "MASTER-1",
+                    "child_serial": "CHILD-1",
+                    "install_apk": False,
+                    "master_apk_path": "",
+                    "child_apk_path": "",
+                    "uninstall_first": False,
+                    "timeout_sec": 7200,
+                    "parallel": True,
+                    "scenario_id": "offline-online-resync",
+                    "profile_id": "dual-device-balanced",
+                    "fault_modes": ["disconnect", "airplane"],
+                },
+            },
+            label="offline-online-resync",
+            priority=20,
+            max_retries=1,
+        )
+        enqueue_job_mock.assert_called_once_with("dual-abcdef123456")
         with app._active_suite_lock:
             queued = app._active_suite_runs["dual-abcdef123456"]
         assert queued["type"] == "dual-device"
         assert queued["scenarioId"] == "offline-online-resync"
         assert queued["profileId"] == "dual-device-balanced"
+
+    def test_do_post_dual_device_rejects_identical_serials_without_side_effects(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/dual-device")
+        handler._read_json_body.return_value = {
+            "masterSerial": "SAME-DEVICE-1",
+            "childSerial": "SAME-DEVICE-1",
+            "scenarioId": "offline-online-resync",
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.BAD_REQUEST,
+            {"error": "Master- und Child-ADB-Serial müssen unterschiedlich sein."},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+        with app._active_suite_lock:
+            assert app._active_suite_runs == {}
 
     def test_do_post_android_compatibility_queues_run_with_versions(self, monkeypatch: pytest.MonkeyPatch):
         import app

@@ -221,6 +221,18 @@ class TestQaRuntimeHttpContracts:
         payload = json.loads(exc_info.value.read().decode("utf-8"))
         assert payload["error"] == "masterSerial und childSerial sind erforderlich."
 
+    def test_runtime_http_rejects_identical_dual_device_serials(self, qa_http_server: str):
+        with pytest.raises(HTTPError) as exc_info:
+            _read_json(
+                f"{qa_http_server}/api/suites/dual-device",
+                method="POST",
+                body={"masterSerial": "SAME-DEVICE-1", "childSerial": "SAME-DEVICE-1"},
+            )
+
+        assert exc_info.value.code == 400
+        payload = json.loads(exc_info.value.read().decode("utf-8"))
+        assert payload["error"] == "Master- und Child-ADB-Serial müssen unterschiedlich sein."
+
     def test_runtime_http_rejects_invalid_android_compatibility_requests(self, qa_http_server: str):
         with pytest.raises(HTTPError) as exc_info:
             _read_json(
