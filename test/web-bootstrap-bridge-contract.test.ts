@@ -12,6 +12,16 @@ describe("web bootstrap bridge contract", () => {
     expect(indexSource).toContain("redeemMasterWebBootstrapToken");
   });
 
+  it("parent-panel launches web-control via server-issued bootstrap links", async () => {
+    const parentPanel = await readUtf8("parent-panel/index.html");
+
+    expect(parentPanel).toContain("createMasterWebBootstrapToken");
+    expect(parentPanel).toContain("targetPath");
+    expect(parentPanel).toContain("queryParamName");
+    expect(parentPanel).toContain("../web-control/index.html");
+    expect(parentPanel).toContain("generateCustomToken");
+  });
+
   it("web clients support bootstrapToken redemption while keeping legacy login fallback", async () => {
     const webControl = await readUtf8("web-control/app.js");
     const parentPanel = await readUtf8("parent-panel/index.html");
