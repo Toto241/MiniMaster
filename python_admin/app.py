@@ -6151,6 +6151,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {
                     "error": "masterSerial und childSerial sind erforderlich."
                 })
+            if master_serial == child_serial:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {
+                    "error": "Master- und Child-ADB-Serial müssen unterschiedlich sein."
+                })
 
             run_id = f"dual-{uuid4().hex[:12]}"
             kwargs = {
