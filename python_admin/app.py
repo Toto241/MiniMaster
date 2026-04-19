@@ -5370,6 +5370,20 @@ def _build_android_automation_sweep_plan() -> dict[str, object]:
     }
 
 
+def _android_automation_sweep_hard_blocker() -> str | None:
+    emulator_lab = get_emulator_lab_overview()
+    hard_blockers = (
+        ("sdkConfigured", "Android-SDK ist nicht konfiguriert."),
+        ("adbAvailable", "ADB ist nicht verfügbar."),
+        ("emulatorBinaryAvailable", "Die Android-Emulator-Binary ist nicht verfügbar."),
+        ("avdManagerAvailable", "Der AVD Manager ist nicht verfügbar."),
+    )
+    for key, message in hard_blockers:
+        if not bool_from_payload(emulator_lab.get(key), default=False):
+            return message
+    return None
+
+
 def _summarize_android_compatibility_runs(sub_runs: list[dict[str, object]]) -> dict[str, object]:
     counts = {
         "total": len(sub_runs),
@@ -6325,6 +6339,9 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             }
             if not cast(list[str], kwargs["android_versions"]):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "Keine aktiven Android-Versionen im QA-Katalog gefunden."})
+            hard_blocker = _android_automation_sweep_hard_blocker()
+            if hard_blocker:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": hard_blocker})
 
             linked_suites = _normalized_suite_run_keys({"type": "android-automation-sweep"})
             with _active_suite_lock:
