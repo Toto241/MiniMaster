@@ -18,6 +18,11 @@ import * as path from "path";
  *
  * Stand F6 CSP-Refactor Stufe 2 (Bootstrap-Firebase + Modal-Close + Jobs):
  *   - Inline onclick="..." in index.html: 87 (-13 via globalActionBootstrap)
+ *
+ * Stand F6 CSP-Refactor Stufe 3 (Tab-Content Buttons en bloc):
+ *   - Inline onclick="..." in index.html: 2 (Restmenge: dynamische Expression-Args fuer
+ *     copyRolloutBundleScript / downloadRolloutBundleScript). 85 weitere Handler via
+ *     Regex-Migration auf data-action / data-args umgestellt.
  */
 
 const APP_JS = "admin-panel/app.js";
@@ -25,7 +30,7 @@ const INDEX_HTML = "admin-panel/index.html";
 
 const MAX_APP_JS_BYTES = 720_000;
 const MAX_TOP_LEVEL_FUNCTIONS = 500;
-const MAX_INLINE_ONCLICK = 95;
+const MAX_INLINE_ONCLICK = 5;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
 const INLINE_ONCLICK_REGEX = /\bonclick\s*=/g;
