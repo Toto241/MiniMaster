@@ -85,18 +85,18 @@ The job was not started because recent account payments have failed or your spen
 - [x] **Recovery-Token Rotation — operationelles Runbook**: Quartals-Rotations-SOP in [RUNBOOK.md](RUNBOOK.md) dokumentiert (Pre-Check, Rotation via `scripts/operator-setup.ps1 rotate-token`, Overlap-Phase, Re-Deploy, Smoke-Test, Old-Token-Removal, Audit; plus Notfall-Rotation bei Kompromittierung).
 - [x] **Debug-Snapshot Felder erweitert** (`src/support.ts`): `DebugSnapshot` um `networkDiagnostics.networkType` (wifi/cellular/none/unknown, sanitisiert/lowercased) und `deviceTelemetry` (`batteryLevelPct` 0-100 clamped, `isCharging`, `storageFreeBytes`, `osVersion`/`appVersion` truncated 32 chars) erweitert; Whitelist-Sanitizer `sanitizeDebugSnapshot` normalisiert ungültige Werte (Test deckt invalid networkType, negative Battery, falscher Typ, überlange Strings ab). Suite 2088/2088 grün ✅, Coverage 87.40/90.31/94.48/94.30 % ✅.
 - [ ] **iOS Family Controls Picker**: Nativer Picker im `iosMasterApp` (Beta → Release)
-- [ ] **Electron Build-Pipeline**: `desktop/`-Bundling + Code-Signing
-- [ ] **Photo-Proof EXIF-Strip** (optional): Client-seitiges EXIF-Stripping (Geo-Daten) ergänzen — MIME/Größe/Path-Scoping sind erledigt
+- [x] **Electron Build-Pipeline**: `desktop/package.json` mit Multi-Target (nsis/portable/dmg/zip/AppImage/deb), GitHub-Actions-Workflow [`.github/workflows/desktop-ci.yml`](.github/workflows/desktop-ci.yml) Matrix (win/mac/linux) mit opt-in Code-Signing über Secrets, `desktop/build/entitlements.mac.plist`, RUNBOOK-Sektion *Desktop Build & Code-Signing* inkl. Release-SOP
+- [x] **Photo-Proof EXIF-GPS-Defense-in-Depth** (`src/tasks.ts`): Neuer reiner Funktions-Detektor `detectExifGpsTag(buf)` parst JPEG-Header ("Exif\x00\x00" → TIFF-Endianness-Header MM/II → GPS-IFD-Tag 0x8825), beschränkt Suche auf das EXIF-Segment (Falschpositiv-Schutz). `validatePhotoObjectMetadata` lädt zusätzlich die ersten 64 KB via `createReadStream(0, 65535)` und lehnt Uploads mit GPS-Geodaten ab (`HttpsError invalid-argument`). Override via `PHOTO_EXIF_GPS_REJECT=false`. 8 neue Unit-Tests (`test/exif-gps-detector.test.ts`) decken empty/no-marker/bad-endian/MM-positive/II-positive/MM-negative/II-negative/false-positive-guard ab. Suite 2141/2141 grün ✅.
 - [x] **Subscription Scheduler – Periodische Play-API-Re-Verifikation** (siehe Durchgeführt-Sektion: täglicher Scheduled-Run reconciliert active/grace_period-Master gegen Play Developer API).
-- [ ] **Offline-Policy Cache (childApp)**: Konfliktauflösung bei längerer Offline-Phase
+- [~] **Offline-Policy Cache (childApp)**: Pure-Kotlin-Modul [`OfflinePolicyCache`](childApp/src/main/java/com/google/pairing/child/OfflinePolicyCache.kt) mit Freshness-Tiers (FRESH/STALE_BUT_USABLE/EXPIRED_SAFE_MODE), deterministischer Conflict-Resolution (`policyVersion` → `appliedAtEpochMs`-Tiebreaker) und 12 JVM-Unit-Tests. RUNBOOK-Sektion *Offline-Policy-Cache (childApp)* dokumentiert Strategie + Wire-up. **Wire-up in `CommandSyncRepository` + `MiniMasterAccessibilityService` + WorkManager-Re-Sync-Job folgt in eigener Iteration.**
 - [ ] **Coverage-Schwellwerte weiter erhöhen** (optional): Aktuell 85/88/90/90 — Ziel 90/92/95/95 wenn nächste Code-Erweiterungen mit Tests landen
 
 ### [DOKU]
 
-- [ ] Formale C4-Diagramme als Mermaid/SVG (textueller Kontext steht)
-- [ ] Sequenzdiagramme: Pairing, Task-Lifecycle, Photo-Proof, Subscription-Renewal, Support-Grant
-- [ ] Rollback-Drill-Protokoll
-- [ ] On-Call-Roster
+- [x] Sequenzdiagramme als Mermaid in [ARCHITECTURE.md](ARCHITECTURE.md): Pairing, Task-Lifecycle, Photo-Proof-Validation, Subscription-Renewal (RTDN + Reverify), Support-Grant, Admin-Recovery.
+- [x] Rollback-Drill-Protokoll in [RUNBOOK.md](RUNBOOK.md): 6-Schritte-Drill (Pre-Snapshot, Fehl-Deploy, Detection-Latenz, Rollback, Post-Validation, jhrl. Datenbank-Restore-Verifikation) inkl. Akzeptanzkriterien (Detect ≤ 5 min, Rollback ≤ 10 min) und Versagensfall-Procedure.
+- [x] On-Call-Roster Template in [RUNBOOK.md](RUNBOOK.md): 4-Wochen-Rotation Primary/Secondary/Eskalation mit Erreichbarkeitsschwellen (P1 ≤ 15 min, P2 ≤ 1 h) und Verantwortungsbereich (Cloud-Functions-Fehlerrate, RTDN-Backlog, Reverify-Fehlerrate, Recovery-Token-Audit).
+- [x] Formale C4-Diagramme als Mermaid in [ARCHITECTURE.md](ARCHITECTURE.md): Level 1 (System Context), Level 2 (Container), Level 3 (Component — Cloud Functions).
 
 ### [EXTERN] – außerhalb Repo-Scope
 

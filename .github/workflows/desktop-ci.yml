@@ -1,0 +1,98 @@
+name: Desktop Build (Electron)
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: "Sign artifacts (requires CSC_* secrets in repo)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: desktop/package.json
+
+      - name: Install Linux build deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot dpkg
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Decode Windows code-signing cert
+        if: runner.os == 'Windows' && github.event.inputs.sign == 'true'
+        shell: pwsh
+        env:
+          WIN_CSC_BASE64: ${{ secrets.WIN_CSC_LINK }}
+        run: |
+          if (-not $env:WIN_CSC_BASE64) { Write-Host "::warning::No WIN_CSC_LINK secret; building unsigned."; exit 0 }
+          $bytes = [Convert]::FromBase64String($env:WIN_CSC_BASE64)
+          $certPath = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, $bytes)
+          echo "CSC_LINK=$certPath" >> $env:GITHUB_ENV
+
+      - name: Decode macOS code-signing cert
+        if: runner.os == 'macOS' && github.event.inputs.sign == 'true'
+        env:
+          MAC_CSC_BASE64: ${{ secrets.MAC_CSC_LINK }}
+        run: |
+          if [ -z "$MAC_CSC_BASE64" ]; then
+            echo "::warning::No MAC_CSC_LINK secret; building unsigned.";
+            exit 0;
+          fi
+          echo "$MAC_CSC_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          echo "CSC_LINK=$RUNNER_TEMP/cert.p12" >> "$GITHUB_ENV"
+
+      - name: Build (signed)
+        if: github.event.inputs.sign == 'true'
+        working-directory: desktop
+        env:
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run dist
+
+      - name: Build (unsigned dev artifact)
+        if: github.event.inputs.sign != 'true'
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.AppImage
+            desktop/release/*.deb
+          if-no-files-found: ignore
+          retention-days: 14
