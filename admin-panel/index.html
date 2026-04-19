@@ -201,7 +201,7 @@
                                         class="form-input"
                                         placeholder="https://example.com/firebase-config.json"
                                     />
-                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromUrl()" title="Firebase-Konfiguration aus einer externen URL laden">
+                                    <button type="button" class="btn btn-secondary" data-action="loadBootstrapFirebaseConfigFromUrl" title="Firebase-Konfiguration aus einer externen URL laden">
                                         Aus URL laden
                                     </button>
                                 </div>
@@ -212,7 +212,7 @@
                                         class="form-input"
                                         accept=".json,application/json"
                                     />
-                                    <button type="button" class="btn btn-secondary" onclick="loadBootstrapFirebaseConfigFromFile()" title="Firebase-Konfiguration aus einer lokalen JSON-Datei importieren">
+                                    <button type="button" class="btn btn-secondary" data-action="loadBootstrapFirebaseConfigFromFile" title="Firebase-Konfiguration aus einer lokalen JSON-Datei importieren">
                                         JSON-Datei importieren
                                     </button>
                                 </div>
@@ -226,8 +226,8 @@
                             <div id="bootstrap-config-status" class="phase-status"></div>
 
                             <div class="phase-actions">
-                                <button onclick="saveBootstrapFirebaseConfig()" class="btn btn-secondary" title="Firebase-Konfiguration nur lokal im Browser speichern">Lokal speichern</button>
-                                <button onclick="reloadWithBootstrapConfig()" class="btn btn-primary" title="Konfiguration speichern und Verbindung zum Firebase-Projekt herstellen">Speichern &amp; verbinden</button>
+                                <button type="button" data-action="saveBootstrapFirebaseConfig" class="btn btn-secondary" title="Firebase-Konfiguration nur lokal im Browser speichern">Lokal speichern</button>
+                                <button type="button" data-action="reloadWithBootstrapConfig" class="btn btn-primary" title="Konfiguration speichern und Verbindung zum Firebase-Projekt herstellen">Speichern &amp; verbinden</button>
                             </div>
 
                             <div class="firebase-import-box" style="margin-block-start: 14px; border-color: #fed7aa; background: #fff7ed;">
@@ -237,9 +237,9 @@
                                     Danach wird automatisch in die Kontoeinrichtung gewechselt.
                                 </p>
                                 <div class="phase-actions" style="margin-block-start: 10px;">
-                                    <button type="button" class="btn btn-secondary" onclick="copyFirebaseRecoveryScript()" title="Recovery-Skript in die Zwischenablage kopieren">Recovery-Skript kopieren</button>
-                                    <button type="button" class="btn btn-primary" onclick="runFirebaseRecoveryAutopilot()" title="Automatische Wiederherstellung von Firestore, Functions und Storage starten">Recovery jetzt ausführen</button>
-                                    <button type="button" class="btn btn-danger" onclick="runStartFromScratchAutopilot()" title="Kompletter Neustart: Cloud-Daten und lokale Einstellungen zurücksetzen">Start bei Null (Cloud + Panel)</button>
+                                    <button type="button" class="btn btn-secondary" data-action="copyFirebaseRecoveryScript" title="Recovery-Skript in die Zwischenablage kopieren">Recovery-Skript kopieren</button>
+                                    <button type="button" class="btn btn-primary" data-action="runFirebaseRecoveryAutopilot" title="Automatische Wiederherstellung von Firestore, Functions und Storage starten">Recovery jetzt ausführen</button>
+                                    <button type="button" class="btn btn-danger" data-action="runStartFromScratchAutopilot" title="Kompletter Neustart: Cloud-Daten und lokale Einstellungen zurücksetzen">Start bei Null (Cloud + Panel)</button>
                                 </div>
                                 <div id="bootstrap-recovery-progress" class="recovery-progress" aria-live="polite">
                                     <div class="recovery-progress-step" data-step="validate">
@@ -2087,13 +2087,13 @@
                     <h3>Geplante Jobs manuell ausführen</h3>
                     <p>Starte geplante Hintergrundjobs sofort.</p>
                     <div class="job-buttons">
-                        <button onclick="triggerJob('checkExpiredSubscriptions')" class="btn btn-secondary" title="Prüft alle Abonnements auf Ablauf und markiert abgelaufene">
+                        <button type="button" data-action="triggerJob" data-args='["checkExpiredSubscriptions"]' class="btn btn-secondary" title="Prüft alle Abonnements auf Ablauf und markiert abgelaufene">
                             Abgelaufene Abos prüfen
                         </button>
-                        <button onclick="triggerJob('cleanupExpiredGrants')" class="btn btn-secondary" title="Räumt abgelaufene Support-Zugriffsfreigaben auf">
+                        <button type="button" data-action="triggerJob" data-args='["cleanupExpiredGrants"]' class="btn btn-secondary" title="Räumt abgelaufene Support-Zugriffsfreigaben auf">
                             Abgelaufene Zugänge aufräumen
                         </button>
-                        <button onclick="triggerJob('sendDailyErrorReport')" class="btn btn-secondary" title="Täglichen Fehlerreport sofort erstellen und versenden">
+                        <button type="button" data-action="triggerJob" data-args='["sendDailyErrorReport"]' class="btn btn-secondary" title="Täglichen Fehlerreport sofort erstellen und versenden">
                             Fehlerreport erstellen
                         </button>
                     </div>
@@ -2356,7 +2356,7 @@
         <!-- User Details Modal -->
         <div id="user-details-modal" class="modal" style="display: none">
             <div class="modal-content modal-large">
-                <span class="close" onclick="closeUserDetailsModal()" title="Dialog schließen"
+                <span class="close" data-action="closeUserDetailsModal" title="Dialog schließen"
                     >&times;</span
                 >
                 <div id="user-details-content">
@@ -2368,7 +2368,7 @@
         <!-- Device Details Modal -->
         <div id="device-details-modal" class="modal" style="display: none">
             <div class="modal-content modal-large">
-                <span class="close" onclick="closeDeviceDetailsModal()" title="Dialog schließen">&times;</span>
+                <span class="close" data-action="closeDeviceDetailsModal" title="Dialog schließen">&times;</span>
                 <div id="device-details-content"></div>
             </div>
         </div>
@@ -2376,7 +2376,7 @@
         <!-- Ticket Details Modal -->
         <div id="ticket-details-modal" class="modal" style="display: none">
             <div class="modal-content modal-large">
-                <span class="close" onclick="closeTicketDetailsModal()" title="Dialog schließen"
+                <span class="close" data-action="closeTicketDetailsModal" title="Dialog schließen"
                     >&times;</span
                 >
                 <div id="ticket-details-content">
