@@ -23,6 +23,12 @@ import * as path from "path";
  *   - Inline onclick="..." in index.html: 2 (Restmenge: dynamische Expression-Args fuer
  *     copyRolloutBundleScript / downloadRolloutBundleScript). 85 weitere Handler via
  *     Regex-Migration auf data-action / data-args umgestellt.
+ *
+ * Stand F6 CSP-Refactor Stufe 4 (Rest-Onclick + CSP-Verifikation):
+ *   - Inline onclick="..." in index.html: 0 (Wrapper *FromForm fuer Rollout-Bundle).
+ *   - Inline-<script>-Bloecke: 0. Inline-Event-Handler insgesamt: 0.
+ *   - CSP `script-src 'self' https://www.gstatic.com` (firebase.json) ist damit
+ *     OHNE 'unsafe-inline' sauber (style-src 'unsafe-inline' bleibt fuer Inline-CSS).
  */
 
 const APP_JS = "admin-panel/app.js";
@@ -30,7 +36,7 @@ const INDEX_HTML = "admin-panel/index.html";
 
 const MAX_APP_JS_BYTES = 720_000;
 const MAX_TOP_LEVEL_FUNCTIONS = 500;
-const MAX_INLINE_ONCLICK = 5;
+const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
 const INLINE_ONCLICK_REGEX = /\bonclick\s*=/g;
@@ -60,5 +66,30 @@ describe("admin-panel bundle budget (Welle 0 baseline)", () => {
     const source = await readUtf8(INDEX_HTML);
     const matches = source.match(INLINE_ONCLICK_REGEX) ?? [];
     expect(matches.length).toBeLessThanOrEqual(MAX_INLINE_ONCLICK);
+  });
+
+  it("index.html ist frei von Inline-<script>-Bloecken und Inline-Event-Handlern (F6 Stufe 4 / CSP-Hardening)", async () => {
+    const source = await readUtf8(INDEX_HTML);
+    // Inline <script> ohne src=
+    const inlineScripts = source.match(/<script(?![^>]*\ssrc=)[^>]*>[\s\S]*?<\/script>/g) ?? [];
+    expect(inlineScripts.length).toBe(0);
+    // Inline-Event-Handler-Attribute (onclick, onload, onerror, onchange, ...)
+    const inlineHandlers = source.match(/\son(?:load|error|click|change|input|submit|focus|blur|mouseover|mouseout|keydown|keyup|keypress)\s*=/g) ?? [];
+    expect(inlineHandlers.length).toBe(0);
+    // Pseudo-Protokoll javascript:
+    expect(source).not.toMatch(/javascript:/);
+  });
+
+  it("firebase.json CSP setzt script-src ohne 'unsafe-inline' fuer admin-panel (F6 Stufe 5)", async () => {
+    const fbJson = await readUtf8("firebase.json");
+    const csps = [...fbJson.matchAll(/"Content-Security-Policy"[\s\S]*?"value"\s*:\s*"([^"]+)"/g)]
+      .map(m => m[1]);
+    expect(csps.length).toBeGreaterThanOrEqual(2);
+    for (const csp of csps) {
+      const scriptSrcMatch = csp.match(/script-src\s+[^;]+/);
+      expect(scriptSrcMatch).not.toBeNull();
+      expect(scriptSrcMatch![0]).not.toMatch(/'unsafe-inline'/);
+      expect(scriptSrcMatch![0]).not.toMatch(/'unsafe-eval'/);
+    }
   });
 });

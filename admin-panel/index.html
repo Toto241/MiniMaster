@@ -1886,8 +1886,8 @@
                             <div class="setup-actions" style="margin-block-start: 12px">
                                 <button data-action="refreshCommandBuilderCommands" class="btn btn-primary" title="Lauffähige Betriebsbefehle aus den Basisdaten generieren">Befehle generieren</button>
                                 <button data-action="saveCommandBuilderConfig" class="btn btn-secondary" title="Aktuelle Eingaben lokal speichern">Vorgaben speichern</button>
-                                <button onclick="copyRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-secondary" title="Rollout-PowerShell-Skript in die Zwischenablage kopieren">Rollout-PS kopieren</button>
-                                <button onclick="downloadRolloutBundleScript(getOperatorConfigFormValues().cloud.projectId || firebaseConfig.projectId)" class="btn btn-primary" title="Rollout-PowerShell-Skript als Datei herunterladen">Rollout-PS herunterladen</button>
+                                <button type="button" data-action="copyRolloutBundleScriptFromForm" class="btn btn-secondary" title="Rollout-PowerShell-Skript in die Zwischenablage kopieren">Rollout-PS kopieren</button>
+                                <button type="button" data-action="downloadRolloutBundleScriptFromForm" class="btn btn-primary" title="Rollout-PowerShell-Skript als Datei herunterladen">Rollout-PS herunterladen</button>
                             </div>
 
                             <div id="command-builder-status" class="data-list" style="margin-block-start: 15px">
