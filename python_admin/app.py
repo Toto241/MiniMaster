@@ -64,6 +64,7 @@ DEFAULT_EVIDENCE_LIMIT = 50
 MAX_EVIDENCE_LIMIT = 500
 DEFAULT_COMMAND_TIMEOUT_SEC = int(os.environ.get("MINIMASTER_COMMAND_TIMEOUT_SEC", "1800"))
 ALLOWED_EVIDENCE_STATUSES = {"pass", "fail", "manual_required"}
+CLIENT_DISCONNECT_WINERRORS = {10053, 10054}
 
 ALLOWED_COMMANDS = {
     "adb",
@@ -3431,6 +3432,14 @@ def _current_timestamp_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _is_client_disconnect_error(error: BaseException) -> bool:
+    if isinstance(error, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+        return True
+    if isinstance(error, OSError) and getattr(error, "winerror", None) in CLIENT_DISCONNECT_WINERRORS:
+        return True
+    return False
+
+
 def _deep_copy_json_compatible(value: object) -> object:
     return json.loads(json.dumps(value, ensure_ascii=False, default=str))
 
@@ -5539,7 +5548,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except OSError as exc:
+            if not _is_client_disconnect_error(exc):
+                raise
+            self.close_connection = True
 
     def guess_type(self, path: str | os.PathLike[str]) -> str:
         path_text = str(path)

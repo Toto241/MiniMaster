@@ -294,6 +294,37 @@ class TestMiniMasterAdminHandlerRoutes:
         cycle_mock.assert_called_once_with(auto_fix=False, stale_after_sec=120, triggered_by="http-get")
         handler._write_json.assert_called_once_with(HTTPStatus.OK, {"systemHealth": "OK", "detectedIssues": []})
 
+    def test_write_json_ignores_client_disconnect_during_body_write(self):
+        import app
+
+        handler = self._make_handler("/api/testing/register")
+        handler.wfile = MagicMock()
+        handler.wfile.write.side_effect = ConnectionAbortedError(10053, "client disconnected")
+        handler.close_connection = False
+
+        app.MiniMasterAdminHandler._write_json(handler, HTTPStatus.OK, {"ok": True})
+
+        handler.send_response.assert_called_once_with(HTTPStatus.OK)
+        handler.send_header.assert_any_call("Content-Type", "application/json; charset=utf-8")
+        handler.end_headers.assert_called_once_with()
+        handler.wfile.write.assert_called_once()
+        assert handler.close_connection is True
+
+    def test_write_json_reraises_non_disconnect_write_errors(self):
+        import app
+
+        handler = self._make_handler("/api/testing/register")
+        handler.wfile = MagicMock()
+        handler.wfile.write.side_effect = OSError("non-disconnect write failure")
+        handler.close_connection = False
+
+        with pytest.raises(OSError, match="non-disconnect write failure"):
+            app.MiniMasterAdminHandler._write_json(handler, HTTPStatus.OK, {"ok": True})
+
+        handler.send_response.assert_called_once_with(HTTPStatus.OK)
+        handler.end_headers.assert_called_once_with()
+        assert handler.close_connection is False
+
     def test_do_post_dual_device_queues_run_with_scenario_profile_and_fault_modes(self, monkeypatch: pytest.MonkeyPatch):
         import app
 
