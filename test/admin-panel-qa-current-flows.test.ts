@@ -179,4 +179,33 @@ describe("admin-panel current QA flows", () => {
     expect(automaticListEl.innerHTML).toContain("sys-dual-1");
     expect(automaticListEl.innerHTML).not.toContain("mod-parent-1");
   });
+
+  it("routes android USB suites through the dedicated QA endpoint", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports();
+
+    elements.set("notification", {
+      textContent: "",
+      className: "",
+      style: { display: "none" },
+    });
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ runId: "usb-run-1" }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+
+    await exports.startSuiteRun("android-usb-master");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/suites/usb-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        appId: "master",
+        serial: "auto",
+        suite: "commissioning",
+      }),
+    });
+  });
 });

@@ -824,11 +824,8 @@ class TestBuildTestingRegister:
         expected_repo_tests = {
             "ma-fcm-working",
             "ma-date-picker",
-            "ma-subscription-enforce",
             "ma-offline-handling",
             "ca-tamper-detection",
-            "dt-parent-panel-login",
-            "dt-admin-panel-login",
             "dt-window-persistence",
             "dt-crash-reporting",
         }
@@ -857,17 +854,25 @@ class TestBuildTestingRegister:
             assert items_by_id[test_id]["source"] == "repo-test"
         assert items_by_id["ma-date-picker"]["suiteRef"] == "backend-jest"
         assert items_by_id["ma-fcm-working"]["suiteRef"] == "android-unit-master"
-        assert items_by_id["ma-subscription-enforce"]["suiteRef"] == "backend-subscription-enforcement"
         assert items_by_id["ma-offline-handling"]["suiteRef"] == "android-unit-master"
         assert items_by_id["ca-tamper-detection"]["suiteRef"] == "android-unit-child"
-        assert items_by_id["dt-parent-panel-login"]["suiteRef"] == "web-control-auth-flow"
-        assert items_by_id["dt-admin-panel-login"]["suiteRef"] == "admin-panel-auth-flow"
         assert items_by_id["dt-window-persistence"]["suiteRef"] == "backend-jest"
         assert items_by_id["dt-crash-reporting"]["suiteRef"] == "backend-jest"
         for test_id in expected_derived:
             assert items_by_id[test_id]["automationType"] == "automatic"
             assert items_by_id[test_id]["source"] == "register-derivative"
             assert items_by_id[test_id]["derivedFrom"]
+
+        for test_id, documentation in {
+            "ma-subscription-enforce": "test/branch-coverage-pairing.test.ts",
+            "dt-parent-panel-login": "test/web-control-ui.test.ts",
+            "dt-admin-panel-login": "test/admin-panel-helpers.test.ts",
+        }.items():
+            assert items_by_id[test_id]["automationType"] == "documented"
+            assert items_by_id[test_id]["source"] == "repo-test"
+            assert items_by_id[test_id]["suiteRef"] == ""
+            assert items_by_id[test_id]["action"] == "protocol"
+            assert items_by_id[test_id]["documentation"] == documentation
 
     def test_register_exposes_duplicate_coverage_insights_for_derived_checks(self):
         from app import build_testing_register
@@ -895,13 +900,13 @@ class TestBuildTestingRegister:
         assert items_by_id["ma-fcm-working"]["source"] == "repo-test"
         assert items_by_id["ca-tamper-detection"]["automationType"] == "automatic"
         assert items_by_id["ca-tamper-detection"]["source"] == "repo-test"
-        assert items_by_id["ma-subscription-enforce"]["automationType"] == "automatic"
+        assert items_by_id["ma-subscription-enforce"]["automationType"] == "documented"
         assert items_by_id["ma-subscription-enforce"]["source"] == "repo-test"
         assert items_by_id["ma-offline-handling"]["automationType"] == "automatic"
         assert items_by_id["ma-offline-handling"]["source"] == "repo-test"
-        assert items_by_id["dt-parent-panel-login"]["automationType"] == "automatic"
+        assert items_by_id["dt-parent-panel-login"]["automationType"] == "documented"
         assert items_by_id["dt-parent-panel-login"]["source"] == "repo-test"
-        assert items_by_id["dt-admin-panel-login"]["automationType"] == "automatic"
+        assert items_by_id["dt-admin-panel-login"]["automationType"] == "documented"
         assert items_by_id["dt-admin-panel-login"]["source"] == "repo-test"
         assert items_by_id["dt-window-persistence"]["automationType"] == "automatic"
         assert items_by_id["dt-window-persistence"]["source"] == "repo-test"
@@ -919,6 +924,80 @@ class TestBuildTestingRegister:
         assert manual_insights["buckets"]["automation-backlog"]["count"] >= 1
         assert manual_insights["buckets"]["external-evidence"]["count"] >= 1
         assert manual_insights["waves"]["wave-2"]["count"] >= 1
+
+    def test_load_latest_suite_results_normalizes_specialized_runs_without_suite_id(self, suite_log_file: Path):
+        import app
+
+        suite_log_file.write_text(
+            "\n".join(
+                [
+                    json.dumps({
+                        "runId": "usb-1",
+                        "type": "usb-test",
+                        "appId": "master",
+                        "status": "finished",
+                        "result": {"overallStatus": "passed"},
+                    }),
+                    json.dumps({
+                        "runId": "compat-1",
+                        "type": "android-compatibility",
+                        "executionMode": "single-child",
+                        "status": "finished",
+                        "result": {"overallStatus": "passed"},
+                    }),
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        latest = app.load_latest_suite_results()
+
+        assert latest["android-usb-master"]["runId"] == "usb-1"
+        assert latest["android-usb-child"]["runId"] == "compat-1"
+        assert latest["android-compatibility-single-child"]["runId"] == "compat-1"
+
+    def test_commissioning_entries_can_inherit_pass_state_from_specialized_usb_runs(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        monkeypatch.setattr(app, "load_commissioning_history", lambda limit: [])
+        monkeypatch.setattr(app, "load_latest_commissioning_evidence", lambda: {})
+        monkeypatch.setattr(
+            app,
+            "get_suite_catalog",
+            lambda: {
+                "suites": [
+                    {
+                        "suiteId": "android-usb-master",
+                        "title": "masterApp USB commissioning",
+                        "group": "device",
+                        "command": "python scripts/usb_test_runner.py --app-id master --suite commissioning",
+                        "prereqsMet": True,
+                        "prereqReason": "",
+                    }
+                ]
+            },
+        )
+        monkeypatch.setattr(
+            app,
+            "load_latest_suite_results",
+            lambda: {
+                "android-usb-master": {
+                    "runId": "usb-1",
+                    "type": "usb-test",
+                    "appId": "master",
+                    "status": "finished",
+                    "timestamp": "2026-04-19T18:20:00Z",
+                    "result": {"overallStatus": "passed"},
+                }
+            },
+        )
+
+        result = app.build_testing_register()
+        items_by_id = {item["id"]: item for item in result["items"]}
+
+        assert items_by_id["doc-create-task"]["status"] == "pass"
+        assert items_by_id["doc-create-task"]["origin"] == "suite-run"
+        assert items_by_id["doc-create-task"]["updatedAt"] == "2026-04-19T18:20:00Z"
 
     def test_local_workspace_checks_can_be_evaluated_automatically(self, monkeypatch: pytest.MonkeyPatch):
         import app
