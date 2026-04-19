@@ -23,15 +23,25 @@ sys.path.insert(0, str(REPO_ROOT / "python_admin"))
 # ═══════════════════════════════════════════════════════════════════
 
 @pytest.fixture(autouse=True)
-def _clean_active_runs():
+def _clean_active_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Reset _active_suite_runs vor und nach jedem Test."""
     import python_admin_app_loader as _  # noqa: F401 – force load
-    from app import _active_suite_runs, _active_suite_lock
+    import app
+    from app import _active_suite_runs, _active_suite_lock, _active_jobs, _job_lock, _job_queue
+    monkeypatch.setattr(app, "JOB_RUN_LOG_FILE", tmp_path / "job_runs.jsonl")
     with _active_suite_lock:
         _active_suite_runs.clear()
+    with _job_lock:
+        _active_jobs.clear()
+        _job_queue.clear()
+    app._job_worker_thread = None
     yield
     with _active_suite_lock:
         _active_suite_runs.clear()
+    with _job_lock:
+        _active_jobs.clear()
+        _job_queue.clear()
+    app._job_worker_thread = None
 
 
 @pytest.fixture()
@@ -40,8 +50,10 @@ def suite_log_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import app
     log_file = tmp_path / "suite_runs.jsonl"
     self_healing_log_file = tmp_path / "self_healing_cycles.jsonl"
+    job_log_file = tmp_path / "job_runs.jsonl"
     monkeypatch.setattr(app, "SUITE_RUN_LOG_FILE", log_file)
     monkeypatch.setattr(app, "SELF_HEALING_LOG_FILE", self_healing_log_file)
+    monkeypatch.setattr(app, "JOB_RUN_LOG_FILE", job_log_file)
     monkeypatch.setattr(app, "LOG_DIR", tmp_path)
     return log_file
 

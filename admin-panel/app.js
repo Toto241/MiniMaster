@@ -2586,6 +2586,80 @@ function buildQaReleaseClipboardPayload(blocker, format = "compact") {
     return JSON.stringify(blocker || {}, null, format === "debug" ? 2 : 0);
 }
 
+function buildQaReleaseErrorClipboardPayload(errorItem, format = "compact") {
+    const item = errorItem && typeof errorItem === "object" ? errorItem : {};
+    const context = item.context && typeof item.context === "object" ? item.context : {};
+    const logs = Array.isArray(context.logs) ? context.logs : [];
+    if (String(format || "compact").toLowerCase() === "debug") {
+        return JSON.stringify(item, null, 2);
+    }
+    return [
+        `Titel: ${String(item.title || item.errorId || "-")}`,
+        `Quelle: ${String(item.sourceType || "system")} / ${String(item.sourceId || "-")}`,
+        `JobId: ${String(item.relatedJobId || "-")}`,
+        `Status: ${String(item.status || "failed")}`,
+        `Zeit: ${String(item.timestamp || "-")}`,
+        `Severity: ${String(item.severity || "medium")}`,
+        `Fehler: ${String(item.message || "-")}`,
+        `Stacktrace: ${String(item.stacktrace || "-")}`,
+        `Logs: ${logs.join(" | ") || "-"}`,
+    ].join("\n");
+}
+
+async function copyQaReleaseError(errorId, format = "compact") {
+    const viewModel = buildQaReleaseWorkspaceViewModel();
+    const errorItem = (viewModel.errors || []).find(item => String(item?.errorId || "") === String(errorId || ""));
+    if (!errorItem) {
+        showNotification("Fehlerobjekt konnte nicht gefunden werden.", "error");
+        return;
+    }
+    try {
+        await copyTextToClipboard(buildQaReleaseErrorClipboardPayload(errorItem, format));
+        showNotification(`Fehler im Format '${format}' kopiert.`, "success");
+    } catch (error) {
+        showNotification("Fehler konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
+async function retryQaReleaseJob(jobId) {
+    if (!jobId) return;
+    try {
+        const response = await fetch("/api/jobs/retry", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ jobId }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Retry konnte nicht gestartet werden.");
+        }
+        showNotification(`Retry für Job ${jobId} eingereiht.`, "success");
+        await loadQaReleaseWorkspace();
+        await loadSuiteRunHistory();
+    } catch (error) {
+        showNotification("Retry fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
+async function analyzeQaReleaseError(errorId) {
+    if (!errorId) return;
+    try {
+        const response = await fetch("/api/agents/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ sourceErrorId: errorId }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Agentenlauf konnte nicht gestartet werden.");
+        }
+        showNotification(`Agenten-Analyse ${payload.jobId || ""} eingereiht.`, "success");
+        await loadQaReleaseWorkspace();
+    } catch (error) {
+        showNotification("Agenten-Analyse fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
 function getSelectedQaReleaseBlocker() {
     const viewModel = buildQaReleaseWorkspaceViewModel();
     const selected = findQaReleaseWorkspaceBlocker(qaReleaseSelectedBlockerId);
@@ -2619,6 +2693,9 @@ function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
     const synthesis = viewModel.synthesis;
     const health = viewModel.health || {};
     const emulators = viewModel.emulators || {};
+    const jobs = Array.isArray(viewModel.jobs) ? viewModel.jobs : [];
+    const errors = Array.isArray(viewModel.errors) ? viewModel.errors : [];
+    const agentCore = viewModel.agentCore || {};
     const metricsHtml = viewModel.metrics.map(item => `
         <article class="qa-release-metric-card qa-release-tone-${escapeQaReleaseChipClass(item.tone)}">
             <span>${escapeHtml(String(item.label || item.id || "Metrik"))}</span>
@@ -2666,11 +2743,49 @@ function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
                 <div class="qa-release-meta-row">
                     <span>Status: ${escapeHtml(String(item?.status || "queued"))}</span>
                     <span>Typ: ${escapeHtml(String(item?.type || "suite"))}</span>
+                    <span>Priorität: ${escapeHtml(String(item?.priority ?? "-"))}</span>
+                    <span>Retries: ${escapeHtml(String(item?.retryCount ?? 0))}</span>
                     <span>Run-ID: ${escapeHtml(String(item?.runId || "-"))}</span>
                 </div>
             </article>
         `).join("")}</div>`
         : "<div class='info'>Keine laufenden oder wartenden Jobs.</div>";
+
+    const jobsHtml = jobs.length > 0
+        ? `<div class="qa-release-timeline">${jobs.map(item => `
+            <article class="qa-release-timeline-entry">
+                <strong>${escapeHtml(String(item?.label || item?.jobId || "Job"))}</strong>
+                <div class="qa-release-meta-row">
+                    <span>Status: ${escapeHtml(String(item?.status || "-"))}</span>
+                    <span>Typ: ${escapeHtml(String(item?.type || "system"))}</span>
+                    <span>Job-ID: ${escapeHtml(String(item?.jobId || "-"))}</span>
+                </div>
+                <p class="qa-register-item-detail">${escapeHtml(String(item?.error?.message || item?.result?.summary || item?.result?.status || item?.result?.reason || "-"))}</p>
+                <div class="qa-release-actions">
+                    ${String(item?.status || "") === "failed" && Number(item?.retryCount ?? 0) <= Number(item?.maxRetries ?? 0) ? `<button class="btn btn-secondary btn-sm" onclick="retryQaReleaseJob('${encodeInlineArgument(String(item?.jobId || ""))}')">Retry</button>` : ""}
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "<div class='info'>Noch keine Jobs protokolliert.</div>";
+
+    const errorsHtml = errors.length > 0
+        ? `<div class="qa-release-timeline">${errors.map(item => `
+            <article class="qa-release-timeline-entry">
+                <strong>${escapeHtml(String(item?.title || item?.errorId || "Fehler"))}</strong>
+                <div class="qa-release-meta-row">
+                    <span>Quelle: ${escapeHtml(String(item?.sourceType || "system"))}</span>
+                    <span>Severity: ${escapeHtml(String(item?.severity || "medium"))}</span>
+                    <span>Zeit: ${escapeHtml(String(item?.timestamp || "-"))}</span>
+                </div>
+                <p class="qa-register-item-detail">${escapeHtml(String(item?.message || "-"))}</p>
+                <div class="qa-release-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="copyQaReleaseError('${encodeInlineArgument(String(item?.errorId || ""))}', 'compact')">Kompakt kopieren</button>
+                    <button class="btn btn-secondary btn-sm" onclick="copyQaReleaseError('${encodeInlineArgument(String(item?.errorId || ""))}', 'debug')">Debug kopieren</button>
+                    <button class="btn btn-secondary btn-sm" onclick="analyzeQaReleaseError('${encodeInlineArgument(String(item?.errorId || ""))}')">Per Agent analysieren</button>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "<div class='info'>Keine zentralen Fehler im aktuellen Verlauf.</div>";
 
     const failuresHtml = viewModel.recentFailures.length > 0
         ? `<div class="qa-release-timeline">${viewModel.recentFailures.map(item => `
@@ -2760,6 +2875,15 @@ function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
                         </div>
                         ${failuresHtml}
                     </section>
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Job-Register</h6>
+                                <div class="python-muted-caption">Zentrale Sicht auf Test-, Agenten- und Emulator-Jobs</div>
+                            </div>
+                        </div>
+                        ${jobsHtml}
+                    </section>
                 </div>
                 <div class="qa-release-column">
                     <section class="qa-release-card">
@@ -2805,6 +2929,9 @@ function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
                                 <div class="python-muted-caption">Deterministische 5-Agenten-Synthese aus Register, Self-Healing, Queue und Laufhistorie</div>
                             </div>
                         </div>
+                        <div class="qa-release-meta-row">
+                            ${Array.isArray(agentCore?.agents) ? agentCore.agents.map(agent => `<span>${escapeHtml(String(agent?.role || agent?.name || "Agent"))}: ${escapeHtml(String(agent?.status || "idle"))}</span>`).join("") : ""}
+                        </div>
                         ${synthesisHtml}
                         ${agentsHtml}
                     </section>
@@ -2822,6 +2949,15 @@ function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
                             <span>Reservierungen: ${escapeHtml(String(emulators?.summary?.reservationCount || 0))}</span>
                             <span>Laufende Emulatoren: ${escapeHtml(String(emulators?.summary?.runningCount || 0))}</span>
                         </div>
+                    </section>
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Fehlerzentrum</h6>
+                                <div class="python-muted-caption">Zentrale Fehlerobjekte mit Copy- und Agenten-Workflow</div>
+                            </div>
+                        </div>
+                        ${errorsHtml}
                     </section>
                 </div>
             </div>
@@ -5358,8 +5494,9 @@ async function startEmulatorAvd(avdName) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Emulator konnte nicht gestartet werden.");
-        showNotification(`Emulator ${avdName} gestartet.`, "success");
+        showNotification(`Emulator-Job ${data.jobId || ""} für ${avdName} eingereiht.`, "success");
         await loadEmulatorLabOverview();
+        await loadQaReleaseWorkspace();
     } catch (error) {
         showNotification("Emulatorstart fehlgeschlagen: " + error.message, "error");
     }
@@ -5376,8 +5513,9 @@ async function stopRunningEmulator(serial) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Emulator konnte nicht beendet werden.");
-        showNotification(`Emulator ${serial} beendet.`, "success");
+        showNotification(`Emulator-Stopp als Job ${data.jobId || ""} eingereiht.`, "success");
         await loadEmulatorLabOverview();
+        await loadQaReleaseWorkspace();
     } catch (error) {
         showNotification("Emulator-Stopp fehlgeschlagen: " + error.message, "error");
     }
@@ -5640,8 +5778,9 @@ async function createEmulatorReservation() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Reservierung konnte nicht erstellt werden.");
-        showNotification(`Reservierung ${data.reservationId} erstellt.`, "success");
+        showNotification(`Reservierungs-Job ${data.jobId || ""} eingereiht.`, "success");
         await loadEmulatorLabOverview();
+        await loadQaReleaseWorkspace();
     } catch (error) {
         showNotification("Reservierung fehlgeschlagen: " + error.message, "error");
     }
@@ -5671,8 +5810,9 @@ async function createEmulatorAvd() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "AVD konnte nicht erstellt werden.");
-        showNotification(`AVD ${data.avdName || avdName} erstellt.`, "success");
+        showNotification(`AVD-Job ${data.jobId || ""} eingereiht.`, "success");
         await loadEmulatorLabOverview();
+        await loadQaReleaseWorkspace();
     } catch (error) {
         showNotification("AVD-Erstellung fehlgeschlagen: " + error.message, "error");
     }
@@ -5689,8 +5829,9 @@ async function releaseEmulatorReservation(reservationId) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Reservierung konnte nicht freigegeben werden.");
-        showNotification(`Reservierung ${reservationId} freigegeben.`, "success");
+        showNotification(`Freigabe-Job ${data.jobId || ""} für ${reservationId} eingereiht.`, "success");
         await loadEmulatorLabOverview();
+        await loadQaReleaseWorkspace();
     } catch (error) {
         showNotification("Freigabe fehlgeschlagen: " + error.message, "error");
     }

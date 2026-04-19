@@ -143,6 +143,33 @@ class TestQaRuntimeHttpContracts:
         assert payload["summary"]["blockingCount"] == 2
         assert payload["agentWorkspace"]["agents"][0]["name"] == "validator"
 
+    def test_runtime_http_serves_operator_jobs(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
+        app = load_app_module()
+
+        monkeypatch.setattr(app, "list_jobs", lambda limit=25, statuses=None, job_types=None: [
+            {"jobId": "suite-1", "type": "test", "status": "running"},
+        ])
+
+        status, headers, payload = _read_json(f"{qa_http_server}/api/jobs?limit=10&type=test")
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert payload == {"jobs": [{"jobId": "suite-1", "type": "test", "status": "running"}], "count": 1}
+
+    def test_runtime_http_serves_operator_errors(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
+        app = load_app_module()
+
+        monkeypatch.setattr(app, "list_operator_errors", lambda limit=50: [
+            {"errorId": "job:suite-1", "title": "Suite fehlgeschlagen", "severity": "high"},
+        ])
+
+        status, headers, payload = _read_json(f"{qa_http_server}/api/jobs/errors")
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert payload["count"] == 1
+        assert payload["errors"][0]["errorId"] == "job:suite-1"
+
     def test_runtime_http_rejects_invalid_dual_device_requests(self, qa_http_server: str):
         with pytest.raises(HTTPError) as exc_info:
             _read_json(

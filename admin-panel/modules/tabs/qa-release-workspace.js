@@ -79,25 +79,32 @@ function _buildViewModel(payload) {
   })));
   const recentFailures = Array.isArray(data.recentFailures) ? data.recentFailures : [];
   const queue = Array.isArray(data.queue) ? data.queue : [];
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const errors = Array.isArray(data.errors) ? data.errors : [];
   const agents = Array.isArray(data.agentWorkspace?.agents) ? data.agentWorkspace.agents : [];
   const synthesis = data.agentWorkspace?.synthesis || null;
   const emulatorSummary = data.emulators?.summary || {};
   const health = data.health || {};
+  const agentCore = data.agentCore || {};
 
   return {
     generatedAt: String(data.generatedAt || ""),
     blockers,
     recentFailures,
     queue,
+    jobs,
+    errors,
     agents,
     synthesis,
     health,
     emulators: data.emulators || {},
+    agentCore,
     metrics: [
       { id: "release-blockers", label: "Release-Blocker", value: Number(summary.blockingCount || blockers.length || 0), tone: Number(summary.blockingCount || blockers.length || 0) > 0 ? "danger" : "success" },
       { id: "stale-evidence", label: "Veraltete Evidenz", value: Number(summary.staleEvidenceCount || 0), tone: Number(summary.staleEvidenceCount || 0) > 0 ? "warning" : "success" },
       { id: "running-jobs", label: "Laufende Jobs", value: Number(summary.runningJobs || 0), tone: Number(summary.runningJobs || 0) > 0 ? "info" : "neutral" },
       { id: "queued-jobs", label: "Queue", value: Number(summary.queuedJobs || 0), tone: Number(summary.queuedJobs || 0) > 0 ? "warning" : "neutral" },
+      { id: "failed-jobs", label: "Fehlgeschlagene Jobs", value: Number(summary.failedJobs || 0), tone: Number(summary.failedJobs || 0) > 0 ? "danger" : "success" },
       { id: "active-emulators", label: "Aktive Emulatoren", value: Number(summary.activeEmulators || emulatorSummary.runningCount || 0), tone: Number(summary.activeEmulators || emulatorSummary.runningCount || 0) > 0 ? "info" : "neutral" },
       { id: "agents", label: "Agenten", value: Number(summary.activeAgents || agents.length || 0), tone: Number(summary.activeAgents || agents.length || 0) > 0 ? "success" : "neutral" },
       { id: "critical-errors", label: "Kritische Fehler", value: Number(summary.criticalIssues || 0), tone: Number(summary.criticalIssues || 0) > 0 ? "danger" : "success" },
