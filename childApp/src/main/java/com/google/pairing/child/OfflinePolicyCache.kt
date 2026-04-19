@@ -40,6 +40,55 @@ object OfflinePolicyCache {
     const val DEFAULT_STALE_AFTER_MS: Long = 6L * 60 * 60 * 1000        // 6 h
     const val DEFAULT_HARD_EXPIRE_MS: Long = 72L * 60 * 60 * 1000        // 72 h
 
+    /**
+     * Default Safe-Mode-Payload, das durchgesetzt wird, wenn der Cache `EXPIRED_SAFE_MODE`
+     * ist und der Server beim Pairing keine eigene Safe-Mode-Konfiguration hinterlegt hat.
+     *
+     * Bedeutung: Gerät komplett gesperrt (`isLocked=true`), keine App-Whitelist, kein
+     * Tageslimit – das Kind muss warten, bis das Gerät wieder online ist und eine
+     * frische Policy zieht. Damit gibt es keinen "Free Pass" durch reinen Offline-Betrieb.
+     */
+    const val SAFE_MODE_DEFAULT_JSON: String =
+        "{\"isLocked\":true,\"appBlacklist\":[],\"usageRules\":{\"dailyLimitSeconds\":0}}"
+
+    private const val FIELD_VERSION = "policyVersion"
+    private const val FIELD_APPLIED = "appliedAtEpochMs"
+    private const val FIELD_SOURCE = "sourceEpochMs"
+    private const val FIELD_PAYLOAD = "payloadJson"
+
+    /**
+     * Serialisiert eine `CachedPolicy` als JSON-String für die Persistierung.
+     * Pure-JVM, nutzt `org.json` (testbar ohne Android-Context).
+     */
+    fun toJson(cache: CachedPolicy): String {
+        val obj = org.json.JSONObject()
+        obj.put(FIELD_VERSION, cache.policyVersion)
+        obj.put(FIELD_APPLIED, cache.appliedAtEpochMs)
+        obj.put(FIELD_SOURCE, cache.sourceEpochMs)
+        obj.put(FIELD_PAYLOAD, cache.payloadJson)
+        return obj.toString()
+    }
+
+    /**
+     * Liest eine `CachedPolicy` aus dem persistierten JSON. Gibt `null` zurück, wenn
+     * der Eintrag fehlt, leer oder strukturell beschädigt ist (defensiv – beschädigte
+     * Caches dürfen niemals zur Anwendung kommen).
+     */
+    fun fromJson(raw: String?): CachedPolicy? {
+        if (raw.isNullOrBlank()) return null
+        return try {
+            val obj = org.json.JSONObject(raw)
+            CachedPolicy(
+                policyVersion = obj.getInt(FIELD_VERSION),
+                appliedAtEpochMs = obj.getLong(FIELD_APPLIED),
+                sourceEpochMs = obj.getLong(FIELD_SOURCE),
+                payloadJson = obj.getString(FIELD_PAYLOAD),
+            )
+        } catch (_: org.json.JSONException) {
+            null
+        }
+    }
+
     fun assessFreshness(
         cache: CachedPolicy?,
         nowEpochMs: Long,

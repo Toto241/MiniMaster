@@ -3,6 +3,8 @@ package com.google.pairing
 import android.content.Context
 import android.util.Log
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.pairing.child.CachedPolicy
+import com.google.pairing.child.OfflinePolicyCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -173,6 +175,11 @@ class CommandSyncRepository @Inject constructor(
             }
 
             Log.i(TAG, "Policy snapshot applied: v$knownPolicyVersion → v$policyVersion")
+
+            // Persist for the offline-policy fallback so a later boot without network
+            // can still enforce the last known good policy until DEFAULT_HARD_EXPIRE_MS.
+            persistCachedPolicy(policyVersion, fullPolicy)
+
             true
         } catch (e: Exception) {
             Log.e(TAG, "syncPolicySnapshot failed", e)
@@ -247,6 +254,81 @@ class CommandSyncRepository @Inject constructor(
             PolicyPreferences.setUsageRules(appContext, org.json.JSONObject(usageRules).toString())
         }
 
+        // One-time provisioning of the safe-mode payload (set during pairing).
+        (fullPolicy["safeModePayload"] as? Map<*, *>)?.let {
+            PolicyPreferences.setSafeModePayload(appContext, org.json.JSONObject(it).toString())
+        }
+
         Log.d(TAG, "Full policy applied: locked=$isLocked, blocked=${appBlacklist.size}")
+    }
+
+    /**
+     * Snapshot the just-applied policy so [OfflinePolicyCache] can serve as fallback
+     * when the device is offline for an extended period.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun persistCachedPolicy(policyVersion: Int, fullPolicy: Map<String, Any>) {        try {
+            val payload = org.json.JSONObject()
+            payload.put("isLocked", fullPolicy["isLocked"] as? Boolean ?: false)
+            payload.put(
+                "appBlacklist",
+                org.json.JSONArray((fullPolicy["appBlacklist"] as? List<String>) ?: emptyList<String>())
+            )
+            (fullPolicy["usageRules"] as? Map<*, *>)?.let {
+                payload.put("usageRules", org.json.JSONObject(it))
+            }
+            val now = System.currentTimeMillis()
+            val sourceMs = (fullPolicy["updatedAtEpochMs"] as? Number)?.toLong() ?: now
+            val cache = CachedPolicy(
+                policyVersion = policyVersion,
+                appliedAtEpochMs = now,
+                sourceEpochMs = sourceMs,
+                payloadJson = payload.toString(),
+            )
+            PolicyPreferences.setCachedPolicy(appContext, cache)
+        } catch (e: Exception) {
+            Log.w(TAG, "persistCachedPolicy failed (non-fatal)", e)
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Offline fallback enforcement
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Re-evaluates the offline-policy cache and enforces the safe-mode payload locally
+     * when the cache is older than [OfflinePolicyCache.DEFAULT_HARD_EXPIRE_MS]. Called
+     * from [HeartbeatWorker] after a sync attempt so a long-offline device never keeps
+     * an unbounded stale policy in effect.
+     *
+     * @return the [com.google.pairing.child.PolicyFreshness] tier observed.
+     */
+    fun enforceOfflineFallbackIfExpired(nowEpochMs: Long = System.currentTimeMillis())
+        : com.google.pairing.child.PolicyFreshness {
+        val cache = PolicyPreferences.getCachedPolicy(appContext)
+        val freshness = OfflinePolicyCache.assessFreshness(cache, nowEpochMs)
+        if (freshness == com.google.pairing.child.PolicyFreshness.EXPIRED_SAFE_MODE) {
+            try {
+                val safeJson = PolicyPreferences.getSafeModePayload(appContext)
+                val safe = org.json.JSONObject(safeJson)
+                PolicyPreferences.setLocked(appContext, safe.optBoolean("isLocked", true))
+                val blacklist = safe.optJSONArray("appBlacklist")
+                val apps = mutableSetOf<String>()
+                if (blacklist != null) {
+                    for (i in 0 until blacklist.length()) {
+                        val s = blacklist.optString(i, "").trim()
+                        if (s.isNotEmpty()) apps.add(s)
+                    }
+                }
+                PolicyPreferences.setBlockedApps(appContext, apps)
+                safe.optJSONObject("usageRules")?.let {
+                    PolicyPreferences.setUsageRules(appContext, it.toString())
+                }
+                Log.w(TAG, "Offline cache expired – safe-mode policy enforced.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enforce safe-mode payload", e)
+            }
+        }
+        return freshness
     }
 }
