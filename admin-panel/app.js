@@ -3686,10 +3686,8 @@ async function runQaSelfHealingCycle() {
         if (!response.ok) {
             throw new Error(payload.error || "Self-Healing-Zyklus konnte nicht gestartet werden.");
         }
-        qaSelfHealingPayload = payload;
-        renderQaSelfHealingStatus(payload);
-        showNotification(`Self-Healing abgeschlossen: ${String(payload.systemHealth || "OK")}.`, payload.pendingFixes?.length ? "error" : "success");
-        loadSuiteRunHistory();
+        showNotification(`Self-Healing-Job ${payload.jobId || ""} eingereiht.`, "success");
+        loadQaReleaseWorkspace().catch(() => undefined);
     } catch (error) {
         showNotification("Self-Healing fehlgeschlagen: " + error.message, "error");
     } finally {

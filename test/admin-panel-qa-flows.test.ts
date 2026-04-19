@@ -460,6 +460,41 @@ describe("admin-panel QA flow integration", () => {
     ]));
   });
 
+  it("queues the manual self-healing run and refreshes the release workspace", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const button = context.document.createElement("button");
+    button.disabled = false;
+    elements.set("qa-self-healing-run-btn", button);
+    elements.set("qa-self-healing-auto-fix", { checked: false });
+
+    context.showNotification = jest.fn();
+    context.loadQaReleaseWorkspace = jest.fn().mockResolvedValue({ ok: true, message: "workspace ok" });
+    context.renderQaSelfHealingStatus = jest.fn();
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ jobId: "job-self-healing-ui", status: "queued" }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+
+    await exports.runQaSelfHealingCycle();
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/qa/self-healing/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({ autoFix: false }),
+    });
+    expect(context.showNotification).toHaveBeenCalledWith("Self-Healing-Job job-self-healing-ui eingereiht.", "success");
+    expect(context.loadQaReleaseWorkspace).toHaveBeenCalled();
+    expect(context.renderQaSelfHealingStatus).not.toHaveBeenCalled();
+    expect(button.disabled).toBe(false);
+  });
+
   it("exposes the QA dashboard section loader registry for orchestration", () => {
     const { exports } = loadAdminPanelTestExports();
 

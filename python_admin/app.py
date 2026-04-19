@@ -4035,6 +4035,19 @@ def _execute_job_action(job_id: str) -> None:
         _run_android_automation_sweep_background(job_id, kwargs)
         _complete_job_from_suite_run(job_id)
         return
+    if action == "self-healing-cycle":
+        result = run_self_healing_cycle(
+            auto_fix=bool_from_payload(payload.get("autoFix"), default=True),
+            stale_after_sec=parse_int(
+                payload.get("staleAfterSec"),
+                SELF_HEALING_STALE_AFTER_SEC,
+                min_value=60,
+                max_value=86400,
+            ),
+            triggered_by=str(payload.get("triggeredBy") or "job-worker"),
+        )
+        complete_job(job_id, result, message="Self-Healing-Zyklus abgeschlossen.")
+        return
     if action == "emulator-reservation":
         reservation = create_emulator_reservation(
             str(payload.get("profileId") or "").strip(),
@@ -5896,12 +5909,23 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 min_value=60,
                 max_value=86400,
             )
-            result = run_self_healing_cycle(auto_fix=auto_fix, stale_after_sec=stale_after_sec, triggered_by="http-post")
+            job = create_job(
+                job_type="system",
+                payload={
+                    "action": "self-healing-cycle",
+                    "autoFix": auto_fix,
+                    "staleAfterSec": stale_after_sec,
+                    "triggeredBy": "http-post",
+                },
+                label="Self-Healing-Zyklus",
+                priority=15,
+            )
+            enqueue_job(str(job.get("jobId") or ""))
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-        return self._write_json(HTTPStatus.OK, result)
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _handle_usb_test(self) -> None:
         try:
