@@ -108,6 +108,15 @@ describe("admin-panel current QA flows", () => {
             },
           ],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
       });
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -118,6 +127,9 @@ describe("admin-panel current QA flows", () => {
     expect(result).toMatchObject({ ok: true, message: "1 Suite-Läufe geladen." });
     expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/suites/history");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/suites", {
+      headers: { Accept: "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/qa/catalog", {
       headers: { Accept: "application/json" },
     });
     expect(context.renderQaExecutionGuide).toHaveBeenCalled();
@@ -271,5 +283,117 @@ describe("admin-panel current QA flows", () => {
     expect(() => exports.buildSuiteRunRequest("android-e2e-shell-script")).toThrow(
       "Die konfigurierte Child-ADB-Serial ist ungültig.",
     );
+  });
+
+  it("starts the Android automation sweep through the dedicated QA endpoint", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+
+    elements.set("notification", createNotificationElement());
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-sweep-install-apk", { checked: true });
+    elements.set("qa-sweep-uninstall-first", { checked: false });
+    elements.set("qa-sweep-skip-activation", { checked: true });
+    elements.set("qa-sweep-parallel", { checked: true });
+    elements.set("qa-sweep-timeout-sec", { value: "8100" });
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ suites: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ runId: "autosweep-run-1" }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    await exports.loadSuiteGuideData();
+
+    await exports.startAndroidAutomationSweep();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/suites/android-automation-sweep", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        installApk: true,
+        uninstallFirst: false,
+        skipActivation: true,
+        parallel: true,
+        timeoutSec: 8100,
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+  });
+
+  it("renders automation sweep runs in history with a dedicated label", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
+    elements.set("suite-run-history", historyEl);
+    elements.set("qa-refresh-status", refreshEl);
+
+    context.renderQaExecutionGuide = jest.fn();
+    context.renderQaTestWorkspace = jest.fn();
+    context.loadTestingRegister = jest.fn();
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          runs: [
+            {
+              runId: "autosweep-1",
+              type: "android-automation-sweep",
+              status: "finished",
+              startedAt: "2026-04-19T10:00:00Z",
+              androidVersions: ["14"],
+              result: {
+                overall_status: "passed",
+                summary: { counts: { total: 2, passed: 2, failed: 0, error: 0, skipped: 0 } },
+              },
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ suites: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+
+    await exports.loadSuiteRunHistory();
+
+    expect(historyEl.innerHTML).toContain("Android-Automation-Sweep");
+    expect(historyEl.innerHTML).toContain("Android 14");
   });
 });

@@ -60,12 +60,30 @@ describe("admin-panel current QA helpers", () => {
   it("derives execution-guide status from suite history instead of the removed suite catalog UI", () => {
     const { exports } = loadAdminPanelTestExports();
 
+    exports.setSuiteCatalogPayloadForTests([]);
+
     exports.setSuiteRunHistoryPayloadForTests([
       {
         runId: "run-1",
         suiteId: "android-unit-master",
         status: "finished",
         result: { status: "passed" },
+      },
+    ]);
+
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    exports.setSuiteCatalogPayloadForTests([
+      {
+        suiteId: "android-unit-master",
+        title: "Android Unit Master",
+        group: "android",
+        prereqsMet: true,
+        testLevel: "module",
+        testLevelLabel: "Modultests",
+        appRole: "parent",
+        appRoleLabel: "Eltern-App",
+        executionProfiles: ["minimal", "standard", "full"],
       },
     ]);
 
@@ -97,18 +115,28 @@ describe("admin-panel current QA helpers", () => {
     const { exports, fetchMock, context } = loadAdminPanelTestExports();
 
     context.renderQaExecutionGuide = jest.fn();
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue({
-        suites: [
-          {
-            suiteId: "android-unit-master",
-            title: "Android Unit Master",
-            prereqsMet: true,
-          },
-        ],
-      }),
-    });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          suites: [
+            {
+              suiteId: "android-unit-master",
+              title: "Android Unit Master",
+              prereqsMet: true,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      });
 
     exports.setPythonOperatorRuntimeForTests(true);
     exports.setPythonCommissioningCatalogForTests({ groups: [] });
@@ -116,10 +144,103 @@ describe("admin-panel current QA helpers", () => {
     const result = await exports.loadSuiteGuideData();
 
     expect(result).toMatchObject({ ok: true, message: "1 Suite(s) geladen." });
-    expect(fetchMock).toHaveBeenCalledWith("/api/suites", {
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/suites", {
+      headers: { Accept: "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/qa/catalog", {
       headers: { Accept: "application/json" },
     });
     expect(context.renderQaExecutionGuide).toHaveBeenCalled();
+  });
+
+  it("builds the Android automation sweep request from guide options and command builder defaults", () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ suites: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      });
+
+    elements.set("qa-start-guide", createDomSinkElement());
+    exports.setPythonOperatorRuntimeForTests(true);
+
+    return exports.loadSuiteGuideData().then(() => {
+      elements.set("qa-sweep-install-apk", { checked: true });
+      elements.set("qa-sweep-uninstall-first", { checked: true });
+      elements.set("qa-sweep-skip-activation", { checked: false });
+      elements.set("qa-sweep-parallel", { checked: true });
+      elements.set("qa-sweep-timeout-sec", { value: "9000" });
+
+      expect(exports.buildAndroidAutomationSweepRequest()).toMatchObject({
+        endpoint: "/api/suites/android-automation-sweep",
+        body: {
+          installApk: true,
+          uninstallFirst: true,
+          skipActivation: false,
+          parallel: true,
+          timeoutSec: 9000,
+          masterApkPath: "masterApp/custom-master.apk",
+          childApkPath: "childApp/custom-child.apk",
+        },
+        historySuiteId: "android-automation-sweep",
+        historyType: "android-automation-sweep",
+      });
+    });
+  });
+
+  it("renders the Android automation sweep as a fourth guide path from the canonical QA catalog", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const guideEl = createDomSinkElement();
+    elements.set("qa-start-guide", guideEl);
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          suites: [
+            {
+              suiteId: "android-unit-master",
+              title: "Android Unit Master",
+              prereqsMet: true,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+
+    await exports.loadSuiteGuideData();
+
+    expect(guideEl.innerHTML).toContain("4. Android-Automation-Sweep");
+    expect(guideEl.innerHTML).toContain("Sweep starten");
+    expect(guideEl.innerHTML).toContain("Android 14");
   });
 
   it("renders the QA test workspace with current register and protocol targets", () => {
