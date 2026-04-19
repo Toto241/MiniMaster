@@ -98,6 +98,7 @@ Die Abschnitte 1–5 beschreiben den ursprünglichen Entwurf. Das tatsächlich p
 | **User-Management** | Master-/Child-Liste, Detailansicht, Sperren/Löschen | `setUserRole`, `setAdminClaim`, `revokeUserTokens`, `deleteUserAccount`, `exportUserData`, `revokeSubscription` |
 | **Operator-Verwaltung** | Operator-Access-Keys erzeugen/einlösen, Rollen pflegen | `createOperatorAccessKey`, `redeemOperatorAccessKey`, `setUserRole` |
 | **QA-Dashboard** | 10 Sektionen: Catalog, History, Evidence, **Self-Healing**, Register, QA-Platform, Emulators, Suites, Suite-History, Devices | `loadPythonAutomationCatalog`, `loadQaSelfHealingStatus`, `loadTestingRegister`, `loadEmulatorLabOverview`, `loadSuiteCatalog`, … |
+| **QA Release Workspace** | fokussierte Leitstandsansicht für Release-Blocker, Queue, Emulatorstatus, Agenten-Synthese und Copy-/Issue-Formate | `loadQaReleaseWorkspace`, `/api/qa/release-workspace`, `startSuiteRun`, `openPythonAutomationProtocol` |
 | **Commissioning** | Inbetriebnahme-Katalog, Run, Evidence-Historie | REST `/api/commissioning/{catalog,run,history,evidence}` (Python-Operator) |
 | **Compliance / Legal** | Aktive Policies, Re-Consent-Trigger | `getActiveLegalPolicies`, `needsLegalReconsent`, `publishLegalPolicy`, `markLegalReconsentRequired` |
 | **Knowledge Base** | AI-Wissensbasis pflegen + Gemini-Verbindungstest | `getKnowledgeBase`, `updateKnowledgeBase`, `testGeminiConnection` |

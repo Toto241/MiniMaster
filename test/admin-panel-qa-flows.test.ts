@@ -240,6 +240,147 @@ describe("admin-panel QA flow integration", () => {
     ]);
   });
 
+  it("loads the QA release workspace payload and renders blocker, queue and agent synthesis data", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const workspaceEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
+    elements.set("qa-release-workspace", workspaceEl);
+    elements.set("qa-refresh-status", refreshEl);
+
+    context.MM = {
+      qaReleaseWorkspace: {
+        buildViewModel: jest.fn((payload: any) => ({
+          ...payload,
+          metrics: [
+            { id: "release-blockers", label: "Release-Blocker", value: 1, tone: "danger" },
+            { id: "health", label: "System-Health", value: "DEGRADED", tone: "warning" },
+          ],
+          agents: payload.agentWorkspace.agents,
+          synthesis: payload.agentWorkspace.synthesis,
+        })),
+        findBlocker: jest.fn((payload: any, blockerId: string) => (payload.blockers || []).find((item: any) => item.id === blockerId) || null),
+        buildClipboardPayload: jest.fn((blocker: any) => JSON.stringify(blocker)),
+      },
+    };
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        generatedAt: "2026-04-19T12:00:00Z",
+        summary: { blockingCount: 1, systemHealth: "DEGRADED", activeEmulators: 2, activeAgents: 5 },
+        blockers: [
+          {
+            id: "failed-suite",
+            title: "Failed Suite",
+            status: "fail",
+            severity: "high",
+            groupTitle: "Testsuite",
+            details: "Runner failed",
+            suiteRef: "android-unit-master",
+            nextAction: { label: "Suite erneut ausführen", detail: "Den Lauf erneut starten.", kind: "suite-run", suiteId: "android-unit-master" },
+          },
+        ],
+        queue: [{ runId: "run-1", label: "android-unit-master", status: "running", type: "suite" }],
+        recentFailures: [{ runId: "run-0", suiteId: "android-connected-child", status: "failed", message: "adb missing" }],
+        health: { systemHealth: "DEGRADED", detectedIssues: [{ id: "issue-1" }], fixesApplied: [] },
+        emulators: { summary: { runningCount: 2, reservationCount: 1 } },
+        agentWorkspace: {
+          agents: [
+            { name: "validator", role: "validator", model: "runtime-rule-engine-v1", status: "completed", priority: "P0", summary: "Checked failures", confidence: 0.87, durationMs: 22 },
+          ],
+          synthesis: { summary: "One blocker remains", confidence: 0.88, findings: ["failed-suite"], risks: ["adb unstable"], recommendations: ["rerun suite"], status: "completed" },
+        },
+      }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.resetQaRefreshStateForTests();
+    const result = await exports.loadQaReleaseWorkspace();
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/qa/release-workspace", { headers: { Accept: "application/json" } });
+    expect(result).toMatchObject({ ok: true, message: "1 Blocker geladen." });
+    expect(workspaceEl.innerHTML).toContain("Failed Suite");
+    expect(workspaceEl.innerHTML).toContain("Queue & Jobs");
+    expect(workspaceEl.innerHTML).toContain("validator");
+    expect(workspaceEl.innerHTML).toContain("One blocker remains");
+    expect(refreshEl.innerHTML).toContain("1 Blocker");
+  });
+
+  it("copies selected QA release blocker in debug format", async () => {
+    const { exports, elements, context } = loadAdminPanelTestExports();
+
+    elements.set("qa-release-workspace", { innerHTML: "" });
+    elements.set("notification", { textContent: "", className: "", style: {} });
+    context.MM = {
+      qaReleaseWorkspace: {
+        buildViewModel: jest.fn((payload: any) => ({
+          ...payload,
+          metrics: [{ id: "release-blockers", label: "Release-Blocker", value: 1, tone: "danger" }],
+          agents: [],
+          synthesis: null,
+        })),
+        findBlocker: jest.fn((payload: any, blockerId: string) => (payload.blockers || []).find((item: any) => item.id === blockerId) || null),
+        buildClipboardPayload: jest.fn((blocker: any, format: string) => `${format}:${blocker.id}`),
+      },
+    };
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setQaReleaseWorkspacePayloadForTests({
+      generatedAt: "2026-04-19T12:00:00Z",
+      summary: { blockingCount: 1, systemHealth: "OK" },
+      blockers: [{ id: "failed-suite", title: "Failed Suite", status: "fail", severity: "high", groupTitle: "Testsuite", nextAction: { label: "Suite erneut ausführen", detail: "rerun", kind: "suite-run", suiteId: "android-unit-master" } }],
+      recentFailures: [],
+      queue: [],
+      health: { systemHealth: "OK" },
+      emulators: { summary: {} },
+      agentWorkspace: { agents: [], synthesis: null },
+    });
+    exports.setQaReleaseSelectedBlockerIdForTests("failed-suite");
+
+    await exports.copySelectedQaReleaseBlocker("debug");
+
+    expect(context.navigator.clipboard.writeText).toHaveBeenCalledWith("debug:failed-suite");
+  });
+
+  it("reruns selected QA release blocker via suite-run action", async () => {
+    const { exports, elements, context, fetchMock } = loadAdminPanelTestExports();
+
+    elements.set("qa-release-workspace", { innerHTML: "" });
+    elements.set("suite-catalog", { innerHTML: "" });
+    elements.set("notification", { textContent: "", className: "", style: {} });
+    context.MM = {
+      qaReleaseWorkspace: {
+        buildViewModel: jest.fn((payload: any) => ({
+          ...payload,
+          metrics: [{ id: "release-blockers", label: "Release-Blocker", value: 1, tone: "danger" }],
+          agents: [],
+          synthesis: null,
+        })),
+        findBlocker: jest.fn((payload: any, blockerId: string) => (payload.blockers || []).find((item: any) => item.id === blockerId) || null),
+        buildClipboardPayload: jest.fn(() => "payload"),
+      },
+    };
+
+    fetchMock.mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({ runId: "run-99" }) });
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setQaReleaseWorkspacePayloadForTests({
+      generatedAt: "2026-04-19T12:00:00Z",
+      summary: { blockingCount: 1, systemHealth: "OK" },
+      blockers: [{ id: "failed-suite", title: "Failed Suite", status: "fail", severity: "high", groupTitle: "Testsuite", suiteRef: "android-unit-master", nextAction: { label: "Suite erneut ausführen", detail: "rerun", kind: "suite-run", suiteId: "android-unit-master" } }],
+      recentFailures: [],
+      queue: [],
+      health: { systemHealth: "OK" },
+      emulators: { summary: {} },
+      agentWorkspace: { agents: [], synthesis: null },
+    });
+    exports.setQaReleaseSelectedBlockerIdForTests("failed-suite");
+
+    await exports.rerunSelectedQaReleaseBlocker();
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/suites/run", expect.objectContaining({ method: "POST" }));
+  });
+
   it("exports the selected dual-device artifact with linked mappings and evidence snapshot", () => {
     const { exports, elements, context } = loadAdminPanelTestExports();
 
@@ -286,6 +427,7 @@ describe("admin-panel QA flow integration", () => {
 
     const refreshEl = context.document.createElement("div");
     elements.set("qa-refresh-status", refreshEl);
+    elements.set("qa-release-workspace", { innerHTML: "" });
 
     exports.setPythonOperatorRuntimeForTests(true);
     exports.resetQaRefreshStateForTests();
@@ -295,6 +437,7 @@ describe("admin-panel QA flow integration", () => {
     context.loadPythonAutomationEvidenceHistory = jest.fn().mockResolvedValue({ ok: true, message: "evidence ok" });
     context.loadQaSelfHealingStatus = jest.fn().mockResolvedValue({ ok: true, message: "self-healing ok" });
     context.loadTestingRegister = jest.fn().mockRejectedValue(new Error("register stale"));
+    context.loadQaReleaseWorkspace = jest.fn().mockResolvedValue({ ok: true, message: "workspace ok" });
     context.loadQaPlatformCatalog = jest.fn().mockRejectedValue(new Error("qa catalog missing"));
     context.loadEmulatorLabOverview = jest.fn().mockResolvedValue({ ok: true, message: "emulators ok" });
     context.loadSuiteCatalog = jest.fn().mockResolvedValue({ ok: true, message: "suites ok" });
@@ -303,11 +446,12 @@ describe("admin-panel QA flow integration", () => {
 
     const result = await exports.loadQaDashboardData("smoke-refresh");
 
-    expect(result).toHaveLength(10);
+    expect(result).toHaveLength(11);
     expect(context.loadPythonAutomationCatalog).toHaveBeenCalled();
+    expect(context.loadQaReleaseWorkspace).toHaveBeenCalled();
     expect(context.loadQaPlatformCatalog).toHaveBeenCalled();
     expect(refreshEl.innerHTML).toContain("Anlass: smoke-refresh");
-    expect(refreshEl.innerHTML).toContain("8/10 QA-Bereiche geladen, 2 mit Fehler");
+    expect(refreshEl.innerHTML).toContain("9/11 QA-Bereiche geladen, 2 mit Fehler");
     expect(refreshEl.innerHTML).toContain("register stale");
     expect(refreshEl.innerHTML).toContain("qa catalog missing");
     expect(result).toEqual(expect.arrayContaining([
@@ -321,13 +465,14 @@ describe("admin-panel QA flow integration", () => {
 
     const sections = exports.getQaDashboardSectionLoaders();
 
-    expect(sections).toHaveLength(10);
+    expect(sections).toHaveLength(11);
     expect(sections.map((entry: [string, unknown]) => entry[0])).toEqual([
       "catalog",
       "history",
       "evidence",
       "selfHealing",
       "register",
+      "releaseWorkspace",
       "qaPlatform",
       "emulators",
       "suites",

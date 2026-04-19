@@ -119,6 +119,30 @@ class TestQaRuntimeHttpContracts:
         assert cycle_calls == [(False, 120, "http-get")]
         assert payload["systemHealth"] == "OK"
 
+    def test_runtime_http_serves_release_workspace_payload(self, qa_http_server: str, monkeypatch: pytest.MonkeyPatch):
+        app = load_app_module()
+
+        monkeypatch.setattr(app, "build_qa_release_workspace", lambda: {
+            "generatedAt": "2026-04-19T12:00:00Z",
+            "summary": {"blockingCount": 2, "systemHealth": "DEGRADED"},
+            "blockers": [{"id": "failed-suite", "title": "Failed Suite"}],
+            "queue": [{"runId": "run-1", "status": "running"}],
+            "recentFailures": [{"runId": "run-0", "suiteId": "android-unit-master"}],
+            "health": {"systemHealth": "DEGRADED"},
+            "emulators": {"summary": {"runningCount": 1}},
+            "agentWorkspace": {
+                "agents": [{"name": "validator", "role": "validator"}],
+                "synthesis": {"summary": "One blocker remains"},
+            },
+        })
+
+        status, headers, payload = _read_json(f"{qa_http_server}/api/qa/release-workspace")
+
+        assert status == 200
+        assert headers.get("Cache-Control") == "no-store"
+        assert payload["summary"]["blockingCount"] == 2
+        assert payload["agentWorkspace"]["agents"][0]["name"] == "validator"
+
     def test_runtime_http_rejects_invalid_dual_device_requests(self, qa_http_server: str):
         with pytest.raises(HTTPError) as exc_info:
             _read_json(

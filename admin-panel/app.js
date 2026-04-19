@@ -229,6 +229,8 @@ let qaArtifactSelectedRunId = "";
 let qaArtifactScenarioFilter = "";
 let qaCompatibilitySelectedRunId = "";
 let qaCompatibilityModeFilter = "all";
+let qaReleaseWorkspacePayload = null;
+let qaReleaseSelectedBlockerId = "";
 let qaDashboardLoadPromise = null;
 let qaSelfHealingPayload = null;
 let qaSelfHealingPollHandle = null;
@@ -245,6 +247,7 @@ const qaRefreshSectionLabels = {
     history: "Laufhistorie",
     evidence: "Nachweise",
     register: "Testregister",
+    releaseWorkspace: "Release Workspace",
     qaPlatform: "QA-Plattform",
     emulators: "Emulator-Labor",
     suites: "Suite-Katalog",
@@ -662,6 +665,7 @@ function getQaDashboardSectionLoaders() {
         ["evidence", loadPythonAutomationEvidenceHistory],
         ["selfHealing", () => loadQaSelfHealingStatus()],
         ["register", loadTestingRegister],
+        ["releaseWorkspace", loadQaReleaseWorkspace],
         ["qaPlatform", loadQaPlatformCatalog],
         ["emulators", loadEmulatorLabOverview],
         ["suites", loadSuiteCatalog],
@@ -2536,6 +2540,390 @@ function getLatestDualDeviceRun() {
         const suiteId = String(run?.suiteId || run?.suite_id || "");
         return type === "dual-device" || suiteId === "dual-device";
     }) || null;
+}
+
+function getQaReleaseWorkspaceModule() {
+    return window.MM && window.MM.qaReleaseWorkspace ? window.MM.qaReleaseWorkspace : null;
+}
+
+function buildQaReleaseWorkspaceViewModel(payload = qaReleaseWorkspacePayload) {
+    const module = getQaReleaseWorkspaceModule();
+    if (module && typeof module.buildViewModel === "function") {
+        return module.buildViewModel(payload);
+    }
+
+    const blockers = Array.isArray(payload?.blockers) ? payload.blockers : [];
+    return {
+        generatedAt: String(payload?.generatedAt || ""),
+        blockers,
+        recentFailures: Array.isArray(payload?.recentFailures) ? payload.recentFailures : [],
+        queue: Array.isArray(payload?.queue) ? payload.queue : [],
+        agents: Array.isArray(payload?.agentWorkspace?.agents) ? payload.agentWorkspace.agents : [],
+        synthesis: payload?.agentWorkspace?.synthesis || null,
+        health: payload?.health || {},
+        emulators: payload?.emulators || {},
+        metrics: [
+            { id: "release-blockers", label: "Release-Blocker", value: Number(payload?.summary?.blockingCount || blockers.length || 0), tone: "warning" },
+        ],
+    };
+}
+
+function findQaReleaseWorkspaceBlocker(blockerId) {
+    const module = getQaReleaseWorkspaceModule();
+    if (module && typeof module.findBlocker === "function") {
+        return module.findBlocker(qaReleaseWorkspacePayload, blockerId);
+    }
+
+    const viewModel = buildQaReleaseWorkspaceViewModel();
+    return viewModel.blockers.find(item => String(item?.id || "") === String(blockerId || "")) || null;
+}
+
+function buildQaReleaseClipboardPayload(blocker, format = "compact") {
+    const module = getQaReleaseWorkspaceModule();
+    if (module && typeof module.buildClipboardPayload === "function") {
+        return module.buildClipboardPayload(blocker, format);
+    }
+    return JSON.stringify(blocker || {}, null, format === "debug" ? 2 : 0);
+}
+
+function getSelectedQaReleaseBlocker() {
+    const viewModel = buildQaReleaseWorkspaceViewModel();
+    const selected = findQaReleaseWorkspaceBlocker(qaReleaseSelectedBlockerId);
+    if (selected) return selected;
+    const fallback = viewModel.blockers[0] || null;
+    qaReleaseSelectedBlockerId = fallback ? String(fallback.id || "") : "";
+    return fallback;
+}
+
+function escapeQaReleaseChipClass(value) {
+    return String(value || "neutral").replace(/[^a-z0-9_-]/gi, "").toLowerCase();
+}
+
+function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
+    const el = document.getElementById("qa-release-workspace");
+    if (!el) return;
+
+    if (!isPythonOperator) {
+        replaceElementWithState(el, "info", "Der QA Release Workspace ist nur im Python-Operator verfügbar.");
+        return;
+    }
+
+    if (!payload) {
+        replaceElementWithState(el, "info", "Noch kein QA Release Workspace geladen.");
+        return;
+    }
+
+    const viewModel = buildQaReleaseWorkspaceViewModel(payload);
+    const selectedBlocker = getSelectedQaReleaseBlocker();
+    const selectedBlockerAction = selectedBlocker?.nextAction || null;
+    const synthesis = viewModel.synthesis;
+    const health = viewModel.health || {};
+    const emulators = viewModel.emulators || {};
+    const metricsHtml = viewModel.metrics.map(item => `
+        <article class="qa-release-metric-card qa-release-tone-${escapeQaReleaseChipClass(item.tone)}">
+            <span>${escapeHtml(String(item.label || item.id || "Metrik"))}</span>
+            <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+        </article>
+    `).join("");
+
+    const blockersHtml = viewModel.blockers.length > 0 ? viewModel.blockers.map(item => {
+        const isSelected = String(item?.id || "") === String(selectedBlocker?.id || "");
+        const severityClass = String(item?.severity || "medium").toLowerCase();
+        const statusClass = String(item?.status || "not_run").toLowerCase() === "pass"
+            ? "is-success"
+            : String(item?.status || "").toLowerCase() === "manual_required"
+                ? "is-warning"
+                : "is-danger";
+        return `
+            <article class="qa-release-item ${isSelected ? "is-selected" : ""}">
+                <div class="qa-release-item-header">
+                    <div>
+                        <h6>${escapeHtml(String(item?.title || item?.id || "Blocker"))}</h6>
+                        <div class="python-muted-caption">${escapeHtml(String(item?.groupTitle || item?.groupId || "-"))}</div>
+                    </div>
+                    <div class="qa-release-chip-row">
+                        <span class="qa-release-chip is-${escapeQaReleaseChipClass(severityClass === "critical" || severityClass === "high" ? "danger" : severityClass === "medium" ? "warning" : "info")}">${escapeHtml(String(item?.severity || "medium"))}</span>
+                        <span class="qa-release-chip ${statusClass}">${escapeHtml(String(item?.status || "not_run"))}</span>
+                    </div>
+                </div>
+                <p class="qa-register-item-detail">${escapeHtml(String(item?.details || item?.successCriteria || "-"))}</p>
+                <div class="qa-release-item-meta">
+                    <span>Suite: ${escapeHtml(String(item?.suiteRef || "-"))}</span>
+                    <span>Aktualisiert: ${escapeHtml(String(item?.updatedAt || "-"))}</span>
+                    <span>Aktion: ${escapeHtml(String(item?.nextAction?.label || "-"))}</span>
+                </div>
+                <div class="qa-release-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="selectQaReleaseBlocker('${encodeInlineArgument(String(item?.id || ""))}')">Details</button>
+                </div>
+            </article>
+        `;
+    }).join("") : "<div class='success-box'>Keine offenen Release-Blocker erkannt.</div>";
+
+    const queueHtml = viewModel.queue.length > 0
+        ? `<div class="qa-release-timeline">${viewModel.queue.map(item => `
+            <article class="qa-release-timeline-entry">
+                <strong>${escapeHtml(String(item?.label || item?.suiteId || item?.runId || "Job"))}</strong>
+                <div class="qa-release-meta-row">
+                    <span>Status: ${escapeHtml(String(item?.status || "queued"))}</span>
+                    <span>Typ: ${escapeHtml(String(item?.type || "suite"))}</span>
+                    <span>Run-ID: ${escapeHtml(String(item?.runId || "-"))}</span>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "<div class='info'>Keine laufenden oder wartenden Jobs.</div>";
+
+    const failuresHtml = viewModel.recentFailures.length > 0
+        ? `<div class="qa-release-timeline">${viewModel.recentFailures.map(item => `
+            <article class="qa-release-timeline-entry">
+                <strong>${escapeHtml(String(item?.suiteId || item?.label || item?.runId || "Suite"))}</strong>
+                <div class="qa-release-meta-row">
+                    <span>Status: ${escapeHtml(String(item?.status || "failed"))}</span>
+                    <span>Run-ID: ${escapeHtml(String(item?.runId || "-"))}</span>
+                    <span>Abschluss: ${escapeHtml(String(item?.finishedAt || item?.timestamp || "-"))}</span>
+                </div>
+                <p class="qa-register-item-detail">${escapeHtml(String(item?.message || item?.error || item?.reason || "-"))}</p>
+            </article>
+        `).join("")}</div>`
+        : "<div class='info'>Keine aktuellen Fehl-Läufe im Verlauf.</div>";
+
+    const agentsHtml = viewModel.agents.length > 0
+        ? `<div class="qa-release-agent-grid">${viewModel.agents.map(agent => `
+            <article class="qa-release-item">
+                <div class="qa-release-agent-header">
+                    <div>
+                        <h6>${escapeHtml(String(agent?.name || agent?.role || "Agent"))}</h6>
+                        <div class="python-muted-caption">${escapeHtml(String(agent?.model || "-"))}</div>
+                    </div>
+                    <div class="qa-release-chip-row">
+                        <span class="qa-release-chip is-${escapeQaReleaseChipClass(String(agent?.status || "completed").toLowerCase() === "failed" ? "danger" : "success")}">${escapeHtml(String(agent?.status || "completed"))}</span>
+                        <span class="qa-release-chip is-info">${escapeHtml(String(agent?.confidence ?? "-"))}</span>
+                    </div>
+                </div>
+                <p class="qa-register-item-detail">${escapeHtml(String(agent?.summary || "-"))}</p>
+                <div class="qa-release-meta-row">
+                    <span>Rolle: ${escapeHtml(String(agent?.role || "-"))}</span>
+                    <span>Priorität: ${escapeHtml(String(agent?.priority || "-"))}</span>
+                    <span>Dauer: ${escapeHtml(String(agent?.durationMs || 0))} ms</span>
+                </div>
+            </article>
+        `).join("")}</div>`
+        : "<div class='info'>Noch keine Agentenergebnisse vorhanden.</div>";
+
+    const synthesisHtml = synthesis
+        ? `
+            <div class="qa-release-synthesis">
+                <div class="qa-release-inspector-header">
+                    <div>
+                        <h6>Synthese</h6>
+                        <div class="python-muted-caption">${escapeHtml(String(synthesis?.status || "completed"))} · Confidence ${escapeHtml(String(synthesis?.confidence ?? "-"))}</div>
+                    </div>
+                </div>
+                <p class="qa-register-item-detail">${escapeHtml(String(synthesis?.summary || "-"))}</p>
+                <div class="qa-release-meta-row">
+                    <span>Findings: ${escapeHtml(String((synthesis?.findings || []).length || 0))}</span>
+                    <span>Risiken: ${escapeHtml(String((synthesis?.risks || []).length || 0))}</span>
+                    <span>Empfehlungen: ${escapeHtml(String((synthesis?.recommendations || []).length || 0))}</span>
+                </div>
+            </div>
+        `
+        : "<div class='info'>Keine Synthese verfügbar.</div>";
+
+    el.innerHTML = `
+        <div class="qa-release-workspace">
+            <div class="qa-release-metrics">${metricsHtml}</div>
+            <div class="qa-release-grid">
+                <div class="qa-release-column">
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Release-Blocker</h6>
+                                <div class="python-muted-caption">Generiert am ${escapeHtml(viewModel.generatedAt || "-")}</div>
+                            </div>
+                        </div>
+                        <div class="qa-release-list">${blockersHtml}</div>
+                    </section>
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Queue & Jobs</h6>
+                                <div class="python-muted-caption">Laufende oder wartende Suite-/Kompatibilitätsläufe</div>
+                            </div>
+                        </div>
+                        ${queueHtml}
+                    </section>
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Letzte Fehl-Läufe</h6>
+                                <div class="python-muted-caption">Verdichtet aus Suite-Historie und Status-Logs</div>
+                            </div>
+                        </div>
+                        ${failuresHtml}
+                    </section>
+                </div>
+                <div class="qa-release-column">
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Blocker-Inspector</h6>
+                                <div class="python-muted-caption">Kontext, nächste Aktion und Copy-Formate</div>
+                            </div>
+                        </div>
+                        ${selectedBlocker ? `
+                            <div class="qa-release-inspector-header">
+                                <div>
+                                    <h6>${escapeHtml(String(selectedBlocker?.title || selectedBlocker?.id || "Blocker"))}</h6>
+                                    <div class="python-muted-caption">${escapeHtml(String(selectedBlocker?.groupTitle || selectedBlocker?.groupId || "-"))}</div>
+                                </div>
+                                <div class="qa-release-chip-row">
+                                    <span class="qa-release-chip is-${escapeQaReleaseChipClass(String(selectedBlocker?.severity || "medium").toLowerCase() === "critical" || String(selectedBlocker?.severity || "").toLowerCase() === "high" ? "danger" : "warning")}">${escapeHtml(String(selectedBlocker?.severity || "medium"))}</span>
+                                    <span class="qa-release-chip is-info">${escapeHtml(String(selectedBlocker?.status || "-"))}</span>
+                                </div>
+                            </div>
+                            <p class="qa-register-item-detail">${escapeHtml(String(selectedBlocker?.details || selectedBlocker?.successCriteria || "-"))}</p>
+                            <div class="qa-release-meta-row">
+                                <span>Suite: ${escapeHtml(String(selectedBlocker?.suiteRef || "-"))}</span>
+                                <span>Dokumentation: ${escapeHtml(String(selectedBlocker?.documentation || "-"))}</span>
+                                <span>Prereqs: ${escapeHtml(selectedBlocker?.prereqsMet === false ? "blockiert" : "ok / n.a.")}</span>
+                            </div>
+                            <div class="qa-release-synthesis" style="margin-block-start: 12px;">
+                                <strong>Nächste Aktion</strong>
+                                <p class="qa-register-item-detail">${escapeHtml(String(selectedBlockerAction?.label || "-"))}: ${escapeHtml(String(selectedBlockerAction?.detail || "-"))}</p>
+                            </div>
+                            <div class="qa-release-copy-grid">
+                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('compact')">Kompakt kopieren</button>
+                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('github')">Issue-Format</button>
+                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('ai')">AI-Format</button>
+                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('debug')">Debug-Format</button>
+                            </div>
+                        ` : "<div class='info'>Noch kein Blocker ausgewählt.</div>"}
+                    </section>
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Agentenmonitor</h6>
+                                <div class="python-muted-caption">Deterministische 5-Agenten-Synthese aus Register, Self-Healing, Queue und Laufhistorie</div>
+                            </div>
+                        </div>
+                        ${synthesisHtml}
+                        ${agentsHtml}
+                    </section>
+                    <section class="qa-release-card">
+                        <div class="qa-release-card-header">
+                            <div>
+                                <h6>Systemzustand</h6>
+                                <div class="python-muted-caption">Self-Healing, Emulator-Labor und Reservierungen</div>
+                            </div>
+                        </div>
+                        <div class="qa-release-meta-row">
+                            <span>Health: ${escapeHtml(String(health?.systemHealth || "OK"))}</span>
+                            <span>Issues: ${escapeHtml(String((health?.detectedIssues || []).length || 0))}</span>
+                            <span>Fixes: ${escapeHtml(String((health?.fixesApplied || []).length || 0))}</span>
+                            <span>Reservierungen: ${escapeHtml(String(emulators?.summary?.reservationCount || 0))}</span>
+                            <span>Laufende Emulatoren: ${escapeHtml(String(emulators?.summary?.runningCount || 0))}</span>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function selectQaReleaseBlocker(encodedBlockerId) {
+    qaReleaseSelectedBlockerId = decodeInlineArgument(encodedBlockerId);
+    renderQaReleaseWorkspace();
+}
+
+async function copySelectedQaReleaseBlocker(format = "compact") {
+    const blocker = getSelectedQaReleaseBlocker();
+    if (!blocker) {
+        showNotification("Es ist kein Release-Blocker ausgewählt.", "info");
+        return;
+    }
+    try {
+        await copyTextToClipboard(buildQaReleaseClipboardPayload(blocker, format));
+        showNotification(`Blocker im Format '${format}' kopiert.`, "success");
+    } catch (error) {
+        showNotification("Blocker konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
+async function copyQaReleaseWorkspaceSummary() {
+    const viewModel = buildQaReleaseWorkspaceViewModel();
+    const payload = {
+        generatedAt: viewModel.generatedAt,
+        metrics: viewModel.metrics,
+        blockers: viewModel.blockers.slice(0, 10).map(item => ({
+            id: item.id,
+            title: item.title,
+            status: item.status,
+            severity: item.severity,
+            nextAction: item.nextAction,
+        })),
+        synthesis: viewModel.synthesis,
+    };
+    try {
+        await copyTextToClipboard(JSON.stringify(payload, null, 2));
+        showNotification("QA Release Workspace kopiert.", "success");
+    } catch (error) {
+        showNotification("Workspace konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
+    }
+}
+
+async function rerunSelectedQaReleaseBlocker() {
+    const blocker = getSelectedQaReleaseBlocker();
+    if (!blocker) {
+        showNotification("Es ist kein Release-Blocker ausgewählt.", "info");
+        return;
+    }
+
+    const action = blocker.nextAction || {};
+    if (action.kind === "suite-run" && action.suiteId) {
+        await startSuiteRun(encodeURIComponent(String(action.suiteId)));
+        return;
+    }
+    if (action.kind === "protocol" && action.testId) {
+        openPythonAutomationProtocol(encodeURIComponent(String(action.testId)));
+        return;
+    }
+    if (action.kind === "emulator-lab") {
+        await loadQaPlatformCatalog();
+        showNotification("Emulator-Labor und QA-Plattform wurden aktualisiert.", "info");
+        return;
+    }
+
+    showNotification(String(action.detail || "Für diesen Blocker ist keine direkte Aktion hinterlegt."), "info");
+}
+
+async function loadQaReleaseWorkspace() {
+    const el = document.getElementById("qa-release-workspace");
+    if (!el) return { ok: false, message: "Release-Workspace-Container fehlt." };
+    if (!isPythonOperator) {
+        replaceElementWithState(el, "info", "Der QA Release Workspace ist nur im Python-Operator verfügbar.");
+        setQaRefreshSectionState("releaseWorkspace", "error", "Nur im Python-Operator verfügbar");
+        return { ok: false, message: "Nur im Python-Operator verfügbar." };
+    }
+
+    replaceElementWithState(el, "loading", "Release Workspace wird geladen...");
+    setQaRefreshSectionState("releaseWorkspace", "loading", "Lädt…");
+    try {
+        const response = await fetch("/api/qa/release-workspace", {
+            headers: { Accept: "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Release Workspace konnte nicht geladen werden.");
+        }
+        qaReleaseWorkspacePayload = payload;
+        qaReleaseSelectedBlockerId = String(payload?.blockers?.[0]?.id || qaReleaseSelectedBlockerId || "");
+        renderQaReleaseWorkspace(payload);
+        setQaRefreshSectionState("releaseWorkspace", payload?.summary?.blockingCount ? "error" : "success", `${String(payload?.summary?.blockingCount || 0)} Blocker`);
+        return { ok: true, message: `${String(payload?.summary?.blockingCount || 0)} Blocker geladen.` };
+    } catch (error) {
+        replaceElementWithState(el, "error", `Release Workspace konnte nicht geladen werden: ${error.message}`);
+        setQaRefreshSectionState("releaseWorkspace", "error", error.message || "Fehler beim Laden");
+        return { ok: false, message: error.message || "Fehler beim Laden" };
+    }
 }
 
 function getDualDeviceRunsFromHistory() {

@@ -74,6 +74,10 @@ Mehrzeilige Befehle werden zeilenweise validiert und nacheinander ausgefuehrt.
 - `GET /api/qa/emulators`
   - liefert den Status der lokalen Android-SDK-/Emulator-Umgebung, vorhandene AVDs, laufende Emulatoren, aktive Reservierungen und den aus dem QA-Katalog abgeleiteten Matrixplan
 
+- `GET /api/qa/release-workspace`
+  - aggregiert Testregister, Suite-Historie, Emulator-Labor und Self-Healing in eine fokussierte Release-Workspace-Payload
+  - enthält verdichtete Release-Blocker, Queue-/Job-Sicht, jüngste Fehl-Läufe sowie eine deterministische 5-Agenten-Synthese (`requirement-mapper`, `validator`, `analyzer`, `gap-closer`, `synthesizer`)
+
 - `GET /api/qa/emulators/running`
   - liefert nur die aktuell ueber ADB sichtbaren laufenden Emulatoren
 
