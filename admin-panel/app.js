@@ -222,6 +222,7 @@ let pythonEvidenceFilterTestId = "";
 let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
 let suiteCatalogPayload = [];
+let qaCatalogPayload = null;
 let suiteRunHistoryPayload = [];
 let qaDashboardLoadPromise = null;
 let qaTestWorkspaceSelection = { kind: "", id: "" };
@@ -3745,6 +3746,28 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
         }))
         .sort((left, right) => String(left.title || left.suiteId).localeCompare(String(right.title || right.suiteId), "de"));
 
+    const qaCatalog = qaCatalogPayload;
+    const androidMatrix = Array.isArray(qaCatalog?.androidMatrix) ? qaCatalog.androidMatrix : [];
+    const activeAndroidVersions = androidMatrix
+        .filter(entry => String(entry?.status || "").trim().toLowerCase() === "active")
+        .map(entry => String(entry?.androidVersion || "").trim())
+        .filter(Boolean);
+    const deviceProfiles = Array.isArray(qaCatalog?.deviceProfiles) ? qaCatalog.deviceProfiles : [];
+    const dualDeviceScenarios = Array.isArray(qaCatalog?.dualDeviceScenarios) ? qaCatalog.dualDeviceScenarios : [];
+    const scenarioMappings = Array.isArray(qaCatalog?.androidScenarioMappings) ? qaCatalog.androidScenarioMappings : [];
+    const dualScenarioIds = new Set(dualDeviceScenarios.map(entry => String(entry?.scenarioId || "").trim()).filter(Boolean));
+    const masterMappingCount = scenarioMappings.filter(entry => dualScenarioIds.has(String(entry?.scenarioId || "").trim()) && String(entry?.role || "").trim() === "master").length;
+    const childMappingCount = scenarioMappings.filter(entry => dualScenarioIds.has(String(entry?.scenarioId || "").trim()) && String(entry?.role || "").trim() === "child").length;
+    const automationSweep = {
+        catalogLoaded: Boolean(qaCatalog),
+        activeAndroidVersions,
+        deviceProfiles,
+        dualDeviceScenarios,
+        masterMappingCount,
+        childMappingCount,
+        canStart: activeAndroidVersions.length > 0 && dualDeviceScenarios.length > 0,
+    };
+
     return {
         commissioningAutomatic: {
             total: commissioningAutomatic.length,
@@ -3754,6 +3777,7 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
             total: manualEvidence.length + externalManualEntries.length,
             groups: groupSummary([...manualEvidence, ...externalManualEntries]),
         },
+        automationSweep,
         suites: suitesSummary,
         storage: payload?.storage || null,
     };
@@ -3768,6 +3792,18 @@ async function loadSuiteGuideData() {
         throw new Error(payload.error || "Suite-Guide-Daten konnten nicht geladen werden.");
     }
     suiteCatalogPayload = Array.isArray(payload?.suites) ? payload.suites : [];
+    try {
+        const qaCatalogResponse = await fetch("/api/qa/catalog", {
+            headers: { "Accept": "application/json" },
+        });
+        const qaPayload = await qaCatalogResponse.json().catch(() => ({}));
+        if (!qaCatalogResponse.ok) {
+            throw new Error(qaPayload.error || "QA-Katalog konnte nicht geladen werden.");
+        }
+        qaCatalogPayload = qaPayload;
+    } catch (_error) {
+        qaCatalogPayload = null;
+    }
     renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
     return {
         ok: true,
@@ -3832,6 +3868,69 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
         `
         : `<p class='python-muted-caption'>Noch keine Suite-Zuordnungen geladen.</p>`;
 
+    const sweepPreview = data.automationSweep;
+    const activeVersionsText = sweepPreview.activeAndroidVersions.length > 0
+        ? `Android ${escapeHtml(sweepPreview.activeAndroidVersions.join(", "))}`
+        : "Keine aktiven Android-Versionen im QA-Katalog gefunden.";
+    const profileText = sweepPreview.deviceProfiles.length > 0
+        ? `${escapeHtml(String(sweepPreview.deviceProfiles.length))} Geräteprofile im Katalog`
+        : "Keine Geräteprofile im QA-Katalog gefunden.";
+    const scenarioPreview = sweepPreview.dualDeviceScenarios.slice(0, 4).map(entry => String(entry?.title || entry?.scenarioId || "").trim()).filter(Boolean);
+    const scenarioText = scenarioPreview.length > 0
+        ? escapeHtml(scenarioPreview.join(" · "))
+        : "Keine Dual-Device-Szenarien im QA-Katalog sichtbar.";
+    const sweepDisabledAttr = !isPythonOperator || !sweepPreview.canStart ? "disabled" : "";
+    const sweepDetailsHtml = !sweepPreview.catalogLoaded
+        ? `<p class='python-muted-caption'>QA-Katalog noch nicht geladen. Die Sweep-Vorschau wird nach dem nächsten Suite-Refresh ergänzt.</p>`
+        : `
+            <div class='qa-guide-group-list'>
+                <div class='qa-guide-group-item'>
+                    <strong>Aktive Android-Versionen</strong>
+                    <span>${escapeHtml(String(sweepPreview.activeAndroidVersions.length))} aktiv</span>
+                    <div class='python-muted-caption'>${activeVersionsText}</div>
+                </div>
+                <div class='qa-guide-group-item'>
+                    <strong>Device-Profile</strong>
+                    <span>${escapeHtml(String(sweepPreview.deviceProfiles.length))} Profile</span>
+                    <div class='python-muted-caption'>${profileText}</div>
+                </div>
+                <div class='qa-guide-group-item'>
+                    <strong>Dual-Device-Szenarien</strong>
+                    <span>${escapeHtml(String(sweepPreview.dualDeviceScenarios.length))} Szenarien</span>
+                    <div class='python-muted-caption'>${scenarioText}</div>
+                </div>
+                <div class='qa-guide-group-item'>
+                    <strong>Mapping-Abdeckung</strong>
+                    <span>Master ${escapeHtml(String(sweepPreview.masterMappingCount))} · Child ${escapeHtml(String(sweepPreview.childMappingCount))}</span>
+                    <div class='python-muted-caption'>Server baut den Sweep-Plan kataloggetrieben aus Matrix, Profilen und Szenarien.</div>
+                </div>
+            </div>
+        `;
+    const sweepOptionFormHtml = `
+        <div class='python-automation-toolbar'>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-sweep-install-apk' />
+                APKs vor dem Sweep installieren
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-sweep-uninstall-first' />
+                Vorher deinstallieren
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-sweep-skip-activation' />
+                Aktivierungsschritte überspringen
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-sweep-parallel' />
+                Parallel ausführen
+            </label>
+            <label>
+                <span>Timeout (Sek.)</span>
+                <input type='number' id='qa-sweep-timeout-sec' min='60' max='14400' step='60' value='7200' />
+            </label>
+        </div>
+    `;
+
     container.innerHTML = `
         <div class='qa-guide-grid'>
             <article class='qa-guide-card'>
@@ -3869,6 +3968,22 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 ${renderGroupList(data.manualEvidence.groups, "Noch keine manuellen oder dokumentierten Prüffälle geladen.")}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.commissioningEvidence || "-"))}</div>
                 <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-protocol-card')">Zum Nachweisformular</button>
+            </article>
+            <article class='qa-guide-card'>
+                <div class='qa-guide-card-header'>
+                    <div>
+                        <h4>4. Android-Automation-Sweep</h4>
+                        <p>Kataloggetriebener Gesamtlauf über aktive Android-Versionen, Device-Profile und Dual-Device-Szenarien.</p>
+                    </div>
+                    <span class='python-bucket-count'>${escapeHtml(String(sweepPreview.activeAndroidVersions.length))} Android-Versionen</span>
+                </div>
+                ${sweepDetailsHtml}
+                ${sweepOptionFormHtml}
+                <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
+                <div class='setup-actions mm-u031'>
+                    <button class='btn btn-secondary btn-sm' onclick="startAndroidAutomationSweep()" ${sweepDisabledAttr}>Sweep starten</button>
+                    <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
+                </div>
             </article>
         </div>
     `;
@@ -4441,35 +4556,93 @@ async function loadTestingRegister() {
 
 let _suiteActivePollers = {};
 
+function getAndroidAutomationSweepFormValues() {
+    return {
+        installApk: Boolean(document.getElementById("qa-sweep-install-apk")?.checked),
+        uninstallFirst: Boolean(document.getElementById("qa-sweep-uninstall-first")?.checked),
+        skipActivation: Boolean(document.getElementById("qa-sweep-skip-activation")?.checked),
+        parallel: Boolean(document.getElementById("qa-sweep-parallel")?.checked),
+        timeoutSec: String(document.getElementById("qa-sweep-timeout-sec")?.value || "").trim(),
+    };
+}
+
+function buildAndroidAutomationSweepRequest() {
+    const automationSweep = buildQaExecutionGuideData(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload).automationSweep;
+    if (!automationSweep.catalogLoaded) {
+        throw new Error("Der QA-Katalog für den Android-Automation-Sweep ist noch nicht geladen.");
+    }
+    if (!automationSweep.canStart) {
+        throw new Error("Der Android-Automation-Sweep kann nicht gestartet werden, weil aktive Android-Versionen oder Dual-Device-Szenarien fehlen.");
+    }
+
+    const values = getAndroidAutomationSweepFormValues();
+    const commandBuilderConfig = loadCommandBuilderConfig();
+    const parsedTimeout = Number.parseInt(values.timeoutSec, 10);
+    const timeoutSec = Number.isFinite(parsedTimeout)
+        ? Math.min(14400, Math.max(60, parsedTimeout))
+        : 7200;
+
+    return {
+        endpoint: "/api/suites/android-automation-sweep",
+        body: {
+            installApk: values.installApk,
+            uninstallFirst: values.uninstallFirst,
+            skipActivation: values.skipActivation,
+            parallel: values.parallel,
+            timeoutSec,
+            masterApkPath: values.installApk ? sanitizeApkPath(commandBuilderConfig.masterApkPath, defaultCommandBuilderConfig.masterApkPath) : "",
+            childApkPath: values.installApk ? sanitizeApkPath(commandBuilderConfig.childApkPath, defaultCommandBuilderConfig.childApkPath) : "",
+        },
+        historySuiteId: "android-automation-sweep",
+        historyType: "android-automation-sweep",
+        displayLabel: "Android-Automation-Sweep",
+        notificationLabel: "Android-Automation-Sweep",
+    };
+}
+
+async function queueSuiteRunRequest(request, errorPrefix = "Suite-Start fehlgeschlagen") {
+    const res = await fetch(request.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request.body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || errorPrefix || "Suite konnte nicht gestartet werden.");
+    suiteRunHistoryPayload = [
+        {
+            suiteId: request.historySuiteId,
+            type: request.historyType,
+            runId: data.runId,
+            status: "running",
+            startedAt: new Date().toISOString(),
+            result: { status: "running" },
+        },
+        ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || "")),
+    ];
+    rerenderQaExecutionGuideFromCache();
+    showNotification(`${request.notificationLabel} gestartet (Run-ID: ${data.runId}).`, "success");
+    pollSuiteRunStatus(data.runId);
+    appendSuiteActiveRun(data.runId, request.displayLabel);
+}
+
 async function startSuiteRun(suiteId) {
     if (!isPythonOperator) return;
     try {
         const decodedSuiteId = decodeURIComponent(String(suiteId || ""));
         const request = buildSuiteRunRequest(decodedSuiteId);
-        const res = await fetch(request.endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(request.body),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Suite konnte nicht gestartet werden.");
-        suiteRunHistoryPayload = [
-            {
-                suiteId: request.historySuiteId,
-                type: request.historyType,
-                runId: data.runId,
-                status: "running",
-                startedAt: new Date().toISOString(),
-                result: { status: "running" },
-            },
-            ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || "")),
-        ];
-        rerenderQaExecutionGuideFromCache();
-        showNotification(`${request.notificationLabel} gestartet (Run-ID: ${data.runId}).`, "success");
-        pollSuiteRunStatus(data.runId);
-        appendSuiteActiveRun(data.runId, request.displayLabel);
+        await queueSuiteRunRequest(request, "Suite konnte nicht gestartet werden.");
     } catch (err) {
         showNotification("Suite-Start fehlgeschlagen: " + err.message, "error");
+    }
+}
+
+async function startAndroidAutomationSweep() {
+    if (!isPythonOperator) return;
+    try {
+        const request = buildAndroidAutomationSweepRequest();
+        await queueSuiteRunRequest(request, "Android-Automation-Sweep konnte nicht gestartet werden.");
+    } catch (err) {
+        showNotification("Android-Automation-Sweep fehlgeschlagen: " + err.message, "error");
     }
 }
 
@@ -4566,7 +4739,10 @@ function buildSuiteRunRequest(suiteId) {
 
 function formatSuiteHistoryTitle(run) {
     const type = String(run?.type || run?.suiteId || run?.suite_id || "?");
-    if (type !== "android-compatibility" && type !== "android-automation-sweep") {
+    if (type === "android-automation-sweep") {
+        return "Android-Automation-Sweep";
+    }
+    if (type !== "android-compatibility") {
         return String(run?.suiteId || run?.suite_id || run?.type || "?");
     }
 
