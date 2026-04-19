@@ -127,4 +127,40 @@ class OfflinePolicyCacheTest {
             OfflinePolicyCache.selectEnforcedPolicy(c, nowEpochMs = now, safeModeJson = safeMode)
         )
     }
+
+    // ── Serialization ─────────────────────────────────────────
+
+    @Test fun `toJson then fromJson is round-trip identical`() {
+        val original = CachedPolicy(
+            policyVersion = 7,
+            appliedAtEpochMs = 12345L,
+            sourceEpochMs = 67890L,
+            payloadJson = payload,
+        )
+        val raw = OfflinePolicyCache.toJson(original)
+        val restored = OfflinePolicyCache.fromJson(raw)
+        assertEquals(original, restored)
+    }
+
+    @Test fun `fromJson returns null for null input`() {
+        assertEquals(null, OfflinePolicyCache.fromJson(null))
+    }
+
+    @Test fun `fromJson returns null for blank input`() {
+        assertEquals(null, OfflinePolicyCache.fromJson("   "))
+    }
+
+    @Test fun `fromJson returns null for malformed JSON`() {
+        assertEquals(null, OfflinePolicyCache.fromJson("{not-json"))
+    }
+
+    @Test fun `fromJson returns null for missing required field`() {
+        assertEquals(null, OfflinePolicyCache.fromJson("""{"policyVersion":1}"""))
+    }
+
+    @Test fun `default safe-mode JSON locks the device`() {
+        val obj = org.json.JSONObject(OfflinePolicyCache.SAFE_MODE_DEFAULT_JSON)
+        assertEquals(true, obj.optBoolean("isLocked"))
+        assertEquals(0L, obj.optJSONObject("usageRules")?.optLong("dailyLimitSeconds") ?: -1L)
+    }
 }

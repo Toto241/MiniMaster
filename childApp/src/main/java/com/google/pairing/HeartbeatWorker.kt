@@ -62,6 +62,11 @@ class HeartbeatWorker @AssistedInject constructor(
             // the snapshot is only applied when upToDate==false.
             commandSyncRepository.syncPolicySnapshot(childId, knownPolicyVersion = 0)
 
+            // Defense-in-depth: if the device has been offline so long that the cached
+            // policy is older than DEFAULT_HARD_EXPIRE_MS, enforce the safe-mode payload
+            // locally so the child cannot benefit from an unbounded stale policy.
+            commandSyncRepository.enforceOfflineFallbackIfExpired()
+
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Heartbeat failed with exception. Retrying...", e)
