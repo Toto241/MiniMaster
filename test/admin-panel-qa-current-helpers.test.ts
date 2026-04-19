@@ -243,6 +243,61 @@ describe("admin-panel current QA helpers", () => {
     expect(guideEl.innerHTML).toContain("Android 14");
   });
 
+  it("derives advisory sweep readiness from catalog, register and recent Android run failures", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    exports.setQaCatalogPayloadForTests({
+      androidMatrix: [{ androidVersion: "14", status: "active" }],
+      deviceProfiles: [],
+      dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+      androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }],
+    });
+    exports.setTestingRegisterPayloadForTests({
+      items: [
+        {
+          id: "blocker-1",
+          title: "Open Release Blocker",
+          status: "fail",
+          blockingForRelease: true,
+          staleEvidence: true,
+          evidenceRequired: true,
+          hasSuccessfulRun: false,
+          groupId: "core-suite",
+        },
+        {
+          id: "unsupported-1",
+          title: "Unsupported Repo Test",
+          status: "not_run",
+          groupId: "repo-tests-unsupported",
+        },
+      ],
+    });
+    exports.setSuiteRunHistoryPayloadForTests([
+      {
+        runId: "autosweep-old-1",
+        type: "android-automation-sweep",
+        status: "finished",
+        result: { overall_status: "error" },
+      },
+    ]);
+
+    const readiness = exports.buildAdvisorySweepReadiness();
+
+    expect(readiness.status).toBe("warning");
+    expect(readiness.requiresConfirmation).toBe(true);
+    expect(readiness.warningCount).toBeGreaterThanOrEqual(4);
+    expect(readiness.warnings.map((item: { id: string }) => item.id)).toEqual(
+      expect.arrayContaining([
+        "device-profiles-missing",
+        "mapping-coverage-incomplete",
+        "register-blockers-open",
+        "stale-evidence-open",
+        "unsupported-suite-mappings",
+        "recent-android-failures",
+      ]),
+    );
+  });
+
   it("renders the QA test workspace with current register and protocol targets", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
