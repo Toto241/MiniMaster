@@ -1004,83 +1004,14 @@
                         </div>
 
                         <div id="qa-start-guide-card" class="setup-card admin-only mm-u029">
-                            <h3>Startwege &amp; enthaltene Testfälle</h3>
+                            <h3>Startwege &amp; reale Datenquellen</h3>
                             <p>
-                                Diese Übersicht zeigt pro Startaktion, <strong>welche Testfälle tatsächlich enthalten sind</strong>,
-                                wohin die Ergebnisse geschrieben werden und in welchen Bereich Sie für Details springen müssen.
+                                Diese Übersicht zeigt nur noch, <strong>welche realen Testquellen und Startwege</strong>
+                                im Projekt vorhanden sind, wohin Ergebnisse geschrieben werden und in welchen Bereich Sie
+                                Status oder Details wiederfinden.
                             </p>
                             <div id="qa-start-guide" class="data-list mm-u036">
                                 <div class="info">Lade QA-Startwege...</div>
-                            </div>
-                        </div>
-
-                        <div class="qa-section-heading">
-                            <h3>Release &amp; Freigaben</h3>
-                            <p>Produktionsbereitschaft, Freigaben und priorisierte Restarbeiten für den Go-Live.</p>
-                        </div>
-
-                        <div class="setup-card admin-only mm-u029">
-                            <h3>Inbetriebnahme-Assistent</h3>
-                            <p>
-                                Dieses Werkzeug bündelt die produktive Inbetriebnahme: Firebase-Bootstrap,
-                                Runtime-Konfiguration, optionale Rollenvergabe und Validierung mit Abschlussbericht.
-                            </p>
-
-                            <div class="wizard-step">
-                                <h4>1. Firebase-Projekt und Zusatzrollen</h4>
-                                <div class="commissioning-grid">
-                                    <label class="field-label" for="commissioning-support-uid">Support Agent UID (optional)</label>
-                                    <input type="text" id="commissioning-support-uid" placeholder="Optional: Support Agent UID" title="UID eines Support-Benutzers für automatische Rollenvergabe (optional)" />
-                                    <label class="field-label" for="commissioning-auditor-uid">Auditor UID (optional)</label>
-                                    <input type="text" id="commissioning-auditor-uid" placeholder="Optional: Auditor UID" title="UID eines Auditor-Benutzers für automatische Rollenvergabe (optional)" />
-                                </div>
-                                <p class="muted-note">
-                                    Die eigentliche Firebase-Webkonfiguration erfolgt im Bootstrap-Block vor dem Login,
-                                    die Cloud-/KI-Runtime-Konfiguration im Block darunter.
-                                </p>
-                            </div>
-
-                            <div class="setup-actions mm-u036">
-                                <button data-action="runCommissioningAssistant" class="btn btn-primary" title="Automatische Inbetriebnahme starten: Firebase-Bootstrap, Rollen und Validierung">Assistent ausführen</button>
-                                <button data-action="refreshCommissioningReport" class="btn btn-secondary" title="Aktuellen Inbetriebnahmebericht neu generieren">Bericht aktualisieren</button>
-                                <button data-action="exportReleaseArtefact" class="btn btn-secondary" title="Zusammenfassung als Release-Artefakt für den produktiven Einsatz exportieren">Release-Artefakt exportieren</button>
-                            </div>
-
-                            <div id="commissioning-report" class="data-list mm-u041">
-                                <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
-                            </div>
-                        </div>
-
-                        <div id="qa-release-workspace-card" class="setup-card admin-only qa-workspace-card mm-u029">
-                            <div class="qa-workspace-header">
-                                <div>
-                                    <h3>Release-Cockpit</h3>
-                                    <p>
-                                        Dieser Bereich bündelt Go-Live-Ampel und Freigaben. Die eigentlichen offenen
-                                        Arbeitsvorräte werden direkt darunter im Testregister bearbeitet.
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="qa-workspace-grid qa-workspace-grid-release mm-u036">
-                                <section class="qa-workspace-panel">
-                                    <div class="qa-workspace-panel-header">
-                                        <div>
-                                            <h4>Go-Live Ampel</h4>
-                                            <p>Aggregiert Backend-Validierung, QA-Freigaben, Plattform-Reifegrad und Play-Store-Gates.</p>
-                                        </div>
-                                    </div>
-                                    <div id="golive-ampel"></div>
-                                    <div id="golive-final-gate" class="mm-u036"></div>
-                                </section>
-                                <section class="qa-workspace-panel">
-                                    <div class="qa-workspace-panel-header">
-                                        <div>
-                                            <h4>Freigaben &amp; Nachweise</h4>
-                                            <p>Alle Go-Live-Nachweise laufen zentral über Qualitätssicherung und das QA-Register.</p>
-                                        </div>
-                                    </div>
-                                    <div id="commissioning-attestations" class="data-list"></div>
-                                </section>
                             </div>
                         </div>
 
@@ -1092,13 +1023,13 @@
                         <div id="qa-register-card" class="setup-card admin-only qa-workspace-card mm-u029">
                             <h3>Testregister &amp; Arbeitsvorrat</h3>
                             <p>
-                                Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle und offenen QA-Arbeiten.
-                                Priorisierte Restarbeiten, automatische Prüfungen und manuelle Nachweise werden hier
-                                entlang des tatsächlichen Arbeitsflusses zusammengeführt.
+                                Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle und ihren belastbaren Status.
+                                Offene Fehler, manuelle Nachweise und automatisierte Ergebnisse werden hier entlang der
+                                tatsächlichen Testquellen zusammengeführt.
                             </p>
                             <div class="info mm-u036">
                                 <strong>Bedienlogik:</strong><br />
-                                Automatische Ergebnisse entstehen über <em>Suite starten</em> oder <em>Python-Testlauf starten</em>.<br />
+                                Automatische Ergebnisse entstehen über <em>Registeraktionen</em> oder <em>Python-Testlauf starten</em>.<br />
                                 Manuelle und dokumentierte Prüfungen werden über <em>Nachweis protokollieren</em> im Protokollformular eingetragen.
                             </div>
                             <div id="testing-register-overview" class="python-automation-overview mm-u036">
@@ -1179,9 +1110,6 @@
                             <div class="setup-actions mm-u038">
                                 <button data-action="runPythonAutomationSuite" class="btn btn-primary" title="Automatische Commissioning-Pruefungen als Python-Lauf starten">
                                     Automatische Commissioning-Pruefung starten
-                                </button>
-                                <button data-action="loadSuiteCatalog" class="btn btn-secondary" title="Testsuiten-Katalog neu laden, um Suite-Laeufe direkt zu starten">
-                                    Suite-Katalog aktualisieren
                                 </button>
                             </div>
                             <div class="python-automation-layout testing-register-panels mm-u036">
@@ -1326,7 +1254,6 @@
                                         </div>
                                         <div class="setup-actions mm-u033">
                                             <button id="python-automation-run-btn" data-action="runPythonAutomationSuite" class="btn btn-primary" title="Alle ausgewählten Testfälle automatisch bewerten und protokollieren">Python-Testlauf starten</button>
-                                            <button id="python-automation-recovery-btn" data-action="runQaQuickRecovery" class="btn btn-secondary" title="Nur betroffene Suite-/Gate-Fehler erneut anstoßen und danach das Register aktualisieren">Quick Recovery</button>
                                             <button data-action="loadPythonAutomationCatalog" class="btn btn-secondary" title="Testfallkatalog aus der Konfiguration neu laden">Testfallkatalog neu laden</button>
                                             <button data-action="copyLatestPythonAutomationRunToClipboard" class="btn btn-secondary" title="Ergebnis des letzten Testlaufs direkt in die Zwischenablage kopieren">Testergebnisse kopieren</button>
                                             <button data-action="exportLatestPythonAutomationRun" class="btn btn-secondary" title="Ergebnis des letzten Testlaufs als Datei exportieren">Letzten Lauf exportieren</button>
@@ -1453,507 +1380,68 @@
                                 </div>
                             </div>
 
-                        <!-- ==================== TESTSUITE-ZENTRALE ==================== -->
                         <div class="qa-section-heading">
-                            <h3>Ausführung &amp; Plattform</h3>
-                            <p>Tests starten, Geräte- und Emulatorstatus prüfen sowie Artefakte und Kataloge auswerten.</p>
+                            <h3>Fehler, Läufe &amp; Details</h3>
+                            <p>Fokussierte Arbeitsfläche für reale Testläufe, offene Befunde und kopierbare Detailansichten.</p>
                         </div>
                         <div id="qa-suite-card" class="setup-card admin-only qa-workspace-card mm-u029">
-                            <h3>🔬 Test-Suiten &amp; USB-Automatisierung</h3>
-                            <p>
-                                Ausführung, Geräte- und Emulatorbetrieb sowie Artefakte der asynchronen Testsuiten.
-                            </p>
-
-                            <div class="python-automation-layout qa-platform-layout mm-u039">
-                                <section class="python-automation-panel">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>QA-Plattformkatalog</h5>
-                                            <p>Android 10 bis 16, Geräteprofile und priorisierte Dual-Device-Szenarien aus dem kanonischen QA-Katalog.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section">
-                                        <summary>Plattformkatalog öffnen</summary>
-                                        <div class="setup-actions mm-u031">
-                                            <button data-action="loadQaPlatformCatalog" class="btn btn-secondary" title="QA-Katalog, Android-Matrix und Dual-Device-Szenarien neu laden">QA-Katalog laden</button>
-                                        </div>
-                                        <div id="qa-platform-overview" class="data-list">
-                                            <div class="info">Noch kein QA-Katalog geladen.</div>
-                                        </div>
-                                    </details>
-                                </section>
-
-                                <section class="python-automation-panel qa-panel-secondary">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Emulator-Labor</h5>
-                                            <p>SDK-/AVD-Status, Matrixplan und aktive Reservierungen für die PC-basierte Android-Testlandschaft.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section">
-                                        <summary>Emulator-Labor öffnen</summary>
-                                        <div class="setup-actions mm-u031">
-                                            <button data-action="loadEmulatorLabOverview" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
-                                        </div>
-                                        <div class="python-automation-group">
-                                        <h6>Reservierung für Testfenster</h6>
-                                        <p class="python-muted-caption">Reserviert ein Android-/Profil-Kombinationsfenster für geplante QA-Läufe.</p>
-                                        <div class="dsar-form qa-emulator-form-grid mm-u033">
-                                            <label>
-                                                <span>Android-Version</span>
-                                                <select id="qa-emulator-reservation-android-version">
-                                                    <option value="">Android-Version wählen</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Geräteprofil</span>
-                                                <select id="qa-emulator-reservation-profile">
-                                                    <option value="">Geräteprofil wählen</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Owner</span>
-                                                <input type="text" id="qa-emulator-owner" placeholder="z. B. qa-automation" />
-                                            </label>
-                                            <label>
-                                                <span>Zweck</span>
-                                                <input type="text" id="qa-emulator-purpose" placeholder="z. B. android-14-dual-device-regression" />
-                                            </label>
-                                            <label>
-                                                <span>TTL in Minuten</span>
-                                                <input type="number" id="qa-emulator-ttl" min="15" max="1440" step="15" value="120" />
-                                            </label>
-                                        </div>
-                                        <div class="setup-actions mm-u035">
-                                            <button data-action="createEmulatorReservation" class="btn btn-primary" title="Neue Reservierung im Emulator-Labor anlegen">Reservierung anlegen</button>
-                                        </div>
-                                        </div>
-                                        <div class="python-automation-group">
-                                        <h6>AVD bereitstellen</h6>
-                                        <p class="python-muted-caption">Legt ein neues AVD passend zu Android-Version und Geräteprofil an.</p>
-                                        <div class="dsar-form qa-emulator-form-grid mm-u033">
-                                            <label>
-                                                <span>Android-Version</span>
-                                                <select id="qa-emulator-avd-android-version">
-                                                    <option value="">Android-Version wählen</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Geräteprofil</span>
-                                                <select id="qa-emulator-avd-profile">
-                                                    <option value="">Geräteprofil wählen</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>AVD-Name</span>
-                                                <input type="text" id="qa-emulator-avd-name" placeholder="z. B. Pixel_8_API_34_QA" />
-                                            </label>
-                                        </div>
-                                        <div class="setup-actions mm-u035">
-                                            <button data-action="createEmulatorAvd" class="btn btn-secondary" title="Neues AVD passend zu Android-Version und Geräteprofil anlegen">AVD erstellen</button>
-                                        </div>
-                                        </div>
-                                        <div id="qa-emulator-lab" class="data-list">
-                                            <div class="info">Noch kein Emulator-Labor geladen.</div>
-                                        </div>
-                                    </details>
-                                </section>
+                            <div class="qa-workspace-header">
+                                <div>
+                                    <h3>Test-Triage &amp; Laufübersicht</h3>
+                                    <p>
+                                        Diese Fläche bündelt nur echte Testdaten aus Register, Python-Commissioning,
+                                        Suite-Verlauf und Evidenzhistorie. Plattformbetrieb, Release-Ops und Self-Healing
+                                        wurden bewusst entfernt.
+                                    </p>
+                                </div>
+                                <div class="setup-actions mm-u031">
+                                    <button type="button" onclick="loadTestingRegister()" class="btn btn-secondary" title="Testregister neu laden">Register aktualisieren</button>
+                                    <button type="button" onclick="loadPythonAutomationHistory()" class="btn btn-secondary" title="Commissioning-Laufhistorie neu laden">Commissioning-Historie laden</button>
+                                    <button type="button" onclick="loadSuiteRunHistory()" class="btn btn-secondary" title="Suite-Laufhistorie neu laden">Suite-Verlauf laden</button>
+                                    <button type="button" onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary" title="Nachweis-Historie neu laden">Nachweise laden</button>
+                                </div>
                             </div>
 
-                            <div class="python-automation-layout mm-u039">
-                                <section class="python-automation-panel">
-                                    <div class="python-automation-panel-header">
+                            <div class="qa-test-workspace mm-u036">
+                                <section class="qa-workspace-panel qa-test-workspace-panel">
+                                    <div class="qa-workspace-panel-header">
                                         <div>
-                                            <h5>Angeschlossene Ger&auml;te</h5>
-                                            <p>ADB-Status der angeschlossenen Android-Ger&auml;te.</p>
+                                            <h4>Letzte Testläufe</h4>
+                                            <p>Verdichtete Sicht auf Python-Commissioning und Suite-Historie mit Fokus auf Status und offene Probleme.</p>
+                                        </div>
+                                    </div>
+                                    <div id="qa-test-run-overview" class="data-list">
+                                        <div class="info">Noch keine Laufdaten geladen.</div>
+                                    </div>
+                                </section>
+
+                                <section class="qa-workspace-panel qa-test-workspace-panel">
+                                    <div class="qa-workspace-panel-header">
+                                        <div>
+                                            <h4>Fehlgeschlagene &amp; offene Punkte</h4>
+                                            <p>Liste aus echten Registerzuständen, Run-Fehlern und fehlenden oder fehlerhaften Nachweisen.</p>
+                                        </div>
+                                    </div>
+                                    <div id="qa-test-failures" class="data-list">
+                                        <div class="info">Noch keine Fehlerdaten geladen.</div>
+                                    </div>
+                                </section>
+
+                                <section class="qa-workspace-panel qa-test-workspace-panel qa-test-detail-panel">
+                                    <div class="qa-workspace-panel-header">
+                                        <div>
+                                            <h4>Detailansicht &amp; Copy</h4>
+                                            <p>Selektierte Einträge lassen sich kompakt oder als Debug-Format kopieren.</p>
                                         </div>
                                     </div>
                                     <div class="setup-actions mm-u031">
-                                        <button data-action="loadSuiteDeviceStatus" class="btn btn-secondary" title="ADB-Status der angeschlossenen Android-Geräte aktualisieren">Ger&auml;te aktualisieren</button>
+                                        <button id="qa-test-copy-compact-btn" type="button" onclick="copySelectedQaTestItemCompact()" class="btn btn-secondary" title="Ausgewählten Eintrag kompakt kopieren">Kompakt kopieren</button>
+                                        <button id="qa-test-copy-debug-btn" type="button" onclick="copySelectedQaTestItemDebug()" class="btn btn-secondary" title="Ausgewählten Eintrag inklusive Rohdaten kopieren">Debug kopieren</button>
                                     </div>
-                                    <div id="suite-device-status" class="data-list">
-                                        <div class="info">Noch nicht geladen.</div>
-                                    </div>
-                                </section>
-
-                                <section class="python-automation-panel">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>USB-Testlauf starten</h5>
-                                            <p>Einzelger&auml;t oder Dual-Device Commissioning &uuml;ber Python.</p>
-                                        </div>
-                                    </div>
-                                    <div class="python-automation-clarity-box qa-usb-launcher-summary-box">
-                                        <strong>Schnellstart</strong>
-                                        <div id="suite-usb-summary" class="qa-usb-summary-grid mm-u033">
-                                            <div class="info">USB-Launcher wird vorbereitet...</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="qa-usb-launcher-grid mm-u036">
-                                        <section class="qa-usb-launcher-card">
-                                            <h6>1. Laufart wählen</h6>
-                                            <div class="qa-usb-form-grid">
-                                                <label>
-                                                    <span>Testtyp</span>
-                                                    <select id="suite-usb-test-type">
-                                                        <option value="single-master">Einzelger&auml;t: Master-App</option>
-                                                        <option value="single-child">Einzelger&auml;t: Kind-App</option>
-                                                        <option value="dual-device">Dual-Device Commissioning</option>
-                                                    </select>
-                                                </label>
-                                                <label id="suite-usb-suite-row">
-                                                    <span>Suite</span>
-                                                    <select id="suite-usb-suite">
-                                                        <option value="commissioning" selected>Commissioning</option>
-                                                        <option value="default">Alle Tests</option>
-                                                    </select>
-                                                </label>
-                                            </div>
-                                            <div class="setup-actions mm-u018">
-                                                <label class="setup-checklist-item python-inline-check">
-                                                    <input type="checkbox" id="suite-usb-install-apk" />
-                                                    APK installieren
-                                                </label>
-                                                <label class="setup-checklist-item python-inline-check" id="suite-usb-skip-activation-row">
-                                                    <input type="checkbox" id="suite-usb-skip-activation" />
-                                                    Aktivierung &uuml;berspringen
-                                                </label>
-                                                <label class="setup-checklist-item python-inline-check" id="suite-usb-parallel-row">
-                                                    <input type="checkbox" id="suite-usb-parallel" />
-                                                    Parallel (Dual-Device)
-                                                </label>
-                                                <label class="setup-checklist-item python-inline-check" id="suite-usb-compatibility-mode-row">
-                                                    <input type="checkbox" id="suite-usb-compatibility-mode" />
-                                                    Android-Kompatibilitätsmatrix als Batch ausführen
-                                                </label>
-                                            </div>
-                                        </section>
-
-                                        <section class="qa-usb-launcher-card">
-                                            <h6>2. Ziele &amp; Szenario</h6>
-                                            <div class="qa-usb-form-grid">
-                                                <label>
-                                                    <span>Master-Serial</span>
-                                                    <input type="text" id="suite-usb-master-serial" placeholder="auto oder Serial (z.B. R58M12345)" value="auto" />
-                                                </label>
-                                                <label id="suite-usb-child-serial-row">
-                                                    <span>Child-Serial</span>
-                                                    <input type="text" id="suite-usb-child-serial" placeholder="Serial des Kind-Ger&auml;ts oder leer f&uuml;r auto" />
-                                                    <small class="qa-usb-help">Im Android-Kompatibilit&auml;tsmodus darf das Feld leer bleiben; dann wird automatisch ein passender Emulator bzw. ein Auto-Ziel verwendet.</small>
-                                                </label>
-                                                <label id="suite-usb-dual-scenario-row">
-                                                    <span>Dual-Device-Szenario</span>
-                                                    <select id="suite-usb-dual-scenario">
-                                                        <option value="">Standard-Dual-Device-Lauf</option>
-                                                    </select>
-                                                    <small id="suite-usb-dual-scenario-help" class="qa-usb-help">Optional: kanonisches Szenario aus dem QA-Katalog wählen, damit Laufhistorie und Fehlerbilder sauber klassifiziert werden.</small>
-                                                </label>
-                                                <label id="suite-usb-dual-profile-row">
-                                                    <span>Geräteprofil</span>
-                                                    <select id="suite-usb-dual-profile">
-                                                        <option value="">Kein Profil erzwungen</option>
-                                                    </select>
-                                                </label>
-                                            </div>
-                                        </section>
-                                    </div>
-
-                                    <details class="qa-collapsible-section mm-u036">
-                                        <summary>Feinsteuerung &amp; Fault-Modes</summary>
-                                        <div class="qa-usb-form-grid mm-u033">
-                                            <label id="suite-usb-fault-modes-row">
-                                                <span>Fault-Modes</span>
-                                                <input type="text" id="suite-usb-fault-modes" placeholder="z. B. network-loss, child-reboot" />
-                                                <small class="qa-usb-help">Mehrere Fault-Modes komma-separiert eintragen. Es werden nur im Katalog bekannte Werte akzeptiert.</small>
-                                            </label>
-                                        </div>
-                                    </details>
-
-                                    <details class="qa-collapsible-section mm-u036">
-                                        <summary>Android-Kompatibilitätsmatrix</summary>
-                                        <div class="qa-usb-form-grid mm-u033">
-                                            <label id="suite-usb-compatibility-preset-row">
-                                                <span>Kompatibilitäts-Preset</span>
-                                                <select id="suite-usb-compatibility-preset">
-                                                    <option value="active">Alle aktiven Versionen</option>
-                                                    <option value="baseline">Nur Baseline</option>
-                                                    <option value="full">Nur Full-Coverage</option>
-                                                    <option value="canary">Nur Canary/Preview</option>
-                                                    <option value="custom">Benutzerdefiniert</option>
-                                                </select>
-                                                <small class="qa-usb-help">Steuert, welche Android-Versionen für den Batch-Lauf geprüft werden.</small>
-                                            </label>
-                                            <label id="suite-usb-android-versions-row">
-                                                <span>Android-Versionen</span>
-                                                <input type="text" id="suite-usb-android-versions" placeholder="z. B. 10, 14, 15" />
-                                                <small class="qa-usb-help">Leer lassen, um das gewählte Preset aus dem QA-Katalog zu verwenden.</small>
-                                            </label>
-                                        </div>
-                                        <div id="suite-usb-compatibility-tests-row" class="mm-u012">
-                                            <span>Automatisierte Testklassen</span>
-                                            <div id="suite-usb-compatibility-tests" class="data-list qa-usb-selection-list mm-u046">
-                                                <div class="info">Noch kein QA-Katalog geladen.</div>
-                                            </div>
-                                            <small class="qa-usb-help">Mehrfachauswahl. Jede ausgewählte Testklasse wird für jede gewählte Android-Version separat ausgeführt.</small>
-                                        </div>
-                                        <div id="suite-usb-compatibility-scenarios-row" class="mm-u012">
-                                            <span>Dual-Device-Szenarien für Matrixlauf</span>
-                                            <div id="suite-usb-compatibility-scenarios" class="data-list qa-usb-selection-list mm-u046">
-                                                <div class="info">Noch kein QA-Katalog geladen.</div>
-                                            </div>
-                                            <small class="qa-usb-help">Mehrfachauswahl. Jedes gewählte Szenario wird für jede passende Android-Version als eigener Dual-Device-Lauf ausgeführt.</small>
-                                        </div>
-                                    </details>
-
-                                    <div class="setup-actions mm-u033">
-                                        <button data-action="startUsbTestRun" class="btn btn-primary" title="USB-Testlauf für das ausgewählte Gerät und die Suite starten">USB-Testlauf starten</button>
-                                        <button data-action="startAllAutomatedUsbTests" class="btn btn-secondary" title="Alle automatisierten Master-, Kind- und Dual-Device-Tests über alle Android-Versionen aus dem QA-Katalog starten">Alle automatisierten Tests starten</button>
+                                    <div id="qa-test-detail" class="data-list">
+                                        <div class="info">Noch kein Eintrag ausgewählt.</div>
                                     </div>
                                 </section>
-                            </div>
-
-                            <div class="python-automation-layout mm-u039">
-                                <section class="python-automation-panel">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Aktive &amp; abgeschlossene L&auml;ufe</h5>
-                                            <p>Status laufender und vergangener Suite-Ausf&uuml;hrungen.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section">
-                                        <summary>Laufhistorie öffnen</summary>
-                                        <div class="setup-actions mm-u031">
-                                            <button data-action="loadSuiteRunHistory" class="btn btn-secondary" title="Verlauf laufender und vergangener Suite-Ausführungen laden">Historie laden</button>
-                                        </div>
-                                        <div id="suite-active-runs" class="data-list">
-                                            <div class="info">Noch keine Testl&auml;ufe.</div>
-                                        </div>
-                                        <div id="suite-run-history" class="data-list mm-u033">
-                                            <div class="info">Noch keine Historie geladen.</div>
-                                        </div>
-                                    </details>
-                                </section>
-
-                                <section class="python-automation-panel qa-panel-secondary">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>System Health Dashboard</h5>
-                                            <p>Kontinuierliche Überwachung, Agentenaktivität und Error Explorer für den Self-Healing-Laufzeitpfad.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section" open>
-                                        <summary>Self-Healing öffnen</summary>
-                                        <div class="setup-actions mm-u031">
-                                            <button id="qa-self-healing-run-btn" data-action="runQaSelfHealingCycle" class="btn btn-primary" title="Self-Healing-Zyklus jetzt ausführen">Self-Healing jetzt ausführen</button>
-                                            <label class="setup-checklist-item python-inline-check">
-                                                <input type="checkbox" id="qa-self-healing-auto-fix" />
-                                                Sichere Auto-Fixes aktivieren
-                                            </label>
-                                        </div>
-                                        <div id="qa-self-healing-summary" class="data-list">
-                                            <div class="info">Noch kein Self-Healing-Zyklus ausgeführt.</div>
-                                        </div>
-                                        <div class="qa-self-healing-grid mm-u033">
-                                            <section class="python-clarity-box">
-                                                <strong>Agent Activity Panel</strong>
-                                                <div id="qa-self-healing-activity" class="data-list mm-u047">
-                                                    <div class="info">Noch keine Agentenaktivität vorhanden.</div>
-                                                </div>
-                                            </section>
-                                            <section class="python-clarity-box">
-                                                <strong>Error Explorer</strong>
-                                                <div id="qa-self-healing-errors" class="data-list mm-u047">
-                                                    <div class="info">Noch keine Probleme erkannt.</div>
-                                                </div>
-                                            </section>
-                                        </div>
-                                    </details>
-                                </section>
-
-                                <section class="python-automation-panel qa-panel-secondary qa-release-workspace-panel">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>QA Release Workspace</h5>
-                                            <p>Release-Blocker, Agenten-Synthese, Queue, Emulatorstatus und Copy-/Rerun-Flows in einer fokussierten Leitstandsansicht.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section" open>
-                                        <summary>Release Workspace öffnen</summary>
-                                        <div class="setup-actions mm-u031">
-                                            <button data-action="loadQaReleaseWorkspace" class="btn btn-primary" title="Release-Blocker, Agenten-Synthese und Queue neu laden">Workspace laden</button>
-                                            <button data-action="copyQaReleaseWorkspaceSummary" class="btn btn-secondary" title="Zusammenfassung aller aktuellen Release-Blocker in die Zwischenablage kopieren">Zusammenfassung kopieren</button>
-                                            <button data-action="rerunSelectedQaReleaseBlocker" class="btn btn-secondary" title="Aktion für den aktuell gewählten Blocker ausführen">Ausgewählten Blocker ausführen</button>
-                                        </div>
-                                        <div id="qa-release-workspace" class="data-list">
-                                            <div class="info">Noch kein QA Release Workspace geladen.</div>
-                                        </div>
-                                    </details>
-                                </section>
-
-                                <section class="python-automation-panel qa-panel-secondary">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Artefakte &amp; Laufspuren</h5>
-                                            <p>Zeigt die letzte Dual-Device-Timeline sowie die jüngste manuelle Evidenzlage im QA-Betrieb.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section">
-                                        <summary>Artefakte und Laufspuren öffnen</summary>
-                                        <div id="qa-artifact-overview" class="data-list">
-                                            <div class="info">Noch keine Artefakte geladen.</div>
-                                        </div>
-                                    </details>
-                                </section>
-
-                                <section class="python-automation-panel qa-suite-catalog-panel">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Suite-Katalog</h5>
-                                            <p>Alle verf&uuml;gbaren Testsuiten mit Voraussetzungs-Status.</p>
-                                        </div>
-                                    </div>
-                                    <details class="qa-collapsible-section">
-                                        <summary>Suite-Katalog öffnen</summary>
-                                        <div class="python-automation-toolbar">
-                                            <select id="suite-group-filter">
-                                                <option value="all">Alle Gruppen</option>
-                                            </select>
-                                            <label class="setup-checklist-item python-inline-check">
-                                                <input type="checkbox" id="suite-ready-only" />
-                                                Nur lauff&auml;hige anzeigen
-                                            </label>
-                                        </div>
-                                        <div class="setup-actions mm-u031">
-                                            <button data-action="loadSuiteCatalog" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
-                                        </div>
-                                        <p class="qa-suite-catalog-hint">
-                                            Breite Katalogansicht mit klar getrennten Spalten f&uuml;r ID, Beschreibung, Voraussetzungen und Startaktion.
-                                        </p>
-                                        <div id="suite-catalog" class="data-list">
-                                            <div class="info">Noch nicht geladen.</div>
-                                        </div>
-                                    </details>
-                                </section>
-                            </div>
-                        </div>
-
-                        <div class="qa-section-heading">
-                            <h3>Erweiterte Betriebswerkzeuge</h3>
-                            <p>Ops-nahe Hilfen für Befehle, Validierung und operatorische Checklisten.</p>
-                        </div>
-
-                        <div class="setup-card admin-only mm-u029">
-                            <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
-                            <p>
-                                Erzeugt aus wenigen Eingaben lauff&auml;hige Betriebsbefehle (inkl. USB-Runner, Rollout und Erstadmin).
-                                Aufbau: erst Basisdaten, dann Android-spezifische Felder, danach Befehle generieren.
-                            </p>
-
-                            <div class="data-list mm-u036">
-                                <div class="info">
-                                    <strong>Schnellablauf in 3 Schritten:</strong><br />
-                                    1) Basisdaten pr&uuml;fen (Workspace, optional Erstadmin)<br />
-                                    2) Bei Android-Tests Serial/APK-Pfade setzen<br />
-                                    3) <em>Befehle generieren</em> klicken und Zielkommando kopieren/ausf&uuml;hren
-                                </div>
-                            </div>
-
-                            <div class="setup-grid mm-u037">
-                                <div class="setup-card mm-u050">
-                                    <h4>Basisdaten</h4>
-                                    <div class="dsar-form mm-u008">
-                                        <label for="cmd-workspace-path">Arbeitsverzeichnis</label>
-                                        <input type="text" id="cmd-workspace-path" placeholder="z. B. D:/Tools/MiniMaster" title="Pfad zum MiniMaster-Arbeitsverzeichnis" />
-                                        <label for="cmd-first-admin-email">Erstadmin E-Mail (optional)</label>
-                                        <input type="email" id="cmd-first-admin-email" placeholder="optional: admin@example.com" title="E-Mail für den automatisch anzulegenden Erstadmin" />
-                                        <label for="cmd-first-admin-password">Erstadmin Passwort (optional)</label>
-                                        <input type="text" id="cmd-first-admin-password" placeholder="optional: Erstadmin Passwort" title="Passwort für den automatisch anzulegenden Erstadmin" />
-                                    </div>
-                                </div>
-
-                                <div class="setup-card mm-u050">
-                                    <h4>Android / USB-Runner</h4>
-                                    <div class="dsar-form mm-u008">
-                                        <label for="cmd-android-device-serial">Allgemeine ADB-Serial (Fallback)</label>
-                                        <input type="text" id="cmd-android-device-serial" aria-label="ADB Device-Serial" placeholder="optional: allgemeine Serial f&uuml;r alle Kommandos" />
-                                        <label for="cmd-master-device-serial">Master-Device-Serial (optional, &uuml;berschreibt Fallback)</label>
-                                        <input type="text" id="cmd-master-device-serial" aria-label="ADB Master Device-Serial" placeholder="optional: nur f&uuml;r Master/Dual" />
-                                        <label for="cmd-child-device-serial">Child-Device-Serial (optional, &uuml;berschreibt Fallback)</label>
-                                        <input type="text" id="cmd-child-device-serial" aria-label="ADB Child Device-Serial" placeholder="optional: nur f&uuml;r Child/Dual" />
-                                    </div>
-                                </div>
-
-                                <div class="setup-card mm-u050">
-                                    <h4>APK-Pfade (optional)</h4>
-                                    <div class="dsar-form mm-u008">
-                                        <label for="cmd-master-apk-path">Pfad Eltern-App APK</label>
-                                        <input type="text" id="cmd-master-apk-path" aria-label="Pfad Eltern-App APK" placeholder="MasterApp APK Pfad" />
-                                        <label for="cmd-child-apk-path">Pfad Kinder-App APK</label>
-                                        <input type="text" id="cmd-child-apk-path" aria-label="Pfad Kinder-App APK" placeholder="ChildApp APK Pfad" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="setup-actions mm-u036">
-                                <button data-action="refreshCommandBuilderCommands" class="btn btn-primary" title="Lauffähige Betriebsbefehle aus den Basisdaten generieren">Befehle generieren</button>
-                                <button data-action="saveCommandBuilderConfig" class="btn btn-secondary" title="Aktuelle Eingaben lokal speichern">Vorgaben speichern</button>
-                                <button type="button" data-action="copyRolloutBundleScriptFromForm" class="btn btn-secondary" title="Rollout-PowerShell-Skript in die Zwischenablage kopieren">Rollout-PS kopieren</button>
-                                <button type="button" data-action="downloadRolloutBundleScriptFromForm" class="btn btn-primary" title="Rollout-PowerShell-Skript als Datei herunterladen">Rollout-PS herunterladen</button>
-                            </div>
-
-                            <div id="command-builder-status" class="data-list mm-u041">
-                                <div class="info">Noch keine Befehle generiert.</div>
-                            </div>
-                            <div id="command-builder-results" class="data-list mm-u041"></div>
-                        </div>
-
-                        <div class="setup-grid">
-                            <div class="setup-card">
-                                <h3>Integrationstest (alle Cloud Functions)</h3>
-                                <p>
-                                    Validiert die Anbindung an zentrale
-                                    Cloud-Dienste (Auth, Firestore, Functions)
-                                    und prüft <strong>alle</strong> kritischen Sammlungen und Callable Functions.
-                                </p>
-                                <div class="setup-actions">
-                                    <button
-                                        data-action="runFullSetupValidation"
-                                        class="btn btn-primary"
-                                        title="Alle Cloud Functions, Sammlungen und Anbindungen vollständig validieren"
-                                    >
-                                        Vollständige Validierung starten
-                                    </button>
-                                    <button
-                                        data-action="exportSetupReport"
-                                        class="btn btn-secondary"
-                                        title="Validierungsbericht als Datei exportieren"
-                                    >
-                                        Bericht exportieren
-                                    </button>
-                                </div>
-                                <div
-                                    id="setup-check-results"
-                                    class="data-list mm-u041"
-
-                                >
-                                    <div class="info">
-                                        Noch keine Validierung ausgeführt.
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="setup-card">
-                                <h3>Operator-Checkliste</h3>
-                                <p>
-                                    Geführte Inbetriebnahme für Betreiber.
-                                    Checkpoints werden lokal im Browser
-                                    gespeichert.
-                                </p>
-                                <div
-                                    id="setup-checklist"
-                                    class="setup-checklist"
-                                ></div>
                             </div>
                         </div>
                     </div>

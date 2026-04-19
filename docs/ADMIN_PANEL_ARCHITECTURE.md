@@ -97,8 +97,7 @@ Die Abschnitte 1–5 beschreiben den ursprünglichen Entwurf. Das tatsächlich p
 | **Support-Tickets** | Ticket-Verwaltung mit Debug-Snapshot | `getTicketUserData`, `grantSupportAccess`*, `analyzeWithDebugData`* |
 | **User-Management** | Master-/Child-Liste, Detailansicht, Sperren/Löschen | `setUserRole`, `setAdminClaim`, `revokeUserTokens`, `deleteUserAccount`, `exportUserData`, `revokeSubscription` |
 | **Operator-Verwaltung** | Operator-Access-Keys erzeugen/einlösen, Rollen pflegen | `createOperatorAccessKey`, `redeemOperatorAccessKey`, `setUserRole` |
-| **QA-Dashboard** | 10 Sektionen: Catalog, History, Evidence, **Self-Healing**, Register, QA-Platform, Emulators, Suites, Suite-History, Devices | `loadPythonAutomationCatalog`, `loadQaSelfHealingStatus`, `loadTestingRegister`, `loadEmulatorLabOverview`, `loadSuiteCatalog`, … |
-| **QA Release Workspace** | fokussierte Leitstandsansicht für Release-Blocker, Queue, Emulatorstatus, Agenten-Synthese und Copy-/Issue-Formate | `loadQaReleaseWorkspace`, `/api/qa/release-workspace`, `startSuiteRun`, `openPythonAutomationProtocol` |
+| **QA-Dashboard** | sichtbarer QA-Reiter mit Datenstand, Startwegen, Register, Python-Testzentrale und Triage-Workspace; Dashboard-Orchestrierung über fünf Kern-Loader | `loadPythonAutomationCatalog`, `loadPythonAutomationHistory`, `loadPythonAutomationEvidenceHistory`, `loadTestingRegister`, `loadSuiteRunHistory` |
 | **Commissioning** | Inbetriebnahme-Katalog, Run, Evidence-Historie | REST `/api/commissioning/{catalog,run,history,evidence}` (Python-Operator) |
 | **Compliance / Legal** | Aktive Policies, Re-Consent-Trigger | `getActiveLegalPolicies`, `needsLegalReconsent`, `publishLegalPolicy`, `markLegalReconsentRequired` |
 | **Knowledge Base** | AI-Wissensbasis pflegen + Gemini-Verbindungstest | `getKnowledgeBase`, `updateKnowledgeBase`, `testGeminiConnection` |
