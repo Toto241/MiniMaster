@@ -598,6 +598,12 @@ class TestMiniMasterAdminHandlerRoutes:
             "childTestClasses": ["child.PairingTest"],
             "selectedScenarioIds": ["pairing"],
         })
+        monkeypatch.setattr(app, "get_emulator_lab_overview", lambda: {
+            "sdkConfigured": True,
+            "adbAvailable": True,
+            "emulatorBinaryAvailable": True,
+            "avdManagerAvailable": True,
+        })
 
         with app._active_suite_lock:
             app._active_suite_runs.clear()
@@ -622,6 +628,89 @@ class TestMiniMasterAdminHandlerRoutes:
         assert queued["type"] == "android-automation-sweep"
         assert queued["executionMode"] == "all-automated"
         assert queued["androidVersions"] == ["10", "14"]
+
+    @pytest.mark.parametrize(
+        ("overview", "expected_error"),
+        [
+            (
+                {
+                    "sdkConfigured": False,
+                    "adbAvailable": True,
+                    "emulatorBinaryAvailable": True,
+                    "avdManagerAvailable": True,
+                },
+                "Android-SDK ist nicht konfiguriert.",
+            ),
+            (
+                {
+                    "sdkConfigured": True,
+                    "adbAvailable": False,
+                    "emulatorBinaryAvailable": True,
+                    "avdManagerAvailable": True,
+                },
+                "ADB ist nicht verfügbar.",
+            ),
+            (
+                {
+                    "sdkConfigured": True,
+                    "adbAvailable": True,
+                    "emulatorBinaryAvailable": False,
+                    "avdManagerAvailable": True,
+                },
+                "Die Android-Emulator-Binary ist nicht verfügbar.",
+            ),
+            (
+                {
+                    "sdkConfigured": True,
+                    "adbAvailable": True,
+                    "emulatorBinaryAvailable": True,
+                    "avdManagerAvailable": False,
+                },
+                "Der AVD Manager ist nicht verfügbar.",
+            ),
+        ],
+    )
+    def test_do_post_android_automation_sweep_rejects_hard_preflight_blockers_without_side_effects(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        overview: dict[str, bool],
+        expected_error: str,
+    ):
+        import app
+
+        handler = self._make_handler("/api/suites/android-automation-sweep")
+        handler._read_json_body.return_value = {
+            "installApk": True,
+            "skipActivation": True,
+            "parallel": True,
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+
+        monkeypatch.setattr(app, "_build_android_automation_sweep_plan", lambda: {
+            "androidVersions": ["10", "14"],
+            "masterTestClasses": ["master.PairingTest"],
+            "childTestClasses": ["child.PairingTest"],
+            "selectedScenarioIds": ["pairing"],
+        })
+        monkeypatch.setattr(app, "get_emulator_lab_overview", lambda: overview)
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.BAD_REQUEST,
+            {"error": expected_error},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+        with app._active_suite_lock:
+            assert app._active_suite_runs == {}
 
 
 class TestBuildTestingRegister:
