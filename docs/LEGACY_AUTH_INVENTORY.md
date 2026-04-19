@@ -23,6 +23,10 @@ Alle neuen Cloud Functions nutzen ausschließlich Firebase Auth (`context.auth`)
 
 ## 1.1 Legacy-Freeze Steuerung (neu)
 
+- `DISABLE_LEGACY_SECRETKEY_AUTH=false` (sicherer Deploy-Default)
+	- Fehlendes Deployment-Secret darf Legacy-Auth NICHT implizit deaktivieren.
+	- Erst für den kontrollierten Cutover explizit auf `true` setzen.
+
 - `DISABLE_LEGACY_SECRETKEY_AUTH=true`
 	- Deaktiviert in `generateCustomToken` den Legacy-Login via `masterImei + secretKey`.
 	- Deaktiviert in `registerMasterDevice` den IMEI-only Fallback ohne `context.auth`.
