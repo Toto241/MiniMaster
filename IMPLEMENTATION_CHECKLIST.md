@@ -80,7 +80,12 @@ The job was not started because recent account payments have failed or your spen
 
 ### [CODE] – Erweiterungen (jeweils eigene Iteration empfohlen)
 
-- [ ] **F6 CSP-Refactor**: ~80+ Inline-`onclick`/`style` in `admin-panel/index.html` zu `addEventListener`/CSS-Klassen migrieren. Erfordert Anpassung der DOM-Snapshot-Tests.
+- [ ] **F6 CSP-Refactor** (in Bearbeitung – Stufe 1 fertig): ~80+ Inline-`onclick`/`style` in `admin-panel/index.html` zu `addEventListener`/CSS-Klassen migrieren. Erfordert Anpassung der DOM-Snapshot-Tests.
+  - [x] **Stufe 1 (Nav + Logout)**: Neues Modul [admin-panel/modules/core/nav-bootstrap.js](admin-panel/modules/core/nav-bootstrap.js) ersetzt 14 `onclick="switchTab('…', event)"` und 1 `onclick="logout()"` per Event-Delegation auf `#dashboard-nav` bzw. `#logout-btn`. `index.html` nutzt jetzt `data-tab="…"` / `data-action="logout"` + `type="button"`. `switchTab` bekommt synthetisches `{ target: button }` damit `evt.target.classList.add("active")` weiter funktioniert. Service-Worker Pre-Cache erweitert. Inline-`onclick=` Inventar 119 → 100 (-15); Bundle-Budget Test ratchet auf `MAX_INLINE_ONCLICK = 110`. Neue Unit-Tests in `admin-panel-modules.test.ts` (Modul + DOM-Migration). Suite 69/69 ✅, 2147/2147 ✅.
+  - [ ] Stufe 2: bootstrap-firebase-config Buttons (Header-Bereich)
+  - [ ] Stufe 3: tab-content Action-Buttons (per Tab batched)
+  - [ ] Stufe 4: Inline-`style="…"` (~187) in CSS-Klassen migrieren
+  - [ ] Stufe 5: CSP-Header `script-src 'self'` (ohne `unsafe-inline`) aktivieren
 - [ ] **Legacy `secretKey` Cutover**: Backend-Migration + koordinierte Mobile-Client-Versionierung
 - [x] **Recovery-Token Rotation — operationelles Runbook**: Quartals-Rotations-SOP in [RUNBOOK.md](RUNBOOK.md) dokumentiert (Pre-Check, Rotation via `scripts/operator-setup.ps1 rotate-token`, Overlap-Phase, Re-Deploy, Smoke-Test, Old-Token-Removal, Audit; plus Notfall-Rotation bei Kompromittierung).
 - [x] **Debug-Snapshot Felder erweitert** (`src/support.ts`): `DebugSnapshot` um `networkDiagnostics.networkType` (wifi/cellular/none/unknown, sanitisiert/lowercased) und `deviceTelemetry` (`batteryLevelPct` 0-100 clamped, `isCharging`, `storageFreeBytes`, `osVersion`/`appVersion` truncated 32 chars) erweitert; Whitelist-Sanitizer `sanitizeDebugSnapshot` normalisiert ungültige Werte (Test deckt invalid networkType, negative Battery, falscher Typ, überlange Strings ab). Suite 2088/2088 grün ✅, Coverage 87.40/90.31/94.48/94.30 % ✅.

@@ -34,7 +34,8 @@
                     <span id="user-email"></span>
                     <button
                         id="logout-btn"
-                        onclick="logout()"
+                        type="button"
+                        data-action="logout"
                         style="display: none"
                         title="Vom Operator-Dashboard abmelden"
                     >
@@ -47,56 +48,59 @@
             <nav id="dashboard-nav" class="dashboard-nav" style="display: none">
                 <button
                     class="nav-tab active"
-                    onclick="switchTab('overview', event)"
+                    type="button"
+                    data-tab="overview"
                     title="KPI-Dashboard mit Statistiken, Diagrammen und Systemgesundheit"
                 >
                     Übersicht
                 </button>
-                <button class="nav-tab" onclick="switchTab('users', event)" title="Benutzer suchen, anzeigen und verwalten">
+                <button class="nav-tab" type="button" data-tab="users" title="Benutzer suchen, anzeigen und verwalten">
                     Benutzer
                 </button>
-                <button class="nav-tab" onclick="switchTab('devices', event)" title="Gekoppelte Kindergeräte suchen und verwalten">
+                <button class="nav-tab" type="button" data-tab="devices" title="Gekoppelte Kindergeräte suchen und verwalten">
                     Geräte
                 </button>
                 <button
                     class="nav-tab"
-                    onclick="switchTab('subscriptions', event)"
+                    type="button"
+                    data-tab="subscriptions"
                     title="Abonnements überwachen und nach Status filtern"
                 >
                     Abonnements
                 </button>
-                <button class="nav-tab" onclick="switchTab('pairing', event)" title="Pairing-Codes und -Tokens überwachen">
+                <button class="nav-tab" type="button" data-tab="pairing" title="Pairing-Codes und -Tokens überwachen">
                     Kopplung
                 </button>
-                <button class="nav-tab" onclick="switchTab('support', event)" title="Support-Tickets verwalten und filtern">
+                <button class="nav-tab" type="button" data-tab="support" title="Support-Tickets verwalten und filtern">
                     Support
                 </button>
-                <button class="nav-tab" onclick="switchTab('errorlogs', event)" title="Fehlerprotokolle durchsuchen und analysieren">
+                <button class="nav-tab" type="button" data-tab="errorlogs" title="Fehlerprotokolle durchsuchen und analysieren">
                     Fehlerprotokoll
                 </button>
                 <button
                     class="nav-tab"
-                    onclick="switchTab('compliance', event)"
+                    type="button"
+                    data-tab="compliance"
                     title="DSGVO-Datenauskunft, Kontolöschung, Audit-Export und Legacy-Auth-Monitor"
                 >
                     Compliance
                 </button>
-                <button class="nav-tab" onclick="switchTab('setup', event)" title="Inbetriebnahme-Assistent und Laufzeitkonfiguration">
+                <button class="nav-tab" type="button" data-tab="setup" title="Inbetriebnahme-Assistent und Laufzeitkonfiguration">
                     ⚙️ Einrichtung
                 </button>
-                <button class="nav-tab" onclick="switchTab('qa', event)" title="Qualitätssicherung: Testläufe, USB-Tests und Befehlszentrale">
+                <button class="nav-tab" type="button" data-tab="qa" title="Qualitätssicherung: Testläufe, USB-Tests und Befehlszentrale">
                     🧪 Qualitätssicherung
                 </button>
-                <button class="nav-tab" onclick="switchTab('admin', event)" title="Admin-Claims, RBAC-Rollenverwaltung und Entwickler-Reset">
+                <button class="nav-tab" type="button" data-tab="admin" title="Admin-Claims, RBAC-Rollenverwaltung und Entwickler-Reset">
                     👤 Administration
                 </button>
-                <button class="nav-tab" onclick="switchTab('firebase', event)" title="Firebase Functions-Status, Gemini-Test, Knowledge Base und FCM">
+                <button class="nav-tab" type="button" data-tab="firebase" title="Firebase Functions-Status, Gemini-Test, Knowledge Base und FCM">
                     Firebase
                 </button>
-                <button class="nav-tab" onclick="switchTab('ai', event)" title="KI-Assistent für Fragen, Operator-Hilfe und Fehlerüberwachung">
+                <button class="nav-tab" type="button" data-tab="ai" title="KI-Assistent für Fragen, Operator-Hilfe und Fehlerüberwachung">
                     🤖 KI-Assistent
                 </button>
-                <button class="nav-tab" onclick="switchTab('legal', event)" title="Richtlinien, Einwilligungen, Reconsent und Play Store Readiness">
+                <button class="nav-tab" type="button" data-tab="legal" title="Richtlinien, Einwilligungen, Reconsent und Play Store Readiness">
                     📜 Recht &amp; Datenschutz
                 </button>
             </nav>
