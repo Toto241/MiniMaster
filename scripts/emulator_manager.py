@@ -611,6 +611,18 @@ def create_reservation(
         "expiresAtEpoch": created_at_epoch + ttl_minutes * 60,
     }
     reservations = load_active_reservations()
+    conflicting = next(
+        (
+            entry for entry in reservations
+            if str(entry.get("profileId", "")).strip() == normalized_profile_id
+            and str(entry.get("androidVersion", "")).strip() == normalized_version
+        ),
+        None,
+    )
+    if conflicting is not None:
+        raise ValueError(
+            f"Für Profil {normalized_profile_id} und Android {normalized_version} existiert bereits eine aktive Reservierung ({str(conflicting.get('reservationId') or 'unbekannt')})."
+        )
     reservations.append(reservation)
     _save_reservations(reservations)
     return reservation
@@ -653,4 +665,10 @@ def get_emulator_lab_overview() -> dict[str, object]:
         "reservationCount": len(reservations),
         "matrixPlan": plan,
         "matrixPlanCount": len(plan),
+        "summary": {
+            "runningCount": len(running),
+            "reservationCount": len(reservations),
+            "busyReservationCount": len(reservations),
+            "problemCount": int(sdk_root is None or emulator_path is None or avdmanager_path is None or not adb_available()),
+        },
     }

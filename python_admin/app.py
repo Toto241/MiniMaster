@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
@@ -56,6 +57,7 @@ from static_readiness_checks import run_checks_as_dicts as run_static_readiness_
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
+JOB_RUN_LOG_FILE = LOG_DIR / "job_runs.jsonl"
 DEFAULT_HOST = os.environ.get("MINIMASTER_ADMIN_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("MINIMASTER_ADMIN_PORT", "8765"))
 DEFAULT_HISTORY_LIMIT = 15
@@ -65,6 +67,10 @@ MAX_EVIDENCE_LIMIT = 500
 DEFAULT_COMMAND_TIMEOUT_SEC = int(os.environ.get("MINIMASTER_COMMAND_TIMEOUT_SEC", "1800"))
 ALLOWED_EVIDENCE_STATUSES = {"pass", "fail", "manual_required"}
 CLIENT_DISCONNECT_WINERRORS = {10053, 10054}
+JOB_TERMINAL_STATUSES = {"success", "failed", "cancelled"}
+JOB_ACTIVE_STATUSES = {"pending", "queued", "running", "retry"}
+JOB_ERROR_LIMIT = 50
+JOB_HISTORY_LIMIT = 100
 
 ALLOWED_COMMANDS = {
     "adb",
@@ -3426,6 +3432,11 @@ _self_healing_monitor_state: dict[str, object] = {
     "lastOutcome": "idle",
     "lastSystemHealth": "OK",
 }
+_active_jobs: dict[str, dict[str, object]] = {}
+_job_lock = threading.Lock()
+_job_queue: list[dict[str, object]] = []
+_job_worker_lock = threading.Lock()
+_job_worker_thread: threading.Thread | None = None
 
 
 def _current_timestamp_iso() -> str:
@@ -3471,6 +3482,626 @@ def _append_self_healing_cycle_log(entry: dict[str, object]) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     with SELF_HEALING_LOG_FILE.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _copy_job_state(job: dict[str, object]) -> dict[str, object]:
+    return cast(dict[str, object], _deep_copy_json_compatible(job))
+
+
+def _job_sort_key(entry: dict[str, object]) -> tuple[int, str, str]:
+    return (
+        int(entry.get("priority") or 50),
+        str(entry.get("queuedAt") or ""),
+        str(entry.get("jobId") or ""),
+    )
+
+
+def _create_job_log(*, category: str, message: str, severity: str = "info", details: dict[str, object] | None = None) -> dict[str, object]:
+    return {
+        "timestamp": _current_timestamp_iso(),
+        "severity": severity,
+        "category": category,
+        "message": message,
+        "details": details or {},
+    }
+
+
+def _append_job_history_snapshot(snapshot: dict[str, object]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with JOB_RUN_LOG_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(snapshot, ensure_ascii=False) + "\n")
+
+
+def _persist_job_snapshot(job_id: str) -> None:
+    with _job_lock:
+        job = _active_jobs.get(job_id)
+        if job is None:
+            return
+        snapshot = _copy_job_state(job)
+    _append_job_history_snapshot(snapshot)
+
+
+def load_job_history(limit: int = JOB_HISTORY_LIMIT) -> list[dict[str, object]]:
+    if not JOB_RUN_LOG_FILE.exists():
+        return []
+    history: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for line in reversed(JOB_RUN_LOG_FILE.read_text(encoding="utf-8").splitlines()):
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        job_id = str(parsed.get("jobId") or "").strip()
+        if not job_id or job_id in seen:
+            continue
+        seen.add(job_id)
+        history.append(parsed)
+        if len(history) >= limit:
+            break
+    return history
+
+
+def _append_job_log(job_id: str, *, category: str, message: str, severity: str = "info", details: dict[str, object] | None = None) -> None:
+    with _job_lock:
+        job = _active_jobs.get(job_id)
+        if job is None:
+            return
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category=category, message=message, severity=severity, details=details))
+        if len(logs) > 200:
+            del logs[:-200]
+    _persist_job_snapshot(job_id)
+
+
+def create_job(
+    *,
+    job_type: str,
+    payload: dict[str, object],
+    priority: int = 50,
+    label: str = "",
+    explicit_job_id: str | None = None,
+    max_retries: int = 0,
+) -> dict[str, object]:
+    job_id = explicit_job_id or f"job-{uuid4().hex[:12]}"
+    now_iso = _current_timestamp_iso()
+    job = {
+        "jobId": job_id,
+        "type": job_type,
+        "status": "pending",
+        "priority": int(priority),
+        "label": label or job_type,
+        "payload": _deep_copy_json_compatible(payload),
+        "result": None,
+        "createdAt": now_iso,
+        "startedAt": None,
+        "finishedAt": None,
+        "retryCount": 0,
+        "maxRetries": max(0, int(max_retries)),
+        "logs": [
+            _create_job_log(category="job", message=f"Job '{label or job_type}' angelegt.", details={"type": job_type}),
+        ],
+        "error": None,
+    }
+    with _job_lock:
+        _active_jobs[job_id] = job
+    _persist_job_snapshot(job_id)
+    return _copy_job_state(job)
+
+
+def get_job_by_id(job_id: str) -> dict[str, object] | None:
+    normalized = str(job_id or "").strip()
+    if not normalized:
+        return None
+    with _job_lock:
+        active = _active_jobs.get(normalized)
+        if active is not None:
+            return _copy_job_state(active)
+    for entry in load_job_history(limit=JOB_HISTORY_LIMIT):
+        if str(entry.get("jobId") or "") == normalized:
+            return cast(dict[str, object], entry)
+    return None
+
+
+def list_jobs(
+    limit: int = 25,
+    *,
+    statuses: set[str] | None = None,
+    job_types: set[str] | None = None,
+) -> list[dict[str, object]]:
+    with _job_lock:
+        jobs = [_copy_job_state(job) for job in _active_jobs.values()]
+    indexed = {str(item.get("jobId") or ""): item for item in jobs if str(item.get("jobId") or "")}
+    for entry in load_job_history(limit=max(limit * 4, JOB_HISTORY_LIMIT)):
+        job_id = str(entry.get("jobId") or "")
+        if job_id and job_id not in indexed:
+            indexed[job_id] = cast(dict[str, object], entry)
+    filtered = []
+    for job in indexed.values():
+        status = str(job.get("status") or "")
+        job_type = str(job.get("type") or "")
+        if statuses and status not in statuses:
+            continue
+        if job_types and job_type not in job_types:
+            continue
+        filtered.append(job)
+    filtered.sort(key=lambda item: (
+        str(item.get("finishedAt") or item.get("startedAt") or item.get("createdAt") or ""),
+        str(item.get("jobId") or ""),
+    ), reverse=True)
+    return filtered[:limit]
+
+
+def enqueue_job(job_id: str) -> dict[str, object]:
+    normalized = str(job_id or "").strip()
+    with _job_lock:
+        job = _active_jobs.get(normalized)
+        if job is None:
+            raise ValueError("Job nicht gefunden.")
+        if str(job.get("status") or "") in JOB_TERMINAL_STATUSES:
+            raise ValueError("Terminale Jobs können nicht erneut eingereiht werden.")
+        now_iso = _current_timestamp_iso()
+        job["status"] = "queued"
+        job["finishedAt"] = None
+        queue_entry = {
+            "jobId": normalized,
+            "priority": int(job.get("priority") or 50),
+            "queuedAt": now_iso,
+        }
+        _job_queue[:] = [entry for entry in _job_queue if str(entry.get("jobId") or "") != normalized]
+        _job_queue.append(queue_entry)
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category="queue", message="Job in die Queue eingereiht.", details={"priority": queue_entry["priority"]}))
+    _persist_job_snapshot(normalized)
+    _ensure_job_worker_running()
+    return cast(dict[str, object], get_job_by_id(normalized) or {})
+
+
+def _mark_job_running(job_id: str) -> None:
+    with _job_lock:
+        job = _active_jobs.get(job_id)
+        if job is None:
+            return
+        job["status"] = "running"
+        job["startedAt"] = job.get("startedAt") or _current_timestamp_iso()
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category="worker", message="Job-Ausführung gestartet."))
+    _persist_job_snapshot(job_id)
+
+
+def complete_job(job_id: str, result: dict[str, object] | None = None, *, message: str = "Job erfolgreich abgeschlossen.") -> dict[str, object] | None:
+    with _job_lock:
+        job = _active_jobs.get(job_id)
+        if job is None:
+            return None
+        job["status"] = "success"
+        job["finishedAt"] = _current_timestamp_iso()
+        job["result"] = _deep_copy_json_compatible(result or {})
+        job["error"] = None
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category="worker", message=message, severity="info"))
+    _persist_job_snapshot(job_id)
+    return get_job_by_id(job_id)
+
+
+def fail_job(
+    job_id: str,
+    error: object,
+    *,
+    severity: str = "high",
+    category: str = "runtime",
+    retryable: bool = False,
+    code: str = "job_failed",
+    stacktrace: str = "",
+) -> dict[str, object] | None:
+    message = str(error or "Unbekannter Fehler")
+    with _job_lock:
+        job = _active_jobs.get(job_id)
+        if job is None:
+            return None
+        job["status"] = "failed"
+        job["finishedAt"] = _current_timestamp_iso()
+        job["error"] = {
+            "code": code,
+            "message": message,
+            "severity": severity,
+            "category": category,
+            "retryable": retryable,
+            "stacktrace": stacktrace,
+        }
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category=category, message=message, severity="error"))
+    _persist_job_snapshot(job_id)
+    return get_job_by_id(job_id)
+
+
+def retry_job(job_id: str) -> dict[str, object]:
+    normalized = str(job_id or "").strip()
+    with _job_lock:
+        job = _active_jobs.get(normalized)
+        if job is None:
+            raise ValueError("Job nicht gefunden.")
+        retry_count = int(job.get("retryCount") or 0)
+        max_retries = int(job.get("maxRetries") or 0)
+        if retry_count >= max_retries:
+            raise ValueError("Retry-Limit erreicht.")
+        job["retryCount"] = retry_count + 1
+        job["status"] = "retry"
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category="queue", message="Retry angefordert.", severity="warning"))
+    _persist_job_snapshot(normalized)
+    return enqueue_job(normalized)
+
+
+def cancel_job(job_id: str) -> dict[str, object]:
+    normalized = str(job_id or "").strip()
+    with _job_lock:
+        job = _active_jobs.get(normalized)
+        if job is None:
+            raise ValueError("Job nicht gefunden.")
+        if str(job.get("status") or "") == "running":
+            raise ValueError("Laufende Jobs können in dieser Ausbaustufe nicht abgebrochen werden.")
+        job["status"] = "cancelled"
+        job["finishedAt"] = _current_timestamp_iso()
+        _job_queue[:] = [entry for entry in _job_queue if str(entry.get("jobId") or "") != normalized]
+        logs = cast(list[dict[str, object]], job.setdefault("logs", []))
+        logs.append(_create_job_log(category="queue", message="Job wurde abgebrochen.", severity="warning"))
+    _persist_job_snapshot(normalized)
+    return cast(dict[str, object], get_job_by_id(normalized) or {})
+
+
+def _ensure_job_worker_running() -> None:
+    global _job_worker_thread
+    with _job_worker_lock:
+        if _job_worker_thread is not None and _job_worker_thread.is_alive():
+            return
+        _job_worker_thread = threading.Thread(target=_job_worker_loop, daemon=True, name="operator-job-worker")
+        _job_worker_thread.start()
+
+
+def _take_next_job_id() -> str | None:
+    with _job_lock:
+        _job_queue.sort(key=_job_sort_key)
+        while _job_queue:
+            entry = _job_queue.pop(0)
+            job_id = str(entry.get("jobId") or "").strip()
+            if not job_id:
+                continue
+            job = _active_jobs.get(job_id)
+            if job is None:
+                continue
+            if str(job.get("status") or "") in {"queued", "retry", "pending"}:
+                return job_id
+    return None
+
+
+def _suite_result_message(run: dict[str, object]) -> str:
+    result = as_dict(run.get("result"))
+    return str(
+        result.get("reason")
+        or result.get("error")
+        or run.get("error")
+        or result.get("status")
+        or run.get("status")
+        or "Job abgeschlossen."
+    )
+
+
+def _complete_job_from_suite_run(job_id: str) -> None:
+    with _active_suite_lock:
+        run = _copy_job_state(cast(dict[str, object], _active_suite_runs.get(job_id) or {})) if job_id in _active_suite_runs else {}
+    if not run:
+        fail_job(job_id, "Run-Datensatz konnte nach Job-Ausführung nicht geladen werden.", category="runner", code="missing_run_state")
+        return
+    lifecycle = str(run.get("status") or "").lower()
+    result = as_dict(run.get("result"))
+    result_status = str(result.get("overallStatus") or result.get("overall_status") or result.get("status") or "").lower()
+    if lifecycle == "error" or result_status in {"failed", "fail", "error", "errored"}:
+        fail_job(
+            job_id,
+            _suite_result_message(run),
+            category="test",
+            code="run_failed",
+            stacktrace=str(result.get("stderr") or result.get("stacktrace") or ""),
+            retryable=True,
+        )
+        return
+    complete_job(job_id, {
+        "runId": job_id,
+        "type": run.get("type") or _infer_suite_run_type(run),
+        "status": lifecycle,
+        "result": result,
+        "currentPhase": run.get("currentPhase"),
+        "lastEvent": run.get("lastEvent"),
+        "timeline": run.get("timeline") or [],
+    }, message=_suite_result_message(run))
+
+
+def _collect_job_log_messages(job: dict[str, object], limit: int = 10) -> list[str]:
+    logs = cast(list[dict[str, object]], job.get("logs") or [])
+    return [str(item.get("message") or "") for item in logs[-limit:] if str(item.get("message") or "").strip()]
+
+
+def _job_to_operator_error(job: dict[str, object]) -> dict[str, object] | None:
+    error = as_dict(job.get("error"))
+    if not error:
+        return None
+    result = as_dict(job.get("result"))
+    job_id = str(job.get("jobId") or "")
+    title = str(job.get("label") or job.get("type") or "Job")
+    return {
+        "errorId": f"job:{job_id}",
+        "sourceType": str(job.get("type") or "system"),
+        "sourceId": job_id,
+        "title": title,
+        "message": str(error.get("message") or result.get("reason") or "Job fehlgeschlagen."),
+        "stacktrace": str(error.get("stacktrace") or result.get("stderr") or ""),
+        "timestamp": str(job.get("finishedAt") or job.get("startedAt") or job.get("createdAt") or ""),
+        "severity": str(error.get("severity") or "high"),
+        "context": {
+            "label": title,
+            "payload": as_dict(job.get("payload")),
+            "logs": _collect_job_log_messages(job),
+            "result": result,
+        },
+        "relatedJobId": job_id,
+        "status": str(job.get("status") or "failed"),
+    }
+
+
+def list_operator_errors(limit: int = JOB_ERROR_LIMIT) -> list[dict[str, object]]:
+    errors: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for job in list_jobs(limit=max(limit * 3, JOB_HISTORY_LIMIT)):
+        entry = _job_to_operator_error(job)
+        if entry is None:
+            continue
+        error_id = str(entry.get("errorId") or "")
+        if error_id in seen:
+            continue
+        seen.add(error_id)
+        errors.append(entry)
+    latest_self_healing = load_self_healing_history(limit=1)
+    if latest_self_healing:
+        cycle = latest_self_healing[0]
+        for issue in cast(list[dict[str, object]], cycle.get("pendingFixes") or []):
+            issue_id = str(issue.get("id") or "")
+            error_id = f"self-healing:{issue_id}"
+            if not issue_id or error_id in seen:
+                continue
+            seen.add(error_id)
+            errors.append({
+                "errorId": error_id,
+                "sourceType": "system",
+                "sourceId": issue_id,
+                "title": str(issue.get("title") or issue_id),
+                "message": str(issue.get("message") or issue.get("rootCause") or "Self-Healing-Befund"),
+                "stacktrace": "",
+                "timestamp": str(cycle.get("generatedAt") or ""),
+                "severity": str(issue.get("severity") or "medium").lower(),
+                "context": {
+                    "manualPlan": issue.get("manualPlan"),
+                    "exactLocation": issue.get("exactLocation"),
+                    "reproduction": issue.get("reproduction"),
+                },
+                "relatedJobId": str(issue.get("runId") or ""),
+                "status": "open",
+            })
+    errors.sort(key=lambda item: str(item.get("timestamp") or ""), reverse=True)
+    return errors[:limit]
+
+
+def _agent_result_entry(*, role: str, status: str, summary: str, evidence: list[str], findings: list[str], risks: list[str], recommendations: list[str], confidence: float, duration_ms: int) -> dict[str, object]:
+    return {
+        "agentId": role,
+        "name": role,
+        "role": role,
+        "status": status,
+        "supportedTaskTypes": ["job-error-analysis", "job-summary"],
+        "configuration": {"engine": "deterministic-runtime"},
+        "summary": summary,
+        "evidence": evidence,
+        "findings": findings,
+        "risks": risks,
+        "recommendations": recommendations,
+        "confidence": round(confidence, 2),
+        "durationMs": duration_ms,
+    }
+
+
+def get_agent_core_status() -> dict[str, object]:
+    recent_agent_jobs = list_jobs(limit=20, job_types={"agent"})
+    latest_by_role: dict[str, dict[str, object]] = {}
+    for job in recent_agent_jobs:
+        result = as_dict(job.get("result"))
+        for agent in cast(list[dict[str, object]], result.get("agentRuns") or []):
+            role = str(agent.get("role") or "")
+            if role and role not in latest_by_role:
+                latest_by_role[role] = agent
+    agents = []
+    for role in ("analyzer", "validator", "synthesizer"):
+        latest = latest_by_role.get(role, {})
+        agents.append({
+            "agentId": role,
+            "name": role,
+            "role": role,
+            "status": str(latest.get("status") or "idle"),
+            "supportedTaskTypes": ["job-error-analysis", "job-summary"],
+            "configuration": {"engine": "deterministic-runtime"},
+            "lastRun": str(latest.get("finishedAt") or latest.get("startedAt") or ""),
+            "lastResultSummary": str(latest.get("summary") or "Noch kein Lauf."),
+            "confidence": latest.get("confidence"),
+        })
+    return {
+        "agents": agents,
+        "recentJobs": recent_agent_jobs[:10],
+    }
+
+
+def _run_agent_analysis_job(job_id: str, job: dict[str, object]) -> None:
+    payload = as_dict(job.get("payload"))
+    source_job_id = str(payload.get("sourceJobId") or "").strip()
+    source_error_id = str(payload.get("sourceErrorId") or "").strip()
+    source_job = get_job_by_id(source_job_id) if source_job_id else None
+    source_error = next((item for item in list_operator_errors(limit=JOB_ERROR_LIMIT) if str(item.get("errorId") or "") == source_error_id), None) if source_error_id else None
+    if source_job is None and source_error is None:
+        fail_job(job_id, "Agentenlauf benötigt sourceJobId oder sourceErrorId.", category="agent", code="invalid_agent_input")
+        return
+
+    source_title = str((source_error or {}).get("title") or (source_job or {}).get("label") or (source_job or {}).get("jobId") or "Analyse")
+    source_message = str((source_error or {}).get("message") or as_dict((source_job or {}).get("error")).get("message") or as_dict((source_job or {}).get("result")).get("reason") or "")
+    source_logs = cast(list[str], ((source_error or {}).get("context") or {}).get("logs") or _collect_job_log_messages(source_job or {}))
+    evidence = [item for item in source_logs if item][:6]
+    if source_message:
+        evidence.insert(0, source_message)
+
+    analyzer = _agent_result_entry(
+        role="analyzer",
+        status="completed",
+        summary=f"Analysiert: {source_title}",
+        evidence=evidence,
+        findings=[source_message or f"Quelle {source_title} weist einen Fehlerzustand auf."],
+        risks=["Fehlerursache kann Folgefehler auslösen."] if source_message else [],
+        recommendations=["Relevante Logs und letzten Status prüfen."],
+        confidence=0.78,
+        duration_ms=12,
+    )
+    validator = _agent_result_entry(
+        role="validator",
+        status="completed",
+        summary="Eingangsdaten und verfügbare Evidenz wurden validiert.",
+        evidence=evidence,
+        findings=[f"{len(evidence)} Evidenzpunkte verfügbar."],
+        risks=[] if len(evidence) >= 2 else ["Die Evidenzlage ist dünn; Ergebnis nur bedingt belastbar."],
+        recommendations=["Fehler nach Möglichkeit mit Retry oder Emulator-/Test-Status korrelieren."],
+        confidence=0.74 if len(evidence) >= 2 else 0.58,
+        duration_ms=10,
+    )
+    synthesizer = _agent_result_entry(
+        role="synthesizer",
+        status="completed",
+        summary=f"Synthese für {source_title}: {source_message or 'Fehlerzustand ohne Detailnachricht.'}",
+        evidence=evidence,
+        findings=[source_message or "Keine explizite Fehlermeldung im Eingang gefunden."],
+        risks=["Weitere Ausführung kann erneut scheitern, solange die Ursache nicht behoben ist."],
+        recommendations=["Fehler kopieren, Job-Kontext prüfen und anschließend gezielten Retry auslösen."],
+        confidence=0.81 if source_message else 0.63,
+        duration_ms=14,
+    )
+    complete_job(job_id, {
+        "summary": synthesizer["summary"],
+        "findings": synthesizer["findings"],
+        "evidence": evidence,
+        "risks": synthesizer["risks"],
+        "recommendations": synthesizer["recommendations"],
+        "confidence": synthesizer["confidence"],
+        "durationMs": 36,
+        "sourceJobId": source_job_id or None,
+        "sourceErrorId": source_error_id or None,
+        "agentRuns": [analyzer, validator, synthesizer],
+    }, message="Agentenlauf abgeschlossen.")
+
+
+def _execute_job_action(job_id: str) -> None:
+    job = get_job_by_id(job_id)
+    if job is None:
+        return
+    payload = as_dict(job.get("payload"))
+    action = str(payload.get("action") or "").strip()
+    if action == "suite-run":
+        _run_suite_background(job_id, str(payload.get("suiteId") or ""), bool(payload.get("strictSkips")))
+        _complete_job_from_suite_run(job_id)
+        return
+    if action == "usb-test":
+        kwargs = as_dict(payload.get("kwargs"))
+        _run_usb_test_background(job_id, kwargs)
+        _complete_job_from_suite_run(job_id)
+        return
+    if action == "dual-device":
+        kwargs = as_dict(payload.get("kwargs"))
+        _run_dual_device_background(job_id, kwargs)
+        _complete_job_from_suite_run(job_id)
+        return
+    if action == "android-compatibility":
+        kwargs = as_dict(payload.get("kwargs"))
+        _run_android_compatibility_background(job_id, kwargs)
+        _complete_job_from_suite_run(job_id)
+        return
+    if action == "android-automation-sweep":
+        kwargs = as_dict(payload.get("kwargs"))
+        _run_android_automation_sweep_background(job_id, kwargs)
+        _complete_job_from_suite_run(job_id)
+        return
+    if action == "emulator-reservation":
+        reservation = create_emulator_reservation(
+            str(payload.get("profileId") or "").strip(),
+            str(payload.get("androidVersion") or "").strip(),
+            owner=str(payload.get("owner") or "").strip(),
+            purpose=str(payload.get("purpose") or "").strip(),
+            ttl_minutes=parse_int(payload.get("ttlMinutes"), default=120, min_value=15, max_value=1440),
+        )
+        complete_job(job_id, {"reservation": reservation}, message="Emulator-Reservierung angelegt.")
+        return
+    if action == "emulator-create-avd":
+        result = create_emulator_avd(
+            str(payload.get("avdName") or "").strip(),
+            profile_id=str(payload.get("profileId") or "").strip(),
+            android_version=str(payload.get("androidVersion") or "").strip(),
+        )
+        complete_job(job_id, result, message="AVD erstellt.")
+        return
+    if action == "emulator-start":
+        result = start_emulator(
+            str(payload.get("avdName") or "").strip(),
+            headless=bool_from_payload(payload.get("headless"), default=True),
+            wipe_data=bool_from_payload(payload.get("wipeData"), default=False),
+            no_snapshot=bool_from_payload(payload.get("noSnapshot"), default=True),
+        )
+        complete_job(job_id, result, message="Emulator gestartet.")
+        return
+    if action == "emulator-stop":
+        result = stop_emulator(str(payload.get("serial") or "").strip())
+        complete_job(job_id, result, message="Emulator beendet.")
+        return
+    if action == "emulator-release":
+        reservation_id = str(payload.get("reservationId") or "").strip()
+        released = release_emulator_reservation(reservation_id)
+        if not released:
+            fail_job(job_id, f"Reservierung {reservation_id} konnte nicht freigegeben werden.", category="emulator", code="reservation_release_failed")
+            return
+        complete_job(job_id, {"reservationId": reservation_id, "released": True}, message="Reservierung freigegeben.")
+        return
+    if action == "agent-analysis":
+        _run_agent_analysis_job(job_id, job)
+        return
+    fail_job(job_id, f"Unbekannte Job-Aktion: {action}", category="job", code="unknown_job_action")
+
+
+def _job_worker_loop() -> None:
+    global _job_worker_thread
+    try:
+        while True:
+            job_id = _take_next_job_id()
+            if job_id is None:
+                return
+            _mark_job_running(job_id)
+            try:
+                _execute_job_action(job_id)
+            except Exception as exc:  # pragma: no cover - defensive background runtime
+                fail_job(
+                    job_id,
+                    str(exc),
+                    category="worker",
+                    code="job_runtime_exception",
+                    stacktrace="".join(traceback.format_exception(exc)),
+                    retryable=True,
+                )
+    finally:
+        with _job_worker_lock:
+            _job_worker_thread = None
 
 
 def load_self_healing_history(limit: int = SELF_HEALING_HISTORY_LIMIT) -> list[dict[str, object]]:
@@ -4161,6 +4792,22 @@ def _build_release_recent_failures(history: list[dict[str, object]], limit: int 
 
 def _build_release_queue(history: list[dict[str, object]], active_runs: dict[str, dict[str, object]]) -> list[dict[str, object]]:
     queue: list[dict[str, object]] = []
+    for job in list_jobs(limit=20, statuses={"queued", "running", "retry", "pending"}):
+        payload = as_dict(job.get("payload"))
+        queue.append({
+            "jobId": str(job.get("jobId") or ""),
+            "runId": str(job.get("jobId") or payload.get("runId") or ""),
+            "label": str(job.get("label") or payload.get("suiteId") or payload.get("action") or "Job"),
+            "status": str(job.get("status") or "queued"),
+            "type": str(job.get("type") or "system"),
+            "priority": int(job.get("priority") or 50),
+            "retryCount": int(job.get("retryCount") or 0),
+            "startedAt": str(job.get("startedAt") or ""),
+            "createdAt": str(job.get("createdAt") or ""),
+        })
+    if queue:
+        return queue[:10]
+
     for run in active_runs.values():
         queue.append({
             "runId": str(run.get("runId") or run.get("run_id") or ""),
@@ -4168,21 +4815,6 @@ def _build_release_queue(history: list[dict[str, object]], active_runs: dict[str
             "status": str(run.get("status") or "queued"),
             "type": _infer_suite_run_type(run),
             "startedAt": str(run.get("startedAt") or run.get("started_at") or ""),
-        })
-
-    for run in history:
-        lifecycle = _normalize_lifecycle_status(run)
-        if lifecycle not in {"queued", "running", "pending"}:
-            continue
-        run_id = str(run.get("runId") or run.get("run_id") or "")
-        if any(str(item.get("runId") or "") == run_id for item in queue):
-            continue
-        queue.append({
-            "runId": run_id,
-            "label": str(run.get("suiteId") or run.get("suite_id") or run.get("type") or "QA-Lauf"),
-            "status": lifecycle,
-            "type": _infer_suite_run_type(run),
-            "startedAt": str(run.get("startedAt") or run.get("started_at") or run.get("timestamp") or ""),
         })
     return queue[:10]
 
@@ -4217,14 +4849,18 @@ def build_qa_release_workspace() -> dict[str, object]:
     blockers = _build_release_workspace_blockers(testing_register)
     recent_failures = _build_release_recent_failures(suite_history)
     queue = _build_release_queue(suite_history, active_runs)
+    jobs = list_jobs(limit=12)
+    errors = list_operator_errors(limit=8)
+    agent_core = get_agent_core_status()
     summary = {
         "blockingCount": len(blockers),
         "staleEvidenceCount": sum(1 for item in blockers if bool(item.get("staleEvidence"))),
         "runningJobs": sum(1 for item in queue if str(item.get("status") or "") in {"running", "pending"}),
         "queuedJobs": sum(1 for item in queue if str(item.get("status") or "") == "queued"),
+        "failedJobs": sum(1 for item in jobs if str(item.get("status") or "") == "failed"),
         "activeEmulators": int(emulator_lab.get("summary", {}).get("runningCount") or 0),
         "busyReservations": int(emulator_lab.get("summary", {}).get("busyReservationCount") or 0),
-        "activeAgents": len(cast(list[dict[str, object]], self_healing.get("agentActivities") or [])) or 5,
+        "activeAgents": len(cast(list[dict[str, object]], agent_core.get("agents") or [])) or 3,
         "criticalIssues": sum(1 for item in cast(list[dict[str, object]], self_healing.get("pendingFixes") or []) if str(item.get("severity") or "").upper() in {"HIGH", "CRITICAL"}),
         "systemHealth": str(self_healing.get("systemHealth") or "OK"),
         "latestAutomationAction": str(cast(list[dict[str, object]], self_healing.get("agentActivities") or [{}])[0].get("action") or "Keine Agentenaktivität"),
@@ -4318,8 +4954,11 @@ def build_qa_release_workspace() -> dict[str, object]:
         "blockers": blockers[:20],
         "recentFailures": recent_failures,
         "queue": queue,
+        "jobs": jobs,
+        "errors": errors,
         "health": self_healing,
         "emulators": emulator_lab,
+        "agentCore": agent_core,
         "agentWorkspace": {
             "status": "completed",
             "runId": f"workspace-{uuid4().hex[:8]}",
@@ -4403,12 +5042,19 @@ def start_suite_run(suite_id: str, strict_skips: bool = False) -> dict[str, obje
             "error": None,
         }
 
-    thread = threading.Thread(
-        target=_run_suite_background,
-        args=(run_id, suite_id, strict_skips),
-        daemon=True,
+    create_job(
+        explicit_job_id=run_id,
+        job_type="test",
+        payload={
+            "action": "suite-run",
+            "suiteId": suite_id,
+            "strictSkips": strict_skips,
+        },
+        label=suite_id,
+        priority=40,
+        max_retries=1,
     )
-    thread.start()
+    enqueue_job(run_id)
 
     return {"runId": run_id, "suiteId": suite_id, "status": "queued"}
 
@@ -5029,6 +5675,23 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/qa/release-workspace":
             return self._write_json(HTTPStatus.OK, build_qa_release_workspace())
 
+        if parsed.path == "/api/jobs":
+            query = parse_qs(parsed.query)
+            limit = parse_int(query.get("limit", [25])[0], 25, min_value=1, max_value=200)
+            statuses = {str(item).strip() for item in ",".join(query.get("status", [])).split(",") if str(item).strip()}
+            job_types = {str(item).strip() for item in ",".join(query.get("type", [])).split(",") if str(item).strip()}
+            jobs = list_jobs(limit=limit, statuses=statuses or None, job_types=job_types or None)
+            return self._write_json(HTTPStatus.OK, {"jobs": jobs, "count": len(jobs)})
+
+        if parsed.path == "/api/jobs/errors":
+            query = parse_qs(parsed.query)
+            limit = parse_int(query.get("limit", [JOB_ERROR_LIMIT])[0], JOB_ERROR_LIMIT, min_value=1, max_value=200)
+            errors = list_operator_errors(limit=limit)
+            return self._write_json(HTTPStatus.OK, {"errors": errors, "count": len(errors)})
+
+        if parsed.path == "/api/agents/status":
+            return self._write_json(HTTPStatus.OK, get_agent_core_status())
+
         if parsed.path == "/api/qa/emulators/running":
             running = list_running_emulators()
             return self._write_json(HTTPStatus.OK, {"runningEmulators": running, "count": len(running)})
@@ -5103,6 +5766,15 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
             return self._write_json(HTTPStatus.OK, status)
 
+        if parsed.path.startswith("/api/jobs/"):
+            job_id = parsed.path.split("/api/jobs/", 1)[1].strip("/")
+            if job_id in {"", "errors"}:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Job nicht gefunden."})
+            job = get_job_by_id(job_id)
+            if job is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Job nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, job)
+
         return super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
@@ -5127,6 +5799,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_android_automation_sweep()
         if parsed.path == "/api/qa/self-healing/run":
             return self._handle_run_self_healing_cycle()
+        if parsed.path == "/api/jobs/retry":
+            return self._handle_retry_job()
+        if parsed.path == "/api/jobs/cancel":
+            return self._handle_cancel_job()
+        if parsed.path == "/api/agents/run":
+            return self._handle_run_agent_analysis()
         if parsed.path == "/api/qa/emulators/reservations":
             return self._handle_create_emulator_reservation()
         if parsed.path == "/api/qa/emulators/start":
@@ -5256,11 +5934,15 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "result": None,
                     "error": None,
                 }
-
-            thread = threading.Thread(
-                target=_run_usb_test_background, args=(run_id, kwargs), daemon=True,
+            create_job(
+                explicit_job_id=run_id,
+                job_type="test",
+                payload={"action": "usb-test", "kwargs": kwargs},
+                label=f"USB {app_id}",
+                priority=30,
+                max_retries=1,
             )
-            thread.start()
+            enqueue_job(run_id)
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
@@ -5308,11 +5990,15 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "result": None,
                     "error": None,
                 }
-
-            thread = threading.Thread(
-                target=_run_dual_device_background, args=(run_id, kwargs), daemon=True,
+            create_job(
+                explicit_job_id=run_id,
+                job_type="test",
+                payload={"action": "dual-device", "kwargs": kwargs},
+                label=str(kwargs["scenario_id"] or "dual-device"),
+                priority=20,
+                max_retries=1,
             )
-            thread.start()
+            enqueue_job(run_id)
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
@@ -5392,11 +6078,15 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "result": None,
                     "error": None,
                 }
-
-            thread = threading.Thread(
-                target=_run_android_compatibility_background, args=(run_id, kwargs), daemon=True,
+            create_job(
+                explicit_job_id=run_id,
+                job_type="test",
+                payload={"action": "android-compatibility", "kwargs": kwargs},
+                label=f"Android-Kompatibilität {execution_mode}",
+                priority=25,
+                max_retries=1,
             )
-            thread.start()
+            enqueue_job(run_id)
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
@@ -5445,11 +6135,15 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "result": None,
                     "error": None,
                 }
-
-            thread = threading.Thread(
-                target=_run_android_automation_sweep_background, args=(run_id, kwargs), daemon=True,
+            create_job(
+                explicit_job_id=run_id,
+                job_type="test",
+                payload={"action": "android-automation-sweep", "kwargs": kwargs},
+                label="Android-Automation-Sweep",
+                priority=15,
+                max_retries=1,
             )
-            thread.start()
+            enqueue_job(run_id)
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
@@ -5467,18 +6161,25 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
     def _handle_create_emulator_reservation(self) -> None:
         try:
             payload = self._read_json_body()
-            reservation = create_emulator_reservation(
-                str(payload.get("profileId") or "").strip(),
-                str(payload.get("androidVersion") or "").strip(),
-                owner=str(payload.get("owner") or "").strip(),
-                purpose=str(payload.get("purpose") or "").strip(),
-                ttl_minutes=parse_int(payload.get("ttlMinutes"), default=120, min_value=15, max_value=1440),
+            job = create_job(
+                job_type="emulator",
+                payload={
+                    "action": "emulator-reservation",
+                    "profileId": str(payload.get("profileId") or "").strip(),
+                    "androidVersion": str(payload.get("androidVersion") or "").strip(),
+                    "owner": str(payload.get("owner") or "").strip(),
+                    "purpose": str(payload.get("purpose") or "").strip(),
+                    "ttlMinutes": parse_int(payload.get("ttlMinutes"), default=120, min_value=15, max_value=1440),
+                },
+                label="Emulator-Reservierung",
+                priority=35,
             )
+            enqueue_job(str(job.get("jobId") or ""))
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-        return self._write_json(HTTPStatus.OK, reservation)
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _handle_release_emulator_reservation(self) -> None:
         try:
@@ -5486,53 +6187,117 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             reservation_id = str(payload.get("reservationId") or "").strip()
             if not reservation_id:
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "reservationId fehlt."})
-            released = release_emulator_reservation(reservation_id)
+            job = create_job(
+                job_type="emulator",
+                payload={"action": "emulator-release", "reservationId": reservation_id},
+                label=f"Reservierung {reservation_id}",
+                priority=30,
+            )
+            enqueue_job(str(job.get("jobId") or ""))
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-        if not released:
-            return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Reservierung nicht gefunden."})
-        return self._write_json(HTTPStatus.OK, {"released": True, "reservationId": reservation_id})
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _handle_start_emulator(self) -> None:
         try:
             payload = self._read_json_body()
-            result = start_emulator(
-                str(payload.get("avdName") or "").strip(),
-                headless=bool_from_payload(payload.get("headless"), default=True),
-                wipe_data=bool_from_payload(payload.get("wipeData"), default=False),
-                no_snapshot=bool_from_payload(payload.get("noSnapshot"), default=True),
+            job = create_job(
+                job_type="emulator",
+                payload={
+                    "action": "emulator-start",
+                    "avdName": str(payload.get("avdName") or "").strip(),
+                    "headless": bool_from_payload(payload.get("headless"), default=True),
+                    "wipeData": bool_from_payload(payload.get("wipeData"), default=False),
+                    "noSnapshot": bool_from_payload(payload.get("noSnapshot"), default=True),
+                },
+                label=str(payload.get("avdName") or "Emulator starten"),
+                priority=20,
             )
+            enqueue_job(str(job.get("jobId") or ""))
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-        return self._write_json(HTTPStatus.OK, result)
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _handle_create_emulator_avd(self) -> None:
         try:
             payload = self._read_json_body()
-            result = create_emulator_avd(
-                str(payload.get("avdName") or "").strip(),
-                profile_id=str(payload.get("profileId") or "").strip(),
-                android_version=str(payload.get("androidVersion") or "").strip(),
+            job = create_job(
+                job_type="emulator",
+                payload={
+                    "action": "emulator-create-avd",
+                    "avdName": str(payload.get("avdName") or "").strip(),
+                    "profileId": str(payload.get("profileId") or "").strip(),
+                    "androidVersion": str(payload.get("androidVersion") or "").strip(),
+                },
+                label=str(payload.get("avdName") or "AVD erstellen"),
+                priority=30,
             )
+            enqueue_job(str(job.get("jobId") or ""))
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-        return self._write_json(HTTPStatus.OK, result)
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _handle_stop_emulator(self) -> None:
         try:
             payload = self._read_json_body()
-            result = stop_emulator(str(payload.get("serial") or "").strip())
+            job = create_job(
+                job_type="emulator",
+                payload={"action": "emulator-stop", "serial": str(payload.get("serial") or "").strip()},
+                label=str(payload.get("serial") or "Emulator stoppen"),
+                priority=20,
+            )
+            enqueue_job(str(job.get("jobId") or ""))
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-        return self._write_json(HTTPStatus.OK, result)
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
+
+    def _handle_retry_job(self) -> None:
+        try:
+            payload = self._read_json_body()
+            job = retry_job(str(payload.get("jobId") or "").strip())
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, job)
+
+    def _handle_cancel_job(self) -> None:
+        try:
+            payload = self._read_json_body()
+            job = cancel_job(str(payload.get("jobId") or "").strip())
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, job)
+
+    def _handle_run_agent_analysis(self) -> None:
+        try:
+            payload = self._read_json_body()
+            job = create_job(
+                job_type="agent",
+                payload={
+                    "action": "agent-analysis",
+                    "sourceJobId": str(payload.get("sourceJobId") or "").strip(),
+                    "sourceErrorId": str(payload.get("sourceErrorId") or "").strip(),
+                },
+                label="Agenten-Analyse",
+                priority=10,
+            )
+            enqueue_job(str(job.get("jobId") or ""))
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))

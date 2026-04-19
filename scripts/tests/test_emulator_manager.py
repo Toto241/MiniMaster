@@ -54,6 +54,22 @@ class TestReservations:
                 purpose="canary",
             )
 
+    def test_create_reservation_rejects_conflicting_active_reservation(self):
+        emulator_manager.create_reservation(
+            "dual-device-balanced",
+            "14",
+            owner="QA",
+            purpose="nightly",
+        )
+
+        with pytest.raises(ValueError, match="bereits eine aktive Reservierung"):
+            emulator_manager.create_reservation(
+                "dual-device-balanced",
+                "14",
+                owner="QA-2",
+                purpose="rerun",
+            )
+
     def test_release_reservation_removes_entry(self):
         reservation = emulator_manager.create_reservation(
             "phone-standard",
