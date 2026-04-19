@@ -1,0 +1,122 @@
+import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
+
+describe("admin-panel current QA flows", () => {
+  it("loads evidence history and updates the visible dependent QA views", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
+    elements.set("python-automation-protocol-history", historyEl);
+    elements.set("qa-refresh-status", refreshEl);
+
+    context.renderPythonAutomationOverview = jest.fn();
+    context.renderPythonAutomationCatalog = jest.fn();
+    context.renderQaTestWorkspace = jest.fn();
+    context.renderPythonAutomationProtocolEditor = jest.fn();
+    context.rerenderTestingRegisterFromCache = jest.fn();
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        entries: [
+          {
+            createdAt: "2026-04-07T13:00:00Z",
+            testId: "ios-xctest-parent",
+            testTitle: "iOS XCTest Parent",
+            status: "pass",
+            operator: "qa-operator",
+            evidenceRef: "EVID-777",
+          },
+        ],
+        latestByTestId: {
+          "ios-xctest-parent": { status: "pass", evidenceRef: "EVID-777" },
+        },
+      }),
+    });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.resetQaRefreshStateForTests();
+    const result = await exports.loadPythonAutomationEvidenceHistory();
+
+    expect(result).toMatchObject({ ok: true, message: "1 Nachweise geladen." });
+    expect(historyEl.innerHTML).toContain("EVID-777");
+    expect(context.renderPythonAutomationOverview).toHaveBeenCalled();
+    expect(context.renderPythonAutomationCatalog).toHaveBeenCalled();
+    expect(context.renderQaTestWorkspace).toHaveBeenCalled();
+    expect(context.renderPythonAutomationProtocolEditor).toHaveBeenCalled();
+    expect(context.rerenderTestingRegisterFromCache).toHaveBeenCalled();
+    expect(refreshEl.innerHTML).toContain("Nachweise geladen");
+  });
+
+  it("keeps the QA dashboard orchestration at five core loaders", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const loaders = exports.getQaDashboardSectionLoaders();
+
+    expect(loaders).toHaveLength(5);
+    expect(loaders.map((entry: [string, unknown]) => entry[0])).toEqual([
+      "catalog",
+      "history",
+      "evidence",
+      "register",
+      "suiteHistory",
+    ]);
+  });
+
+  it("loads suite history together with guide data and refreshes guide plus workspace", async () => {
+    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    const refreshEl = context.document.createElement("div");
+    elements.set("suite-run-history", historyEl);
+    elements.set("qa-refresh-status", refreshEl);
+
+    context.renderQaExecutionGuide = jest.fn();
+    context.renderQaTestWorkspace = jest.fn();
+    context.loadTestingRegister = jest.fn();
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          runs: [
+            {
+              runId: "run-1",
+              suiteId: "android-unit-master",
+              status: "finished",
+              startedAt: "2026-04-19T10:00:00Z",
+              result: { status: "passed" },
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          suites: [
+            {
+              suiteId: "android-unit-master",
+              title: "Android Unit Master",
+              group: "android",
+              prereqsMet: true,
+            },
+          ],
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    const result = await exports.loadSuiteRunHistory();
+
+    expect(result).toMatchObject({ ok: true, message: "1 Suite-Läufe geladen." });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/suites/history");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/suites", {
+      headers: { Accept: "application/json" },
+    });
+    expect(context.renderQaExecutionGuide).toHaveBeenCalled();
+    expect(context.renderQaTestWorkspace).toHaveBeenCalled();
+    expect(historyEl.innerHTML).toContain("android-unit-master");
+    expect(refreshEl.innerHTML).toContain("Suite-Läufe geladen");
+  });
+});

@@ -29,10 +29,7 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "renderPythonAutomationHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadPythonAutomationHistory")).not.toContain("historyEl.innerHTML");
     expect(extractFunctionBody(source, "loadPythonAutomationEvidenceHistory")).not.toContain("historyEl.innerHTML");
-    expect(extractFunctionBody(source, "renderQaArtifactsOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "loadSuiteRunHistory")).not.toContain("historyEl.innerHTML = \"<div class='info'>");
-    expect(extractFunctionBody(source, "renderQaPlatformOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
-    expect(extractFunctionBody(source, "renderEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "renderTestingRegisterOverview")).not.toContain("overviewEl.innerHTML = \"<div class='info'>Noch kein Testregister geladen.");
     expect(extractFunctionBody(source, "renderTestingRegisterStorage")).not.toContain("storageEl.innerHTML = \"<div class='info'>Speicherorte werden nach dem Laden des Registers angezeigt.");
     expect(extractFunctionBody(source, "renderTestingRegisterList")).not.toContain("automaticListEl.innerHTML = emptyHtml");
@@ -41,11 +38,6 @@ describe("admin-panel app security regressions", () => {
     expect(extractFunctionBody(source, "renderTestingRegisterList")).not.toContain("manualListEl.innerHTML = emptyFilterHtml");
     expect(extractFunctionBody(source, "loadTestingRegister")).not.toContain("automaticListEl.innerHTML = loadingHtml");
     expect(extractFunctionBody(source, "loadTestingRegister")).not.toContain("manualListEl.innerHTML = loadingHtml");
-    expect(extractFunctionBody(source, "loadQaPlatformCatalog")).not.toContain("el.innerHTML = \"<div class='loading'>");
-    expect(extractFunctionBody(source, "loadEmulatorLabOverview")).not.toContain("el.innerHTML = \"<div class='loading'>");
-    expect(extractFunctionBody(source, "loadSuiteDeviceStatus")).not.toContain("el.innerHTML = \"<div class='info'>");
-    expect(extractFunctionBody(source, "loadSuiteCatalog")).not.toContain("el.innerHTML = \"<div class='info'>");
-    expect(extractFunctionBody(source, "renderSuiteCatalog")).not.toContain("el.innerHTML = \"<div class='info'>");
     expect(extractFunctionBody(source, "showBootstrapImportPreview")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "cancelBootstrapImportPreview")).not.toContain("innerHTML");
     expect(extractFunctionBody(source, "confirmBootstrapImportPreview")).not.toContain("innerHTML");

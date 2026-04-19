@@ -31,7 +31,6 @@ import "./tabs/commissioning-qa.js";
 import "./tabs/python-automation-actions.js";
 import "./tabs/testing-register-insights.js";
 import "./tabs/testing-register-priorities.js";
-import "./tabs/qa-release-workspace.js";
 
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {

@@ -221,19 +221,10 @@ let pythonEvidenceFilterStatus = "";
 let pythonEvidenceFilterTestId = "";
 let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
-let qaPlatformCatalogPayload = null;
-let emulatorLabPayload = null;
 let suiteCatalogPayload = [];
 let suiteRunHistoryPayload = [];
-let qaArtifactSelectedRunId = "";
-let qaArtifactScenarioFilter = "";
-let qaCompatibilitySelectedRunId = "";
-let qaCompatibilityModeFilter = "all";
-let qaReleaseWorkspacePayload = null;
-let qaReleaseSelectedBlockerId = "";
 let qaDashboardLoadPromise = null;
-let qaSelfHealingPayload = null;
-let qaSelfHealingPollHandle = null;
+let qaTestWorkspaceSelection = { kind: "", id: "" };
 let qaRefreshState = {
     lastStartedAt: "",
     lastCompletedAt: "",
@@ -247,12 +238,7 @@ const qaRefreshSectionLabels = {
     history: "Laufhistorie",
     evidence: "Nachweise",
     register: "Testregister",
-    releaseWorkspace: "Release Workspace",
-    qaPlatform: "QA-Plattform",
-    emulators: "Emulator-Labor",
-    suites: "Suite-Katalog",
-    suiteHistory: "Suite-Historie",
-    devices: "Gerätestatus",
+    suiteHistory: "Suite-Verlauf",
 };
 
 const setupChecklistItems = [
@@ -514,8 +500,8 @@ function createQaRuntimeBanner(isOperatorMode) {
 
     const description = document.createElement("span");
     description.textContent = isOperatorMode
-        ? " QA-Register, Suite-Läufe, Emulator-Labor und Artefakte können vollständig geladen und ausgeführt werden."
-        : " Ohne Python-Operator sind laufzeitabhängige QA-Bereiche nur eingeschränkt verfügbar. Sichtbar bleiben Dokumentation, Zusammenfassungen und bereits geladene Zustände.";
+        ? " Testregister, Python-Läufe, Suite-Verlauf und Fehlerdetails können vollständig geladen und ausgewertet werden."
+        : " Ohne Python-Operator sind laufzeitabhängige Testdaten nur eingeschränkt verfügbar. Sichtbar bleiben Dokumentation, Zusammenfassungen und bereits geladene Zustände.";
     banner.appendChild(description);
 
     return banner;
@@ -663,14 +649,8 @@ function getQaDashboardSectionLoaders() {
         ["catalog", loadPythonAutomationCatalog],
         ["history", loadPythonAutomationHistory],
         ["evidence", loadPythonAutomationEvidenceHistory],
-        ["selfHealing", () => loadQaSelfHealingStatus()],
         ["register", loadTestingRegister],
-        ["releaseWorkspace", loadQaReleaseWorkspace],
-        ["qaPlatform", loadQaPlatformCatalog],
-        ["emulators", loadEmulatorLabOverview],
-        ["suites", loadSuiteCatalog],
         ["suiteHistory", loadSuiteRunHistory],
-        ["devices", loadSuiteDeviceStatus],
     ];
 }
 
@@ -1026,59 +1006,8 @@ function getLatestSuiteRunIndex(runs = suiteRunHistoryPayload) {
     return index;
 }
 
-function getTestingRegisterItemById(itemId, payload = testingRegisterPayload) {
-    return (Array.isArray(payload?.items) ? payload.items : []).find(item => String(item?.id || "") === String(itemId || "")) || null;
-}
-
-function getSuiteCatalogExecutionStatus(item) {
-    if (String(item?.executionMode || "") === "external-evidence") {
-        const registerItem = getTestingRegisterItemById(getSuiteCatalogItemId(item));
-        if (registerItem) {
-            const status = String(registerItem.status || "not_run");
-            if (status === "pass") {
-                return {
-                    state: "ok",
-                    label: "OK",
-                    detail: String(registerItem.details || "Externer Nachweis protokolliert"),
-                };
-            }
-            if (status === "fail") {
-                return {
-                    state: "fail",
-                    label: "FAIL",
-                    detail: String(registerItem.details || "Externer Nachweis fehlgeschlagen"),
-                };
-            }
-            return {
-                state: "open",
-                label: "OPEN",
-                detail: String(registerItem.details || item?.prereqReason || "Externer Lauf noch nicht protokolliert"),
-            };
-        }
-
-        return {
-            state: "open",
-            label: "OPEN",
-            detail: getSuiteCatalogItemReason(item) || "Externer Lauf noch nicht protokolliert",
-        };
-    }
-
-    if (!getSuiteCatalogItemReady(item)) {
-        return {
-            state: "fail",
-            label: "FAIL",
-            detail: getSuiteCatalogItemReason(item) || "Voraussetzungen aktuell nicht erfüllt",
-        };
-    }
-    const suiteId = getSuiteCatalogItemId(item);
-    const latestRun = getLatestSuiteRunIndex().get(suiteId);
-    return normalizeSuiteExecutionState(latestRun);
-}
-
-function rerenderSuiteCatalogFromCache() {
-    if (Array.isArray(suiteCatalogPayload) && suiteCatalogPayload.length > 0) {
-        renderSuiteCatalog(suiteCatalogPayload);
-    }
+function rerenderQaExecutionGuideFromCache() {
+    renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
 }
 
 function formatPythonAutomationType(type, source = "") {
@@ -1807,6 +1736,7 @@ function renderPythonAutomationResult(run) {
 
     if (!run) {
         replaceElementWithState(resultEl, "info", "Noch kein Python-Automationslauf ausgeführt.");
+        renderQaTestWorkspace();
         return;
     }
 
@@ -2088,6 +2018,7 @@ function renderPythonAutomationResult(run) {
         </section>
 
     `;
+    renderQaTestWorkspace();
 }
 
 function mergePythonPendingIntoCommissioning(run) {
@@ -2227,6 +2158,7 @@ function renderPythonAutomationHistory(runs) {
             renderPythonAutomationOverview(pythonCommissioningCatalog, null);
             renderPythonAutomationCatalog(pythonCommissioningCatalog, null);
         }
+        renderQaTestWorkspace();
         return;
     }
 
@@ -2250,6 +2182,7 @@ function renderPythonAutomationHistory(runs) {
 
     if (filteredRuns.length === 0) {
         replaceElementWithState(historyEl, "info", "Keine Läufe passen auf die aktuellen Filter.");
+        renderQaTestWorkspace();
         return;
     }
 
@@ -2291,6 +2224,7 @@ function renderPythonAutomationHistory(runs) {
             ${cards}
         </div>
     `;
+    renderQaTestWorkspace();
 }
 
 function showPythonAutomationHistoryRun(index) {
@@ -2301,6 +2235,7 @@ function showPythonAutomationHistoryRun(index) {
     }
     pythonCommissioningLastRun = selected;
     renderPythonAutomationResult(selected);
+    renderQaTestWorkspace();
     showNotification("Historienlauf geladen: " + (selected.runId || "-"), "info");
 }
 
@@ -2310,6 +2245,7 @@ async function loadPythonAutomationHistory() {
 
     if (!isPythonOperator) {
         replaceElementWithState(historyEl, "info", "Historie ist nur im Python-Operator verfügbar.");
+        renderQaTestWorkspace();
         setQaRefreshSectionState("history", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
@@ -2334,6 +2270,7 @@ async function loadPythonAutomationHistory() {
         return { ok: true, message: `${runs.length} Lauf/Läufe geladen.` };
     } catch (error) {
         replaceElementWithState(historyEl, "error", `Historie konnte nicht geladen werden: ${error.message}`);
+        renderQaTestWorkspace();
         setQaRefreshSectionState("history", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }
@@ -2348,6 +2285,7 @@ function renderPythonAutomationEvidenceHistory(entries) {
             ${buildPythonEvidenceFilterToolbar([])}
             <div class='info'>Noch keine manuellen Nachweise protokolliert.</div>
         `;
+        renderQaTestWorkspace();
         return;
     }
 
@@ -2407,6 +2345,7 @@ function renderPythonAutomationEvidenceHistory(entries) {
             </div>
         ` : "<div class='info'>Keine Nachweise entsprechen dem aktuellen Filter.</div>"}
     `;
+    renderQaTestWorkspace();
 }
 
 function buildPythonEvidenceFilterToolbar(entries) {
@@ -2463,6 +2402,7 @@ async function loadPythonAutomationEvidenceHistory() {
 
     if (!isPythonOperator) {
         replaceElementWithState(historyEl, "info", "Nachweis-Historie ist nur im Python-Operator verfuegbar.");
+        renderQaTestWorkspace();
         setQaRefreshSectionState("evidence", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
@@ -2481,13 +2421,14 @@ async function loadPythonAutomationEvidenceHistory() {
         renderPythonAutomationOverview(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationCatalog(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
-        renderQaArtifactsOverview();
+        renderQaTestWorkspace();
         renderPythonAutomationProtocolEditor();
         rerenderTestingRegisterFromCache();
         setQaRefreshSectionState("evidence", "success", `${pythonCommissioningEvidenceHistory.length} Nachweise geladen`);
         return { ok: true, message: `${pythonCommissioningEvidenceHistory.length} Nachweise geladen.` };
     } catch (error) {
         replaceElementWithState(historyEl, "error", `Nachweis-Historie konnte nicht geladen werden: ${error.message}`);
+        renderQaTestWorkspace();
         setQaRefreshSectionState("evidence", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }
@@ -2534,918 +2475,516 @@ async function refreshQaDashboard() {
     await loadQaDashboardData("manueller Refresh");
 }
 
-function getLatestDualDeviceRun() {
-    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).find(run => {
-        const type = String(run?.type || "");
-        const suiteId = String(run?.suiteId || run?.suite_id || "");
-        return type === "dual-device" || suiteId === "dual-device";
-    }) || null;
+/**
+ * @typedef {Object} QaTestWorkspaceItem
+ * @property {string} id
+ * @property {string} kind
+ * @property {string} title
+ * @property {string} status
+ * @property {string} statusLabel
+ * @property {string} statusClassName
+ * @property {string} sourceLabel
+ * @property {string} summary
+ * @property {string} detail
+ * @property {string} updatedAt
+ * @property {string} primaryActionLabel
+ * @property {string} secondaryActionLabel
+ * @property {string} secondaryAction
+ * @property {number} priority
+ * @property {*} raw
+ */
+
+function getQaWorkspaceTimestampValue(value) {
+    const parsed = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getQaReleaseWorkspaceModule() {
-    return window.MM && window.MM.qaReleaseWorkspace ? window.MM.qaReleaseWorkspace : null;
+function buildQaTestWorkspaceMeta(label, value) {
+    if (!value) return "";
+    return `<div class='qa-test-detail-meta-item'><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
-function buildQaReleaseWorkspaceViewModel(payload = qaReleaseWorkspacePayload) {
-    const module = getQaReleaseWorkspaceModule();
-    if (module && typeof module.buildViewModel === "function") {
-        return module.buildViewModel(payload);
+function getQaTestWorkspaceSelectionKey(kind, id) {
+    return `${String(kind || "")}::${String(id || "")}`;
+}
+
+function buildQaTestWorkspaceRunItems() {
+    /** @type {QaTestWorkspaceItem[]} */
+    const items = [];
+    const seen = new Set();
+    const pythonRuns = [];
+
+    if (pythonCommissioningLastRun?.runId) {
+        pythonRuns.push(pythonCommissioningLastRun);
+    }
+    if (Array.isArray(pythonCommissioningHistoryRuns)) {
+        pythonCommissioningHistoryRuns.forEach(run => pythonRuns.push(run));
     }
 
-    const blockers = Array.isArray(payload?.blockers) ? payload.blockers : [];
-    return {
-        generatedAt: String(payload?.generatedAt || ""),
-        blockers,
-        recentFailures: Array.isArray(payload?.recentFailures) ? payload.recentFailures : [],
-        queue: Array.isArray(payload?.queue) ? payload.queue : [],
-        agents: Array.isArray(payload?.agentWorkspace?.agents) ? payload.agentWorkspace.agents : [],
-        synthesis: payload?.agentWorkspace?.synthesis || null,
-        health: payload?.health || {},
-        emulators: payload?.emulators || {},
-        metrics: [
-            { id: "release-blockers", label: "Release-Blocker", value: Number(payload?.summary?.blockingCount || blockers.length || 0), tone: "warning" },
-        ],
+    pythonRuns.forEach(run => {
+        const runId = String(run?.runId || "").trim();
+        if (!runId || seen.has(`commissioning:${runId}`)) return;
+        seen.add(`commissioning:${runId}`);
+        const counts = run?.evaluation?.statusCounts || {};
+        const status = String(run?.overall || "not_run");
+        const statusMeta = getPythonAutomationStatusMeta(status);
+        items.push({
+            id: runId,
+            kind: "commissioning-run",
+            title: `Python-Commissioning ${runId}`,
+            status,
+            statusLabel: formatPythonAutomationStatus(status),
+            statusClassName: statusMeta.className,
+            sourceLabel: "Python-Commissioning",
+            summary: `${Number(counts.fail || 0)} fehlgeschlagen · ${Number(counts.manual_required || 0)} offen · ${Number(counts.pass || 0)} bestanden`,
+            detail: String(run?.pending?.[0]?.details || run?.evaluation?.checks?.find(item => item?.status === "fail")?.details || "Kein Fehlerdetail hinterlegt."),
+            updatedAt: String(run?.finishedAt || run?.startedAt || ""),
+            primaryActionLabel: "Im Ergebnisbereich öffnen",
+            secondaryActionLabel: "Zum Python-Lauf",
+            secondaryAction: "scrollQaSection('qa-python-run-card')",
+            priority: status === "fail" ? 0 : status === "manual_required" ? 1 : 4,
+            raw: run,
+        });
+    });
+
+    (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).forEach(run => {
+        const runId = String(run?.runId || run?.run_id || "").trim();
+        if (!runId || seen.has(`suite:${runId}`)) return;
+        seen.add(`suite:${runId}`);
+        const statusMeta = getSuiteRunStatusMeta(run);
+        const resultStatus = String(run?.result?.status || run?.result?.overall_status || run?.status || "").toLowerCase();
+        items.push({
+            id: runId,
+            kind: "suite-run",
+            title: formatSuiteHistoryTitle(run),
+            status: resultStatus || String(run?.status || "not_run"),
+            statusLabel: statusMeta.label,
+            statusClassName: statusMeta.className,
+            sourceLabel: "Suite-Verlauf",
+            summary: formatSuiteHistoryMeta(run) || "Kein zusätzlicher Verlauf vorhanden.",
+            detail: String(run?.lastEvent?.message || run?.currentPhase || run?.result?.reason || run?.result?.error || run?.error || "Kein Fehlerdetail hinterlegt."),
+            updatedAt: String(run?.finishedAt || run?.startedAt || run?.started_at || run?.timestamp || ""),
+            primaryActionLabel: "Details anzeigen",
+            secondaryActionLabel: "Suite-Verlauf neu laden",
+            secondaryAction: "loadSuiteRunHistory()",
+            priority: statusMeta.className === "python-status-fail" ? 1 : statusMeta.className === "python-status-running" ? 2 : 5,
+            raw: run,
+        });
+    });
+
+    return items.sort((left, right) => {
+        const priorityDelta = left.priority - right.priority;
+        if (priorityDelta !== 0) return priorityDelta;
+        return getQaWorkspaceTimestampValue(right.updatedAt) - getQaWorkspaceTimestampValue(left.updatedAt);
+    }).slice(0, 12);
+}
+
+function buildQaTestWorkspaceFailureItems() {
+    /** @type {QaTestWorkspaceItem[]} */
+    const failures = [];
+    const registerItems = Array.isArray(testingRegisterPayload?.items) ? testingRegisterPayload.items : [];
+    registerItems.forEach(item => {
+        const status = String(item?.status || "not_run");
+        const include = status === "fail" || status === "manual_required" || (status === "not_run" && isTestingRegisterReleaseBlockerOpen(item));
+        if (!include) return;
+        const statusMeta = getPythonAutomationStatusMeta(status === "not_run" ? "manual_required" : status);
+        failures.push({
+            id: String(item?.id || ""),
+            kind: "register-item",
+            title: String(item?.title || item?.id || "Offener Registereintrag"),
+            status,
+            statusLabel: formatPythonAutomationStatus(status),
+            statusClassName: statusMeta.className,
+            sourceLabel: `Testregister · ${formatTestingRegisterGroupTitle(item)}`,
+            summary: buildTestingRegisterExecutionPath(item),
+            detail: buildTestingRegisterDetailText(item) || "Keine zusätzlichen Details vorhanden.",
+            updatedAt: String(item?.updatedAt || ""),
+            primaryActionLabel: String(item?.action || "") === "protocol" ? "Nachweis öffnen" : String(item?.action || "") === "suite-run" ? "Suite-Aktion prüfen" : "Commissioning-Lauf prüfen",
+            secondaryActionLabel: "Im Register anzeigen",
+            secondaryAction: "scrollQaSection('qa-register-card')",
+            priority: status === "fail" ? 0 : status === "manual_required" ? 1 : 2,
+            raw: item,
+        });
+    });
+
+    const activeRun = pythonCommissioningLastRun;
+    if (activeRun) {
+        const runId = String(activeRun?.runId || "aktueller-lauf");
+        const checks = Array.isArray(activeRun?.evaluation?.checks) ? activeRun.evaluation.checks : [];
+        checks.forEach((item, index) => {
+            const status = String(item?.status || "not_run");
+            if (!(status === "fail" || status === "manual_required")) return;
+            const statusMeta = getPythonAutomationStatusMeta(status);
+            failures.push({
+                id: `${runId}:check:${index}`,
+                kind: "python-check",
+                title: String(item?.title || `Check ${index + 1}`),
+                status,
+                statusLabel: formatPythonAutomationStatus(status),
+                statusClassName: statusMeta.className,
+                sourceLabel: `Python-Lauf ${runId}`,
+                summary: "Automatischer Prüfschritt aus dem aktuellen Lauf",
+                detail: String(item?.details || "Kein Fehlerdetail hinterlegt."),
+                updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
+                primaryActionLabel: "Im Ergebnisbereich öffnen",
+                secondaryActionLabel: "Zum Python-Lauf",
+                secondaryAction: "scrollQaSection('qa-python-run-card')",
+                priority: status === "fail" ? 0 : 1,
+                raw: { run: activeRun, item },
+            });
+        });
+
+        const pending = Array.isArray(activeRun?.pending) ? activeRun.pending : [];
+        pending.forEach((item, index) => {
+            const status = String(item?.status || "manual_required");
+            if (!(status === "fail" || status === "manual_required")) return;
+            const statusMeta = getPythonAutomationStatusMeta(status);
+            failures.push({
+                id: `${runId}:pending:${index}`,
+                kind: "python-pending",
+                title: String(item?.title || `Offener Punkt ${index + 1}`),
+                status,
+                statusLabel: formatPythonAutomationStatus(status),
+                statusClassName: statusMeta.className,
+                sourceLabel: `Python-Lauf ${runId}`,
+                summary: "Manueller Folgepunkt aus dem aktuellen Lauf",
+                detail: String(item?.details || "Kein Fehlerdetail hinterlegt."),
+                updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
+                primaryActionLabel: "Im Ergebnisbereich öffnen",
+                secondaryActionLabel: "Zum Python-Lauf",
+                secondaryAction: "scrollQaSection('qa-python-run-card')",
+                priority: status === "fail" ? 0 : 1,
+                raw: { run: activeRun, item },
+            });
+        });
+
+        const commandResults = Array.isArray(activeRun?.commands?.results) ? activeRun.commands.results : [];
+        commandResults.forEach((item, index) => {
+            if (String(item?.status || "") !== "fail") return;
+            failures.push({
+                id: `${runId}:command:${index}`,
+                kind: "python-command",
+                title: String(item?.label || item?.command || `Kommando ${index + 1}`),
+                status: "fail",
+                statusLabel: "Fehlgeschlagen",
+                statusClassName: "python-status-fail",
+                sourceLabel: `Python-Lauf ${runId}`,
+                summary: String(item?.command || "Lokales Gate-Kommando"),
+                detail: String(item?.output || item?.error || "Keine Kommandoausgabe verfügbar."),
+                updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
+                primaryActionLabel: "Im Ergebnisbereich öffnen",
+                secondaryActionLabel: "Zum Python-Lauf",
+                secondaryAction: "scrollQaSection('qa-python-run-card')",
+                priority: 0,
+                raw: { run: activeRun, item },
+            });
+        });
+
+        const evidenceCoverage = activeRun?.evidenceCoverage || {};
+        const uncovered = Array.isArray(evidenceCoverage.uncovered) ? evidenceCoverage.uncovered : [];
+        uncovered.forEach((item, index) => {
+            failures.push({
+                id: `${runId}:evidence-uncovered:${index}`,
+                kind: "python-evidence",
+                title: String(item?.testTitle || item?.testId || "Fehlender Nachweis"),
+                status: "manual_required",
+                statusLabel: "Nachweis offen",
+                statusClassName: "python-status-manual_required",
+                sourceLabel: `Nachweisabdeckung · ${runId}`,
+                summary: String(item?.groupTitle || "Manueller oder dokumentierter Test"),
+                detail: "Für diesen Testfall liegt noch kein belastbarer Nachweis vor.",
+                updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
+                primaryActionLabel: "Nachweis öffnen",
+                secondaryActionLabel: "Zum Protokoll",
+                secondaryAction: "scrollQaSection('qa-protocol-card')",
+                priority: 1,
+                raw: { run: activeRun, item },
+            });
+        });
+
+        const failedEvidence = Array.isArray(evidenceCoverage.failedEvidence) ? evidenceCoverage.failedEvidence : [];
+        failedEvidence.forEach((item, index) => {
+            failures.push({
+                id: `${runId}:evidence-failed:${index}`,
+                kind: "python-evidence",
+                title: String(item?.testTitle || item?.testId || "Fehlerhafter Nachweis"),
+                status: "fail",
+                statusLabel: "Nachweis FAIL",
+                statusClassName: "python-status-fail",
+                sourceLabel: `Nachweisabdeckung · ${runId}`,
+                summary: String(item?.groupTitle || "Manueller oder dokumentierter Test"),
+                detail: String(item?.details || "Der zuletzt gespeicherte Nachweis ist negativ bewertet."),
+                updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
+                primaryActionLabel: "Nachweis öffnen",
+                secondaryActionLabel: "Zum Protokoll",
+                secondaryAction: "scrollQaSection('qa-protocol-card')",
+                priority: 0,
+                raw: { run: activeRun, item },
+            });
+        });
+    }
+
+    (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).forEach(run => {
+        const statusMeta = getSuiteRunStatusMeta(run);
+        if (statusMeta.className !== "python-status-fail") return;
+        const runId = String(run?.runId || run?.run_id || "");
+        failures.push({
+            id: runId,
+            kind: "suite-run",
+            title: formatSuiteHistoryTitle(run),
+            status: "fail",
+            statusLabel: statusMeta.label,
+            statusClassName: statusMeta.className,
+            sourceLabel: "Suite-Verlauf",
+            summary: formatSuiteHistoryMeta(run) || "Asynchroner Suite-Lauf",
+            detail: String(run?.result?.reason || run?.result?.error || run?.error || run?.lastEvent?.message || "Kein Fehlerdetail hinterlegt."),
+            updatedAt: String(run?.finishedAt || run?.startedAt || run?.started_at || run?.timestamp || ""),
+            primaryActionLabel: "Details anzeigen",
+            secondaryActionLabel: "Suite-Verlauf neu laden",
+            secondaryAction: "loadSuiteRunHistory()",
+            priority: 0,
+            raw: run,
+        });
+    });
+
+    return failures.sort((left, right) => {
+        const priorityDelta = left.priority - right.priority;
+        if (priorityDelta !== 0) return priorityDelta;
+        return getQaWorkspaceTimestampValue(right.updatedAt) - getQaWorkspaceTimestampValue(left.updatedAt);
+    }).slice(0, 24);
+}
+
+function resolveQaTestWorkspaceSelection(runs, failures) {
+    const allItems = [...failures, ...runs];
+    const selectionKey = getQaTestWorkspaceSelectionKey(qaTestWorkspaceSelection.kind, qaTestWorkspaceSelection.id);
+    const selected = allItems.find(item => getQaTestWorkspaceSelectionKey(item.kind, item.id) === selectionKey)
+        || failures[0]
+        || runs[0]
+        || null;
+    qaTestWorkspaceSelection = selected ? { kind: selected.kind, id: selected.id } : { kind: "", id: "" };
+    return selected;
+}
+
+function renderQaTestWorkspaceList(container, items, selected, emptyMessage) {
+    if (!container) return;
+    if (!Array.isArray(items) || items.length === 0) {
+        container.innerHTML = `<div class='qa-test-empty'>${escapeHtml(emptyMessage)}</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class='qa-test-list-summary'>${escapeHtml(String(items.length))} Einträge sichtbar.</div>
+        <div class='qa-test-list'>
+            ${items.map(item => {
+                const isSelected = selected && selected.kind === item.kind && selected.id === item.id;
+                const encodedKind = encodeInlineArgument(item.kind);
+                const encodedId = encodeInlineArgument(item.id);
+                return `
+                    <article class='qa-test-list-item ${isSelected ? "is-selected" : ""}'>
+                        <div class='qa-register-item-header'>
+                            <div>
+                                <h6>${escapeHtml(item.title)}</h6>
+                                <div class='python-muted-caption'>${escapeHtml(item.sourceLabel)}</div>
+                            </div>
+                            <span class='python-status-badge ${escapeHtml(item.statusClassName)}'>${escapeHtml(item.statusLabel)}</span>
+                        </div>
+                        <p>${escapeHtml(item.summary || item.detail || "Keine Zusatzinformationen verfügbar.")}</p>
+                        <div class='qa-test-list-meta'>
+                            <span>${escapeHtml(item.updatedAt ? formatQaRefreshTimestamp(item.updatedAt) : "Zeitpunkt unbekannt")}</span>
+                        </div>
+                        <div class='setup-actions' style='margin-top: 10px'>
+                            <button type='button' class='btn btn-secondary btn-sm' onclick="selectQaTestWorkspaceItem('${encodedKind}', '${encodedId}')">Details</button>
+                        </div>
+                    </article>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function renderQaTestWorkspaceDetail(container, item) {
+    if (!container) return;
+    if (!item) {
+        container.innerHTML = "<div class='qa-test-empty'>Noch kein Eintrag ausgewählt.</div>";
+        return;
+    }
+
+    const detailMeta = [
+        buildQaTestWorkspaceMeta("Typ", item.kind),
+        buildQaTestWorkspaceMeta("Status", item.statusLabel),
+        buildQaTestWorkspaceMeta("Quelle", item.sourceLabel),
+        buildQaTestWorkspaceMeta("Zeitpunkt", item.updatedAt ? formatQaRefreshTimestamp(item.updatedAt) : "-")
+    ].filter(Boolean).join("");
+
+    const rawDebug = escapeHtml(JSON.stringify(item.raw, null, 2));
+    const secondaryActionHtml = item.secondaryAction && item.secondaryActionLabel
+        ? `<button type='button' class='btn btn-secondary btn-sm' onclick="${item.secondaryAction}">${escapeHtml(item.secondaryActionLabel)}</button>`
+        : "";
+
+    container.innerHTML = `
+        <div class='python-clarity-box'>
+            <strong>${escapeHtml(item.title)}</strong>
+            <div class='python-muted-caption'>${escapeHtml(item.summary || item.sourceLabel)}</div>
+        </div>
+        <div class='qa-test-detail-meta'>${detailMeta}</div>
+        <div class='qa-test-detail-block'>
+            <strong>Fehler- oder Statusdetail</strong>
+            <p>${escapeHtml(item.detail || "Keine Detailbeschreibung vorhanden.")}</p>
+        </div>
+        <div class='setup-actions' style='margin-top: 12px'>
+            <button type='button' class='btn btn-secondary btn-sm' onclick='openSelectedQaTestWorkspaceItem()'>${escapeHtml(item.primaryActionLabel || "Öffnen")}</button>
+            ${secondaryActionHtml}
+        </div>
+        <details class='qa-test-detail-block'>
+            <summary>Debug-Rohdaten</summary>
+            <pre class='code-block'>${rawDebug}</pre>
+        </details>
+    `;
+}
+
+function renderQaTestWorkspace() {
+    const runsEl = document.getElementById("qa-test-run-overview");
+    const failuresEl = document.getElementById("qa-test-failures");
+    const detailEl = document.getElementById("qa-test-detail");
+    if (!runsEl || !failuresEl || !detailEl) return;
+
+    if (!isPythonOperator) {
+        replaceElementWithState(runsEl, "info", "Laufdaten sind nur im Python-Operator verfügbar.");
+        replaceElementWithState(failuresEl, "info", "Fehlerdaten sind nur im Python-Operator verfügbar.");
+        replaceElementWithState(detailEl, "info", "Detailansichten werden nach Aktivierung des Python-Operators geladen.");
+        return;
+    }
+
+    const runs = buildQaTestWorkspaceRunItems();
+    const failures = buildQaTestWorkspaceFailureItems();
+    const selected = resolveQaTestWorkspaceSelection(runs, failures);
+
+    renderQaTestWorkspaceList(
+        runsEl,
+        runs,
+        selected,
+        "Noch keine Python- oder Suite-Läufe geladen."
+    );
+    renderQaTestWorkspaceList(
+        failuresEl,
+        failures,
+        selected,
+        "Keine fehlgeschlagenen oder offenen Punkte aus den geladenen Testdaten erkannt."
+    );
+    renderQaTestWorkspaceDetail(detailEl, selected);
+
+    const compactBtn = document.getElementById("qa-test-copy-compact-btn");
+    const debugBtn = document.getElementById("qa-test-copy-debug-btn");
+    if (compactBtn) compactBtn.disabled = !selected;
+    if (debugBtn) debugBtn.disabled = !selected;
+}
+
+function selectQaTestWorkspaceItem(kind, encodedId) {
+    qaTestWorkspaceSelection = {
+        kind: decodeInlineArgument(kind),
+        id: decodeInlineArgument(encodedId),
     };
+    renderQaTestWorkspace();
 }
 
-function findQaReleaseWorkspaceBlocker(blockerId) {
-    const module = getQaReleaseWorkspaceModule();
-    if (module && typeof module.findBlocker === "function") {
-        return module.findBlocker(qaReleaseWorkspacePayload, blockerId);
-    }
-
-    const viewModel = buildQaReleaseWorkspaceViewModel();
-    return viewModel.blockers.find(item => String(item?.id || "") === String(blockerId || "")) || null;
+function getSelectedQaTestWorkspaceItem() {
+    const runs = buildQaTestWorkspaceRunItems();
+    const failures = buildQaTestWorkspaceFailureItems();
+    return resolveQaTestWorkspaceSelection(runs, failures);
 }
 
-function buildQaReleaseClipboardPayload(blocker, format = "compact") {
-    const module = getQaReleaseWorkspaceModule();
-    if (module && typeof module.buildClipboardPayload === "function") {
-        return module.buildClipboardPayload(blocker, format);
+function openSelectedQaTestWorkspaceItem() {
+    const selected = getSelectedQaTestWorkspaceItem();
+    if (!selected) {
+        showNotification("Kein Testeintrag ausgewählt.", "info");
+        return;
     }
-    return JSON.stringify(blocker || {}, null, format === "debug" ? 2 : 0);
+
+    if (selected.kind === "commissioning-run") {
+        pythonCommissioningLastRun = selected.raw;
+        renderPythonAutomationResult(selected.raw);
+        scrollQaSection("qa-python-run-card");
+        return;
+    }
+
+    if (selected.kind === "register-item") {
+        const item = selected.raw || {};
+        if (String(item.action || "") === "protocol") {
+            openPythonAutomationProtocol(encodeURIComponent(String(item.id || "")));
+            return;
+        }
+        scrollQaSection("qa-register-card");
+        return;
+    }
+
+    if (selected.kind === "python-evidence") {
+        const testId = String(selected.raw?.item?.testId || "");
+        if (testId) {
+            openPythonAutomationProtocol(encodeURIComponent(testId));
+            return;
+        }
+    }
+
+    if (["python-check", "python-pending", "python-command"].includes(selected.kind)) {
+        if (selected.raw?.run) {
+            pythonCommissioningLastRun = selected.raw.run;
+            renderPythonAutomationResult(selected.raw.run);
+        }
+        scrollQaSection("qa-python-run-card");
+        return;
+    }
+
+    scrollQaSection("qa-suite-card");
 }
 
-function buildQaReleaseErrorClipboardPayload(errorItem, format = "compact") {
-    const item = errorItem && typeof errorItem === "object" ? errorItem : {};
-    const context = item.context && typeof item.context === "object" ? item.context : {};
-    const logs = Array.isArray(context.logs) ? context.logs : [];
-    if (String(format || "compact").toLowerCase() === "debug") {
-        return JSON.stringify(item, null, 2);
+function buildSelectedQaTestItemClipboardPayload(format = "compact") {
+    const selected = getSelectedQaTestWorkspaceItem();
+    if (!selected) return "";
+    if (format === "debug") {
+        return JSON.stringify({
+            kind: selected.kind,
+            id: selected.id,
+            title: selected.title,
+            status: selected.status,
+            sourceLabel: selected.sourceLabel,
+            summary: selected.summary,
+            detail: selected.detail,
+            updatedAt: selected.updatedAt,
+            raw: selected.raw,
+        }, null, 2);
     }
+
     return [
-        `Titel: ${String(item.title || item.errorId || "-")}`,
-        `Quelle: ${String(item.sourceType || "system")} / ${String(item.sourceId || "-")}`,
-        `JobId: ${String(item.relatedJobId || "-")}`,
-        `Status: ${String(item.status || "failed")}`,
-        `Zeit: ${String(item.timestamp || "-")}`,
-        `Severity: ${String(item.severity || "medium")}`,
-        `Fehler: ${String(item.message || "-")}`,
-        `Stacktrace: ${String(item.stacktrace || "-")}`,
-        `Logs: ${logs.join(" | ") || "-"}`,
+        `Titel: ${selected.title}`,
+        `Typ: ${selected.kind}`,
+        `Status: ${selected.statusLabel}`,
+        `Quelle: ${selected.sourceLabel}`,
+        `Zusammenfassung: ${selected.summary || "-"}`,
+        `Detail: ${selected.detail || "-"}`,
+        `Zeitpunkt: ${selected.updatedAt ? formatQaRefreshTimestamp(selected.updatedAt) : "-"}`,
     ].join("\n");
 }
 
-async function copyQaReleaseError(errorId, format = "compact") {
-    const viewModel = buildQaReleaseWorkspaceViewModel();
-    const errorItem = (viewModel.errors || []).find(item => String(item?.errorId || "") === String(errorId || ""));
-    if (!errorItem) {
-        showNotification("Fehlerobjekt konnte nicht gefunden werden.", "error");
-        return;
-    }
-    try {
-        await copyTextToClipboard(buildQaReleaseErrorClipboardPayload(errorItem, format));
-        showNotification(`Fehler im Format '${format}' kopiert.`, "success");
-    } catch (error) {
-        showNotification("Fehler konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
-    }
-}
-
-async function retryQaReleaseJob(jobId) {
-    if (!jobId) return;
-    try {
-        const response = await fetch("/api/jobs/retry", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({ jobId }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(payload.error || "Retry konnte nicht gestartet werden.");
-        }
-        showNotification(`Retry für Job ${jobId} eingereiht.`, "success");
-        await loadQaReleaseWorkspace();
-        await loadSuiteRunHistory();
-    } catch (error) {
-        showNotification("Retry fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
-    }
-}
-
-async function analyzeQaReleaseError(errorId) {
-    if (!errorId) return;
-    try {
-        const response = await fetch("/api/agents/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({ sourceErrorId: errorId }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(payload.error || "Agentenlauf konnte nicht gestartet werden.");
-        }
-        showNotification(`Agenten-Analyse ${payload.jobId || ""} eingereiht.`, "success");
-        await loadQaReleaseWorkspace();
-    } catch (error) {
-        showNotification("Agenten-Analyse fehlgeschlagen: " + (error?.message || "Unbekannter Fehler"), "error");
-    }
-}
-
-function getSelectedQaReleaseBlocker() {
-    const viewModel = buildQaReleaseWorkspaceViewModel();
-    const selected = findQaReleaseWorkspaceBlocker(qaReleaseSelectedBlockerId);
-    if (selected) return selected;
-    const fallback = viewModel.blockers[0] || null;
-    qaReleaseSelectedBlockerId = fallback ? String(fallback.id || "") : "";
-    return fallback;
-}
-
-function escapeQaReleaseChipClass(value) {
-    return String(value || "neutral").replace(/[^a-z0-9_-]/gi, "").toLowerCase();
-}
-
-function renderQaReleaseWorkspace(payload = qaReleaseWorkspacePayload) {
-    const el = document.getElementById("qa-release-workspace");
-    if (!el) return;
-
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "Der QA Release Workspace ist nur im Python-Operator verfügbar.");
-        return;
-    }
-
+async function copySelectedQaTestItem(format = "compact") {
+    const payload = buildSelectedQaTestItemClipboardPayload(format);
     if (!payload) {
-        replaceElementWithState(el, "info", "Noch kein QA Release Workspace geladen.");
-        return;
-    }
-
-    const viewModel = buildQaReleaseWorkspaceViewModel(payload);
-    const selectedBlocker = getSelectedQaReleaseBlocker();
-    const selectedBlockerAction = selectedBlocker?.nextAction || null;
-    const synthesis = viewModel.synthesis;
-    const health = viewModel.health || {};
-    const emulators = viewModel.emulators || {};
-    const jobs = Array.isArray(viewModel.jobs) ? viewModel.jobs : [];
-    const errors = Array.isArray(viewModel.errors) ? viewModel.errors : [];
-    const agentCore = viewModel.agentCore || {};
-    const metricsHtml = viewModel.metrics.map(item => `
-        <article class="qa-release-metric-card qa-release-tone-${escapeQaReleaseChipClass(item.tone)}">
-            <span>${escapeHtml(String(item.label || item.id || "Metrik"))}</span>
-            <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
-        </article>
-    `).join("");
-
-    const blockersHtml = viewModel.blockers.length > 0 ? viewModel.blockers.map(item => {
-        const isSelected = String(item?.id || "") === String(selectedBlocker?.id || "");
-        const severityClass = String(item?.severity || "medium").toLowerCase();
-        const statusClass = String(item?.status || "not_run").toLowerCase() === "pass"
-            ? "is-success"
-            : String(item?.status || "").toLowerCase() === "manual_required"
-                ? "is-warning"
-                : "is-danger";
-        return `
-            <article class="qa-release-item ${isSelected ? "is-selected" : ""}">
-                <div class="qa-release-item-header">
-                    <div>
-                        <h6>${escapeHtml(String(item?.title || item?.id || "Blocker"))}</h6>
-                        <div class="python-muted-caption">${escapeHtml(String(item?.groupTitle || item?.groupId || "-"))}</div>
-                    </div>
-                    <div class="qa-release-chip-row">
-                        <span class="qa-release-chip is-${escapeQaReleaseChipClass(severityClass === "critical" || severityClass === "high" ? "danger" : severityClass === "medium" ? "warning" : "info")}">${escapeHtml(String(item?.severity || "medium"))}</span>
-                        <span class="qa-release-chip ${statusClass}">${escapeHtml(String(item?.status || "not_run"))}</span>
-                    </div>
-                </div>
-                <p class="qa-register-item-detail">${escapeHtml(String(item?.details || item?.successCriteria || "-"))}</p>
-                <div class="qa-release-item-meta">
-                    <span>Suite: ${escapeHtml(String(item?.suiteRef || "-"))}</span>
-                    <span>Aktualisiert: ${escapeHtml(String(item?.updatedAt || "-"))}</span>
-                    <span>Aktion: ${escapeHtml(String(item?.nextAction?.label || "-"))}</span>
-                </div>
-                <div class="qa-release-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="selectQaReleaseBlocker('${encodeInlineArgument(String(item?.id || ""))}')">Details</button>
-                </div>
-            </article>
-        `;
-    }).join("") : "<div class='success-box'>Keine offenen Release-Blocker erkannt.</div>";
-
-    const queueHtml = viewModel.queue.length > 0
-        ? `<div class="qa-release-timeline">${viewModel.queue.map(item => `
-            <article class="qa-release-timeline-entry">
-                <strong>${escapeHtml(String(item?.label || item?.suiteId || item?.runId || "Job"))}</strong>
-                <div class="qa-release-meta-row">
-                    <span>Status: ${escapeHtml(String(item?.status || "queued"))}</span>
-                    <span>Typ: ${escapeHtml(String(item?.type || "suite"))}</span>
-                    <span>Priorität: ${escapeHtml(String(item?.priority ?? "-"))}</span>
-                    <span>Retries: ${escapeHtml(String(item?.retryCount ?? 0))}</span>
-                    <span>Run-ID: ${escapeHtml(String(item?.runId || "-"))}</span>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "<div class='info'>Keine laufenden oder wartenden Jobs.</div>";
-
-    const jobsHtml = jobs.length > 0
-        ? `<div class="qa-release-timeline">${jobs.map(item => `
-            <article class="qa-release-timeline-entry">
-                <strong>${escapeHtml(String(item?.label || item?.jobId || "Job"))}</strong>
-                <div class="qa-release-meta-row">
-                    <span>Status: ${escapeHtml(String(item?.status || "-"))}</span>
-                    <span>Typ: ${escapeHtml(String(item?.type || "system"))}</span>
-                    <span>Job-ID: ${escapeHtml(String(item?.jobId || "-"))}</span>
-                </div>
-                <p class="qa-register-item-detail">${escapeHtml(String(item?.error?.message || item?.result?.summary || item?.result?.status || item?.result?.reason || "-"))}</p>
-                <div class="qa-release-actions">
-                    ${String(item?.status || "") === "failed" && Number(item?.retryCount ?? 0) <= Number(item?.maxRetries ?? 0) ? `<button class="btn btn-secondary btn-sm" onclick="retryQaReleaseJob('${encodeInlineArgument(String(item?.jobId || ""))}')">Retry</button>` : ""}
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "<div class='info'>Noch keine Jobs protokolliert.</div>";
-
-    const errorsHtml = errors.length > 0
-        ? `<div class="qa-release-timeline">${errors.map(item => `
-            <article class="qa-release-timeline-entry">
-                <strong>${escapeHtml(String(item?.title || item?.errorId || "Fehler"))}</strong>
-                <div class="qa-release-meta-row">
-                    <span>Quelle: ${escapeHtml(String(item?.sourceType || "system"))}</span>
-                    <span>Severity: ${escapeHtml(String(item?.severity || "medium"))}</span>
-                    <span>Zeit: ${escapeHtml(String(item?.timestamp || "-"))}</span>
-                </div>
-                <p class="qa-register-item-detail">${escapeHtml(String(item?.message || "-"))}</p>
-                <div class="qa-release-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="copyQaReleaseError('${encodeInlineArgument(String(item?.errorId || ""))}', 'compact')">Kompakt kopieren</button>
-                    <button class="btn btn-secondary btn-sm" onclick="copyQaReleaseError('${encodeInlineArgument(String(item?.errorId || ""))}', 'debug')">Debug kopieren</button>
-                    <button class="btn btn-secondary btn-sm" onclick="analyzeQaReleaseError('${encodeInlineArgument(String(item?.errorId || ""))}')">Per Agent analysieren</button>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "<div class='info'>Keine zentralen Fehler im aktuellen Verlauf.</div>";
-
-    const failuresHtml = viewModel.recentFailures.length > 0
-        ? `<div class="qa-release-timeline">${viewModel.recentFailures.map(item => `
-            <article class="qa-release-timeline-entry">
-                <strong>${escapeHtml(String(item?.suiteId || item?.label || item?.runId || "Suite"))}</strong>
-                <div class="qa-release-meta-row">
-                    <span>Status: ${escapeHtml(String(item?.status || "failed"))}</span>
-                    <span>Run-ID: ${escapeHtml(String(item?.runId || "-"))}</span>
-                    <span>Abschluss: ${escapeHtml(String(item?.finishedAt || item?.timestamp || "-"))}</span>
-                </div>
-                <p class="qa-register-item-detail">${escapeHtml(String(item?.message || item?.error || item?.reason || "-"))}</p>
-            </article>
-        `).join("")}</div>`
-        : "<div class='info'>Keine aktuellen Fehl-Läufe im Verlauf.</div>";
-
-    const agentsHtml = viewModel.agents.length > 0
-        ? `<div class="qa-release-agent-grid">${viewModel.agents.map(agent => `
-            <article class="qa-release-item">
-                <div class="qa-release-agent-header">
-                    <div>
-                        <h6>${escapeHtml(String(agent?.name || agent?.role || "Agent"))}</h6>
-                        <div class="python-muted-caption">${escapeHtml(String(agent?.model || "-"))}</div>
-                    </div>
-                    <div class="qa-release-chip-row">
-                        <span class="qa-release-chip is-${escapeQaReleaseChipClass(String(agent?.status || "completed").toLowerCase() === "failed" ? "danger" : "success")}">${escapeHtml(String(agent?.status || "completed"))}</span>
-                        <span class="qa-release-chip is-info">${escapeHtml(String(agent?.confidence ?? "-"))}</span>
-                    </div>
-                </div>
-                <p class="qa-register-item-detail">${escapeHtml(String(agent?.summary || "-"))}</p>
-                <div class="qa-release-meta-row">
-                    <span>Rolle: ${escapeHtml(String(agent?.role || "-"))}</span>
-                    <span>Priorität: ${escapeHtml(String(agent?.priority || "-"))}</span>
-                    <span>Dauer: ${escapeHtml(String(agent?.durationMs || 0))} ms</span>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "<div class='info'>Noch keine Agentenergebnisse vorhanden.</div>";
-
-    const synthesisHtml = synthesis
-        ? `
-            <div class="qa-release-synthesis">
-                <div class="qa-release-inspector-header">
-                    <div>
-                        <h6>Synthese</h6>
-                        <div class="python-muted-caption">${escapeHtml(String(synthesis?.status || "completed"))} · Confidence ${escapeHtml(String(synthesis?.confidence ?? "-"))}</div>
-                    </div>
-                </div>
-                <p class="qa-register-item-detail">${escapeHtml(String(synthesis?.summary || "-"))}</p>
-                <div class="qa-release-meta-row">
-                    <span>Findings: ${escapeHtml(String((synthesis?.findings || []).length || 0))}</span>
-                    <span>Risiken: ${escapeHtml(String((synthesis?.risks || []).length || 0))}</span>
-                    <span>Empfehlungen: ${escapeHtml(String((synthesis?.recommendations || []).length || 0))}</span>
-                </div>
-            </div>
-        `
-        : "<div class='info'>Keine Synthese verfügbar.</div>";
-
-    el.innerHTML = `
-        <div class="qa-release-workspace">
-            <div class="qa-release-metrics">${metricsHtml}</div>
-            <div class="qa-release-grid">
-                <div class="qa-release-column">
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Release-Blocker</h6>
-                                <div class="python-muted-caption">Generiert am ${escapeHtml(viewModel.generatedAt || "-")}</div>
-                            </div>
-                        </div>
-                        <div class="qa-release-list">${blockersHtml}</div>
-                    </section>
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Queue & Jobs</h6>
-                                <div class="python-muted-caption">Laufende oder wartende Suite-/Kompatibilitätsläufe</div>
-                            </div>
-                        </div>
-                        ${queueHtml}
-                    </section>
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Letzte Fehl-Läufe</h6>
-                                <div class="python-muted-caption">Verdichtet aus Suite-Historie und Status-Logs</div>
-                            </div>
-                        </div>
-                        ${failuresHtml}
-                    </section>
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Job-Register</h6>
-                                <div class="python-muted-caption">Zentrale Sicht auf Test-, Agenten- und Emulator-Jobs</div>
-                            </div>
-                        </div>
-                        ${jobsHtml}
-                    </section>
-                </div>
-                <div class="qa-release-column">
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Blocker-Inspector</h6>
-                                <div class="python-muted-caption">Kontext, nächste Aktion und Copy-Formate</div>
-                            </div>
-                        </div>
-                        ${selectedBlocker ? `
-                            <div class="qa-release-inspector-header">
-                                <div>
-                                    <h6>${escapeHtml(String(selectedBlocker?.title || selectedBlocker?.id || "Blocker"))}</h6>
-                                    <div class="python-muted-caption">${escapeHtml(String(selectedBlocker?.groupTitle || selectedBlocker?.groupId || "-"))}</div>
-                                </div>
-                                <div class="qa-release-chip-row">
-                                    <span class="qa-release-chip is-${escapeQaReleaseChipClass(String(selectedBlocker?.severity || "medium").toLowerCase() === "critical" || String(selectedBlocker?.severity || "").toLowerCase() === "high" ? "danger" : "warning")}">${escapeHtml(String(selectedBlocker?.severity || "medium"))}</span>
-                                    <span class="qa-release-chip is-info">${escapeHtml(String(selectedBlocker?.status || "-"))}</span>
-                                </div>
-                            </div>
-                            <p class="qa-register-item-detail">${escapeHtml(String(selectedBlocker?.details || selectedBlocker?.successCriteria || "-"))}</p>
-                            <div class="qa-release-meta-row">
-                                <span>Suite: ${escapeHtml(String(selectedBlocker?.suiteRef || "-"))}</span>
-                                <span>Dokumentation: ${escapeHtml(String(selectedBlocker?.documentation || "-"))}</span>
-                                <span>Prereqs: ${escapeHtml(selectedBlocker?.prereqsMet === false ? "blockiert" : "ok / n.a.")}</span>
-                            </div>
-                            <div class="qa-release-synthesis" style="margin-block-start: 12px;">
-                                <strong>Nächste Aktion</strong>
-                                <p class="qa-register-item-detail">${escapeHtml(String(selectedBlockerAction?.label || "-"))}: ${escapeHtml(String(selectedBlockerAction?.detail || "-"))}</p>
-                            </div>
-                            <div class="qa-release-copy-grid">
-                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('compact')">Kompakt kopieren</button>
-                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('github')">Issue-Format</button>
-                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('ai')">AI-Format</button>
-                                <button class="btn btn-secondary btn-sm" onclick="copySelectedQaReleaseBlocker('debug')">Debug-Format</button>
-                            </div>
-                        ` : "<div class='info'>Noch kein Blocker ausgewählt.</div>"}
-                    </section>
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Agentenmonitor</h6>
-                                <div class="python-muted-caption">Deterministische 5-Agenten-Synthese aus Register, Self-Healing, Queue und Laufhistorie</div>
-                            </div>
-                        </div>
-                        <div class="qa-release-meta-row">
-                            ${Array.isArray(agentCore?.agents) ? agentCore.agents.map(agent => `<span>${escapeHtml(String(agent?.role || agent?.name || "Agent"))}: ${escapeHtml(String(agent?.status || "idle"))}</span>`).join("") : ""}
-                        </div>
-                        ${synthesisHtml}
-                        ${agentsHtml}
-                    </section>
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Systemzustand</h6>
-                                <div class="python-muted-caption">Self-Healing, Emulator-Labor und Reservierungen</div>
-                            </div>
-                        </div>
-                        <div class="qa-release-meta-row">
-                            <span>Health: ${escapeHtml(String(health?.systemHealth || "OK"))}</span>
-                            <span>Issues: ${escapeHtml(String((health?.detectedIssues || []).length || 0))}</span>
-                            <span>Fixes: ${escapeHtml(String((health?.fixesApplied || []).length || 0))}</span>
-                            <span>Reservierungen: ${escapeHtml(String(emulators?.summary?.reservationCount || 0))}</span>
-                            <span>Laufende Emulatoren: ${escapeHtml(String(emulators?.summary?.runningCount || 0))}</span>
-                        </div>
-                    </section>
-                    <section class="qa-release-card">
-                        <div class="qa-release-card-header">
-                            <div>
-                                <h6>Fehlerzentrum</h6>
-                                <div class="python-muted-caption">Zentrale Fehlerobjekte mit Copy- und Agenten-Workflow</div>
-                            </div>
-                        </div>
-                        ${errorsHtml}
-                    </section>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function selectQaReleaseBlocker(encodedBlockerId) {
-    qaReleaseSelectedBlockerId = decodeInlineArgument(encodedBlockerId);
-    renderQaReleaseWorkspace();
-}
-
-async function copySelectedQaReleaseBlocker(format = "compact") {
-    const blocker = getSelectedQaReleaseBlocker();
-    if (!blocker) {
-        showNotification("Es ist kein Release-Blocker ausgewählt.", "info");
+        showNotification("Es ist noch kein Testeintrag zum Kopieren ausgewählt.", "info");
         return;
     }
     try {
-        await copyTextToClipboard(buildQaReleaseClipboardPayload(blocker, format));
-        showNotification(`Blocker im Format '${format}' kopiert.`, "success");
+        await copyTextToClipboard(payload);
+        showNotification(format === "debug" ? "Debug-Detail kopiert." : "Testdetail kopiert.", "success");
     } catch (error) {
-        showNotification("Blocker konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
+        showNotification("Detail konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
     }
 }
 
-async function copyQaReleaseWorkspaceSummary() {
-    const viewModel = buildQaReleaseWorkspaceViewModel();
-    const payload = {
-        generatedAt: viewModel.generatedAt,
-        metrics: viewModel.metrics,
-        blockers: viewModel.blockers.slice(0, 10).map(item => ({
-            id: item.id,
-            title: item.title,
-            status: item.status,
-            severity: item.severity,
-            nextAction: item.nextAction,
-        })),
-        synthesis: viewModel.synthesis,
-    };
-    try {
-        await copyTextToClipboard(JSON.stringify(payload, null, 2));
-        showNotification("QA Release Workspace kopiert.", "success");
-    } catch (error) {
-        showNotification("Workspace konnte nicht kopiert werden: " + (error?.message || "Unbekannter Fehler"), "error");
-    }
+function copySelectedQaTestItemCompact() {
+    return copySelectedQaTestItem("compact");
 }
 
-async function rerunSelectedQaReleaseBlocker() {
-    const blocker = getSelectedQaReleaseBlocker();
-    if (!blocker) {
-        showNotification("Es ist kein Release-Blocker ausgewählt.", "info");
-        return;
-    }
-
-    const action = blocker.nextAction || {};
-    if (action.kind === "suite-run" && action.suiteId) {
-        await startSuiteRun(encodeURIComponent(String(action.suiteId)));
-        return;
-    }
-    if (action.kind === "protocol" && action.testId) {
-        openPythonAutomationProtocol(encodeURIComponent(String(action.testId)));
-        return;
-    }
-    if (action.kind === "emulator-lab") {
-        await loadQaPlatformCatalog();
-        showNotification("Emulator-Labor und QA-Plattform wurden aktualisiert.", "info");
-        return;
-    }
-
-    showNotification(String(action.detail || "Für diesen Blocker ist keine direkte Aktion hinterlegt."), "info");
-}
-
-async function loadQaReleaseWorkspace() {
-    const el = document.getElementById("qa-release-workspace");
-    if (!el) return { ok: false, message: "Release-Workspace-Container fehlt." };
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "Der QA Release Workspace ist nur im Python-Operator verfügbar.");
-        setQaRefreshSectionState("releaseWorkspace", "error", "Nur im Python-Operator verfügbar");
-        return { ok: false, message: "Nur im Python-Operator verfügbar." };
-    }
-
-    replaceElementWithState(el, "loading", "Release Workspace wird geladen...");
-    setQaRefreshSectionState("releaseWorkspace", "loading", "Lädt…");
-    try {
-        const response = await fetch("/api/qa/release-workspace", {
-            headers: { Accept: "application/json" },
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(payload.error || "Release Workspace konnte nicht geladen werden.");
-        }
-        qaReleaseWorkspacePayload = payload;
-        qaReleaseSelectedBlockerId = String(payload?.blockers?.[0]?.id || qaReleaseSelectedBlockerId || "");
-        renderQaReleaseWorkspace(payload);
-        setQaRefreshSectionState("releaseWorkspace", payload?.summary?.blockingCount ? "error" : "success", `${String(payload?.summary?.blockingCount || 0)} Blocker`);
-        return { ok: true, message: `${String(payload?.summary?.blockingCount || 0)} Blocker geladen.` };
-    } catch (error) {
-        replaceElementWithState(el, "error", `Release Workspace konnte nicht geladen werden: ${error.message}`);
-        setQaRefreshSectionState("releaseWorkspace", "error", error.message || "Fehler beim Laden");
-        return { ok: false, message: error.message || "Fehler beim Laden" };
-    }
-}
-
-function getDualDeviceRunsFromHistory() {
-    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => {
-        const type = String(run?.type || "");
-        const suiteId = String(run?.suiteId || run?.suite_id || "");
-        return type === "dual-device" || suiteId === "dual-device";
-    });
-}
-
-function getCompatibilityRunsFromHistory() {
-    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => {
-        const type = String(run?.type || "");
-        return type === "android-compatibility" || type === "android-automation-sweep";
-    });
-}
-
-function getSuiteRunIdentifier(run) {
-    return String(run?.runId || run?.run_id || "");
-}
-
-function getSelectedQaArtifactRun(filteredRuns = getDualDeviceRunsFromHistory()) {
-    const selected = filteredRuns.find(run => getSuiteRunIdentifier(run) === qaArtifactSelectedRunId) || null;
-    if (selected) return selected;
-    const fallback = filteredRuns[0] || null;
-    qaArtifactSelectedRunId = fallback ? getSuiteRunIdentifier(fallback) : "";
-    return fallback;
-}
-
-function getFilteredCompatibilityRuns() {
-    const compatibilityRuns = getCompatibilityRunsFromHistory();
-    return qaCompatibilityModeFilter && qaCompatibilityModeFilter !== "all"
-        ? compatibilityRuns.filter(run => String(run?.executionMode || run?.result?.executionMode || "") === qaCompatibilityModeFilter)
-        : compatibilityRuns;
-}
-
-function getSelectedCompatibilityRun(filteredRuns = getFilteredCompatibilityRuns()) {
-    const selected = filteredRuns.find(run => getSuiteRunIdentifier(run) === qaCompatibilitySelectedRunId) || null;
-    if (selected) return selected;
-    const fallback = filteredRuns[0] || null;
-    qaCompatibilitySelectedRunId = fallback ? getSuiteRunIdentifier(fallback) : "";
-    return fallback;
-}
-
-function getFilteredDualDeviceRuns() {
-    const dualRuns = getDualDeviceRunsFromHistory();
-    return qaArtifactScenarioFilter
-        ? dualRuns.filter(run => String(run?.scenarioId || run?.result?.scenarioId || "") === qaArtifactScenarioFilter)
-        : dualRuns;
-}
-
-function buildQaArtifactExportPayload(selectedRun, exportedAt = new Date().toISOString()) {
-    const scenarioId = String(selectedRun?.scenarioId || selectedRun?.result?.scenarioId || "");
-    const mappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings)
-        ? qaPlatformCatalogPayload.androidScenarioMappings.filter(item => String(item?.scenarioId || "") === scenarioId)
-        : [];
-
-    return {
-        exportedAt,
-        selectedRun,
-        linkedAndroidMappings: mappings,
-        evidenceSnapshot: pythonCommissioningEvidenceHistory.slice(0, 20),
-    };
-}
-
-function applyQaArtifactFilters() {
-    qaArtifactScenarioFilter = document.getElementById("qa-artifact-scenario-filter")?.value || "";
-    qaArtifactSelectedRunId = document.getElementById("qa-artifact-run-select")?.value || "";
-    renderQaArtifactsOverview();
-}
-
-function applyQaCompatibilityFilters() {
-    qaCompatibilityModeFilter = document.getElementById("qa-compatibility-mode-filter")?.value || "all";
-    qaCompatibilitySelectedRunId = document.getElementById("qa-compatibility-run-select")?.value || "";
-    renderQaArtifactsOverview();
-}
-
-function normalizeCompatibilitySubRuns(run) {
-    return Array.isArray(run?.subRuns)
-        ? run.subRuns
-        : Array.isArray(run?.result?.subRuns)
-            ? run.result.subRuns
-            : [];
-}
-
-function getCompatibilityRunSummary(run) {
-    const summary = run?.result?.summary;
-    if (summary && typeof summary === "object") return summary;
-    const subRuns = normalizeCompatibilitySubRuns(run);
-    const counts = { total: subRuns.length, passed: 0, failed: 0, error: 0, skipped: 0 };
-    subRuns.forEach(item => {
-        const status = String(item?.status || "").toLowerCase();
-        if (status === "passed" || status === "failed" || status === "error" || status === "skipped") {
-            counts[status] += 1;
-        }
-    });
-    return {
-        counts,
-        overallStatus: counts.failed || counts.error ? "failed" : counts.passed ? "passed" : "skipped",
-    };
-}
-
-function renderCompatibilityMatrixTable(run) {
-    const subRuns = normalizeCompatibilitySubRuns(run);
-    if (subRuns.length === 0) {
-        return "<div class='info'>Für den ausgewählten Kompatibilitätslauf liegen noch keine Teil-Ergebnisse vor.</div>";
-    }
-
-    return `
-        <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
-            <table class='qa-platform-table qa-compatibility-table'>
-                <thead>
-                    <tr>
-                        <th>Android</th>
-                        <th>Modus</th>
-                        <th>Status</th>
-                        <th>Profil</th>
-                        <th>Ziel / Provisionierung</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${subRuns.map(item => {
-                        const status = String(item?.status || item?.result?.status || item?.result?.overallStatus || "-");
-                        const executionMode = String(item?.executionMode || run?.executionMode || run?.result?.executionMode || "-");
-                        const provisioning = Array.isArray(item?.provisioning) ? item.provisioning : [];
-                        const provisionText = provisioning.length > 0
-                            ? provisioning.map(entry => `${String(entry?.serial || "-")} (${String(entry?.avdName || entry?.profileId || "AVD")})`).join(" · ")
-                            : (String(item?.result?.serial || item?.result?.masterResult?.serial || "") || "manuell / vorhanden");
-                        const details = [
-                            item?.appId ? `App: ${String(item.appId)}` : "",
-                            item?.scenarioId ? `Szenario: ${String(item.scenarioId)}` : "",
-                            item?.testClass ? `Testklasse: ${String(item.testClass)}` : "",
-                            item?.error ? `Fehler: ${String(item.error)}` : "",
-                            item?.result?.error ? `Fehler: ${String(item.result.error)}` : "",
-                        ].filter(Boolean).join(" · ");
-                        return `
-                            <tr>
-                                <td><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong></td>
-                                <td>${escapeHtml(executionMode)}</td>
-                                <td><span class='badge ${status === "passed" ? "pass" : status === "skipped" ? "running" : status === "running" ? "running" : "fail"}'>${escapeHtml(status)}</span></td>
-                                <td>${escapeHtml(String(item?.profileId || "-"))}</td>
-                                <td>${escapeHtml(provisionText || "-")}</td>
-                                <td>${escapeHtml(details || "-")}</td>
-                            </tr>
-                        `;
-                    }).join("")}
-                </tbody>
-            </table>
-        </div>
-    `;
-}
-
-function exportSelectedQaArtifact() {
-    const filteredRuns = getFilteredDualDeviceRuns();
-    const selectedRun = getSelectedQaArtifactRun(filteredRuns);
-    if (!selectedRun) {
-        showNotification("Es liegt noch kein exportierbares Dual-Device-Artefakt vor.", "info");
-        return;
-    }
-
-    const scenarioId = String(selectedRun?.scenarioId || selectedRun?.result?.scenarioId || "");
-    const payload = buildQaArtifactExportPayload(selectedRun);
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `dual-device-artifact-${scenarioId || "run"}-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification("Dual-Device-Artefakt exportiert.", "success");
-}
-
-function buildEvidenceStatusCounts(entries = pythonCommissioningEvidenceHistory) {
-    const counts = { pass: 0, fail: 0, manual_required: 0 };
-    (Array.isArray(entries) ? entries : []).forEach(entry => {
-        const status = String(entry?.status || "");
-        if (status === "pass" || status === "fail" || status === "manual_required") {
-            counts[status] += 1;
-        }
-    });
-    return counts;
-}
-
-function renderQaArtifactsOverview() {
-    const el = document.getElementById("qa-artifact-overview");
-    if (!el) return;
-
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "Artefakte und Laufspuren sind nur im Python-Operator verfügbar.");
-        return;
-    }
-
-    const filteredRuns = getFilteredDualDeviceRuns();
-    const latestDualRun = getSelectedQaArtifactRun(filteredRuns) || getLatestDualDeviceRun();
-    const filteredCompatibilityRuns = getFilteredCompatibilityRuns();
-    const selectedCompatibilityRun = getSelectedCompatibilityRun(filteredCompatibilityRuns);
-    const compatibilitySummary = selectedCompatibilityRun ? getCompatibilityRunSummary(selectedCompatibilityRun) : null;
-    const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
-    const evidenceCounts = buildEvidenceStatusCounts(evidenceEntries);
-    const recentEvidence = evidenceEntries.slice(0, 5);
-    const scenarios = Array.isArray(qaPlatformCatalogPayload?.dualDeviceScenarios) ? qaPlatformCatalogPayload.dualDeviceScenarios : [];
-    const androidMappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings) ? qaPlatformCatalogPayload.androidScenarioMappings : [];
-    const selectedScenarioId = String(latestDualRun?.scenarioId || latestDualRun?.result?.scenarioId || qaArtifactScenarioFilter || "");
-    const linkedMappings = selectedScenarioId
-        ? androidMappings.filter(item => String(item?.scenarioId || "") === selectedScenarioId).slice(0, 6)
-        : [];
-    const timeline = Array.isArray(latestDualRun?.timeline)
-        ? latestDualRun.timeline
-        : Array.isArray(latestDualRun?.result?.timeline)
-            ? latestDualRun.result.timeline
-            : [];
-    const faultModes = Array.isArray(latestDualRun?.result?.faultModes) ? latestDualRun.result.faultModes : [];
-
-    if (!latestDualRun && !selectedCompatibilityRun && evidenceEntries.length === 0) {
-        replaceElementWithState(el, "info", "Noch keine Artefakte oder Laufspuren vorhanden.");
-        return;
-    }
-
-    const timelineHtml = timeline.length > 0
-        ? `<div class='qa-register-card-list'>${timeline.slice(0, 8).map(item => `
-            <article class='qa-register-item-card qa-artifact-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>${escapeHtml(String(item?.phase || "-"))}</h6>
-                    </div>
-                    <span class='python-muted-caption'>${escapeHtml(String(item?.timestamp || "-"))}</span>
-                </div>
-                <p class='qa-register-item-detail'>${escapeHtml(String(item?.message || "-") || "-")}</p>
-            </article>
-        `).join("")}</div>`
-        : "Keine Timeline für Dual-Device-Läufe verfügbar.";
-
-    const evidenceHtml = recentEvidence.length > 0
-        ? `<div class='qa-register-card-list'>${recentEvidence.map(item => {
-            const statusMeta = getPythonAutomationStatusMeta(String(item?.status || "manual_required"));
-            return `
-                <article class='qa-register-item-card qa-artifact-card'>
-                    <div class='qa-register-item-header'>
-                        <div>
-                            <h6>${escapeHtml(String(item?.testTitle || item?.testId || "-"))}</h6>
-                        </div>
-                        <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(formatPythonAutomationStatus(String(item?.status || "manual_required")))}</span>
-                    </div>
-                    <div class='qa-register-item-grid'>
-                        <div>
-                            <span class='qa-register-item-label'>Operator</span>
-                            <strong>${escapeHtml(String(item?.operator || "-"))}</strong>
-                        </div>
-                    </div>
-                    <p class='qa-register-item-detail'>${escapeHtml(String(item?.evidenceRef || item?.notes || "-") || "-")}</p>
-                </article>
-            `;
-        }).join("")}</div>`
-        : "Keine manuellen Evidenzartefakte vorhanden.";
-
-    const mappingHtml = linkedMappings.length > 0
-        ? `<div class='qa-register-card-list'>${linkedMappings.map(item => `
-            <article class='qa-register-item-card qa-artifact-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>${escapeHtml(String(item?.testClass || "-"))}</h6>
-                    </div>
-                    <span class='python-muted-caption'>${escapeHtml(String(item?.role || "-"))}</span>
-                </div>
-                <p class='qa-register-item-detail'>${escapeHtml(String(item?.testMethod || "-") || "-")}</p>
-            </article>
-        `).join("")}</div>`
-        : "Keine Android-Testbindungen für das gewählte Szenario vorhanden.";
-
-    el.innerHTML = `
-        <div class='python-automation-toolbar' style='margin-block-end: 12px'>
-            <select id='qa-artifact-scenario-filter' onchange='applyQaArtifactFilters()'>
-                <option value=''>Alle Dual-Device-Szenarien</option>
-                ${scenarios.map(item => {
-                    const scenarioId = String(item?.scenarioId || "");
-                    const title = String(item?.title || scenarioId);
-                    return `<option value='${escapeHtml(scenarioId)}' ${qaArtifactScenarioFilter === scenarioId ? "selected" : ""}>${escapeHtml(title)}</option>`;
-                }).join("")}
-            </select>
-            <select id='qa-artifact-run-select' onchange='applyQaArtifactFilters()'>
-                ${filteredRuns.map(run => {
-                    const runId = getSuiteRunIdentifier(run);
-                    const scenarioId = String(run?.scenarioId || run?.result?.scenarioId || "ohne-szenario");
-                    const status = String(run?.status || run?.result?.overallStatus || "-");
-                    return `<option value='${escapeHtml(runId)}' ${qaArtifactSelectedRunId === runId ? "selected" : ""}>${escapeHtml(`${scenarioId} · ${status} · ${runId}`)}</option>`;
-                }).join("") || "<option value=''>Keine Dual-Device-Läufe</option>"}
-            </select>
-            <button class='btn btn-secondary btn-sm' onclick='exportSelectedQaArtifact()'>Artefakt exportieren</button>
-        </div>
-        <div class='qa-platform-mini-grid'>
-            <article class='qa-register-item-card qa-artifact-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>Letzter Dual-Device-Lauf</h6>
-                    </div>
-                </div>
-                ${latestDualRun ? `
-                    <div class='qa-register-item-grid'>
-                        <div>
-                            <span class='qa-register-item-label'>Szenario</span>
-                            <strong>${escapeHtml(String(latestDualRun?.scenarioId || latestDualRun?.result?.scenarioId || "ohne Szenario"))}</strong>
-                        </div>
-                        <div>
-                            <span class='qa-register-item-label'>Status</span>
-                            <strong>${escapeHtml(String(latestDualRun?.status || latestDualRun?.result?.overallStatus || "-"))}</strong>
-                        </div>
-                        <div>
-                            <span class='qa-register-item-label'>Profil</span>
-                            <strong>${escapeHtml(String(latestDualRun?.profileId || latestDualRun?.result?.profileId || "-"))}</strong>
-                        </div>
-                    </div>
-                    <p class='qa-register-item-detail'>Fault-Modes: ${escapeHtml(faultModes.join(", ") || "keine")}</p>
-                ` : "Noch kein Dual-Device-Lauf protokolliert."}
-            </article>
-            <article class='qa-register-item-card qa-artifact-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>Manuelle Evidenzlage</h6>
-                    </div>
-                </div>
-                <div class='qa-register-item-grid'>
-                    <div>
-                        <span class='qa-register-item-label'>Nachweise</span>
-                        <strong>${escapeHtml(String(evidenceEntries.length))}</strong>
-                    </div>
-                    <div>
-                        <span class='qa-register-item-label'>PASS / FAIL / Offen</span>
-                        <strong>${escapeHtml(String(evidenceCounts.pass))} / ${escapeHtml(String(evidenceCounts.fail))} / ${escapeHtml(String(evidenceCounts.manual_required))}</strong>
-                    </div>
-                </div>
-            </article>
-        </div>
-        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
-            <section class='python-clarity-box qa-compatibility-box'>
-                <strong>Android-Kompatibilitätsmatrix</strong><br />
-                <div class='python-automation-toolbar qa-compatibility-toolbar' style='margin-block: 12px 8px'>
-                    <select id='qa-compatibility-mode-filter' onchange='applyQaCompatibilityFilters()'>
-                        <option value='all'>Alle Modi</option>
-                        <option value='single-master' ${qaCompatibilityModeFilter === "single-master" ? "selected" : ""}>Master-App</option>
-                        <option value='single-child' ${qaCompatibilityModeFilter === "single-child" ? "selected" : ""}>Kind-App</option>
-                        <option value='dual-device' ${qaCompatibilityModeFilter === "dual-device" ? "selected" : ""}>Dual-Device</option>
-                    </select>
-                    <select id='qa-compatibility-run-select' onchange='applyQaCompatibilityFilters()'>
-                        ${filteredCompatibilityRuns.map(run => {
-                            const runId = getSuiteRunIdentifier(run);
-                            const executionMode = String(run?.executionMode || run?.result?.executionMode || "-");
-                            const versions = Array.isArray(run?.androidVersions) ? run.androidVersions : Array.isArray(run?.result?.androidVersions) ? run.result.androidVersions : [];
-                            const status = String(run?.result?.overallStatus || run?.status || "-");
-                            return `<option value='${escapeHtml(runId)}' ${qaCompatibilitySelectedRunId === runId ? "selected" : ""}>${escapeHtml(`${executionMode} · ${versions.join(", ") || "-"} · ${status}`)}</option>`;
-                        }).join("") || "<option value=''>Keine Kompatibilitätsläufe</option>"}
-                    </select>
-                </div>
-                ${selectedCompatibilityRun ? `
-                    <div class='qa-platform-mini-grid qa-compatibility-summary-grid'>
-                        <div class='qa-platform-mini-row'>
-                            <strong>${escapeHtml(String(selectedCompatibilityRun?.executionMode || selectedCompatibilityRun?.result?.executionMode || "-"))}</strong>
-                            <span>Versionen: ${escapeHtml((selectedCompatibilityRun?.androidVersions || selectedCompatibilityRun?.result?.androidVersions || []).join(", ") || "-")}</span>
-                            <span>Status: ${escapeHtml(String(compatibilitySummary?.overallStatus || "-"))}</span>
-                        </div>
-                        <div class='qa-platform-mini-row'>
-                            <strong>Teil-Läufe</strong>
-                            <span>PASS ${escapeHtml(String(compatibilitySummary?.counts?.passed || 0))} · FAIL ${escapeHtml(String(compatibilitySummary?.counts?.failed || 0))} · ERROR ${escapeHtml(String(compatibilitySummary?.counts?.error || 0))} · SKIP ${escapeHtml(String(compatibilitySummary?.counts?.skipped || 0))}</span>
-                            <span>Run-ID: ${escapeHtml(getSuiteRunIdentifier(selectedCompatibilityRun) || "-")}</span>
-                        </div>
-                    </div>
-                    ${renderCompatibilityMatrixTable(selectedCompatibilityRun)}
-                ` : "Noch kein Android-Kompatibilitätslauf protokolliert."}
-            </section>
-        </div>
-        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
-            <section class='python-clarity-box'>
-                <strong>Dual-Device-Timeline</strong><br />
-                ${timelineHtml}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Letzte Evidenzartefakte</strong><br />
-                ${evidenceHtml}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Verknüpfte Android-Testabdeckung</strong><br />
-                ${mappingHtml}
-            </section>
-        </div>
-    `;
+function copySelectedQaTestItemDebug() {
+    return copySelectedQaTestItem("debug");
 }
 
 function getSuiteRunStatusMeta(run) {
@@ -3505,248 +3044,6 @@ function renderSuiteRunCards(runs, emptyLabel) {
             }).join("")}
         </div>
     `;
-}
-
-function getQaSelfHealingHealthMeta(payload = qaSelfHealingPayload) {
-    const systemHealth = String(payload?.systemHealth || "OK").toUpperCase();
-    if (systemHealth === "CRITICAL") {
-        return { className: "health-red", label: "Kritische Self-Healing-Probleme" };
-    }
-    if (systemHealth === "DEGRADED") {
-        return { className: "health-yellow", label: "Self-Healing aktiv, Restprobleme vorhanden" };
-    }
-    return { className: "health-green", label: "Self-Healing stabil" };
-}
-
-function renderQaSelfHealingStatus(payload = qaSelfHealingPayload) {
-    const summaryEl = document.getElementById("qa-self-healing-summary");
-    const activityEl = document.getElementById("qa-self-healing-activity");
-    const errorEl = document.getElementById("qa-self-healing-errors");
-    if (!summaryEl || !activityEl || !errorEl) return;
-
-    if (!payload) {
-        replaceElementWithState(summaryEl, "info", "Noch kein Self-Healing-Zyklus ausgeführt.");
-        replaceElementWithState(activityEl, "info", "Noch keine Agentenaktivität vorhanden.");
-        replaceElementWithState(errorEl, "info", "Noch keine Probleme erkannt.");
-        return;
-    }
-
-    const detectedIssues = Array.isArray(payload.detectedIssues) ? payload.detectedIssues : [];
-    const fixesApplied = Array.isArray(payload.fixesApplied) ? payload.fixesApplied : [];
-    const pendingFixes = Array.isArray(payload.pendingFixes) ? payload.pendingFixes : [];
-    const validationResults = Array.isArray(payload.validationResults) ? payload.validationResults : [];
-    const agentActivities = Array.isArray(payload.agentActivities) ? payload.agentActivities : [];
-    const monitor = payload.monitor || {};
-    const healthMeta = getQaSelfHealingHealthMeta(payload);
-
-    summaryEl.innerHTML = `
-        <div class='health-banner ${healthMeta.className}'>
-            <div class='health-main'>
-                <div class='health-indicator'><span class='health-dot'></span><span class='health-label'>${escapeHtml(healthMeta.label)}</span></div>
-                <div class='health-details'>
-                    <span class='health-item'><span class='h-dot h-dot-${String(payload.systemHealth || "OK").toLowerCase() === "critical" ? "red" : String(payload.systemHealth || "OK").toLowerCase() === "degraded" ? "yellow" : "green"}'></span>Status: ${escapeHtml(String(payload.systemHealth || "OK"))}</span>
-                    <span class='health-item'><span class='h-dot h-dot-yellow'></span>Issues: ${escapeHtml(String(detectedIssues.length))}</span>
-                    <span class='health-item'><span class='h-dot h-dot-green'></span>Auto-Fixes: ${escapeHtml(String(fixesApplied.length))}</span>
-                    <span class='health-item'><span class='h-dot h-dot-red'></span>Offen: ${escapeHtml(String(pendingFixes.length))}</span>
-                    <span class='health-item'><span class='h-dot h-dot-green'></span>Validierungen: ${escapeHtml(String(validationResults.length))}</span>
-                </div>
-            </div>
-        </div>
-        <div class='qa-refresh-grid' style='margin-block-start: 12px'>
-            <article class='qa-refresh-card ${pendingFixes.length > 0 ? "is-error" : fixesApplied.length > 0 ? "is-loading" : "is-success"}'>
-                <strong>Monitor</strong>
-                <div class='qa-refresh-meta'>Trigger: ${escapeHtml(String(payload.triggeredBy || "-"))}</div>
-                <div class='qa-refresh-meta'>Letzter Lauf: ${escapeHtml(formatQaRefreshTimestamp(payload.generatedAt || monitor.lastCompletedAt || ""))}</div>
-                <div class='qa-refresh-meta'>Intervall: ${escapeHtml(String(monitor.intervalSec || 30))}s · Aktiv: ${monitor.enabled ? "ja" : "nein"}</div>
-            </article>
-            <article class='qa-refresh-card ${detectedIssues.length > 0 ? "is-loading" : "is-success"}'>
-                <strong>Root Cause Scan</strong>
-                <div class='qa-refresh-meta'>Erkannte Probleme: ${escapeHtml(String(detectedIssues.length))}</div>
-                <div class='qa-refresh-meta'>Schweregrade: ${escapeHtml(detectedIssues.map(item => String(item?.severity || "")).filter(Boolean).slice(0, 4).join(", ") || "keine")}</div>
-            </article>
-            <article class='qa-refresh-card ${fixesApplied.length > 0 ? "is-success" : "is-loading"}'>
-                <strong>Auto-Fix</strong>
-                <div class='qa-refresh-meta'>Angewendet: ${escapeHtml(String(fixesApplied.length))}</div>
-                <div class='qa-refresh-meta'>Pending: ${escapeHtml(String(pendingFixes.length))}</div>
-            </article>
-        </div>
-    `;
-
-    if (agentActivities.length === 0) {
-        replaceElementWithState(activityEl, "info", "Noch keine Agentenaktivität vorhanden.");
-    } else {
-        activityEl.innerHTML = `
-            <div class='qa-register-card-list'>
-                ${agentActivities.slice(0, 12).map(item => `
-                    <article class='qa-register-item-card'>
-                        <div class='qa-register-item-header'>
-                            <div>
-                                <h6>${escapeHtml(String(item.agent || "agent"))}</h6>
-                                <div class='python-muted-caption'>${escapeHtml(String(item.timestamp || ""))}</div>
-                            </div>
-                            <span class='category-badge'>${escapeHtml(String(item.result || "offen"))}</span>
-                        </div>
-                        <p class='qa-register-item-detail'>${escapeHtml(String(item.action || "Aktion"))} → ${escapeHtml(String(item.target || "-"))}</p>
-                        ${item.details ? `<div class='qa-refresh-meta'>${escapeHtml(String(item.details || ""))}</div>` : ""}
-                        ${item.error ? `<div class='qa-refresh-meta'>Fehler: ${escapeHtml(String(item.error || ""))}</div>` : ""}
-                    </article>
-                `).join("")}
-            </div>
-        `;
-    }
-
-    if (detectedIssues.length === 0 && pendingFixes.length === 0) {
-        replaceElementWithState(errorEl, "success-box", "Keine offenen Self-Healing-Probleme erkannt.");
-    } else {
-        const combinedIssues = [...pendingFixes, ...detectedIssues.filter(issue => !pendingFixes.some(pending => pending.id === issue.id))]
-            .sort((left, right) => Number(left?.severityRank || 99) - Number(right?.severityRank || 99));
-        errorEl.innerHTML = `
-            <div class='qa-register-card-list'>
-                ${combinedIssues.slice(0, 20).map(issue => `
-                    <article class='qa-register-item-card'>
-                        <div class='qa-register-item-header'>
-                            <div>
-                                <h6>${escapeHtml(String(issue.title || issue.id || "Problem"))}</h6>
-                                <div class='python-muted-caption'>${escapeHtml(String(issue.exactLocation || issue.runId || "-"))}</div>
-                            </div>
-                            <div class='qa-register-item-badges'>
-                                <span class='severity-badge ${escapeHtml(String(issue.severity || "low").toLowerCase())}'>${escapeHtml(String(issue.severity || "LOW"))}</span>
-                                <span class='category-badge'>${escapeHtml(String(issue.fixType || "AUTO_FIX"))}</span>
-                            </div>
-                        </div>
-                        <p class='qa-register-item-detail'>${escapeHtml(String(issue.message || issue.rootCause || ""))}</p>
-                        ${issue.rootCause ? `<div class='qa-refresh-meta'>Ursache: ${escapeHtml(String(issue.rootCause || ""))}</div>` : ""}
-                        ${issue.reproduction ? `<div class='qa-refresh-meta'>Reproduktion: ${escapeHtml(String(issue.reproduction || ""))}</div>` : ""}
-                        ${issue.manualPlan ? `<div class='qa-refresh-meta'>Fix-Plan: ${escapeHtml(String(issue.manualPlan || ""))}</div>` : ""}
-                    </article>
-                `).join("")}
-            </div>
-        `;
-    }
-}
-
-async function loadQaSelfHealingStatus() {
-    const summaryEl = document.getElementById("qa-self-healing-summary");
-    const activityEl = document.getElementById("qa-self-healing-activity");
-    const errorEl = document.getElementById("qa-self-healing-errors");
-    if (!summaryEl || !activityEl || !errorEl) {
-        return { ok: false, message: "Self-Healing-Container fehlt." };
-    }
-    if (!isPythonOperator) {
-        replaceElementWithState(summaryEl, "info", "Self-Healing ist nur im Python-Operator verfuegbar.");
-        replaceElementWithState(activityEl, "info", "Agentenaktivität ist nur im Python-Operator verfuegbar.");
-        replaceElementWithState(errorEl, "info", "Error Explorer ist nur im Python-Operator verfuegbar.");
-        setQaRefreshSectionState("selfHealing", "error", "Nur im Python-Operator verfügbar");
-        return { ok: false, message: "Nur im Python-Operator verfügbar." };
-    }
-
-    replaceElementWithState(summaryEl, "loading", "Self-Healing-Status wird geladen...");
-    replaceElementWithState(activityEl, "loading", "Agentenaktivität wird geladen...");
-    replaceElementWithState(errorEl, "loading", "Error Explorer wird geladen...");
-    setQaRefreshSectionState("selfHealing", "loading", "Prüft…");
-
-    try {
-        const response = await fetch("/api/qa/self-healing/status");
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(payload.error || "Self-Healing-Status konnte nicht geladen werden.");
-        }
-        qaSelfHealingPayload = payload;
-        renderQaSelfHealingStatus(payload);
-        setQaRefreshSectionState("selfHealing", payload.pendingFixes?.length ? "error" : payload.fixesApplied?.length ? "loading" : "success", `Health: ${String(payload.systemHealth || "OK")}`);
-        return { ok: true, message: `Health: ${String(payload.systemHealth || "OK")}` };
-    } catch (error) {
-        replaceElementWithState(summaryEl, "error", `Self-Healing fehlgeschlagen: ${error.message}`);
-        replaceElementWithState(activityEl, "info", "Keine Agentenaktivität verfügbar.");
-        replaceElementWithState(errorEl, "error", `Error Explorer fehlgeschlagen: ${error.message}`);
-        setQaRefreshSectionState("selfHealing", "error", error.message || "Fehler beim Laden");
-        return { ok: false, message: error.message || "Fehler beim Laden" };
-    }
-}
-
-async function runQaSelfHealingCycle() {
-    if (!isPythonOperator) {
-        showNotification("Self-Healing ist nur im Python-Operator verfügbar.", "error");
-        return;
-    }
-
-    const button = document.getElementById("qa-self-healing-run-btn");
-    const autoFix = Boolean(document.getElementById("qa-self-healing-auto-fix")?.checked);
-    if (button) button.disabled = true;
-    try {
-        const response = await fetch("/api/qa/self-healing/run", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-            body: JSON.stringify({ autoFix }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(payload.error || "Self-Healing-Zyklus konnte nicht gestartet werden.");
-        }
-        showNotification(`Self-Healing-Job ${payload.jobId || ""} eingereiht.`, "success");
-        loadQaReleaseWorkspace().catch(() => undefined);
-    } catch (error) {
-        showNotification("Self-Healing fehlgeschlagen: " + error.message, "error");
-    } finally {
-        if (button) button.disabled = false;
-    }
-}
-
-function startQaSelfHealingPolling() {
-    if (qaSelfHealingPollHandle) {
-        clearInterval(qaSelfHealingPollHandle);
-        qaSelfHealingPollHandle = null;
-    }
-    if (!isPythonOperator) {
-        renderQaSelfHealingStatus(null);
-        return;
-    }
-
-    const execute = () => {
-        loadQaSelfHealingStatus().catch(() => undefined);
-    };
-
-    execute();
-    qaSelfHealingPollHandle = setInterval(execute, 30000);
-}
-
-function getLatestFailedSuiteRun() {
-    return (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).find(run => {
-        const lifecycle = String(run?.status || "").toLowerCase();
-        const resultStatus = String(run?.result?.status || run?.result?.overall_status || "").toLowerCase();
-        return lifecycle === "finished" && ["failed", "fail", "error", "errored"].includes(resultStatus);
-    }) || null;
-}
-
-async function runQaQuickRecovery() {
-    if (!isPythonOperator) {
-        showNotification("Quick Recovery ist nur im Python-Operator verfügbar.", "error");
-        return;
-    }
-
-    const failedSuiteRun = getLatestFailedSuiteRun();
-    if (failedSuiteRun?.suiteId) {
-        await startSuiteRun(encodeURIComponent(String(failedSuiteRun.suiteId)));
-    }
-
-    const refreshValidationEl = document.getElementById("python-automation-refresh-validation");
-    const rerunFailedEl = document.getElementById("python-automation-rerun-failed");
-    const previousRefresh = Boolean(refreshValidationEl?.checked);
-    const previousRerun = Boolean(rerunFailedEl?.checked);
-
-    if (refreshValidationEl) refreshValidationEl.checked = false;
-    if (rerunFailedEl) rerunFailedEl.checked = true;
-
-    try {
-        await runPythonAutomationSuite();
-        showNotification("Quick Recovery angestoßen. Register und Historien werden automatisch aktualisiert.", "success");
-    } finally {
-        if (refreshValidationEl) refreshValidationEl.checked = previousRefresh;
-        if (rerunFailedEl) rerunFailedEl.checked = previousRerun;
-    }
 }
 
 async function savePythonAutomationEvidence() {
@@ -4360,11 +3657,17 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
     (Array.isArray(suites) ? suites : []).forEach(item => {
         const suiteId = String(item?.suiteId || item?.id || "");
         if (!suiteId || suiteMap.has(suiteId)) return;
+        const latestRun = getLatestSuiteRunIndex().get(suiteId);
+        const executionState = normalizeSuiteExecutionState(latestRun);
         suiteMap.set(suiteId, {
             suiteId,
             title: String(item?.title || suiteId),
             details: String(item?.description || ""),
-            status: "not_run",
+            status: executionState.state === "ok"
+                ? "pass"
+                : executionState.state === "fail"
+                    ? "fail"
+                    : "not_run",
             prereqsMet: item?.prereqsMet,
             prereqReason: String(item?.prereqReason || ""),
             linkedTests: [],
@@ -4418,6 +3721,23 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
         },
         suites: suitesSummary,
         storage: payload?.storage || null,
+    };
+}
+
+async function loadSuiteGuideData() {
+    const response = await fetch("/api/suites", {
+        headers: { "Accept": "application/json" },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || "Suite-Guide-Daten konnten nicht geladen werden.");
+    }
+    suiteCatalogPayload = Array.isArray(payload?.suites) ? payload.suites : [];
+    renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
+    return {
+        ok: true,
+        message: `${suiteCatalogPayload.length} Suite(s) geladen.`,
+        suites: suiteCatalogPayload,
     };
 }
 
@@ -4500,7 +3820,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 </div>
                 ${suiteItemsHtml}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
-                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zum Suite-Hub</button>
+                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
             </article>
             <article class='qa-guide-card'>
                 <div class='qa-guide-card-header'>
@@ -4574,6 +3894,7 @@ function rerenderTestingRegisterFromCache() {
         renderGoLiveAmpel();
         renderPrioritizedActionPlan();
     }
+    renderQaTestWorkspace();
 }
 
 function renderTestingRegisterOverview(payload) {
@@ -4993,6 +4314,7 @@ async function loadTestingRegister() {
         renderQaExecutionGuide(pythonCommissioningCatalog, null, suiteCatalogPayload);
         replaceElementWithState(automaticListEl, "info", "Das Testregister ist nur im Python-Operator verfügbar.");
         replaceElementWithState(manualListEl, "info", "Das Testregister ist nur im Python-Operator verfügbar.");
+        renderQaTestWorkspace();
         setQaRefreshSectionState("register", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
@@ -5019,6 +4341,7 @@ async function loadTestingRegister() {
         renderQaExecutionGuide(pythonCommissioningCatalog, null, suiteCatalogPayload);
         replaceElementWithState(automaticListEl, "error", `Testregister konnte nicht geladen werden: ${error.message}`);
         replaceElementWithState(manualListEl, "error", `Testregister konnte nicht geladen werden: ${error.message}`);
+        renderQaTestWorkspace();
         setQaRefreshSectionState("register", "error", error.message || "Fehler beim Laden");
         return { ok: false, message: error.message || "Fehler beim Laden" };
     }
@@ -5027,1094 +4350,6 @@ async function loadTestingRegister() {
 // ===================== TEST-SUITEN-ZENTRALE =====================
 
 let _suiteActivePollers = {};
-
-function parseQaMultiValueInput(value) {
-    return String(value || "")
-        .split(",")
-        .map(item => item.trim())
-        .filter(Boolean);
-}
-
-function getUsbFormVisibilityState(testType) {
-    const isDual = testType === "dual-device";
-    return {
-        isDual,
-        showChildSerial: isDual,
-        showScenario: isDual,
-        showProfile: isDual,
-        showFaultModes: isDual,
-        showSuite: !isDual,
-        showSkipActivation: !isDual,
-        showParallel: isDual,
-    };
-}
-
-function getAndroidVersionsForCompatibilityPreset(preset) {
-    const matrix = Array.isArray(qaPlatformCatalogPayload?.androidMatrix) ? qaPlatformCatalogPayload.androidMatrix : [];
-    const selectedPreset = String(preset || "active").trim() || "active";
-    return matrix
-        .filter(item => {
-            const status = String(item?.status || "");
-            const coverageTier = String(item?.coverageTier || "");
-            if (selectedPreset === "custom") return true;
-            if (selectedPreset === "baseline") return coverageTier === "baseline";
-            if (selectedPreset === "full") return coverageTier === "full" && status === "active";
-            if (selectedPreset === "canary") return coverageTier === "canary" || status === "preview";
-            return status === "active";
-        })
-        .map(item => String(item?.androidVersion || "").trim())
-        .filter(Boolean);
-}
-
-function syncUsbCompatibilityControls() {
-    const compatibilityToggle = document.getElementById("suite-usb-compatibility-mode");
-    const typeSelect = document.getElementById("suite-usb-test-type");
-    const presetSelect = document.getElementById("suite-usb-compatibility-preset");
-    const versionsInput = document.getElementById("suite-usb-android-versions");
-    const presetRow = document.getElementById("suite-usb-compatibility-preset-row");
-    const versionsRow = document.getElementById("suite-usb-android-versions-row");
-    const testsRow = document.getElementById("suite-usb-compatibility-tests-row");
-    const scenariosRow = document.getElementById("suite-usb-compatibility-scenarios-row");
-    const compatibilityEnabled = compatibilityToggle?.checked || false;
-    const isDual = (typeSelect?.value || "single-master") === "dual-device";
-    if (presetRow) presetRow.style.display = compatibilityEnabled ? "" : "none";
-    if (versionsRow) versionsRow.style.display = compatibilityEnabled ? "" : "none";
-    if (testsRow) testsRow.style.display = compatibilityEnabled && !isDual ? "" : "none";
-    if (scenariosRow) scenariosRow.style.display = compatibilityEnabled && isDual ? "" : "none";
-    if (!compatibilityEnabled || !presetSelect || !versionsInput) return;
-    const preset = presetSelect.value || "active";
-    if (preset !== "custom" && !String(versionsInput.value || "").trim()) {
-        versionsInput.value = getAndroidVersionsForCompatibilityPreset(preset).join(", ");
-    }
-    renderCompatibilitySelectionOptions();
-}
-
-function getCheckedValuesFromContainer(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return [];
-    return Array.from(container.querySelectorAll("input[type='checkbox']:checked"))
-        .map(input => String(input.value || "").trim())
-        .filter(Boolean);
-}
-
-function getCompatibilitySelectionVersions() {
-    const versionsInput = document.getElementById("suite-usb-android-versions");
-    const presetSelect = document.getElementById("suite-usb-compatibility-preset");
-    const typedVersions = parseQaMultiValueInput(versionsInput?.value || "");
-    if (typedVersions.length > 0) return typedVersions;
-    return getAndroidVersionsForCompatibilityPreset(presetSelect?.value || "active");
-}
-
-function syncUsbCompatibilityPresetFromVersionsInput() {
-    const versionsInput = document.getElementById("suite-usb-android-versions");
-    const presetSelect = document.getElementById("suite-usb-compatibility-preset");
-    if (!versionsInput || !presetSelect) return;
-    if (String(versionsInput.value || "").trim()) {
-        presetSelect.value = "custom";
-    }
-}
-
-function getUsbLauncherSummaryModel() {
-    const testType = String(document.getElementById("suite-usb-test-type")?.value || "single-master");
-    const compatibilityMode = Boolean(document.getElementById("suite-usb-compatibility-mode")?.checked);
-    const suite = String(document.getElementById("suite-usb-suite")?.value || "commissioning");
-    const masterSerial = String(document.getElementById("suite-usb-master-serial")?.value || "auto").trim() || "auto";
-    const childSerial = String(document.getElementById("suite-usb-child-serial")?.value || "").trim();
-    const scenarioId = String(document.getElementById("suite-usb-dual-scenario")?.value || "").trim();
-    const selectedScenarioIds = getCheckedValuesFromContainer("suite-usb-compatibility-scenarios");
-    const selectedTestClasses = getCheckedValuesFromContainer("suite-usb-compatibility-tests");
-    const androidVersions = compatibilityMode ? getCompatibilitySelectionVersions() : [];
-    const options = [
-        Boolean(document.getElementById("suite-usb-install-apk")?.checked) ? "APK-Install" : "bestehende App",
-        Boolean(document.getElementById("suite-usb-skip-activation")?.checked) ? "ohne Aktivierung" : "mit Aktivierung",
-        Boolean(document.getElementById("suite-usb-parallel")?.checked) ? "parallel" : "sequenziell",
-    ];
-
-    const typeLabel = testType === "single-child"
-        ? "Kind-App"
-        : testType === "dual-device"
-            ? "Dual-Device"
-            : "Master-App";
-    const suiteLabel = suite === "default" ? "Alle Tests" : "Commissioning";
-    const targetLabel = testType === "dual-device"
-        ? `Master ${masterSerial} · Child ${childSerial || (compatibilityMode ? "auto" : "fehlt")}`
-        : masterSerial;
-    const scenarioLabel = compatibilityMode
-        ? (testType === "dual-device"
-            ? `${selectedScenarioIds.length || (scenarioId ? 1 : 0)} Szenario(s) ausgewählt`
-            : `${selectedTestClasses.length} Testklasse(n) ausgewählt`)
-        : (scenarioId || "Standardlauf");
-
-    return {
-        modeLabel: compatibilityMode ? `Matrixlauf · ${typeLabel}` : typeLabel,
-        suiteLabel,
-        targetLabel,
-        scenarioLabel,
-        androidLabel: compatibilityMode ? (androidVersions.join(", ") || "keine Version gewählt") : "nicht aktiv",
-        optionLabel: options.join(" · "),
-    };
-}
-
-function renderUsbLauncherSummary() {
-    const summaryEl = document.getElementById("suite-usb-summary");
-    if (!summaryEl) return;
-    const model = getUsbLauncherSummaryModel();
-    summaryEl.innerHTML = `
-        <article class='qa-register-item-card qa-usb-summary-card'>
-            <div class='qa-register-item-grid'>
-                <div>
-                    <span class='qa-register-item-label'>Lauf</span>
-                    <strong>${escapeHtml(model.modeLabel)}</strong>
-                </div>
-                <div>
-                    <span class='qa-register-item-label'>Suite</span>
-                    <strong>${escapeHtml(model.suiteLabel)}</strong>
-                </div>
-                <div>
-                    <span class='qa-register-item-label'>Ziel</span>
-                    <strong>${escapeHtml(model.targetLabel)}</strong>
-                </div>
-                <div>
-                    <span class='qa-register-item-label'>Szenario</span>
-                    <strong>${escapeHtml(model.scenarioLabel)}</strong>
-                </div>
-                <div>
-                    <span class='qa-register-item-label'>Android</span>
-                    <strong>${escapeHtml(model.androidLabel)}</strong>
-                </div>
-                <div>
-                    <span class='qa-register-item-label'>Optionen</span>
-                    <strong>${escapeHtml(model.optionLabel)}</strong>
-                </div>
-            </div>
-        </article>
-    `;
-}
-
-function renderCompatibilitySelectionOptions() {
-    const compatibilityToggle = document.getElementById("suite-usb-compatibility-mode");
-    const typeSelect = document.getElementById("suite-usb-test-type");
-    const testsContainer = document.getElementById("suite-usb-compatibility-tests");
-    const scenariosContainer = document.getElementById("suite-usb-compatibility-scenarios");
-    if (!testsContainer || !scenariosContainer) return;
-
-    const compatibilityEnabled = compatibilityToggle?.checked || false;
-    const testType = String(typeSelect?.value || "single-master");
-    if (!compatibilityEnabled) {
-        testsContainer.innerHTML = "<div class='info'>Android-Kompatibilitätsmatrix aktivieren, um Tests auszuwählen.</div>";
-        scenariosContainer.innerHTML = "<div class='info'>Android-Kompatibilitätsmatrix aktivieren, um Szenarien auszuwählen.</div>";
-        renderUsbLauncherSummary();
-        return;
-    }
-
-    const selectedVersions = getCompatibilitySelectionVersions();
-    const scenarios = Array.isArray(qaPlatformCatalogPayload?.dualDeviceScenarios) ? qaPlatformCatalogPayload.dualDeviceScenarios : [];
-    const mappings = Array.isArray(qaPlatformCatalogPayload?.androidScenarioMappings) ? qaPlatformCatalogPayload.androidScenarioMappings : [];
-    const selectedTests = new Set(getCheckedValuesFromContainer("suite-usb-compatibility-tests"));
-    const selectedScenarios = new Set(getCheckedValuesFromContainer("suite-usb-compatibility-scenarios"));
-    const allowedScenarioIds = new Set(
-        scenarios
-            .filter(item => {
-                const scenarioVersions = Array.isArray(item?.androidVersions) ? item.androidVersions.map(entry => String(entry || "").trim()).filter(Boolean) : [];
-                return selectedVersions.length === 0 || scenarioVersions.length === 0 || scenarioVersions.some(version => selectedVersions.includes(version));
-            })
-            .map(item => String(item?.scenarioId || "").trim())
-            .filter(Boolean),
-    );
-
-    if (testType === "dual-device") {
-        const compatibleScenarios = scenarios.filter(item => allowedScenarioIds.has(String(item?.scenarioId || "").trim()));
-        scenariosContainer.innerHTML = compatibleScenarios.length > 0
-            ? compatibleScenarios.map(item => {
-                const scenarioId = String(item?.scenarioId || "").trim();
-                const title = String(item?.title || scenarioId).trim();
-                const versions = Array.isArray(item?.androidVersions) ? item.androidVersions.map(entry => String(entry || "").trim()).filter(Boolean) : [];
-                const description = String(item?.description || "").trim();
-                return `
-                    <label class='data-row' style='display:grid;gap:2px'>
-                        <span><input type='checkbox' value='${escapeHtml(scenarioId)}' ${selectedScenarios.has(scenarioId) ? "checked" : ""} /> <strong>${escapeHtml(title)}</strong></span>
-                        <span class='qa-refresh-meta'>${escapeHtml(description || "Kein Beschreibungstext hinterlegt.")}</span>
-                        <span class='qa-refresh-meta'>Android: ${escapeHtml(versions.join(", ") || "offen")}</span>
-                    </label>
-                `;
-            }).join("")
-            : "<div class='info'>Keine passenden Dual-Device-Szenarien für die gewählten Android-Versionen im QA-Katalog gefunden.</div>";
-        testsContainer.innerHTML = "<div class='info'>Für Dual-Device-Läufe werden Szenarien statt Einzel-Testklassen ausgewählt.</div>";
-        return;
-    }
-
-    const role = testType === "single-child" ? "child" : "master";
-    const compatibleTests = [];
-    const seenTestClasses = new Set();
-    mappings.forEach(item => {
-        const mappingRole = String(item?.role || "").trim();
-        const testClass = String(item?.testClass || "").trim();
-        const scenarioId = String(item?.scenarioId || "").trim();
-        if (mappingRole !== role || !testClass || seenTestClasses.has(testClass)) return;
-        if (allowedScenarioIds.size > 0 && scenarioId && !allowedScenarioIds.has(scenarioId)) return;
-        seenTestClasses.add(testClass);
-        compatibleTests.push({
-            testClass,
-            testMethod: String(item?.testMethod || "").trim(),
-            scenarioId,
-            coverage: String(item?.coverage || "").trim(),
-            sourcePath: String(item?.sourcePath || "").trim(),
-        });
-    });
-
-    testsContainer.innerHTML = compatibleTests.length > 0
-        ? compatibleTests.map(item => `
-            <label class='data-row' style='display:grid;gap:2px'>
-                <span><input type='checkbox' value='${escapeHtml(item.testClass)}' ${selectedTests.has(item.testClass) ? "checked" : ""} /> <strong>${escapeHtml(item.testClass)}</strong></span>
-                <span class='qa-refresh-meta'>Szenario: ${escapeHtml(item.scenarioId || "ohne Zuordnung")} · Methode: ${escapeHtml(item.testMethod || "alle")}</span>
-                <span class='qa-refresh-meta'>Coverage: ${escapeHtml(item.coverage || "-")} · Quelle: ${escapeHtml(item.sourcePath || "-")}</span>
-            </label>
-        `).join("")
-        : "<div class='info'>Keine kompatiblen Testklassen für die gewählten Android-Versionen gefunden.</div>";
-    scenariosContainer.innerHTML = "<div class='info'>Für Einzel-App-Läufe werden Testklassen statt Dual-Device-Szenarien ausgewählt.</div>";
-    renderUsbLauncherSummary();
-}
-
-function buildUsbTestRunRequestPayload(input) {
-    const testType = String(input?.testType || "single-master");
-    const masterSerial = String(input?.masterSerial || "auto").trim() || "auto";
-    const childSerial = String(input?.childSerial || "").trim();
-    const androidVersions = Array.isArray(input?.androidVersions) ? input.androidVersions : [];
-    const compatibilityMode = Boolean(input?.compatibilityMode);
-    const selectedTestClasses = Array.isArray(input?.selectedTestClasses) ? input.selectedTestClasses.map(item => String(item || "").trim()).filter(Boolean) : [];
-    const selectedScenarioIds = Array.isArray(input?.selectedScenarioIds) ? input.selectedScenarioIds.map(item => String(item || "").trim()).filter(Boolean) : [];
-
-    if (compatibilityMode) {
-        if (androidVersions.length === 0) {
-            return { error: "Bitte mindestens eine Android-Version für den Kompatibilitätslauf angeben." };
-        }
-        if (testType === "dual-device" && selectedScenarioIds.length === 0 && !String(input?.scenarioId || "").trim()) {
-            return { error: "Bitte mindestens ein Dual-Device-Szenario für den Kompatibilitätslauf auswählen." };
-        }
-        if (testType !== "dual-device" && selectedTestClasses.length === 0) {
-            return { error: "Bitte mindestens eine automatisierte Testklasse für den Kompatibilitätslauf auswählen." };
-        }
-        return {
-            endpoint: "/api/suites/android-compatibility",
-            payload: {
-                executionMode: testType,
-                androidVersions,
-                serial: masterSerial === "auto" ? "auto" : masterSerial,
-                masterSerial: masterSerial || "auto",
-                childSerial: testType === "dual-device" ? (childSerial || "auto") : childSerial,
-                suite: String(input?.suite || "commissioning").trim() || "commissioning",
-                installApk: Boolean(input?.installApk),
-                skipActivation: Boolean(input?.skipActivation),
-                parallel: Boolean(input?.parallel),
-                scenarioId: String(input?.scenarioId || "").trim(),
-                selectedScenarioIds,
-                selectedTestClasses,
-                profileId: String(input?.profileId || "").trim(),
-                faultModes: Array.isArray(input?.faultModes) ? input.faultModes : [],
-            },
-        };
-    }
-
-    if (testType === "dual-device") {
-        if (!childSerial) {
-            return { error: "Bitte Child-Serial angeben fuer Dual-Device-Test." };
-        }
-        return {
-            endpoint: "/api/suites/dual-device",
-            payload: {
-                masterSerial: masterSerial || "auto",
-                childSerial,
-                installApk: Boolean(input?.installApk),
-                parallel: Boolean(input?.parallel),
-                scenarioId: String(input?.scenarioId || "").trim(),
-                profileId: String(input?.profileId || "").trim(),
-                faultModes: Array.isArray(input?.faultModes) ? input.faultModes : [],
-            },
-        };
-    }
-
-    return {
-        endpoint: "/api/suites/usb-test",
-        payload: {
-            appId: testType === "single-child" ? "child" : "master",
-            serial: masterSerial === "auto" ? "auto" : masterSerial,
-            suite: String(input?.suite || "commissioning").trim() || "commissioning",
-            installApk: Boolean(input?.installApk),
-            skipActivation: Boolean(input?.skipActivation),
-        },
-    };
-}
-
-function updateUsbTestTypeFormState() {
-    const typeSelect = document.getElementById("suite-usb-test-type");
-    const childRow = document.getElementById("suite-usb-child-serial-row");
-    const parallelRow = document.getElementById("suite-usb-parallel-row");
-    const scenarioRow = document.getElementById("suite-usb-dual-scenario-row");
-    const profileRow = document.getElementById("suite-usb-dual-profile-row");
-    const faultModesRow = document.getElementById("suite-usb-fault-modes-row");
-    const suiteRow = document.getElementById("suite-usb-suite-row");
-    const skipActivationRow = document.getElementById("suite-usb-skip-activation-row");
-    const visibility = getUsbFormVisibilityState(typeSelect?.value || "single-master");
-
-    if (childRow) childRow.style.display = visibility.showChildSerial ? "" : "none";
-    if (parallelRow) parallelRow.style.display = visibility.showParallel ? "" : "none";
-    if (scenarioRow) scenarioRow.style.display = visibility.showScenario ? "" : "none";
-    if (profileRow) profileRow.style.display = visibility.showProfile ? "" : "none";
-    if (faultModesRow) faultModesRow.style.display = visibility.showFaultModes ? "" : "none";
-    if (suiteRow) suiteRow.style.display = visibility.showSuite ? "" : "none";
-    if (skipActivationRow) skipActivationRow.style.display = visibility.showSkipActivation ? "" : "none";
-    syncUsbCompatibilityControls();
-    renderUsbLauncherSummary();
-}
-
-function syncDualDeviceCatalogOptions() {
-    const scenarioSelect = document.getElementById("suite-usb-dual-scenario");
-    const profileSelect = document.getElementById("suite-usb-dual-profile");
-    const scenarioHelp = document.getElementById("suite-usb-dual-scenario-help");
-    const scenarios = Array.isArray(qaPlatformCatalogPayload?.dualDeviceScenarios) ? qaPlatformCatalogPayload.dualDeviceScenarios : [];
-    const profiles = Array.isArray(qaPlatformCatalogPayload?.deviceProfiles)
-        ? qaPlatformCatalogPayload.deviceProfiles.filter(item => String(item?.deviceMode || "") === "dual-device")
-        : [];
-
-    if (scenarioSelect) {
-        const currentValue = scenarioSelect.value || "";
-        scenarioSelect.innerHTML = [
-            `<option value="">Standard-Dual-Device-Lauf</option>`,
-            ...scenarios.map(item => {
-                const scenarioId = String(item?.scenarioId || "");
-                const title = String(item?.title || scenarioId);
-                const priority = String(item?.priority || "");
-                return `<option value="${escapeHtml(scenarioId)}">${escapeHtml(priority ? `${priority} · ${title}` : title)}</option>`;
-            }),
-        ].join("");
-        if (currentValue && scenarios.some(item => String(item?.scenarioId || "") === currentValue)) {
-            scenarioSelect.value = currentValue;
-        }
-
-        const selected = scenarios.find(item => String(item?.scenarioId || "") === scenarioSelect.value) || null;
-        if (scenarioHelp) {
-            if (selected) {
-                const failureModes = Array.isArray(selected.failureModes) ? selected.failureModes.map(item => String(item)).filter(Boolean) : [];
-                const androidVersions = Array.isArray(selected.androidVersions) ? selected.androidVersions.map(item => String(item)).filter(Boolean) : [];
-                scenarioHelp.innerHTML = `${escapeHtml(String(selected.description || ""))}<br /><span class='qa-refresh-meta'>Android: ${escapeHtml(androidVersions.join(", ") || "offen")} · Fault-Modes: ${escapeHtml(failureModes.join(", ") || "keine vordefiniert")}</span>`;
-            } else {
-                scenarioHelp.innerHTML = "Optional: kanonisches Szenario aus dem QA-Katalog wählen, damit Laufhistorie und Fehlerbilder sauber klassifiziert werden.";
-            }
-        }
-
-
-    renderUsbLauncherSummary();
-        if (!scenarioSelect.__qaCatalogBound) {
-            scenarioSelect.addEventListener("change", syncDualDeviceCatalogOptions);
-            scenarioSelect.__qaCatalogBound = true;
-        }
-    }
-
-    if (profileSelect) {
-        const currentValue = profileSelect.value || "";
-        profileSelect.innerHTML = [
-            `<option value="">Kein Profil erzwungen</option>`,
-            ...profiles.map(item => {
-                const profileId = String(item?.profileId || "");
-                const displayName = String(item?.displayName || profileId);
-                const networkProfile = String(item?.networkProfile || "");
-                return `<option value="${escapeHtml(profileId)}">${escapeHtml(networkProfile ? `${displayName} · ${networkProfile}` : displayName)}</option>`;
-            }),
-        ].join("");
-        if (currentValue && profiles.some(item => String(item?.profileId || "") === currentValue)) {
-            profileSelect.value = currentValue;
-        }
-    }
-
-    renderCompatibilitySelectionOptions();
-}
-
-function syncEmulatorReservationOptions() {
-    const reservationAndroidSelect = document.getElementById("qa-emulator-reservation-android-version");
-    const avdAndroidSelect = document.getElementById("qa-emulator-avd-android-version");
-    const reservationProfileSelect = document.getElementById("qa-emulator-reservation-profile");
-    const avdProfileSelect = document.getElementById("qa-emulator-avd-profile");
-    const matrix = Array.isArray(qaPlatformCatalogPayload?.androidMatrix) ? qaPlatformCatalogPayload.androidMatrix : [];
-    const profiles = Array.isArray(qaPlatformCatalogPayload?.deviceProfiles) ? qaPlatformCatalogPayload.deviceProfiles : [];
-
-    const applyAndroidOptions = (selectEl) => {
-        if (!selectEl) return;
-        const currentValue = selectEl.value || "";
-        selectEl.innerHTML = [
-            `<option value="">Android-Version wählen</option>`,
-            ...matrix.map(item => {
-                const androidVersion = String(item?.androidVersion || "");
-                const apiLevel = String(item?.apiLevel || "");
-                return `<option value="${escapeHtml(androidVersion)}">${escapeHtml(apiLevel ? `Android ${androidVersion} · API ${apiLevel}` : `Android ${androidVersion}`)}</option>`;
-            }),
-        ].join("");
-        if (currentValue && matrix.some(item => String(item?.androidVersion || "") === currentValue)) {
-            selectEl.value = currentValue;
-        }
-    };
-
-    const applyProfileOptions = (selectEl) => {
-        if (!selectEl) return;
-        const currentValue = selectEl.value || "";
-        selectEl.innerHTML = [
-            `<option value="">Geräteprofil wählen</option>`,
-            ...profiles.map(item => {
-                const profileId = String(item?.profileId || "");
-                const displayName = String(item?.displayName || profileId);
-                const deviceMode = String(item?.deviceMode || "single-device");
-                return `<option value="${escapeHtml(profileId)}">${escapeHtml(`${displayName} · ${deviceMode}`)}</option>`;
-            }),
-        ].join("");
-        if (currentValue && profiles.some(item => String(item?.profileId || "") === currentValue)) {
-            selectEl.value = currentValue;
-        }
-    };
-
-    applyAndroidOptions(reservationAndroidSelect);
-    applyAndroidOptions(avdAndroidSelect);
-    applyProfileOptions(reservationProfileSelect);
-    applyProfileOptions(avdProfileSelect);
-}
-
-async function startEmulatorAvd(avdName) {
-    if (!isPythonOperator || !avdName) return;
-
-    try {
-        const res = await fetch("/api/qa/emulators/start", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                avdName,
-                headless: true,
-                wipeData: false,
-                noSnapshot: true,
-            }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Emulator konnte nicht gestartet werden.");
-        showNotification(`Emulator-Job ${data.jobId || ""} für ${avdName} eingereiht.`, "success");
-        await loadEmulatorLabOverview();
-        await loadQaReleaseWorkspace();
-    } catch (error) {
-        showNotification("Emulatorstart fehlgeschlagen: " + error.message, "error");
-    }
-}
-
-async function stopRunningEmulator(serial) {
-    if (!isPythonOperator || !serial) return;
-
-    try {
-        const res = await fetch("/api/qa/emulators/stop", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ serial }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Emulator konnte nicht beendet werden.");
-        showNotification(`Emulator-Stopp als Job ${data.jobId || ""} eingereiht.`, "success");
-        await loadEmulatorLabOverview();
-        await loadQaReleaseWorkspace();
-    } catch (error) {
-        showNotification("Emulator-Stopp fehlgeschlagen: " + error.message, "error");
-    }
-}
-
-function renderQaPlatformOverview(payload = qaPlatformCatalogPayload) {
-    const el = document.getElementById("qa-platform-overview");
-    if (!el) return;
-
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "QA-Plattformdaten sind nur im Python-Operator verfügbar.");
-        return;
-    }
-
-    if (!payload) {
-        replaceElementWithState(el, "info", "Noch kein QA-Katalog geladen.");
-        return;
-    }
-
-    const androidMatrix = Array.isArray(payload.androidMatrix) ? payload.androidMatrix : [];
-    const deviceProfiles = Array.isArray(payload.deviceProfiles) ? payload.deviceProfiles : [];
-    const dualDeviceScenarios = Array.isArray(payload.dualDeviceScenarios) ? payload.dualDeviceScenarios : [];
-    const androidScenarioMappings = Array.isArray(payload.androidScenarioMappings) ? payload.androidScenarioMappings : [];
-    const suiteEntries = Array.isArray(payload.suiteEntries) ? payload.suiteEntries : [];
-    const criticalBacklog = Array.isArray(payload.criticalBacklog) ? payload.criticalBacklog : [];
-    const registerSummary = payload.registerSummary || {};
-
-    const dualProfiles = deviceProfiles.filter(item => String(item?.deviceMode || "") === "dual-device");
-    const highestPriorityScenarios = dualDeviceScenarios
-        .filter(item => ["P0", "P1"].includes(String(item?.priority || "")))
-        .slice(0, 4);
-
-    el.innerHTML = `
-        <div class='qa-refresh-grid'>
-            <article class='qa-refresh-card is-success'>
-                <strong>Android-Matrix</strong>
-                <span>${androidMatrix.length} Versionen im Katalog</span>
-                <div class='qa-refresh-meta'>Abdeckung: ${escapeHtml(androidMatrix.map(item => String(item?.androidVersion || "")).filter(Boolean).join(", ") || "-")}</div>
-            </article>
-            <article class='qa-refresh-card is-success'>
-                <strong>Geräteprofile</strong>
-                <span>${deviceProfiles.length} Profile, davon ${dualProfiles.length} Dual-Device</span>
-                <div class='qa-refresh-meta'>Suite-Referenzen: ${escapeHtml(String(suiteEntries.length))}</div>
-            </article>
-            <article class='qa-refresh-card is-success'>
-                <strong>Android-Szenario-Mapping</strong>
-                <span>${androidScenarioMappings.length} Bindungen zwischen Szenario und Testklasse</span>
-                <div class='qa-refresh-meta'>Master: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "master").length))} · Child: ${escapeHtml(String(androidScenarioMappings.filter(item => item.role === "child").length))} · Offen: ${escapeHtml(String(payload.summary?.unmappedScenarioCount || 0))}</div>
-            </article>
-            <article class='qa-refresh-card ${criticalBacklog.length > 0 ? "is-loading" : "is-success"}'>
-                <strong>Priorisierte Lücken</strong>
-                <span>${criticalBacklog.length} offene P0/P1-Backlogpunkte</span>
-                <div class='qa-refresh-meta'>Blocker: ${escapeHtml(String(registerSummary.blocking || 0))} · Stale: ${escapeHtml(String(registerSummary.stale || 0))}</div>
-            </article>
-        </div>
-        <div class='qa-platform-table-wrap' style='margin-block-start: 12px'>
-            <table class='qa-platform-table'>
-                <thead>
-                    <tr>
-                        <th>Android</th>
-                        <th>API</th>
-                        <th>Tier</th>
-                        <th>Status</th>
-                        <th>Empfohlene Profile</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${androidMatrix.map(item => `
-                        <tr>
-                            <td><strong>${escapeHtml(String(item?.androidVersion || "-"))}</strong></td>
-                            <td>${escapeHtml(String(item?.apiLevel || "-"))}</td>
-                            <td>${escapeHtml(String(item?.coverageTier || "-"))}</td>
-                            <td>${escapeHtml(String(item?.status || "-"))}</td>
-                            <td>${escapeHtml((Array.isArray(item?.recommendedProfiles) ? item.recommendedProfiles : []).map(entry => String(entry)).filter(Boolean).join(", ") || "-")}</td>
-                        </tr>
-                    `).join("")}
-                </tbody>
-            </table>
-        </div>
-        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
-            <section class='python-clarity-box'>
-                <strong>Dual-Device-Szenarien mit Vorrang</strong><br />
-                ${highestPriorityScenarios.length > 0 ? highestPriorityScenarios.map(item => {
-                    const failureModes = Array.isArray(item.failureModes) ? item.failureModes.map(entry => String(entry)).filter(Boolean).join(", ") : "";
-                    return `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.priority || "P?"))}</strong> ${escapeHtml(String(item?.title || item?.scenarioId || "-"))}<span>${escapeHtml(failureModes || "keine Fault-Modes hinterlegt")}</span></div>`;
-                }).join("") : "Keine priorisierten Szenarien im Katalog."}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Nächste Plattformarbeiten</strong><br />
-                ${criticalBacklog.slice(0, 4).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.priority || "-"))}</strong> ${escapeHtml(String(item?.title || item?.id || "-"))}<span>${escapeHtml(String(item?.owner || item?.team || "Owner offen"))}</span></div>`).join("") || "Keine kritischen Backlogeinträge vorhanden."}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Android-Testbindungen</strong><br />
-                ${androidScenarioMappings.slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item?.scenarioId || "-"))}</strong> ${escapeHtml(String(item?.testClass || "-"))}<span>${escapeHtml(String(item?.testMethod || "-"))}</span></div>`).join("") || "Noch keine Android-Szenario-Bindungen vorhanden."}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Offene Szenario-Abdeckung</strong><br />
-                ${(Array.isArray(payload.summary?.unmappedScenarioIds) ? payload.summary.unmappedScenarioIds : []).slice(0, 5).map(item => `<div class='qa-platform-mini-row'><strong>${escapeHtml(String(item))}</strong><span>Noch keine Android-Bindung hinterlegt</span></div>`).join("") || "Alle Szenarien sind an Android-Tests gebunden."}
-            </section>
-        </div>
-    `;
-}
-
-function renderEmulatorLabOverview(payload = emulatorLabPayload) {
-    const el = document.getElementById("qa-emulator-lab");
-    if (!el) return;
-
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "Emulatorstatus ist nur im Python-Operator verfügbar.");
-        return;
-    }
-
-    if (!payload) {
-        replaceElementWithState(el, "info", "Noch kein Emulator-Labor geladen.");
-        return;
-    }
-
-    const availableAvds = Array.isArray(payload.availableAvds) ? payload.availableAvds : [];
-    const runningEmulators = Array.isArray(payload.runningEmulators) ? payload.runningEmulators : [];
-    const reservations = Array.isArray(payload.reservations) ? payload.reservations : [];
-    const matrixPlan = Array.isArray(payload.matrixPlan) ? payload.matrixPlan : [];
-
-    const statusCards = [
-        { title: "SDK", ok: Boolean(payload.sdkConfigured), detail: payload.sdkConfigured ? (payload.sdkRoot || "Pfad erkannt") : "Nicht konfiguriert" },
-        { title: "ADB", ok: Boolean(payload.adbAvailable), detail: payload.adbAvailable ? "Verfügbar" : "Nicht verfügbar" },
-        { title: "Emulator-Binary", ok: Boolean(payload.emulatorBinaryAvailable), detail: payload.emulatorBinaryAvailable ? "Gefunden" : "Fehlt" },
-        { title: "AVD Manager", ok: Boolean(payload.avdManagerAvailable), detail: payload.avdManagerAvailable ? "Gefunden" : "Fehlt" },
-    ];
-
-    const availableAvdsHtml = availableAvds.length > 0
-        ? `<div class='qa-register-card-list'>${availableAvds.map(name => `
-            <article class='qa-register-item-card qa-emulator-item-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>${escapeHtml(String(name))}</h6>
-                    </div>
-                    <span class='python-status-badge python-status-not_run'>AVD</span>
-                </div>
-                <div class='suite-catalog-action'>
-                    <button type='button' class='btn btn-secondary btn-sm' onclick="startEmulatorAvd('${escapeHtml(String(name))}')">Starten</button>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "Keine AVDs erkannt.";
-
-    const runningEmulatorsHtml = runningEmulators.length > 0
-        ? `<div class='qa-register-card-list'>${runningEmulators.map(item => `
-            <article class='qa-register-item-card qa-emulator-item-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>${escapeHtml(String(item?.serial || "-"))}</h6>
-                        <div class='python-muted-caption'>${escapeHtml(String(item?.model || item?.device || "Emulator"))}</div>
-                    </div>
-                    <span class='python-status-badge ${String(item?.state || '').toLowerCase() === 'device' ? 'python-status-pass' : 'python-status-manual_required'}'>${escapeHtml(String(item?.state || 'unknown'))}</span>
-                </div>
-                <div class='suite-catalog-action'>
-                    <button type='button' class='btn btn-secondary btn-sm' onclick="stopRunningEmulator('${escapeHtml(String(item?.serial || ""))}')">Stoppen</button>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "Keine laufenden Emulatoren erkannt.";
-
-    const reservationsHtml = reservations.length > 0
-        ? `<div class='qa-register-card-list'>${reservations.slice(0, 5).map(item => `
-            <article class='qa-register-item-card qa-emulator-item-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>${escapeHtml(String(item?.androidVersion || '-'))}</h6>
-                        <div class='python-muted-caption'>${escapeHtml(String(item?.profileId || '-'))}</div>
-                    </div>
-                    <span class='python-status-badge python-status-running'>reserviert</span>
-                </div>
-                <p class='qa-register-item-detail'>${escapeHtml(String(item?.owner || '-'))} · ${escapeHtml(String(item?.purpose || '-'))}</p>
-                <div class='suite-catalog-action'>
-                    <button type='button' class='btn btn-secondary btn-sm' onclick="releaseEmulatorReservation('${escapeHtml(String(item?.reservationId || ""))}')">Freigeben</button>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "Keine aktiven Reservierungen.";
-
-    const matrixPlanHtml = matrixPlan.length > 0
-        ? `<div class='qa-register-card-list'>${matrixPlan.slice(0, 8).map(item => `
-            <article class='qa-register-item-card qa-emulator-item-card'>
-                <div class='qa-register-item-header'>
-                    <div>
-                        <h6>${escapeHtml(String(item?.planId || '-'))}</h6>
-                        <div class='python-muted-caption'>${escapeHtml(String(item?.profileDisplayName || item?.profileId || '-'))}</div>
-                    </div>
-                    <span class='python-status-badge python-status-not_run'>${escapeHtml(String(item?.deviceMode || '-'))}</span>
-                </div>
-                <div class='qa-register-item-grid'>
-                    <div>
-                        <span class='qa-register-item-label'>Android</span>
-                        <strong>${escapeHtml(String(item?.androidVersion || '-'))} / API ${escapeHtml(String(item?.apiLevel || '-'))}</strong>
-                    </div>
-                    <div>
-                        <span class='qa-register-item-label'>Netz</span>
-                        <strong>${escapeHtml(String(item?.networkProfile || '-'))}</strong>
-                    </div>
-                </div>
-            </article>
-        `).join("")}</div>`
-        : "Noch kein Matrixplan verfügbar.";
-
-    el.innerHTML = `
-        <div class='qa-refresh-grid'>
-            ${statusCards.map(card => `
-                <article class='qa-refresh-card ${card.ok ? "is-success" : "is-error"}'>
-                    <strong>${escapeHtml(card.title)}</strong>
-                    <span>${escapeHtml(card.detail)}</span>
-                </article>
-            `).join("")}
-        </div>
-        <div class='qa-platform-mini-grid' style='margin-block-start: 12px'>
-            <section class='python-clarity-box'>
-                <strong>Verfügbare AVDs</strong><br />
-                ${availableAvdsHtml}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Laufende Emulatoren</strong><br />
-                ${runningEmulatorsHtml}
-            </section>
-            <section class='python-clarity-box'>
-                <strong>Aktive Reservierungen</strong><br />
-                ${reservationsHtml}
-            </section>
-        </div>
-        <section class='python-clarity-box' style='margin-block-start: 12px'>
-            <strong>Matrixplan</strong><br />
-            ${matrixPlanHtml}
-        </section>
-    `;
-}
-
-async function createEmulatorReservation() {
-    if (!isPythonOperator) return;
-
-    const androidVersion = (document.getElementById("qa-emulator-reservation-android-version")?.value || "").trim();
-    const profileId = (document.getElementById("qa-emulator-reservation-profile")?.value || "").trim();
-    const owner = (document.getElementById("qa-emulator-owner")?.value || "").trim();
-    const purpose = (document.getElementById("qa-emulator-purpose")?.value || "").trim();
-    const ttlMinutes = Number(document.getElementById("qa-emulator-ttl")?.value || 120);
-
-    if (!androidVersion || !profileId || !owner || !purpose) {
-        showNotification("Für eine Emulator-Reservierung sind Android-Version, Profil, Owner und Zweck erforderlich.", "error");
-        return;
-    }
-
-    try {
-        const res = await fetch("/api/qa/emulators/reservations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                androidVersion,
-                profileId,
-                owner,
-                purpose,
-                ttlMinutes,
-            }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Reservierung konnte nicht erstellt werden.");
-        showNotification(`Reservierungs-Job ${data.jobId || ""} eingereiht.`, "success");
-        await loadEmulatorLabOverview();
-        await loadQaReleaseWorkspace();
-    } catch (error) {
-        showNotification("Reservierung fehlgeschlagen: " + error.message, "error");
-    }
-}
-
-async function createEmulatorAvd() {
-    if (!isPythonOperator) return;
-
-    const androidVersion = (document.getElementById("qa-emulator-avd-android-version")?.value || "").trim();
-    const profileId = (document.getElementById("qa-emulator-avd-profile")?.value || "").trim();
-    const avdName = (document.getElementById("qa-emulator-avd-name")?.value || "").trim();
-
-    if (!androidVersion || !profileId || !avdName) {
-        showNotification("Für ein neues AVD sind Android-Version, Profil und AVD-Name erforderlich.", "error");
-        return;
-    }
-
-    try {
-        const res = await fetch("/api/qa/emulators/create", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                androidVersion,
-                profileId,
-                avdName,
-            }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "AVD konnte nicht erstellt werden.");
-        showNotification(`AVD-Job ${data.jobId || ""} eingereiht.`, "success");
-        await loadEmulatorLabOverview();
-        await loadQaReleaseWorkspace();
-    } catch (error) {
-        showNotification("AVD-Erstellung fehlgeschlagen: " + error.message, "error");
-    }
-}
-
-async function releaseEmulatorReservation(reservationId) {
-    if (!isPythonOperator || !reservationId) return;
-
-    try {
-        const res = await fetch("/api/qa/emulators/release", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reservationId }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Reservierung konnte nicht freigegeben werden.");
-        showNotification(`Freigabe-Job ${data.jobId || ""} für ${reservationId} eingereiht.`, "success");
-        await loadEmulatorLabOverview();
-        await loadQaReleaseWorkspace();
-    } catch (error) {
-        showNotification("Freigabe fehlgeschlagen: " + error.message, "error");
-    }
-}
-
-async function loadQaPlatformCatalog() {
-    const el = document.getElementById("qa-platform-overview");
-    if (!el) return { ok: false, message: "QA-Plattform-Container fehlt." };
-    if (!isPythonOperator) {
-        renderQaPlatformOverview(null);
-        setQaRefreshSectionState("qaPlatform", "error", "Nur im Python-Operator verfügbar");
-        return { ok: false, message: "Nur im Python-Operator verfügbar." };
-    }
-    replaceElementWithState(el, "loading", "Lade QA-Katalog...");
-    setQaRefreshSectionState("qaPlatform", "loading", "Lädt…");
-    try {
-        const res = await fetch("/api/qa/catalog");
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
-        qaPlatformCatalogPayload = data;
-        renderQaPlatformOverview(data);
-        renderQaArtifactsOverview();
-        syncDualDeviceCatalogOptions();
-        syncEmulatorReservationOptions();
-        syncUsbCompatibilityControls();
-        setQaRefreshSectionState("qaPlatform", "success", `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen`);
-        return { ok: true, message: `${(data.dualDeviceScenarios || []).length} Szenario(s) geladen.` };
-    } catch (err) {
-        qaPlatformCatalogPayload = null;
-        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
-        renderQaArtifactsOverview();
-        syncDualDeviceCatalogOptions();
-        syncEmulatorReservationOptions();
-        syncUsbCompatibilityControls();
-        setQaRefreshSectionState("qaPlatform", "error", err.message || "Fehler beim Laden");
-        return { ok: false, message: err.message || "Fehler beim Laden" };
-    }
-}
-
-async function loadEmulatorLabOverview() {
-    const el = document.getElementById("qa-emulator-lab");
-    if (!el) return { ok: false, message: "Emulator-Labor-Container fehlt." };
-    if (!isPythonOperator) {
-        renderEmulatorLabOverview(null);
-        setQaRefreshSectionState("emulators", "error", "Nur im Python-Operator verfügbar");
-        return { ok: false, message: "Nur im Python-Operator verfügbar." };
-    }
-    replaceElementWithState(el, "loading", "Lade Emulator-Labor...");
-    setQaRefreshSectionState("emulators", "loading", "Lädt…");
-    try {
-        const res = await fetch("/api/qa/emulators");
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
-        emulatorLabPayload = data;
-        renderEmulatorLabOverview(data);
-        setQaRefreshSectionState("emulators", "success", `${Number(data.availableAvdCount || 0)} AVD(s), ${Number(data.reservationCount || 0)} Reservierungen`);
-        return { ok: true, message: `${Number(data.availableAvdCount || 0)} AVD(s), ${Number(data.reservationCount || 0)} Reservierungen.` };
-    } catch (err) {
-        emulatorLabPayload = null;
-        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
-        setQaRefreshSectionState("emulators", "error", err.message || "Fehler beim Laden");
-        return { ok: false, message: err.message || "Fehler beim Laden" };
-    }
-}
-
-async function loadSuiteDeviceStatus() {
-    const el = document.getElementById("suite-device-status");
-    if (!el) return { ok: false, message: "Gerätestatus-Container fehlt." };
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "Geraetestatus ist nur im Python-Operator verfuegbar.");
-        setQaRefreshSectionState("devices", "error", "Nur im Python-Operator verfügbar");
-        return { ok: false, message: "Nur im Python-Operator verfügbar." };
-    }
-    replaceElementWithState(el, "loading", "Lade Geraetestatus...");
-    setQaRefreshSectionState("devices", "loading", "Lädt…");
-    try {
-        const res = await fetch("/api/suites/devices");
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
-        if (!data.adbAvailable) {
-            replaceElementWithState(el, "error", "ADB ist nicht verfuegbar. Bitte Android SDK installieren.");
-            setQaRefreshSectionState("devices", "error", "ADB nicht verfügbar");
-            return { ok: false, message: "ADB nicht verfügbar." };
-        }
-        if (!data.devices || data.devices.length === 0) {
-            replaceElementWithState(el, "info", "Keine Geraete angeschlossen.");
-            setQaRefreshSectionState("devices", "success", "Keine Geräte angeschlossen");
-            return { ok: true, message: "Keine Geräte angeschlossen." };
-        }
-        el.innerHTML = `
-            <div class='qa-register-card-list'>
-                ${data.devices.map(d => `
-                    <article class='qa-register-item-card qa-device-status-card'>
-                        <div class='qa-register-item-header'>
-                            <div>
-                                <h6>${escapeHtml(d.serial)}</h6>
-                                <div class='python-muted-caption'>${escapeHtml(d.model || 'Unbekanntes Gerät')}</div>
-                            </div>
-                            <span class='python-status-badge ${d.state === 'device' ? 'python-status-pass' : 'python-status-fail'}'>${escapeHtml(d.state)}</span>
-                        </div>
-                        <div class='qa-register-item-grid'>
-                            <div>
-                                <span class='qa-register-item-label'>Android</span>
-                                <strong>${escapeHtml(d.androidVersion || '?')}</strong>
-                            </div>
-                        </div>
-                    </article>
-                `).join('')}
-            </div>
-        `;
-        setQaRefreshSectionState("devices", "success", `${data.devices.length} Gerät(e) erkannt`);
-        return { ok: true, message: `${data.devices.length} Gerät(e) erkannt.` };
-    } catch (err) {
-        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
-        setQaRefreshSectionState("devices", "error", err.message || "Fehler beim Laden");
-        return { ok: false, message: err.message || "Fehler beim Laden" };
-    }
-}
-
-function getSuiteCatalogItemId(item) {
-    return String(item?.suiteId || item?.id || "");
-}
-
-function getSuiteCatalogItemReady(item) {
-    if (typeof item?.prereqsMet === "boolean") return item.prereqsMet;
-    if (typeof item?.prereqs_met === "boolean") return item.prereqs_met;
-    return false;
-}
-
-function getSuiteCatalogItemReason(item) {
-    return String(item?.prereqReason || item?.missing_prereqs || "");
-}
-
-function syncSuiteGroupFilterOptions(suites) {
-    const filterEl = document.getElementById("suite-group-filter");
-    if (!filterEl) return;
-
-    const currentValue = filterEl.value || "all";
-    const groups = [...new Set((Array.isArray(suites) ? suites : []).map(item => String(item?.group || "")).filter(Boolean))]
-        .sort((left, right) => left.localeCompare(right, "de"));
-    const labels = {
-        android: "Android",
-        backend: "Backend",
-        device: "Device/USB",
-        ios: "iOS / extern",
-        python: "Python",
-        release: "Release",
-    };
-
-    filterEl.innerHTML = [
-        `<option value="all">Alle Gruppen</option>`,
-        ...groups.map(group => `<option value="${escapeHtml(group)}">${escapeHtml(labels[group] || group)}</option>`),
-    ].join("");
-
-    filterEl.value = groups.includes(currentValue) || currentValue === "all" ? currentValue : "all";
-}
-
-async function loadSuiteCatalog() {
-    const el = document.getElementById("suite-catalog");
-    if (!el) return { ok: false, message: "Suite-Katalog-Container fehlt." };
-    if (!isPythonOperator) {
-        replaceElementWithState(el, "info", "Suite-Katalog ist nur im Python-Operator verfuegbar.");
-        setQaRefreshSectionState("suites", "error", "Nur im Python-Operator verfügbar");
-        return { ok: false, message: "Nur im Python-Operator verfügbar." };
-    }
-    replaceElementWithState(el, "loading", "Lade Katalog...");
-    setQaRefreshSectionState("suites", "loading", "Lädt…");
-    try {
-        const res = await fetch("/api/suites");
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
-        renderSuiteCatalog(data.suites || []);
-        setQaRefreshSectionState("suites", "success", `${(data.suites || []).length} Suite(s) geladen`);
-        return { ok: true, message: `${(data.suites || []).length} Suite(s) geladen.` };
-    } catch (err) {
-        replaceElementWithState(el, "error", String(err.message || "Fehler beim Laden"));
-        setQaRefreshSectionState("suites", "error", err.message || "Fehler beim Laden");
-        return { ok: false, message: err.message || "Fehler beim Laden" };
-    }
-}
-
-function renderSuiteCatalog(suites) {
-    const el = document.getElementById("suite-catalog");
-    if (!el) return;
-    suiteCatalogPayload = Array.isArray(suites) ? suites : [];
-    renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
-    syncSuiteGroupFilterOptions(suiteCatalogPayload);
-    const groupFilter = document.getElementById("suite-group-filter")?.value || "all";
-    const readyOnly = document.getElementById("suite-ready-only")?.checked || false;
-
-    let filtered = suites;
-    if (groupFilter !== "all") filtered = filtered.filter(s => s.group === groupFilter);
-    if (readyOnly) filtered = filtered.filter(s => getSuiteCatalogItemReady(s));
-
-    if (filtered.length === 0) {
-        replaceElementWithState(el, "info", "Keine Suiten gefunden.");
-        return;
-    }
-
-    const groupMap = {};
-    for (const s of filtered) {
-        const g = s.group || "sonstige";
-        if (!groupMap[g]) groupMap[g] = [];
-        groupMap[g].push(s);
-    }
-
-    const groupLabels = { backend: "Backend", android: "Android", device: "Device/USB", ios: "iOS / extern", python: "Python", release: "Release", sonstige: "Sonstige" };
-
-    el.innerHTML = `<div class="suite-catalog-groups">${Object.entries(groupMap).map(([group, items]) => {
-        const readyCount = items.filter(getSuiteCatalogItemReady).length;
-        const blockedCount = items.length - readyCount;
-        return `
-            <section class="suite-catalog-group">
-                <header class="suite-catalog-group-header">
-                    <div>
-                        <h6>${escapeHtml(groupLabels[group] || group)}</h6>
-                        <div class="suite-catalog-group-meta">${readyCount} bereit · ${blockedCount} blockiert</div>
-                    </div>
-                    <span class="suite-catalog-group-count">${items.length} Suite${items.length === 1 ? "" : "n"}</span>
-                </header>
-                <div class="qa-register-card-list suite-catalog-card-list">${items.map(s => {
-                    const suiteId = getSuiteCatalogItemId(s);
-                    const subtitle = s.title || "Kein Kurztitel hinterlegt";
-                    const description = s.command || s.description || "Keine Beschreibung hinterlegt.";
-                    const scopeNote = String(s.scopeNote || "");
-                    const isReady = getSuiteCatalogItemReady(s);
-                    const isExternalEvidenceSuite = String(s.executionMode || "") === "external-evidence";
-                    const prereqText = isReady ? "Alle Voraussetzungen erfüllt" : (getSuiteCatalogItemReason(s) || "Nicht bereit");
-                    const executionStatus = getSuiteCatalogExecutionStatus(s);
-                    const executionField = renderTriStateStatusField(executionStatus.state, "suite-status-field", "suite-status-cell");
-                    const latestRun = getLatestSuiteRunIndex().get(suiteId);
-                    const latestRunMeta = latestRun
-                        ? `Run ${String(latestRun.runId || latestRun.run_id || "-")} · ${String(latestRun.startedAt || latestRun.started_at || latestRun.timestamp || "")}`
-                        : "Noch kein Lauf vorhanden";
-                    const readinessBadgeClass = isReady ? "python-status-pass" : "python-status-fail";
-                    const executionBadgeClass = executionStatus.state === "ok"
-                        ? "python-status-pass"
-                        : executionStatus.state === "fail"
-                            ? "python-status-fail"
-                            : "python-status-manual_required";
-                    const actionHtml = isExternalEvidenceSuite
-                        ? `
-                            <div class="suite-catalog-action is-external">
-                                <button onclick="openPythonAutomationProtocol('${encodeURIComponent(String(s.evidenceTargetId || suiteId))}')" class="btn btn-secondary btn-sm">Extern protokollieren</button>
-                                <div class="suite-catalog-action-note">Externer macOS/Xcode-Lauf. Ergebnis anschließend als Evidenz im QA-Formular festhalten.</div>
-                            </div>
-                        `
-                        : `<div class="suite-catalog-action"><button onclick="startSuiteRun('${encodeURIComponent(suiteId)}')" class="btn btn-secondary btn-sm" ${isReady ? '' : 'disabled'}>Starten</button></div>`;
-
-                    return `
-                        <article class="qa-register-item-card suite-catalog-compact-card">
-                            <div class="qa-register-item-header">
-                                <div>
-                                    <h6>${escapeHtml(suiteId)}</h6>
-                                    <div class="python-muted-caption">${escapeHtml(subtitle)}</div>
-                                </div>
-                                <div class="qa-register-item-badges">
-                                    <span class="python-status-badge ${readinessBadgeClass}">${isReady ? 'Bereit' : 'Blockiert'}</span>
-                                    <span class="python-status-badge ${executionBadgeClass}">${escapeHtml(executionStatus.label || 'OPEN')}</span>
-                                </div>
-                            </div>
-                            <p class="qa-register-item-detail">${escapeHtml(description)}</p>
-                            ${scopeNote ? `<div class="suite-catalog-scope-note">${escapeHtml(scopeNote)}</div>` : ""}
-                            <div class="qa-register-item-grid">
-                                <div>
-                                    <span class="qa-register-item-label">Voraussetzungen</span>
-                                    <strong>${escapeHtml(prereqText)}</strong>
-                                </div>
-                                <div>
-                                    <span class="qa-register-item-label">Letzter Lauf</span>
-                                    <strong>${escapeHtml(latestRunMeta)}</strong>
-                                </div>
-                            </div>
-                            <div class="suite-catalog-status-block">
-                                <span class="suite-catalog-status-label">Teststatus</span>
-                                ${executionField}
-                                <span class="suite-catalog-status-caption">${escapeHtml(executionStatus.detail)}</span>
-                            </div>
-                            ${actionHtml}
-                        </article>`;
-                }).join("")}</div>
-            </section>
-        `;
-    }).join("")}</div>`;
-}
 
 async function startSuiteRun(suiteId) {
     if (!isPythonOperator) return;
@@ -6137,74 +4372,13 @@ async function startSuiteRun(suiteId) {
             },
             ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || "")),
         ];
-        rerenderSuiteCatalogFromCache();
+        rerenderQaExecutionGuideFromCache();
         showNotification(`Suite '${decodedSuiteId}' gestartet (Run-ID: ${data.runId}).`, "success");
         pollSuiteRunStatus(data.runId);
         appendSuiteActiveRun(data.runId, decodedSuiteId);
     } catch (err) {
         showNotification("Suite-Start fehlgeschlagen: " + err.message, "error");
     }
-}
-
-async function startUsbTestRun() {
-    if (!isPythonOperator) return;
-    const request = buildUsbTestRunRequestPayload({
-        testType: document.getElementById("suite-usb-test-type")?.value || "single-master",
-        masterSerial: document.getElementById("suite-usb-master-serial")?.value || "auto",
-        childSerial: document.getElementById("suite-usb-child-serial")?.value || "",
-        scenarioId: document.getElementById("suite-usb-dual-scenario")?.value || "",
-        selectedScenarioIds: getCheckedValuesFromContainer("suite-usb-compatibility-scenarios"),
-        selectedTestClasses: getCheckedValuesFromContainer("suite-usb-compatibility-tests"),
-        profileId: document.getElementById("suite-usb-dual-profile")?.value || "",
-        faultModes: parseQaMultiValueInput(document.getElementById("suite-usb-fault-modes")?.value || ""),
-        suite: document.getElementById("suite-usb-suite")?.value || "commissioning",
-        compatibilityMode: document.getElementById("suite-usb-compatibility-mode")?.checked || false,
-        androidVersions: parseQaMultiValueInput(document.getElementById("suite-usb-android-versions")?.value || ""),
-        installApk: document.getElementById("suite-usb-install-apk")?.checked || false,
-        skipActivation: document.getElementById("suite-usb-skip-activation")?.checked || false,
-        parallel: document.getElementById("suite-usb-parallel")?.checked || false,
-    });
-
-    try {
-        if (request.error) {
-            showNotification(request.error, "error");
-            return;
-        }
-        const res = await fetch(request.endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(request.payload),
-        });
-        let data;
-        data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "USB-Test konnte nicht gestartet werden.");
-        showNotification(`USB-Testlauf gestartet (Run-ID: ${data.runId}).`, "success");
-        pollSuiteRunStatus(data.runId);
-        appendSuiteActiveRun(data.runId, formatSuiteRunLabel(request.payload));
-    } catch (err) {
-        showNotification("USB-Test fehlgeschlagen: " + err.message, "error");
-    }
-}
-
-function formatSuiteRunLabel(payload) {
-    if (!payload || typeof payload !== "object") return "QA-Lauf";
-    const androidVersions = Array.isArray(payload.androidVersions) ? payload.androidVersions.map(item => String(item)).filter(Boolean) : [];
-    if (androidVersions.length > 0) {
-        const scope = payload.executionMode === "all-automated"
-            ? "Gesamtlauf"
-            : payload.executionMode === "dual-device"
-            ? "Dual-Device"
-            : payload.executionMode === "single-child"
-                ? "Kind-App"
-                : payload.executionMode === "single-master"
-                    ? "Master-App"
-                    : "Kompatibilität";
-        return `Android-Kompatibilität: ${scope} · ${androidVersions.join(", ")}`;
-    }
-    if (payload.appId === "master") return "USB: Master-App";
-    if (payload.appId === "child") return "USB: Kind-App";
-    if (payload.scenarioId) return `Dual-Device: ${payload.scenarioId}`;
-    return "Dual-Device";
 }
 
 function formatSuiteHistoryTitle(run) {
@@ -6248,28 +4422,6 @@ function formatSuiteHistoryMeta(run) {
     return parts.join(" · ");
 }
 
-async function startAllAutomatedUsbTests() {
-    if (!isPythonOperator) return;
-    try {
-        const payload = {
-            installApk: document.getElementById("suite-usb-install-apk")?.checked || false,
-            skipActivation: document.getElementById("suite-usb-skip-activation")?.checked || false,
-            parallel: document.getElementById("suite-usb-parallel")?.checked || false,
-        };
-        const res = await fetch("/api/suites/android-automation-sweep", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Gesamtlauf konnte nicht gestartet werden.");
-        showNotification(`Automatisierter Gesamtlauf gestartet (Run-ID: ${data.runId}).`, "success");
-        pollSuiteRunStatus(data.runId);
-        appendSuiteActiveRun(data.runId, formatSuiteRunLabel(data));
-    } catch (err) {
-        showNotification("Gesamtlauf fehlgeschlagen: " + err.message, "error");
-    }
-}
 
 function appendSuiteActiveRun(runId, label) {
     const el = document.getElementById("suite-active-runs");
@@ -6327,7 +4479,7 @@ function pollSuiteRunStatus(runId) {
                         mergedRun,
                         ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || runId || "")),
                     ];
-                    renderQaArtifactsOverview();
+                    rerenderQaExecutionGuideFromCache();
                 } else {
                     const statusMeta = getSuiteRunStatusMeta(mergedRun);
                     const resultStatus = data.result?.status || data.result?.overall_status;
@@ -6343,8 +4495,7 @@ function pollSuiteRunStatus(runId) {
                         mergedRun,
                         ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || runId || "")),
                     ];
-                    renderQaArtifactsOverview();
-                    rerenderSuiteCatalogFromCache();
+                    rerenderQaExecutionGuideFromCache();
                     clearInterval(_suiteActivePollers[runId]);
                     delete _suiteActivePollers[runId];
                     loadTestingRegister();
@@ -6359,96 +4510,61 @@ function pollSuiteRunStatus(runId) {
 
 async function loadSuiteRunHistory() {
     const historyEl = document.getElementById("suite-run-history");
-    if (!historyEl) return { ok: false, message: "Suite-Historien-Container fehlt." };
     if (!isPythonOperator) {
-        replaceElementWithState(historyEl, "info", "Historie ist nur im Python-Operator verfuegbar.");
+        if (historyEl) {
+            replaceElementWithState(historyEl, "info", "Historie ist nur im Python-Operator verfuegbar.");
+        }
+        renderQaTestWorkspace();
         setQaRefreshSectionState("suiteHistory", "error", "Nur im Python-Operator verfügbar");
         return { ok: false, message: "Nur im Python-Operator verfügbar." };
     }
-    replaceElementWithState(historyEl, "loading", "Lade Historie...");
+    if (historyEl) {
+        replaceElementWithState(historyEl, "loading", "Lade Historie...");
+    }
     setQaRefreshSectionState("suiteHistory", "loading", "Lädt…");
     try {
-        const res = await fetch("/api/suites/history");
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Fehler beim Laden");
+        const [historyRes, guideResult] = await Promise.all([
+            fetch("/api/suites/history"),
+            loadSuiteGuideData(),
+        ]);
+        const data = await historyRes.json().catch(() => ({}));
+        if (!historyRes.ok) throw new Error(data.error || "Fehler beim Laden");
         const runs = data.runs || [];
         suiteRunHistoryPayload = runs;
-        renderQaArtifactsOverview();
-        rerenderSuiteCatalogFromCache();
+        if (!guideResult.ok) {
+            throw new Error(guideResult.message || "Fehler beim Laden der Suite-Startwege");
+        }
+        rerenderQaExecutionGuideFromCache();
         if (runs.length === 0) {
-            replaceElementWithState(historyEl, "info", "Keine Testlaeufe in der Historie.");
+            if (historyEl) {
+                replaceElementWithState(historyEl, "info", "Keine Testlaeufe in der Historie.");
+            }
+            renderQaTestWorkspace();
             setQaRefreshSectionState("suiteHistory", "success", "Keine Testläufe vorhanden");
             return { ok: true, message: "Keine Testläufe vorhanden." };
         }
-        historyEl.innerHTML = renderSuiteRunCards(runs.slice(0, 50), "Keine Testläufe in der Historie.");
+        if (historyEl) {
+            historyEl.innerHTML = renderSuiteRunCards(runs.slice(0, 50), "Keine Testläufe in der Historie.");
+        }
         loadTestingRegister();
+        renderQaTestWorkspace();
         setQaRefreshSectionState("suiteHistory", "success", `${runs.length} Suite-Läufe geladen`);
         return { ok: true, message: `${runs.length} Suite-Läufe geladen.` };
     } catch (err) {
-        replaceElementWithState(historyEl, "error", String(err.message || "Fehler beim Laden"));
+        if (historyEl) {
+            replaceElementWithState(historyEl, "error", String(err.message || "Fehler beim Laden"));
+        }
+        renderQaTestWorkspace();
         setQaRefreshSectionState("suiteHistory", "error", err.message || "Fehler beim Laden");
         return { ok: false, message: err.message || "Fehler beim Laden" };
     }
 }
 
-// Dual-Device: Child-Serial-Zeile nur bei Dual-Device anzeigen
 document.addEventListener("DOMContentLoaded", () => {
-    const typeSelect = document.getElementById("suite-usb-test-type");
-    if (typeSelect) {
-        typeSelect.addEventListener("change", updateUsbTestTypeFormState);
-        updateUsbTestTypeFormState();
-    }
-    const compatibilityToggle = document.getElementById("suite-usb-compatibility-mode");
-    if (compatibilityToggle) {
-        compatibilityToggle.addEventListener("change", syncUsbCompatibilityControls);
-    }
-    const compatibilityPreset = document.getElementById("suite-usb-compatibility-preset");
-    if (compatibilityPreset) {
-        compatibilityPreset.addEventListener("change", () => {
-            const versionsInput = document.getElementById("suite-usb-android-versions");
-            if (versionsInput && compatibilityPreset.value !== "custom") {
-                versionsInput.value = "";
-            }
-            syncUsbCompatibilityControls();
-        });
-    }
-    const compatibilityVersionsInput = document.getElementById("suite-usb-android-versions");
-    if (compatibilityVersionsInput) {
-        compatibilityVersionsInput.addEventListener("input", () => {
-            syncUsbCompatibilityPresetFromVersionsInput();
-            renderCompatibilitySelectionOptions();
-        });
-    }
-    [
-        "suite-usb-master-serial",
-        "suite-usb-child-serial",
-        "suite-usb-dual-scenario",
-        "suite-usb-dual-profile",
-        "suite-usb-fault-modes",
-        "suite-usb-suite",
-        "suite-usb-install-apk",
-        "suite-usb-skip-activation",
-        "suite-usb-parallel",
-    ].forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener(el.tagName === "INPUT" && el.type === "checkbox" ? "change" : "input", renderUsbLauncherSummary);
-        if (el.tagName === "SELECT") {
-            el.addEventListener("change", renderUsbLauncherSummary);
-        }
-    });
-    const compatibilityTestsContainer = document.getElementById("suite-usb-compatibility-tests");
-    const compatibilityScenariosContainer = document.getElementById("suite-usb-compatibility-scenarios");
-    compatibilityTestsContainer?.addEventListener("change", renderUsbLauncherSummary);
-    compatibilityScenariosContainer?.addEventListener("change", renderUsbLauncherSummary);
-    renderUsbLauncherSummary();
     const protocolStatusEl = document.getElementById("python-automation-protocol-status");
     if (protocolStatusEl) {
         protocolStatusEl.addEventListener("change", renderPythonAutomationProtocolRequirements);
     }
-    syncDualDeviceCatalogOptions();
-    syncEmulatorReservationOptions();
-    syncUsbCompatibilityControls();
 });
 
 // ===================== ENDE TEST-SUITEN-ZENTRALE =====================
@@ -9566,7 +7682,6 @@ function refreshCommissioningReport() {
 document.addEventListener("DOMContentLoaded", async function() {
     await detectPythonOperatorRuntime();
     renderQaRuntimeModeBanner();
-    startQaSelfHealingPolling();
     renderBootstrapFirebaseConfig(firebaseConfig);
     setupBootstrapConfigLiveSync();
     renderCommandBuilderConfig(loadCommandBuilderConfig());
@@ -9660,16 +7775,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         element.addEventListener("change", () => renderOperatorConfigGuidance());
         element.__operatorGuidanceBound = true;
     });
-
-    const suiteGroupFilterEl = document.getElementById("suite-group-filter");
-    if (suiteGroupFilterEl) {
-        suiteGroupFilterEl.addEventListener("change", () => loadSuiteCatalog());
-    }
-
-    const suiteReadyOnlyEl = document.getElementById("suite-ready-only");
-    if (suiteReadyOnlyEl) {
-        suiteReadyOnlyEl.addEventListener("change", () => loadSuiteCatalog());
-    }
 
     // Operator-Laufzeit-Badge anzeigen
     if (canExecuteCommandsDirectly()) {
