@@ -156,6 +156,9 @@ jobs:
       run: |
         # Firebase CLI picks up .env in project root and uploads env vars with functions.
         # Use empty string fallback so the step never fails on missing optional secrets.
+        # Legacy secretKey auth stays ENABLED by default until cutover is explicitly
+        # approved and the secret is set to true. This avoids accidental production
+        # lockout for still-migrating clients.
         {
           echo "GEMINI_API_KEY=${GEMINI_API_KEY:-}"
           echo "GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}"
@@ -163,7 +166,7 @@ jobs:
           echo "OPENAI_FALLBACK_ENABLED=${OPENAI_FALLBACK_ENABLED:-false}"
           echo "LEGAL_POLICY_BASE_URL=${LEGAL_POLICY_BASE_URL:-https://minimaster.app/legal}"
           echo "PAIRING_LINK_BASE_URL=${PAIRING_LINK_BASE_URL:-https://minimaster.app/pair}"
-          echo "DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-true}"
+          echo "DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-false}"
         } > .env
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

@@ -2,6 +2,9 @@
 
 Status: actionable cutover plan for decommissioning secretKey/IMEI-based authentication.
 
+Operational default: production deployments keep `DISABLE_LEGACY_SECRETKEY_AUTH=false`
+unless the cutover is explicitly approved and the deployment secret is set to `true`.
+
 ## 1. Objective
 
 Eliminate production dependency on client-passed legacy credentials (`masterImei + secretKey`) by activating `DISABLE_LEGACY_SECRETKEY_AUTH=true` and verifying zero residual usage.
@@ -42,7 +45,9 @@ Legacy usage dashboard is available in the Admin Panel under Compliance > Legacy
 
 ### Phase 2: Soft Disable (Pre-Cutover)
 
-1. Set `DISABLE_LEGACY_SECRETKEY_AUTH=true` in Functions environment.
+1. Explicitly set `DISABLE_LEGACY_SECRETKEY_AUTH=true` in Functions environment.
+	The deployment workflow default remains `false` on purpose, so a missing secret
+	must never disable legacy auth accidentally.
 2. Deploy updated functions.
 3. Monitor for `failed-precondition` errors from legacy clients.
 4. If errors detected: evaluate whether affected clients need update push.
@@ -66,6 +71,12 @@ If cutover causes regression:
 4. Investigate and resolve client migration gaps before retrying.
 
 Rollback time: under 10 minutes (environment variable change + deploy).
+
+## 5.1 Deployment Safety Rule
+
+- Missing GitHub Secret for `DISABLE_LEGACY_SECRETKEY_AUTH` MUST behave like `false`.
+- Enabling the cutover MUST be an explicit operational action, not an implicit default.
+- Admin Panel Legacy-Auth telemetry remains the release gate before any permanent switch.
 
 ## 6. Post-Cutover Cleanup
 

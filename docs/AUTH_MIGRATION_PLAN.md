@@ -32,6 +32,9 @@
    - Backfill `masters/{uid}` if legacy IDs exist.
    - Migrate `pairingTokens`/`pairingCodes` to `masterId`.
 2. **Deprecation**
+   - Keep `DISABLE_LEGACY_SECRETKEY_AUTH=false` as the deployment default until all
+     active clients are migrated and legacy telemetry shows zero calls for 14 days.
+   - Switch `DISABLE_LEGACY_SECRETKEY_AUTH=true` only as an explicit release gate.
    - Remove backward compatibility fields (`masterImei`) where no longer used.
 3. **Security Testing**
    - Verify Firestore rules deny cross-tenant access.
