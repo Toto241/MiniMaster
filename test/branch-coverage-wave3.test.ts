@@ -28,6 +28,8 @@ const mockBucketFileMetadata = {
   exists: true,
   contentType: "image/jpeg" as string | null,
   size: 1024 * 100, // 100 KB → bestanden Default
+  exifBuffer: null as Buffer | null,           // null = leer (kein GPS)
+  exifStreamError: null as Error | null,       // gesetzt → Stream emittiert 'error'
 };
 const mockBucket = {
   name: "test-bucket",
@@ -38,6 +40,20 @@ const mockBucket = {
       contentType: mockBucketFileMetadata.contentType,
       size: String(mockBucketFileMetadata.size),
     }]),
+    createReadStream: jest.fn(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Readable } = require("stream");
+      const err = mockBucketFileMetadata.exifStreamError;
+      const buf = mockBucketFileMetadata.exifBuffer;
+      const stream = new Readable({ read() { /* push controlled below */ } });
+      // Asynchron emittieren, damit Listener registriert sind.
+      setImmediate(() => {
+        if (err) { stream.emit("error", err); return; }
+        if (buf && buf.length > 0) stream.push(buf);
+        stream.push(null);
+      });
+      return stream;
+    }),
   })),
 };
 
@@ -1059,6 +1075,84 @@ describe("tasks.ts branch coverage", () => {
         }, asChild)).rejects.toThrow(/existiert nicht/);
       } finally {
         mockBucketFileMetadata.exists = originalExists;
+      }
+    });
+
+    it("rejects photoUrl whose first 64KB contain an EXIF GPS tag (big-endian)", async () => {
+      const EXIF_MARKER = Buffer.from([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
+      const tiffHeaderBE = Buffer.from([0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08]);
+      const gpsTagBE = Buffer.from([0x88, 0x25]);
+      mockBucketFileMetadata.exifBuffer = Buffer.concat([
+        Buffer.alloc(8, 0xFF), EXIF_MARKER, tiffHeaderBE, gpsTagBE, Buffer.alloc(1024, 0xAB),
+      ]);
+      try {
+        const wrapped = testEnv.wrap(fns.completeTask);
+        await expect(wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fgeo.jpg",
+        }, asChild)).rejects.toThrow(/EXIF-GPS-Geodaten/);
+      } finally {
+        mockBucketFileMetadata.exifBuffer = null;
+      }
+    });
+
+    it("accepts photoUrl when EXIF segment exists but contains no GPS tag", async () => {
+      const EXIF_MARKER = Buffer.from([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
+      const tiffHeaderBE = Buffer.from([0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08]);
+      const benignTag = Buffer.from([0x01, 0x02]);
+      mockBucketFileMetadata.exifBuffer = Buffer.concat([
+        Buffer.alloc(8, 0xFF), EXIF_MARKER, tiffHeaderBE, benignTag, Buffer.alloc(1024, 0x55),
+      ]);
+      try {
+        const wrapped = testEnv.wrap(fns.completeTask);
+        const res = await wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fclean.jpg",
+        }, asChild);
+        expect(res.success).toBe(true);
+      } finally {
+        mockBucketFileMetadata.exifBuffer = null;
+      }
+    });
+
+    it("skips EXIF GPS scan when override env PHOTO_EXIF_GPS_REJECT=false is set", async () => {
+      const EXIF_MARKER = Buffer.from([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
+      const tiffHeaderBE = Buffer.from([0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08]);
+      const gpsTagBE = Buffer.from([0x88, 0x25]);
+      const original = process.env.PHOTO_EXIF_GPS_REJECT;
+      process.env.PHOTO_EXIF_GPS_REJECT = "false";
+      mockBucketFileMetadata.exifBuffer = Buffer.concat([
+        Buffer.alloc(8, 0xFF), EXIF_MARKER, tiffHeaderBE, gpsTagBE, Buffer.alloc(1024, 0xCD),
+      ]);
+      try {
+        // Reset 2nd task to pending so we can complete it.
+        state["children/c1/tasks"].task4 = { status: "pending", description: "Override", masterImei: "m1" };
+        const wrapped = testEnv.wrap(fns.completeTask);
+        const res = await wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Foverride.jpg",
+        }, asChild);
+        expect(res.success).toBe(true);
+      } finally {
+        mockBucketFileMetadata.exifBuffer = null;
+        if (original === undefined) delete process.env.PHOTO_EXIF_GPS_REJECT;
+        else process.env.PHOTO_EXIF_GPS_REJECT = original;
+      }
+    });
+
+    it("treats EXIF stream IO error as warning (does not block upload)", async () => {
+      mockBucketFileMetadata.exifStreamError = new Error("simulated stream IO failure");
+      try {
+        // Reset task back to pending in case prior test consumed it.
+        state["children/c1/tasks"].task4 = { status: "pending", description: "IO err", masterImei: "m1" };
+        const wrapped = testEnv.wrap(fns.completeTask);
+        const res = await wrapped({
+          taskId: "task4",
+          photoUrl: "https://firebasestorage.googleapis.com/v0/b/test/o/children%2Fc1%2Fphotos%2Fioerror.jpg",
+        }, asChild);
+        expect(res.success).toBe(true);
+      } finally {
+        mockBucketFileMetadata.exifStreamError = null;
       }
     });
   });
