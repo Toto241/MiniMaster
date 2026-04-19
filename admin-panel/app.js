@@ -3783,6 +3783,112 @@ function buildQaExecutionGuideData(catalog, payload, suites = suiteCatalogPayloa
     };
 }
 
+function buildAdvisorySweepReadiness() {
+    const automationSweep = buildQaExecutionGuideData(
+        pythonCommissioningCatalog,
+        testingRegisterPayload,
+        suiteCatalogPayload,
+    ).automationSweep;
+    const warnings = [];
+    const riskSummary = buildTestingRegisterRiskSummary(testingRegisterPayload);
+
+    if (automationSweep.catalogLoaded && automationSweep.deviceProfiles.length === 0) {
+        warnings.push({
+            id: "device-profiles-missing",
+            tone: "warning",
+            title: "Keine Geräteprofile im QA-Katalog sichtbar",
+            detail: "Der Sweep bleibt startbar, aber die Profilabdeckung für reproduzierbare Läufe ist derzeit unklar.",
+            actionLabel: "Zur Laufübersicht",
+            action: "scrollQaSection('qa-suite-card')",
+        });
+    }
+    if (automationSweep.catalogLoaded && (automationSweep.masterMappingCount === 0 || automationSweep.childMappingCount === 0)) {
+        warnings.push({
+            id: "mapping-coverage-incomplete",
+            tone: "warning",
+            title: "Master-/Child-Mappings sind unvollständig",
+            detail: "Der QA-Katalog zeigt keine vollständige Rollenabdeckung für die Dual-Device-Szenarien des Sweeps.",
+            actionLabel: "Zur Laufübersicht",
+            action: "scrollQaSection('qa-suite-card')",
+        });
+    }
+    if (riskSummary.blockingOpen.length > 0) {
+        warnings.push({
+            id: "register-blockers-open",
+            tone: "danger",
+            title: `${riskSummary.blockingOpen.length} Release-Blocker sind noch offen`,
+            detail: "Vor dem Sweep sollte geprüft werden, ob bekannte Blocker oder fehlende PASS-Nachweise die Auswertung verfälschen.",
+            actionLabel: "Blocker filtern",
+            action: "applyTestingRegisterQuickFilter('blocking')",
+        });
+    }
+    if (riskSummary.staleItems.length > 0) {
+        warnings.push({
+            id: "stale-evidence-open",
+            tone: "warning",
+            title: `${riskSummary.staleItems.length} Nachweise sind veraltet`,
+            detail: "Mindestens ein relevanter Nachweis liegt außerhalb des Stale-Fensters und sollte vor dem Gesamtlauf aktualisiert werden.",
+            actionLabel: "Veraltete Nachweise",
+            action: "applyTestingRegisterQuickFilter('stale', { sort: 'updated' })",
+        });
+    }
+    if (riskSummary.unsupportedItems.length > 0) {
+        warnings.push({
+            id: "unsupported-suite-mappings",
+            tone: "info",
+            title: `${riskSummary.unsupportedItems.length} Repo-Tests sind noch keiner Suite zugeordnet`,
+            detail: "Der Sweep deckt diese Tests nicht automatisch ab. Prüfen Sie den Backlog vor einer systematischen Gesamtbewertung.",
+            actionLabel: "Unsupported anzeigen",
+            action: "applyTestingRegisterQuickFilter('unsupported', { sort: 'group' })",
+        });
+    }
+
+    const relevantRuns = (Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : []).filter(run => {
+        const type = String(run?.type || run?.suiteId || run?.suite_id || "").trim();
+        return type === "android-automation-sweep"
+            || type === "android-compatibility"
+            || type === "android-e2e-shell"
+            || type === "android-e2e-shell-script";
+    });
+    const activeRuns = relevantRuns.filter(run => {
+        const status = String(run?.status || run?.result?.status || "").trim().toLowerCase();
+        return status === "running" || status === "queued";
+    });
+    const recentFailures = relevantRuns.filter(run => {
+        const status = String(run?.status || "").trim().toLowerCase();
+        const resultStatus = String(run?.result?.status || run?.result?.overall_status || "").trim().toLowerCase();
+        return status === "error" || resultStatus === "failed" || resultStatus === "fail" || resultStatus === "error";
+    }).slice(0, 3);
+
+    if (activeRuns.length > 0) {
+        warnings.push({
+            id: "android-runs-active",
+            tone: "info",
+            title: `${activeRuns.length} Android-Läufe sind noch aktiv`,
+            detail: "Ein zusätzlicher Sweep kann Logs und Fehlerbilder überlagern. Prüfen Sie zuerst die laufenden oder wartenden Jobs.",
+            actionLabel: "Zur Laufübersicht",
+            action: "scrollQaSection('qa-suite-card')",
+        });
+    }
+    if (recentFailures.length > 0) {
+        warnings.push({
+            id: "recent-android-failures",
+            tone: "warning",
+            title: `${recentFailures.length} jüngste Android-Läufe sind fehlgeschlagen`,
+            detail: "Vor einem neuen Sweep sollte der letzte Fehlerzustand im Suite-Verlauf geprüft werden.",
+            actionLabel: "Fehlerlauf ansehen",
+            action: "scrollQaSection('qa-suite-card')",
+        });
+    }
+
+    return {
+        status: warnings.length > 0 ? "warning" : "ready",
+        warnings,
+        requiresConfirmation: warnings.length > 0,
+        warningCount: warnings.length,
+    };
+}
+
 async function loadSuiteGuideData() {
     const response = await fetch("/api/suites", {
         headers: { "Accept": "application/json" },
@@ -3869,6 +3975,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
         : `<p class='python-muted-caption'>Noch keine Suite-Zuordnungen geladen.</p>`;
 
     const sweepPreview = data.automationSweep;
+    const sweepReadiness = buildAdvisorySweepReadiness();
     const activeVersionsText = sweepPreview.activeAndroidVersions.length > 0
         ? `Android ${escapeHtml(sweepPreview.activeAndroidVersions.join(", "))}`
         : "Keine aktiven Android-Versionen im QA-Katalog gefunden.";
@@ -3930,6 +4037,28 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
             </label>
         </div>
     `;
+    const sweepReadinessHtml = sweepReadiness.warningCount > 0
+        ? `
+            <div class='qa-register-callout-stack'>
+                ${sweepReadiness.warnings.map(warning => `
+                    <article class='qa-register-callout qa-register-callout-${escapeHtml(String(warning.tone || "info"))}'>
+                        <div>
+                            <strong>${escapeHtml(warning.title)}</strong>
+                            <p>${escapeHtml(warning.detail)}</p>
+                        </div>
+                        <button class='btn btn-secondary btn-sm' onclick="${warning.action}">${escapeHtml(warning.actionLabel)}</button>
+                    </article>
+                `).join("")}
+            </div>
+        `
+        : `
+            <article class='qa-register-callout qa-register-callout-success'>
+                <div>
+                    <strong>Sweep-Readiness ohne akute QA-Warnsignale</strong>
+                    <p>Register, Android-Verlauf und Katalog liefern aktuell keine zusätzlichen Warnhinweise für diesen Gesamtlauf.</p>
+                </div>
+            </article>
+        `;
 
     container.innerHTML = `
         <div class='qa-guide-grid'>
@@ -3978,6 +4107,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                     <span class='python-bucket-count'>${escapeHtml(String(sweepPreview.activeAndroidVersions.length))} Android-Versionen</span>
                 </div>
                 ${sweepDetailsHtml}
+                ${sweepReadinessHtml}
                 ${sweepOptionFormHtml}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
                 <div class='setup-actions mm-u031'>
@@ -4639,6 +4769,15 @@ async function startSuiteRun(suiteId) {
 async function startAndroidAutomationSweep() {
     if (!isPythonOperator) return;
     try {
+        const readiness = buildAdvisorySweepReadiness();
+        if (readiness.requiresConfirmation) {
+            const warningSummary = readiness.warnings.slice(0, 3).map(item => `- ${item.title}`).join("\n");
+            const confirmed = confirm(`Für den Android-Automation-Sweep liegen noch QA-Warnhinweise vor:\n\n${warningSummary}\n\nTrotzdem starten?`);
+            if (!confirmed) {
+                showNotification("Android-Automation-Sweep abgebrochen: zuerst die offenen Warnhinweise prüfen.", "info");
+                return;
+            }
+        }
         const request = buildAndroidAutomationSweepRequest();
         await queueSuiteRunRequest(request, "Android-Automation-Sweep konnte nicht gestartet werden.");
     } catch (err) {
