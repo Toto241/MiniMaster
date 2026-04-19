@@ -1304,11 +1304,11 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "ma-subscription-enforce",
                 "title": "Free-Tier-Limit (1 Kind) wird vor Aktionen erzwungen",
-                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Free-Tier- und Subscription-Enforcement werden in Cloud-Functions und Pairing-Flows bereits hart abgeprueft.",
-                "automationType": "automatic",
+                "description": "Dokumentierter Repo-Nachweis: Subscription-Enforcement ist durch vorhandene Backend-/Pairing-Tests abgedeckt, aber derzeit nicht als eigene startbare QA-Suite verdrahtet.",
+                "automationType": "documented",
                 "source": "repo-test",
-                "suiteRef": "backend-subscription-enforcement",
-                "successCriteria": "Repository-Tests decken sowohl das Child-Limit beim Pairing als auch das Blockieren von Aktionen ohne aktive Subscription ab.",
+                "documentation": "test/branch-coverage-pairing.test.ts",
+                "successCriteria": "Die verknüpften Pairing-/Subscription-Repository-Tests sind grün und das Ergebnis wurde als Repo-Evidenz im QA-Register protokolliert.",
             },
             {
                 "id": "ma-fcm-working",
@@ -1525,20 +1525,20 @@ COMMISSIONING_TEST_GROUPS = (
             {
                 "id": "dt-parent-panel-login",
                 "title": "Parent-Panel-Login im Electron-Fenster geprüft",
-                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Der Desktop-Launcher verweist auf das Web-Control-Panel, und dessen Login-/Session-Flow wird direkt im Browser-Harness getestet.",
-                "automationType": "automatic",
+                "description": "Dokumentierter Repo-Nachweis: Der Login-/Session-Flow des Parent-Web-Panels ist durch vorhandene Browser-Harness-Tests abgedeckt, aber nicht als eigene Python-QA-Suite startbar.",
+                "automationType": "documented",
                 "source": "repo-test",
-                "suiteRef": "web-control-auth-flow",
-                "successCriteria": "Web-Control-Tests decken Custom-Token-Login, Session-Start und Logout ab; Desktop-Tests pruefen den Launcher-Einstieg ins Web-Control-Panel.",
+                "documentation": "test/web-control-ui.test.ts",
+                "successCriteria": "Die Web-Control-Login-/Session-Tests sowie der Desktop-Launcher-Einstieg sind grün und wurden als Repo-Evidenz dokumentiert.",
             },
             {
                 "id": "dt-admin-panel-login",
                 "title": "Admin-Panel-Login im Electron-Fenster geprüft",
-                "description": "Automatischer Nachweis ueber verknuepfte Repository-Tests: Das Electron-Operatorfenster laedt das Admin-Panel mit Operator-Preload, und der Login-/Session-Flow wird direkt im Admin-Panel-Code getestet.",
-                "automationType": "automatic",
+                "description": "Dokumentierter Repo-Nachweis: Der Login-/Session-Flow des Admin-Panels ist durch vorhandene UI-Tests abgedeckt, aber nicht als eigene Python-QA-Suite startbar.",
+                "automationType": "documented",
                 "source": "repo-test",
-                "suiteRef": "admin-panel-auth-flow",
-                "successCriteria": "Desktop-Tests pruefen das Operatorfenster fuer admin-panel/index.html; Admin-Panel-Tests decken Login, Rollenwechsel und Session-Monitoring fuer Admin-Operatoren ab.",
+                "documentation": "test/admin-panel-helpers.test.ts",
+                "successCriteria": "Die Admin-Panel-Login-/Session-Tests und der Desktop-Operatorfenster-Einstieg sind grün und wurden als Repo-Evidenz dokumentiert.",
             },
             {
                 "id": "dt-crash-reporting",
@@ -2779,8 +2779,15 @@ def build_commissioning_run_index(run: dict[str, object] | None) -> dict[str, di
 
 def suite_result_to_register_state(entry: dict[str, object]) -> dict[str, object]:
     result = as_dict(entry.get("result"))
-    result_status = str(result.get("status") or "").strip().lower()
+    result_status = str(
+        result.get("overallStatus")
+        or result.get("overall_status")
+        or result.get("status")
+        or ""
+    ).strip().lower()
     run_status = str(entry.get("status") or "").strip().lower()
+    summary_counts = as_dict(result.get("summary")).get("counts") if isinstance(result.get("summary"), dict) else {}
+    counts = as_dict(summary_counts)
 
     if run_status == "running":
         return {
@@ -2792,15 +2799,27 @@ def suite_result_to_register_state(entry: dict[str, object]) -> dict[str, object
             "status": "fail",
             "details": str(entry.get("error") or "Suite-Lauf mit Fehler beendet."),
         }
-    if result_status == "passed":
+    if result_status in {"passed", "pass"}:
+        summary_hint = ""
+        if counts:
+            summary_hint = (
+                f" PASS {counts.get('passed', 0)} · FAIL {counts.get('failed', 0)}"
+                f" · ERROR {counts.get('error', 0)} · SKIP {counts.get('skipped', 0)}"
+            )
         return {
             "status": "pass",
-            "details": f"Suite erfolgreich beendet (Exit-Code {result.get('returncode', 0)}).",
+            "details": f"Suite erfolgreich beendet (Exit-Code {result.get('returncode', 0)}).{summary_hint}".strip(),
         }
-    if result_status == "failed":
+    if result_status in {"failed", "fail", "error"}:
         return {
             "status": "fail",
-            "details": str(result.get("reason") or result.get("stderr") or "Suite fehlgeschlagen."),
+            "details": str(
+                result.get("reason")
+                or result.get("error")
+                or result.get("stderr")
+                or entry.get("error")
+                or "Suite fehlgeschlagen."
+            ),
         }
     if result_status == "skipped":
         return {
@@ -2813,13 +2832,54 @@ def suite_result_to_register_state(entry: dict[str, object]) -> dict[str, object
     }
 
 
+def _normalized_suite_run_keys(entry: dict[str, object]) -> list[str]:
+    result = as_dict(entry.get("result"))
+    run_type = str(entry.get("type") or entry.get("suiteType") or "").strip().lower()
+    suite_id = str(entry.get("suiteId") or entry.get("suite_id") or "").strip()
+    app_id = str(entry.get("appId") or entry.get("app_id") or result.get("appId") or result.get("app_id") or "").strip().lower()
+    execution_mode = str(entry.get("executionMode") or result.get("executionMode") or "").strip().lower()
+    keys: list[str] = []
+
+    if suite_id:
+        keys.append(suite_id)
+
+    if run_type == "usb-test":
+        if app_id == "master":
+            keys.append("android-usb-master")
+        elif app_id == "child":
+            keys.append("android-usb-child")
+    elif run_type == "dual-device":
+        keys.extend(["android-e2e-shell-script", "dual-device"])
+    elif run_type == "android-compatibility":
+        if execution_mode == "single-master":
+            keys.extend(["android-compatibility-single-master", "android-usb-master"])
+        elif execution_mode == "single-child":
+            keys.extend(["android-compatibility-single-child", "android-usb-child"])
+        elif execution_mode == "dual-device":
+            keys.extend(["android-compatibility-dual-device", "android-e2e-shell-script"])
+    elif run_type == "android-automation-sweep":
+        keys.extend([
+            "android-automation-sweep",
+            "android-usb-master",
+            "android-usb-child",
+            "android-e2e-shell-script",
+        ])
+
+    deduped: list[str] = []
+    for key in keys:
+        normalized = str(key).strip()
+        if normalized and normalized not in deduped:
+            deduped.append(normalized)
+    return deduped
+
+
 def load_latest_suite_results() -> dict[str, dict[str, object]]:
     latest: dict[str, dict[str, object]] = {}
     for entry in load_suite_run_history(limit=MAX_HISTORY_LIMIT):
-        suite_id = str(entry.get("suiteId") or entry.get("suite_id") or "").strip()
-        if not suite_id or suite_id in latest:
-            continue
-        latest[suite_id] = entry
+        for suite_key in _normalized_suite_run_keys(entry):
+            if suite_key in latest:
+                continue
+            latest[suite_key] = entry
     return latest
 
 
@@ -6053,11 +6113,14 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 "timeout_sec": parse_int(payload.get("timeoutSec"), default=3600, min_value=60, max_value=7200),
             }
 
+            linked_suites = _normalized_suite_run_keys({"type": "usb-test", "appId": app_id})
             with _active_suite_lock:
                 _active_suite_runs[run_id] = {
                     "runId": run_id,
                     "type": "usb-test",
                     "appId": app_id,
+                    "suiteId": linked_suites[0] if linked_suites else "",
+                    "linkedSuites": linked_suites,
                     "status": "queued",
                     "startedAt": None,
                     "finishedAt": None,
@@ -6108,10 +6171,13 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 ],
             }
 
+            linked_suites = _normalized_suite_run_keys({"type": "dual-device"})
             with _active_suite_lock:
                 _active_suite_runs[run_id] = {
                     "runId": run_id,
                     "type": "dual-device",
+                    "suiteId": linked_suites[0] if linked_suites else "",
+                    "linkedSuites": linked_suites,
                     "scenarioId": kwargs["scenario_id"],
                     "profileId": kwargs["profile_id"],
                     "status": "queued",
@@ -6194,10 +6260,16 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "timeout_sec": parse_int(payload.get("timeoutSec"), default=3600, min_value=60, max_value=7200),
                 })
 
+            linked_suites = _normalized_suite_run_keys({
+                "type": "android-compatibility",
+                "executionMode": execution_mode,
+            })
             with _active_suite_lock:
                 _active_suite_runs[run_id] = {
                     "runId": run_id,
                     "type": "android-compatibility",
+                    "suiteId": linked_suites[0] if linked_suites else "",
+                    "linkedSuites": linked_suites,
                     "executionMode": execution_mode,
                     "androidVersions": android_versions,
                     "selectedScenarioIds": cast(list[str], kwargs.get("selected_scenario_ids") or []),
@@ -6250,10 +6322,13 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             if not cast(list[str], kwargs["android_versions"]):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "Keine aktiven Android-Versionen im QA-Katalog gefunden."})
 
+            linked_suites = _normalized_suite_run_keys({"type": "android-automation-sweep"})
             with _active_suite_lock:
                 _active_suite_runs[run_id] = {
                     "runId": run_id,
                     "type": "android-automation-sweep",
+                    "suiteId": linked_suites[0] if linked_suites else "",
+                    "linkedSuites": linked_suites,
                     "executionMode": "all-automated",
                     "androidVersions": cast(list[str], kwargs["android_versions"]),
                     "masterTestClasses": cast(list[str], kwargs["master_test_classes"]),

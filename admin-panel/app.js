@@ -3570,7 +3570,13 @@ function applyTestingRegisterQuickFilter(type, options = {}) {
 
 function getTestingRegisterActionLabel(item) {
     const action = String(item?.action || "commissioning-run");
-    if (action === "suite-run") return "Suite-Start";
+    if (action === "suite-run") {
+        const suiteRef = String(item?.suiteRef || item?.id || "").trim();
+        if (suiteRef === "android-usb-master" || suiteRef === "android-usb-child") {
+            return "USB-Start";
+        }
+        return "Suite-Start";
+    }
     if (action === "protocol") return "Nachweis-Protokoll";
     if (action === "external-protocol") return "Externer Lauf + Nachweis";
     if (String(item?.source || "") === "repo-test") return "Repository-Tests prüfen";
@@ -4138,7 +4144,10 @@ function buildTestingRegisterAction(item) {
     if (item.action === "suite-run") {
         const suiteId = encodeURIComponent(String(item.suiteRef || item.id || ""));
         const disabled = item.prereqsMet === false ? "disabled" : "";
-        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled} ${tooltip}>Suite starten</button>`;
+        const buttonLabel = String(item.suiteRef || item.id || "").trim().startsWith("android-usb-")
+            ? "USB-Lauf starten"
+            : "Suite starten";
+        return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled} ${tooltip}>${buttonLabel}</button>`;
     }
     if (item.action === "protocol") {
         return `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodeURIComponent(String(item.id || ""))}')" ${tooltip}>Nachweis protokollieren</button>`;
@@ -4430,16 +4439,18 @@ async function startSuiteRun(suiteId) {
     if (!isPythonOperator) return;
     try {
         const decodedSuiteId = decodeURIComponent(String(suiteId || ""));
-        const res = await fetch("/api/suites/run", {
+        const request = buildSuiteRunRequest(decodedSuiteId);
+        const res = await fetch(request.endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ suiteId: decodedSuiteId }),
+            body: JSON.stringify(request.body),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Suite konnte nicht gestartet werden.");
         suiteRunHistoryPayload = [
             {
-                suiteId: decodedSuiteId,
+                suiteId: request.historySuiteId,
+                type: request.historyType,
                 runId: data.runId,
                 status: "running",
                 startedAt: new Date().toISOString(),
@@ -4448,12 +4459,52 @@ async function startSuiteRun(suiteId) {
             ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || "")),
         ];
         rerenderQaExecutionGuideFromCache();
-        showNotification(`Suite '${decodedSuiteId}' gestartet (Run-ID: ${data.runId}).`, "success");
+        showNotification(`${request.notificationLabel} gestartet (Run-ID: ${data.runId}).`, "success");
         pollSuiteRunStatus(data.runId);
-        appendSuiteActiveRun(data.runId, decodedSuiteId);
+        appendSuiteActiveRun(data.runId, request.displayLabel);
     } catch (err) {
         showNotification("Suite-Start fehlgeschlagen: " + err.message, "error");
     }
+}
+
+function buildSuiteRunRequest(suiteId) {
+    const normalizedSuiteId = String(suiteId || "").trim();
+    if (normalizedSuiteId === "android-usb-master") {
+        return {
+            endpoint: "/api/suites/usb-test",
+            body: {
+                appId: "master",
+                serial: "auto",
+                suite: "commissioning",
+            },
+            historySuiteId: normalizedSuiteId,
+            historyType: "usb-test",
+            displayLabel: "USB Eltern-App",
+            notificationLabel: "USB-Lauf 'android-usb-master'",
+        };
+    }
+    if (normalizedSuiteId === "android-usb-child") {
+        return {
+            endpoint: "/api/suites/usb-test",
+            body: {
+                appId: "child",
+                serial: "auto",
+                suite: "commissioning",
+            },
+            historySuiteId: normalizedSuiteId,
+            historyType: "usb-test",
+            displayLabel: "USB Kinder-App",
+            notificationLabel: "USB-Lauf 'android-usb-child'",
+        };
+    }
+    return {
+        endpoint: "/api/suites/run",
+        body: { suiteId: normalizedSuiteId },
+        historySuiteId: normalizedSuiteId,
+        historyType: "suite",
+        displayLabel: normalizedSuiteId,
+        notificationLabel: `Suite '${normalizedSuiteId}'`,
+    };
 }
 
 function formatSuiteHistoryTitle(run) {

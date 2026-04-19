@@ -323,6 +323,8 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  renderTestingRegisterStorage,",
     "  renderQaExecutionGuide,",
     "  buildQaExecutionGuideData,",
+    "  buildSuiteRunRequest,",
+    "  startSuiteRun,",
     "  loadSuiteGuideData,",
     "  loadSuiteRunHistory,",
     "  loadTestingRegister,",
