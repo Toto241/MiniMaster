@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
 function createDomSinkElement() {
@@ -18,6 +20,14 @@ function createDomSinkElement() {
 }
 
 describe("admin-panel current QA helpers", () => {
+  it("keeps the visible QA tab focused on runs, failures and details", () => {
+    const html = fs.readFileSync(path.join(process.cwd(), "admin-panel", "index.html"), "utf8");
+
+    expect(html).toContain("Qualitätssicherung: Testläufe, Fehlerschwerpunkte und Ergebnisdetails");
+    expect(html).toContain("Test-Triage &amp; Laufübersicht");
+    expect(html).not.toContain("Priorisierte nächste Schritte");
+  });
+
   it("sanitizes ADB serials and APK paths safely", () => {
     const { exports } = loadAdminPanelTestExports();
 
