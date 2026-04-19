@@ -10,6 +10,8 @@ export {
   setAdminClaim,
   setUserRole,
   generateCustomToken,
+  createMasterWebBootstrapToken,
+  redeemMasterWebBootstrapToken,
   registerMasterDevice,
   revokeUserTokens,
   bootstrapFirstAdmin,

@@ -586,6 +586,54 @@ Generates a Firebase custom token for authenticated session establishment.
 - `failed-precondition`: Legacy login disabled (`DISABLE_LEGACY_SECRETKEY_AUTH=true`)
 - `internal`: Token generation failure
 
+### createMasterWebBootstrapToken
+
+Creates a short-lived, one-time bootstrap token for browser login to `web-control`, `parent-panel`, or `child-panel`.
+This is the additive bridge used during legacy secretKey cutover.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  target?: "web-control" | "parent-panel" | "child-panel",
+  ttlMinutes?: number // 1-30, default 10
+}
+```
+
+**Response**:
+```typescript
+{
+  bootstrapToken: string,
+  expiresAtMs: number,
+  target: string,
+  targetPath: string,
+  queryParamName: "bootstrapToken"
+}
+```
+
+**Errors**:
+- `unauthenticated`: No Firebase auth context
+- `invalid-argument`: Invalid ttlMinutes
+- `not-found`: Master account does not exist
+
+### redeemMasterWebBootstrapToken
+
+Redeems a one-time browser bootstrap token and returns a Firebase custom token for the bound master account.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ bootstrapToken: string }`
+
+**Response**: `{ masterId: string, customToken: string, target: string }`
+
+**Errors**:
+- `invalid-argument`: Invalid token format
+- `permission-denied`: Unknown or revoked bootstrap token
+- `failed-precondition`: Token already redeemed
+- `deadline-exceeded`: Token expired
+- `internal`: Token redemption failure
+
 ### createOperatorAccessKey (Admin)
 
 Creates a one-time operator access key (SHA-256 hash stored). Non-admin callers may bootstrap if no admin exists.
