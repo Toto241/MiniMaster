@@ -10,6 +10,7 @@
         <link rel="manifest" href="manifest.webmanifest" />
         <link rel="apple-touch-icon" href="icon.svg" />
         <link rel="stylesheet" href="styles.css?v=20260319" />
+        <link rel="stylesheet" href="styles-utilities.css?v=20260419" />
         <!-- Firebase SDKs (SRI integrity enforced) -->
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
@@ -36,7 +37,7 @@
                         id="logout-btn"
                         type="button"
                         data-action="logout"
-                        style="display: none"
+                        class="mm-u010"
                         title="Vom Operator-Dashboard abmelden"
                     >
                         Abmelden
@@ -45,7 +46,7 @@
             </header>
 
             <!-- Navigation Tabs -->
-            <nav id="dashboard-nav" class="dashboard-nav" style="display: none">
+            <nav id="dashboard-nav" class="dashboard-nav mm-u010">
                 <button
                     class="nav-tab active"
                     type="button"
@@ -117,7 +118,7 @@
                             &ndash; nicht für Eltern oder Kinder. Folgen Sie den Schritten unten, um Ihr System
                             einzurichten und Zugang zu erhalten.
                         </p>
-                        <p id="electron-operator-badge" style="display:none; margin-block-start:8px">
+                        <p id="electron-operator-badge" class="mm-u013">
                                 aus dem QA-Register ableiten lassen. Bereits nach Qualitätssicherung migrierte Freigaben wie
                                 Play-Store-Readiness, Android-/Support-/Compliance-Commissioning und AI-Runtime werden nur noch
                                 im Bereich <strong>Qualitätssicherung</strong> gepflegt. Alles hier ist lokal persistiert, im Admin-Panel sichtbar und
@@ -205,7 +206,7 @@
                                         Aus URL laden
                                     </button>
                                 </div>
-                                <div class="firebase-import-row" style="margin-block-start:8px;">
+                                <div class="firebase-import-row mm-u049">
                                     <input
                                         type="file"
                                         id="bootstrap-config-file"
@@ -230,13 +231,13 @@
                                 <button type="button" data-action="reloadWithBootstrapConfig" class="btn btn-primary" title="Konfiguration speichern und Verbindung zum Firebase-Projekt herstellen">Speichern &amp; verbinden</button>
                             </div>
 
-                            <div class="firebase-import-box" style="margin-block-start: 14px; border-color: #fed7aa; background: #fff7ed;">
+                            <div class="firebase-import-box mm-u040">
                                 <h4>Notfall-Neueinrichtung nach Cloud-Löschung</h4>
                                 <p>
                                     Wenn Firestore/Functions/Storage gelöscht wurden, können Sie die Basis direkt von hier wiederherstellen.
                                     Danach wird automatisch in die Kontoeinrichtung gewechselt.
                                 </p>
-                                <div class="phase-actions" style="margin-block-start: 10px;">
+                                <div class="phase-actions mm-u034">
                                     <button type="button" class="btn btn-secondary" data-action="copyFirebaseRecoveryScript" title="Recovery-Skript in die Zwischenablage kopieren">Recovery-Skript kopieren</button>
                                     <button type="button" class="btn btn-primary" data-action="runFirebaseRecoveryAutopilot" title="Automatische Wiederherstellung von Firestore, Functions und Storage starten">Recovery jetzt ausführen</button>
                                     <button type="button" class="btn btn-danger" data-action="runStartFromScratchAutopilot" title="Kompletter Neustart: Cloud-Daten und lokale Einstellungen zurücksetzen">Start bei Null (Cloud + Panel)</button>
@@ -268,7 +269,7 @@
                                     <span class="recovery-alive-message">Bereit</span>
                                     <span class="recovery-alive-cursor" aria-hidden="true"></span>
                                 </div>
-                                <div id="bootstrap-recovery-status" class="phase-status" style="margin-block-start: 8px"></div>
+                                <div id="bootstrap-recovery-status" class="phase-status mm-u047"></div>
                                 <small class="text-muted">
                                     Hinweis: Direkte Ausführung funktioniert im Python-Operator-/Desktop-Modus.
                                     Im Browsermodus können Sie das Skript kopieren und im Terminal ausführen.
@@ -292,7 +293,7 @@
                     </div>
 
                     <!-- ===== Phase 2: Konto erstellen oder Einloggen ===== -->
-                    <div id="onboarding-phase-2" class="onboarding-phase" style="display: none">
+                    <div id="onboarding-phase-2" class="onboarding-phase mm-u010">
                         <div class="phase-card">
                             <div class="phase-header">
                                 <div class="phase-icon">👤</div>
@@ -354,7 +355,7 @@
                             </form>
 
                             <!-- Login-Formular -->
-                            <form id="login-form" class="auth-form" style="display: none">
+                            <form id="login-form" class="auth-form mm-u010">
                                 <div class="form-group">
                                     <label for="login-email">E-Mail-Adresse</label>
                                     <input type="email" id="login-email" placeholder="operator@example.com" required title="E-Mail-Adresse des bestehenden Operator-Kontos" />
@@ -386,7 +387,7 @@
                     </div>
 
                     <!-- ===== Phase 3: Admin-Zugang aktivieren ===== -->
-                    <div id="onboarding-phase-3" class="onboarding-phase" style="display: none">
+                    <div id="onboarding-phase-3" class="onboarding-phase mm-u010">
                         <div class="phase-card">
                             <div class="phase-header">
                                 <div class="phase-icon">🔑</div>
@@ -412,8 +413,8 @@
                 <!-- Dashboard Section (Hidden until authorized) -->
                 <section
                     id="dashboard-section"
-                    class="section"
-                    style="display: none"
+                    class="section mm-u010"
+
                 >
                     <!-- Tab: Overview / KPI Dashboard -->
                     <div id="tab-overview" class="tab-content active">
@@ -450,23 +451,14 @@
                         </div>
 
                         <div
-                            class="quick-links"
-                            style="
-                                margin: 20px 0;
-                                padding: 15px;
-                                background: #f5f5f5;
-                                border-radius: 8px;
-                            "
+                            class="quick-links mm-u002"
+
                         >
-                            <h3 style="margin-block-start: 0">Schnellzugriff</h3>
+                            <h3 class="mm-u032">Schnellzugriff</h3>
                             <a
                                 href="logs.html"
-                                class="btn btn-primary"
-                                style="
-                                    display: inline-block;
-                                    text-decoration: none;
-                                    margin-inline-end: 10px;
-                                "
+                                class="btn btn-primary mm-u001"
+
                                 title="Detaillierte Audit-Log-Ansicht mit Filtern und Paginierung öffnen"
                                 >Audit-Logs anzeigen</a
                             >
@@ -543,7 +535,7 @@
                         </div>
 
                         <!-- Subscription Expiry Warnings -->
-                        <div id="subscription-warnings" class="data-list" style="margin-block-end: 20px"></div>
+                        <div id="subscription-warnings" class="data-list mm-u029"></div>
 
                         <!-- Performance Metrics -->
                         <h3>Leistungskennzahlen</h3>
@@ -553,14 +545,14 @@
 
                         <!-- Security Status -->
                         <h3>Sicherheit &amp; Systemstatus</h3>
-                        <div class="stats-grid" style="margin-block-end: 20px">
+                        <div class="stats-grid mm-u029">
                             <div class="stat-card">
                                 <h3>App Check</h3>
-                                <p id="stat-appcheck-status" style="font-size:1em">--</p>
+                                <p id="stat-appcheck-status" class="mm-u017">--</p>
                             </div>
                             <div class="stat-card">
                                 <h3>Firestore-Indizes</h3>
-                                <p id="stat-indexes-status" style="font-size:1em">--</p>
+                                <p id="stat-indexes-status" class="mm-u017">--</p>
                             </div>
                             <div class="stat-card">
                                 <h3>Aktive Kopplungscodes</h3>
@@ -584,8 +576,8 @@
                     <!-- Tab: Users -->
                     <div
                         id="tab-users"
-                        class="tab-content"
-                        style="display: none"
+                        class="tab-content mm-u010"
+
                     >
                         <h2>Benutzerverwaltung</h2>
                         <div class="user-search">
@@ -617,7 +609,7 @@
                     </div>
 
                     <!-- Tab: Devices (Children) -->
-                    <div id="tab-devices" class="tab-content" style="display: none">
+                    <div id="tab-devices" class="tab-content mm-u010">
                         <h2>Geräte (Kinder-Geräte)</h2>
                         <div class="user-search">
                             <input type="text" id="device-search-input" placeholder="Suche nach Child-ID oder Master-ID" title="Child-ID oder zugehörige Master-ID eingeben, um Geräte zu finden" />
@@ -631,8 +623,8 @@
                     <!-- Tab: Subscriptions -->
                     <div
                         id="tab-subscriptions"
-                        class="tab-content"
-                        style="display: none"
+                        class="tab-content mm-u010"
+
                     >
                         <h2>Abonnement-Überwachung</h2>
                         <div class="sub-filters">
@@ -665,14 +657,14 @@
                     </div>
 
                     <!-- Tab: Pairing -->
-                    <div id="tab-pairing" class="tab-content" style="display: none">
+                    <div id="tab-pairing" class="tab-content mm-u010">
                         <h2>Pairing-Codes &amp; Tokens</h2>
                         <div class="sub-filters">
                             <button data-action="loadPairingOverview" data-args='["codes"]' class="btn btn-secondary" title="Nur 6-stellige Pairing-Codes laden (24h gültig)">Pairing Codes (6-stellig)</button>
                             <button data-action="loadPairingOverview" data-args='["tokens"]' class="btn btn-secondary" title="Nur UUID-basierte Pairing-Tokens laden (5 Min. gültig)">Pairing Tokens (UUID)</button>
                             <button data-action="loadPairingOverview" data-args='["all"]' class="btn btn-primary" title="Alle Pairing-Codes und -Tokens gemeinsam laden">Alle laden</button>
                         </div>
-                        <div class="stats-grid" style="margin-block-end: 15px">
+                        <div class="stats-grid mm-u028">
                             <div class="stat-card"><h3>Aktive Codes</h3><p id="pairing-active-codes">--</p></div>
                             <div class="stat-card"><h3>Abgelaufene Codes</h3><p id="pairing-expired-codes">--</p></div>
                             <div class="stat-card"><h3>Aktive Tokens</h3><p id="pairing-active-tokens">--</p></div>
@@ -684,8 +676,8 @@
                     <!-- Tab: Support Tickets -->
                     <div
                         id="tab-support"
-                        class="tab-content"
-                        style="display: none"
+                        class="tab-content mm-u010"
+
                     >
                         <h2>Support-Tickets</h2>
                         <div class="support-filters">
@@ -739,7 +731,7 @@
                     </div>
 
                     <!-- Tab: Error Logs -->
-                    <div id="tab-errorlogs" class="tab-content" style="display: none">
+                    <div id="tab-errorlogs" class="tab-content mm-u010">
                         <h2>Fehlerprotokoll (durchsuchbar)</h2>
                         <div class="user-search">
                             <input type="text" id="errorlog-search-input" placeholder="Suche nach Funktionsname oder Fehlermeldung" title="Funktionsname oder Fehlernachricht eingeben" />
@@ -755,8 +747,8 @@
                     <!-- Tab: Compliance -->
                     <div
                         id="tab-compliance"
-                        class="tab-content"
-                        style="display: none"
+                        class="tab-content mm-u010"
+
                     >
                         <h2>Compliance &amp; Datenverwaltung</h2>
                         <div class="compliance-section">
@@ -766,7 +758,7 @@
                                 gemäß DSGVO-Anforderungen.
                             </p>
                             <div class="dsar-form">
-                                <div class="form-group" style="flex: 1; min-inline-size: 200px">
+                                <div class="form-group mm-u015">
                                     <label for="dsar-master-id" class="field-label">Master-ID</label>
                                     <input
                                         type="text"
@@ -785,14 +777,14 @@
                             </div>
                             <div
                                 id="dsar-result"
-                                class="data-list"
-                                style="margin-block-start: 15px"
+                                class="data-list mm-u041"
+
                             ></div>
                         </div>
 
                         <div
-                            class="compliance-section admin-only"
-                            style="margin-block-start: 30px"
+                            class="compliance-section admin-only mm-u045"
+
                         >
                             <h3>Datenlöschung (DSGVO Art. 17)</h3>
                             <p>
@@ -800,7 +792,7 @@
                                 <code>deleteUserAccount</code> auf. Löscht Master, Children, Tasks, Subscriptions.
                             </p>
                             <div class="dsar-form">
-                                <div class="form-group" style="flex: 1; min-inline-size: 200px">
+                                <div class="form-group mm-u015">
                                     <label for="delete-master-id" class="field-label">Master-ID</label>
                                     <input
                                         type="text"
@@ -817,12 +809,12 @@
                                     Benutzerkonto löschen
                                 </button>
                             </div>
-                            <div id="delete-result" class="data-list" style="margin-block-start: 10px"></div>
+                            <div id="delete-result" class="data-list mm-u033"></div>
                         </div>
 
                         <div
-                            class="compliance-section"
-                            style="margin-block-start: 30px"
+                            class="compliance-section mm-u045"
+
                         >
                             <h3>Audit-Log Export</h3>
                             <p>Exportieren Sie Audit-Logs für einen bestimmten Zeitraum.</p>
@@ -845,14 +837,14 @@
                             </div>
                             <div
                                 id="audit-export-result"
-                                class="data-list"
-                                style="margin-block-start: 15px"
+                                class="data-list mm-u041"
+
                             ></div>
                         </div>
 
                         <div
-                            class="compliance-section admin-only"
-                            style="margin-block-start: 30px"
+                            class="compliance-section admin-only mm-u045"
+
                         >
                             <h3>Legacy-Auth Nutzungsmonitor</h3>
                             <p>
@@ -870,18 +862,18 @@
                             </div>
                             <div
                                 id="legacy-auth-result"
-                                class="data-list"
-                                style="margin-block-start: 15px"
+                                class="data-list mm-u041"
+
                             ></div>
                         </div>
                     </div>
 
                     <!-- ==================== TAB: EINRICHTUNG ==================== -->
-                    <div id="tab-setup" class="tab-content" style="display: none">
+                    <div id="tab-setup" class="tab-content mm-u010">
                         <h2>⚙️ Einrichtung &amp; Inbetriebnahme</h2>
 
                         <!-- ==================== Operator-Readiness ==================== -->
-                        <div class="setup-card" id="operator-readiness-card" style="margin-block-start: 20px">
+                        <div class="setup-card mm-u043" id="operator-readiness-card">
                             <h3>🚦 Inbetriebnahme-Status (live)</h3>
                             <p>
                                 Konsolidierter Backend-Status: Secrets, Storage, Firestore,
@@ -890,7 +882,7 @@
                                 Aktualisiert direkt aus der Cloud-Function
                                 <code>getOperatorSetupStatus</code>.
                             </p>
-                            <div style="display:flex; gap:10px; margin-block-start:10px; flex-wrap:wrap">
+                            <div class="mm-u011">
                                 <button id="btn-refresh-operator-readiness" class="primary-btn" type="button">
                                     🔄 Status aktualisieren
                                 </button>
@@ -899,14 +891,14 @@
                                 </button>
                                 <span id="operator-readiness-summary" class="status-badge" aria-live="polite">noch nicht geladen</span>
                             </div>
-                            <div id="operator-readiness-content" style="margin-block-start:15px">
+                            <div id="operator-readiness-content" class="mm-u048">
                                 <p class="muted">Klicken Sie auf „Status aktualisieren", um den aktuellen Inbetriebnahme-Status abzurufen.</p>
                             </div>
                         </div>
 
                         <div
-                            class="setup-card"
-                            style="margin-block-start: 20px"
+                            class="setup-card mm-u043"
+
                         >
                             <h3>Laufzeitkonfiguration (Cloud + KI)</h3>
                             <p>
@@ -916,10 +908,10 @@
                                 Betriebsteam versioniert/freigegeben werden.
                             </p>
 
-                            <div class="setup-grid" style="margin-block-start: 10px">
+                            <div class="setup-grid mm-u033">
                                 <div>
                                     <h4>Cloud Services</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 10px">
+                                    <div class="dsar-form mm-u006">
                                         <div class="form-group">
                                             <label for="cfg-cloud-project-id" class="field-label">Firebase Project ID</label>
                                             <input type="text" id="cfg-cloud-project-id" placeholder="Firebase Project ID" title="Firebase-Projekt-ID für die Cloud-Anbindung" />
@@ -940,7 +932,7 @@
                                 </div>
                                 <div>
                                     <h4>KI / Support-Automation</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 10px">
+                                    <div class="dsar-form mm-u006">
                                         <div class="form-group">
                                             <label for="cfg-ai-provider" class="field-label">KI-Anbieter</label>
                                             <input type="text" id="cfg-ai-provider" placeholder="AI Provider (z.B. gemini)" title="KI-Anbieter für den Support-Assistenten" />
@@ -969,29 +961,29 @@
                                 </div>
                             </div>
 
-                            <div class="setup-actions" style="margin-block-start: 12px">
+                            <div class="setup-actions mm-u036">
                                 <button data-action="loadOperatorConfig" class="btn btn-secondary" title="Aktuelle Betreiber-Konfiguration aus Firestore laden">Konfiguration laden</button>
                                 <button data-action="applyBootstrapProjectIdToRuntime" class="btn btn-secondary" title="Firebase-Projekt-ID aus der Bootstrap-Konfiguration in den Runtime-Block übernehmen">Bootstrap-Projekt übernehmen</button>
                                 <button data-action="applyGeminiRuntimeTemplate" class="btn btn-secondary" title="Gemini-Defaults und Secret-Referenz-Vorlage für die Runtime-Konfiguration einsetzen">Gemini-Vorlage einsetzen</button>
                                 <button data-action="saveOperatorConfig" class="btn btn-primary" title="Änderungen an der Betreiber-Konfiguration in Firestore speichern">Konfiguration speichern</button>
                                 <button data-action="testAiConfiguration" class="btn btn-secondary" title="Verbindung zum KI-Anbieter mit den aktuellen Einstellungen testen">Test KI-Konfiguration</button>
                             </div>
-                            <div id="operator-config-guidance" class="data-list" style="margin-block-start: 12px">
+                            <div id="operator-config-guidance" class="data-list mm-u036">
                                 <div class="info">Runtime-Hinweise werden geladen.</div>
                             </div>
-                            <div id="operator-config-status" class="data-list" style="margin-block-start: 15px">
+                            <div id="operator-config-status" class="data-list mm-u041">
                                 <div class="info">Noch keine Konfiguration geladen.</div>
                             </div>
                         </div>
                     </div>
                     <!-- ==================== TAB: QUALITÄTSSICHERUNG ==================== -->
-                    <div id="tab-qa" class="tab-content" style="display: none">
+                    <div id="tab-qa" class="tab-content mm-u010">
                         <h2>🧪 Qualitätssicherung &amp; Tests</h2>
-                        <div id="qa-runtime-mode-banner" class="data-list" style="margin-block-end: 20px">
+                        <div id="qa-runtime-mode-banner" class="data-list mm-u029">
                             <div class="info">Prüfe QA-Laufzeitmodus...</div>
                         </div>
 
-                        <div id="qa-refresh-card" class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div id="qa-refresh-card" class="setup-card admin-only mm-u029">
                             <div class="qa-refresh-header">
                                 <div>
                                     <h3>QA-Datenstand &amp; Synchronisierung</h3>
@@ -1000,24 +992,24 @@
                                         Synchronisationslauf stattgefunden hat.
                                     </p>
                                 </div>
-                                <div class="setup-actions" style="margin-block-start: 0">
+                                <div class="setup-actions mm-u032">
                                     <button data-action="refreshQaDashboard" class="btn btn-secondary" title="Alle QA-Datenquellen neu laden und den Datenstand aktualisieren">
                                         QA-Daten aktualisieren
                                     </button>
                                 </div>
                             </div>
-                            <div id="qa-refresh-status" class="data-list" style="margin-block-start: 12px">
+                            <div id="qa-refresh-status" class="data-list mm-u036">
                                 <div class="info">Noch keine QA-Synchronisierung ausgeführt.</div>
                             </div>
                         </div>
 
-                        <div id="qa-start-guide-card" class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div id="qa-start-guide-card" class="setup-card admin-only mm-u029">
                             <h3>Startwege &amp; enthaltene Testfälle</h3>
                             <p>
                                 Diese Übersicht zeigt pro Startaktion, <strong>welche Testfälle tatsächlich enthalten sind</strong>,
                                 wohin die Ergebnisse geschrieben werden und in welchen Bereich Sie für Details springen müssen.
                             </p>
-                            <div id="qa-start-guide" class="data-list" style="margin-block-start: 12px">
+                            <div id="qa-start-guide" class="data-list mm-u036">
                                 <div class="info">Lade QA-Startwege...</div>
                             </div>
                         </div>
@@ -1027,7 +1019,7 @@
                             <p>Produktionsbereitschaft, Freigaben und priorisierte Restarbeiten für den Go-Live.</p>
                         </div>
 
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div class="setup-card admin-only mm-u029">
                             <h3>Inbetriebnahme-Assistent</h3>
                             <p>
                                 Dieses Werkzeug bündelt die produktive Inbetriebnahme: Firebase-Bootstrap,
@@ -1048,18 +1040,18 @@
                                 </p>
                             </div>
 
-                            <div class="setup-actions" style="margin-block-start: 12px">
+                            <div class="setup-actions mm-u036">
                                 <button data-action="runCommissioningAssistant" class="btn btn-primary" title="Automatische Inbetriebnahme starten: Firebase-Bootstrap, Rollen und Validierung">Assistent ausführen</button>
                                 <button data-action="refreshCommissioningReport" class="btn btn-secondary" title="Aktuellen Inbetriebnahmebericht neu generieren">Bericht aktualisieren</button>
                                 <button data-action="exportReleaseArtefact" class="btn btn-secondary" title="Zusammenfassung als Release-Artefakt für den produktiven Einsatz exportieren">Release-Artefakt exportieren</button>
                             </div>
 
-                            <div id="commissioning-report" class="data-list" style="margin-block-start: 15px">
+                            <div id="commissioning-report" class="data-list mm-u041">
                                 <div class="info">Noch kein Inbetriebnahmebericht erzeugt.</div>
                             </div>
                         </div>
 
-                        <div id="qa-release-workspace-card" class="setup-card admin-only qa-workspace-card" style="margin-block-end: 20px">
+                        <div id="qa-release-workspace-card" class="setup-card admin-only qa-workspace-card mm-u029">
                             <div class="qa-workspace-header">
                                 <div>
                                     <h3>Release-Cockpit</h3>
@@ -1069,7 +1061,7 @@
                                     </p>
                                 </div>
                             </div>
-                            <div class="qa-workspace-grid qa-workspace-grid-release" style="margin-block-start: 12px">
+                            <div class="qa-workspace-grid qa-workspace-grid-release mm-u036">
                                 <section class="qa-workspace-panel">
                                     <div class="qa-workspace-panel-header">
                                         <div>
@@ -1078,7 +1070,7 @@
                                         </div>
                                     </div>
                                     <div id="golive-ampel"></div>
-                                    <div id="golive-final-gate" style="margin-block-start: 12px"></div>
+                                    <div id="golive-final-gate" class="mm-u036"></div>
                                 </section>
                                 <section class="qa-workspace-panel">
                                     <div class="qa-workspace-panel-header">
@@ -1097,22 +1089,22 @@
                             <p>Zentrale Sicht auf Testbestand, Nachweise, Commissioning-Läufe und manuelle Freigaben.</p>
                         </div>
 
-                        <div id="qa-register-card" class="setup-card admin-only qa-workspace-card" style="margin-block-end: 20px">
+                        <div id="qa-register-card" class="setup-card admin-only qa-workspace-card mm-u029">
                             <h3>Testregister &amp; Arbeitsvorrat</h3>
                             <p>
                                 Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle und offenen QA-Arbeiten.
                                 Priorisierte Restarbeiten, automatische Prüfungen und manuelle Nachweise werden hier
                                 entlang des tatsächlichen Arbeitsflusses zusammengeführt.
                             </p>
-                            <div class="info" style="margin-block-start: 12px">
+                            <div class="info mm-u036">
                                 <strong>Bedienlogik:</strong><br />
                                 Automatische Ergebnisse entstehen über <em>Suite starten</em> oder <em>Python-Testlauf starten</em>.<br />
                                 Manuelle und dokumentierte Prüfungen werden über <em>Nachweis protokollieren</em> im Protokollformular eingetragen.
                             </div>
-                            <div id="testing-register-overview" class="python-automation-overview" style="margin-block-start: 12px">
+                            <div id="testing-register-overview" class="python-automation-overview mm-u036">
                                 <div class="info">Noch kein Testregister geladen.</div>
                             </div>
-                            <div class="qa-register-workspace" style="margin-block-start: 12px">
+                            <div class="qa-register-workspace mm-u036">
                                 <section class="qa-register-focus-panel">
                                     <div class="qa-workspace-panel-header">
                                         <div>
@@ -1136,7 +1128,7 @@
                                     </div>
                                 </section>
                             </div>
-                            <div class="python-automation-toolbar" style="margin-block-start: 12px">
+                            <div class="python-automation-toolbar mm-u036">
                                 <input
                                     type="text"
                                     id="testing-register-search"
@@ -1162,9 +1154,9 @@
                                 </select>
                                 <button data-action="loadTestingRegister" class="btn btn-secondary" title="Vollständiges Testregister neu laden">Testregister laden</button>
                             </div>
-                            <details class="qa-register-advanced-filters" style="margin-block-start: 10px">
+                            <details class="qa-register-advanced-filters mm-u033">
                                 <summary>Erweiterte Filter</summary>
-                                <div class="python-automation-toolbar qa-register-advanced-toolbar" style="margin-block-start: 10px">
+                                <div class="python-automation-toolbar qa-register-advanced-toolbar mm-u033">
                                     <select id="testing-register-advanced-filter" title="Spezialfilter für seltene QA-Sichten">
                                         <option value="all">Kein Spezialfilter</option>
                                         <option value="critical">Nur kritische Punkte</option>
@@ -1184,7 +1176,7 @@
                                     <button data-action="resetTestingRegisterAdvancedFilter" class="btn btn-secondary" title="Erweiterte Filter zurücksetzen">Spezialfilter zurücksetzen</button>
                                 </div>
                             </details>
-                            <div class="setup-actions" style="margin-block-start: 12px; gap: 8px; flex-wrap: wrap">
+                            <div class="setup-actions mm-u038">
                                 <button data-action="runPythonAutomationSuite" class="btn btn-primary" title="Automatische Commissioning-Pruefungen als Python-Lauf starten">
                                     Automatische Commissioning-Pruefung starten
                                 </button>
@@ -1192,7 +1184,7 @@
                                     Suite-Katalog aktualisieren
                                 </button>
                             </div>
-                            <div class="python-automation-layout testing-register-panels" style="margin-block-start: 12px">
+                            <div class="python-automation-layout testing-register-panels mm-u036">
                                 <section class="python-automation-panel qa-panel-secondary">
                                     <div class="python-automation-panel-header">
                                         <div>
@@ -1218,7 +1210,7 @@
                             </div>
                         </div>
 
-                            <div id="qa-python-run-card" class="setup-card python-automation-shell" style="margin-block-start: 16px; margin-block-end: 0">
+                            <div id="qa-python-run-card" class="setup-card python-automation-shell mm-u042">
                                 <div class="python-automation-intro">
                                     <div>
                                         <h4>Python-basierte Testzentrale</h4>
@@ -1237,11 +1229,11 @@
                                     </div>
                                 </div>
 
-                                <div id="python-automation-overview" class="python-automation-overview" style="margin-block-start: 12px">
+                                <div id="python-automation-overview" class="python-automation-overview mm-u036">
                                     <div class="info">Lade Python-Testkatalog...</div>
                                 </div>
 
-                                <div class="python-automation-layout" style="margin-block-start: 14px">
+                                <div class="python-automation-layout mm-u039">
                                     <section class="python-automation-panel qa-panel-secondary">
                                         <div class="python-automation-panel-header">
                                             <div>
@@ -1285,7 +1277,7 @@
                                                     Nur offene/fehlgeschlagene Ergebnisse hervorheben
                                                 </label>
                                             </div>
-                                            <div id="python-automation-catalog" class="data-list" style="margin-block-start: 12px">
+                                            <div id="python-automation-catalog" class="data-list mm-u036">
                                                 <div class="info">Noch kein Python-Testkatalog geladen.</div>
                                             </div>
                                         </details>
@@ -1301,7 +1293,7 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div class="setup-actions" style="align-items: center; gap: 10px; flex-wrap: wrap">
+                                        <div class="setup-actions mm-u003">
                                             <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="python-automation-run-commands" checked />
                                                 Lokale Gate-Kommandos ausführen (validate:readiness + ci:revalidate)
@@ -1322,7 +1314,7 @@
                                                 step="30"
                                                 value="1800"
                                                 placeholder="Timeout (Sekunden)"
-                                                style="max-inline-size: 220px"
+                                                class="mm-u051"
                                             />
                                         </div>
                                         <div id="python-automation-run-state" class="python-run-state python-run-state-idle" role="status" aria-live="polite">
@@ -1332,7 +1324,7 @@
                                                 <div class="python-muted-caption">Sobald ein Lauf gestartet wird, erscheint hier sofort der Live-Status inkl. Laufzeit.</div>
                                             </div>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-start: 10px">
+                                        <div class="setup-actions mm-u033">
                                             <button id="python-automation-run-btn" data-action="runPythonAutomationSuite" class="btn btn-primary" title="Alle ausgewählten Testfälle automatisch bewerten und protokollieren">Python-Testlauf starten</button>
                                             <button id="python-automation-recovery-btn" data-action="runQaQuickRecovery" class="btn btn-secondary" title="Nur betroffene Suite-/Gate-Fehler erneut anstoßen und danach das Register aktualisieren">Quick Recovery</button>
                                             <button data-action="loadPythonAutomationCatalog" class="btn btn-secondary" title="Testfallkatalog aus der Konfiguration neu laden">Testfallkatalog neu laden</button>
@@ -1342,7 +1334,7 @@
                                     </section>
                                 </div>
 
-                                <div class="python-automation-layout" style="margin-block-start: 14px">
+                                <div class="python-automation-layout mm-u039">
                                     <section class="python-automation-panel">
                                         <div class="python-automation-panel-header">
                                             <div>
@@ -1352,7 +1344,7 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div id="python-automation-results" class="data-list" style="margin-block-start: 12px">
+                                        <div id="python-automation-results" class="data-list mm-u036">
                                             <div class="info">Noch kein Python-Automationslauf ausgeführt.</div>
                                         </div>
                                     </section>
@@ -1368,7 +1360,7 @@
                                         </div>
                                         <details class="qa-collapsible-section">
                                             <summary>Historie und Filter öffnen</summary>
-                                            <div class="setup-actions" style="margin-block-end: 8px">
+                                            <div class="setup-actions mm-u031">
                                                 <button data-action="loadPythonAutomationHistory" class="btn btn-secondary" title="Vergangene Testläufe laden und als Nachweis einsehen">Historie laden</button>
                                             </div>
                                             <div class="python-automation-toolbar">
@@ -1383,14 +1375,14 @@
                                                     Nur Läufe mit offenen Punkten
                                                 </label>
                                             </div>
-                                            <div id="python-automation-history" class="data-list" style="margin-block-start: 12px">
+                                            <div id="python-automation-history" class="data-list mm-u036">
                                                 <div class="info">Noch keine Laufhistorie geladen.</div>
                                             </div>
                                         </details>
                                     </section>
                                 </div>
 
-                                <div class="python-automation-layout" style="margin-block-start: 14px">
+                                <div class="python-automation-layout mm-u039">
                                     <section class="python-automation-panel" id="qa-protocol-card">
                                         <div class="python-automation-panel-header">
                                             <div>
@@ -1401,10 +1393,10 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div id="python-automation-protocol-selected" class="data-list" style="margin-block-start: 12px">
+                                        <div id="python-automation-protocol-selected" class="data-list mm-u036">
                                             <div class="info">Noch kein Testfall fuer die Protokollierung ausgewaehlt.</div>
                                         </div>
-                                        <div class="python-protocol-form" style="margin-block-start: 12px">
+                                        <div class="python-protocol-form mm-u036">
                                             <div id="python-automation-protocol-requirements" class="python-clarity-box python-protocol-requirements">
                                                 Anforderungen für den ausgewählten Nachweis werden geladen.
                                             </div>
@@ -1428,12 +1420,12 @@
                                                 <span>Notizen</span>
                                                 <textarea id="python-automation-protocol-notes" rows="4" placeholder="Beobachtungen, Restarbeiten, Besonderheiten"></textarea>
                                             </label>
-                                            <label class="setup-checklist-item python-inline-check" id="python-automation-protocol-doc-row" style="display: none">
+                                            <label class="setup-checklist-item python-inline-check mm-u010" id="python-automation-protocol-doc-row">
                                                 <input type="checkbox" id="python-automation-protocol-doc-check" />
                                                 Dokumentierten Ablauf und Evidenzquelle abgeglichen
                                             </label>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-start: 10px">
+                                        <div class="setup-actions mm-u033">
                                             <button data-action="savePythonAutomationEvidence" class="btn btn-primary" title="Manuellen Nachweis für den ausgewählten Testfall speichern">Nachweis speichern</button>
                                             <button data-action="renderPythonAutomationProtocolEditor" class="btn btn-secondary" title="Formularfelder mit dem letzten gespeicherten Nachweis vorausfüllen">Formular auf letzten Nachweis setzen</button>
                                         </div>
@@ -1450,10 +1442,10 @@
                                         </div>
                                         <details class="qa-collapsible-section">
                                             <summary>Nachweis-Historie öffnen</summary>
-                                            <div class="setup-actions" style="margin-block-end: 8px">
+                                            <div class="setup-actions mm-u031">
                                                 <button data-action="loadPythonAutomationEvidenceHistory" class="btn btn-secondary" title="Alle gespeicherten manuellen Nachweise laden und anzeigen">Nachweise laden</button>
                                             </div>
-                                            <div id="python-automation-protocol-history" class="data-list" style="margin-block-start: 12px">
+                                            <div id="python-automation-protocol-history" class="data-list mm-u036">
                                                 <div class="info">Noch keine manuellen Nachweise geladen.</div>
                                             </div>
                                         </details>
@@ -1466,13 +1458,13 @@
                             <h3>Ausführung &amp; Plattform</h3>
                             <p>Tests starten, Geräte- und Emulatorstatus prüfen sowie Artefakte und Kataloge auswerten.</p>
                         </div>
-                        <div id="qa-suite-card" class="setup-card admin-only qa-workspace-card" style="margin-block-end: 20px">
+                        <div id="qa-suite-card" class="setup-card admin-only qa-workspace-card mm-u029">
                             <h3>🔬 Test-Suiten &amp; USB-Automatisierung</h3>
                             <p>
                                 Ausführung, Geräte- und Emulatorbetrieb sowie Artefakte der asynchronen Testsuiten.
                             </p>
 
-                            <div class="python-automation-layout qa-platform-layout" style="margin-block-start: 14px">
+                            <div class="python-automation-layout qa-platform-layout mm-u039">
                                 <section class="python-automation-panel">
                                     <div class="python-automation-panel-header">
                                         <div>
@@ -1482,7 +1474,7 @@
                                     </div>
                                     <details class="qa-collapsible-section">
                                         <summary>Plattformkatalog öffnen</summary>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                        <div class="setup-actions mm-u031">
                                             <button data-action="loadQaPlatformCatalog" class="btn btn-secondary" title="QA-Katalog, Android-Matrix und Dual-Device-Szenarien neu laden">QA-Katalog laden</button>
                                         </div>
                                         <div id="qa-platform-overview" class="data-list">
@@ -1500,13 +1492,13 @@
                                     </div>
                                     <details class="qa-collapsible-section">
                                         <summary>Emulator-Labor öffnen</summary>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                        <div class="setup-actions mm-u031">
                                             <button data-action="loadEmulatorLabOverview" class="btn btn-secondary" title="Emulator- und AVD-Status neu laden">Emulatorstatus laden</button>
                                         </div>
                                         <div class="python-automation-group">
                                         <h6>Reservierung für Testfenster</h6>
                                         <p class="python-muted-caption">Reserviert ein Android-/Profil-Kombinationsfenster für geplante QA-Läufe.</p>
-                                        <div class="dsar-form qa-emulator-form-grid" style="margin-block-start: 10px">
+                                        <div class="dsar-form qa-emulator-form-grid mm-u033">
                                             <label>
                                                 <span>Android-Version</span>
                                                 <select id="qa-emulator-reservation-android-version">
@@ -1532,14 +1524,14 @@
                                                 <input type="number" id="qa-emulator-ttl" min="15" max="1440" step="15" value="120" />
                                             </label>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-start: 10px; margin-block-end: 8px">
+                                        <div class="setup-actions mm-u035">
                                             <button data-action="createEmulatorReservation" class="btn btn-primary" title="Neue Reservierung im Emulator-Labor anlegen">Reservierung anlegen</button>
                                         </div>
                                         </div>
                                         <div class="python-automation-group">
                                         <h6>AVD bereitstellen</h6>
                                         <p class="python-muted-caption">Legt ein neues AVD passend zu Android-Version und Geräteprofil an.</p>
-                                        <div class="dsar-form qa-emulator-form-grid" style="margin-block-start: 10px">
+                                        <div class="dsar-form qa-emulator-form-grid mm-u033">
                                             <label>
                                                 <span>Android-Version</span>
                                                 <select id="qa-emulator-avd-android-version">
@@ -1557,7 +1549,7 @@
                                                 <input type="text" id="qa-emulator-avd-name" placeholder="z. B. Pixel_8_API_34_QA" />
                                             </label>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-start: 10px; margin-block-end: 8px">
+                                        <div class="setup-actions mm-u035">
                                             <button data-action="createEmulatorAvd" class="btn btn-secondary" title="Neues AVD passend zu Android-Version und Geräteprofil anlegen">AVD erstellen</button>
                                         </div>
                                         </div>
@@ -1568,7 +1560,7 @@
                                 </section>
                             </div>
 
-                            <div class="python-automation-layout" style="margin-block-start: 14px">
+                            <div class="python-automation-layout mm-u039">
                                 <section class="python-automation-panel">
                                     <div class="python-automation-panel-header">
                                         <div>
@@ -1576,7 +1568,7 @@
                                             <p>ADB-Status der angeschlossenen Android-Ger&auml;te.</p>
                                         </div>
                                     </div>
-                                    <div class="setup-actions" style="margin-block-end: 8px">
+                                    <div class="setup-actions mm-u031">
                                         <button data-action="loadSuiteDeviceStatus" class="btn btn-secondary" title="ADB-Status der angeschlossenen Android-Geräte aktualisieren">Ger&auml;te aktualisieren</button>
                                     </div>
                                     <div id="suite-device-status" class="data-list">
@@ -1593,12 +1585,12 @@
                                     </div>
                                     <div class="python-automation-clarity-box qa-usb-launcher-summary-box">
                                         <strong>Schnellstart</strong>
-                                        <div id="suite-usb-summary" class="qa-usb-summary-grid" style="margin-block-start: 10px">
+                                        <div id="suite-usb-summary" class="qa-usb-summary-grid mm-u033">
                                             <div class="info">USB-Launcher wird vorbereitet...</div>
                                         </div>
                                     </div>
 
-                                    <div class="qa-usb-launcher-grid" style="margin-block-start: 12px">
+                                    <div class="qa-usb-launcher-grid mm-u036">
                                         <section class="qa-usb-launcher-card">
                                             <h6>1. Laufart wählen</h6>
                                             <div class="qa-usb-form-grid">
@@ -1618,7 +1610,7 @@
                                                     </select>
                                                 </label>
                                             </div>
-                                            <div class="setup-actions" style="gap: 8px; flex-wrap: wrap; margin-block-start: 10px">
+                                            <div class="setup-actions mm-u018">
                                                 <label class="setup-checklist-item python-inline-check">
                                                     <input type="checkbox" id="suite-usb-install-apk" />
                                                     APK installieren
@@ -1667,9 +1659,9 @@
                                         </section>
                                     </div>
 
-                                    <details class="qa-collapsible-section" style="margin-block-start: 12px">
+                                    <details class="qa-collapsible-section mm-u036">
                                         <summary>Feinsteuerung &amp; Fault-Modes</summary>
-                                        <div class="qa-usb-form-grid" style="margin-block-start: 10px">
+                                        <div class="qa-usb-form-grid mm-u033">
                                             <label id="suite-usb-fault-modes-row">
                                                 <span>Fault-Modes</span>
                                                 <input type="text" id="suite-usb-fault-modes" placeholder="z. B. network-loss, child-reboot" />
@@ -1678,9 +1670,9 @@
                                         </div>
                                     </details>
 
-                                    <details class="qa-collapsible-section" style="margin-block-start: 12px">
+                                    <details class="qa-collapsible-section mm-u036">
                                         <summary>Android-Kompatibilitätsmatrix</summary>
-                                        <div class="qa-usb-form-grid" style="margin-block-start: 10px">
+                                        <div class="qa-usb-form-grid mm-u033">
                                             <label id="suite-usb-compatibility-preset-row">
                                                 <span>Kompatibilitäts-Preset</span>
                                                 <select id="suite-usb-compatibility-preset">
@@ -1698,30 +1690,30 @@
                                                 <small class="qa-usb-help">Leer lassen, um das gewählte Preset aus dem QA-Katalog zu verwenden.</small>
                                             </label>
                                         </div>
-                                        <div id="suite-usb-compatibility-tests-row" style="display:none; margin-block-start: 12px">
+                                        <div id="suite-usb-compatibility-tests-row" class="mm-u012">
                                             <span>Automatisierte Testklassen</span>
-                                            <div id="suite-usb-compatibility-tests" class="data-list qa-usb-selection-list" style="margin-block-start: 6px">
+                                            <div id="suite-usb-compatibility-tests" class="data-list qa-usb-selection-list mm-u046">
                                                 <div class="info">Noch kein QA-Katalog geladen.</div>
                                             </div>
                                             <small class="qa-usb-help">Mehrfachauswahl. Jede ausgewählte Testklasse wird für jede gewählte Android-Version separat ausgeführt.</small>
                                         </div>
-                                        <div id="suite-usb-compatibility-scenarios-row" style="display:none; margin-block-start: 12px">
+                                        <div id="suite-usb-compatibility-scenarios-row" class="mm-u012">
                                             <span>Dual-Device-Szenarien für Matrixlauf</span>
-                                            <div id="suite-usb-compatibility-scenarios" class="data-list qa-usb-selection-list" style="margin-block-start: 6px">
+                                            <div id="suite-usb-compatibility-scenarios" class="data-list qa-usb-selection-list mm-u046">
                                                 <div class="info">Noch kein QA-Katalog geladen.</div>
                                             </div>
                                             <small class="qa-usb-help">Mehrfachauswahl. Jedes gewählte Szenario wird für jede passende Android-Version als eigener Dual-Device-Lauf ausgeführt.</small>
                                         </div>
                                     </details>
 
-                                    <div class="setup-actions" style="margin-block-start: 10px">
+                                    <div class="setup-actions mm-u033">
                                         <button data-action="startUsbTestRun" class="btn btn-primary" title="USB-Testlauf für das ausgewählte Gerät und die Suite starten">USB-Testlauf starten</button>
                                         <button data-action="startAllAutomatedUsbTests" class="btn btn-secondary" title="Alle automatisierten Master-, Kind- und Dual-Device-Tests über alle Android-Versionen aus dem QA-Katalog starten">Alle automatisierten Tests starten</button>
                                     </div>
                                 </section>
                             </div>
 
-                            <div class="python-automation-layout" style="margin-block-start: 14px">
+                            <div class="python-automation-layout mm-u039">
                                 <section class="python-automation-panel">
                                     <div class="python-automation-panel-header">
                                         <div>
@@ -1731,13 +1723,13 @@
                                     </div>
                                     <details class="qa-collapsible-section">
                                         <summary>Laufhistorie öffnen</summary>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                        <div class="setup-actions mm-u031">
                                             <button data-action="loadSuiteRunHistory" class="btn btn-secondary" title="Verlauf laufender und vergangener Suite-Ausführungen laden">Historie laden</button>
                                         </div>
                                         <div id="suite-active-runs" class="data-list">
                                             <div class="info">Noch keine Testl&auml;ufe.</div>
                                         </div>
-                                        <div id="suite-run-history" class="data-list" style="margin-block-start: 10px">
+                                        <div id="suite-run-history" class="data-list mm-u033">
                                             <div class="info">Noch keine Historie geladen.</div>
                                         </div>
                                     </details>
@@ -1752,7 +1744,7 @@
                                     </div>
                                     <details class="qa-collapsible-section" open>
                                         <summary>Self-Healing öffnen</summary>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                        <div class="setup-actions mm-u031">
                                             <button id="qa-self-healing-run-btn" data-action="runQaSelfHealingCycle" class="btn btn-primary" title="Self-Healing-Zyklus jetzt ausführen">Self-Healing jetzt ausführen</button>
                                             <label class="setup-checklist-item python-inline-check">
                                                 <input type="checkbox" id="qa-self-healing-auto-fix" />
@@ -1762,16 +1754,16 @@
                                         <div id="qa-self-healing-summary" class="data-list">
                                             <div class="info">Noch kein Self-Healing-Zyklus ausgeführt.</div>
                                         </div>
-                                        <div class="qa-self-healing-grid" style="margin-block-start: 10px">
+                                        <div class="qa-self-healing-grid mm-u033">
                                             <section class="python-clarity-box">
                                                 <strong>Agent Activity Panel</strong>
-                                                <div id="qa-self-healing-activity" class="data-list" style="margin-block-start: 8px">
+                                                <div id="qa-self-healing-activity" class="data-list mm-u047">
                                                     <div class="info">Noch keine Agentenaktivität vorhanden.</div>
                                                 </div>
                                             </section>
                                             <section class="python-clarity-box">
                                                 <strong>Error Explorer</strong>
-                                                <div id="qa-self-healing-errors" class="data-list" style="margin-block-start: 8px">
+                                                <div id="qa-self-healing-errors" class="data-list mm-u047">
                                                     <div class="info">Noch keine Probleme erkannt.</div>
                                                 </div>
                                             </section>
@@ -1812,7 +1804,7 @@
                                                 Nur lauff&auml;hige anzeigen
                                             </label>
                                         </div>
-                                        <div class="setup-actions" style="margin-block-end: 8px">
+                                        <div class="setup-actions mm-u031">
                                             <button data-action="loadSuiteCatalog" class="btn btn-secondary" title="Alle verfügbaren Testsuiten mit Voraussetzungs-Status laden">Katalog laden</button>
                                         </div>
                                         <p class="qa-suite-catalog-hint">
@@ -1831,14 +1823,14 @@
                             <p>Ops-nahe Hilfen für Befehle, Validierung und operatorische Checklisten.</p>
                         </div>
 
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div class="setup-card admin-only mm-u029">
                             <h3>Befehlszentrale &amp; PowerShell-Konverter</h3>
                             <p>
                                 Erzeugt aus wenigen Eingaben lauff&auml;hige Betriebsbefehle (inkl. USB-Runner, Rollout und Erstadmin).
                                 Aufbau: erst Basisdaten, dann Android-spezifische Felder, danach Befehle generieren.
                             </p>
 
-                            <div class="data-list" style="margin-block-start: 12px">
+                            <div class="data-list mm-u036">
                                 <div class="info">
                                     <strong>Schnellablauf in 3 Schritten:</strong><br />
                                     1) Basisdaten pr&uuml;fen (Workspace, optional Erstadmin)<br />
@@ -1847,10 +1839,10 @@
                                 </div>
                             </div>
 
-                            <div class="setup-grid" style="margin-block-start: 12px; gap: 14px">
-                                <div class="setup-card" style="margin: 0">
+                            <div class="setup-grid mm-u037">
+                                <div class="setup-card mm-u050">
                                     <h4>Basisdaten</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 8px">
+                                    <div class="dsar-form mm-u008">
                                         <label for="cmd-workspace-path">Arbeitsverzeichnis</label>
                                         <input type="text" id="cmd-workspace-path" placeholder="z. B. D:/Tools/MiniMaster" title="Pfad zum MiniMaster-Arbeitsverzeichnis" />
                                         <label for="cmd-first-admin-email">Erstadmin E-Mail (optional)</label>
@@ -1860,9 +1852,9 @@
                                     </div>
                                 </div>
 
-                                <div class="setup-card" style="margin: 0">
+                                <div class="setup-card mm-u050">
                                     <h4>Android / USB-Runner</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 8px">
+                                    <div class="dsar-form mm-u008">
                                         <label for="cmd-android-device-serial">Allgemeine ADB-Serial (Fallback)</label>
                                         <input type="text" id="cmd-android-device-serial" aria-label="ADB Device-Serial" placeholder="optional: allgemeine Serial f&uuml;r alle Kommandos" />
                                         <label for="cmd-master-device-serial">Master-Device-Serial (optional, &uuml;berschreibt Fallback)</label>
@@ -1872,9 +1864,9 @@
                                     </div>
                                 </div>
 
-                                <div class="setup-card" style="margin: 0">
+                                <div class="setup-card mm-u050">
                                     <h4>APK-Pfade (optional)</h4>
-                                    <div class="dsar-form" style="display: grid; gap: 8px">
+                                    <div class="dsar-form mm-u008">
                                         <label for="cmd-master-apk-path">Pfad Eltern-App APK</label>
                                         <input type="text" id="cmd-master-apk-path" aria-label="Pfad Eltern-App APK" placeholder="MasterApp APK Pfad" />
                                         <label for="cmd-child-apk-path">Pfad Kinder-App APK</label>
@@ -1883,17 +1875,17 @@
                                 </div>
                             </div>
 
-                            <div class="setup-actions" style="margin-block-start: 12px">
+                            <div class="setup-actions mm-u036">
                                 <button data-action="refreshCommandBuilderCommands" class="btn btn-primary" title="Lauffähige Betriebsbefehle aus den Basisdaten generieren">Befehle generieren</button>
                                 <button data-action="saveCommandBuilderConfig" class="btn btn-secondary" title="Aktuelle Eingaben lokal speichern">Vorgaben speichern</button>
                                 <button type="button" data-action="copyRolloutBundleScriptFromForm" class="btn btn-secondary" title="Rollout-PowerShell-Skript in die Zwischenablage kopieren">Rollout-PS kopieren</button>
                                 <button type="button" data-action="downloadRolloutBundleScriptFromForm" class="btn btn-primary" title="Rollout-PowerShell-Skript als Datei herunterladen">Rollout-PS herunterladen</button>
                             </div>
 
-                            <div id="command-builder-status" class="data-list" style="margin-block-start: 15px">
+                            <div id="command-builder-status" class="data-list mm-u041">
                                 <div class="info">Noch keine Befehle generiert.</div>
                             </div>
-                            <div id="command-builder-results" class="data-list" style="margin-block-start: 15px"></div>
+                            <div id="command-builder-results" class="data-list mm-u041"></div>
                         </div>
 
                         <div class="setup-grid">
@@ -1922,8 +1914,8 @@
                                 </div>
                                 <div
                                     id="setup-check-results"
-                                    class="data-list"
-                                    style="margin-block-start: 15px"
+                                    class="data-list mm-u041"
+
                                 >
                                     <div class="info">
                                         Noch keine Validierung ausgeführt.
@@ -1946,10 +1938,10 @@
                         </div>
                     </div>
                     <!-- ==================== TAB: ADMINISTRATION ==================== -->
-                    <div id="tab-admin" class="tab-content" style="display: none">
+                    <div id="tab-admin" class="tab-content mm-u010">
                         <h2>👤 Administration &amp; Zugangsverwaltung</h2>
 
-                        <div class="setup-card admin-only" style="margin-block-start: 20px">
+                        <div class="setup-card admin-only mm-u043">
                             <h3>Admin-Konto erstellen / Admin-Claim vergeben</h3>
                             <p>Bestehenden Firebase-Auth-User zum Operator/Admin hochstufen (nur für bereits authentifizierte Admins).</p>
                             <div class="dsar-form">
@@ -1957,10 +1949,10 @@
                                 <input type="text" id="admin-target-uid" placeholder="User UID des neuen Admins" title="Firebase Auth UID des Benutzers, der Admin-Rechte erhalten soll" />
                                 <button data-action="grantAdminClaim" class="btn btn-primary" title="Dem angegebenen Benutzer die Admin-Berechtigung erteilen">Admin-Claim setzen</button>
                             </div>
-                            <div id="admin-claim-result" class="data-list" style="margin-block-start: 10px"></div>
+                            <div id="admin-claim-result" class="data-list mm-u033"></div>
                         </div>
 
-                        <div class="setup-card admin-only" style="margin-block-start: 20px">
+                        <div class="setup-card admin-only mm-u043">
                             <h3>Rollenverwaltung (RBAC)</h3>
                             <p>Operator-Rollen zuweisen: <strong>Admin</strong> (Vollzugriff), <strong>Support</strong> (Tickets + KI-Support, eingeschränkt auf freigegebene Fälle), <strong>Auditor</strong> (Einsicht Audit-Logs + Compliance).</p>
                             <div class="dsar-form">
@@ -1975,10 +1967,10 @@
                                 </select>
                                 <button data-action="assignUserRole" class="btn btn-primary" title="Dem Benutzer die ausgewählte Rolle zuweisen">Rolle zuweisen</button>
                             </div>
-                            <div id="role-result" class="data-list" style="margin-block-start: 10px"></div>
+                            <div id="role-result" class="data-list mm-u033"></div>
                         </div>
 
-                        <div class="setup-card admin-only" style="margin-block-start: 20px; border-inline-start: 4px solid #dc2626;">
+                        <div class="setup-card admin-only mm-u044">
                             <h3>Entwickler-Reset: Betreiberkonten</h3>
                             <p>
                                 Setzt alle bisher angelegten Betreiberkonten (Rollen <strong>admin/support/auditor</strong>) zurück
@@ -1992,13 +1984,13 @@
                             <div class="setup-actions">
                                 <button data-action="resetOperatorAccountsFromAdminPanel" class="btn btn-danger" title="ACHTUNG: Alle Betreiberkonten (Admin/Support/Auditor) unwiderruflich zurücksetzen">Alle Betreiberkonten zurücksetzen</button>
                             </div>
-                            <div id="operator-reset-result" class="data-list" style="margin-block-start: 10px"></div>
+                            <div id="operator-reset-result" class="data-list mm-u033"></div>
                         </div>
                     </div>
                 </section>
             </main>
             <!-- ==================== TAB: FIREBASE ==================== -->
-            <div id="tab-firebase" class="tab-content" style="display: none">
+            <div id="tab-firebase" class="tab-content mm-u010">
                 <h2>Firebase-Verwaltung</h2>
 
                 <!-- Section 1: Functions Status Dashboard -->
@@ -2026,7 +2018,7 @@
                     <h3>Knowledge Base Editor</h3>
                     <p>Bearbeite die Wissensbasis für den KI-Support-Agenten.</p>
                     <button data-action="loadKnowledgeBase" class="btn btn-secondary" title="Aktuelle Wissensbasis für den KI-Support laden">Knowledge Base laden</button>
-                    <div class="form-group" style="margin-block-start: 10px">
+                    <div class="form-group mm-u033">
                         <label class="field-label" for="knowledge-base-editor">Wissensbasis-Inhalt</label>
                         <textarea id="knowledge-base-editor" rows="15" class="form-input" placeholder="Knowledge Base wird geladen..." title="Wissensbasis-Inhalte bearbeiten, die der KI-Agent als Kontext nutzt"></textarea>
                     </div>
@@ -2043,7 +2035,7 @@
                     <p>Durchsuche die Audit-Logs in Echtzeit.</p>
                     <div class="sub-filters">
                         <label class="field-label" for="audit-action-filter">Aktion</label>
-                        <select id="audit-action-filter" class="form-input" style="inline-size: auto; display: inline-block" title="Audit-Logs nach bestimmter Aktion filtern">
+                        <select id="audit-action-filter" class="form-input mm-u026" title="Audit-Logs nach bestimmter Aktion filtern">
                             <option value="">Alle Aktionen</option>
                             <option value="auth.login">auth.login</option>
                             <option value="auth.register">auth.register</option>
@@ -2058,7 +2050,7 @@
                             <option value="admin.role">admin.role</option>
                         </select>
                         <label class="field-label" for="audit-limit">Max. Einträge</label>
-                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input" style="inline-size: 80px; display: inline-block" title="Maximale Anzahl der anzuzeigenden Audit-Log-Einträge" />
+                        <input type="number" id="audit-limit" value="50" min="10" max="500" class="form-input mm-u025" title="Maximale Anzahl der anzuzeigenden Audit-Log-Einträge" />
                         <button data-action="loadAuditLogs" class="btn btn-primary" title="Audit-Logs mit den gewählten Filtern laden">Laden</button>
                     </div>
                     <div id="audit-log-list" class="data-list"></div>
@@ -2100,28 +2092,28 @@
             </div>
 
             <!-- ==================== TAB: KI-ASSISTENT ==================== -->
-            <div id="tab-ai" class="tab-content" style="display: none">
+            <div id="tab-ai" class="tab-content mm-u010">
                 <h2>🤖 KI-Assistent &amp; Fehlerüberwachung</h2>
 
-                        <div class="setup-card admin-only" style="margin-block-end: 20px">
+                        <div class="setup-card admin-only mm-u029">
                             <h3>🤖 Gemini KI-Assistent</h3>
                             <p>
                                 Stellen Sie eine freie Frage zur Einrichtung, Konfiguration oder einem Problem.
                                 Gemini analysiert den Kontext und liefert eine Erkl&auml;rung mit L&ouml;sungsvorschlag.
                                 <strong>Vor jeder Anfrage ist eine Zustimmung erforderlich.</strong>
                             </p>
-                            <div id="ai-consent-status" style="margin-block-end: 10px"></div>
+                            <div id="ai-consent-status" class="mm-u027"></div>
                             <div class="dsar-form">
                                 <label class="field-label" for="ai-freeform-input">Ihre Frage an Gemini</label>
                                 <textarea id="ai-freeform-input" rows="3" placeholder="Beschreiben Sie Ihr Problem oder Ihre Frage (min. 10 Zeichen)..." title="Freie Frage an Gemini zu Einrichtung, Konfiguration oder Problemen"></textarea>
                                 <button data-action="askGeminiFreiform" class="btn btn-primary" title="Frage an Gemini senden und KI-gestützte Antwort erhalten">🤖 Gemini fragen</button>
                             </div>
-                            <div id="ai-explain-response" class="data-list" style="margin-block-start: 12px"></div>
+                            <div id="ai-explain-response" class="data-list mm-u036"></div>
                         </div>
 
                         <div
-                            class="setup-card"
-                            style="margin-block-start: 20px"
+                            class="setup-card mm-u043"
+
                         >
                             <h3>Operator-Assistent</h3>
                             <p>
@@ -2155,7 +2147,7 @@
                             </div>
                         </div>
 
-                <div class="setup-card" style="margin-block-start: 20px">
+                <div class="setup-card mm-u043">
                 <h3>🔍 KI-Fehlerüberwachung</h3>
                 <p class="section-description">
                     Systemfehler werden mit Google Gemini analysiert. Die KI erstellt Diagnosen, schlägt Lösungen vor
@@ -2180,20 +2172,20 @@
                             📋 Fix-Historie laden
                         </button>
                     </div>
-                    <div id="ai-scan-status" class="ai-scan-status" style="display: none">
+                    <div id="ai-scan-status" class="ai-scan-status mm-u010">
                         <div class="spinner-small"></div>
                         <span>Gemini analysiert Systemfehler...</span>
                     </div>
                 </div>
 
                 <!-- Analysis Results -->
-                <div id="ai-analysis-results" class="ai-analysis-results" style="display: none">
+                <div id="ai-analysis-results" class="ai-analysis-results mm-u010">
                     <div class="ai-summary-bar" id="ai-summary-bar"></div>
                     <div id="ai-error-cards"></div>
                 </div>
 
                 <!-- Fix History -->
-                <div id="ai-fix-history" class="ai-fix-history" style="display: none">
+                <div id="ai-fix-history" class="ai-fix-history mm-u010">
                     <h3>Protokoll: KI-Analysen &amp; Auto-Fixes</h3>
                     <div id="ai-fix-history-list"></div>
                 </div>
@@ -2201,70 +2193,70 @@
             </div>
 
             <!-- ==================== LEGAL / DATENSCHUTZ TAB ==================== -->
-            <div id="tab-legal" class="tab-content" style="display: none">
+            <div id="tab-legal" class="tab-content mm-u010">
                 <h2>📜 Recht &amp; Datenschutz – Richtlinienverwaltung</h2>
 
                 <!-- Section 1: Aktive Richtlinien laden -->
-                <div class="compliance-section" style="margin-block-end: 30px">
+                <div class="compliance-section mm-u030">
                     <h3>Aktive Richtlinien abfragen</h3>
                     <p>Zeigt die aktuell aktiven AGB- und Datenschutz-Richtlinien für ein Land/Locale.</p>
                     <div class="dsar-form">
                         <label class="field-label" for="legal-policy-country">Land</label>
-                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Zweistelliger Ländercode (ISO 3166-1)" />
+                        <input type="text" id="legal-policy-country" placeholder="Land (z.B. DE)" maxlength="2" class="mm-u024" title="Zweistelliger Ländercode (ISO 3166-1)" />
                         <label class="field-label" for="legal-policy-locale">Locale</label>
-                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die gewünschte Sprachversion" />
+                        <input type="text" id="legal-policy-locale" placeholder="Locale (z.B. de-DE)" class="mm-u021" title="Locale-Code für die gewünschte Sprachversion" />
                         <button data-action="loadActiveLegalPolicies" class="btn btn-primary" title="Aktuell aktive AGB- und Datenschutz-Richtlinien für das gewählte Land laden">
                             Richtlinien laden
                         </button>
                     </div>
-                    <div id="legal-policies-result" class="data-list" style="margin-block-start: 15px"></div>
+                    <div id="legal-policies-result" class="data-list mm-u041"></div>
                 </div>
 
                 <!-- Section 2: Consent-Status prüfen -->
-                <div class="compliance-section" style="margin-block-end: 30px">
+                <div class="compliance-section mm-u030">
                     <h3>Einwilligungsstatus prüfen</h3>
                     <p>Prüft, ob ein bestimmter Nutzer den aktuellen Richtlinien zugestimmt hat (Reconsent nötig?).</p>
                     <div class="dsar-form">
                         <label class="field-label" for="legal-consent-country">Land</label>
-                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Einwilligungsprüfung" />
+                        <input type="text" id="legal-consent-country" placeholder="Land (z.B. DE)" maxlength="2" class="mm-u024" title="Ländercode für die Einwilligungsprüfung" />
                         <label class="field-label" for="legal-consent-locale">Locale</label>
-                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Einwilligungsprüfung" />
+                        <input type="text" id="legal-consent-locale" placeholder="Locale (z.B. de-DE)" class="mm-u021" title="Locale-Code für die Einwilligungsprüfung" />
                         <button data-action="checkLegalReconsentStatus" class="btn btn-primary" title="Prüfen, ob der Nutzer den aktuellen Richtlinien zugestimmt hat">
                             Status prüfen
                         </button>
                     </div>
-                    <div id="legal-consent-result" class="data-list" style="margin-block-start: 15px"></div>
+                    <div id="legal-consent-result" class="data-list mm-u041"></div>
                 </div>
 
                 <!-- Section 3: Richtlinie veröffentlichen (Admin only) -->
-                <div id="playstore-readiness-card" class="compliance-section admin-only" style="margin-block-end: 30px">
+                <div id="playstore-readiness-card" class="compliance-section admin-only mm-u030">
                     <h3>Richtlinie veröffentlichen</h3>
                     <p>Erstellt oder aktualisiert eine AGB- oder Datenschutz-Richtlinie für ein bestimmtes Land/Locale.</p>
-                    <div class="dsar-form" style="flex-direction: column; gap: 10px; align-items: stretch">
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                    <div class="dsar-form mm-u014">
+                        <div class="mm-u005">
                             <div><label class="field-label" for="legal-publish-type">Richtlinien-Typ</label>
-                            <select id="legal-publish-type" style="inline-size: 140px" title="Art der Richtlinie: AGB oder Datenschutz">
+                            <select id="legal-publish-type" class="mm-u021" title="Art der Richtlinie: AGB oder Datenschutz">
                                 <option value="terms">AGB (terms)</option>
                                 <option value="privacy">Datenschutz (privacy)</option>
                             </select></div>
                             <div><label class="field-label" for="legal-publish-country">Land</label>
-                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für die Richtlinie" /></div>
+                            <input type="text" id="legal-publish-country" placeholder="Land (z.B. DE)" maxlength="2" class="mm-u024" title="Ländercode für die Richtlinie" /></div>
                             <div><label class="field-label" for="legal-publish-locale">Locale</label>
-                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für die Richtlinie" /></div>
+                            <input type="text" id="legal-publish-locale" placeholder="Locale (z.B. de-DE)" class="mm-u021" title="Locale-Code für die Richtlinie" /></div>
                             <div><label class="field-label" for="legal-publish-version">Version</label>
-                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" style="inline-size: 180px" title="Versionsnummer der Richtlinie" /></div>
+                            <input type="text" id="legal-publish-version" placeholder="Version (z.B. 2026.03.19-1)" class="mm-u022" title="Versionsnummer der Richtlinie" /></div>
                         </div>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                            <div style="flex: 1; min-inline-size: 250px"><label class="field-label" for="legal-publish-url">Content-URL</label>
-                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" style="inline-size: 100%" title="URL zum vollständigen Richtlinien-Dokument" /></div>
+                        <div class="mm-u005">
+                            <div class="mm-u016"><label class="field-label" for="legal-publish-url">Content-URL</label>
+                            <input type="url" id="legal-publish-url" placeholder="Content-URL (https://...)" class="mm-u019" title="URL zum vollständigen Richtlinien-Dokument" /></div>
                             <div><label class="field-label" for="legal-publish-status">Status</label>
-                            <select id="legal-publish-status" style="inline-size: 120px" title="Veröffentlichungsstatus der Richtlinie">
+                            <select id="legal-publish-status" class="mm-u020" title="Veröffentlichungsstatus der Richtlinie">
                                 <option value="active">Aktiv</option>
                                 <option value="draft">Entwurf</option>
                                 <option value="approved">Freigegeben</option>
                                 <option value="retired">Zurückgezogen</option>
                             </select></div>
-                            <label style="display: flex; align-items: center; gap: 5px">
+                            <label class="mm-u004">
                                 <input type="checkbox" id="legal-publish-major" /> Major Change
                             </label>
                         </div>
@@ -2274,11 +2266,11 @@
                             </button>
                         </div>
                     </div>
-                    <div id="legal-publish-result" class="data-list" style="margin-block-start: 15px"></div>
+                    <div id="legal-publish-result" class="data-list mm-u041"></div>
                 </div>
 
                 <!-- Section 4: Reconsent erzwingen (Admin only) -->
-                <div class="compliance-section admin-only" style="margin-block-end: 30px">
+                <div class="compliance-section admin-only mm-u030">
                     <h3>Reconsent erzwingen</h3>
                     <p>
                         Markiert Nutzer als „Erneute Zustimmung erforderlich". Entweder für einen einzelnen
@@ -2286,29 +2278,29 @@
                     </p>
                     <div class="dsar-form">
                         <label class="field-label" for="legal-reconsent-country">Land</label>
-                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" style="inline-size: 80px" title="Ländercode für den Reconsent" />
+                        <input type="text" id="legal-reconsent-country" placeholder="Land (z.B. DE)" maxlength="2" class="mm-u024" title="Ländercode für den Reconsent" />
                         <label class="field-label" for="legal-reconsent-locale">Locale</label>
-                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" style="inline-size: 140px" title="Locale-Code für den Reconsent" />
+                        <input type="text" id="legal-reconsent-locale" placeholder="Locale (z.B. de-DE)" class="mm-u021" title="Locale-Code für den Reconsent" />
                         <label class="field-label" for="legal-reconsent-master">Master-ID (optional)</label>
-                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" style="inline-size: 220px" title="Einzelne Master-ID oder leer lassen für alle Nutzer des Landes" />
+                        <input type="text" id="legal-reconsent-master" placeholder="Master-ID (optional, leer = alle)" class="mm-u023" title="Einzelne Master-ID oder leer lassen für alle Nutzer des Landes" />
                         <button data-action="triggerLegalReconsent" class="btn btn-danger" title="Nutzer als 'Erneute Zustimmung erforderlich' markieren">
                             Reconsent erzwingen
                         </button>
                     </div>
-                    <div id="legal-reconsent-result" class="data-list" style="margin-block-start: 15px"></div>
+                    <div id="legal-reconsent-result" class="data-list mm-u041"></div>
                 </div>
 
                 <!-- Section 5: Play Store Readiness (Admin only) -->
-                <div class="compliance-section admin-only" style="margin-block-end: 30px">
+                <div class="compliance-section admin-only mm-u030">
                     <h3>Google Play Store Readiness</h3>
                     <p>
                         Operative Checkliste für den tatsächlichen Release-Status. Die Werte werden lokal gespeichert
                         (Browser localStorage) und können als JSON-Nachweis exportiert werden.
                     </p>
 
-                    <div id="playstore-readiness-summary" class="data-list" style="margin-block-end: 10px"></div>
+                    <div id="playstore-readiness-summary" class="data-list mm-u027"></div>
 
-                    <div class="dsar-form" style="display: grid; gap: 8px; align-items: start">
+                    <div class="dsar-form mm-u009">
                         <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-data-safety" /> Data-Safety-Formular in Play Console vollständig und geprüft</label></div>
                         <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-iarc" /> IARC-Altersfreigabe abgeschlossen</label></div>
                         <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-listing" /> Store Listing vollständig (Beschreibung, Screenshots, Kontakt)</label></div>
@@ -2319,7 +2311,7 @@
                         <div class="setup-checklist-item"><label><input type="checkbox" id="ps-check-signoff" /> Interne Go/No-Go-Freigabe dokumentiert</label></div>
                     </div>
 
-                    <div class="dsar-form" style="display: grid; gap: 10px; margin-block-start: 12px">
+                    <div class="dsar-form mm-u007">
                         <label class="field-label" for="ps-privacy-url">Privacy-Policy-URL</label>
                         <input type="url" id="ps-privacy-url" placeholder="Privacy Policy URL (https://...)" title="Öffentliche URL der Datenschutzerklärung" />
                         <label class="field-label" for="ps-support-email">Support-/Privacy-E-Mail</label>
@@ -2330,15 +2322,15 @@
                         <textarea id="ps-release-notes" rows="4" placeholder="Release-Notizen / Reviewer-Hinweise" title="Hinweise für den Google Play Reviewer und Release-Notizen"></textarea>
                     </div>
 
-                    <div class="dsar-form" style="margin-block-start: 12px">
+                    <div class="dsar-form mm-u036">
                         <button data-action="savePlayStoreReadiness" class="btn btn-primary" title="Play Store Readiness-Status lokal speichern">Readiness speichern</button>
                         <button data-action="exportPlayStoreReadiness" class="btn btn-secondary" title="Readiness-Status als JSON-Nachweis exportieren">JSON exportieren</button>
                         <button data-action="generateReviewerGuide" class="btn btn-secondary" title="Anleitung für den Google Play Reviewer automatisch generieren">Reviewer-Anleitung generieren</button>
                         <button data-action="resetPlayStoreReadiness" class="btn btn-danger" title="Alle Readiness-Eingaben zurücksetzen">Zurücksetzen</button>
                     </div>
 
-                    <div id="playstore-readiness-result" class="data-list" style="margin-block-start: 15px"></div>
-                    <div id="ps-reviewer-guide-output" class="data-list" style="margin-block-start: 10px"></div>
+                    <div id="playstore-readiness-result" class="data-list mm-u041"></div>
+                    <div id="ps-reviewer-guide-output" class="data-list mm-u033"></div>
                 </div>
             </div>
 
@@ -2347,12 +2339,12 @@
         <!-- Global Notification (outside dashboard-section so it's visible during onboarding) -->
         <div
             id="notification"
-            class="notification"
-            style="display: none"
+            class="notification mm-u010"
+
         ></div>
 
         <!-- User Details Modal -->
-        <div id="user-details-modal" class="modal" style="display: none">
+        <div id="user-details-modal" class="modal mm-u010">
             <div class="modal-content modal-large">
                 <span class="close" data-action="closeUserDetailsModal" title="Dialog schließen"
                     >&times;</span
@@ -2364,7 +2356,7 @@
         </div>
 
         <!-- Device Details Modal -->
-        <div id="device-details-modal" class="modal" style="display: none">
+        <div id="device-details-modal" class="modal mm-u010">
             <div class="modal-content modal-large">
                 <span class="close" data-action="closeDeviceDetailsModal" title="Dialog schließen">&times;</span>
                 <div id="device-details-content"></div>
@@ -2372,7 +2364,7 @@
         </div>
 
         <!-- Ticket Details Modal -->
-        <div id="ticket-details-modal" class="modal" style="display: none">
+        <div id="ticket-details-modal" class="modal mm-u010">
             <div class="modal-content modal-large">
                 <span class="close" data-action="closeTicketDetailsModal" title="Dialog schließen"
                     >&times;</span

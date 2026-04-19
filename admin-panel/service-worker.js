@@ -4,6 +4,7 @@ const APP_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./styles-utilities.css",
   "./app.js",
   "./appcheck-init.js",
   "./pwa-register.js",

@@ -1,0 +1,66 @@
+/* MiniMaster Admin-Panel - Style Utilities (F6.1 CSS-Hardening)
+ * Auto-generiert aus index.html-Inline-Styles. Ersetzt 100% der
+ * `style="..."`-Attribute durch deterministische Klassen `mm-uXXX`.
+ * Damit ist `style-src 'self'` ohne 'unsafe-inline' moeglich.
+ */
+
+.mm-u001 { display: inline-block; text-decoration: none; margin-inline-end: 10px; }  /* original: 
+                                    display: inline-block;
+                                    text-decoration: none;
+                                    margin-inline-end: 10px;
+                                 */
+.mm-u002 { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px; }  /* original: 
+                                margin: 20px 0;
+                                padding: 15px;
+                                background: #f5f5f5;
+                                border-radius: 8px;
+                             */
+.mm-u003 { align-items: center; gap: 10px; flex-wrap: wrap; }  /* original: align-items: center; gap: 10px; flex-wrap: wrap */
+.mm-u004 { display: flex; align-items: center; gap: 5px; }  /* original: display: flex; align-items: center; gap: 5px */
+.mm-u005 { display: flex; gap: 10px; flex-wrap: wrap; }  /* original: display: flex; gap: 10px; flex-wrap: wrap */
+.mm-u006 { display: grid; gap: 10px; }  /* original: display: grid; gap: 10px */
+.mm-u007 { display: grid; gap: 10px; margin-block-start: 12px; }  /* original: display: grid; gap: 10px; margin-block-start: 12px */
+.mm-u008 { display: grid; gap: 8px; }  /* original: display: grid; gap: 8px */
+.mm-u009 { display: grid; gap: 8px; align-items: start; }  /* original: display: grid; gap: 8px; align-items: start */
+.mm-u010 { display: none; }  /* original: display: none */
+.mm-u011 { display:flex; gap:10px; margin-block-start:10px; flex-wrap:wrap; }  /* original: display:flex; gap:10px; margin-block-start:10px; flex-wrap:wrap */
+.mm-u012 { display:none; margin-block-start: 12px; }  /* original: display:none; margin-block-start: 12px */
+.mm-u013 { display:none; margin-block-start:8px; }  /* original: display:none; margin-block-start:8px */
+.mm-u014 { flex-direction: column; gap: 10px; align-items: stretch; }  /* original: flex-direction: column; gap: 10px; align-items: stretch */
+.mm-u015 { flex: 1; min-inline-size: 200px; }  /* original: flex: 1; min-inline-size: 200px */
+.mm-u016 { flex: 1; min-inline-size: 250px; }  /* original: flex: 1; min-inline-size: 250px */
+.mm-u017 { font-size:1em; }  /* original: font-size:1em */
+.mm-u018 { gap: 8px; flex-wrap: wrap; margin-block-start: 10px; }  /* original: gap: 8px; flex-wrap: wrap; margin-block-start: 10px */
+.mm-u019 { inline-size: 100%; }  /* original: inline-size: 100% */
+.mm-u020 { inline-size: 120px; }  /* original: inline-size: 120px */
+.mm-u021 { inline-size: 140px; }  /* original: inline-size: 140px */
+.mm-u022 { inline-size: 180px; }  /* original: inline-size: 180px */
+.mm-u023 { inline-size: 220px; }  /* original: inline-size: 220px */
+.mm-u024 { inline-size: 80px; }  /* original: inline-size: 80px */
+.mm-u025 { inline-size: 80px; display: inline-block; }  /* original: inline-size: 80px; display: inline-block */
+.mm-u026 { inline-size: auto; display: inline-block; }  /* original: inline-size: auto; display: inline-block */
+.mm-u027 { margin-block-end: 10px; }  /* original: margin-block-end: 10px */
+.mm-u028 { margin-block-end: 15px; }  /* original: margin-block-end: 15px */
+.mm-u029 { margin-block-end: 20px; }  /* original: margin-block-end: 20px */
+.mm-u030 { margin-block-end: 30px; }  /* original: margin-block-end: 30px */
+.mm-u031 { margin-block-end: 8px; }  /* original: margin-block-end: 8px */
+.mm-u032 { margin-block-start: 0; }  /* original: margin-block-start: 0 */
+.mm-u033 { margin-block-start: 10px; }  /* original: margin-block-start: 10px */
+.mm-u034 { margin-block-start: 10px; }  /* original: margin-block-start: 10px; */
+.mm-u035 { margin-block-start: 10px; margin-block-end: 8px; }  /* original: margin-block-start: 10px; margin-block-end: 8px */
+.mm-u036 { margin-block-start: 12px; }  /* original: margin-block-start: 12px */
+.mm-u037 { margin-block-start: 12px; gap: 14px; }  /* original: margin-block-start: 12px; gap: 14px */
+.mm-u038 { margin-block-start: 12px; gap: 8px; flex-wrap: wrap; }  /* original: margin-block-start: 12px; gap: 8px; flex-wrap: wrap */
+.mm-u039 { margin-block-start: 14px; }  /* original: margin-block-start: 14px */
+.mm-u040 { margin-block-start: 14px; border-color: #fed7aa; background: #fff7ed; }  /* original: margin-block-start: 14px; border-color: #fed7aa; background: #fff7ed; */
+.mm-u041 { margin-block-start: 15px; }  /* original: margin-block-start: 15px */
+.mm-u042 { margin-block-start: 16px; margin-block-end: 0; }  /* original: margin-block-start: 16px; margin-block-end: 0 */
+.mm-u043 { margin-block-start: 20px; }  /* original: margin-block-start: 20px */
+.mm-u044 { margin-block-start: 20px; border-inline-start: 4px solid #dc2626; }  /* original: margin-block-start: 20px; border-inline-start: 4px solid #dc2626; */
+.mm-u045 { margin-block-start: 30px; }  /* original: margin-block-start: 30px */
+.mm-u046 { margin-block-start: 6px; }  /* original: margin-block-start: 6px */
+.mm-u047 { margin-block-start: 8px; }  /* original: margin-block-start: 8px */
+.mm-u048 { margin-block-start:15px; }  /* original: margin-block-start:15px */
+.mm-u049 { margin-block-start:8px; }  /* original: margin-block-start:8px; */
+.mm-u050 { margin: 0; }  /* original: margin: 0 */
+.mm-u051 { max-inline-size: 220px; }  /* original: max-inline-size: 220px */

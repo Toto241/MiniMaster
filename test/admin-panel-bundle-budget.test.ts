@@ -29,6 +29,11 @@ import * as path from "path";
  *   - Inline-<script>-Bloecke: 0. Inline-Event-Handler insgesamt: 0.
  *   - CSP `script-src 'self' https://www.gstatic.com` (firebase.json) ist damit
  *     OHNE 'unsafe-inline' sauber (style-src 'unsafe-inline' bleibt fuer Inline-CSS).
+ *
+ * Stand F6.1 CSS-Hardening:
+ *   - Inline style="..."-Attribute in index.html: 0 (51 unique Werte -> Klassen
+ *     mm-u001 .. mm-u051 in admin-panel/styles-utilities.css).
+ *   - admin-panel CSP `style-src 'self'` (ohne 'unsafe-inline') aktiv.
  */
 
 const APP_JS = "admin-panel/app.js";
@@ -91,5 +96,38 @@ describe("admin-panel bundle budget (Welle 0 baseline)", () => {
       expect(scriptSrcMatch![0]).not.toMatch(/'unsafe-inline'/);
       expect(scriptSrcMatch![0]).not.toMatch(/'unsafe-eval'/);
     }
+  });
+
+  it("index.html ist frei von Inline-style=-Attributen (F6.1 CSS-Hardening)", async () => {
+    const source = await readUtf8(INDEX_HTML);
+    const inlineStyles = source.match(/\sstyle="/g) ?? [];
+    expect(inlineStyles.length).toBe(0);
+    // Style-Utilities-CSS muss eingebunden sein.
+    expect(source).toMatch(/<link[^>]+href="styles-utilities\.css/);
+    // Mindestens ein paar mm-u-Klassen muessen verwendet sein.
+    const used = source.match(/\bmm-u\d+\b/g) ?? [];
+    expect(used.length).toBeGreaterThan(100);
+  });
+
+  it("styles-utilities.css definiert alle in index.html verwendeten mm-u-Klassen (F6.1 Integritaet)", async () => {
+    const html = await readUtf8(INDEX_HTML);
+    const css = await readUtf8("admin-panel/styles-utilities.css");
+    const usedSet = new Set((html.match(/\bmm-u\d+\b/g) ?? []));
+    expect(usedSet.size).toBeGreaterThan(0);
+    for (const cls of usedSet) {
+      // jede genutzte Klasse muss als ".mm-uXXX {" definiert sein
+      expect(css).toMatch(new RegExp(`\\.${cls}\\s*\\{`));
+    }
+  });
+
+  it("firebase.json admin-panel CSP setzt style-src 'self' ohne 'unsafe-inline' (F6.1)", async () => {
+    const fbJson = await readUtf8("firebase.json");
+    // Suche den admin-panel-Block; er folgt einem "target": "admin-panel"
+    const adminBlockMatch = fbJson.match(/"target"\s*:\s*"admin-panel"[\s\S]*?"Content-Security-Policy"[\s\S]*?"value"\s*:\s*"([^"]+)"/);
+    expect(adminBlockMatch).not.toBeNull();
+    const csp = adminBlockMatch![1];
+    const styleSrcMatch = csp.match(/style-src\s+[^;]+/);
+    expect(styleSrcMatch).not.toBeNull();
+    expect(styleSrcMatch![0]).not.toMatch(/'unsafe-inline'/);
   });
 });
