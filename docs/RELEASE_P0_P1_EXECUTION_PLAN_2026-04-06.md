@@ -46,7 +46,7 @@ Diese Punkte muessen vor jeder Freigabeentscheidung mindestens auf Conditional G
 | P0-4 | Finalen Deploy-Nachweis erzeugen | Engineering | Deploy-Referenz in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) eingetragen | P0-2 |
 | P0-5 | Firebase-Key-Rotation und Restriktionen abschliessen | Security Owner | Key-ID alt/neu, Revocation-Zeitpunkt, Console-Nachweis im Evidence Register | Firebase Console Zugriff |
 | P0-6 | Play Console Paket einreichen: Data Safety, IARC, Permissions, App Access | Product/Ops + Compliance | Screenshots/URLs und Status im Evidence Register | Play Console Zugriff |
-| P0-7 | Physische Commissioning-Checks auf Geraet/Emulator abschliessen | QA/Operations | Ausgefuellte Checkliste mit Sign-off | Reale Testumgebung |
+| P0-7 | Physische Commissioning-Checks auf Geraet/Emulator abschliessen | QA/Operations | Ausgefuellte Checkliste mit Sign-off; aktuell blockiert, bis fuer den geplanten Single-Emulator-Lauf ein lokales AVD plus avdmanager/sdkmanager verfuegbar ist oder alternativ eine reale Testumgebung/macOS-iOS-Nachweis bereitsteht | Reale Testumgebung |
 | P0-8 | On-call Roster final benennen und Reachability-Test dokumentieren | Operations Lead | Vollstaendige Namen/Kontakte + Reachability-Evidence | Operative Owner verfuegbar |
 | P0-9 | Re-Decision auf Conditional Go oder Go dokumentieren | Release Manager | Aktualisierte [RELEASE_DECISION_2026-03-21_RC-2026-03-21.md](RELEASE_DECISION_2026-03-21_RC-2026-03-21.md) | P0-1 bis P0-8 |
 
