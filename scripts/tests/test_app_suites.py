@@ -807,6 +807,74 @@ class TestMiniMasterAdminHandlerRoutes:
             },
         )
 
+    def test_do_post_android_compatibility_rejects_stale_plan_hash(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility")
+        handler._read_json_body.return_value = {
+            "executionMode": "single-master",
+            "androidVersions": ["14"],
+            "serial": "auto",
+            "suite": "commissioning",
+            "expectedPlanHash": "compat-plan-hash-old",
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+        monkeypatch.setattr(app, "_build_android_compatibility_preflight", lambda _payload: {
+            "status": "approved",
+            "canStart": True,
+            "approvalRequired": True,
+            "hasActiveApproval": True,
+            "activeApproval": {
+                "approvalId": "compat-approval-1",
+                "approvedAt": "2026-04-20T10:00:00Z",
+                "approvedBy": "qa-admin-panel",
+                "expiresAt": "2026-04-20T18:00:00Z",
+                "warningIds": ["register-blockers-open"],
+                "planHash": "compat-plan-hash-new",
+            },
+            "planHash": "compat-plan-hash-new",
+            "warningCount": 1,
+            "warnings": [{"id": "register-blockers-open"}],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.CONFLICT,
+            {
+                "error": "Der serverseitige Android-Kompatibilitäts-Preflight hat sich seit der letzten Ansicht geändert. Bitte Preflight neu laden und Warnlagen erneut prüfen.",
+                "requiresRefresh": True,
+                "currentPlanHash": "compat-plan-hash-new",
+                "preflight": {
+                    "status": "approved",
+                    "canStart": True,
+                    "approvalRequired": True,
+                    "hasActiveApproval": True,
+                    "activeApproval": {
+                        "approvalId": "compat-approval-1",
+                        "approvedAt": "2026-04-20T10:00:00Z",
+                        "approvedBy": "qa-admin-panel",
+                        "expiresAt": "2026-04-20T18:00:00Z",
+                        "warningIds": ["register-blockers-open"],
+                        "planHash": "compat-plan-hash-new",
+                    },
+                    "planHash": "compat-plan-hash-new",
+                    "warningCount": 1,
+                    "warnings": [{"id": "register-blockers-open"}],
+                    "blockingCount": 0,
+                    "blockingReasons": [],
+                },
+            },
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+
     def test_do_post_android_compatibility_rejects_missing_dual_serials(self):
         import app
 
@@ -943,6 +1011,86 @@ class TestMiniMasterAdminHandlerRoutes:
         handler._write_json.assert_called_once_with(
             HTTPStatus.CONFLICT,
             {"error": "Für den Android-Automation-Sweep liegt eine serverseitig erforderliche Warnlagen-Freigabe vor. Bitte zuerst die Sweep-Freigabe speichern."},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+
+    def test_do_post_android_automation_sweep_rejects_stale_approval_id(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-automation-sweep")
+        handler._read_json_body.return_value = {
+            "approvalId": "sweep-approval-stale",
+            "expectedPlanHash": "plan-hash-1",
+            "installApk": False,
+            "skipActivation": True,
+            "parallel": False,
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+        monkeypatch.setattr(app, "_build_android_automation_sweep_plan", lambda: {
+            "androidVersions": ["10", "14"],
+            "masterTestClasses": ["master.PairingTest"],
+            "childTestClasses": ["child.PairingTest"],
+            "selectedScenarioIds": ["pairing"],
+        })
+        monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: {
+            "status": "approved",
+            "canStart": True,
+            "approvalRequired": True,
+            "hasActiveApproval": True,
+            "activeApproval": {
+                "approvalId": "sweep-approval-current",
+                "approvedAt": "2026-04-20T10:00:00Z",
+                "approvedBy": "qa-admin-panel",
+                "expiresAt": "2026-04-20T18:00:00Z",
+                "warningIds": ["register-blockers-open"],
+                "planHash": "plan-hash-1",
+            },
+            "planHash": "plan-hash-1",
+            "warningCount": 1,
+            "warnings": [{"id": "register-blockers-open"}],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
+        monkeypatch.setattr(app, "get_emulator_lab_overview", lambda: {
+            "sdkConfigured": True,
+            "adbAvailable": True,
+            "emulatorBinaryAvailable": True,
+            "avdManagerAvailable": True,
+        })
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.CONFLICT,
+            {
+                "error": "Die gespeicherte Android-Automation-Sweep-Freigabe ist nicht mehr für den aktuellen Plan gültig. Bitte Preflight neu laden und gegebenenfalls erneut freigeben.",
+                "requiresRefresh": True,
+                "currentPlanHash": "plan-hash-1",
+                "preflight": {
+                    "status": "approved",
+                    "canStart": True,
+                    "approvalRequired": True,
+                    "hasActiveApproval": True,
+                    "activeApproval": {
+                        "approvalId": "sweep-approval-current",
+                        "approvedAt": "2026-04-20T10:00:00Z",
+                        "approvedBy": "qa-admin-panel",
+                        "expiresAt": "2026-04-20T18:00:00Z",
+                        "warningIds": ["register-blockers-open"],
+                        "planHash": "plan-hash-1",
+                    },
+                    "planHash": "plan-hash-1",
+                    "warningCount": 1,
+                    "warnings": [{"id": "register-blockers-open"}],
+                    "blockingCount": 0,
+                    "blockingReasons": [],
+                },
+            },
         )
         create_job_mock.assert_not_called()
         enqueue_job_mock.assert_not_called()

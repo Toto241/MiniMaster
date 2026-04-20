@@ -320,6 +320,7 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "ready",
           canStart: true,
+          planHash: "plan-hash-ready",
           approvalRequired: false,
           hasActiveApproval: false,
           activeApproval: null,
@@ -346,6 +347,7 @@ describe("admin-panel current QA flows", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         approvalId: "",
+        expectedPlanHash: "plan-hash-ready",
         installApk: true,
         uninstallFirst: false,
         skipActivation: true,
@@ -393,6 +395,7 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "warning",
           canStart: false,
+          planHash: "plan-hash-warning",
           approvalRequired: true,
           hasActiveApproval: false,
           activeApproval: null,
@@ -472,6 +475,7 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "warning",
           canStart: false,
+          planHash: "plan-hash-1",
           approvalRequired: true,
           hasActiveApproval: false,
           activeApproval: null,
@@ -486,6 +490,7 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "approved",
           canStart: true,
+          planHash: "plan-hash-1",
           approvalRequired: true,
           hasActiveApproval: true,
           activeApproval: {
@@ -528,13 +533,14 @@ describe("admin-panel current QA flows", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/suites/android-automation-sweep/approve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approvedBy: "qa-admin-panel" }),
+      body: JSON.stringify({ approvedBy: "qa-admin-panel", expectedPlanHash: "plan-hash-1" }),
     });
     expect(fetchMock).toHaveBeenNthCalledWith(5, "/api/suites/android-automation-sweep", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         approvalId: "sweep-approval-1",
+        expectedPlanHash: "plan-hash-1",
         installApk: true,
         uninstallFirst: false,
         skipActivation: false,
@@ -578,6 +584,7 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "blocked",
           canStart: false,
+          planHash: "plan-hash-blocked",
           approvalRequired: false,
           hasActiveApproval: false,
           activeApproval: null,
@@ -605,6 +612,300 @@ describe("admin-panel current QA flows", () => {
     expect(context.confirm).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(notificationEl.textContent).toContain("Android-Automation-Sweep blockiert: ADB ist nicht verfügbar.");
+  });
+
+  it("requires a server-side warning approval before a compatibility run can start", async () => {
+    const { exports, fetchMock, elements, context } = loadAdminPanelTestExports();
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-compat-execution-mode", { value: "single-master" });
+    elements.set("qa-compat-install-apk", { checked: false });
+    elements.set("qa-compat-uninstall-first", { checked: false });
+    elements.set("qa-compat-skip-activation", { checked: false });
+    elements.set("qa-compat-parallel", { checked: false });
+    elements.set("qa-compat-timeout-sec", { value: "3600" });
+
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue({ suites: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "warning",
+          canStart: false,
+          planHash: "compat-plan-hash-1",
+          approvalRequired: true,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "warning",
+          canStart: false,
+          planHash: "compat-plan-hash-1",
+          approvalRequired: true,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [{ id: "blocker-1", title: "Open Release Blocker", status: "fail", blockingForRelease: true, groupId: "core-suite" }] });
+    await exports.loadSuiteGuideData();
+
+    await exports.startAndroidCompatibilityRun();
+
+    expect(context.confirm).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/suites/android-compatibility/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        executionMode: "single-master",
+        androidVersions: ["14"],
+        installApk: false,
+        uninstallFirst: false,
+        serial: "auto",
+        suite: "commissioning",
+        testFilter: "",
+        selectedTestClasses: [],
+        skipActivation: false,
+        timeoutSec: 3600,
+        apkPath: "",
+      }),
+    });
+    expect(notificationEl.textContent).toContain("serverseitige Warnlagen-Freigabe");
+  });
+
+  it("stores a compatibility approval and starts with the active approval id", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-compat-execution-mode", { value: "dual-device" });
+    elements.set("qa-compat-install-apk", { checked: true });
+    elements.set("qa-compat-uninstall-first", { checked: false });
+    elements.set("qa-compat-skip-activation", { checked: false });
+    elements.set("qa-compat-parallel", { checked: true });
+    elements.set("qa-compat-timeout-sec", { value: "7200" });
+
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue({ suites: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "warning",
+          canStart: false,
+          planHash: "compat-plan-hash-1",
+          approvalRequired: true,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "approved",
+          canStart: true,
+          planHash: "compat-plan-hash-1",
+          approvalRequired: true,
+          hasActiveApproval: true,
+          activeApproval: {
+            approvalId: "compat-approval-1",
+            approvedAt: "2026-04-20T10:00:00Z",
+            approvedBy: "qa-admin-panel",
+            expiresAt: "2026-04-20T18:00:00Z",
+            warningIds: ["register-blockers-open"],
+            planHash: "compat-plan-hash-1",
+          },
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "approved",
+          canStart: true,
+          planHash: "compat-plan-hash-1",
+          approvalRequired: true,
+          hasActiveApproval: true,
+          activeApproval: {
+            approvalId: "compat-approval-1",
+            approvedAt: "2026-04-20T10:00:00Z",
+            approvedBy: "qa-admin-panel",
+            expiresAt: "2026-04-20T18:00:00Z",
+            warningIds: ["register-blockers-open"],
+            planHash: "compat-plan-hash-1",
+          },
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "approved",
+          canStart: true,
+          planHash: "compat-plan-hash-1",
+          approvalRequired: true,
+          hasActiveApproval: true,
+          activeApproval: {
+            approvalId: "compat-approval-1",
+            approvedAt: "2026-04-20T10:00:00Z",
+            approvedBy: "qa-admin-panel",
+            expiresAt: "2026-04-20T18:00:00Z",
+            warningIds: ["register-blockers-open"],
+            planHash: "compat-plan-hash-1",
+          },
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue({ runId: "compat-run-1", approvalId: "compat-approval-1", approvedAt: "2026-04-20T10:00:00Z", approvedBy: "qa-admin-panel", approvalWarnings: ["register-blockers-open"] }) });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [{ id: "blocker-1", title: "Open Release Blocker", status: "fail", blockingForRelease: true, groupId: "core-suite" }] });
+    await exports.loadSuiteGuideData();
+
+    await exports.requestAndroidCompatibilityApproval();
+    await exports.startAndroidCompatibilityRun();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/suites/android-compatibility/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        executionMode: "dual-device",
+        androidVersions: ["14"],
+        installApk: true,
+        uninstallFirst: false,
+        masterSerial: "auto",
+        childSerial: "auto",
+        parallel: true,
+        selectedScenarioIds: ["pairing"],
+        selectedTestClasses: [],
+        profileId: "",
+        scenarioId: "",
+        faultModes: [],
+        timeoutSec: 7200,
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(5, "/api/suites/android-compatibility/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        executionMode: "dual-device",
+        androidVersions: ["14"],
+        installApk: true,
+        uninstallFirst: false,
+        masterSerial: "auto",
+        childSerial: "auto",
+        parallel: true,
+        selectedScenarioIds: ["pairing"],
+        selectedTestClasses: [],
+        profileId: "",
+        scenarioId: "",
+        faultModes: [],
+        timeoutSec: 7200,
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+        approvedBy: "qa-admin-panel",
+        expectedPlanHash: "compat-plan-hash-1",
+      }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(6, "/api/suites/android-compatibility/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        executionMode: "dual-device",
+        androidVersions: ["14"],
+        installApk: true,
+        uninstallFirst: false,
+        masterSerial: "auto",
+        childSerial: "auto",
+        parallel: true,
+        selectedScenarioIds: ["pairing"],
+        selectedTestClasses: [],
+        profileId: "",
+        scenarioId: "",
+        faultModes: [],
+        timeoutSec: 7200,
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(7, "/api/suites/android-compatibility", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        executionMode: "dual-device",
+        androidVersions: ["14"],
+        installApk: true,
+        uninstallFirst: false,
+        masterSerial: "auto",
+        childSerial: "auto",
+        parallel: true,
+        selectedScenarioIds: ["pairing"],
+        selectedTestClasses: [],
+        profileId: "",
+        scenarioId: "",
+        faultModes: [],
+        timeoutSec: 7200,
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+        approvalId: "compat-approval-1",
+        expectedPlanHash: "compat-plan-hash-1",
+      }),
+    });
+    expect(notificationEl.textContent).toContain("Android-Kompatibilitätslauf gestartet");
   });
 
   it("renders automation sweep runs in history with a dedicated label", async () => {
