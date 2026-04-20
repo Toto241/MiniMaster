@@ -27,6 +27,9 @@ describe("admin-panel current QA helpers", () => {
     expect(html).toContain("Letzte Testläufe, Fehler &amp; Detailansicht");
     expect(html).toContain("qa-test-metrics");
     expect(html).toContain("qa-test-rerun-btn");
+    expect(html).toContain("qa-secondary-details");
+    expect(html).toContain("Nur bei Bedarf öffnen");
+    expect(html).toContain("Nur für tiefe Ursachenanalyse und Nachweisarbeit");
     expect(html).not.toContain("Priorisierte nächste Schritte");
   });
 

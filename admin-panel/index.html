@@ -1003,52 +1003,56 @@
                             </div>
                         </div>
 
-                        <div id="qa-start-guide-card" class="setup-card admin-only mm-u029">
-                            <h3>Startwege &amp; reale Datenquellen</h3>
-                            <p>
-                                Diese Übersicht zeigt nur noch, <strong>welche realen Testquellen und Startwege</strong>
-                                im Projekt vorhanden sind, wohin Ergebnisse geschrieben werden und in welchen Bereich Sie
-                                Status oder Details wiederfinden.
-                            </p>
-                            <div id="qa-start-guide" class="data-list mm-u036">
-                                <div class="info">Lade QA-Startwege...</div>
-                            </div>
+                        <div id="qa-start-guide-card" class="setup-card admin-only qa-secondary-card mm-u029">
+                            <details class="qa-secondary-details">
+                                <summary>
+                                    <span>Startwege &amp; reale Datenquellen</span>
+                                    <small>Nur bei Bedarf öffnen</small>
+                                </summary>
+                                <p>
+                                    Diese Übersicht zeigt nur noch, <strong>welche realen Testquellen und Startwege</strong>
+                                    im Projekt vorhanden sind, wohin Ergebnisse geschrieben werden und in welchen Bereich Sie
+                                    Status oder Details wiederfinden.
+                                </p>
+                                <div id="qa-start-guide" class="data-list mm-u036">
+                                    <div class="info">Lade QA-Startwege...</div>
+                                </div>
+                            </details>
                         </div>
 
-                        <div class="qa-section-heading">
-                            <h3>Register &amp; Evidenz</h3>
-                            <p>Zentrale Sicht auf Testbestand, Nachweise, Commissioning-Läufe und manuelle Freigaben.</p>
-                        </div>
-
-                        <div id="qa-register-card" class="setup-card admin-only qa-workspace-card mm-u029">
-                            <h3>Testregister &amp; Arbeitsvorrat</h3>
-                            <p>
-                                Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle und ihren belastbaren Status.
-                                Offene Fehler, manuelle Nachweise und automatisierte Ergebnisse werden hier entlang der
-                                tatsächlichen Testquellen zusammengeführt.
-                            </p>
-                            <div class="info mm-u036">
-                                <strong>Bedienlogik:</strong><br />
-                                Automatische Ergebnisse entstehen über <em>Registeraktionen</em> oder <em>Python-Testlauf starten</em>.<br />
-                                Manuelle und dokumentierte Prüfungen werden über <em>Nachweis protokollieren</em> im Protokollformular eingetragen.
-                            </div>
-                            <div id="testing-register-overview" class="python-automation-overview mm-u036">
-                                <div class="info">Noch kein Testregister geladen.</div>
-                            </div>
-                            <div class="qa-register-workspace mm-u036">
-                                <section class="qa-register-focus-panel qa-register-focus-panel-secondary">
-                                    <div class="qa-workspace-panel-header">
-                                        <div>
-                                            <h4>Technikdetails</h4>
-                                            <p>Speicherorte und Artefakte nur bei Bedarf einblenden.</p>
+                        <div id="qa-register-card" class="setup-card admin-only qa-workspace-card qa-secondary-card mm-u029">
+                            <details class="qa-secondary-details">
+                                <summary>
+                                    <span>Register, Evidenz und Arbeitsvorrat</span>
+                                    <small>Nur für tiefe Ursachenanalyse und Nachweisarbeit</small>
+                                </summary>
+                                <p>
+                                    Zentrale Sicht auf <strong>alle</strong> bekannten Testfälle und ihren belastbaren Status.
+                                    Offene Fehler, manuelle Nachweise und automatisierte Ergebnisse werden hier entlang der
+                                    tatsächlichen Testquellen zusammengeführt.
+                                </p>
+                                <div class="info mm-u036">
+                                    <strong>Bedienlogik:</strong><br />
+                                    Automatische Ergebnisse entstehen über <em>Registeraktionen</em> oder <em>Python-Testlauf starten</em>.<br />
+                                    Manuelle und dokumentierte Prüfungen werden über <em>Nachweis protokollieren</em> im Protokollformular eingetragen.
+                                </div>
+                                <div id="testing-register-overview" class="python-automation-overview mm-u036">
+                                    <div class="info">Noch kein Testregister geladen.</div>
+                                </div>
+                                <div class="qa-register-workspace mm-u036">
+                                    <section class="qa-register-focus-panel qa-register-focus-panel-secondary">
+                                        <div class="qa-workspace-panel-header">
+                                            <div>
+                                                <h4>Technikdetails</h4>
+                                                <p>Speicherorte und Artefakte nur bei Bedarf einblenden.</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div id="testing-register-storage" class="data-list">
-                                        <div class="info">Speicherorte werden nach dem Laden des Registers angezeigt.</div>
-                                    </div>
-                                </section>
-                            </div>
-                            <div class="python-automation-toolbar mm-u036">
+                                        <div id="testing-register-storage" class="data-list">
+                                            <div class="info">Speicherorte werden nach dem Laden des Registers angezeigt.</div>
+                                        </div>
+                                    </section>
+                                </div>
+                                <div class="python-automation-toolbar mm-u036">
                                 <input
                                     type="text"
                                     id="testing-register-search"
@@ -1073,8 +1077,8 @@
                                     <option value="updated">Sortierung: Letztes Update</option>
                                 </select>
                                 <button data-action="loadTestingRegister" class="btn btn-secondary" title="Vollständiges Testregister neu laden">Testregister laden</button>
-                            </div>
-                            <details class="qa-register-advanced-filters mm-u033">
+                                </div>
+                                <details class="qa-register-advanced-filters mm-u033">
                                 <summary>Erweiterte Filter</summary>
                                 <div class="python-automation-toolbar qa-register-advanced-toolbar mm-u033">
                                     <select id="testing-register-level-filter" title="Nach Testebene filtern">
@@ -1125,39 +1129,45 @@
                                     </select>
                                     <button data-action="resetTestingRegisterAdvancedFilter" class="btn btn-secondary" title="Erweiterte Filter zurücksetzen">Spezialfilter zurücksetzen</button>
                                 </div>
+                                </details>
+                                <div class="setup-actions mm-u038">
+                                    <button data-action="runPythonAutomationSuite" class="btn btn-primary" title="Automatische Commissioning-Pruefungen als Python-Lauf starten">
+                                        Automatische Commissioning-Pruefung starten
+                                    </button>
+                                </div>
+                                <div class="python-automation-layout testing-register-panels mm-u036">
+                                    <section class="python-automation-panel qa-panel-secondary">
+                                        <div class="python-automation-panel-header">
+                                            <div>
+                                                <h5>Automatische Tests</h5>
+                                                <p>Python-Automation, lokale Gate-Kommandos, statische Checks und Suite-Starts.</p>
+                                            </div>
+                                        </div>
+                                        <div id="testing-register-list-automatic" class="data-list">
+                                            <div class="info">Noch kein Testregister geladen.</div>
+                                        </div>
+                                    </section>
+                                    <section class="python-automation-panel qa-panel-secondary">
+                                        <div class="python-automation-panel-header">
+                                            <div>
+                                                <h5>Manuelle Tests &amp; dokumentierte Nachweise</h5>
+                                                <p>Freigaben, physische Abnahmen, externe Nachweise und Automatisierungs-Backlog.</p>
+                                            </div>
+                                        </div>
+                                        <div id="testing-register-list-manual" class="data-list">
+                                            <div class="info">Noch kein Testregister geladen.</div>
+                                        </div>
+                                    </section>
+                                </div>
                             </details>
-                            <div class="setup-actions mm-u038">
-                                <button data-action="runPythonAutomationSuite" class="btn btn-primary" title="Automatische Commissioning-Pruefungen als Python-Lauf starten">
-                                    Automatische Commissioning-Pruefung starten
-                                </button>
-                            </div>
-                            <div class="python-automation-layout testing-register-panels mm-u036">
-                                <section class="python-automation-panel qa-panel-secondary">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Automatische Tests</h5>
-                                            <p>Python-Automation, lokale Gate-Kommandos, statische Checks und Suite-Starts.</p>
-                                        </div>
-                                    </div>
-                                    <div id="testing-register-list-automatic" class="data-list">
-                                        <div class="info">Noch kein Testregister geladen.</div>
-                                    </div>
-                                </section>
-                                <section class="python-automation-panel qa-panel-secondary">
-                                    <div class="python-automation-panel-header">
-                                        <div>
-                                            <h5>Manuelle Tests &amp; dokumentierte Nachweise</h5>
-                                            <p>Freigaben, physische Abnahmen, externe Nachweise und Automatisierungs-Backlog.</p>
-                                        </div>
-                                    </div>
-                                    <div id="testing-register-list-manual" class="data-list">
-                                        <div class="info">Noch kein Testregister geladen.</div>
-                                    </div>
-                                </section>
-                            </div>
                         </div>
 
-                            <div id="qa-python-run-card" class="setup-card python-automation-shell mm-u042">
+                            <div id="qa-python-run-card" class="setup-card python-automation-shell qa-secondary-card mm-u042">
+                                <details class="qa-secondary-details">
+                                    <summary>
+                                        <span>Python-Commissioning und Nachweiszentrale</span>
+                                        <small>Für Katalog, Laufdetails und manuelle Protokollierung</small>
+                                    </summary>
                                 <div class="python-automation-intro">
                                     <div>
                                         <h4>Python-basierte Testzentrale</h4>
@@ -1398,6 +1408,8 @@
                                     </section>
                                 </div>
                             </div>
+                            </details>
+                        </div>
 
                         <div class="qa-section-heading">
                             <h3>QA-Arbeitsfläche</h3>
