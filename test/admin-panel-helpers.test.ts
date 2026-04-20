@@ -774,6 +774,7 @@ describe("admin-panel helper functions", () => {
     expect(historyEl.innerHTML).toContain("Nachweis-Historie konnte nicht geladen werden: Nachweise fehlen");
   });
 
+
   it("renders python automation catalog state messages via DOM helpers", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 

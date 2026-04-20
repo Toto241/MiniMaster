@@ -216,6 +216,9 @@ let pythonCommissioningHistoryRuns = [];
 let pythonCommissioningCatalog = null;
 let pythonCommissioningEvidenceHistory = [];
 let pythonCommissioningEvidenceIndex = new Map();
+let remoteMacAgentRunHistory = [];
+let remoteMacAgentRunIndex = new Map();
+let remoteMacAgentRunLoadError = "";
 let pythonCommissioningSelectedTestId = null;
 let pythonEvidenceFilterStatus = "";
 let pythonEvidenceFilterTestId = "";
@@ -1134,9 +1137,123 @@ function setPythonAutomationEvidenceCache(payload) {
     }
 }
 
+function setRemoteMacAgentRunCache(payload, loadError = "") {
+    remoteMacAgentRunHistory = Array.isArray(payload?.entries) ? payload.entries : [];
+    remoteMacAgentRunIndex = new Map(Object.entries(payload?.latestBySuiteId || {}));
+    remoteMacAgentRunLoadError = String(loadError || "").trim();
+}
+
 function getLatestPythonAutomationEvidence(testId) {
     if (!testId) return null;
     return pythonCommissioningEvidenceIndex.get(testId) || null;
+}
+
+function getLatestRemoteMacAgentRun(suiteId) {
+    if (!suiteId) return null;
+    return remoteMacAgentRunIndex.get(suiteId) || null;
+}
+
+function resolveRemoteMacEvidenceTarget(entry) {
+    const explicitTarget = String(entry?.evidenceTargetId || "").trim();
+    if (explicitTarget) return explicitTarget;
+
+    const suiteId = String(entry?.suiteId || "").trim();
+    if (suiteId === "ios-xctest-parent" || suiteId === "ios-xctest-child") {
+        return suiteId;
+    }
+    return "";
+}
+
+function formatRemoteMacRunStatus(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (["passed", "pass", "ok", "success"].includes(normalized)) return "Bestanden";
+    if (["failed", "fail"].includes(normalized)) return "Fehlgeschlagen";
+    if (["error", "errored"].includes(normalized)) return "Fehler";
+    if (["running"].includes(normalized)) return "Laufend";
+    if (["queued"].includes(normalized)) return "Wartend";
+    if (["cancelled", "canceled"].includes(normalized)) return "Abgebrochen";
+    if (["skipped", "skip"].includes(normalized)) return "Übersprungen";
+    return normalized ? normalized.toUpperCase() : "Offen";
+}
+
+function getRemoteMacRunStatusMeta(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (["passed", "pass", "ok", "success"].includes(normalized)) {
+        return { className: "python-status-pass", label: formatRemoteMacRunStatus(normalized) };
+    }
+    if (["failed", "fail", "error", "errored", "cancelled", "canceled"].includes(normalized)) {
+        return { className: "python-status-fail", label: formatRemoteMacRunStatus(normalized) };
+    }
+    if (["running", "queued"].includes(normalized)) {
+        return { className: "python-status-running", label: formatRemoteMacRunStatus(normalized) };
+    }
+    return { className: "python-status-not_run", label: formatRemoteMacRunStatus(normalized || "offen") };
+}
+
+function renderRemoteMacRunHistorySection() {
+    if (remoteMacAgentRunLoadError) {
+        return `<div class='warning-box'>Remote-Mac-Historie konnte nicht geladen werden: ${escapeHtml(remoteMacAgentRunLoadError)}</div>`;
+    }
+
+    if (!Array.isArray(remoteMacAgentRunHistory) || remoteMacAgentRunHistory.length === 0) {
+        return "<div class='info'>Noch keine Remote-Mac-Läufe protokolliert.</div>";
+    }
+
+    const cards = remoteMacAgentRunHistory.map(entry => {
+        const statusMeta = getRemoteMacRunStatusMeta(entry?.status);
+        const targetId = resolveRemoteMacEvidenceTarget(entry);
+        const encodedTargetId = encodeURIComponent(targetId);
+        const destinationName = String(entry?.destination?.name || entry?.destination?.udid || "-");
+        const artifacts = Array.isArray(entry?.artifacts) ? entry.artifacts : [];
+        const logsRef = String(entry?.logsRef || "").trim();
+        const notes = String(entry?.notes || "").trim();
+        return `
+            <article class='qa-register-item-card'>
+                <div class='qa-register-item-header'>
+                    <div>
+                        <h6>${escapeHtml(String(entry?.suiteId || "Remote-Mac-Lauf"))}</h6>
+                        <div class='python-muted-caption'>${escapeHtml(formatPythonAutomationTimestamp(entry?.startedAt || entry?.finishedAt || ""))}</div>
+                    </div>
+                    <span class='python-status-badge ${statusMeta.className}'>${escapeHtml(statusMeta.label)}</span>
+                </div>
+                <div class='qa-register-item-grid'>
+                    <div>
+                        <span class='qa-register-item-label'>Host</span>
+                        <strong>${escapeHtml(String(entry?.host || entry?.agentId || "-"))}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Xcode</span>
+                        <strong>${escapeHtml(String(entry?.xcodeVersion || "-"))}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Ziel</span>
+                        <strong>${escapeHtml(destinationName)}</strong>
+                    </div>
+                    <div>
+                        <span class='qa-register-item-label'>Artefakte</span>
+                        <strong>${escapeHtml(String(artifacts.length))}</strong>
+                    </div>
+                </div>
+                <p class='qa-register-item-detail'>${escapeHtml(notes || logsRef || "Kein zusätzlicher Remote-Mac-Hinweis vorhanden.")}</p>
+                <div class='qa-register-item-footer'>
+                    <span class='python-muted-caption'>${escapeHtml(logsRef ? `Logs: ${logsRef}` : "Lauf in Nachweis-Kontext übernehmen")}</span>
+                    ${targetId ? `<button class='btn btn-secondary btn-sm' onclick="openPythonAutomationProtocol('${encodedTargetId}')">Nachweis öffnen</button>` : ""}
+                </div>
+            </article>
+        `;
+    }).join("");
+
+    return `
+        <div class='qa-evidence-remote-mac-section'>
+            <div class='python-clarity-box'>
+                <strong>Remote-Mac-Läufe</strong><br />
+                Read-only-Verlauf für externe iOS/XCTest-Ausführungen auf macOS/Xcode.
+            </div>
+            <div class='qa-register-card-list'>
+                ${cards}
+            </div>
+        </div>
+    `;
 }
 
 function findPythonAutomationTestById(testId) {
@@ -2292,10 +2409,13 @@ function renderPythonAutomationEvidenceHistory(entries) {
     const historyEl = document.getElementById("python-automation-protocol-history");
     if (!historyEl) return;
 
+    const remoteMacSectionHtml = renderRemoteMacRunHistorySection();
+
     if (!Array.isArray(entries) || entries.length === 0) {
         historyEl.innerHTML = `
             ${buildPythonEvidenceFilterToolbar([])}
             <div class='info'>Noch keine manuellen Nachweise protokolliert.</div>
+            ${remoteMacSectionHtml}
         `;
         renderQaTestWorkspace();
         return;
@@ -2356,6 +2476,7 @@ function renderPythonAutomationEvidenceHistory(entries) {
                 ${cards}
             </div>
         ` : "<div class='info'>Keine Nachweise entsprechen dem aktuellen Filter.</div>"}
+        ${remoteMacSectionHtml}
     `;
     renderQaTestWorkspace();
 }
@@ -2429,16 +2550,37 @@ async function loadPythonAutomationEvidenceHistory() {
         if (!response.ok) {
             throw new Error(payload.error || "Nachweis-Historie konnte nicht geladen werden.");
         }
+        let remoteMacPayload = { entries: [], latestBySuiteId: {} };
+        let remoteMacLoadError = "";
+        try {
+            const remoteResponse = await fetch("/api/commissioning/remote-mac-runs?limit=20", {
+                headers: { "Accept": "application/json" },
+            });
+            const remotePayload = await remoteResponse.json().catch(() => ({}));
+            if (!remoteResponse.ok) {
+                throw new Error(remotePayload.error || "Remote-Mac-Historie konnte nicht geladen werden.");
+            }
+            remoteMacPayload = remotePayload;
+        } catch (remoteError) {
+            remoteMacLoadError = remoteError?.message || "Fehler beim Laden";
+        }
         setPythonAutomationEvidenceCache(payload);
+        setRemoteMacAgentRunCache(remoteMacPayload, remoteMacLoadError);
         renderPythonAutomationOverview(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationCatalog(pythonCommissioningCatalog, pythonCommissioningLastRun);
         renderPythonAutomationEvidenceHistory(pythonCommissioningEvidenceHistory);
         renderQaTestWorkspace();
         renderPythonAutomationProtocolEditor();
         rerenderTestingRegisterFromCache();
-        setQaRefreshSectionState("evidence", "success", `${pythonCommissioningEvidenceHistory.length} Nachweise geladen`);
-        return { ok: true, message: `${pythonCommissioningEvidenceHistory.length} Nachweise geladen.` };
+        const remoteSuffix = remoteMacAgentRunHistory.length > 0
+            ? ` · ${remoteMacAgentRunHistory.length} Remote-Mac-Läufe geladen`
+            : remoteMacAgentRunLoadError
+                ? " · Remote-Mac-Historie mit Warnung"
+                : "";
+        setQaRefreshSectionState("evidence", "success", `${pythonCommissioningEvidenceHistory.length} Nachweise geladen${remoteSuffix}`);
+        return { ok: true, message: `${pythonCommissioningEvidenceHistory.length} Nachweise geladen.${remoteSuffix ? ` ${remoteSuffix.trim()}` : ""}`.trim() };
     } catch (error) {
+        setRemoteMacAgentRunCache({ entries: [], latestBySuiteId: {} }, "");
         replaceElementWithState(historyEl, "error", `Nachweis-Historie konnte nicht geladen werden: ${error.message}`);
         renderQaTestWorkspace();
         setQaRefreshSectionState("evidence", "error", error.message || "Fehler beim Laden");
