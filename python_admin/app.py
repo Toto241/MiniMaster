@@ -6598,12 +6598,17 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             app_id = str(payload.get("appId") or "").strip()
             if app_id not in ("master", "child"):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "appId muss 'master' oder 'child' sein."})
+            suite = str(payload.get("suite") or "commissioning").strip()
+            if suite == "commissioning":
+                return self._write_json(HTTPStatus.CONFLICT, {
+                    "error": "Direkte Android-USB-Commissioning-Starts wurden entfernt. Bitte den serverseitigen Android-Kompatibilitätslauf verwenden.",
+                })
 
             run_id = f"usb-{uuid4().hex[:12]}"
             kwargs = {
                 "app_id": app_id,
                 "serial": str(payload.get("serial") or "auto").strip(),
-                "suite": str(payload.get("suite") or "commissioning").strip(),
+                "suite": suite,
                 "test_filter": str(payload.get("testFilter") or "").strip(),
                 "skip_activation": bool_from_payload(payload.get("skipActivation"), default=False),
                 "install_apk": bool_from_payload(payload.get("installApk"), default=False),
@@ -6654,24 +6659,36 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {
                     "error": "Master- und Child-ADB-Serial müssen unterschiedlich sein."
                 })
+            scenario_id = str(payload.get("scenarioId") or "").strip()
+            profile_id = str(payload.get("profileId") or "").strip()
+            fault_modes = [
+                str(item).strip()
+                for item in cast(list[object], payload.get("faultModes") or [])
+                if str(item).strip()
+            ]
+            install_apk = bool_from_payload(payload.get("installApk"), default=False)
+            uninstall_first = bool_from_payload(payload.get("uninstallFirst"), default=False)
+            parallel = bool_from_payload(payload.get("parallel"), default=False)
+            master_apk_path = str(payload.get("masterApkPath") or "").strip()
+            child_apk_path = str(payload.get("childApkPath") or "").strip()
+            if not scenario_id and not profile_id and not fault_modes and not install_apk and not uninstall_first and not parallel and not master_apk_path and not child_apk_path:
+                return self._write_json(HTTPStatus.CONFLICT, {
+                    "error": "Direkte Android-Dual-Device-Starts wurden entfernt. Bitte den serverseitigen Android-Kompatibilitätslauf verwenden.",
+                })
 
             run_id = f"dual-{uuid4().hex[:12]}"
             kwargs = {
                 "master_serial": master_serial,
                 "child_serial": child_serial,
-                "install_apk": bool_from_payload(payload.get("installApk"), default=False),
-                "master_apk_path": str(payload.get("masterApkPath") or "").strip(),
-                "child_apk_path": str(payload.get("childApkPath") or "").strip(),
-                "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
+                "install_apk": install_apk,
+                "master_apk_path": master_apk_path,
+                "child_apk_path": child_apk_path,
+                "uninstall_first": uninstall_first,
                 "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
-                "parallel": bool_from_payload(payload.get("parallel"), default=False),
-                "scenario_id": str(payload.get("scenarioId") or "").strip(),
-                "profile_id": str(payload.get("profileId") or "").strip(),
-                "fault_modes": [
-                    str(item).strip()
-                    for item in cast(list[object], payload.get("faultModes") or [])
-                    if str(item).strip()
-                ],
+                "parallel": parallel,
+                "scenario_id": scenario_id,
+                "profile_id": profile_id,
+                "fault_modes": fault_modes,
             }
 
             linked_suites = _normalized_suite_run_keys({"type": "dual-device"})
