@@ -5521,10 +5521,10 @@ def _normalize_android_compatibility_request(payload: dict[str, object]) -> tupl
     }
 
     if execution_mode == "dual-device":
-        master_serial = str(payload.get("masterSerial") or "").strip()
-        child_serial = str(payload.get("childSerial") or "").strip()
-        if not master_serial or not child_serial:
-            raise ValueError("masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich.")
+        master_serial = str(payload.get("masterSerial") or "auto").strip() or "auto"
+        child_serial = str(payload.get("childSerial") or "auto").strip() or "auto"
+        if master_serial != "auto" or child_serial != "auto":
+            raise ValueError("Android-Kompatibilitätsläufe unterstützen nur auto-provisionierte Emulatoren.")
         kwargs.update({
             "master_serial": master_serial,
             "child_serial": child_serial,
@@ -5544,9 +5544,12 @@ def _normalize_android_compatibility_request(payload: dict[str, object]) -> tupl
             "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
         })
     else:
+        serial = str(payload.get("serial") or "auto").strip() or "auto"
+        if serial != "auto":
+            raise ValueError("Android-Kompatibilitätsläufe unterstützen nur auto-provisionierte Emulatoren.")
         kwargs.update({
             "app_id": "child" if execution_mode == "single-child" else "master",
-            "serial": str(payload.get("serial") or "auto").strip() or "auto",
+            "serial": serial,
             "suite": str(payload.get("suite") or "commissioning").strip() or "commissioning",
             "test_filter": str(payload.get("testFilter") or "").strip(),
             "skip_activation": bool_from_payload(payload.get("skipActivation"), default=False),
@@ -5993,47 +5996,25 @@ def _execute_android_compatibility_sub_runs(
                     ] if scenario_definition else []
                     if scenario_versions and android_version not in scenario_versions:
                         continue
-                    if master_serial == "auto" or child_serial == "auto":
-                        outcome = run_dual_device_matrix_entry(
-                            run_id=run_id,
-                            android_version=android_version,
-                            profile_id=recommended_profile,
-                            master_serial=master_serial,
-                            child_serial=child_serial,
-                            scenario_id=current_scenario_id,
-                            fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
-                            install_apk=bool(kwargs.get("install_apk")),
-                            master_apk_path=str(kwargs.get("master_apk_path") or ""),
-                            child_apk_path=str(kwargs.get("child_apk_path") or ""),
-                            uninstall_first=bool(kwargs.get("uninstall_first")),
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                            parallel=bool(kwargs.get("parallel")),
-                        )
-                        provisioning = cast(list[dict[str, object]], outcome.get("provisioning") or [])
-                        status = str(outcome.get("status") or "error")
-                        result_payload = cast(dict[str, object], outcome.get("result") or {})
-                        artifacts = cast(dict[str, object], outcome.get("artifacts") or {})
-                        reservation_id = str(outcome.get("reservationId") or "")
-                    else:
-                        result = run_dual_device(
-                            master_serial=master_serial,
-                            child_serial=child_serial,
-                            install_apk=bool(kwargs.get("install_apk")),
-                            master_apk_path=str(kwargs.get("master_apk_path") or ""),
-                            child_apk_path=str(kwargs.get("child_apk_path") or ""),
-                            uninstall_first=bool(kwargs.get("uninstall_first")),
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                            parallel=bool(kwargs.get("parallel")),
-                            scenario_id=current_scenario_id,
-                            profile_id=recommended_profile,
-                            fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
-                            expected_android_version=android_version,
-                            verbose=False,
-                        )
-                        status = result.overall_status
-                        result_payload = result.to_dict()
-                        artifacts = {}
-                        reservation_id = ""
+                    outcome = run_dual_device_matrix_entry(
+                        run_id=run_id,
+                        android_version=android_version,
+                        profile_id=recommended_profile,
+                        master_serial=master_serial or "auto",
+                        child_serial=child_serial or "auto",
+                        scenario_id=current_scenario_id,
+                        fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
+                        install_apk=bool(kwargs.get("install_apk")),
+                        master_apk_path=str(kwargs.get("master_apk_path") or ""),
+                        child_apk_path=str(kwargs.get("child_apk_path") or ""),
+                        uninstall_first=bool(kwargs.get("uninstall_first")),
+                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                        parallel=bool(kwargs.get("parallel")),
+                    )
+                    provisioning = cast(list[dict[str, object]], outcome.get("provisioning") or [])
+                    status = str(outcome.get("status") or "error")
+                    result_payload = cast(dict[str, object], outcome.get("result") or {})
+                    artifacts = cast(dict[str, object], outcome.get("artifacts") or {})
                     collected_sub_runs.append({
                         "runId": f"{run_id}:{execution_mode}:{android_version}:{current_scenario_id or 'default'}",
                         "androidVersion": android_version,
@@ -6041,7 +6022,6 @@ def _execute_android_compatibility_sub_runs(
                         "scenarioId": current_scenario_id,
                         "profileId": recommended_profile,
                         "provisioning": provisioning,
-                        "reservationId": reservation_id or None,
                         "artifacts": artifacts,
                         "status": status,
                         "result": result_payload,
@@ -6051,47 +6031,26 @@ def _execute_android_compatibility_sub_runs(
                 run_test_classes = selected_test_classes or ([str(kwargs.get("test_filter") or "").strip()] if str(kwargs.get("test_filter") or "").strip() else [""])
                 for current_test_class in run_test_classes:
                     selected_classes_for_run = [current_test_class] if current_test_class else None
-                    if serial == "auto":
-                        outcome = run_single_device_matrix_entry(
-                            run_id=run_id,
-                            android_version=android_version,
-                            app_id=app_id,
-                            profile_id=recommended_profile,
-                            serial=serial,
-                            suite=str(kwargs.get("suite") or "commissioning"),
-                            selected_test_classes=selected_classes_for_run,
-                            skip_activation=bool(kwargs.get("skip_activation")),
-                            install_apk=bool(kwargs.get("install_apk")),
-                            apk_path=str(kwargs.get("apk_path") or ""),
-                            uninstall_first=bool(kwargs.get("uninstall_first")),
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                            deep_link_url=str(kwargs.get("deep_link_url") or ""),
-                            deep_link_package=str(kwargs.get("deep_link_package") or ""),
-                        )
-                        provisioning = cast(list[dict[str, object]], outcome.get("provisioning") or [])
-                        status = str(outcome.get("status") or "error")
-                        result_payload = cast(dict[str, object], outcome.get("result") or {})
-                        artifacts = cast(dict[str, object], outcome.get("artifacts") or {})
-                        reservation_id = str(outcome.get("reservationId") or "")
-                    else:
-                        result = run_usb_test(
-                            app_id=app_id,
-                            serial=serial,
-                            suite=str(kwargs.get("suite") or "commissioning"),
-                            test_filter="",
-                            selected_test_classes=selected_classes_for_run,
-                            skip_activation=bool(kwargs.get("skip_activation")),
-                            install_apk=bool(kwargs.get("install_apk")),
-                            apk_path=str(kwargs.get("apk_path") or ""),
-                            uninstall_first=bool(kwargs.get("uninstall_first")),
-                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                            expected_android_version=android_version,
-                            verbose=False,
-                        )
-                        status = result.overall_status
-                        result_payload = result.to_dict()
-                        artifacts = {}
-                        reservation_id = ""
+                    outcome = run_single_device_matrix_entry(
+                        run_id=run_id,
+                        android_version=android_version,
+                        app_id=app_id,
+                        profile_id=recommended_profile,
+                        serial=serial,
+                        suite=str(kwargs.get("suite") or "commissioning"),
+                        selected_test_classes=selected_classes_for_run,
+                        skip_activation=bool(kwargs.get("skip_activation")),
+                        install_apk=bool(kwargs.get("install_apk")),
+                        apk_path=str(kwargs.get("apk_path") or ""),
+                        uninstall_first=bool(kwargs.get("uninstall_first")),
+                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                        deep_link_url=str(kwargs.get("deep_link_url") or ""),
+                        deep_link_package=str(kwargs.get("deep_link_package") or ""),
+                    )
+                    provisioning = cast(list[dict[str, object]], outcome.get("provisioning") or [])
+                    status = str(outcome.get("status") or "error")
+                    result_payload = cast(dict[str, object], outcome.get("result") or {})
+                    artifacts = cast(dict[str, object], outcome.get("artifacts") or {})
                     collected_sub_runs.append({
                         "runId": f"{run_id}:{execution_mode}:{android_version}:{app_id}:{current_test_class or 'default'}",
                         "androidVersion": android_version,
@@ -6100,7 +6059,6 @@ def _execute_android_compatibility_sub_runs(
                         "testClass": current_test_class,
                         "profileId": recommended_profile,
                         "provisioning": provisioning,
-                        "reservationId": reservation_id or None,
                         "artifacts": artifacts,
                         "status": status,
                         "result": result_payload,

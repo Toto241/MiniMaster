@@ -119,7 +119,6 @@ def run_single_device_matrix_entry(
             "status": result.overall_status,
             "result": result.to_dict(),
             "provisioning": provisioning,
-            "reservationId": reservation_id,
             "artifacts": artifacts,
             "serial": target_serial,
         }
@@ -209,7 +208,6 @@ def run_dual_device_matrix_entry(
             "status": result.overall_status,
             "result": result.to_dict(),
             "provisioning": provisioning,
-            "reservationId": reservation_id,
             "artifacts": artifacts,
             "masterSerial": effective_master_serial,
             "childSerial": effective_child_serial,

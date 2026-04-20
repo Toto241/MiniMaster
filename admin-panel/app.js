@@ -3961,17 +3961,6 @@ function buildAndroidCompatibilityRequestDraft() {
     const scenarioIds = sweepPreview.dualDeviceScenarios
         .map(entry => String(entry?.scenarioId || "").trim())
         .filter(Boolean);
-    const deviceConfig = getSuiteRunDeviceConfig();
-    const useConfiguredDualSerials = Boolean(deviceConfig.masterDeviceSerial && deviceConfig.childDeviceSerial && deviceConfig.masterDeviceSerial !== deviceConfig.childDeviceSerial);
-    const dualSerials = useConfiguredDualSerials
-        ? {
-            masterSerial: deviceConfig.masterDeviceSerial,
-            childSerial: deviceConfig.childDeviceSerial,
-        }
-        : {
-            masterSerial: "auto",
-            childSerial: "auto",
-        };
 
     const basePayload = {
         executionMode: values.executionMode,
@@ -3983,8 +3972,8 @@ function buildAndroidCompatibilityRequestDraft() {
     if (values.executionMode === "dual-device") {
         return {
             ...basePayload,
-            masterSerial: dualSerials.masterSerial,
-            childSerial: dualSerials.childSerial,
+            masterSerial: "auto",
+            childSerial: "auto",
             parallel: values.parallel,
             selectedScenarioIds: scenarioIds,
             selectedTestClasses: [],

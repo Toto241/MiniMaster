@@ -65,6 +65,7 @@ class TestAndroidScenarioRunner:
 
         assert result["status"] == "passed"
         assert result["provisioning"][0]["serial"] == "emulator-5554"
+        assert "reservationId" not in result
         assert Path(str(result["artifacts"]["logcatPath"])).exists()
         assert deep_links == [("minimaster://pair/token", "com.minimaster.master")]
         assert released == ["emu-123"]
@@ -99,5 +100,6 @@ class TestAndroidScenarioRunner:
         assert result["status"] == "passed"
         assert result["masterSerial"] == "emulator-5554"
         assert result["childSerial"] == "emulator-5556"
+        assert "reservationId" not in result
         assert Path(str(result["artifacts"]["master"]["logcatPath"])).exists()
         assert released == ["emu-456"]
