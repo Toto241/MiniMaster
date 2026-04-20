@@ -223,6 +223,7 @@ let pythonAutomationRunStartedAtMs = null;
 let testingRegisterPayload = null;
 let suiteCatalogPayload = [];
 let qaCatalogPayload = null;
+let androidAutomationSweepPreflightPayload = null;
 let suiteRunHistoryPayload = [];
 let qaDashboardLoadPromise = null;
 let qaTestWorkspaceSelection = { kind: "", id: "" };
@@ -3889,6 +3890,57 @@ function buildAdvisorySweepReadiness() {
     };
 }
 
+function getAndroidAutomationSweepPreflightState() {
+    const fallbackReadiness = buildAdvisorySweepReadiness();
+    const automationSweep = buildQaExecutionGuideData(
+        pythonCommissioningCatalog,
+        testingRegisterPayload,
+        suiteCatalogPayload,
+    ).automationSweep;
+    const payload = androidAutomationSweepPreflightPayload;
+    if (!payload || typeof payload !== "object") {
+        return {
+            status: fallbackReadiness.status,
+            canStart: automationSweep.canStart,
+            requiresConfirmation: false,
+            warnings: Array.isArray(fallbackReadiness.warnings) ? fallbackReadiness.warnings : [],
+            warningCount: Number(fallbackReadiness.warningCount || 0),
+            blockingReasons: [],
+            blockingCount: 0,
+            source: "client-fallback",
+        };
+    }
+    return {
+        status: String(payload.status || (payload.blockingCount > 0 ? "blocked" : payload.warningCount > 0 ? "warning" : "ready")),
+        canStart: Boolean(payload.canStart),
+        requiresConfirmation: false,
+        warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+        warningCount: Number(payload.warningCount || 0),
+        blockingReasons: Array.isArray(payload.blockingReasons) ? payload.blockingReasons : [],
+        blockingCount: Number(payload.blockingCount || 0),
+        source: "server",
+    };
+}
+
+async function ensureAndroidAutomationSweepPreflightLoaded() {
+    if (androidAutomationSweepPreflightPayload) {
+        return getAndroidAutomationSweepPreflightState();
+    }
+    try {
+        const response = await fetch("/api/suites/android-automation-sweep/preflight", {
+            headers: { "Accept": "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Sweep-Preflight konnte nicht geladen werden.");
+        }
+        androidAutomationSweepPreflightPayload = payload;
+    } catch (_error) {
+        androidAutomationSweepPreflightPayload = null;
+    }
+    return getAndroidAutomationSweepPreflightState();
+}
+
 async function loadSuiteGuideData() {
     const response = await fetch("/api/suites", {
         headers: { "Accept": "application/json" },
@@ -3909,6 +3961,18 @@ async function loadSuiteGuideData() {
         qaCatalogPayload = qaPayload;
     } catch (_error) {
         qaCatalogPayload = null;
+    }
+    try {
+        const sweepPreflightResponse = await fetch("/api/suites/android-automation-sweep/preflight", {
+            headers: { "Accept": "application/json" },
+        });
+        const sweepPreflightPayload = await sweepPreflightResponse.json().catch(() => ({}));
+        if (!sweepPreflightResponse.ok) {
+            throw new Error(sweepPreflightPayload.error || "Sweep-Preflight konnte nicht geladen werden.");
+        }
+        androidAutomationSweepPreflightPayload = sweepPreflightPayload;
+    } catch (_error) {
+        androidAutomationSweepPreflightPayload = null;
     }
     renderQaExecutionGuide(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
     return {
@@ -3975,7 +4039,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
         : `<p class='python-muted-caption'>Noch keine Suite-Zuordnungen geladen.</p>`;
 
     const sweepPreview = data.automationSweep;
-    const sweepReadiness = buildAdvisorySweepReadiness();
+    const sweepReadiness = getAndroidAutomationSweepPreflightState();
     const activeVersionsText = sweepPreview.activeAndroidVersions.length > 0
         ? `Android ${escapeHtml(sweepPreview.activeAndroidVersions.join(", "))}`
         : "Keine aktiven Android-Versionen im QA-Katalog gefunden.";
@@ -3986,7 +4050,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
     const scenarioText = scenarioPreview.length > 0
         ? escapeHtml(scenarioPreview.join(" · "))
         : "Keine Dual-Device-Szenarien im QA-Katalog sichtbar.";
-    const sweepDisabledAttr = !isPythonOperator || !sweepPreview.canStart ? "disabled" : "";
+    const sweepDisabledAttr = !isPythonOperator || !sweepPreview.canStart || sweepReadiness.canStart === false ? "disabled" : "";
     const sweepDetailsHtml = !sweepPreview.catalogLoaded
         ? `<p class='python-muted-caption'>QA-Katalog noch nicht geladen. Die Sweep-Vorschau wird nach dem nächsten Suite-Refresh ergänzt.</p>`
         : `
@@ -4037,6 +4101,20 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
             </label>
         </div>
     `;
+    const sweepBlockingHtml = sweepReadiness.blockingCount > 0
+        ? `
+            <div class='qa-register-callout-stack'>
+                ${sweepReadiness.blockingReasons.map(reason => `
+                    <article class='qa-register-callout qa-register-callout-${escapeHtml(String(reason.tone || "danger"))}'>
+                        <div>
+                            <strong>${escapeHtml(reason.title)}</strong>
+                            <p>${escapeHtml(reason.detail)}</p>
+                        </div>
+                    </article>
+                `).join("")}
+            </div>
+        `
+        : "";
     const sweepReadinessHtml = sweepReadiness.warningCount > 0
         ? `
             <div class='qa-register-callout-stack'>
@@ -4107,6 +4185,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                     <span class='python-bucket-count'>${escapeHtml(String(sweepPreview.activeAndroidVersions.length))} Android-Versionen</span>
                 </div>
                 ${sweepDetailsHtml}
+                ${sweepBlockingHtml}
                 ${sweepReadinessHtml}
                 ${sweepOptionFormHtml}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
@@ -4769,14 +4848,16 @@ async function startSuiteRun(suiteId) {
 async function startAndroidAutomationSweep() {
     if (!isPythonOperator) return;
     try {
-        const readiness = buildAdvisorySweepReadiness();
-        if (readiness.requiresConfirmation) {
-            const warningSummary = readiness.warnings.slice(0, 3).map(item => `- ${item.title}`).join("\n");
-            const confirmed = confirm(`Für den Android-Automation-Sweep liegen noch QA-Warnhinweise vor:\n\n${warningSummary}\n\nTrotzdem starten?`);
-            if (!confirmed) {
-                showNotification("Android-Automation-Sweep abgebrochen: zuerst die offenen Warnhinweise prüfen.", "info");
-                return;
-            }
+        const readiness = await ensureAndroidAutomationSweepPreflightLoaded();
+        if (readiness.canStart === false) {
+            const blocker = Array.isArray(readiness.blockingReasons) && readiness.blockingReasons.length > 0
+                ? readiness.blockingReasons[0]
+                : null;
+            showNotification(
+                `Android-Automation-Sweep blockiert: ${String(blocker?.detail || blocker?.title || "Serverseitiger Preflight nicht erfüllt.")}`,
+                "error",
+            );
+            return;
         }
         const request = buildAndroidAutomationSweepRequest();
         await queueSuiteRunRequest(request, "Android-Automation-Sweep konnte nicht gestartet werden.");

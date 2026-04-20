@@ -294,6 +294,24 @@ class TestMiniMasterAdminHandlerRoutes:
             },
         )
 
+    def test_do_get_android_automation_sweep_preflight_returns_backend_payload(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        payload = {
+            "status": "warning",
+            "canStart": True,
+            "warningCount": 1,
+            "warnings": [{"id": "register-blockers-open"}],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        }
+        handler = self._make_handler("/api/suites/android-automation-sweep/preflight")
+        monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: payload)
+
+        app.MiniMasterAdminHandler.do_GET(handler)
+
+        handler._write_json.assert_called_once_with(HTTPStatus.OK, payload)
+
     def test_do_get_self_healing_status_forwards_parameters(self, monkeypatch: pytest.MonkeyPatch):
         import app
 
