@@ -326,6 +326,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  buildAdvisorySweepReadiness,",
     "  getAndroidAutomationSweepPreflightState,",
     "  ensureAndroidAutomationSweepPreflightLoaded,",
+    "  requestAndroidAutomationSweepApproval,",
     "  buildAndroidAutomationSweepRequest,",
     "  buildSuiteRunRequest,",
     "  startAndroidAutomationSweep,",

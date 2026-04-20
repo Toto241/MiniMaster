@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import mimetypes
 import os
 import re
@@ -59,6 +60,7 @@ LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
 JOB_RUN_LOG_FILE = LOG_DIR / "job_runs.jsonl"
+ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE = LOG_DIR / "android_automation_sweep_approvals.jsonl"
 DEFAULT_HOST = os.environ.get("MINIMASTER_ADMIN_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("MINIMASTER_ADMIN_PORT", "8765"))
 DEFAULT_HISTORY_LIMIT = 15
@@ -72,6 +74,7 @@ JOB_TERMINAL_STATUSES = {"success", "failed", "cancelled"}
 JOB_ACTIVE_STATUSES = {"pending", "queued", "running", "retry"}
 JOB_ERROR_LIMIT = 50
 JOB_HISTORY_LIMIT = 100
+ANDROID_AUTOMATION_SWEEP_APPROVAL_TTL_SEC = int(os.environ.get("MINIMASTER_SWEEP_APPROVAL_TTL_SEC", "28800"))
 
 ALLOWED_COMMANDS = {
     "adb",
@@ -5402,6 +5405,51 @@ def _android_automation_sweep_hard_blocker() -> str | None:
     return None
 
 
+def _compute_android_automation_sweep_plan_hash(payload: dict[str, object]) -> str:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _append_android_automation_sweep_approval(entry: dict[str, object]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _is_future_timestamp(raw_value: object) -> bool:
+    try:
+        expires_at = datetime.fromisoformat(str(raw_value).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return expires_at > datetime.now(timezone.utc)
+
+
+def _load_active_android_automation_sweep_approval(plan_hash: str) -> dict[str, object] | None:
+    entries = _load_jsonl_entries(ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE)
+    for entry in reversed(entries):
+        if str(entry.get("planHash") or "") != plan_hash:
+            continue
+        if str(entry.get("status") or "active") != "active":
+            continue
+        if not _is_future_timestamp(entry.get("expiresAt")):
+            continue
+        return entry
+    return None
+
+
+def _serialize_android_automation_sweep_approval(entry: dict[str, object] | None) -> dict[str, object] | None:
+    if not entry:
+        return None
+    return {
+        "approvalId": str(entry.get("approvalId") or ""),
+        "approvedAt": str(entry.get("approvedAt") or ""),
+        "approvedBy": str(entry.get("approvedBy") or ""),
+        "expiresAt": str(entry.get("expiresAt") or ""),
+        "warningIds": list(cast(list[str], entry.get("warningIds") or [])),
+        "planHash": str(entry.get("planHash") or ""),
+    }
+
+
 def _build_android_automation_sweep_preflight() -> dict[str, object]:
     qa_catalog = get_qa_catalog()
     plan = _build_android_automation_sweep_plan()
@@ -5521,11 +5569,27 @@ def _build_android_automation_sweep_preflight() -> dict[str, object]:
             "detail": hard_blocker,
         })
 
-    status = "blocked" if blocking_reasons else ("warning" if warnings else "ready")
+    approval_required = not blocking_reasons and len(warnings) > 0
+    plan_signature_payload = {
+        "androidVersions": cast(list[str], plan.get("androidVersions") or []),
+        "masterTestClasses": cast(list[str], plan.get("masterTestClasses") or []),
+        "childTestClasses": cast(list[str], plan.get("childTestClasses") or []),
+        "selectedScenarioIds": cast(list[str], plan.get("selectedScenarioIds") or []),
+        "warningIds": [str(item.get("id") or "") for item in warnings],
+        "blockingIds": [str(item.get("id") or "") for item in blocking_reasons],
+    }
+    plan_hash = _compute_android_automation_sweep_plan_hash(cast(dict[str, object], plan_signature_payload))
+    active_approval = _load_active_android_automation_sweep_approval(plan_hash) if approval_required else None
+    can_start = not blocking_reasons and (not approval_required or active_approval is not None)
+    status = "blocked" if blocking_reasons else ("approved" if active_approval else ("warning" if warnings else "ready"))
     return {
         "status": status,
-        "canStart": not blocking_reasons,
+        "canStart": can_start,
         "requiresConfirmation": False,
+        "approvalRequired": approval_required,
+        "hasActiveApproval": active_approval is not None,
+        "activeApproval": _serialize_android_automation_sweep_approval(active_approval),
+        "planHash": plan_hash,
         "warningCount": len(warnings),
         "warnings": warnings,
         "blockingCount": len(blocking_reasons),
@@ -6152,6 +6216,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_android_compatibility_test()
         if parsed.path == "/api/suites/android-automation-sweep":
             return self._handle_android_automation_sweep()
+        if parsed.path == "/api/suites/android-automation-sweep/approve":
+            return self._handle_android_automation_sweep_approve()
         if parsed.path == "/api/qa/self-healing/run":
             return self._handle_run_self_healing_cycle()
         if parsed.path == "/api/jobs/retry":
@@ -6483,7 +6549,6 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
     def _handle_android_automation_sweep(self) -> None:
         try:
             payload = self._read_json_body()
-            run_id = f"autosweep-{uuid4().hex[:12]}"
             plan = _build_android_automation_sweep_plan()
             kwargs: dict[str, object] = {
                 "android_versions": cast(list[str], plan.get("androidVersions") or []),
@@ -6516,6 +6581,19 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             if hard_blocker:
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": hard_blocker})
 
+            preflight = _build_android_automation_sweep_preflight()
+            if not bool(preflight.get("canStart")):
+                if bool(preflight.get("approvalRequired")) and not bool(preflight.get("hasActiveApproval")):
+                    return self._write_json(HTTPStatus.CONFLICT, {
+                        "error": "Für den Android-Automation-Sweep liegt eine serverseitig erforderliche Warnlagen-Freigabe vor. Bitte zuerst die Sweep-Freigabe speichern.",
+                    })
+                blocking_reasons = cast(list[dict[str, object]], preflight.get("blockingReasons") or [])
+                blocking_detail = str((blocking_reasons[0] if blocking_reasons else {}).get("detail") or "Der serverseitige Sweep-Preflight blockiert den Start.")
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": blocking_detail})
+
+            run_id = f"autosweep-{uuid4().hex[:12]}"
+            active_approval = cast(dict[str, object] | None, preflight.get("activeApproval"))
+
             linked_suites = _normalized_suite_run_keys({"type": "android-automation-sweep"})
             with _active_suite_lock:
                 _active_suite_runs[run_id] = {
@@ -6528,6 +6606,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "masterTestClasses": cast(list[str], kwargs["master_test_classes"]),
                     "childTestClasses": cast(list[str], kwargs["child_test_classes"]),
                     "selectedScenarioIds": cast(list[str], kwargs["selected_scenario_ids"]),
+                    "approvalId": str((active_approval or {}).get("approvalId") or ""),
+                    "approvedAt": str((active_approval or {}).get("approvedAt") or ""),
+                    "approvedBy": str((active_approval or {}).get("approvedBy") or ""),
+                    "approvalWarnings": list(cast(list[str], (active_approval or {}).get("warningIds") or [])),
                     "status": "queued",
                     "startedAt": None,
                     "finishedAt": None,
@@ -6556,6 +6638,37 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             "childTestClasses": kwargs["child_test_classes"],
             "selectedScenarioIds": kwargs["selected_scenario_ids"],
         })
+
+    def _handle_android_automation_sweep_approve(self) -> None:
+        try:
+            payload = self._read_json_body()
+            preflight = _build_android_automation_sweep_preflight()
+            if bool(preflight.get("blockingCount")):
+                blocking_reasons = cast(list[dict[str, object]], preflight.get("blockingReasons") or [])
+                blocking_detail = str((blocking_reasons[0] if blocking_reasons else {}).get("detail") or "Der serverseitige Sweep-Preflight blockiert die Freigabe.")
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": blocking_detail})
+            if not bool(preflight.get("approvalRequired")) or bool(preflight.get("hasActiveApproval")):
+                return self._write_json(HTTPStatus.OK, preflight)
+
+            approval_entry = {
+                "approvalId": f"sweep-approval-{uuid4().hex[:12]}",
+                "planHash": str(preflight.get("planHash") or ""),
+                "approvedAt": _current_timestamp_iso(),
+                "approvedBy": str(payload.get("approvedBy") or "qa-admin-panel").strip() or "qa-admin-panel",
+                "expiresAt": (datetime.now(timezone.utc) + timedelta(seconds=ANDROID_AUTOMATION_SWEEP_APPROVAL_TTL_SEC)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "warningIds": [
+                    str(item.get("id") or "")
+                    for item in cast(list[dict[str, object]], preflight.get("warnings") or [])
+                    if str(item.get("id") or "")
+                ],
+                "status": "active",
+            }
+            _append_android_automation_sweep_approval(cast(dict[str, object], approval_entry))
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, _build_android_automation_sweep_preflight())
 
     def _handle_create_emulator_reservation(self) -> None:
         try:
