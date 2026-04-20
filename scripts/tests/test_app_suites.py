@@ -29,6 +29,7 @@ def _clean_active_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import app
     from app import _active_suite_runs, _active_suite_lock, _active_jobs, _job_lock, _job_queue
     monkeypatch.setattr(app, "JOB_RUN_LOG_FILE", tmp_path / "job_runs.jsonl")
+    monkeypatch.setattr(app, "ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE", tmp_path / "android_automation_sweep_approvals.jsonl")
     with _active_suite_lock:
         _active_suite_runs.clear()
     with _job_lock:
@@ -311,6 +312,81 @@ class TestMiniMasterAdminHandlerRoutes:
         app.MiniMasterAdminHandler.do_GET(handler)
 
         handler._write_json.assert_called_once_with(HTTPStatus.OK, payload)
+
+    def test_do_post_android_automation_sweep_approve_persists_active_approval(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-automation-sweep/approve")
+        handler._read_json_body.return_value = {"approvedBy": "qa-admin-panel"}
+
+        preflight_states = [
+            {
+                "status": "warning",
+                "canStart": False,
+                "approvalRequired": True,
+                "hasActiveApproval": False,
+                "activeApproval": None,
+                "planHash": "plan-hash-1",
+                "warningCount": 1,
+                "warnings": [{"id": "register-blockers-open"}],
+                "blockingCount": 0,
+                "blockingReasons": [],
+            },
+            {
+                "status": "approved",
+                "canStart": True,
+                "approvalRequired": True,
+                "hasActiveApproval": True,
+                "activeApproval": {
+                    "approvalId": "sweep-approval-123",
+                    "approvedAt": "2026-04-20T10:00:00Z",
+                    "approvedBy": "qa-admin-panel",
+                    "expiresAt": "2026-04-20T18:00:00Z",
+                    "warningIds": ["register-blockers-open"],
+                    "planHash": "plan-hash-1",
+                },
+                "planHash": "plan-hash-1",
+                "warningCount": 1,
+                "warnings": [{"id": "register-blockers-open"}],
+                "blockingCount": 0,
+                "blockingReasons": [],
+            },
+        ]
+        append_mock = MagicMock()
+
+        monkeypatch.setattr(app, "uuid4", lambda: type("_FakeUuid", (), {"hex": "1234567890abcdef"})())
+        monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: preflight_states.pop(0))
+        monkeypatch.setattr(app, "_append_android_automation_sweep_approval", append_mock)
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        append_mock.assert_called_once()
+        approval_entry = append_mock.call_args.args[0]
+        assert approval_entry["approvalId"] == "sweep-approval-1234567890ab"
+        assert approval_entry["planHash"] == "plan-hash-1"
+        assert approval_entry["approvedBy"] == "qa-admin-panel"
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "status": "approved",
+                "canStart": True,
+                "approvalRequired": True,
+                "hasActiveApproval": True,
+                "activeApproval": {
+                    "approvalId": "sweep-approval-123",
+                    "approvedAt": "2026-04-20T10:00:00Z",
+                    "approvedBy": "qa-admin-panel",
+                    "expiresAt": "2026-04-20T18:00:00Z",
+                    "warningIds": ["register-blockers-open"],
+                    "planHash": "plan-hash-1",
+                },
+                "planHash": "plan-hash-1",
+                "warningCount": 1,
+                "warnings": [{"id": "register-blockers-open"}],
+                "blockingCount": 0,
+                "blockingReasons": [],
+            },
+        )
 
     def test_do_get_self_healing_status_forwards_parameters(self, monkeypatch: pytest.MonkeyPatch):
         import app
@@ -622,6 +698,17 @@ class TestMiniMasterAdminHandlerRoutes:
             "childTestClasses": ["child.PairingTest"],
             "selectedScenarioIds": ["pairing"],
         })
+        monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: {
+            "status": "ready",
+            "canStart": True,
+            "approvalRequired": False,
+            "hasActiveApproval": False,
+            "activeApproval": None,
+            "warningCount": 0,
+            "warnings": [],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
         monkeypatch.setattr(app, "get_emulator_lab_overview", lambda: {
             "sdkConfigured": True,
             "adbAvailable": True,
@@ -652,6 +739,41 @@ class TestMiniMasterAdminHandlerRoutes:
         assert queued["type"] == "android-automation-sweep"
         assert queued["executionMode"] == "all-automated"
         assert queued["androidVersions"] == ["10", "14"]
+
+    def test_do_post_android_automation_sweep_rejects_warning_state_without_active_approval(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-automation-sweep")
+        handler._read_json_body.return_value = {
+            "installApk": False,
+            "skipActivation": True,
+            "parallel": False,
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+        monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: {
+            "status": "warning",
+            "canStart": False,
+            "approvalRequired": True,
+            "hasActiveApproval": False,
+            "activeApproval": None,
+            "warningCount": 1,
+            "warnings": [{"id": "register-blockers-open"}],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.CONFLICT,
+            {"error": "Für den Android-Automation-Sweep liegt eine serverseitig erforderliche Warnlagen-Freigabe vor. Bitte zuerst die Sweep-Freigabe speichern."},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
 
     @pytest.mark.parametrize(
         ("overview", "expected_error"),

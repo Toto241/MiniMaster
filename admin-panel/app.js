@@ -3903,6 +3903,9 @@ function getAndroidAutomationSweepPreflightState() {
             status: fallbackReadiness.status,
             canStart: automationSweep.canStart,
             requiresConfirmation: false,
+            approvalRequired: false,
+            hasActiveApproval: false,
+            activeApproval: null,
             warnings: Array.isArray(fallbackReadiness.warnings) ? fallbackReadiness.warnings : [],
             warningCount: Number(fallbackReadiness.warningCount || 0),
             blockingReasons: [],
@@ -3914,6 +3917,9 @@ function getAndroidAutomationSweepPreflightState() {
         status: String(payload.status || (payload.blockingCount > 0 ? "blocked" : payload.warningCount > 0 ? "warning" : "ready")),
         canStart: Boolean(payload.canStart),
         requiresConfirmation: false,
+        approvalRequired: Boolean(payload.approvalRequired),
+        hasActiveApproval: Boolean(payload.hasActiveApproval),
+        activeApproval: payload.activeApproval && typeof payload.activeApproval === "object" ? payload.activeApproval : null,
         warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
         warningCount: Number(payload.warningCount || 0),
         blockingReasons: Array.isArray(payload.blockingReasons) ? payload.blockingReasons : [],
@@ -3938,6 +3944,22 @@ async function ensureAndroidAutomationSweepPreflightLoaded() {
     } catch (_error) {
         androidAutomationSweepPreflightPayload = null;
     }
+    return getAndroidAutomationSweepPreflightState();
+}
+
+async function requestAndroidAutomationSweepApproval() {
+    const response = await fetch("/api/suites/android-automation-sweep/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvedBy: "qa-admin-panel" }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || "Sweep-Freigabe konnte nicht gespeichert werden.");
+    }
+    androidAutomationSweepPreflightPayload = payload;
+    rerenderQaExecutionGuideFromCache();
+    showNotification("Sweep-Warnlagen serverseitig freigegeben.", "success");
     return getAndroidAutomationSweepPreflightState();
 }
 
@@ -4051,6 +4073,28 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
         ? escapeHtml(scenarioPreview.join(" · "))
         : "Keine Dual-Device-Szenarien im QA-Katalog sichtbar.";
     const sweepDisabledAttr = !isPythonOperator || !sweepPreview.canStart || sweepReadiness.canStart === false ? "disabled" : "";
+    const sweepApprovalRequiredHtml = sweepReadiness.approvalRequired && !sweepReadiness.hasActiveApproval
+        ? `
+            <article class='qa-register-callout qa-register-callout-warning'>
+                <div>
+                    <strong>Warnlagen müssen serverseitig freigegeben werden</strong>
+                    <p>Der Sweep bleibt wegen bestehender Warnlagen gesperrt, bis die aktuelle Warnkonstellation einmalig serverseitig freigegeben wurde.</p>
+                </div>
+                <button class='btn btn-secondary btn-sm' onclick="requestAndroidAutomationSweepApproval()">Warnlagen freigeben</button>
+            </article>
+        `
+        : "";
+    const activeApproval = sweepReadiness.activeApproval;
+    const sweepApprovalActiveHtml = sweepReadiness.hasActiveApproval && activeApproval
+        ? `
+            <article class='qa-register-callout qa-register-callout-success'>
+                <div>
+                    <strong>Warnlagen serverseitig freigegeben</strong>
+                    <p>Freigegeben durch ${escapeHtml(String(activeApproval.approvedBy || "-"))} bis ${escapeHtml(String(activeApproval.expiresAt || "-"))}.</p>
+                </div>
+            </article>
+        `
+        : "";
     const sweepDetailsHtml = !sweepPreview.catalogLoaded
         ? `<p class='python-muted-caption'>QA-Katalog noch nicht geladen. Die Sweep-Vorschau wird nach dem nächsten Suite-Refresh ergänzt.</p>`
         : `
@@ -4187,6 +4231,8 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 ${sweepDetailsHtml}
                 ${sweepBlockingHtml}
                 ${sweepReadinessHtml}
+                ${sweepApprovalRequiredHtml}
+                ${sweepApprovalActiveHtml}
                 ${sweepOptionFormHtml}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
                 <div class='setup-actions mm-u031'>
@@ -4784,6 +4830,7 @@ function buildAndroidAutomationSweepRequest() {
         throw new Error("Der Android-Automation-Sweep kann nicht gestartet werden, weil aktive Android-Versionen oder Dual-Device-Szenarien fehlen.");
     }
 
+    const sweepReadiness = getAndroidAutomationSweepPreflightState();
     const values = getAndroidAutomationSweepFormValues();
     const commandBuilderConfig = loadCommandBuilderConfig();
     const parsedTimeout = Number.parseInt(values.timeoutSec, 10);
@@ -4794,6 +4841,7 @@ function buildAndroidAutomationSweepRequest() {
     return {
         endpoint: "/api/suites/android-automation-sweep",
         body: {
+            approvalId: sweepReadiness.hasActiveApproval ? String(sweepReadiness.activeApproval?.approvalId || "") : "",
             installApk: values.installApk,
             uninstallFirst: values.uninstallFirst,
             skipActivation: values.skipActivation,
@@ -4850,6 +4898,10 @@ async function startAndroidAutomationSweep() {
     try {
         const readiness = await ensureAndroidAutomationSweepPreflightLoaded();
         if (readiness.canStart === false) {
+            if (readiness.approvalRequired && !readiness.hasActiveApproval) {
+                showNotification("Android-Automation-Sweep wartet auf eine serverseitige Warnlagen-Freigabe.", "info");
+                return;
+            }
             const blocker = Array.isArray(readiness.blockingReasons) && readiness.blockingReasons.length > 0
                 ? readiness.blockingReasons[0]
                 : null;

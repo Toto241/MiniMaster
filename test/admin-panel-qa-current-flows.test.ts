@@ -320,6 +320,9 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "ready",
           canStart: true,
+          approvalRequired: false,
+          hasActiveApproval: false,
+          activeApproval: null,
           warningCount: 0,
           warnings: [],
           blockingCount: 0,
@@ -342,6 +345,7 @@ describe("admin-panel current QA flows", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        approvalId: "",
         installApk: true,
         uninstallFirst: false,
         skipActivation: true,
@@ -353,7 +357,7 @@ describe("admin-panel current QA flows", () => {
     });
   });
 
-  it("starts the sweep without a confirmation dialog when server preflight reports warnings only", async () => {
+  it("requires a server-side warning approval before a warning-state sweep can start", async () => {
     const { exports, fetchMock, elements, context } = loadAdminPanelTestExports({
       operatorCommandBuilderConfig: JSON.stringify({
         masterApkPath: "masterApp/custom-master.apk",
@@ -388,7 +392,10 @@ describe("admin-panel current QA flows", () => {
         ok: true,
         json: jest.fn().mockResolvedValue({
           status: "warning",
-          canStart: true,
+          canStart: false,
+          approvalRequired: true,
+          hasActiveApproval: false,
+          activeApproval: null,
           warningCount: 1,
           warnings: [
             {
@@ -425,7 +432,118 @@ describe("admin-panel current QA flows", () => {
     await exports.startAndroidAutomationSweep();
 
     expect(context.confirm).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(notificationEl.textContent).toContain("serverseitige Warnlagen-Freigabe");
+  });
+
+  it("stores a sweep approval and starts with the active approval id", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-sweep-install-apk", { checked: true });
+    elements.set("qa-sweep-uninstall-first", { checked: false });
+    elements.set("qa-sweep-skip-activation", { checked: false });
+    elements.set("qa-sweep-parallel", { checked: false });
+    elements.set("qa-sweep-timeout-sec", { value: "7200" });
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ suites: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "warning",
+          canStart: false,
+          approvalRequired: true,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "approved",
+          canStart: true,
+          approvalRequired: true,
+          hasActiveApproval: true,
+          activeApproval: {
+            approvalId: "sweep-approval-1",
+            approvedAt: "2026-04-20T10:00:00Z",
+            approvedBy: "qa-admin-panel",
+            expiresAt: "2026-04-20T18:00:00Z",
+            warningIds: ["register-blockers-open"],
+            planHash: "plan-hash-1",
+          },
+          warningCount: 1,
+          warnings: [{ id: "register-blockers-open", tone: "danger", title: "1 Release-Blocker sind noch offen", detail: "Warnung." }],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ runId: "autosweep-run-3" }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({
+      items: [
+        {
+          id: "blocker-1",
+          title: "Open Release Blocker",
+          status: "fail",
+          blockingForRelease: true,
+          groupId: "core-suite",
+        },
+      ],
+    });
+    await exports.loadSuiteGuideData();
+
+    await exports.requestAndroidAutomationSweepApproval();
+    await exports.startAndroidAutomationSweep();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/suites/android-automation-sweep/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approvedBy: "qa-admin-panel" }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(5, "/api/suites/android-automation-sweep", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approvalId: "sweep-approval-1",
+        installApk: true,
+        uninstallFirst: false,
+        skipActivation: false,
+        parallel: false,
+        timeoutSec: 7200,
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
     expect(notificationEl.textContent).toContain("Android-Automation-Sweep gestartet");
   });
 
@@ -460,6 +578,9 @@ describe("admin-panel current QA flows", () => {
         json: jest.fn().mockResolvedValue({
           status: "blocked",
           canStart: false,
+          approvalRequired: false,
+          hasActiveApproval: false,
+          activeApproval: null,
           warningCount: 0,
           warnings: [],
           blockingCount: 1,
