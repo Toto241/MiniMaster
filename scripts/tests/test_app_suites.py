@@ -523,6 +523,63 @@ class TestMiniMasterAdminHandlerRoutes:
         with app._active_suite_lock:
             assert app._active_suite_runs == {}
 
+    def test_do_post_dual_device_rejects_legacy_direct_start_without_side_effects(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/dual-device")
+        handler._read_json_body.return_value = {
+            "masterSerial": "MASTER-1",
+            "childSerial": "CHILD-1",
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.CONFLICT,
+            {"error": "Direkte Android-Dual-Device-Starts wurden entfernt. Bitte den serverseitigen Android-Kompatibilitätslauf verwenden."},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+        with app._active_suite_lock:
+            assert app._active_suite_runs == {}
+
+    def test_do_post_usb_test_rejects_legacy_commissioning_start_without_side_effects(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/usb-test")
+        handler._read_json_body.return_value = {
+            "appId": "master",
+            "serial": "auto",
+            "suite": "commissioning",
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+
+        with app._active_suite_lock:
+            app._active_suite_runs.clear()
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.CONFLICT,
+            {"error": "Direkte Android-USB-Commissioning-Starts wurden entfernt. Bitte den serverseitigen Android-Kompatibilitätslauf verwenden."},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
+        with app._active_suite_lock:
+            assert app._active_suite_runs == {}
+
     def test_do_post_android_compatibility_queues_run_with_versions(self, monkeypatch: pytest.MonkeyPatch):
         import app
 

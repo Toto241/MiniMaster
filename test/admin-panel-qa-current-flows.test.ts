@@ -198,61 +198,39 @@ describe("admin-panel current QA flows", () => {
     expect(automaticListEl.innerHTML).not.toContain("mod-parent-1");
   });
 
-  it("routes android USB suites through the dedicated QA endpoint", async () => {
+  it("redirects android USB suites into the compatibility flow", async () => {
     const { exports, fetchMock, elements } = loadAdminPanelTestExports();
 
-    elements.set("notification", createNotificationElement());
-
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ runId: "usb-run-1" }),
-    });
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
 
     exports.setPythonOperatorRuntimeForTests(true);
 
     await exports.startSuiteRun("android-usb-master");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/suites/usb-test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        appId: "master",
-        serial: "auto",
-        suite: "commissioning",
-      }),
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(exports.buildAndroidCompatibilityRequest().body.executionMode).toBe("single-master");
+    expect(notificationEl.textContent).toContain("Android-Kompatibilität: Eltern-App");
   });
 
-  it("routes dual-device suites through the dedicated QA endpoint when distinct serials are configured", async () => {
-    const { exports, fetchMock, elements } = loadAdminPanelTestExports({
-      operatorCommandBuilderConfig: JSON.stringify({
-        masterDeviceSerial: "emulator-5554",
-        childDeviceSerial: "emulator-5556",
-      }),
-    });
+  it("redirects dual-device suites into the compatibility flow", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports();
 
-    elements.set("notification", createNotificationElement());
-
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ runId: "dual-run-1" }),
-    });
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
 
     exports.setPythonOperatorRuntimeForTests(true);
 
     await exports.startSuiteRun("android-e2e-shell-script");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/suites/dual-device", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        masterSerial: "emulator-5554",
-        childSerial: "emulator-5556",
-      }),
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(exports.buildAndroidCompatibilityRequest().body.executionMode).toBe("dual-device");
+    expect(notificationEl.textContent).toContain("Android-Kompatibilität: Dual-Device");
   });
 
-  it("blocks dual-device suite starts when both configured serials are identical", async () => {
+  it("routes dual-device suites into compatibility even when legacy serial config would have failed", async () => {
     const { exports, fetchMock, elements } = loadAdminPanelTestExports({
       operatorCommandBuilderConfig: JSON.stringify({
         masterDeviceSerial: "emulator-5554",
@@ -268,11 +246,12 @@ describe("admin-panel current QA flows", () => {
     await exports.startSuiteRun("android-e2e-shell-script");
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(notificationEl.textContent).toContain("Master- und Child-ADB-Serial müssen unterschiedlich sein.");
-    expect(notificationEl.className).toBe("notification error");
+    expect(exports.buildAndroidCompatibilityRequest().body.executionMode).toBe("dual-device");
+    expect(notificationEl.textContent).toContain("Android-Kompatibilität: Dual-Device");
+    expect(notificationEl.className).toBe("notification info");
   });
 
-  it("rejects invalid dual-device serial configuration before building the request", () => {
+  it("rejects legacy Android direct-start request building", () => {
     const { exports } = loadAdminPanelTestExports({
       operatorCommandBuilderConfig: JSON.stringify({
         masterDeviceSerial: "emulator-5554",
@@ -281,7 +260,7 @@ describe("admin-panel current QA flows", () => {
     });
 
     expect(() => exports.buildSuiteRunRequest("android-e2e-shell-script")).toThrow(
-      "Die konfigurierte Child-ADB-Serial ist ungültig.",
+      "Direktstarts für android-e2e-shell-script wurden entfernt.",
     );
   });
 
@@ -551,6 +530,84 @@ describe("admin-panel current QA flows", () => {
       }),
     });
     expect(notificationEl.textContent).toContain("Android-Automation-Sweep gestartet");
+  });
+
+  it("refreshes the cached sweep preflight after a stale sweep start conflict", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports();
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-sweep-install-apk", { checked: false });
+    elements.set("qa-sweep-uninstall-first", { checked: false });
+    elements.set("qa-sweep-skip-activation", { checked: false });
+    elements.set("qa-sweep-parallel", { checked: false });
+    elements.set("qa-sweep-timeout-sec", { value: "7200" });
+
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue({ suites: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          planHash: "plan-hash-old",
+          approvalRequired: false,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: jest.fn().mockResolvedValue({
+          error: "Sweep-Plan ist veraltet.",
+          requiresRefresh: true,
+          currentPlanHash: "plan-hash-new",
+          preflight: {
+            status: "warning",
+            canStart: false,
+            planHash: "plan-hash-new",
+            approvalRequired: true,
+            hasActiveApproval: false,
+            activeApproval: null,
+            warningCount: 1,
+            warnings: [{ id: "register-blockers-open", tone: "danger", title: "Neue Warnlage", detail: "Bitte neu freigeben." }],
+            blockingCount: 0,
+            blockingReasons: [],
+          },
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    await exports.loadSuiteGuideData();
+
+    await exports.startAndroidAutomationSweep();
+
+    expect(exports.getAndroidAutomationSweepPreflightState()).toMatchObject({
+      planHash: "plan-hash-new",
+      approvalRequired: true,
+      hasActiveApproval: false,
+      warningCount: 1,
+    });
+    expect(notificationEl.textContent).toContain("Sweep-Plan ist veraltet");
+    fetchMock.mockClear();
+    await exports.ensureAndroidAutomationSweepPreflightLoaded();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("blocks the sweep before POST when server preflight reports a hard blocker", async () => {
@@ -906,6 +963,100 @@ describe("admin-panel current QA flows", () => {
       }),
     });
     expect(notificationEl.textContent).toContain("Android-Kompatibilitätslauf gestartet");
+  });
+
+  it("refreshes the cached compatibility preflight after a stale compatibility start conflict", async () => {
+    const { exports, fetchMock, elements } = loadAdminPanelTestExports();
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-compat-execution-mode", { value: "single-child" });
+    elements.set("qa-compat-install-apk", { checked: false });
+    elements.set("qa-compat-uninstall-first", { checked: false });
+    elements.set("qa-compat-skip-activation", { checked: false });
+    elements.set("qa-compat-parallel", { checked: false });
+    elements.set("qa-compat-timeout-sec", { value: "3600" });
+
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue({ suites: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          planHash: "compat-old",
+          approvalRequired: false,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          planHash: "compat-old",
+          approvalRequired: false,
+          hasActiveApproval: false,
+          activeApproval: null,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: jest.fn().mockResolvedValue({
+          error: "Kompatibilitäts-Plan ist veraltet.",
+          requiresRefresh: true,
+          currentPlanHash: "compat-new",
+          preflight: {
+            status: "warning",
+            canStart: false,
+            planHash: "compat-new",
+            approvalRequired: true,
+            hasActiveApproval: false,
+            activeApproval: null,
+            warningCount: 1,
+            warnings: [{ id: "register-blockers-open", tone: "danger", title: "Neue Kompatibilitäts-Warnlage", detail: "Bitte neu freigeben." }],
+            blockingCount: 0,
+            blockingReasons: [],
+          },
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    await exports.loadSuiteGuideData();
+
+    await exports.startAndroidCompatibilityRun();
+
+    expect(exports.getAndroidCompatibilityPreflightState()).toMatchObject({
+      planHash: "compat-new",
+      approvalRequired: true,
+      hasActiveApproval: false,
+      warningCount: 1,
+    });
+    expect(notificationEl.textContent).toContain("Kompatibilitäts-Plan ist veraltet");
+    fetchMock.mockClear();
+    await exports.ensureAndroidCompatibilityPreflightLoaded();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("renders automation sweep runs in history with a dedicated label", async () => {

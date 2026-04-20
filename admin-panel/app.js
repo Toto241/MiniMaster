@@ -3580,15 +3580,47 @@ function applyTestingRegisterQuickFilter(type, options = {}) {
     document.getElementById("qa-register-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function getLegacyAndroidCompatibilityMode(suiteRef) {
+    const normalizedSuiteRef = String(suiteRef || "").trim();
+    if (normalizedSuiteRef === "android-usb-master") return "single-master";
+    if (normalizedSuiteRef === "android-usb-child") return "single-child";
+    if (normalizedSuiteRef === "android-e2e-shell" || normalizedSuiteRef === "android-e2e-shell-script") return "dual-device";
+    return "";
+}
+
+function getLegacyAndroidCompatibilityLabel(suiteRef) {
+    const mode = getLegacyAndroidCompatibilityMode(suiteRef);
+    if (mode === "single-child") return "Android-Kompatibilität: Kind-App";
+    if (mode === "dual-device") return "Android-Kompatibilität: Dual-Device";
+    if (mode === "single-master") return "Android-Kompatibilität: Eltern-App";
+    return "";
+}
+
+function routeLegacyAndroidSuiteToCompatibility(suiteId) {
+    const decodedSuiteId = decodeURIComponent(String(suiteId || ""));
+    const compatibilityMode = getLegacyAndroidCompatibilityMode(decodedSuiteId);
+    if (!compatibilityMode) {
+        return false;
+    }
+    androidCompatibilityFormDraft = {
+        ...androidCompatibilityFormDraft,
+        executionMode: compatibilityMode,
+    };
+    androidCompatibilityPreflightPayload = null;
+    androidCompatibilityPreflightRequestSignature = "";
+    rerenderQaExecutionGuideFromCache();
+    scrollQaSection("qa-android-compatibility-card");
+    const targetLabel = getLegacyAndroidCompatibilityLabel(decodedSuiteId) || "Android-Kompatibilität";
+    showNotification(`Direkte Android-Suite-Starts laufen jetzt über ${targetLabel}.`, "info");
+    return true;
+}
+
 function getTestingRegisterActionLabel(item) {
     const action = String(item?.action || "commissioning-run");
     if (action === "suite-run") {
         const suiteRef = String(item?.suiteRef || item?.id || "").trim();
-        if (suiteRef === "android-usb-master" || suiteRef === "android-usb-child") {
-            return "USB-Start";
-        }
-        if (suiteRef === "android-e2e-shell" || suiteRef === "android-e2e-shell-script") {
-            return "Dual-Start";
+        if (getLegacyAndroidCompatibilityMode(suiteRef)) {
+            return getLegacyAndroidCompatibilityLabel(suiteRef);
         }
         return "Suite-Start";
     }
@@ -3610,6 +3642,10 @@ function buildTestingRegisterExecutionPath(item) {
     }
     if (String(item?.action || "") === "suite-run") {
         const suiteRef = String(item?.suiteRef || item?.id || "").trim();
+        const compatibilityLabel = getLegacyAndroidCompatibilityLabel(suiteRef);
+        if (compatibilityLabel) {
+            return `${compatibilityLabel} statt Direktstart`;
+        }
         return suiteRef ? `${actionLabel}: ${suiteRef}` : actionLabel;
     }
     if (String(item?.action || "") === "protocol") {
@@ -4546,7 +4582,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
             ${approvalOverviewHtml}
         </div>
         <div class='qa-guide-grid'>
-            <article class='qa-guide-card'>
+            <article class='qa-guide-card' id='qa-android-compatibility-card'>
                 <div class='qa-guide-card-header'>
                     <div>
                         <h4>1. Python-Commissioning-Lauf</h4>
@@ -4637,6 +4673,11 @@ function scrollQaSection(sectionId) {
 
 function buildTestingRegisterActionTooltip(item) {
     if (item.action === "suite-run") {
+        const suiteRef = String(item?.suiteRef || item?.id || "").trim();
+        const compatibilityLabel = getLegacyAndroidCompatibilityLabel(suiteRef);
+        if (compatibilityLabel) {
+            return `Öffnet ${compatibilityLabel} mit serverseitigem Freigabe- und Preflight-Flow.`;
+        }
         if (item.prereqsMet === false) {
             return `Suite kann aktuell nicht gestartet werden: ${String(item.prereqReason || "Voraussetzungen nicht erfuellt")}`;
         }
@@ -4901,11 +4942,10 @@ function buildTestingRegisterAction(item) {
         const suiteId = encodeURIComponent(String(item.suiteRef || item.id || ""));
         const disabled = item.prereqsMet === false ? "disabled" : "";
         const suiteRef = String(item.suiteRef || item.id || "").trim();
-        const buttonLabel = suiteRef.startsWith("android-usb-")
-            ? "USB-Lauf starten"
-            : (suiteRef === "android-e2e-shell" || suiteRef === "android-e2e-shell-script")
-                ? "Dual-Device-Lauf starten"
-                : "Suite starten";
+        if (getLegacyAndroidCompatibilityMode(suiteRef)) {
+            return `<button class='btn btn-secondary btn-sm' onclick="routeLegacyAndroidSuiteToCompatibility('${suiteId}')" ${disabled} ${tooltip}>Zum Kompatibilitätslauf</button>`;
+        }
+        const buttonLabel = "Suite starten";
         return `<button class='btn btn-secondary btn-sm' onclick="startSuiteRun('${suiteId}')" ${disabled} ${tooltip}>${buttonLabel}</button>`;
     }
     if (item.action === "protocol") {
@@ -5289,6 +5329,9 @@ async function startSuiteRun(suiteId) {
     if (!isPythonOperator) return;
     try {
         const decodedSuiteId = decodeURIComponent(String(suiteId || ""));
+        if (routeLegacyAndroidSuiteToCompatibility(decodedSuiteId)) {
+            return;
+        }
         const request = buildSuiteRunRequest(decodedSuiteId);
         await queueSuiteRunRequest(request, "Suite konnte nicht gestartet werden.");
     } catch (err) {
@@ -5389,69 +5432,9 @@ function getSuiteRunDeviceConfig() {
 
 function buildSuiteRunRequest(suiteId) {
     const normalizedSuiteId = String(suiteId || "").trim();
-    if (normalizedSuiteId === "android-usb-master") {
-        return {
-            endpoint: "/api/suites/usb-test",
-            body: {
-                appId: "master",
-                serial: "auto",
-                suite: "commissioning",
-            },
-            historySuiteId: normalizedSuiteId,
-            historyType: "usb-test",
-            displayLabel: "USB Eltern-App",
-            notificationLabel: "USB-Lauf 'android-usb-master'",
-        };
-    }
-    if (normalizedSuiteId === "android-usb-child") {
-        return {
-            endpoint: "/api/suites/usb-test",
-            body: {
-                appId: "child",
-                serial: "auto",
-                suite: "commissioning",
-            },
-            historySuiteId: normalizedSuiteId,
-            historyType: "usb-test",
-            displayLabel: "USB Kinder-App",
-            notificationLabel: "USB-Lauf 'android-usb-child'",
-        };
-    }
-    if (normalizedSuiteId === "android-e2e-shell" || normalizedSuiteId === "android-e2e-shell-script") {
-        const {
-            rawMasterDeviceSerial,
-            rawChildDeviceSerial,
-            masterDeviceSerial,
-            childDeviceSerial,
-        } = getSuiteRunDeviceConfig();
-
-        if (!rawMasterDeviceSerial) {
-            throw new Error("Für Dual-Device-Suiten muss eine Master-ADB-Serial in der Befehlszentrale gepflegt sein.");
-        }
-        if (!masterDeviceSerial) {
-            throw new Error("Die konfigurierte Master-ADB-Serial ist ungültig.");
-        }
-        if (!rawChildDeviceSerial) {
-            throw new Error("Für Dual-Device-Suiten muss eine Child-ADB-Serial in der Befehlszentrale gepflegt sein.");
-        }
-        if (!childDeviceSerial) {
-            throw new Error("Die konfigurierte Child-ADB-Serial ist ungültig.");
-        }
-        if (masterDeviceSerial === childDeviceSerial) {
-            throw new Error("Master- und Child-ADB-Serial müssen unterschiedlich sein.");
-        }
-
-        return {
-            endpoint: "/api/suites/dual-device",
-            body: {
-                masterSerial: masterDeviceSerial,
-                childSerial: childDeviceSerial,
-            },
-            historySuiteId: normalizedSuiteId,
-            historyType: "dual-device",
-            displayLabel: "Dual-Device Eltern+Kind",
-            notificationLabel: `Dual-Device-Lauf '${normalizedSuiteId}'`,
-        };
+    if (getLegacyAndroidCompatibilityMode(normalizedSuiteId)) {
+        const compatibilityLabel = getLegacyAndroidCompatibilityLabel(normalizedSuiteId) || "Android-Kompatibilität";
+        throw new Error(`Direktstarts für ${normalizedSuiteId} wurden entfernt. Bitte ${compatibilityLabel} verwenden.`);
     }
     return {
         endpoint: "/api/suites/run",
