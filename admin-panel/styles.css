@@ -2068,6 +2068,90 @@ input:focus, select:focus, textarea:focus {
     align-items: start;
 }
 
+.qa-test-workspace-status {
+    margin-block-end: 12px;
+}
+
+.qa-test-workspace-callout {
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, #ffffff, #f8fbff);
+    display: grid;
+    gap: 4px;
+}
+
+.qa-test-workspace-callout strong {
+    color: #0f172a;
+}
+
+.qa-test-workspace-callout span {
+    color: #475569;
+    font-size: 0.88rem;
+}
+
+.qa-test-workspace-callout.is-warning {
+    border-color: #fcd34d;
+    background: linear-gradient(180deg, #fffbeb, #fef3c7);
+}
+
+.qa-test-workspace-callout.is-error {
+    border-color: #fecaca;
+    background: linear-gradient(180deg, #fff1f2, #fef2f2);
+}
+
+.qa-test-workspace-callout.is-success {
+    border-color: #bbf7d0;
+    background: linear-gradient(180deg, #f0fdf4, #dcfce7);
+}
+
+.qa-test-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.qa-test-metric-card {
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff, #f8fbff);
+    padding: 14px;
+    display: grid;
+    gap: 4px;
+}
+
+.qa-test-metric-card strong {
+    color: #0f172a;
+    font-size: 1.45rem;
+    line-height: 1.1;
+}
+
+.qa-test-metric-card span {
+    color: #475569;
+    font-size: 0.85rem;
+}
+
+.qa-test-metric-card em {
+    color: #64748b;
+    font-size: 0.79rem;
+    font-style: normal;
+}
+
+.qa-test-metric-card.is-danger {
+    border-color: #fecaca;
+    background: linear-gradient(180deg, #fff1f2, #fef2f2);
+}
+
+.qa-test-metric-card.is-warning {
+    border-color: #fde68a;
+    background: linear-gradient(180deg, #fffbeb, #fef3c7);
+}
+
+.qa-test-metric-card.is-success {
+    border-color: #bbf7d0;
+    background: linear-gradient(180deg, #f0fdf4, #dcfce7);
+}
+
 .qa-test-workspace-panel {
     min-inline-size: 0;
 }
@@ -2099,15 +2183,19 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 10px;
+    margin-block-start: 10px;
     color: #64748b;
     font-size: 0.79rem;
 }
 
 .qa-test-list-summary {
-    margin-bottom: 10px;
+    margin-block-end: 10px;
     color: #475569;
     font-size: 0.82rem;
+}
+
+.qa-test-list-summary strong {
+    color: #0f172a;
 }
 
 .qa-test-empty {
@@ -2122,7 +2210,7 @@ input:focus, select:focus, textarea:focus {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 10px;
-    margin-top: 12px;
+    margin-block-start: 12px;
 }
 
 .qa-test-detail-meta-item {
@@ -2136,7 +2224,7 @@ input:focus, select:focus, textarea:focus {
     display: block;
     color: #64748b;
     font-size: 0.77rem;
-    margin-bottom: 4px;
+    margin-block-end: 4px;
 }
 
 .qa-test-detail-meta-item strong {
@@ -2145,12 +2233,12 @@ input:focus, select:focus, textarea:focus {
 }
 
 .qa-test-detail-block {
-    margin-top: 12px;
+    margin-block-start: 12px;
 }
 
 .qa-test-detail-block strong {
     display: block;
-    margin-bottom: 6px;
+    margin-block-end: 6px;
     color: #0f172a;
 }
 
