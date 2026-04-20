@@ -2658,6 +2658,151 @@ function buildQaTestWorkspaceMeta(label, value) {
     return `<div class='qa-test-detail-meta-item'><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
+function getQaRefreshSectionEntries() {
+    return Object.entries(qaRefreshState.sections || {});
+}
+
+function getQaFailedRefreshSections() {
+    return getQaRefreshSectionEntries()
+        .filter(([, entry]) => String(entry?.state || "") === "error")
+        .map(([key]) => qaRefreshSectionLabels[key] || key);
+}
+
+function getLatestQaWorkspaceTimestamp(runs = [], failures = []) {
+    const timestamps = [
+        ...runs.map(item => getQaWorkspaceTimestampValue(item.updatedAt)),
+        ...failures.map(item => getQaWorkspaceTimestampValue(item.updatedAt)),
+        ...getQaRefreshSectionEntries().map(([, entry]) => getQaWorkspaceTimestampValue(entry?.updatedAt || "")),
+    ].filter(value => value > 0);
+    if (timestamps.length === 0) return "";
+    return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function buildQaTestWorkspaceMetrics(runs = [], failures = []) {
+    const registerItems = Array.isArray(testingRegisterPayload?.items) ? testingRegisterPayload.items : [];
+    const openRegisterItems = registerItems.filter(item => {
+        const status = String(item?.status || "not_run");
+        return status === "fail" || status === "manual_required" || (status === "not_run" && isTestingRegisterReleaseBlockerOpen(item));
+    }).length;
+    const openEvidenceItems = registerItems.filter(item => {
+        const status = String(item?.status || "not_run");
+        return Boolean(item?.evidenceRequired) && (status === "fail" || status === "manual_required" || item?.staleEvidence || !item?.hasSuccessfulRun);
+    }).length;
+    const failedRefreshSections = getQaFailedRefreshSections();
+    const latestTimestamp = getLatestQaWorkspaceTimestamp(runs, failures);
+
+    return [
+        {
+            label: "Letzte Läufe",
+            value: String(runs.length),
+            detail: runs.length > 0 ? "Geladene Commissioning- und Suite-Läufe" : "Noch keine Laufdaten geladen",
+            className: runs.length > 0 ? "is-success" : "",
+        },
+        {
+            label: "Offene Fehler",
+            value: String(failures.length),
+            detail: failures.length > 0 ? "Fehlgeschlagene oder offene Punkte in der Arbeitsfläche" : "Keine offenen Fehler in den geladenen Daten",
+            className: failures.length > 0 ? "is-danger" : "is-success",
+        },
+        {
+            label: "Register offen",
+            value: String(openRegisterItems),
+            detail: "Offene oder blockierende Registereinträge",
+            className: openRegisterItems > 0 ? "is-warning" : "is-success",
+        },
+        {
+            label: "Nachweise offen",
+            value: String(openEvidenceItems),
+            detail: "Einträge mit fehlender, veralteter oder negativer Evidenz",
+            className: openEvidenceItems > 0 ? "is-warning" : "is-success",
+        },
+        {
+            label: "Datenstand",
+            value: latestTimestamp ? formatQaRefreshTimestamp(latestTimestamp) : "-",
+            detail: failedRefreshSections.length > 0 ? `Teilweise unvollständig: ${failedRefreshSections.join(", ")}` : "Zuletzt sichtbarer Zeitstempel in der Arbeitsfläche",
+            className: failedRefreshSections.length > 0 ? "is-warning" : latestTimestamp ? "is-success" : "",
+        },
+    ];
+}
+
+function renderQaTestWorkspaceMetrics(container, runs = [], failures = []) {
+    if (!container) return;
+    const metrics = buildQaTestWorkspaceMetrics(runs, failures);
+    container.innerHTML = `
+        ${metrics.map(metric => `
+            <article class='qa-test-metric-card ${escapeHtml(metric.className || "")}'>
+                <span>${escapeHtml(metric.label)}</span>
+                <strong>${escapeHtml(metric.value)}</strong>
+                <em>${escapeHtml(metric.detail)}</em>
+            </article>
+        `).join("")}
+    `;
+}
+
+function renderQaTestWorkspaceStatus(container, runs = [], failures = []) {
+    if (!container) return;
+    const failedRefreshSections = getQaFailedRefreshSections();
+    const hasData = runs.length > 0 || failures.length > 0;
+    const summary = failedRefreshSections.length > 0
+        ? {
+            title: "QA-Arbeitsfläche ist teilweise geladen.",
+            detail: `Diese Bereiche haben beim letzten Refresh Fehler geliefert: ${failedRefreshSections.join(", ")}. Sichtbare Daten bleiben erhalten.`,
+            className: "is-warning",
+        }
+        : hasData
+            ? {
+                title: "QA-Arbeitsfläche ist synchronisiert.",
+                detail: "Die sichtbaren Listen basieren auf realen Läufen, Registerzuständen und Nachweisen aus dem aktuellen Datenstand.",
+                className: "is-success",
+            }
+            : {
+                title: "Noch keine QA-Arbeitsdaten geladen.",
+                detail: "Nutzen Sie Aktualisieren, damit Läufe, Fehler und Details aus den vorhandenen Backend-Quellen zusammengeführt werden.",
+                className: "",
+            };
+
+    container.innerHTML = `
+        <div class='qa-test-workspace-callout ${escapeHtml(summary.className || "")}'>
+            <strong>${escapeHtml(summary.title)}</strong>
+            <span>${escapeHtml(summary.detail)}</span>
+        </div>
+    `;
+}
+
+function getQaTestWorkspaceActionState(selected) {
+    if (!selected) {
+        return {
+            canRerun: false,
+            rerunLabel: "Ausgewählten Lauf erneut starten",
+        };
+    }
+
+    if (["commissioning-run", "python-check", "python-pending", "python-command", "python-evidence"].includes(selected.kind)) {
+        return {
+            canRerun: true,
+            rerunLabel: "Python-Commissioning erneut starten",
+        };
+    }
+
+    if (selected.kind === "suite-run") {
+        const runType = String(selected.raw?.type || selected.raw?.suiteId || selected.raw?.suite_id || "").trim();
+        if (runType === "android-compatibility") {
+            return { canRerun: true, rerunLabel: "Android-Kompatibilität erneut starten" };
+        }
+        if (runType === "android-automation-sweep") {
+            return { canRerun: true, rerunLabel: "Android-Sweep erneut starten" };
+        }
+        if (selected.raw?.suiteId || selected.raw?.suite_id) {
+            return { canRerun: true, rerunLabel: "Suite erneut starten" };
+        }
+    }
+
+    return {
+        canRerun: false,
+        rerunLabel: "Für Auswahl kein Wiederanlauf verfügbar",
+    };
+}
+
 function getQaTestWorkspaceSelectionKey(kind, id) {
     return `${String(kind || "")}::${String(id || "")}`;
 }
@@ -2927,7 +3072,7 @@ function renderQaTestWorkspaceList(container, items, selected, emptyMessage) {
     }
 
     container.innerHTML = `
-        <div class='qa-test-list-summary'>${escapeHtml(String(items.length))} Einträge sichtbar.</div>
+        <div class='qa-test-list-summary'><strong>${escapeHtml(String(items.length))}</strong> Einträge sichtbar.</div>
         <div class='qa-test-list'>
             ${items.map(item => {
                 const isSelected = selected && selected.kind === item.kind && selected.id === item.id;
@@ -2946,7 +3091,7 @@ function renderQaTestWorkspaceList(container, items, selected, emptyMessage) {
                         <div class='qa-test-list-meta'>
                             <span>${escapeHtml(item.updatedAt ? formatQaRefreshTimestamp(item.updatedAt) : "Zeitpunkt unbekannt")}</span>
                         </div>
-                        <div class='setup-actions' style='margin-top: 10px'>
+                        <div class='setup-actions' style='margin-block-start: 10px'>
                             <button type='button' class='btn btn-secondary btn-sm' onclick="selectQaTestWorkspaceItem('${encodedKind}', '${encodedId}')">Details</button>
                         </div>
                     </article>
@@ -3146,7 +3291,7 @@ function renderQaTestWorkspaceDetail(container, item) {
             <p>${escapeHtml(item.detail || "Keine Detailbeschreibung vorhanden.")}</p>
         </div>
         ${structuredDetailHtml}
-        <div class='setup-actions' style='margin-top: 12px'>
+        <div class='setup-actions' style='margin-block-start: 12px'>
             <button type='button' class='btn btn-secondary btn-sm' onclick='openSelectedQaTestWorkspaceItem()'>${escapeHtml(item.primaryActionLabel || "Öffnen")}</button>
             ${secondaryActionHtml}
         </div>
@@ -3158,12 +3303,20 @@ function renderQaTestWorkspaceDetail(container, item) {
 }
 
 function renderQaTestWorkspace() {
+    const statusEl = document.getElementById("qa-test-workspace-status");
+    const metricsEl = document.getElementById("qa-test-metrics");
     const runsEl = document.getElementById("qa-test-run-overview");
     const failuresEl = document.getElementById("qa-test-failures");
     const detailEl = document.getElementById("qa-test-detail");
     if (!runsEl || !failuresEl || !detailEl) return;
 
     if (!isPythonOperator) {
+        if (statusEl) {
+            replaceElementWithState(statusEl, "info", "Die QA-Arbeitsfläche ist nur im Python-Operator vollständig verfügbar.");
+        }
+        if (metricsEl) {
+            replaceElementWithState(metricsEl, "info", "Kennzahlen werden nach Aktivierung des Python-Operators geladen.");
+        }
         replaceElementWithState(runsEl, "info", "Laufdaten sind nur im Python-Operator verfügbar.");
         replaceElementWithState(failuresEl, "info", "Fehlerdaten sind nur im Python-Operator verfügbar.");
         replaceElementWithState(detailEl, "info", "Detailansichten werden nach Aktivierung des Python-Operators geladen.");
@@ -3173,6 +3326,8 @@ function renderQaTestWorkspace() {
     const runs = buildQaTestWorkspaceRunItems();
     const failures = buildQaTestWorkspaceFailureItems();
     const selected = resolveQaTestWorkspaceSelection(runs, failures);
+    renderQaTestWorkspaceStatus(statusEl, runs, failures);
+    renderQaTestWorkspaceMetrics(metricsEl, runs, failures);
 
     renderQaTestWorkspaceList(
         runsEl,
@@ -3190,8 +3345,17 @@ function renderQaTestWorkspace() {
 
     const compactBtn = document.getElementById("qa-test-copy-compact-btn");
     const debugBtn = document.getElementById("qa-test-copy-debug-btn");
+    const rerunBtn = document.getElementById("qa-test-rerun-btn");
+    const actionState = getQaTestWorkspaceActionState(selected);
     if (compactBtn) compactBtn.disabled = !selected;
     if (debugBtn) debugBtn.disabled = !selected;
+    if (rerunBtn) {
+        rerunBtn.disabled = !actionState.canRerun;
+        rerunBtn.textContent = actionState.rerunLabel;
+        rerunBtn.title = actionState.canRerun
+            ? `${actionState.rerunLabel} basierend auf dem ausgewählten Eintrag`
+            : "Nur echte Läufe mit bekanntem Startpfad können erneut gestartet werden";
+    }
 }
 
 function selectQaTestWorkspaceItem(kind, encodedId) {
@@ -3250,6 +3414,38 @@ function openSelectedQaTestWorkspaceItem() {
     }
 
     scrollQaSection("qa-suite-card");
+}
+
+async function rerunSelectedQaTestWorkspaceItem() {
+    const selected = getSelectedQaTestWorkspaceItem();
+    if (!selected) {
+        showNotification("Kein Testeintrag für einen Wiederanlauf ausgewählt.", "info");
+        return;
+    }
+
+    if (["commissioning-run", "python-check", "python-pending", "python-command", "python-evidence"].includes(selected.kind)) {
+        await runPythonAutomationSuite();
+        return;
+    }
+
+    if (selected.kind === "suite-run") {
+        const runType = String(selected.raw?.type || selected.raw?.suiteId || selected.raw?.suite_id || "").trim();
+        if (runType === "android-compatibility") {
+            await startAndroidCompatibilityRun();
+            return;
+        }
+        if (runType === "android-automation-sweep") {
+            await startAndroidAutomationSweep();
+            return;
+        }
+        const suiteId = String(selected.raw?.suiteId || selected.raw?.suite_id || "").trim();
+        if (suiteId) {
+            await startSuiteRun(suiteId);
+            return;
+        }
+    }
+
+    showNotification("Für den ausgewählten Eintrag ist kein echter Wiederanlauf verfügbar.", "info");
 }
 
 function buildSelectedQaTestItemClipboardPayload(format = "compact") {

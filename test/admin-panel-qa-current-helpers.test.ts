@@ -23,9 +23,60 @@ describe("admin-panel current QA helpers", () => {
   it("keeps the visible QA tab focused on runs, failures and details", () => {
     const html = fs.readFileSync(path.join(process.cwd(), "admin-panel", "index.html"), "utf8");
 
-    expect(html).toContain("Qualitätssicherung: Testläufe, Fehlerschwerpunkte und Ergebnisdetails");
-    expect(html).toContain("Test-Triage &amp; Laufübersicht");
+    expect(html).toContain("QA-Arbeitsfläche");
+    expect(html).toContain("Letzte Testläufe, Fehler &amp; Detailansicht");
+    expect(html).toContain("qa-test-metrics");
+    expect(html).toContain("qa-test-rerun-btn");
     expect(html).not.toContain("Priorisierte nächste Schritte");
+  });
+
+  it("derives workspace metrics and rerun state from real QA data only", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    exports.setTestingRegisterPayloadForTests({
+      items: [
+        { id: "reg-1", status: "fail", evidenceRequired: true, hasSuccessfulRun: false },
+        { id: "reg-2", status: "manual_required", evidenceRequired: true, staleEvidence: true },
+      ],
+    });
+    exports.setPythonCommissioningLastRunForTests({
+      runId: "py-run-1",
+      overall: "fail",
+      finishedAt: "2026-04-20T10:00:00Z",
+      evaluation: { statusCounts: { fail: 1, manual_required: 1, pass: 2 } },
+      pending: [{ status: "manual_required", title: "Manual follow-up", details: "Needs evidence" }],
+    });
+    exports.setSuiteRunHistoryPayloadForTests([
+      {
+        runId: "suite-run-1",
+        suiteId: "android-unit-master",
+        status: "finished",
+        finishedAt: "2026-04-20T11:00:00Z",
+        result: { status: "passed" },
+      },
+    ]);
+
+    const metrics = exports.buildQaTestWorkspaceMetrics(
+      exports.buildQaTestWorkspaceRunItems(),
+      exports.buildQaTestWorkspaceFailureItems(),
+    );
+    const rerunState = exports.getQaTestWorkspaceActionState({
+      kind: "suite-run",
+      raw: { suiteId: "android-unit-master" },
+    });
+
+    expect(metrics.map((metric: { label: string }) => metric.label)).toEqual([
+      "Letzte Läufe",
+      "Offene Fehler",
+      "Register offen",
+      "Nachweise offen",
+      "Datenstand",
+    ]);
+    expect(metrics[0].value).toBe("2");
+    expect(metrics[1].value).toBe("3");
+    expect(metrics[2].value).toBe("2");
+    expect(metrics[3].value).toBe("2");
+    expect(rerunState).toMatchObject({ canRerun: true, rerunLabel: "Suite erneut starten" });
   });
 
   it("sanitizes ADB serials and APK paths safely", () => {

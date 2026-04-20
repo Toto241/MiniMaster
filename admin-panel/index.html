@@ -1400,25 +1400,31 @@
                             </div>
 
                         <div class="qa-section-heading">
-                            <h3>Fehler, Läufe &amp; Details</h3>
-                            <p>Fokussierte Arbeitsfläche für reale Testläufe, offene Befunde und kopierbare Detailansichten.</p>
+                            <h3>QA-Arbeitsfläche</h3>
+                            <p>Eine fokussierte Sicht auf reale Läufe, offene Fehler, strukturierte Details und belastbare Folgeaktionen.</p>
                         </div>
                         <div id="qa-suite-card" class="setup-card admin-only qa-workspace-card mm-u029">
                             <div class="qa-workspace-header">
                                 <div>
-                                    <h3>Test-Triage &amp; Laufübersicht</h3>
+                                    <h3>Letzte Testläufe, Fehler &amp; Detailansicht</h3>
                                     <p>
-                                        Diese Fläche bündelt nur echte Testdaten aus Register, Python-Commissioning,
-                                        Suite-Verlauf und Evidenzhistorie. Plattformbetrieb, Release-Ops und Self-Healing
-                                        wurden bewusst entfernt.
+                                        Diese Fläche bündelt nur echte Testdaten aus Python-Commissioning, Suite-Verlauf,
+                                        Testregister und Evidenzhistorie. Sie ist auf Triage, Detailanalyse, Copy und echte
+                                        Wiederanläufe reduziert.
                                     </p>
                                 </div>
                                 <div class="setup-actions mm-u031">
-                                    <button type="button" onclick="loadTestingRegister()" class="btn btn-secondary" title="Testregister neu laden">Register aktualisieren</button>
-                                    <button type="button" onclick="loadPythonAutomationHistory()" class="btn btn-secondary" title="Commissioning-Laufhistorie neu laden">Commissioning-Historie laden</button>
-                                    <button type="button" onclick="loadSuiteRunHistory()" class="btn btn-secondary" title="Suite-Laufhistorie neu laden">Suite-Verlauf laden</button>
-                                    <button type="button" onclick="loadPythonAutomationEvidenceHistory()" class="btn btn-secondary" title="Nachweis-Historie neu laden">Nachweise laden</button>
+                                    <button type="button" onclick="refreshQaDashboard()" class="btn btn-secondary" title="Alle QA-Datenquellen gemeinsam neu laden">Aktualisieren</button>
+                                    <button id="qa-test-rerun-btn" type="button" onclick="rerunSelectedQaTestWorkspaceItem()" class="btn btn-primary" title="Ausgewählten realen Lauf erneut starten">Ausgewählten Lauf erneut starten</button>
                                 </div>
+                            </div>
+
+                            <div id="qa-test-workspace-status" class="data-list qa-test-workspace-status mm-u031">
+                                <div class="info">Noch keine QA-Arbeitsdaten geladen.</div>
+                            </div>
+
+                            <div id="qa-test-metrics" class="qa-test-metrics mm-u031">
+                                <div class="info">Kennzahlen werden nach dem ersten Laden angezeigt.</div>
                             </div>
 
                             <div class="qa-test-workspace mm-u036">
@@ -1449,8 +1455,8 @@
                                 <section class="qa-workspace-panel qa-test-workspace-panel qa-test-detail-panel">
                                     <div class="qa-workspace-panel-header">
                                         <div>
-                                            <h4>Detailansicht &amp; Copy</h4>
-                                            <p>Selektierte Einträge lassen sich kompakt oder als Debug-Format kopieren.</p>
+                                            <h4>Detailansicht &amp; Aktionen</h4>
+                                            <p>Selektierte Einträge zeigen strukturierte Details, echte Sprungziele und kopierbare Formate.</p>
                                         </div>
                                     </div>
                                     <div class="setup-actions mm-u031">
