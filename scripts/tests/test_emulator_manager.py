@@ -81,6 +81,36 @@ class TestReservations:
         assert emulator_manager.release_reservation(reservation["reservationId"]) is True
         assert emulator_manager.load_active_reservations() == []
 
+    def test_ensure_emulator_pool_binds_allocated_targets_to_reservation(self, monkeypatch: pytest.MonkeyPatch):
+        reservation = emulator_manager.create_reservation(
+            "dual-device-balanced",
+            "14",
+            owner="QA",
+            purpose="nightly",
+        )
+
+        def fake_ensure(profile_id, android_version, *, slot=1, **kwargs):
+            return {
+                "serial": f"emulator-{slot}",
+                "profileId": profile_id,
+                "androidVersion": android_version,
+                "avdName": f"qa-{slot}",
+            }
+
+        monkeypatch.setattr(emulator_manager, "ensure_emulator_available", fake_ensure)
+
+        emulator_manager.ensure_emulator_pool(
+            "dual-device-balanced",
+            "14",
+            device_count=2,
+            reservation_id=str(reservation["reservationId"]),
+        )
+
+        active = emulator_manager.load_active_reservations()
+        assert len(active) == 1
+        assert active[0]["assignedTargets"][0]["serial"] == "emulator-1"
+        assert active[0]["assignedTargets"][1]["avdName"] == "qa-2"
+
 
 class TestOverview:
     def test_overview_contains_matrix_and_reservation_counts(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -104,19 +134,29 @@ class TestRunningEmulators:
     def test_list_running_emulators_parses_adb_devices(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(emulator_manager, "_adb_binary", lambda: "adb")
 
-        completed = subprocess.CompletedProcess(
-            args=["adb", "devices", "-l"],
-            returncode=0,
-            stdout="List of devices attached\nemulator-5554 device product:sdk_gphone64_x86_64 model:Pixel_8 device:emu64xa transport_id:5\n",
-            stderr="",
-        )
-        monkeypatch.setattr(emulator_manager.subprocess, "run", lambda *args, **kwargs: completed)
+        def fake_run(command, **kwargs):
+            if command[:3] == ["adb", "devices", "-l"]:
+                return subprocess.CompletedProcess(
+                    args=command,
+                    returncode=0,
+                    stdout="List of devices attached\nemulator-5554 device product:sdk_gphone64_x86_64 model:Pixel_8 device:emu64xa transport_id:5\n",
+                    stderr="",
+                )
+            if command[-1] == "ro.build.version.release":
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="14\n", stderr="")
+            if command[-1] in {"ro.boot.qemu.avd_name", "qemu.avd_name"}:
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="MiniMaster_phone_standard_API_14_1\n", stderr="")
+            raise AssertionError(command)
+
+        monkeypatch.setattr(emulator_manager.subprocess, "run", fake_run)
 
         result = emulator_manager.list_running_emulators()
 
         assert len(result) == 1
         assert result[0]["serial"] == "emulator-5554"
         assert result[0]["model"] == "Pixel_8"
+        assert result[0]["androidVersion"] == "14"
+        assert result[0]["avdName"] == "MiniMaster_phone_standard_API_14_1"
 
 
 class TestEmulatorLifecycle:
@@ -187,26 +227,36 @@ class TestEmulatorLifecycle:
         assert "--name" in run_calls[0][0]
 
     def test_ensure_emulator_available_reuses_matching_running_emulator(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(emulator_manager, "list_running_emulators", lambda: [{"serial": "emulator-5554", "state": "device"}])
-        monkeypatch.setattr(emulator_manager, "get_emulator_android_version", lambda serial: "14")
+        monkeypatch.setattr(emulator_manager, "list_running_emulators", lambda: [{"serial": "emulator-5554", "state": "device", "avdName": "MiniMaster_phone_standard_API_14_1", "androidVersion": "14"}])
 
         result = emulator_manager.ensure_emulator_available("phone-standard", "14")
 
         assert result["reused"] is True
         assert result["serial"] == "emulator-5554"
 
+    def test_ensure_emulator_available_starts_requested_slot_when_other_slot_is_running(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(
+            emulator_manager,
+            "list_running_emulators",
+            lambda: [{"serial": "emulator-5554", "state": "device", "avdName": "MiniMaster_phone_standard_API_14_2", "androidVersion": "14"}],
+        )
+        monkeypatch.setattr(emulator_manager, "list_avds", lambda: ["MiniMaster_phone_standard_API_14_1"])
+        monkeypatch.setattr(emulator_manager, "start_emulator", lambda *args, **kwargs: {"started": True})
+        monkeypatch.setattr(emulator_manager, "wait_for_emulator_ready", lambda serial, timeout_sec=240: {"ready": True, "serial": serial, "androidVersion": "14"})
+        monkeypatch.setattr(emulator_manager, "_wait_for_serial_for_avd_name", lambda avd_name, **kwargs: "emulator-5556")
+
+        result = emulator_manager.ensure_emulator_available("phone-standard", "14", slot=1)
+
+        assert result["reused"] is False
+        assert result["serial"] == "emulator-5556"
+
     def test_ensure_emulator_available_creates_and_waits_for_new_emulator(self, monkeypatch: pytest.MonkeyPatch):
-        running_snapshots = [[], [], [{"serial": "emulator-5556", "state": "device"}]]
         monkeypatch.setattr(emulator_manager, "list_avds", lambda: [])
         monkeypatch.setattr(emulator_manager, "create_avd", lambda avd_name, profile_id, android_version: {"created": True, "avdName": avd_name, "profileId": profile_id, "androidVersion": android_version})
         monkeypatch.setattr(emulator_manager, "start_emulator", lambda *args, **kwargs: {"started": True})
         monkeypatch.setattr(emulator_manager, "wait_for_emulator_ready", lambda serial, timeout_sec=240: {"ready": True, "serial": serial, "androidVersion": "14"})
-        monkeypatch.setattr(emulator_manager, "time", MagicMock(time=lambda: 0, sleep=lambda seconds: None))
-
-        def fake_list_running():
-            return running_snapshots.pop(0) if running_snapshots else [{"serial": "emulator-5556", "state": "device"}]
-
-        monkeypatch.setattr(emulator_manager, "list_running_emulators", fake_list_running)
+        monkeypatch.setattr(emulator_manager, "list_running_emulators", lambda: [])
+        monkeypatch.setattr(emulator_manager, "_wait_for_serial_for_avd_name", lambda avd_name, **kwargs: "emulator-5556")
 
         result = emulator_manager.ensure_emulator_available("phone-standard", "14")
 

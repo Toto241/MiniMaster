@@ -21,20 +21,22 @@ SPEC.loader.exec_module(emulator_orchestrator)
 
 class TestAndroidEmulatorAdapter:
     def test_list_targets_merges_avds_and_running_emulators(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(emulator_orchestrator.emulator_manager, "list_avds", lambda: ["Pixel_8_API_34"])
+        monkeypatch.setattr(emulator_orchestrator.emulator_manager, "list_avds", lambda: ["Pixel_8_API_34", "Pixel_6_API_31"])
         monkeypatch.setattr(
             emulator_orchestrator.emulator_manager,
             "list_running_emulators",
-            lambda: [{"serial": "emulator-5554", "state": "device", "model": "Pixel 8", "androidVersion": "14"}],
+            lambda: [{"serial": "emulator-5554", "state": "device", "model": "Pixel 8", "androidVersion": "14", "avdName": "Pixel_8_API_34"}],
         )
 
         adapter = emulator_orchestrator.AndroidEmulatorAdapter()
         targets = adapter.list_targets()
 
-        assert len(targets) == 1
+        assert len(targets) == 2
         assert targets[0]["platform"] == "android"
         assert targets[0]["target_id"] == "Pixel_8_API_34"
         assert targets[0]["serial"] == "emulator-5554"
+        assert targets[1]["target_id"] == "Pixel_6_API_31"
+        assert targets[1]["state"] == "stopped"
 
     def test_boot_target_starts_emulator_and_waits(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(
@@ -45,7 +47,7 @@ class TestAndroidEmulatorAdapter:
         monkeypatch.setattr(
             emulator_orchestrator.AndroidEmulatorAdapter,
             "_await_serial",
-            lambda self, timeout_sec=240: "emulator-5556",
+            lambda self, avd_name, timeout_sec=240: "emulator-5556",
         )
         monkeypatch.setattr(
             emulator_orchestrator.emulator_manager,
@@ -58,6 +60,21 @@ class TestAndroidEmulatorAdapter:
 
         assert result["ok"] is True
         assert result["details"]["serial"] == "emulator-5556"
+
+    def test_await_serial_uses_avd_name_lookup(self, monkeypatch: pytest.MonkeyPatch):
+        snapshots = iter([None, {"serial": "emulator-5558"}])
+        monkeypatch.setattr(
+            emulator_orchestrator.emulator_manager,
+            "find_running_emulator_by_avd_name",
+            lambda avd_name: next(snapshots),
+        )
+        monkeypatch.setattr(emulator_orchestrator.time, "sleep", lambda _seconds: None)
+        time_values = iter([0, 1, 2])
+        monkeypatch.setattr(emulator_orchestrator.time, "time", lambda: next(time_values))
+
+        adapter = emulator_orchestrator.AndroidEmulatorAdapter()
+
+        assert adapter._await_serial(avd_name="Pixel_8_API_34", timeout_sec=30) == "emulator-5558"
 
     def test_install_artifact_uses_adb_client(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         apk_path = tmp_path / "app-debug.apk"

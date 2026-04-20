@@ -278,6 +278,44 @@ class TestMiniMasterAdminHandlerRoutes:
             },
         )
 
+    def test_do_get_remote_mac_runs_clamps_limit_and_forwards_suite_id(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/commissioning/remote-mac-runs?limit=9999&suiteId=ios-xctest-parent")
+        history_mock = MagicMock(return_value=[{"suiteId": "ios-xctest-parent", "status": "passed"}])
+        latest_mock = MagicMock(return_value={"ios-xctest-parent": {"status": "passed"}})
+        monkeypatch.setattr(app, "load_remote_mac_agent_run_history", history_mock)
+        monkeypatch.setattr(app, "load_latest_remote_mac_agent_runs", latest_mock)
+
+        app.MiniMasterAdminHandler.do_GET(handler)
+
+        history_mock.assert_called_once_with(app.MAX_EVIDENCE_LIMIT, suite_id="ios-xctest-parent")
+        latest_mock.assert_called_once_with()
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "entries": [{"suiteId": "ios-xctest-parent", "status": "passed"}],
+                "latestBySuiteId": {"ios-xctest-parent": {"status": "passed"}},
+                "count": app.MAX_EVIDENCE_LIMIT,
+            },
+        )
+
+    def test_do_post_remote_mac_run_validates_and_persists_entry(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/commissioning/remote-mac-run")
+        payload = {"suiteId": "ios-xctest-parent"}
+        entry = {"entryId": "remote-mac-1", "suiteId": "ios-xctest-parent"}
+        append_mock = MagicMock()
+        handler._read_json_body.return_value = payload
+        monkeypatch.setattr(app, "build_remote_mac_agent_run_entry", lambda current_payload: entry if current_payload == payload else {})
+        monkeypatch.setattr(app, "append_remote_mac_agent_run_log", append_mock)
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        append_mock.assert_called_once_with(entry)
+        handler._write_json.assert_called_once_with(HTTPStatus.CREATED, entry)
+
     def test_do_get_suite_history_clamps_limit_to_http_contract(self, monkeypatch: pytest.MonkeyPatch):
         import app
 
@@ -2291,17 +2329,18 @@ class TestRunAndroidCompatibilityBackground:
             assert _active_suite_runs[run_id]["result"]["summary"]["counts"]["error"] == 1
             assert _active_suite_runs[run_id]["result"]["overallStatus"] == "failed"
 
-    @patch("app.ensure_emulator_pool")
-    @patch("app.run_usb_test")
-    def test_provisions_emulator_when_single_run_uses_auto_serial(self, mock_run_usb, mock_pool, suite_log_file):
+    @patch("app.run_single_device_matrix_entry")
+    def test_provisions_emulator_when_single_run_uses_auto_serial(self, mock_runner, suite_log_file):
         from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
-        from usb_test_runner import UsbTestRunResult
 
         run_id = "compat-auto-single"
-        mock_pool.return_value = [{"serial": "emulator-5554", "androidVersion": "14", "profileId": "phone-large"}]
-        result = UsbTestRunResult(app_id="master", serial="emulator-5554", suite="commissioning")
-        result.overall_status = "passed"
-        mock_run_usb.return_value = result
+        mock_runner.return_value = {
+            "status": "passed",
+            "result": {"overallStatus": "passed"},
+            "provisioning": [{"serial": "emulator-5554", "androidVersion": "14", "profileId": "phone-large"}],
+            "reservationId": "emu-123",
+            "artifacts": {"logcatPath": "logs.txt"},
+        }
 
         with _active_suite_lock:
             _active_suite_runs[run_id] = {"status": "queued"}
@@ -2314,10 +2353,11 @@ class TestRunAndroidCompatibilityBackground:
             "suite": "commissioning",
         })
 
-        mock_pool.assert_called_once()
-        assert mock_run_usb.call_args.kwargs["serial"] == "emulator-5554"
+        mock_runner.assert_called_once()
+        assert mock_runner.call_args.kwargs["serial"] == "auto"
         with _active_suite_lock:
             assert _active_suite_runs[run_id]["subRuns"][0]["provisioning"][0]["serial"] == "emulator-5554"
+            assert _active_suite_runs[run_id]["subRuns"][0]["reservationId"] == "emu-123"
 
     @patch("app.run_usb_test")
     def test_runs_each_selected_test_class_per_android_version(self, mock_run_usb, suite_log_file):
@@ -2355,20 +2395,21 @@ class TestRunAndroidCompatibilityBackground:
         assert sub_runs[0]["testClass"] == "com.minimaster.masterapp.FirstUiTest"
         assert sub_runs[1]["testClass"] == "com.minimaster.masterapp.SecondUiTest"
 
-    @patch("app.ensure_emulator_pool")
-    @patch("app.run_dual_device")
-    def test_provisions_two_emulators_when_dual_run_uses_auto_serials(self, mock_run_dual, mock_pool, suite_log_file):
+    @patch("app.run_dual_device_matrix_entry")
+    def test_provisions_two_emulators_when_dual_run_uses_auto_serials(self, mock_runner, suite_log_file):
         from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
-        from dual_device_runner import DualDeviceResult
 
         run_id = "compat-auto-dual"
-        mock_pool.return_value = [
-            {"serial": "emulator-5554", "androidVersion": "14", "profileId": "dual-device-balanced"},
-            {"serial": "emulator-5556", "androidVersion": "14", "profileId": "dual-device-balanced"},
-        ]
-        result = DualDeviceResult(master_serial="emulator-5554", child_serial="emulator-5556")
-        result.overall_status = "passed"
-        mock_run_dual.return_value = result
+        mock_runner.return_value = {
+            "status": "passed",
+            "result": {"overallStatus": "passed"},
+            "provisioning": [
+                {"serial": "emulator-5554", "androidVersion": "14", "profileId": "dual-device-balanced"},
+                {"serial": "emulator-5556", "androidVersion": "14", "profileId": "dual-device-balanced"},
+            ],
+            "reservationId": "emu-456",
+            "artifacts": {"master": {}, "child": {}},
+        }
 
         with _active_suite_lock:
             _active_suite_runs[run_id] = {"status": "queued"}
@@ -2383,9 +2424,14 @@ class TestRunAndroidCompatibilityBackground:
             "fault_modes": [],
         })
 
-        mock_pool.assert_called_once()
-        assert mock_run_dual.call_args.kwargs["master_serial"] == "emulator-5554"
-        assert mock_run_dual.call_args.kwargs["child_serial"] == "emulator-5556"
+        mock_runner.assert_called_once()
+        assert mock_runner.call_args.kwargs["master_serial"] == "auto"
+        assert mock_runner.call_args.kwargs["child_serial"] == "auto"
+
+        with _active_suite_lock:
+            sub_run = _active_suite_runs[run_id]["subRuns"][0]
+        assert sub_run["reservationId"] == "emu-456"
+        assert sub_run["provisioning"][1]["serial"] == "emulator-5556"
 
     @patch("app.load_dual_device_scenarios")
     @patch("app.run_dual_device")
@@ -2428,32 +2474,41 @@ class TestRunAndroidCompatibilityBackground:
 
 
 class TestRunAndroidAutomationSweepBackground:
-    @patch("app.ensure_emulator_pool")
+    @patch("app.run_dual_device_matrix_entry")
     @patch("app.load_dual_device_scenarios")
     @patch("app.run_dual_device")
+    @patch("app.run_single_device_matrix_entry")
     @patch("app.run_usb_test")
-    def test_runs_master_child_and_dual_jobs_in_single_sweep(self, mock_run_usb, mock_run_dual, mock_scenarios, mock_pool, suite_log_file):
+    def test_runs_master_child_and_dual_jobs_in_single_sweep(self, mock_run_usb, mock_single_runner, mock_run_dual, mock_scenarios, mock_dual_runner, suite_log_file):
         from app import _run_android_automation_sweep_background, _active_suite_runs, _active_suite_lock
-        from dual_device_runner import DualDeviceResult
-        from usb_test_runner import UsbTestRunResult
 
         run_id = "autosweep-test-1"
-        master_result = UsbTestRunResult(app_id="master", serial="emu-1", suite="commissioning")
-        master_result.overall_status = "passed"
-        child_result = UsbTestRunResult(app_id="child", serial="emu-2", suite="commissioning")
-        child_result.overall_status = "passed"
-        dual_result = DualDeviceResult(master_serial="emu-3", child_serial="emu-4")
-        dual_result.overall_status = "passed"
-        mock_pool.side_effect = [
-            [{"serial": "emu-1", "androidVersion": "14", "profileId": "phone-large"}],
-            [{"serial": "emu-2", "androidVersion": "14", "profileId": "phone-large"}],
-            [
+        mock_single_runner.side_effect = [
+            {
+                "status": "passed",
+                "result": {"overallStatus": "passed"},
+                "provisioning": [{"serial": "emu-1", "androidVersion": "14", "profileId": "phone-large"}],
+                "reservationId": "emu-res-1",
+                "artifacts": {"logcatPath": "master-log.txt"},
+            },
+            {
+                "status": "passed",
+                "result": {"overallStatus": "passed"},
+                "provisioning": [{"serial": "emu-2", "androidVersion": "14", "profileId": "phone-large"}],
+                "reservationId": "emu-res-2",
+                "artifacts": {"logcatPath": "child-log.txt"},
+            },
+        ]
+        mock_dual_runner.return_value = {
+            "status": "passed",
+            "result": {"overallStatus": "passed"},
+            "provisioning": [
                 {"serial": "emu-3", "androidVersion": "14", "profileId": "dual-device-balanced"},
                 {"serial": "emu-4", "androidVersion": "14", "profileId": "dual-device-balanced"},
             ],
-        ]
-        mock_run_usb.side_effect = [master_result, child_result]
-        mock_run_dual.return_value = dual_result
+            "reservationId": "emu-res-3",
+            "artifacts": {"master": {}, "child": {}},
+        }
         mock_scenarios.return_value = [{"scenarioId": "pairing", "androidVersions": ["14"]}]
 
         with _active_suite_lock:
@@ -2468,8 +2523,10 @@ class TestRunAndroidAutomationSweepBackground:
             "parallel": True,
         })
 
-        assert mock_run_usb.call_count == 2
-        assert mock_run_dual.call_count == 1
+        mock_run_usb.assert_not_called()
+        mock_run_dual.assert_not_called()
+        assert mock_single_runner.call_count == 2
+        assert mock_dual_runner.call_count == 1
         with _active_suite_lock:
             run_state = _active_suite_runs[run_id]
         assert run_state["status"] == "finished"

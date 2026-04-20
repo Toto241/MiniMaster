@@ -207,6 +207,26 @@ Neutrale Host-Orchestrierung für Emulator-/Simulator-Aktionen mit erster Androi
 
 Die fokussierten Python-Tests liegen in `scripts/tests/test_emulator_orchestrator.py`.
 
+### 8. android_scenario_runner.py
+
+Schmale Runner-Schicht für Android-Matrixläufe auf Basis von `emulator_orchestrator.py`.
+
+- Nutzt Reservierungen und `ensure_emulator_pool(...)` für Auto-Zielzuweisung
+- Führt Single- und Dual-Device-Matrixeinträge mit vorhandenen USB-/Dual-Runnern aus
+- Hängt standardisierte Artefakterzeugung (Logcat, Screenshot, optional Video) direkt an die Läufe
+
+Die fokussierten Python-Tests liegen in `scripts/tests/test_android_scenario_runner.py`.
+
+### 9. remote_mac_agent_contract.py
+
+Separater HTTP-/Persistenz-Vertrag für zukünftige iOS-Läufe über einen Remote-Mac-Agent.
+
+- Typisierte Validierung eingehender Agent-Resultate
+- Getrennte Ablage gegenüber manueller Commissioning-Evidenz
+- Grundlage für einen späteren iOS-Adapter ohne Vermischung mit manuellen Nachweisen
+
+Die fokussierten Python-Tests liegen in `scripts/tests/test_remote_mac_agent_contract.py`.
+
 ## Getting Your Service Account Key
 
 To use the `setup-admin.js` script, you need a service account key:
