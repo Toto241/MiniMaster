@@ -5534,6 +5534,46 @@ def _serialize_android_compatibility_approval(entry: dict[str, object] | None) -
     return _serialize_android_automation_sweep_approval(entry)
 
 
+def _approval_refresh_error(message: str, preflight: dict[str, object]) -> dict[str, object]:
+    return {
+        "error": message,
+        "requiresRefresh": True,
+        "currentPlanHash": str(preflight.get("planHash") or ""),
+        "preflight": preflight,
+    }
+
+
+def _validate_preflight_request_binding(
+    *,
+    payload: dict[str, object],
+    preflight: dict[str, object],
+    suite_label: str,
+    require_approval_id_match: bool,
+) -> dict[str, object] | None:
+    expected_plan_hash = str(payload.get("expectedPlanHash") or "").strip()
+    current_plan_hash = str(preflight.get("planHash") or "").strip()
+    if expected_plan_hash and current_plan_hash and expected_plan_hash != current_plan_hash:
+        return _approval_refresh_error(
+            f"Der serverseitige {suite_label}-Preflight hat sich seit der letzten Ansicht geändert. Bitte Preflight neu laden und Warnlagen erneut prüfen.",
+            preflight,
+        )
+
+    if not require_approval_id_match:
+        return None
+
+    approval_id = str(payload.get("approvalId") or "").strip()
+    if not approval_id:
+        return None
+    active_approval = cast(dict[str, object] | None, preflight.get("activeApproval"))
+    current_approval_id = str((active_approval or {}).get("approvalId") or "").strip()
+    if current_approval_id != approval_id:
+        return _approval_refresh_error(
+            f"Die gespeicherte {suite_label}-Freigabe ist nicht mehr für den aktuellen Plan gültig. Bitte Preflight neu laden und gegebenenfalls erneut freigeben.",
+            preflight,
+        )
+    return None
+
+
 def _build_android_compatibility_preflight(payload: dict[str, object]) -> dict[str, object]:
     execution_mode, android_versions, kwargs = _normalize_android_compatibility_request(payload)
     register = build_testing_register()
@@ -6670,6 +6710,14 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             execution_mode, android_versions, kwargs = _normalize_android_compatibility_request(payload)
             run_id = f"compat-{uuid4().hex[:12]}"
             preflight = _build_android_compatibility_preflight(payload)
+            mismatch_error = _validate_preflight_request_binding(
+                payload=payload,
+                preflight=preflight,
+                suite_label="Android-Kompatibilitäts",
+                require_approval_id_match=True,
+            )
+            if mismatch_error is not None:
+                return self._write_json(HTTPStatus.CONFLICT, mismatch_error)
             if not bool(preflight.get("canStart")):
                 if bool(preflight.get("approvalRequired")) and not bool(preflight.get("hasActiveApproval")):
                     return self._write_json(HTTPStatus.CONFLICT, {
@@ -6742,6 +6790,14 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         try:
             payload = self._read_json_body()
             preflight = _build_android_compatibility_preflight(payload)
+            mismatch_error = _validate_preflight_request_binding(
+                payload=payload,
+                preflight=preflight,
+                suite_label="Android-Kompatibilitäts",
+                require_approval_id_match=False,
+            )
+            if mismatch_error is not None:
+                return self._write_json(HTTPStatus.CONFLICT, mismatch_error)
             if bool(preflight.get("blockingCount")):
                 blocking_reasons = cast(list[dict[str, object]], preflight.get("blockingReasons") or [])
                 blocking_detail = str((blocking_reasons[0] if blocking_reasons else {}).get("detail") or "Der serverseitige Kompatibilitäts-Preflight blockiert die Freigabe.")
@@ -6805,6 +6861,14 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.BAD_REQUEST, {"error": hard_blocker})
 
             preflight = _build_android_automation_sweep_preflight()
+            mismatch_error = _validate_preflight_request_binding(
+                payload=payload,
+                preflight=preflight,
+                suite_label="Android-Automation-Sweep",
+                require_approval_id_match=True,
+            )
+            if mismatch_error is not None:
+                return self._write_json(HTTPStatus.CONFLICT, mismatch_error)
             if not bool(preflight.get("canStart")):
                 if bool(preflight.get("approvalRequired")) and not bool(preflight.get("hasActiveApproval")):
                     return self._write_json(HTTPStatus.CONFLICT, {
@@ -6870,6 +6934,14 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         try:
             payload = self._read_json_body()
             preflight = _build_android_automation_sweep_preflight()
+            mismatch_error = _validate_preflight_request_binding(
+                payload=payload,
+                preflight=preflight,
+                suite_label="Android-Automation-Sweep",
+                require_approval_id_match=False,
+            )
+            if mismatch_error is not None:
+                return self._write_json(HTTPStatus.CONFLICT, mismatch_error)
             if bool(preflight.get("blockingCount")):
                 blocking_reasons = cast(list[dict[str, object]], preflight.get("blockingReasons") or [])
                 blocking_detail = str((blocking_reasons[0] if blocking_reasons else {}).get("detail") or "Der serverseitige Sweep-Preflight blockiert die Freigabe.")

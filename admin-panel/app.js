@@ -224,6 +224,16 @@ let testingRegisterPayload = null;
 let suiteCatalogPayload = [];
 let qaCatalogPayload = null;
 let androidAutomationSweepPreflightPayload = null;
+let androidCompatibilityPreflightPayload = null;
+let androidCompatibilityPreflightRequestSignature = "";
+let androidCompatibilityFormDraft = {
+    executionMode: "single-master",
+    installApk: false,
+    uninstallFirst: false,
+    skipActivation: false,
+    parallel: false,
+    timeoutSec: "3600",
+};
 let suiteRunHistoryPayload = [];
 let qaDashboardLoadPromise = null;
 let qaTestWorkspaceSelection = { kind: "", id: "" };
@@ -3890,6 +3900,184 @@ function buildAdvisorySweepReadiness() {
     };
 }
 
+function getAndroidCompatibilityFormValues() {
+    const currentValues = {
+        executionMode: String(document.getElementById("qa-compat-execution-mode")?.value || androidCompatibilityFormDraft.executionMode || "single-master"),
+        installApk: Boolean(document.getElementById("qa-compat-install-apk")?.checked ?? androidCompatibilityFormDraft.installApk),
+        uninstallFirst: Boolean(document.getElementById("qa-compat-uninstall-first")?.checked ?? androidCompatibilityFormDraft.uninstallFirst),
+        skipActivation: Boolean(document.getElementById("qa-compat-skip-activation")?.checked ?? androidCompatibilityFormDraft.skipActivation),
+        parallel: Boolean(document.getElementById("qa-compat-parallel")?.checked ?? androidCompatibilityFormDraft.parallel),
+        timeoutSec: String(document.getElementById("qa-compat-timeout-sec")?.value || androidCompatibilityFormDraft.timeoutSec || "3600").trim(),
+    };
+    androidCompatibilityFormDraft = { ...androidCompatibilityFormDraft, ...currentValues };
+    return currentValues;
+}
+
+function buildAndroidCompatibilityRequestDraft() {
+    const guideData = buildQaExecutionGuideData(pythonCommissioningCatalog, testingRegisterPayload, suiteCatalogPayload);
+    const sweepPreview = guideData.automationSweep;
+    const values = getAndroidCompatibilityFormValues();
+    const commandBuilderConfig = loadCommandBuilderConfig();
+    const parsedTimeout = Number.parseInt(values.timeoutSec, 10);
+    const timeoutSec = Number.isFinite(parsedTimeout)
+        ? Math.min(14400, Math.max(60, parsedTimeout))
+        : (values.executionMode === "dual-device" ? 7200 : 3600);
+    const scenarioIds = sweepPreview.dualDeviceScenarios
+        .map(entry => String(entry?.scenarioId || "").trim())
+        .filter(Boolean);
+    const deviceConfig = getSuiteRunDeviceConfig();
+    const useConfiguredDualSerials = Boolean(deviceConfig.masterDeviceSerial && deviceConfig.childDeviceSerial && deviceConfig.masterDeviceSerial !== deviceConfig.childDeviceSerial);
+    const dualSerials = useConfiguredDualSerials
+        ? {
+            masterSerial: deviceConfig.masterDeviceSerial,
+            childSerial: deviceConfig.childDeviceSerial,
+        }
+        : {
+            masterSerial: "auto",
+            childSerial: "auto",
+        };
+
+    const basePayload = {
+        executionMode: values.executionMode,
+        androidVersions: Array.isArray(sweepPreview.activeAndroidVersions) ? sweepPreview.activeAndroidVersions : [],
+        installApk: values.installApk,
+        uninstallFirst: values.uninstallFirst,
+    };
+
+    if (values.executionMode === "dual-device") {
+        return {
+            ...basePayload,
+            masterSerial: dualSerials.masterSerial,
+            childSerial: dualSerials.childSerial,
+            parallel: values.parallel,
+            selectedScenarioIds: scenarioIds,
+            selectedTestClasses: [],
+            profileId: "",
+            scenarioId: "",
+            faultModes: [],
+            timeoutSec,
+            masterApkPath: values.installApk ? sanitizeApkPath(commandBuilderConfig.masterApkPath, defaultCommandBuilderConfig.masterApkPath) : "",
+            childApkPath: values.installApk ? sanitizeApkPath(commandBuilderConfig.childApkPath, defaultCommandBuilderConfig.childApkPath) : "",
+        };
+    }
+
+    const apkFallback = values.executionMode === "single-child"
+        ? defaultCommandBuilderConfig.childApkPath
+        : defaultCommandBuilderConfig.masterApkPath;
+    const apkValue = values.executionMode === "single-child"
+        ? commandBuilderConfig.childApkPath
+        : commandBuilderConfig.masterApkPath;
+    return {
+        ...basePayload,
+        serial: "auto",
+        suite: "commissioning",
+        testFilter: "",
+        selectedTestClasses: [],
+        skipActivation: values.skipActivation,
+        timeoutSec,
+        apkPath: values.installApk ? sanitizeApkPath(apkValue, apkFallback) : "",
+    };
+}
+
+function getAndroidCompatibilityPreflightState() {
+    const fallbackReadiness = buildAdvisorySweepReadiness();
+    const draft = buildAndroidCompatibilityRequestDraft();
+    const payload = androidCompatibilityPreflightPayload;
+    const canStartFallback = Array.isArray(draft.androidVersions) && draft.androidVersions.length > 0
+        && (draft.executionMode !== "dual-device" || (Array.isArray(draft.selectedScenarioIds) && draft.selectedScenarioIds.length > 0));
+    if (!payload || typeof payload !== "object") {
+        return {
+            status: fallbackReadiness.status,
+            canStart: canStartFallback,
+            requiresConfirmation: false,
+            approvalRequired: false,
+            hasActiveApproval: false,
+            activeApproval: null,
+            planHash: "",
+            warnings: Array.isArray(fallbackReadiness.warnings) ? fallbackReadiness.warnings : [],
+            warningCount: Number(fallbackReadiness.warningCount || 0),
+            blockingReasons: [],
+            blockingCount: 0,
+            source: "client-fallback",
+        };
+    }
+    return {
+        status: String(payload.status || (payload.blockingCount > 0 ? "blocked" : payload.warningCount > 0 ? "warning" : "ready")),
+        canStart: Boolean(payload.canStart),
+        requiresConfirmation: false,
+        approvalRequired: Boolean(payload.approvalRequired),
+        hasActiveApproval: Boolean(payload.hasActiveApproval),
+        activeApproval: payload.activeApproval && typeof payload.activeApproval === "object" ? payload.activeApproval : null,
+        planHash: String(payload.planHash || ""),
+        warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+        warningCount: Number(payload.warningCount || 0),
+        blockingReasons: Array.isArray(payload.blockingReasons) ? payload.blockingReasons : [],
+        blockingCount: Number(payload.blockingCount || 0),
+        source: "server",
+    };
+}
+
+async function ensureAndroidCompatibilityPreflightLoaded({ forceRefresh = false } = {}) {
+    const payload = buildAndroidCompatibilityRequestDraft();
+    const signature = JSON.stringify(payload);
+    if (!forceRefresh && androidCompatibilityPreflightPayload && androidCompatibilityPreflightRequestSignature === signature) {
+        return getAndroidCompatibilityPreflightState();
+    }
+    try {
+        const response = await fetch("/api/suites/android-compatibility/preflight", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const preflightPayload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(preflightPayload.error || "Kompatibilitäts-Preflight konnte nicht geladen werden.");
+        }
+        androidCompatibilityPreflightPayload = preflightPayload;
+        androidCompatibilityPreflightRequestSignature = signature;
+    } catch (_error) {
+        androidCompatibilityPreflightPayload = null;
+        androidCompatibilityPreflightRequestSignature = "";
+    }
+    return getAndroidCompatibilityPreflightState();
+}
+
+async function requestAndroidCompatibilityApproval() {
+    try {
+        const draft = buildAndroidCompatibilityRequestDraft();
+        const currentState = await ensureAndroidCompatibilityPreflightLoaded({ forceRefresh: true });
+        const response = await fetch("/api/suites/android-compatibility/approve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                ...draft,
+                approvedBy: "qa-admin-panel",
+                expectedPlanHash: String(currentState.planHash || ""),
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const error = new Error(payload.error || "Kompatibilitäts-Freigabe konnte nicht gespeichert werden.");
+            error.requiresRefresh = Boolean(payload.requiresRefresh);
+            error.currentPreflight = payload.preflight || null;
+            throw error;
+        }
+        androidCompatibilityPreflightPayload = payload;
+        androidCompatibilityPreflightRequestSignature = JSON.stringify(draft);
+        rerenderQaExecutionGuideFromCache();
+        showNotification("Kompatibilitäts-Warnlagen serverseitig freigegeben.", "success");
+        return getAndroidCompatibilityPreflightState();
+    } catch (error) {
+        if (error?.requiresRefresh && error.currentPreflight) {
+            androidCompatibilityPreflightPayload = error.currentPreflight;
+            androidCompatibilityPreflightRequestSignature = JSON.stringify(buildAndroidCompatibilityRequestDraft());
+            rerenderQaExecutionGuideFromCache();
+        }
+        showNotification("Kompatibilitäts-Freigabe fehlgeschlagen: " + error.message, "error");
+        return getAndroidCompatibilityPreflightState();
+    }
+}
+
 function getAndroidAutomationSweepPreflightState() {
     const fallbackReadiness = buildAdvisorySweepReadiness();
     const automationSweep = buildQaExecutionGuideData(
@@ -3920,6 +4108,7 @@ function getAndroidAutomationSweepPreflightState() {
         approvalRequired: Boolean(payload.approvalRequired),
         hasActiveApproval: Boolean(payload.hasActiveApproval),
         activeApproval: payload.activeApproval && typeof payload.activeApproval === "object" ? payload.activeApproval : null,
+        planHash: String(payload.planHash || ""),
         warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
         warningCount: Number(payload.warningCount || 0),
         blockingReasons: Array.isArray(payload.blockingReasons) ? payload.blockingReasons : [],
@@ -3948,19 +4137,35 @@ async function ensureAndroidAutomationSweepPreflightLoaded() {
 }
 
 async function requestAndroidAutomationSweepApproval() {
-    const response = await fetch("/api/suites/android-automation-sweep/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvedBy: "qa-admin-panel" }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        throw new Error(payload.error || "Sweep-Freigabe konnte nicht gespeichert werden.");
+    try {
+        const currentState = getAndroidAutomationSweepPreflightState();
+        const response = await fetch("/api/suites/android-automation-sweep/approve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                approvedBy: "qa-admin-panel",
+                expectedPlanHash: String(currentState.planHash || ""),
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const error = new Error(payload.error || "Sweep-Freigabe konnte nicht gespeichert werden.");
+            error.requiresRefresh = Boolean(payload.requiresRefresh);
+            error.currentPreflight = payload.preflight || null;
+            throw error;
+        }
+        androidAutomationSweepPreflightPayload = payload;
+        rerenderQaExecutionGuideFromCache();
+        showNotification("Sweep-Warnlagen serverseitig freigegeben.", "success");
+        return getAndroidAutomationSweepPreflightState();
+    } catch (error) {
+        if (error?.requiresRefresh && error.currentPreflight) {
+            androidAutomationSweepPreflightPayload = error.currentPreflight;
+            rerenderQaExecutionGuideFromCache();
+        }
+        showNotification("Sweep-Freigabe fehlgeschlagen: " + error.message, "error");
+        return getAndroidAutomationSweepPreflightState();
     }
-    androidAutomationSweepPreflightPayload = payload;
-    rerenderQaExecutionGuideFromCache();
-    showNotification("Sweep-Warnlagen serverseitig freigegeben.", "success");
-    return getAndroidAutomationSweepPreflightState();
 }
 
 async function loadSuiteGuideData() {
@@ -3984,6 +4189,8 @@ async function loadSuiteGuideData() {
     } catch (_error) {
         qaCatalogPayload = null;
     }
+    androidCompatibilityPreflightPayload = null;
+    androidCompatibilityPreflightRequestSignature = "";
     try {
         const sweepPreflightResponse = await fetch("/api/suites/android-automation-sweep/preflight", {
             headers: { "Accept": "application/json" },
@@ -4062,6 +4269,8 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
 
     const sweepPreview = data.automationSweep;
     const sweepReadiness = getAndroidAutomationSweepPreflightState();
+    const compatibilityDraft = buildAndroidCompatibilityRequestDraft();
+    const compatibilityReadiness = getAndroidCompatibilityPreflightState();
     const activeVersionsText = sweepPreview.activeAndroidVersions.length > 0
         ? `Android ${escapeHtml(sweepPreview.activeAndroidVersions.join(", "))}`
         : "Keine aktiven Android-Versionen im QA-Katalog gefunden.";
@@ -4072,6 +4281,44 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
     const scenarioText = scenarioPreview.length > 0
         ? escapeHtml(scenarioPreview.join(" · "))
         : "Keine Dual-Device-Szenarien im QA-Katalog sichtbar.";
+    const compatibilityModeLabel = compatibilityDraft.executionMode === "dual-device"
+        ? "Dual-Device"
+        : compatibilityDraft.executionMode === "single-child"
+            ? "Kind-App"
+            : "Eltern-App";
+    const activeAndroidApprovals = [
+        sweepReadiness.hasActiveApproval && sweepReadiness.activeApproval
+            ? {
+                title: "Android-Automation-Sweep",
+                detail: `Freigegeben durch ${String(sweepReadiness.activeApproval.approvedBy || "-")} bis ${String(sweepReadiness.activeApproval.expiresAt || "-")}`,
+            }
+            : null,
+        compatibilityReadiness.hasActiveApproval && compatibilityReadiness.activeApproval
+            ? {
+                title: `Android-Kompatibilität (${compatibilityModeLabel})`,
+                detail: `Freigegeben durch ${String(compatibilityReadiness.activeApproval.approvedBy || "-")} bis ${String(compatibilityReadiness.activeApproval.expiresAt || "-")}`,
+            }
+            : null,
+    ].filter(Boolean);
+    const approvalOverviewHtml = `
+        <article class='qa-guide-card'>
+            <div class='qa-guide-card-header'>
+                <div>
+                    <h4>Aktive Android-Freigaben</h4>
+                    <p>Zentrale Sicht auf serverseitig aktive Freigaben für aktuelle Android-QA-Konfigurationen.</p>
+                </div>
+                <span class='python-bucket-count'>${escapeHtml(String(activeAndroidApprovals.length))} aktiv</span>
+            </div>
+            ${activeAndroidApprovals.length > 0
+                ? `<div class='qa-guide-group-list'>${activeAndroidApprovals.map(item => `
+                    <div class='qa-guide-group-item'>
+                        <strong>${escapeHtml(item.title)}</strong>
+                        <div class='python-muted-caption'>${escapeHtml(item.detail)}</div>
+                    </div>
+                `).join("")}</div>`
+                : `<p class='python-muted-caption'>Zur aktuellen Sweep- und Kompatibilitäts-Konfiguration liegt noch keine aktive serverseitige Freigabe vor.</p>`}
+        </article>
+    `;
     const sweepDisabledAttr = !isPythonOperator || !sweepPreview.canStart || sweepReadiness.canStart === false ? "disabled" : "";
     const sweepApprovalRequiredHtml = sweepReadiness.approvalRequired && !sweepReadiness.hasActiveApproval
         ? `
@@ -4181,8 +4428,123 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 </div>
             </article>
         `;
+    const compatibilityDisabledAttr = !isPythonOperator || compatibilityReadiness.canStart === false ? "disabled" : "";
+    const compatibilityApprovalRequiredHtml = compatibilityReadiness.approvalRequired && !compatibilityReadiness.hasActiveApproval
+        ? `
+            <article class='qa-register-callout qa-register-callout-warning'>
+                <div>
+                    <strong>Kompatibilitäts-Warnlagen müssen serverseitig freigegeben werden</strong>
+                    <p>Der aktuelle Kompatibilitätsplan bleibt gesperrt, bis die serverseitige Warnlagen-Freigabe für diese Konfiguration gespeichert wurde.</p>
+                </div>
+                <button class='btn btn-secondary btn-sm' onclick="requestAndroidCompatibilityApproval()">Warnlagen freigeben</button>
+            </article>
+        `
+        : "";
+    const compatibilityActiveApproval = compatibilityReadiness.activeApproval;
+    const compatibilityApprovalActiveHtml = compatibilityReadiness.hasActiveApproval && compatibilityActiveApproval
+        ? `
+            <article class='qa-register-callout qa-register-callout-success'>
+                <div>
+                    <strong>Kompatibilitäts-Warnlagen serverseitig freigegeben</strong>
+                    <p>Freigegeben durch ${escapeHtml(String(compatibilityActiveApproval.approvedBy || "-"))} bis ${escapeHtml(String(compatibilityActiveApproval.expiresAt || "-"))}.</p>
+                </div>
+            </article>
+        `
+        : "";
+    const compatibilityBlockingHtml = compatibilityReadiness.blockingCount > 0
+        ? `
+            <div class='qa-register-callout-stack'>
+                ${compatibilityReadiness.blockingReasons.map(reason => `
+                    <article class='qa-register-callout qa-register-callout-${escapeHtml(String(reason.tone || "danger"))}'>
+                        <div>
+                            <strong>${escapeHtml(reason.title)}</strong>
+                            <p>${escapeHtml(reason.detail)}</p>
+                        </div>
+                    </article>
+                `).join("")}
+            </div>
+        `
+        : "";
+    const compatibilityReadinessHtml = compatibilityReadiness.warningCount > 0
+        ? `
+            <div class='qa-register-callout-stack'>
+                ${compatibilityReadiness.warnings.map(warning => `
+                    <article class='qa-register-callout qa-register-callout-${escapeHtml(String(warning.tone || "info"))}'>
+                        <div>
+                            <strong>${escapeHtml(warning.title)}</strong>
+                            <p>${escapeHtml(warning.detail)}</p>
+                        </div>
+                        <button class='btn btn-secondary btn-sm' onclick="${warning.action}">${escapeHtml(warning.actionLabel)}</button>
+                    </article>
+                `).join("")}
+            </div>
+        `
+        : `
+            <article class='qa-register-callout qa-register-callout-success'>
+                <div>
+                    <strong>Kompatibilitäts-Readiness ohne akute QA-Warnsignale</strong>
+                    <p>Register, Android-Verlauf und Katalog liefern aktuell keine zusätzlichen Warnhinweise für den gewählten Kompatibilitätslauf.</p>
+                </div>
+            </article>
+        `;
+    const compatibilityDetailsHtml = !sweepPreview.catalogLoaded
+        ? `<p class='python-muted-caption'>QA-Katalog noch nicht geladen. Die Kompatibilitäts-Vorschau wird nach dem nächsten Suite-Refresh ergänzt.</p>`
+        : `
+            <div class='qa-guide-group-list'>
+                <div class='qa-guide-group-item'>
+                    <strong>Ausführungsmodus</strong>
+                    <span>${escapeHtml(compatibilityModeLabel)}</span>
+                    <div class='python-muted-caption'>Aktive Android-Versionen: ${activeVersionsText}</div>
+                </div>
+                <div class='qa-guide-group-item'>
+                    <strong>Dual-Device-Szenarien</strong>
+                    <span>${escapeHtml(String(sweepPreview.dualDeviceScenarios.length))} Szenarien</span>
+                    <div class='python-muted-caption'>${scenarioText}</div>
+                </div>
+                <div class='qa-guide-group-item'>
+                    <strong>Aktueller Plan</strong>
+                    <span>${escapeHtml(String(compatibilityDraft.androidVersions?.length || 0))} Android-Versionen</span>
+                    <div class='python-muted-caption'>Dual-Device nutzt automatisch alle katalogsichtbaren Szenarien. Einzel-App-Läufe verwenden den Commissioning-USB-Pfad mit Auto-Serial.</div>
+                </div>
+            </div>
+        `;
+    const compatibilityOptionFormHtml = `
+        <div class='python-automation-toolbar'>
+            <label>
+                <span>Modus</span>
+                <select id='qa-compat-execution-mode'>
+                    <option value='single-master' ${compatibilityDraft.executionMode === "single-master" ? "selected" : ""}>Eltern-App</option>
+                    <option value='single-child' ${compatibilityDraft.executionMode === "single-child" ? "selected" : ""}>Kind-App</option>
+                    <option value='dual-device' ${compatibilityDraft.executionMode === "dual-device" ? "selected" : ""}>Dual-Device</option>
+                </select>
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-compat-install-apk' ${compatibilityDraft.installApk ? "checked" : ""} />
+                APKs vor dem Lauf installieren
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-compat-uninstall-first' ${compatibilityDraft.uninstallFirst ? "checked" : ""} />
+                Vorher deinstallieren
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-compat-skip-activation' ${compatibilityDraft.skipActivation ? "checked" : ""} />
+                Aktivierungsschritte überspringen
+            </label>
+            <label class='setup-checklist-item python-inline-check'>
+                <input type='checkbox' id='qa-compat-parallel' ${compatibilityDraft.parallel ? "checked" : ""} />
+                Dual-Device parallel ausführen
+            </label>
+            <label>
+                <span>Timeout (Sek.)</span>
+                <input type='number' id='qa-compat-timeout-sec' min='60' max='14400' step='60' value='${escapeHtml(String(compatibilityDraft.timeoutSec || "3600"))}' />
+            </label>
+        </div>
+    `;
 
     container.innerHTML = `
+        <div class='qa-guide-grid'>
+            ${approvalOverviewHtml}
+        </div>
         <div class='qa-guide-grid'>
             <article class='qa-guide-card'>
                 <div class='qa-guide-card-header'>
@@ -4237,6 +4599,27 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
                 <div class='setup-actions mm-u031'>
                     <button class='btn btn-secondary btn-sm' onclick="startAndroidAutomationSweep()" ${sweepDisabledAttr}>Sweep starten</button>
+                    <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
+                </div>
+            </article>
+            <article class='qa-guide-card'>
+                <div class='qa-guide-card-header'>
+                    <div>
+                        <h4>5. Android-Kompatibilität</h4>
+                        <p>Gezielter Kompatibilitätslauf über aktive Android-Versionen. Dual-Device nutzt denselben serverseitigen Freigabepfad wie der Sweep.</p>
+                    </div>
+                    <span class='python-bucket-count'>${escapeHtml(compatibilityModeLabel)}</span>
+                </div>
+                ${compatibilityDetailsHtml}
+                ${compatibilityBlockingHtml}
+                ${compatibilityReadinessHtml}
+                ${compatibilityApprovalRequiredHtml}
+                ${compatibilityApprovalActiveHtml}
+                ${compatibilityOptionFormHtml}
+                <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
+                <div class='setup-actions mm-u031'>
+                    <button class='btn btn-secondary btn-sm' onclick="ensureAndroidCompatibilityPreflightLoaded({ forceRefresh: true }).then(() => rerenderQaExecutionGuideFromCache())">Preflight aktualisieren</button>
+                    <button class='btn btn-secondary btn-sm' onclick="startAndroidCompatibilityRun()" ${compatibilityDisabledAttr}>Kompatibilität starten</button>
                     <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
                 </div>
             </article>
@@ -4842,6 +5225,7 @@ function buildAndroidAutomationSweepRequest() {
         endpoint: "/api/suites/android-automation-sweep",
         body: {
             approvalId: sweepReadiness.hasActiveApproval ? String(sweepReadiness.activeApproval?.approvalId || "") : "",
+            expectedPlanHash: String(sweepReadiness.planHash || ""),
             installApk: values.installApk,
             uninstallFirst: values.uninstallFirst,
             skipActivation: values.skipActivation,
@@ -4864,7 +5248,13 @@ async function queueSuiteRunRequest(request, errorPrefix = "Suite-Start fehlgesc
         body: JSON.stringify(request.body),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || errorPrefix || "Suite konnte nicht gestartet werden.");
+    if (!res.ok) {
+        const error = new Error(data.error || errorPrefix || "Suite konnte nicht gestartet werden.");
+        error.requiresRefresh = Boolean(data.requiresRefresh);
+        error.currentPlanHash = String(data.currentPlanHash || "");
+        error.currentPreflight = data.preflight || null;
+        throw error;
+    }
     const startedAt = new Date().toISOString();
     const approvalWarnings = Array.isArray(data.approvalWarnings) ? data.approvalWarnings : [];
     suiteRunHistoryPayload = [
@@ -4927,7 +5317,58 @@ async function startAndroidAutomationSweep() {
         const request = buildAndroidAutomationSweepRequest();
         await queueSuiteRunRequest(request, "Android-Automation-Sweep konnte nicht gestartet werden.");
     } catch (err) {
+        if (err?.requiresRefresh && err.currentPreflight) {
+            androidAutomationSweepPreflightPayload = err.currentPreflight;
+            rerenderQaExecutionGuideFromCache();
+        }
         showNotification("Android-Automation-Sweep fehlgeschlagen: " + err.message, "error");
+    }
+}
+
+function buildAndroidCompatibilityRequest() {
+    const draft = buildAndroidCompatibilityRequestDraft();
+    const readiness = getAndroidCompatibilityPreflightState();
+    return {
+        endpoint: "/api/suites/android-compatibility",
+        body: {
+            ...draft,
+            approvalId: readiness.hasActiveApproval ? String(readiness.activeApproval?.approvalId || "") : "",
+            expectedPlanHash: String(readiness.planHash || ""),
+        },
+        historySuiteId: "android-compatibility",
+        historyType: "android-compatibility",
+        displayLabel: `Android-Kompatibilität ${String(draft.executionMode || "single-master")}`,
+        notificationLabel: "Android-Kompatibilitätslauf",
+    };
+}
+
+async function startAndroidCompatibilityRun() {
+    if (!isPythonOperator) return;
+    try {
+        const readiness = await ensureAndroidCompatibilityPreflightLoaded({ forceRefresh: true });
+        if (readiness.canStart === false) {
+            if (readiness.approvalRequired && !readiness.hasActiveApproval) {
+                showNotification("Android-Kompatibilität wartet auf eine serverseitige Warnlagen-Freigabe.", "info");
+                return;
+            }
+            const blocker = Array.isArray(readiness.blockingReasons) && readiness.blockingReasons.length > 0
+                ? readiness.blockingReasons[0]
+                : null;
+            showNotification(
+                `Android-Kompatibilität blockiert: ${String(blocker?.detail || blocker?.title || "Serverseitiger Preflight nicht erfüllt.")}`,
+                "error",
+            );
+            return;
+        }
+        const request = buildAndroidCompatibilityRequest();
+        await queueSuiteRunRequest(request, "Android-Kompatibilitätslauf konnte nicht gestartet werden.");
+    } catch (err) {
+        if (err?.requiresRefresh && err.currentPreflight) {
+            androidCompatibilityPreflightPayload = err.currentPreflight;
+            androidCompatibilityPreflightRequestSignature = JSON.stringify(buildAndroidCompatibilityRequestDraft());
+            rerenderQaExecutionGuideFromCache();
+        }
+        showNotification("Android-Kompatibilität fehlgeschlagen: " + err.message, "error");
     }
 }
 

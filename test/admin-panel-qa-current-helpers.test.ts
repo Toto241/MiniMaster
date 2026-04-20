@@ -223,6 +223,7 @@ describe("admin-panel current QA helpers", () => {
         endpoint: "/api/suites/android-automation-sweep",
         body: {
           approvalId: "",
+          expectedPlanHash: "",
           installApk: true,
           uninstallFirst: true,
           skipActivation: false,
@@ -234,6 +235,52 @@ describe("admin-panel current QA helpers", () => {
         historySuiteId: "android-automation-sweep",
         historyType: "android-automation-sweep",
       });
+    });
+  });
+
+  it("builds the Android compatibility request from guide options and command builder defaults", () => {
+    const { exports, elements } = loadAdminPanelTestExports({
+      operatorCommandBuilderConfig: JSON.stringify({
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      }),
+    });
+
+    elements.set("qa-compat-execution-mode", { value: "dual-device" });
+    elements.set("qa-compat-install-apk", { checked: true });
+    elements.set("qa-compat-uninstall-first", { checked: true });
+    elements.set("qa-compat-skip-activation", { checked: false });
+    elements.set("qa-compat-parallel", { checked: true });
+    elements.set("qa-compat-timeout-sec", { value: "9000" });
+
+    exports.setQaCatalogPayloadForTests({
+      androidMatrix: [{ androidVersion: "14", status: "active" }],
+      deviceProfiles: [{ profileId: "standard" }],
+      dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+      androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+    });
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+
+    expect(exports.buildAndroidCompatibilityRequest()).toMatchObject({
+      endpoint: "/api/suites/android-compatibility",
+      body: {
+        executionMode: "dual-device",
+        androidVersions: ["14"],
+        approvalId: "",
+        expectedPlanHash: "",
+        installApk: true,
+        uninstallFirst: true,
+        parallel: true,
+        timeoutSec: 9000,
+        masterSerial: "auto",
+        childSerial: "auto",
+        selectedScenarioIds: ["pairing"],
+        masterApkPath: "masterApp/custom-master.apk",
+        childApkPath: "childApp/custom-child.apk",
+      },
+      historySuiteId: "android-compatibility",
+      historyType: "android-compatibility",
     });
   });
 
@@ -284,8 +331,58 @@ describe("admin-panel current QA helpers", () => {
     await exports.loadSuiteGuideData();
 
     expect(guideEl.innerHTML).toContain("4. Android-Automation-Sweep");
+    expect(guideEl.innerHTML).toContain("5. Android-Kompatibilität");
     expect(guideEl.innerHTML).toContain("Sweep starten");
+    expect(guideEl.innerHTML).toContain("Kompatibilität starten");
     expect(guideEl.innerHTML).toContain("Android 14");
+  });
+
+  it("renders a central active Android approval overview", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const guideEl = createDomSinkElement();
+    elements.set("qa-start-guide", guideEl);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    exports.setSuiteCatalogPayloadForTests([{ suiteId: "android-unit-master", title: "Android Unit Master", prereqsMet: true }]);
+    exports.setQaCatalogPayloadForTests({
+      androidMatrix: [{ androidVersion: "14", status: "active" }],
+      deviceProfiles: [{ profileId: "standard" }],
+      dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+      androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+    });
+    exports.setAndroidAutomationSweepPreflightPayloadForTests({
+      status: "approved",
+      canStart: true,
+      planHash: "plan-hash-1",
+      approvalRequired: true,
+      hasActiveApproval: true,
+      activeApproval: { approvalId: "sweep-approval-1", approvedBy: "qa-admin-panel", approvedAt: "2026-04-20T10:00:00Z", expiresAt: "2026-04-20T18:00:00Z", warningIds: ["register-blockers-open"], planHash: "plan-hash-1" },
+      warningCount: 1,
+      warnings: [{ id: "register-blockers-open", tone: "danger", title: "Warnung", detail: "Warnung." }],
+      blockingCount: 0,
+      blockingReasons: [],
+    });
+    exports.setAndroidCompatibilityPreflightPayloadForTests({
+      status: "approved",
+      canStart: true,
+      planHash: "compat-plan-hash-1",
+      approvalRequired: true,
+      hasActiveApproval: true,
+      activeApproval: { approvalId: "compat-approval-1", approvedBy: "qa-admin-panel", approvedAt: "2026-04-20T10:00:00Z", expiresAt: "2026-04-20T18:00:00Z", warningIds: ["register-blockers-open"], planHash: "compat-plan-hash-1" },
+      warningCount: 1,
+      warnings: [{ id: "register-blockers-open", tone: "danger", title: "Warnung", detail: "Warnung." }],
+      blockingCount: 0,
+      blockingReasons: [],
+    });
+
+    exports.renderQaExecutionGuide({ groups: [] }, { items: [] }, [{ suiteId: "android-unit-master", title: "Android Unit Master", prereqsMet: true }]);
+
+    expect(guideEl.innerHTML).toContain("Aktive Android-Freigaben");
+    expect(guideEl.innerHTML).toContain("Android-Automation-Sweep");
+    expect(guideEl.innerHTML).toContain("Android-Kompatibilität");
   });
 
   it("renders server-side sweep blockers directly in the guide and disables the start button", () => {
