@@ -699,11 +699,18 @@ class TestMiniMasterAdminHandlerRoutes:
             "selectedScenarioIds": ["pairing"],
         })
         monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: {
-            "status": "ready",
+            "status": "approved",
             "canStart": True,
-            "approvalRequired": False,
-            "hasActiveApproval": False,
-            "activeApproval": None,
+            "approvalRequired": True,
+            "hasActiveApproval": True,
+            "activeApproval": {
+                "approvalId": "sweep-approval-1",
+                "approvedAt": "2026-04-20T10:00:00Z",
+                "approvedBy": "qa-admin-panel",
+                "expiresAt": "2026-04-20T18:00:00Z",
+                "warningIds": ["register-blockers-open"],
+                "planHash": "plan-hash-1",
+            },
             "warningCount": 0,
             "warnings": [],
             "blockingCount": 0,
@@ -731,6 +738,10 @@ class TestMiniMasterAdminHandlerRoutes:
                 "masterTestClasses": ["master.PairingTest"],
                 "childTestClasses": ["child.PairingTest"],
                 "selectedScenarioIds": ["pairing"],
+                "approvalId": "sweep-approval-1",
+                "approvedAt": "2026-04-20T10:00:00Z",
+                "approvedBy": "qa-admin-panel",
+                "approvalWarnings": ["register-blockers-open"],
             },
         )
         fake_thread.start.assert_called_once_with()
@@ -739,6 +750,10 @@ class TestMiniMasterAdminHandlerRoutes:
         assert queued["type"] == "android-automation-sweep"
         assert queued["executionMode"] == "all-automated"
         assert queued["androidVersions"] == ["10", "14"]
+        assert queued["approvalId"] == "sweep-approval-1"
+        assert queued["approvedAt"] == "2026-04-20T10:00:00Z"
+        assert queued["approvedBy"] == "qa-admin-panel"
+        assert queued["approvalWarnings"] == ["register-blockers-open"]
 
     def test_do_post_android_automation_sweep_rejects_warning_state_without_active_approval(self, monkeypatch: pytest.MonkeyPatch):
         import app

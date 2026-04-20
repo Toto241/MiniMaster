@@ -6637,6 +6637,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             "masterTestClasses": kwargs["master_test_classes"],
             "childTestClasses": kwargs["child_test_classes"],
             "selectedScenarioIds": kwargs["selected_scenario_ids"],
+            "approvalId": str((active_approval or {}).get("approvalId") or ""),
+            "approvedAt": str((active_approval or {}).get("approvedAt") or ""),
+            "approvedBy": str((active_approval or {}).get("approvedBy") or ""),
+            "approvalWarnings": list(cast(list[str], (active_approval or {}).get("warningIds") or [])),
         })
 
     def _handle_android_automation_sweep_approve(self) -> None:

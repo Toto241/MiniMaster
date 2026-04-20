@@ -329,6 +329,7 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  requestAndroidAutomationSweepApproval,",
     "  buildAndroidAutomationSweepRequest,",
     "  buildSuiteRunRequest,",
+    "  formatSuiteHistoryMeta,",
     "  startAndroidAutomationSweep,",
     "  startSuiteRun,",
     "  loadSuiteGuideData,",
