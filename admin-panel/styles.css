@@ -2042,6 +2042,40 @@ input:focus, select:focus, textarea:focus {
         linear-gradient(180deg, #ffffff, #f8fbff);
 }
 
+.qa-secondary-card {
+    background: linear-gradient(180deg, #fbfdff, #f8fafc);
+}
+
+.qa-secondary-details {
+    display: grid;
+    gap: 14px;
+}
+
+.qa-secondary-details summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.qa-secondary-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.qa-secondary-details summary small {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.qa-secondary-details:not([open]) {
+    gap: 0;
+}
+
 .qa-workspace-header h3,
 .qa-workspace-panel-header h4 {
     margin: 0 0 4px;
