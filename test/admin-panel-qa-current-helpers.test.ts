@@ -573,4 +573,61 @@ describe("admin-panel current QA helpers", () => {
     expect(failuresEl.innerHTML).toContain("Register Item");
     expect(runOverviewEl.innerHTML).toContain("Python-Commissioning run-1");
   });
+
+  it("renders structured Android suite run details in the QA workspace", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const runOverviewEl = { innerHTML: "" };
+    const failuresEl = { innerHTML: "" };
+    const detailEl = { innerHTML: "" };
+    elements.set("qa-test-run-overview", runOverviewEl);
+    elements.set("qa-test-failures", failuresEl);
+    elements.set("qa-test-detail", detailEl);
+    elements.set("qa-test-copy-compact-btn", { disabled: false });
+    elements.set("qa-test-copy-debug-btn", { disabled: false });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningLastRunForTests(null);
+    exports.setPythonCommissioningHistoryRunsForTests([]);
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    exports.setSuiteRunHistoryPayloadForTests([
+      {
+        runId: "compat-android-1",
+        type: "android-compatibility",
+        status: "finished",
+        executionMode: "dual-device",
+        androidVersions: ["14"],
+        selectedScenarioIds: ["offline-online-resync"],
+        result: {
+          overall_status: "failed",
+          summary: { counts: { total: 2, passed: 1, failed: 1, error: 0, skipped: 0 } },
+        },
+        subRuns: [
+          {
+            androidVersion: "14",
+            scenarioId: "offline-online-resync",
+            status: "passed",
+            provisioning: [
+              { serial: "emulator-5554", androidVersion: "14", profileId: "dual-device-balanced" },
+              { serial: "emulator-5556", androidVersion: "14", profileId: "dual-device-balanced" },
+            ],
+            artifacts: {
+              master: { logcatPath: "logs/master.txt", screenshotPath: "images/master.png" },
+              child: { logcatPath: "logs/child.txt" },
+            },
+            result: { overallStatus: "passed" },
+          },
+        ],
+      },
+    ]);
+
+    exports.renderQaTestWorkspace();
+
+    expect(runOverviewEl.innerHTML).toContain("Android-Kompatibilität: Dual-Device");
+    expect(detailEl.innerHTML).toContain("Android-Laufkontext");
+    expect(detailEl.innerHTML).toContain("Sub-Läufe und Artefakte");
+    expect(detailEl.innerHTML).toContain("offline-online-resync");
+    expect(detailEl.innerHTML).toContain("emulator-5554");
+    expect(detailEl.innerHTML).toContain("logs/master.txt");
+  });
 });

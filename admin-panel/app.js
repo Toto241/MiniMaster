@@ -2814,6 +2814,165 @@ function renderQaTestWorkspaceList(container, items, selected, emptyMessage) {
     `;
 }
 
+function formatSuiteRunStatusLabel(status) {
+    const normalized = String(status || "offen").trim().toLowerCase();
+    if (["passed", "pass", "ok", "success"].includes(normalized)) return "Bestanden";
+    if (["failed", "fail"].includes(normalized)) return "Fehlgeschlagen";
+    if (["error", "errored"].includes(normalized)) return "Fehler";
+    if (["skipped", "skip"].includes(normalized)) return "Übersprungen";
+    if (normalized === "running") return "Laufend";
+    if (normalized === "queued") return "Wartend";
+    if (normalized === "pending") return "Ausstehend";
+    return normalized ? normalized.toUpperCase() : "Offen";
+}
+
+function collectSuiteRunArtifactEntries(value, prefix = "") {
+    if (!value || typeof value !== "object") return [];
+    const entries = [];
+    Object.entries(value).forEach(([key, entryValue]) => {
+        const nextPrefix = prefix ? `${prefix} > ${key}` : key;
+        if (typeof entryValue === "string") {
+            entries.push({ label: nextPrefix, value: entryValue });
+            return;
+        }
+        if (Array.isArray(entryValue)) {
+            entryValue.forEach((item, index) => {
+                if (typeof item === "string") {
+                    entries.push({ label: `${nextPrefix} #${index + 1}`, value: item });
+                }
+            });
+            return;
+        }
+        if (entryValue && typeof entryValue === "object") {
+            entries.push(...collectSuiteRunArtifactEntries(entryValue, nextPrefix));
+        }
+    });
+    return entries;
+}
+
+function renderSuiteRunStructuredDetail(item) {
+    const run = item?.raw;
+    if (!run || item?.kind !== "suite-run") return "";
+
+    const type = String(run?.type || run?.suiteId || run?.suite_id || "");
+    if (type !== "android-compatibility" && type !== "android-automation-sweep") {
+        return "";
+    }
+
+    const executionMode = String(run?.executionMode || run?.result?.executionMode || "").trim();
+    const androidVersions = Array.isArray(run?.androidVersions)
+        ? run.androidVersions
+        : Array.isArray(run?.result?.androidVersions)
+            ? run.result.androidVersions
+            : [];
+    const selectedScenarioIds = Array.isArray(run?.selectedScenarioIds)
+        ? run.selectedScenarioIds
+        : Array.isArray(run?.result?.selectedScenarioIds)
+            ? run.result.selectedScenarioIds
+            : [];
+    const masterTestClasses = Array.isArray(run?.masterTestClasses)
+        ? run.masterTestClasses
+        : Array.isArray(run?.result?.masterTestClasses)
+            ? run.result.masterTestClasses
+            : [];
+    const childTestClasses = Array.isArray(run?.childTestClasses)
+        ? run.childTestClasses
+        : Array.isArray(run?.result?.childTestClasses)
+            ? run.result.childTestClasses
+            : [];
+    const subRuns = Array.isArray(run?.subRuns)
+        ? run.subRuns
+        : Array.isArray(run?.result?.subRuns)
+            ? run.result.subRuns
+            : [];
+
+    const topMeta = [
+        buildQaTestWorkspaceMeta("Ausführung", executionMode || "-"),
+        buildQaTestWorkspaceMeta("Android", androidVersions.length > 0 ? androidVersions.join(", ") : "-"),
+        buildQaTestWorkspaceMeta("Szenarien", selectedScenarioIds.length > 0 ? String(selectedScenarioIds.length) : "0"),
+        buildQaTestWorkspaceMeta("Master-Tests", masterTestClasses.length > 0 ? String(masterTestClasses.length) : "0"),
+        buildQaTestWorkspaceMeta("Child-Tests", childTestClasses.length > 0 ? String(childTestClasses.length) : "0"),
+        buildQaTestWorkspaceMeta("Sub-Läufe", subRuns.length > 0 ? String(subRuns.length) : "0")
+    ].filter(Boolean).join("");
+
+    const selectionParts = [];
+    if (selectedScenarioIds.length > 0) {
+        selectionParts.push(`<div><strong>Szenarien</strong><br />${escapeHtml(selectedScenarioIds.join(", "))}</div>`);
+    }
+    if (masterTestClasses.length > 0) {
+        selectionParts.push(`<div><strong>Master-Tests</strong><br />${escapeHtml(masterTestClasses.join(", "))}</div>`);
+    }
+    if (childTestClasses.length > 0) {
+        selectionParts.push(`<div><strong>Child-Tests</strong><br />${escapeHtml(childTestClasses.join(", "))}</div>`);
+    }
+
+    const subRunHtml = subRuns.length > 0
+        ? `
+            <div class='qa-register-card-list'>
+                ${subRuns.map((subRun, index) => {
+                    const provisioning = Array.isArray(subRun?.provisioning) ? subRun.provisioning : [];
+                    const artifactEntries = collectSuiteRunArtifactEntries(subRun?.artifacts || {});
+                    const provisioningLabel = provisioning.length > 0
+                        ? provisioning.map(entry => {
+                            const serial = String(entry?.serial || entry?.targetId || "-");
+                            const version = String(entry?.androidVersion || "").trim();
+                            const profileId = String(entry?.profileId || "").trim();
+                            return [serial, version ? `Android ${version}` : "", profileId || ""].filter(Boolean).join(" · ");
+                        }).join("; ")
+                        : "Keine Provisioning-Daten";
+                    const summaryParts = [
+                        String(subRun?.androidVersion || "").trim() ? `Android ${String(subRun.androidVersion).trim()}` : "",
+                        String(subRun?.appId || "").trim() ? `App ${String(subRun.appId).trim()}` : "",
+                        String(subRun?.scenarioId || "").trim() ? `Szenario ${String(subRun.scenarioId).trim()}` : "",
+                        String(subRun?.testClass || "").trim() ? `Test ${String(subRun.testClass).trim()}` : ""
+                    ].filter(Boolean).join(" · ");
+                    const detailText = String(subRun?.result?.reason || subRun?.result?.error || subRun?.status || "Keine Details");
+                    const badgeMeta = getSuiteRunStatusMeta({ status: subRun?.status, result: subRun?.result });
+                    return `
+                        <article class='qa-register-item-card suite-run-card'>
+                            <div class='qa-register-item-header'>
+                                <div>
+                                    <h6>Sub-Lauf ${escapeHtml(String(index + 1))}</h6>
+                                    <div class='python-muted-caption'>${escapeHtml(summaryParts || "Kein Scope hinterlegt")}</div>
+                                </div>
+                                <span class='python-status-badge ${escapeHtml(badgeMeta.className)}'>${escapeHtml(formatSuiteRunStatusLabel(subRun?.status || subRun?.result?.overallStatus || subRun?.result?.overall_status))}</span>
+                            </div>
+                            <p class='qa-register-item-detail suite-run-detail'>${escapeHtml(detailText)}</p>
+                            <div class='qa-register-item-grid'>
+                                <div>
+                                    <span class='qa-register-item-label'>Provisioning</span>
+                                    <strong>${escapeHtml(provisioningLabel)}</strong>
+                                </div>
+                                <div>
+                                    <span class='qa-register-item-label'>Artefakte</span>
+                                    <strong>${escapeHtml(String(artifactEntries.length))}</strong>
+                                </div>
+                            </div>
+                            ${artifactEntries.length > 0 ? `
+                                <div class='python-muted-caption'>
+                                    ${artifactEntries.slice(0, 6).map(entry => `${escapeHtml(entry.label)}: ${escapeHtml(entry.value)}`).join("<br />")}
+                                </div>
+                            ` : ""}
+                        </article>
+                    `;
+                }).join("")}
+            </div>
+        `
+        : "<div class='info'>Noch keine Sub-Läufe für diesen Android-Lauf protokolliert.</div>";
+
+    return `
+        <div class='qa-test-detail-block'>
+            <strong>Android-Laufkontext</strong>
+            <div class='qa-test-detail-meta'>${topMeta}</div>
+            ${selectionParts.length > 0 ? `<div class='qa-register-item-grid'>${selectionParts.join("")}</div>` : ""}
+        </div>
+        <div class='qa-test-detail-block'>
+            <strong>Sub-Läufe und Artefakte</strong>
+            ${subRunHtml}
+        </div>
+    `;
+}
+
 function renderQaTestWorkspaceDetail(container, item) {
     if (!container) return;
     if (!item) {
@@ -2829,6 +2988,7 @@ function renderQaTestWorkspaceDetail(container, item) {
     ].filter(Boolean).join("");
 
     const rawDebug = escapeHtml(JSON.stringify(item.raw, null, 2));
+    const structuredDetailHtml = renderSuiteRunStructuredDetail(item);
     const secondaryActionHtml = item.secondaryAction && item.secondaryActionLabel
         ? `<button type='button' class='btn btn-secondary btn-sm' onclick="${item.secondaryAction}">${escapeHtml(item.secondaryActionLabel)}</button>`
         : "";
@@ -2843,6 +3003,7 @@ function renderQaTestWorkspaceDetail(container, item) {
             <strong>Fehler- oder Statusdetail</strong>
             <p>${escapeHtml(item.detail || "Keine Detailbeschreibung vorhanden.")}</p>
         </div>
+        ${structuredDetailHtml}
         <div class='setup-actions' style='margin-top: 12px'>
             <button type='button' class='btn btn-secondary btn-sm' onclick='openSelectedQaTestWorkspaceItem()'>${escapeHtml(item.primaryActionLabel || "Öffnen")}</button>
             ${secondaryActionHtml}
