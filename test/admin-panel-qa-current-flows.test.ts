@@ -21,7 +21,7 @@ describe("admin-panel current QA flows", () => {
     context.renderPythonAutomationProtocolEditor = jest.fn();
     context.rerenderTestingRegisterFromCache = jest.fn();
 
-    fetchMock.mockResolvedValue({
+    fetchMock.mockResolvedValueOnce({
       ok: true,
       json: jest.fn().mockResolvedValue({
         entries: [
@@ -39,19 +39,81 @@ describe("admin-panel current QA flows", () => {
         },
       }),
     });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        entries: [
+          {
+            suiteId: "ios-xctest-parent",
+            status: "passed",
+            host: "mac-mini-01",
+            xcodeVersion: "16.4",
+            startedAt: "2026-04-07T13:10:00Z",
+            logsRef: "logs/ios-parent.log",
+            evidenceTargetId: "ios-xctest-parent",
+            destination: { name: "iPhone 15" },
+            artifacts: [{ kind: "xcresult", path: "artifacts/parent.xcresult", label: "xcresult" }],
+          },
+        ],
+        latestBySuiteId: {
+          "ios-xctest-parent": { status: "passed" },
+        },
+      }),
+    });
 
     exports.setPythonOperatorRuntimeForTests(true);
     exports.resetQaRefreshStateForTests();
     const result = await exports.loadPythonAutomationEvidenceHistory();
 
-    expect(result).toMatchObject({ ok: true, message: "1 Nachweise geladen." });
+    expect(result).toMatchObject({ ok: true });
     expect(historyEl.innerHTML).toContain("EVID-777");
+    expect(historyEl.innerHTML).toContain("Remote-Mac-Läufe");
+    expect(historyEl.innerHTML).toContain("mac-mini-01");
+    expect(historyEl.innerHTML).toContain("logs/ios-parent.log");
     expect(context.renderPythonAutomationOverview).toHaveBeenCalled();
     expect(context.renderPythonAutomationCatalog).toHaveBeenCalled();
     expect(context.renderQaTestWorkspace).toHaveBeenCalled();
     expect(context.renderPythonAutomationProtocolEditor).toHaveBeenCalled();
     expect(context.rerenderTestingRegisterFromCache).toHaveBeenCalled();
     expect(refreshEl.innerHTML).toContain("Nachweise geladen");
+  });
+
+  it("keeps evidence history visible when remote Mac history loading fails", async () => {
+    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
+
+    const historyEl = { innerHTML: "" };
+    elements.set("python-automation-protocol-history", historyEl);
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          entries: [
+            {
+              createdAt: "2026-04-07T13:00:00Z",
+              testId: "ios-xctest-parent",
+              testTitle: "iOS XCTest Parent",
+              status: "pass",
+              operator: "qa-operator",
+              evidenceRef: "EVID-777",
+            },
+          ],
+          latestByTestId: {
+            "ios-xctest-parent": { status: "pass", evidenceRef: "EVID-777" },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: jest.fn().mockResolvedValue({ error: "Remote-Agent offline" }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    const result = await exports.loadPythonAutomationEvidenceHistory();
+
+    expect(result).toMatchObject({ ok: true });
+    expect(historyEl.innerHTML).toContain("EVID-777");
+    expect(historyEl.innerHTML).toContain("Remote-Mac-Historie konnte nicht geladen werden: Remote-Agent offline");
   });
 
   it("keeps the QA dashboard orchestration at five core loaders", () => {
