@@ -222,6 +222,7 @@ describe("admin-panel current QA helpers", () => {
       expect(exports.buildAndroidAutomationSweepRequest()).toMatchObject({
         endpoint: "/api/suites/android-automation-sweep",
         body: {
+          approvalId: "",
           installApk: true,
           uninstallFirst: true,
           skipActivation: false,
@@ -337,6 +338,28 @@ describe("admin-panel current QA helpers", () => {
     expect(guideEl.innerHTML).toContain("ADB ist nicht verfügbar.");
     expect(guideEl.innerHTML).toContain("Sweep starten");
     expect(guideEl.innerHTML).toContain("disabled");
+  });
+
+  it("adds approval metadata to Android sweep history meta lines", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    const meta = exports.formatSuiteHistoryMeta({
+      type: "android-automation-sweep",
+      androidVersions: ["14"],
+      approvedBy: "qa-admin-panel",
+      approvedAt: "2026-04-20T10:00:00Z",
+      approvalWarnings: ["register-blockers-open"],
+      result: {
+        summary: {
+          counts: { total: 2, passed: 2, failed: 0, error: 0, skipped: 0 },
+        },
+      },
+    });
+
+    expect(meta).toContain("Android 14");
+    expect(meta).toContain("PASS 2 · FAIL 0 · ERROR 0 · SKIP 0");
+    expect(meta).toContain("Freigabe qa-admin-panel");
+    expect(meta).toContain("1 Warnung(en) freigegeben");
   });
 
   it("derives advisory sweep readiness from catalog, register and recent Android run failures", () => {

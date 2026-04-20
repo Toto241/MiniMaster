@@ -4865,21 +4865,34 @@ async function queueSuiteRunRequest(request, errorPrefix = "Suite-Start fehlgesc
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || errorPrefix || "Suite konnte nicht gestartet werden.");
+    const startedAt = new Date().toISOString();
+    const approvalWarnings = Array.isArray(data.approvalWarnings) ? data.approvalWarnings : [];
     suiteRunHistoryPayload = [
         {
             suiteId: request.historySuiteId,
             type: request.historyType,
             runId: data.runId,
             status: "running",
-            startedAt: new Date().toISOString(),
+            startedAt,
             result: { status: "running" },
+            approvalId: String(data.approvalId || ""),
+            approvedAt: String(data.approvedAt || ""),
+            approvedBy: String(data.approvedBy || ""),
+            approvalWarnings,
         },
         ...suiteRunHistoryPayload.filter(item => String(item?.runId || item?.run_id || "") !== String(data.runId || "")),
     ];
     rerenderQaExecutionGuideFromCache();
     showNotification(`${request.notificationLabel} gestartet (Run-ID: ${data.runId}).`, "success");
     pollSuiteRunStatus(data.runId);
-    appendSuiteActiveRun(data.runId, request.displayLabel);
+    appendSuiteActiveRun(data.runId, request.displayLabel, {
+        runId: data.runId,
+        startedAt,
+        approvalId: String(data.approvalId || ""),
+        approvedAt: String(data.approvedAt || ""),
+        approvedBy: String(data.approvedBy || ""),
+        approvalWarnings,
+    });
 }
 
 async function startSuiteRun(suiteId) {
@@ -5031,6 +5044,30 @@ function formatSuiteHistoryTitle(run) {
     return modeLabel;
 }
 
+function formatSuiteApprovalMeta(run) {
+    const approvalId = String(run?.approvalId || "").trim();
+    const approvedBy = String(run?.approvedBy || "").trim();
+    const approvedAt = String(run?.approvedAt || "").trim();
+    const approvalWarnings = Array.isArray(run?.approvalWarnings) ? run.approvalWarnings : [];
+    if (!approvalId && !approvedBy && !approvedAt && approvalWarnings.length === 0) {
+        return "";
+    }
+
+    const parts = [];
+    if (approvedBy) {
+        parts.push(`Freigabe ${approvedBy}`);
+    } else if (approvalId) {
+        parts.push(`Freigabe ${approvalId}`);
+    }
+    if (approvedAt) {
+        parts.push(`seit ${approvedAt}`);
+    }
+    if (approvalWarnings.length > 0) {
+        parts.push(`${approvalWarnings.length} Warnung(en) freigegeben`);
+    }
+    return parts.join(" · ");
+}
+
 function formatSuiteHistoryMeta(run) {
     const type = String(run?.type || run?.suiteId || run?.suite_id || "");
     if (type !== "android-compatibility" && type !== "android-automation-sweep") {
@@ -5050,14 +5087,19 @@ function formatSuiteHistoryMeta(run) {
     if (Number(summary.total || 0) > 0) {
         parts.push(`PASS ${Number(summary.passed || 0)} · FAIL ${Number(summary.failed || 0)} · ERROR ${Number(summary.error || 0)} · SKIP ${Number(summary.skipped || 0)}`);
     }
+    const approvalMeta = formatSuiteApprovalMeta(run);
+    if (approvalMeta) {
+        parts.push(approvalMeta);
+    }
     return parts.join(" · ");
 }
 
 
-function appendSuiteActiveRun(runId, label) {
+function appendSuiteActiveRun(runId, label, run = null) {
     const el = document.getElementById("suite-active-runs");
     if (!el) return;
     if (el.querySelector(".info")) el.innerHTML = "";
+    const footerParts = [String(run?.startedAt || "").trim(), formatSuiteApprovalMeta(run)].filter(Boolean);
     const row = document.createElement("article");
     row.className = "qa-register-item-card suite-run-card";
     row.id = `suite-run-${runId}`;
@@ -5070,7 +5112,7 @@ function appendSuiteActiveRun(runId, label) {
         </div>
         <p class="qa-register-item-detail suite-run-detail">...</p>
         <div class="qa-register-item-footer">
-            <span class="python-muted-caption"></span>
+            <span class="python-muted-caption">${escapeHtml(footerParts.join(" · "))}</span>
             <code class="suite-run-code">${escapeHtml(runId)}</code>
         </div>
     `;
@@ -5104,7 +5146,10 @@ function pollSuiteRunStatus(runId) {
                         detail.textContent = data.lastEvent?.message || data.currentPhase || data.startedAt || "...";
                     }
                     if (footerCaption) {
-                        footerCaption.textContent = data.startedAt || existingRun?.startedAt || "";
+                        footerCaption.textContent = [
+                            data.startedAt || existingRun?.startedAt || "",
+                            formatSuiteApprovalMeta(mergedRun),
+                        ].filter(Boolean).join(" · ");
                     }
                     suiteRunHistoryPayload = [
                         mergedRun,
@@ -5120,7 +5165,10 @@ function pollSuiteRunStatus(runId) {
                     }
                     if (detail) detail.textContent = data.result?.reason || data.result?.error || data.error || resultStatus || "";
                     if (footerCaption) {
-                        footerCaption.textContent = data.startedAt || existingRun?.startedAt || "";
+                        footerCaption.textContent = [
+                            data.startedAt || existingRun?.startedAt || "",
+                            formatSuiteApprovalMeta(mergedRun),
+                        ].filter(Boolean).join(" · ");
                     }
                     suiteRunHistoryPayload = [
                         mergedRun,
@@ -5175,7 +5223,7 @@ async function loadSuiteRunHistory() {
             return { ok: true, message: "Keine Testläufe vorhanden." };
         }
         if (historyEl) {
-            historyEl.innerHTML = renderSuiteRunCards(runs.slice(0, 50), "Keine Testläufe in der Historie.");
+            historyEl.innerHTML = renderSuiteRunCards(runs, "Keine Testläufe vorhanden.");
         }
         loadTestingRegister();
         renderQaTestWorkspace();
