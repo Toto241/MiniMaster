@@ -970,7 +970,24 @@ class TestMiniMasterAdminHandlerRoutes:
         create_job_mock.assert_not_called()
         enqueue_job_mock.assert_not_called()
 
-    def test_do_post_android_compatibility_rejects_missing_dual_serials(self):
+    def test_do_post_android_compatibility_rejects_explicit_single_serial(self):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility")
+        handler._read_json_body.return_value = {
+            "executionMode": "single-master",
+            "androidVersions": ["14"],
+            "serial": "emulator-5554",
+        }
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.BAD_REQUEST,
+            {"error": "Android-Kompatibilitätsläufe unterstützen nur auto-provisionierte Emulatoren."},
+        )
+
+    def test_do_post_android_compatibility_rejects_explicit_dual_serials(self):
         import app
 
         handler = self._make_handler("/api/suites/android-compatibility")
@@ -978,13 +995,14 @@ class TestMiniMasterAdminHandlerRoutes:
             "executionMode": "dual-device",
             "androidVersions": ["14"],
             "masterSerial": "MASTER-1",
+            "childSerial": "CHILD-1",
         }
 
         app.MiniMasterAdminHandler.do_POST(handler)
 
         handler._write_json.assert_called_once_with(
             HTTPStatus.BAD_REQUEST,
-            {"error": "masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich."},
+            {"error": "Android-Kompatibilitätsläufe unterstützen nur auto-provisionierte Emulatoren."},
         )
 
     def test_do_post_android_automation_sweep_queues_catalog_driven_run(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -2298,18 +2316,25 @@ class TestRunDualDeviceBackground:
 
 
 class TestRunAndroidCompatibilityBackground:
-    @patch("app.run_usb_test")
-    def test_collects_subruns_and_summary(self, mock_run_usb, suite_log_file):
+    @patch("app.run_single_device_matrix_entry")
+    def test_collects_subruns_and_summary(self, mock_runner, suite_log_file):
         from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
-        from usb_test_runner import UsbTestRunResult
 
         run_id = "compat-test-1"
-        first = UsbTestRunResult(app_id="master", serial="A", suite="commissioning")
-        first.overall_status = "passed"
-        second = UsbTestRunResult(app_id="master", serial="A", suite="commissioning")
-        second.overall_status = "error"
-        second.error = "Version mismatch"
-        mock_run_usb.side_effect = [first, second]
+        mock_runner.side_effect = [
+            {
+                "status": "passed",
+                "result": {"overallStatus": "passed"},
+                "provisioning": [{"serial": "emulator-5554"}],
+                "artifacts": {"logcatPath": "run-1.txt"},
+            },
+            {
+                "status": "error",
+                "result": {"overallStatus": "error", "error": "Version mismatch"},
+                "provisioning": [{"serial": "emulator-5556"}],
+                "artifacts": {"logcatPath": "run-2.txt"},
+            },
+        ]
 
         with _active_suite_lock:
             _active_suite_runs[run_id] = {"status": "queued"}
@@ -2318,7 +2343,7 @@ class TestRunAndroidCompatibilityBackground:
             "execution_mode": "single-master",
             "android_versions": ["10", "14"],
             "app_id": "master",
-            "serial": "DEVICE-1",
+            "serial": "auto",
             "suite": "commissioning",
         })
 
@@ -2357,19 +2382,17 @@ class TestRunAndroidCompatibilityBackground:
         assert mock_runner.call_args.kwargs["serial"] == "auto"
         with _active_suite_lock:
             assert _active_suite_runs[run_id]["subRuns"][0]["provisioning"][0]["serial"] == "emulator-5554"
-            assert _active_suite_runs[run_id]["subRuns"][0]["reservationId"] == "emu-123"
+            assert "reservationId" not in _active_suite_runs[run_id]["subRuns"][0]
 
-    @patch("app.run_usb_test")
-    def test_runs_each_selected_test_class_per_android_version(self, mock_run_usb, suite_log_file):
+    @patch("app.run_single_device_matrix_entry")
+    def test_runs_each_selected_test_class_per_android_version(self, mock_runner, suite_log_file):
         from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
-        from usb_test_runner import UsbTestRunResult
 
         run_id = "compat-selected-tests"
-        first = UsbTestRunResult(app_id="master", serial="DEVICE-1", suite="commissioning")
-        first.overall_status = "passed"
-        second = UsbTestRunResult(app_id="master", serial="DEVICE-1", suite="commissioning")
-        second.overall_status = "passed"
-        mock_run_usb.side_effect = [first, second]
+        mock_runner.side_effect = [
+            {"status": "passed", "result": {"overallStatus": "passed"}, "provisioning": [{"serial": "emulator-5554"}], "artifacts": {}},
+            {"status": "passed", "result": {"overallStatus": "passed"}, "provisioning": [{"serial": "emulator-5554"}], "artifacts": {}},
+        ]
 
         with _active_suite_lock:
             _active_suite_runs[run_id] = {"status": "queued"}
@@ -2378,7 +2401,7 @@ class TestRunAndroidCompatibilityBackground:
             "execution_mode": "single-master",
             "android_versions": ["14"],
             "app_id": "master",
-            "serial": "DEVICE-1",
+            "serial": "auto",
             "suite": "commissioning",
             "selected_test_classes": [
                 "com.minimaster.masterapp.FirstUiTest",
@@ -2386,9 +2409,9 @@ class TestRunAndroidCompatibilityBackground:
             ],
         })
 
-        assert mock_run_usb.call_count == 2
-        assert mock_run_usb.call_args_list[0].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.FirstUiTest"]
-        assert mock_run_usb.call_args_list[1].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.SecondUiTest"]
+        assert mock_runner.call_count == 2
+        assert mock_runner.call_args_list[0].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.FirstUiTest"]
+        assert mock_runner.call_args_list[1].kwargs["selected_test_classes"] == ["com.minimaster.masterapp.SecondUiTest"]
         with _active_suite_lock:
             sub_runs = _active_suite_runs[run_id]["subRuns"]
         assert len(sub_runs) == 2
@@ -2430,21 +2453,19 @@ class TestRunAndroidCompatibilityBackground:
 
         with _active_suite_lock:
             sub_run = _active_suite_runs[run_id]["subRuns"][0]
-        assert sub_run["reservationId"] == "emu-456"
+        assert "reservationId" not in sub_run
         assert sub_run["provisioning"][1]["serial"] == "emulator-5556"
 
     @patch("app.load_dual_device_scenarios")
-    @patch("app.run_dual_device")
-    def test_runs_each_selected_dual_scenario_for_matching_android_version(self, mock_run_dual, mock_scenarios, suite_log_file):
+    @patch("app.run_dual_device_matrix_entry")
+    def test_runs_each_selected_dual_scenario_for_matching_android_version(self, mock_runner, mock_scenarios, suite_log_file):
         from app import _run_android_compatibility_background, _active_suite_runs, _active_suite_lock
-        from dual_device_runner import DualDeviceResult
 
         run_id = "compat-selected-scenarios"
-        first = DualDeviceResult(master_serial="M1", child_serial="C1")
-        first.overall_status = "passed"
-        second = DualDeviceResult(master_serial="M1", child_serial="C1")
-        second.overall_status = "passed"
-        mock_run_dual.side_effect = [first, second]
+        mock_runner.side_effect = [
+            {"status": "passed", "result": {"overallStatus": "passed"}, "provisioning": [{"serial": "emulator-5554"}, {"serial": "emulator-5556"}], "artifacts": {}},
+            {"status": "passed", "result": {"overallStatus": "passed"}, "provisioning": [{"serial": "emulator-5554"}, {"serial": "emulator-5556"}], "artifacts": {}},
+        ]
         mock_scenarios.return_value = [
             {"scenarioId": "offline-online-resync", "androidVersions": ["14"]},
             {"scenarioId": "pairing-code-expiry", "androidVersions": ["14", "15"]},
@@ -2457,16 +2478,16 @@ class TestRunAndroidCompatibilityBackground:
         _run_android_compatibility_background(run_id, {
             "execution_mode": "dual-device",
             "android_versions": ["14"],
-            "master_serial": "M1",
-            "child_serial": "C1",
+            "master_serial": "auto",
+            "child_serial": "auto",
             "selected_scenario_ids": ["offline-online-resync", "pairing-code-expiry", "legacy-only"],
             "profile_id": "dual-device-balanced",
             "fault_modes": [],
         })
 
-        assert mock_run_dual.call_count == 2
-        assert mock_run_dual.call_args_list[0].kwargs["scenario_id"] == "offline-online-resync"
-        assert mock_run_dual.call_args_list[1].kwargs["scenario_id"] == "pairing-code-expiry"
+        assert mock_runner.call_count == 2
+        assert mock_runner.call_args_list[0].kwargs["scenario_id"] == "offline-online-resync"
+        assert mock_runner.call_args_list[1].kwargs["scenario_id"] == "pairing-code-expiry"
         with _active_suite_lock:
             sub_runs = _active_suite_runs[run_id]["subRuns"]
         assert len(sub_runs) == 2

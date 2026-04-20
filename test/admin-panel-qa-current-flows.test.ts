@@ -247,6 +247,8 @@ describe("admin-panel current QA flows", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(exports.buildAndroidCompatibilityRequest().body.executionMode).toBe("dual-device");
+    expect(exports.buildAndroidCompatibilityRequest().body.masterSerial).toBe("auto");
+    expect(exports.buildAndroidCompatibilityRequest().body.childSerial).toBe("auto");
     expect(notificationEl.textContent).toContain("Android-Kompatibilität: Dual-Device");
     expect(notificationEl.className).toBe("notification info");
   });
