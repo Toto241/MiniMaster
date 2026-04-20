@@ -2,7 +2,7 @@
 
 **Status:** Consolidated evidence register for release candidate approval.
 
-Current synthesis note (2026-04-17): Repo-side remediation remains complete. The previously confirmed Web-Control legal/re-consent gap is now closed repo-side and backed by a green targeted browser test run (`npx jest test/web-control-ui.test.ts --runInBand`, 19/19 passed on 2026-04-17). A fresh CI revalidation with reruns requested is now in progress; CodeQL and Android CI currently show `queued / pending`, so final blocker classification for those two workflows is pending until the runs complete. The release remains blocked by the still-missing final deploy evidence and the remaining external go-live operations. A local deploy was not executed from this workspace because Firebase CLI/project access is present, but runtime secrets/config for a production-grade Functions deploy are not available locally (`.env` / `.runtimeconfig.json` absent). See [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md) and [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md).
+Current synthesis note (2026-04-20): Repo-side remediation remains complete, including the Android-QA approval and preflight hardening in the admin workflow. The remaining Android commissioning blocker is no longer a repo defect but missing local emulator runtime readiness: this Windows host has the Android SDK, emulator binary, debug secrets and debug APKs, but currently no AVD profile and no local `avdmanager`/`sdkmanager` tooling to create one. As a result, single-emulator Android commissioning/E2E could not be executed from this workspace yet, and iOS continues to require an external macOS/Xcode run. The release therefore remains blocked by missing commissioning evidence, final deploy evidence and the remaining external go-live operations. See [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md), [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md), [iOS_BUILD_REFERENCE.md](iOS_BUILD_REFERENCE.md) and [AUTOMATED_COMMISSIONING_TEST_RUNNER.md](AUTOMATED_COMMISSIONING_TEST_RUNNER.md).
 
 ## 1. Purpose
 
@@ -38,7 +38,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 | Checklist Key | Result | Evidence Link | Tester | Date |
 | --------------- | -------- | --------------- | -------- | ------ |
-| android-apps (pairing + sync) | ⬜ | build/test-automation/latest-summary.json (android-connected-master/android-connected-child skipped: No connected Android device or emulator detected via adb.) | Automated + Device Owner pending | 2026-04-05 |
+| android-apps (pairing + sync) | ⬜ | build/test-automation/latest-summary.json shows the Android device suites still skipped because no connected Android device or emulator is visible via adb; local validation on 2026-04-20 additionally confirmed that this Windows host has no AVD profile and no local avdmanager/sdkmanager to create the required single emulator yet | Automated + QA/Operations pending | 2026-04-20 |
 | `ai-config` (AI setup + generation) | ⬜ | Betriebsnachweis fuer produktiven Provider/Fallback noch offen | Engineering + Product/Ops | offen |
 | `support-workflow` (ticket lifecycle) | ✅ | build/test-automation/latest-summary.json (`backend-jest` inkl. e2e-ticket-lifecycle) | Automated | 2026-03-29 |
 | `compliance-flow` (DSAR + audit) | ✅ | test/enforcement-automation.test.ts | Automated | 2026-03-19 |
@@ -107,7 +107,7 @@ Aktuelle Priorisierung siehe: [RELEASE_P0_P1_EXECUTION_PLAN_2026-04-06.md](RELEA
 | GitHub Actions Billing/Spending-Limit bereinigen | Aktuelle Revalidation zeigt fuer CodeQL und Android CI laufende Reruns (`queued / pending`); finale Billing-/Code-Scanning-Klassifikation steht noch aus, siehe [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md) | ⬜ | Repo Owner | offen |
 | CodeQL-Ergebnis verlinken | Frischer Rerun [24559307544](https://github.com/Toto241/MiniMaster/actions/runs/24559307544) laeuft noch; belastbarer gruener Nachweis fehlt bis zum Abschluss weiter, siehe [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md) | ⬜ | Engineering Owner | offen |
 | Android CI Build-Nachweis verlinken | Frischer Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) laeuft noch; belastbarer gruener Nachweis fehlt bis zum Abschluss weiter, siehe [CI_REVALIDATION_LATEST.md](CI_REVALIDATION_LATEST.md) | ⬜ | Engineering Owner | offen |
-| Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST | ⬜ | QA/Operations | offen |
+| Physische Commissioning-Checks durchführen | Ausgefüllte COMMISSIONING_ACCEPTANCE_CHECKLIST; aktuell weiter offen, weil auf dem Windows-Host zwar Emulator-Binary, Debug-Secrets und Debug-APKs vorhanden sind, aber noch kein AVD und keine lokalen AVD-Manager-Tools für den geforderten Single-Emulator-Lauf | ⬜ | QA/Operations | offen |
 | On-call/Eskalations-Roster verbindlich benennen | Roster mit Namen, Kontakt, Vertretung (operationalisierte Vorlage in [ONCALL_ESCALATION_ROSTER.md](ONCALL_ESCALATION_ROSTER.md); Inhalte offen) | ⬜ | Operations Lead | offen |
 
 ## 7. Current Priority Execution Plan (Owner-Driven)

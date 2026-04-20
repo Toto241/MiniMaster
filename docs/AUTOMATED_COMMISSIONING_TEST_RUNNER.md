@@ -3,6 +3,11 @@
 Dieses Setup automatisiert die commissioning-relevanten Android-Tests auf zwei physischen Geraeten
 (Eltern-App + Kinder-App) unter Nutzung der abgesicherten Debug-Schnittstelle.
 
+Fuer Windows-Hosts mit genau einem Android-Emulator ist zusaetzlich ein vorbereitender Single-Emulator-Pfad moeglich:
+Die Master- und Child-Commissioning-Suites werden dabei nacheinander gegen dieselbe ADB-Serial ausgefuehrt.
+Dieser Nachweis ist operativ nuetzlich, ersetzt aber nicht automatisch das finale Physical-Commissioning-Sign-off
+auf echter Zielumgebung oder einen externen iOS-Nachweis auf macOS/Xcode.
+
 ## Voraussetzungen
 
 - Zwei per USB angeschlossene Android-Geraete
@@ -34,6 +39,21 @@ Dieses Setup automatisiert die commissioning-relevanten Android-Tests auf zwei p
 pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial <MASTER_SERIAL> -Suite commissioning
 pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial <CHILD_SERIAL> -Suite commissioning
 ```
+
+### Einzel-Emulator (vorbereitender Windows-Pfad)
+
+Wenn genau ein Emulator verfuegbar ist, koennen Master und Child sequenziell gegen dieselbe Serial geprueft werden:
+
+```powershell
+pwsh -File scripts/run-usb-tests.ps1 -AppId master -AdbSerial <EMULATOR_SERIAL> -Suite commissioning -InstallApk
+pwsh -File scripts/run-usb-tests.ps1 -AppId child -AdbSerial <EMULATOR_SERIAL> -Suite commissioning -InstallApk
+```
+
+Hinweis:
+
+- Dieser Pfad belegt Single-Device-Commissioning auf einem Emulator.
+- Pairing-/Sync- oder Dual-Device-Aussagen muessen weiterhin separat auf echter oder dualer Testumgebung verifiziert werden.
+- iOS-Laeufe werden dadurch nicht ersetzt; sie bleiben externe macOS-/Xcode-Nachweise.
 
 ### Einzel-App mit APK-Installation
 
