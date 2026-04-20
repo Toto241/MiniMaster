@@ -229,6 +229,66 @@ class AdbClient:
         args.append(str(apk_path))
         return self.run(args, timeout=120)
 
+    def open_deep_link(self, url: str, package: str | None = None, wait_for_launch: bool = True) -> AdbResult:
+        """Öffnet einen Deep Link über den Activity Manager."""
+        args = ["shell", "am", "start"]
+        if wait_for_launch:
+            args.append("-W")
+        args.extend(["-a", "android.intent.action.VIEW", "-d", url])
+        if package:
+            args.append(package)
+        return self.run(args, timeout=30)
+
+    def capture_logcat(self, tag: str | None = None, since_seconds: int = 5, max_lines: int | None = None) -> AdbResult:
+        """Liest Logcat-Ausgabe optional gefiltert nach Tag."""
+        args = ["logcat", "-d", "-T", str(since_seconds)]
+        if tag:
+            args.extend(["-s", f"{tag}:D"])
+        result = self.run(args, timeout=30)
+        if not result.ok or max_lines is None:
+            return result
+        lines = result.stdout.splitlines()
+        trimmed = "\n".join(lines[-max_lines:])
+        return AdbResult(result.returncode, trimmed + ("\n" if trimmed else ""), result.stderr)
+
+    def capture_screenshot(self, destination: str | Path) -> AdbResult:
+        """Erstellt einen PNG-Screenshot direkt auf dem Host."""
+        target = Path(destination)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        cmd = self._base_cmd() + ["exec-out", "screencap", "-p"]
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return AdbResult(124, "", "ADB-Befehl Timeout nach 30s")
+        except FileNotFoundError:
+            return AdbResult(127, "", f"{_adb_binary()} nicht gefunden im PATH")
+
+        stdout = proc.stdout or b""
+        stderr = (proc.stderr or b"").decode("utf-8", errors="replace")
+        if proc.returncode == 0:
+            target.write_bytes(stdout)
+            return AdbResult(proc.returncode, str(target), stderr)
+        return AdbResult(proc.returncode, "", stderr)
+
+    def record_screen(self, device_destination: str, *, time_limit_sec: int = 30, bit_rate: int | None = None) -> AdbResult:
+        """Startet eine Bildschirmaufzeichnung auf dem Gerät."""
+        args = ["shell", "screenrecord", "--time-limit", str(max(1, min(time_limit_sec, 180)))]
+        if bit_rate is not None:
+            args.extend(["--bit-rate", str(bit_rate)])
+        args.append(device_destination)
+        return self.run(args, timeout=max(35, time_limit_sec + 10))
+
+    def pull_file(self, remote_path: str, local_path: str | Path) -> AdbResult:
+        """Kopiert eine Datei vom Gerät auf den Host."""
+        target = Path(local_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        return self.run(["pull", remote_path, str(target)], timeout=60)
+
     def uninstall_package(self, package: str) -> AdbResult:
         """Deinstalliert ein Paket vom Gerät."""
         return self.run(["uninstall", package], timeout=30)

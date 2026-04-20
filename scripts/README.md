@@ -189,6 +189,24 @@ cp scripts/security-test.env.template scripts/security-test.env
 
 These values are merged with real environment variables; env vars take precedence.
 
+### 7. emulator_orchestrator.py
+
+Neutrale Host-Orchestrierung für Emulator-/Simulator-Aktionen mit erster Android-Implementierung.
+
+**Aktueller Scope:**
+
+- Plattformneutrale Orchestrator-API für Target-Liste, Boot, Install, Deep-Link, Logs, Screenshot und Video
+- Android-Adapter auf Basis von `emulator_manager.py` und `adb_client.py`
+- iOS ist bewusst noch nicht implementiert; dafür ist später ein Remote-Mac-Agent vorgesehen
+
+**Gedachter Einsatz:**
+
+- Wiederverwendbare QA-/Commissioning-Szenarien gegen AVDs
+- Einheitliche Evidence-Erzeugung (Logcat, Screenshots, Videos)
+- Zentraler Einstiegspunkt für spätere Android-/iOS-Adapter
+
+Die fokussierten Python-Tests liegen in `scripts/tests/test_emulator_orchestrator.py`.
+
 ## Getting Your Service Account Key
 
 To use the `setup-admin.js` script, you need a service account key:
