@@ -317,6 +317,17 @@ describe("admin-panel current QA flows", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         json: jest.fn().mockResolvedValue({ runId: "autosweep-run-1" }),
       });
 
@@ -327,7 +338,7 @@ describe("admin-panel current QA flows", () => {
 
     await exports.startAndroidAutomationSweep();
 
-    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/suites/android-automation-sweep", {
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/suites/android-automation-sweep", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -342,7 +353,7 @@ describe("admin-panel current QA flows", () => {
     });
   });
 
-  it("requires explicit confirmation before starting the sweep when QA warnings are present", async () => {
+  it("starts the sweep without a confirmation dialog when server preflight reports warnings only", async () => {
     const { exports, fetchMock, elements, context } = loadAdminPanelTestExports({
       operatorCommandBuilderConfig: JSON.stringify({
         masterApkPath: "masterApp/custom-master.apk",
@@ -372,6 +383,28 @@ describe("admin-panel current QA flows", () => {
           dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
           androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "warning",
+          canStart: true,
+          warningCount: 1,
+          warnings: [
+            {
+              id: "register-blockers-open",
+              tone: "danger",
+              title: "1 Release-Blocker sind noch offen",
+              detail: "Vor dem Sweep sollte geprüft werden, ob bekannte Blocker oder fehlende PASS-Nachweise die Auswertung verfälschen.",
+            },
+          ],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ runId: "autosweep-run-2" }),
       });
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -389,13 +422,68 @@ describe("admin-panel current QA flows", () => {
     });
     await exports.loadSuiteGuideData();
 
-    context.confirm.mockReturnValue(false);
+    await exports.startAndroidAutomationSweep();
+
+    expect(context.confirm).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(notificationEl.textContent).toContain("Android-Automation-Sweep gestartet");
+  });
+
+  it("blocks the sweep before POST when server preflight reports a hard blocker", async () => {
+    const { exports, fetchMock, elements, context } = loadAdminPanelTestExports();
+
+    const notificationEl = createNotificationElement();
+    elements.set("notification", notificationEl);
+    elements.set("qa-start-guide", { innerHTML: "" });
+    elements.set("qa-sweep-install-apk", { checked: false });
+    elements.set("qa-sweep-uninstall-first", { checked: false });
+    elements.set("qa-sweep-skip-activation", { checked: false });
+    elements.set("qa-sweep-parallel", { checked: false });
+    elements.set("qa-sweep-timeout-sec", { value: "7200" });
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ suites: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          androidMatrix: [{ androidVersion: "14", status: "active" }],
+          deviceProfiles: [{ profileId: "standard" }],
+          dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+          androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "blocked",
+          canStart: false,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 1,
+          blockingReasons: [
+            {
+              id: "toolchain-hard-blocker",
+              tone: "danger",
+              title: "Android-Labor nicht startbereit",
+              detail: "ADB ist nicht verfügbar.",
+            },
+          ],
+        }),
+      });
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    await exports.loadSuiteGuideData();
 
     await exports.startAndroidAutomationSweep();
 
-    expect(context.confirm).toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(notificationEl.textContent).toContain("Android-Automation-Sweep abgebrochen");
+    expect(context.confirm).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(notificationEl.textContent).toContain("Android-Automation-Sweep blockiert: ADB ist nicht verfügbar.");
   });
 
   it("renders automation sweep runs in history with a dedicated label", async () => {

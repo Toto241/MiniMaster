@@ -136,6 +136,17 @@ describe("admin-panel current QA helpers", () => {
           dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
           androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
       });
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -148,6 +159,9 @@ describe("admin-panel current QA helpers", () => {
       headers: { Accept: "application/json" },
     });
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/qa/catalog", {
+      headers: { Accept: "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/suites/android-automation-sweep/preflight", {
       headers: { Accept: "application/json" },
     });
     expect(context.renderQaExecutionGuide).toHaveBeenCalled();
@@ -164,7 +178,15 @@ describe("admin-panel current QA helpers", () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue({ suites: [] }),
+        json: jest.fn().mockResolvedValue({
+          suites: [
+            {
+              suiteId: "android-unit-master",
+              title: "Android Unit Master",
+              prereqsMet: true,
+            },
+          ],
+        }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -173,6 +195,17 @@ describe("admin-panel current QA helpers", () => {
           deviceProfiles: [{ profileId: "standard" }],
           dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
           androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
         }),
       });
 
@@ -230,6 +263,17 @@ describe("admin-panel current QA helpers", () => {
           dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
           androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          status: "ready",
+          canStart: true,
+          warningCount: 0,
+          warnings: [],
+          blockingCount: 0,
+          blockingReasons: [],
+        }),
       });
 
     exports.setPythonOperatorRuntimeForTests(true);
@@ -241,6 +285,58 @@ describe("admin-panel current QA helpers", () => {
     expect(guideEl.innerHTML).toContain("4. Android-Automation-Sweep");
     expect(guideEl.innerHTML).toContain("Sweep starten");
     expect(guideEl.innerHTML).toContain("Android 14");
+  });
+
+  it("renders server-side sweep blockers directly in the guide and disables the start button", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const guideEl = createDomSinkElement();
+    elements.set("qa-start-guide", guideEl);
+
+    exports.setPythonOperatorRuntimeForTests(true);
+    exports.setPythonCommissioningCatalogForTests({ groups: [] });
+    exports.setTestingRegisterPayloadForTests({ items: [] });
+    exports.setSuiteCatalogPayloadForTests([
+      {
+        suiteId: "android-unit-master",
+        title: "Android Unit Master",
+        prereqsMet: true,
+      },
+    ]);
+    exports.setQaCatalogPayloadForTests({
+      androidMatrix: [{ androidVersion: "14", status: "active" }],
+      deviceProfiles: [{ profileId: "standard" }],
+      dualDeviceScenarios: [{ scenarioId: "pairing", title: "Pairing" }],
+      androidScenarioMappings: [{ scenarioId: "pairing", role: "master" }, { scenarioId: "pairing", role: "child" }],
+    });
+    exports.setAndroidAutomationSweepPreflightPayloadForTests({
+      status: "blocked",
+      canStart: false,
+      warningCount: 0,
+      warnings: [],
+      blockingCount: 1,
+      blockingReasons: [
+        {
+          id: "toolchain-hard-blocker",
+          tone: "danger",
+          title: "Android-Labor nicht startbereit",
+          detail: "ADB ist nicht verfügbar.",
+        },
+      ],
+    });
+
+    exports.renderQaExecutionGuide({ groups: [] }, { items: [] }, [
+      {
+        suiteId: "android-unit-master",
+        title: "Android Unit Master",
+        prereqsMet: true,
+      },
+    ]);
+
+    expect(guideEl.innerHTML).toContain("Android-Labor nicht startbereit");
+    expect(guideEl.innerHTML).toContain("ADB ist nicht verfügbar.");
+    expect(guideEl.innerHTML).toContain("Sweep starten");
+    expect(guideEl.innerHTML).toContain("disabled");
   });
 
   it("derives advisory sweep readiness from catalog, register and recent Android run failures", () => {

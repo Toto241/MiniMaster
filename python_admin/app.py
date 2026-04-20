@@ -5402,6 +5402,147 @@ def _android_automation_sweep_hard_blocker() -> str | None:
     return None
 
 
+def _build_android_automation_sweep_preflight() -> dict[str, object]:
+    qa_catalog = get_qa_catalog()
+    plan = _build_android_automation_sweep_plan()
+    register = build_testing_register()
+    register_items = cast(list[dict[str, object]], register.get("items") or [])
+    history = load_suite_run_history(limit=MAX_HISTORY_LIMIT)
+
+    warnings: list[dict[str, str]] = []
+    blocking_reasons: list[dict[str, str]] = []
+
+    device_profiles = cast(list[dict[str, object]], qa_catalog.get("deviceProfiles") or [])
+    dual_device_scenarios = cast(list[dict[str, object]], qa_catalog.get("dualDeviceScenarios") or [])
+    scenario_mappings = cast(list[dict[str, object]], qa_catalog.get("androidScenarioMappings") or [])
+    master_mapping_count = sum(1 for item in scenario_mappings if str(item.get("role") or "").strip() == "master")
+    child_mapping_count = sum(1 for item in scenario_mappings if str(item.get("role") or "").strip() == "child")
+
+    if len(device_profiles) == 0:
+        warnings.append({
+            "id": "device-profiles-missing",
+            "tone": "warning",
+            "title": "Keine Geräteprofile im QA-Katalog sichtbar",
+            "detail": "Der Sweep bleibt startbar, aber die Profilabdeckung für reproduzierbare Läufe ist derzeit unklar.",
+        })
+    if master_mapping_count == 0 or child_mapping_count == 0:
+        warnings.append({
+            "id": "mapping-coverage-incomplete",
+            "tone": "warning",
+            "title": "Master-/Child-Mappings sind unvollständig",
+            "detail": "Der QA-Katalog zeigt keine vollständige Rollenabdeckung für die Dual-Device-Szenarien des Sweeps.",
+        })
+
+    blocking_open = [
+        item for item in register_items
+        if bool(item.get("blockingForRelease"))
+        and (
+            str(item.get("status") or "").strip().lower() != "pass"
+            or bool(item.get("staleEvidence"))
+            or not bool(item.get("hasSuccessfulRun"))
+        )
+    ]
+    stale_items = [item for item in register_items if bool(item.get("staleEvidence"))]
+    unsupported_items = [item for item in register_items if str(item.get("groupId") or "") == "repo-tests-unsupported"]
+
+    if blocking_open:
+        warnings.append({
+            "id": "register-blockers-open",
+            "tone": "danger",
+            "title": f"{len(blocking_open)} Release-Blocker sind noch offen",
+            "detail": "Vor dem Sweep sollte geprüft werden, ob bekannte Blocker oder fehlende PASS-Nachweise die Auswertung verfälschen.",
+        })
+    if stale_items:
+        warnings.append({
+            "id": "stale-evidence-open",
+            "tone": "warning",
+            "title": f"{len(stale_items)} Nachweise sind veraltet",
+            "detail": "Mindestens ein relevanter Nachweis liegt außerhalb des Stale-Fensters und sollte vor dem Gesamtlauf aktualisiert werden.",
+        })
+    if unsupported_items:
+        warnings.append({
+            "id": "unsupported-suite-mappings",
+            "tone": "info",
+            "title": f"{len(unsupported_items)} Repo-Tests sind noch keiner Suite zugeordnet",
+            "detail": "Der Sweep deckt diese Tests nicht automatisch ab. Prüfen Sie den Backlog vor einer systematischen Gesamtbewertung.",
+        })
+
+    relevant_runs = [
+        run for run in history
+        if str(run.get("type") or run.get("suiteId") or run.get("suite_id") or "").strip() in {
+            "android-automation-sweep",
+            "android-compatibility",
+            "android-e2e-shell",
+            "android-e2e-shell-script",
+        }
+    ]
+    active_runs = [
+        run for run in relevant_runs
+        if str(run.get("status") or cast(dict[str, object], run.get("result") or {}).get("status") or "").strip().lower() in {"running", "queued"}
+    ]
+    recent_failures = [
+        run for run in relevant_runs
+        if (
+            str(run.get("status") or "").strip().lower() == "error"
+            or str(cast(dict[str, object], run.get("result") or {}).get("status") or "").strip().lower() in {"failed", "fail", "error"}
+            or str(cast(dict[str, object], run.get("result") or {}).get("overall_status") or "").strip().lower() in {"failed", "fail", "error"}
+        )
+    ][:3]
+
+    if active_runs:
+        warnings.append({
+            "id": "android-runs-active",
+            "tone": "info",
+            "title": f"{len(active_runs)} Android-Läufe sind noch aktiv",
+            "detail": "Ein zusätzlicher Sweep kann Logs und Fehlerbilder überlagern. Prüfen Sie zuerst die laufenden oder wartenden Jobs.",
+        })
+    if recent_failures:
+        warnings.append({
+            "id": "recent-android-failures",
+            "tone": "warning",
+            "title": f"{len(recent_failures)} jüngste Android-Läufe sind fehlgeschlagen",
+            "detail": "Vor einem neuen Sweep sollte der letzte Fehlerzustand im Suite-Verlauf geprüft werden.",
+        })
+
+    if not cast(list[str], plan.get("androidVersions") or []):
+        blocking_reasons.append({
+            "id": "android-versions-missing",
+            "tone": "danger",
+            "title": "Keine aktiven Android-Versionen im QA-Katalog gefunden",
+            "detail": "Der Android-Automation-Sweep kann ohne aktive Android-Versionen nicht gestartet werden.",
+        })
+
+    hard_blocker = _android_automation_sweep_hard_blocker()
+    if hard_blocker:
+        blocking_reasons.append({
+            "id": "toolchain-hard-blocker",
+            "tone": "danger",
+            "title": "Android-Labor nicht startbereit",
+            "detail": hard_blocker,
+        })
+
+    status = "blocked" if blocking_reasons else ("warning" if warnings else "ready")
+    return {
+        "status": status,
+        "canStart": not blocking_reasons,
+        "requiresConfirmation": False,
+        "warningCount": len(warnings),
+        "warnings": warnings,
+        "blockingCount": len(blocking_reasons),
+        "blockingReasons": blocking_reasons,
+        "plan": {
+            "androidVersionCount": len(cast(list[str], plan.get("androidVersions") or [])),
+            "selectedScenarioCount": len(cast(list[str], plan.get("selectedScenarioIds") or [])),
+            "masterTestClassCount": len(cast(list[str], plan.get("masterTestClasses") or [])),
+            "childTestClassCount": len(cast(list[str], plan.get("childTestClasses") or [])),
+            "deviceProfileCount": len(device_profiles),
+            "dualDeviceScenarioCount": len(dual_device_scenarios),
+            "masterMappingCount": master_mapping_count,
+            "childMappingCount": child_mapping_count,
+        },
+    }
+
+
 def _summarize_android_compatibility_runs(sub_runs: list[dict[str, object]]) -> dict[str, object]:
     counts = {
         "total": len(sub_runs),
@@ -5956,6 +6097,9 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 "runs": load_suite_run_history(limit),
                 "count": limit,
             })
+
+        if parsed.path == "/api/suites/android-automation-sweep/preflight":
+            return self._write_json(HTTPStatus.OK, _build_android_automation_sweep_preflight())
 
         if parsed.path == "/api/qa/self-healing/status":
             query = parse_qs(parsed.query)
