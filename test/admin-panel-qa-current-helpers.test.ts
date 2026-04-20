@@ -626,6 +626,31 @@ describe("admin-panel current QA helpers", () => {
 
     expect(failuresEl.innerHTML).toContain("Register Item");
     expect(runOverviewEl.innerHTML).toContain("Python-Commissioning run-1");
+    expect(detailEl.innerHTML).toContain("Registerstatus und Ursachenbild");
+    expect(detailEl.innerHTML).toContain("Register-Kontext");
+    expect(detailEl.innerHTML).toContain("Systemtests");
+    expect(detailEl.innerHTML).toContain("Beide Apps");
+  });
+
+  it("opens collapsed QA drilldown targets before scrolling to protocol details", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    const qaPythonRunCard = { closest: jest.fn(() => null) };
+    const qaProtocolCard = {
+      tagName: "DIV",
+      closest: jest.fn((selector: string) => (selector === "details" ? detailsEl : null)),
+      scrollIntoView: jest.fn(),
+      classList: { add: jest.fn(), remove: jest.fn() },
+    };
+    const detailsEl = { open: false };
+
+    elements.set("qa-python-run-card", qaPythonRunCard);
+    elements.set("qa-protocol-card", qaProtocolCard);
+
+    exports.openPythonAutomationProtocol(encodeURIComponent("register-1"));
+
+    expect(detailsEl.open).toBe(true);
+    expect(qaProtocolCard.scrollIntoView).toHaveBeenCalled();
   });
 
   it("renders structured Android suite run details in the QA workspace", () => {

@@ -337,6 +337,8 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  startAndroidCompatibilityRun,",
     "  startAndroidAutomationSweep,",
     "  startSuiteRun,",
+    "  openPythonAutomationProtocol,",
+    "  scrollQaSection,",
     "  loadSuiteGuideData,",
     "  loadSuiteRunHistory,",
     "  loadTestingRegister,",
