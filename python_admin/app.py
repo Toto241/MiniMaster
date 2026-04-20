@@ -61,6 +61,7 @@ COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
 JOB_RUN_LOG_FILE = LOG_DIR / "job_runs.jsonl"
 ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE = LOG_DIR / "android_automation_sweep_approvals.jsonl"
+ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE = LOG_DIR / "android_compatibility_approvals.jsonl"
 DEFAULT_HOST = os.environ.get("MINIMASTER_ADMIN_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("MINIMASTER_ADMIN_PORT", "8765"))
 DEFAULT_HISTORY_LIMIT = 15
@@ -5450,6 +5451,218 @@ def _serialize_android_automation_sweep_approval(entry: dict[str, object] | None
     }
 
 
+def _normalize_android_compatibility_request(payload: dict[str, object]) -> tuple[str, list[str], dict[str, object]]:
+    execution_mode = str(payload.get("executionMode") or "single-master").strip()
+    android_versions = _normalize_android_versions(payload.get("androidVersions"))
+    if execution_mode not in ("single-master", "single-child", "dual-device"):
+        raise ValueError("executionMode muss 'single-master', 'single-child' oder 'dual-device' sein.")
+
+    kwargs: dict[str, object] = {
+        "execution_mode": execution_mode,
+        "android_versions": android_versions,
+        "install_apk": bool_from_payload(payload.get("installApk"), default=False),
+        "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
+        "selected_test_classes": [
+            str(item).strip()
+            for item in cast(list[object], payload.get("selectedTestClasses") or [])
+            if str(item).strip()
+        ],
+    }
+
+    if execution_mode == "dual-device":
+        master_serial = str(payload.get("masterSerial") or "").strip()
+        child_serial = str(payload.get("childSerial") or "").strip()
+        if not master_serial or not child_serial:
+            raise ValueError("masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich.")
+        kwargs.update({
+            "master_serial": master_serial,
+            "child_serial": child_serial,
+            "parallel": bool_from_payload(payload.get("parallel"), default=False),
+            "scenario_id": str(payload.get("scenarioId") or "").strip(),
+            "selected_scenario_ids": [
+                str(item).strip()
+                for item in cast(list[object], payload.get("selectedScenarioIds") or [])
+                if str(item).strip()
+            ],
+            "profile_id": str(payload.get("profileId") or "").strip(),
+            "fault_modes": [
+                str(item).strip()
+                for item in cast(list[object], payload.get("faultModes") or [])
+                if str(item).strip()
+            ],
+            "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
+        })
+    else:
+        kwargs.update({
+            "app_id": "child" if execution_mode == "single-child" else "master",
+            "serial": str(payload.get("serial") or "auto").strip() or "auto",
+            "suite": str(payload.get("suite") or "commissioning").strip() or "commissioning",
+            "test_filter": str(payload.get("testFilter") or "").strip(),
+            "skip_activation": bool_from_payload(payload.get("skipActivation"), default=False),
+            "apk_path": str(payload.get("apkPath") or "").strip(),
+            "timeout_sec": parse_int(payload.get("timeoutSec"), default=3600, min_value=60, max_value=7200),
+        })
+
+    return execution_mode, android_versions, kwargs
+
+
+def _compute_android_compatibility_plan_hash(payload: dict[str, object]) -> str:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _append_android_compatibility_approval(entry: dict[str, object]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _load_active_android_compatibility_approval(plan_hash: str) -> dict[str, object] | None:
+    entries = _load_jsonl_entries(ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE)
+    for entry in reversed(entries):
+        if str(entry.get("planHash") or "") != plan_hash:
+            continue
+        if str(entry.get("status") or "active") != "active":
+            continue
+        if not _is_future_timestamp(entry.get("expiresAt")):
+            continue
+        return entry
+    return None
+
+
+def _serialize_android_compatibility_approval(entry: dict[str, object] | None) -> dict[str, object] | None:
+    return _serialize_android_automation_sweep_approval(entry)
+
+
+def _build_android_compatibility_preflight(payload: dict[str, object]) -> dict[str, object]:
+    execution_mode, android_versions, kwargs = _normalize_android_compatibility_request(payload)
+    register = build_testing_register()
+    register_items = cast(list[dict[str, object]], register.get("items") or [])
+    history = load_suite_run_history(limit=MAX_HISTORY_LIMIT)
+
+    warnings: list[dict[str, str]] = []
+    blocking_reasons: list[dict[str, str]] = []
+
+    blocking_open = [
+        item for item in register_items
+        if bool(item.get("blockingForRelease"))
+        and (
+            str(item.get("status") or "").strip().lower() != "pass"
+            or bool(item.get("staleEvidence"))
+            or not bool(item.get("hasSuccessfulRun"))
+        )
+    ]
+    stale_items = [item for item in register_items if bool(item.get("staleEvidence"))]
+    unsupported_items = [item for item in register_items if str(item.get("groupId") or "") == "repo-tests-unsupported"]
+
+    if blocking_open:
+        warnings.append({
+            "id": "register-blockers-open",
+            "tone": "danger",
+            "title": f"{len(blocking_open)} Release-Blocker sind noch offen",
+            "detail": "Vor dem Android-Kompatibilitätslauf sollten bekannte Blocker und fehlende PASS-Nachweise geprüft werden.",
+        })
+    if stale_items:
+        warnings.append({
+            "id": "stale-evidence-open",
+            "tone": "warning",
+            "title": f"{len(stale_items)} Nachweise sind veraltet",
+            "detail": "Mindestens ein relevanter Nachweis liegt außerhalb des Stale-Fensters und sollte vor dem Kompatibilitätslauf aktualisiert werden.",
+        })
+    if unsupported_items:
+        warnings.append({
+            "id": "unsupported-suite-mappings",
+            "tone": "info",
+            "title": f"{len(unsupported_items)} Repo-Tests sind noch keiner Suite zugeordnet",
+            "detail": "Der Kompatibilitätslauf deckt diese Tests nicht automatisch ab. Prüfen Sie den Backlog vor der Gesamtbewertung.",
+        })
+
+    relevant_runs = [
+        run for run in history
+        if str(run.get("type") or run.get("suiteId") or run.get("suite_id") or "").strip() in {
+            "android-automation-sweep",
+            "android-compatibility",
+            "android-e2e-shell",
+            "android-e2e-shell-script",
+        }
+    ]
+    active_runs = [
+        run for run in relevant_runs
+        if str(run.get("status") or cast(dict[str, object], run.get("result") or {}).get("status") or "").strip().lower() in {"running", "queued"}
+    ]
+    recent_failures = [
+        run for run in relevant_runs
+        if (
+            str(run.get("status") or "").strip().lower() == "error"
+            or str(cast(dict[str, object], run.get("result") or {}).get("status") or "").strip().lower() in {"failed", "fail", "error"}
+            or str(cast(dict[str, object], run.get("result") or {}).get("overall_status") or "").strip().lower() in {"failed", "fail", "error"}
+        )
+    ][:3]
+    if active_runs:
+        warnings.append({
+            "id": "android-runs-active",
+            "tone": "info",
+            "title": f"{len(active_runs)} Android-Läufe sind noch aktiv",
+            "detail": "Ein zusätzlicher Kompatibilitätslauf kann Logs und Fehlerbilder überlagern. Prüfen Sie zuerst laufende oder wartende Jobs.",
+        })
+    if recent_failures:
+        warnings.append({
+            "id": "recent-android-failures",
+            "tone": "warning",
+            "title": f"{len(recent_failures)} jüngste Android-Läufe sind fehlgeschlagen",
+            "detail": "Vor einem neuen Kompatibilitätslauf sollte der letzte Fehlerzustand im Suite-Verlauf geprüft werden.",
+        })
+
+    hard_blocker = _android_automation_sweep_hard_blocker()
+    if hard_blocker:
+        blocking_reasons.append({
+            "id": "toolchain-hard-blocker",
+            "tone": "danger",
+            "title": "Android-Labor nicht startbereit",
+            "detail": hard_blocker,
+        })
+
+    plan_signature_payload = {
+        "executionMode": execution_mode,
+        "androidVersions": android_versions,
+        "selectedTestClasses": cast(list[str], kwargs.get("selected_test_classes") or []),
+        "selectedScenarioIds": cast(list[str], kwargs.get("selected_scenario_ids") or []),
+        "scenarioId": str(kwargs.get("scenario_id") or ""),
+        "profileId": str(kwargs.get("profile_id") or ""),
+        "faultModes": cast(list[str], kwargs.get("fault_modes") or []),
+        "appId": str(kwargs.get("app_id") or ""),
+        "suite": str(kwargs.get("suite") or ""),
+        "serial": str(kwargs.get("serial") or ""),
+        "testFilter": str(kwargs.get("test_filter") or ""),
+        "warningIds": [str(item.get("id") or "") for item in warnings],
+        "blockingIds": [str(item.get("id") or "") for item in blocking_reasons],
+    }
+    plan_hash = _compute_android_compatibility_plan_hash(cast(dict[str, object], plan_signature_payload))
+    approval_required = not blocking_reasons and len(warnings) > 0
+    active_approval = _load_active_android_compatibility_approval(plan_hash) if approval_required else None
+    can_start = not blocking_reasons and (not approval_required or active_approval is not None)
+    status = "blocked" if blocking_reasons else ("approved" if active_approval else ("warning" if warnings else "ready"))
+    return {
+        "status": status,
+        "canStart": can_start,
+        "requiresConfirmation": False,
+        "approvalRequired": approval_required,
+        "hasActiveApproval": active_approval is not None,
+        "activeApproval": _serialize_android_compatibility_approval(active_approval),
+        "planHash": plan_hash,
+        "warningCount": len(warnings),
+        "warnings": warnings,
+        "blockingCount": len(blocking_reasons),
+        "blockingReasons": blocking_reasons,
+        "plan": {
+            "executionMode": execution_mode,
+            "androidVersionCount": len(android_versions),
+            "selectedScenarioCount": len(cast(list[str], kwargs.get("selected_scenario_ids") or [])),
+            "selectedTestClassCount": len(cast(list[str], kwargs.get("selected_test_classes") or [])),
+        },
+    }
+
+
 def _build_android_automation_sweep_preflight() -> dict[str, object]:
     qa_catalog = get_qa_catalog()
     plan = _build_android_automation_sweep_plan()
@@ -6214,8 +6427,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_dual_device_test()
         if parsed.path == "/api/suites/android-compatibility":
             return self._handle_android_compatibility_test()
+        if parsed.path == "/api/suites/android-compatibility/preflight":
+            return self._handle_android_compatibility_preflight()
         if parsed.path == "/api/suites/android-automation-sweep":
             return self._handle_android_automation_sweep()
+        if parsed.path == "/api/suites/android-compatibility/approve":
+            return self._handle_android_compatibility_approve()
         if parsed.path == "/api/suites/android-automation-sweep/approve":
             return self._handle_android_automation_sweep_approve()
         if parsed.path == "/api/qa/self-healing/run":
@@ -6450,61 +6667,18 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
     def _handle_android_compatibility_test(self) -> None:
         try:
             payload = self._read_json_body()
-            execution_mode = str(payload.get("executionMode") or "single-master").strip()
-            android_versions = _normalize_android_versions(payload.get("androidVersions"))
-            if execution_mode not in ("single-master", "single-child", "dual-device"):
-                return self._write_json(HTTPStatus.BAD_REQUEST, {
-                    "error": "executionMode muss 'single-master', 'single-child' oder 'dual-device' sein."
-                })
-
+            execution_mode, android_versions, kwargs = _normalize_android_compatibility_request(payload)
             run_id = f"compat-{uuid4().hex[:12]}"
-            kwargs: dict[str, object] = {
-                "execution_mode": execution_mode,
-                "android_versions": android_versions,
-                "install_apk": bool_from_payload(payload.get("installApk"), default=False),
-                "uninstall_first": bool_from_payload(payload.get("uninstallFirst"), default=False),
-                "selected_test_classes": [
-                    str(item).strip()
-                    for item in cast(list[object], payload.get("selectedTestClasses") or [])
-                    if str(item).strip()
-                ],
-            }
-
-            if execution_mode == "dual-device":
-                master_serial = str(payload.get("masterSerial") or "").strip()
-                child_serial = str(payload.get("childSerial") or "").strip()
-                if not master_serial or not child_serial:
-                    return self._write_json(HTTPStatus.BAD_REQUEST, {
-                        "error": "masterSerial und childSerial sind für Dual-Device-Kompatibilitätsläufe erforderlich."
+            preflight = _build_android_compatibility_preflight(payload)
+            if not bool(preflight.get("canStart")):
+                if bool(preflight.get("approvalRequired")) and not bool(preflight.get("hasActiveApproval")):
+                    return self._write_json(HTTPStatus.CONFLICT, {
+                        "error": "Für den Android-Kompatibilitätslauf liegt eine serverseitig erforderliche Warnlagen-Freigabe vor. Bitte zuerst die Kompatibilitäts-Freigabe speichern.",
                     })
-                kwargs.update({
-                    "master_serial": master_serial,
-                    "child_serial": child_serial,
-                    "parallel": bool_from_payload(payload.get("parallel"), default=False),
-                    "scenario_id": str(payload.get("scenarioId") or "").strip(),
-                    "selected_scenario_ids": [
-                        str(item).strip()
-                        for item in cast(list[object], payload.get("selectedScenarioIds") or [])
-                        if str(item).strip()
-                    ],
-                    "profile_id": str(payload.get("profileId") or "").strip(),
-                    "fault_modes": [
-                        str(item).strip()
-                        for item in cast(list[object], payload.get("faultModes") or [])
-                        if str(item).strip()
-                    ],
-                    "timeout_sec": parse_int(payload.get("timeoutSec"), default=7200, min_value=60, max_value=14400),
-                })
-            else:
-                kwargs.update({
-                    "app_id": "child" if execution_mode == "single-child" else "master",
-                    "serial": str(payload.get("serial") or "auto").strip() or "auto",
-                    "suite": str(payload.get("suite") or "commissioning").strip() or "commissioning",
-                    "test_filter": str(payload.get("testFilter") or "").strip(),
-                    "skip_activation": bool_from_payload(payload.get("skipActivation"), default=False),
-                    "apk_path": str(payload.get("apkPath") or "").strip(),
-                    "timeout_sec": parse_int(payload.get("timeoutSec"), default=3600, min_value=60, max_value=7200),
-                })
+                blocking_reasons = cast(list[dict[str, object]], preflight.get("blockingReasons") or [])
+                blocking_detail = str((blocking_reasons[0] if blocking_reasons else {}).get("detail") or "Der serverseitige Kompatibilitäts-Preflight blockiert den Start.")
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": blocking_detail})
+            active_approval = cast(dict[str, object] | None, preflight.get("activeApproval"))
 
             linked_suites = _normalized_suite_run_keys({
                 "type": "android-compatibility",
@@ -6520,6 +6694,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "androidVersions": android_versions,
                     "selectedScenarioIds": cast(list[str], kwargs.get("selected_scenario_ids") or []),
                     "selectedTestClasses": cast(list[str], kwargs.get("selected_test_classes") or []),
+                    "approvalId": str((active_approval or {}).get("approvalId") or ""),
+                    "approvedAt": str((active_approval or {}).get("approvedAt") or ""),
+                    "approvedBy": str((active_approval or {}).get("approvedBy") or ""),
+                    "approvalWarnings": list(cast(list[str], (active_approval or {}).get("warningIds") or [])),
                     "status": "queued",
                     "startedAt": None,
                     "finishedAt": None,
@@ -6544,7 +6722,52 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             "status": "queued",
             "executionMode": execution_mode,
             "androidVersions": android_versions,
+            "approvalId": str((active_approval or {}).get("approvalId") or ""),
+            "approvedAt": str((active_approval or {}).get("approvedAt") or ""),
+            "approvedBy": str((active_approval or {}).get("approvedBy") or ""),
+            "approvalWarnings": list(cast(list[str], (active_approval or {}).get("warningIds") or [])),
         })
+
+    def _handle_android_compatibility_preflight(self) -> None:
+        try:
+            payload = self._read_json_body()
+            preflight = _build_android_compatibility_preflight(payload)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, preflight)
+
+    def _handle_android_compatibility_approve(self) -> None:
+        try:
+            payload = self._read_json_body()
+            preflight = _build_android_compatibility_preflight(payload)
+            if bool(preflight.get("blockingCount")):
+                blocking_reasons = cast(list[dict[str, object]], preflight.get("blockingReasons") or [])
+                blocking_detail = str((blocking_reasons[0] if blocking_reasons else {}).get("detail") or "Der serverseitige Kompatibilitäts-Preflight blockiert die Freigabe.")
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": blocking_detail})
+            if not bool(preflight.get("approvalRequired")) or bool(preflight.get("hasActiveApproval")):
+                return self._write_json(HTTPStatus.OK, preflight)
+
+            approval_entry = {
+                "approvalId": f"compat-approval-{uuid4().hex[:12]}",
+                "planHash": str(preflight.get("planHash") or ""),
+                "approvedAt": _current_timestamp_iso(),
+                "approvedBy": str(payload.get("approvedBy") or "qa-admin-panel").strip() or "qa-admin-panel",
+                "expiresAt": (datetime.now(timezone.utc) + timedelta(seconds=ANDROID_AUTOMATION_SWEEP_APPROVAL_TTL_SEC)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "warningIds": [
+                    str(item.get("id") or "")
+                    for item in cast(list[dict[str, object]], preflight.get("warnings") or [])
+                    if str(item.get("id") or "")
+                ],
+                "status": "active",
+            }
+            _append_android_compatibility_approval(cast(dict[str, object], approval_entry))
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, _build_android_compatibility_preflight(payload))
 
     def _handle_android_automation_sweep(self) -> None:
         try:

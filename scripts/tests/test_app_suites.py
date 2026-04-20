@@ -30,6 +30,7 @@ def _clean_active_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from app import _active_suite_runs, _active_suite_lock, _active_jobs, _job_lock, _job_queue
     monkeypatch.setattr(app, "JOB_RUN_LOG_FILE", tmp_path / "job_runs.jsonl")
     monkeypatch.setattr(app, "ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE", tmp_path / "android_automation_sweep_approvals.jsonl")
+    monkeypatch.setattr(app, "ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE", tmp_path / "android_compatibility_approvals.jsonl")
     with _active_suite_lock:
         _active_suite_runs.clear()
     with _job_lock:
@@ -542,6 +543,17 @@ class TestMiniMasterAdminHandlerRoutes:
 
         monkeypatch.setattr(app.threading, "Thread", thread_cls)
         monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+        monkeypatch.setattr(app, "_build_android_compatibility_preflight", lambda _payload: {
+            "status": "ready",
+            "canStart": True,
+            "approvalRequired": False,
+            "hasActiveApproval": False,
+            "activeApproval": None,
+            "warningCount": 0,
+            "warnings": [],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
 
         with app._active_suite_lock:
             app._active_suite_runs.clear()
@@ -555,6 +567,10 @@ class TestMiniMasterAdminHandlerRoutes:
                 "status": "queued",
                 "executionMode": "single-master",
                 "androidVersions": ["10", "14"],
+                "approvalId": "",
+                "approvedAt": "",
+                "approvedBy": "",
+                "approvalWarnings": [],
             },
         )
         fake_thread.start.assert_called_once_with()
@@ -562,6 +578,42 @@ class TestMiniMasterAdminHandlerRoutes:
             queued = app._active_suite_runs["compat-fedcba123456"]
         assert queued["type"] == "android-compatibility"
         assert queued["androidVersions"] == ["10", "14"]
+
+    def test_do_post_android_compatibility_rejects_warning_state_without_active_approval(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility")
+        handler._read_json_body.return_value = {
+            "executionMode": "single-master",
+            "androidVersions": ["14"],
+            "serial": "auto",
+            "suite": "commissioning",
+        }
+
+        create_job_mock = MagicMock()
+        enqueue_job_mock = MagicMock()
+        monkeypatch.setattr(app, "create_job", create_job_mock)
+        monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+        monkeypatch.setattr(app, "_build_android_compatibility_preflight", lambda _payload: {
+            "status": "warning",
+            "canStart": False,
+            "approvalRequired": True,
+            "hasActiveApproval": False,
+            "activeApproval": None,
+            "warningCount": 1,
+            "warnings": [{"id": "register-blockers-open"}],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.CONFLICT,
+            {"error": "Für den Android-Kompatibilitätslauf liegt eine serverseitig erforderliche Warnlagen-Freigabe vor. Bitte zuerst die Kompatibilitäts-Freigabe speichern."},
+        )
+        create_job_mock.assert_not_called()
+        enqueue_job_mock.assert_not_called()
 
     def test_do_post_self_healing_runs_cycle(self, monkeypatch: pytest.MonkeyPatch):
         import app
@@ -639,6 +691,24 @@ class TestMiniMasterAdminHandlerRoutes:
 
         monkeypatch.setattr(app.threading, "Thread", thread_cls)
         monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+        monkeypatch.setattr(app, "_build_android_compatibility_preflight", lambda _payload: {
+            "status": "approved",
+            "canStart": True,
+            "approvalRequired": True,
+            "hasActiveApproval": True,
+            "activeApproval": {
+                "approvalId": "compat-approval-1",
+                "approvedAt": "2026-04-20T10:00:00Z",
+                "approvedBy": "qa-admin-panel",
+                "expiresAt": "2026-04-20T18:00:00Z",
+                "warningIds": ["register-blockers-open"],
+                "planHash": "compat-plan-hash-1",
+            },
+            "warningCount": 1,
+            "warnings": [{"id": "register-blockers-open"}],
+            "blockingCount": 0,
+            "blockingReasons": [],
+        })
 
         with app._active_suite_lock:
             app._active_suite_runs.clear()
@@ -649,6 +719,93 @@ class TestMiniMasterAdminHandlerRoutes:
             queued = app._active_suite_runs["compat-feedface1234"]
         assert queued["selectedScenarioIds"] == ["offline-online-resync", "pairing-code-expiry"]
         assert queued["selectedTestClasses"] == ["com.minimaster.masterapp.MasterScenarioTest"]
+        assert queued["approvalId"] == "compat-approval-1"
+        assert queued["approvedBy"] == "qa-admin-panel"
+        assert queued["approvalWarnings"] == ["register-blockers-open"]
+
+    def test_do_post_android_compatibility_approve_persists_active_approval(self, monkeypatch: pytest.MonkeyPatch):
+        import app
+
+        handler = self._make_handler("/api/suites/android-compatibility/approve")
+        handler._read_json_body.return_value = {
+            "executionMode": "single-master",
+            "androidVersions": ["14"],
+            "serial": "auto",
+            "suite": "commissioning",
+            "approvedBy": "qa-admin-panel",
+        }
+
+        preflight_sequence = iter([
+            {
+                "status": "warning",
+                "canStart": False,
+                "approvalRequired": True,
+                "hasActiveApproval": False,
+                "activeApproval": None,
+                "planHash": "compat-plan-hash-1",
+                "warningCount": 1,
+                "warnings": [{"id": "register-blockers-open"}],
+                "blockingCount": 0,
+                "blockingReasons": [],
+            },
+            {
+                "status": "approved",
+                "canStart": True,
+                "approvalRequired": True,
+                "hasActiveApproval": True,
+                "activeApproval": {
+                    "approvalId": "compat-approval-123",
+                    "approvedAt": "2026-04-20T10:00:00Z",
+                    "approvedBy": "qa-admin-panel",
+                    "expiresAt": "2026-04-20T18:00:00Z",
+                    "warningIds": ["register-blockers-open"],
+                    "planHash": "compat-plan-hash-1",
+                },
+                "planHash": "compat-plan-hash-1",
+                "warningCount": 1,
+                "warnings": [{"id": "register-blockers-open"}],
+                "blockingCount": 0,
+                "blockingReasons": [],
+            },
+        ])
+        monkeypatch.setattr(app, "_build_android_compatibility_preflight", lambda _payload: next(preflight_sequence))
+        append_mock = MagicMock()
+        monkeypatch.setattr(app, "_append_android_compatibility_approval", append_mock)
+
+        class _FakeUuid:
+            hex = "1234567890abcdef"
+
+        monkeypatch.setattr(app, "uuid4", lambda: _FakeUuid())
+
+        app.MiniMasterAdminHandler.do_POST(handler)
+
+        append_mock.assert_called_once()
+        approval_entry = append_mock.call_args.args[0]
+        assert approval_entry["approvalId"] == "compat-approval-1234567890ab"
+        assert approval_entry["planHash"] == "compat-plan-hash-1"
+        assert approval_entry["approvedBy"] == "qa-admin-panel"
+        handler._write_json.assert_called_once_with(
+            HTTPStatus.OK,
+            {
+                "status": "approved",
+                "canStart": True,
+                "approvalRequired": True,
+                "hasActiveApproval": True,
+                "activeApproval": {
+                    "approvalId": "compat-approval-123",
+                    "approvedAt": "2026-04-20T10:00:00Z",
+                    "approvedBy": "qa-admin-panel",
+                    "expiresAt": "2026-04-20T18:00:00Z",
+                    "warningIds": ["register-blockers-open"],
+                    "planHash": "compat-plan-hash-1",
+                },
+                "planHash": "compat-plan-hash-1",
+                "warningCount": 1,
+                "warnings": [{"id": "register-blockers-open"}],
+                "blockingCount": 0,
+                "blockingReasons": [],
+            },
+        )
 
     def test_do_post_android_compatibility_rejects_missing_dual_serials(self):
         import app
