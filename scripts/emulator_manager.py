@@ -89,6 +89,26 @@ def _safe_int(value: object, default: int = 0) -> int:
         return default
 
 
+def _adb_getprop(serial: str, prop_name: str) -> str:
+    normalized_serial = serial.strip()
+    if not normalized_serial:
+        return ""
+    adb_binary = _adb_binary()
+    if not adb_binary:
+        return ""
+    result = subprocess.run(
+        [adb_binary, "-s", normalized_serial, "shell", "getprop", prop_name],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=20,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 def list_avds() -> list[str]:
     emulator_path = emulator_binary_path()
     if emulator_path is None:
@@ -146,29 +166,19 @@ def list_running_emulators() -> list[dict[str, object]]:
                 "model": details.get("model", ""),
                 "device": details.get("device", ""),
                 "transportId": details.get("transport_id", ""),
+                "androidVersion": _adb_getprop(serial, "ro.build.version.release"),
+                "avdName": _adb_getprop(serial, "ro.boot.qemu.avd_name") or _adb_getprop(serial, "qemu.avd_name"),
             }
         )
     return devices
 
 
 def get_emulator_android_version(serial: str) -> str:
-    normalized_serial = serial.strip()
-    if not normalized_serial:
-        return ""
-    adb_binary = _adb_binary()
-    if not adb_binary:
-        return ""
-    result = subprocess.run(
-        [adb_binary, "-s", normalized_serial, "shell", "getprop", "ro.build.version.release"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-        timeout=20,
-    )
-    return result.stdout.strip() if result.returncode == 0 else ""
+    return _adb_getprop(serial, "ro.build.version.release")
+
+
+def get_emulator_avd_name(serial: str) -> str:
+    return _adb_getprop(serial, "ro.boot.qemu.avd_name") or _adb_getprop(serial, "qemu.avd_name")
 
 
 def wait_for_emulator_ready(serial: str, timeout_sec: int = 240) -> dict[str, object]:
@@ -226,11 +236,48 @@ def find_running_emulator_by_android_version(android_version: str, *, exclude_se
         serial = str(item.get("serial", "")).strip()
         if not serial or serial in excluded:
             continue
-        if get_emulator_android_version(serial) == android_version:
+        detected_version = str(item.get("androidVersion") or get_emulator_android_version(serial)).strip()
+        if detected_version == android_version:
             enriched = dict(item)
-            enriched["androidVersion"] = android_version
+            enriched["androidVersion"] = detected_version
             return enriched
     return None
+
+
+def find_running_emulator_by_avd_name(avd_name: str, *, exclude_serials: list[str] | None = None) -> dict[str, object] | None:
+    normalized_avd_name = avd_name.strip()
+    if not normalized_avd_name:
+        return None
+    excluded = {item.strip() for item in (exclude_serials or []) if item and item.strip()}
+    for item in list_running_emulators():
+        serial = str(item.get("serial", "")).strip()
+        if not serial or serial in excluded:
+            continue
+        detected_avd_name = str(item.get("avdName") or get_emulator_avd_name(serial)).strip()
+        if detected_avd_name == normalized_avd_name:
+            enriched = dict(item)
+            enriched["avdName"] = detected_avd_name
+            enriched["androidVersion"] = str(item.get("androidVersion") or get_emulator_android_version(serial)).strip()
+            return enriched
+    return None
+
+
+def _wait_for_serial_for_avd_name(avd_name: str, *, before_serials: set[str] | None = None, timeout_sec: int = 240) -> str:
+    normalized_avd_name = avd_name.strip()
+    if not normalized_avd_name:
+        raise ValueError("avdName ist erforderlich.")
+    seen_serials = {item.strip() for item in (before_serials or set()) if item and item.strip()}
+    deadline = time.time() + max(30, timeout_sec)
+    while time.time() < deadline:
+        running = find_running_emulator_by_avd_name(normalized_avd_name)
+        if running is not None:
+            serial = str(running.get("serial") or "").strip()
+            if serial and (not seen_serials or serial not in seen_serials):
+                return serial
+            if serial:
+                return serial
+        time.sleep(2)
+    raise ValueError(f"Kein Emulator-Serial für {normalized_avd_name} erkannt.")
 
 
 def ensure_emulator_available(
@@ -244,19 +291,19 @@ def ensure_emulator_available(
     timeout_sec: int = 240,
     exclude_serials: list[str] | None = None,
 ) -> dict[str, object]:
-    existing = find_running_emulator_by_android_version(android_version, exclude_serials=exclude_serials)
+    avd_name = build_managed_avd_name(profile_id, android_version, slot=slot)
+    existing = find_running_emulator_by_avd_name(avd_name, exclude_serials=exclude_serials)
     if existing is not None:
         return {
             "serial": str(existing.get("serial", "")),
             "androidVersion": android_version,
             "profileId": profile_id,
-            "avdName": str(existing.get("avdName", "")),
+            "avdName": str(existing.get("avdName", avd_name)),
             "reused": True,
             "created": False,
             "started": False,
         }
 
-    avd_name = build_managed_avd_name(profile_id, android_version, slot=slot)
     created = False
     if avd_name not in list_avds():
         create_avd(avd_name, profile_id=profile_id, android_version=android_version)
@@ -273,19 +320,11 @@ def ensure_emulator_available(
         wipe_data=wipe_data,
         no_snapshot=no_snapshot,
     )
-    deadline = time.time() + max(30, timeout_sec)
-    assigned_serial = ""
-    while time.time() < deadline and not assigned_serial:
-        for item in list_running_emulators():
-            serial = str(item.get("serial", "")).strip()
-            if serial and serial not in before_serials:
-                assigned_serial = serial
-                break
-        if not assigned_serial:
-            time.sleep(2)
-
-    if not assigned_serial:
-        raise ValueError(f"Kein neuer Emulator-Serial für {avd_name} erkannt.")
+    assigned_serial = _wait_for_serial_for_avd_name(
+        avd_name,
+        before_serials=before_serials,
+        timeout_sec=timeout_sec,
+    )
 
     wait_result = wait_for_emulator_ready(assigned_serial, timeout_sec=timeout_sec)
     return {
@@ -306,8 +345,24 @@ def ensure_emulator_pool(
     *,
     device_count: int = 1,
     timeout_sec: int = 240,
+    reservation_id: str = "",
 ) -> list[dict[str, object]]:
     normalized_count = max(1, int(device_count))
+    normalized_reservation_id = reservation_id.strip()
+    reservation: dict[str, object] | None = None
+    if normalized_reservation_id:
+        reservation = next(
+            (
+                entry for entry in load_active_reservations()
+                if str(entry.get("reservationId", "")).strip() == normalized_reservation_id
+            ),
+            None,
+        )
+        if reservation is None:
+            raise ValueError(f"Reservierung {normalized_reservation_id} ist nicht aktiv.")
+        if str(reservation.get("profileId", "")).strip() != profile_id.strip() or str(reservation.get("androidVersion", "")).strip() != android_version.strip():
+            raise ValueError("Reservierung passt nicht zu profileId/androidVersion.")
+
     allocated: list[dict[str, object]] = []
     exclude_serials: list[str] = []
     for slot in range(1, normalized_count + 1):
@@ -318,10 +373,30 @@ def ensure_emulator_pool(
             timeout_sec=timeout_sec,
             exclude_serials=exclude_serials,
         )
+        if normalized_reservation_id:
+            entry["reservationId"] = normalized_reservation_id
         serial = str(entry.get("serial", "")).strip()
         if serial:
             exclude_serials.append(serial)
         allocated.append(entry)
+
+    if reservation is not None:
+        updated = dict(reservation)
+        updated["assignedTargets"] = [
+            {
+                "slot": index,
+                "serial": str(item.get("serial") or ""),
+                "avdName": str(item.get("avdName") or ""),
+                "profileId": str(item.get("profileId") or profile_id),
+                "androidVersion": str(item.get("androidVersion") or android_version),
+            }
+            for index, item in enumerate(allocated, start=1)
+        ]
+        reservations = [
+            updated if str(item.get("reservationId", "")).strip() == normalized_reservation_id else item
+            for item in _load_reservations()
+        ]
+        _save_reservations(reservations)
     return allocated
 
 
@@ -609,6 +684,7 @@ def create_reservation(
         "createdAt": _utc_now(),
         "createdAtEpoch": created_at_epoch,
         "expiresAtEpoch": created_at_epoch + ttl_minutes * 60,
+        "assignedTargets": [],
     }
     reservations = load_active_reservations()
     conflicting = next(

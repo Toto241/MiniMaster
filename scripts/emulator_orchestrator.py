@@ -55,21 +55,23 @@ class AndroidEmulatorAdapter:
         running = emulator_manager.list_running_emulators()
         avd_names = emulator_manager.list_avds()
         targets: list[EmulatorTarget] = []
-
-        serial = str(running[0].get("serial", "")).strip() if running else ""
-        runtime = str(running[0].get("androidVersion", "")).strip() if running else ""
-        state = str(running[0].get("state", "stopped")).strip() if running else "stopped"
+        running_by_avd = {
+            str(item.get("avdName") or "").strip(): item
+            for item in running
+            if str(item.get("avdName") or "").strip()
+        }
 
         for avd_name in avd_names:
+            running_entry = running_by_avd.get(avd_name, {})
             targets.append(
                 EmulatorTarget(
                     platform=self.platform,
                     target_id=avd_name,
                     display_name=avd_name.replace("_", " "),
-                    state=state,
-                    runtime=runtime,
-                    serial=serial,
-                    metadata={"avdName": avd_name, "managed": True},
+                    state=str(running_entry.get("state") or "stopped"),
+                    runtime=str(running_entry.get("androidVersion") or ""),
+                    serial=str(running_entry.get("serial") or ""),
+                    metadata={"avdName": avd_name, "managed": True, **running_entry},
                 )
             )
 
@@ -108,7 +110,7 @@ class AndroidEmulatorAdapter:
             wipe_data=wipe_data,
             no_snapshot=no_snapshot,
         )
-        serial = self._await_serial(timeout_sec=timeout_sec)
+        serial = self._await_serial(avd_name=avd_name, timeout_sec=timeout_sec)
         boot = emulator_manager.wait_for_emulator_ready(serial, timeout_sec=timeout_sec)
         return OrchestratorResult(
             platform=self.platform,
@@ -204,15 +206,16 @@ class AndroidEmulatorAdapter:
             details={"serial": serial, "path": str(destination_path), "remotePath": remote_path},
         ).to_dict()
 
-    def _await_serial(self, *, timeout_sec: int = 240) -> str:
+    def _await_serial(self, *, avd_name: str, timeout_sec: int = 240) -> str:
         deadline = time.time() + max(30, timeout_sec)
         while time.time() < deadline:
-            running = emulator_manager.list_running_emulators()
-            serials = [str(item.get("serial", "")).strip() for item in running if str(item.get("serial", "")).strip()]
-            if serials:
-                return serials[-1]
+            running = emulator_manager.find_running_emulator_by_avd_name(avd_name)
+            if running is not None:
+                serial = str(running.get("serial") or "").strip()
+                if serial:
+                    return serial
             time.sleep(2)
-        raise ValueError("Kein Emulator-Serial erkannt.")
+        raise ValueError(f"Kein Emulator-Serial für {avd_name} erkannt.")
 
 
 class EmulatorOrchestrator:

@@ -53,12 +53,15 @@ from emulator_manager import (  # noqa: E402
     start_emulator,
     stop_emulator,
 )
+from android_scenario_runner import run_dual_device_matrix_entry, run_single_device_matrix_entry  # noqa: E402
+from remote_mac_agent_contract import build_remote_mac_agent_run_entry  # noqa: E402
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
 from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
+REMOTE_MAC_AGENT_RUN_LOG_FILE = LOG_DIR / "remote_mac_agent_runs.jsonl"
 JOB_RUN_LOG_FILE = LOG_DIR / "job_runs.jsonl"
 ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE = LOG_DIR / "android_automation_sweep_approvals.jsonl"
 ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE = LOG_DIR / "android_compatibility_approvals.jsonl"
@@ -2370,6 +2373,54 @@ def load_latest_commissioning_evidence() -> dict[str, dict[str, object]]:
         if not test_id or test_id in latest:
             continue
         latest[test_id] = entry
+    return latest
+
+
+def append_remote_mac_agent_run_log(entry: dict[str, object]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with REMOTE_MAC_AGENT_RUN_LOG_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def load_remote_mac_agent_run_history(limit: int, *, suite_id: str | None = None) -> list[dict[str, object]]:
+    if not REMOTE_MAC_AGENT_RUN_LOG_FILE.exists():
+        return []
+
+    lines = REMOTE_MAC_AGENT_RUN_LOG_FILE.read_text(encoding="utf-8").splitlines()
+    history: list[dict[str, object]] = []
+    filter_suite_id = (suite_id or "").strip()
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if filter_suite_id and str(entry.get("suiteId") or "").strip() != filter_suite_id:
+            continue
+        history.append(entry)
+        if len(history) >= limit:
+            break
+    return history
+
+
+def load_latest_remote_mac_agent_runs() -> dict[str, dict[str, object]]:
+    latest: dict[str, dict[str, object]] = {}
+    if not REMOTE_MAC_AGENT_RUN_LOG_FILE.exists():
+        return latest
+
+    lines = REMOTE_MAC_AGENT_RUN_LOG_FILE.read_text(encoding="utf-8").splitlines()
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        suite_id = str(entry.get("suiteId") or "").strip()
+        if not suite_id or suite_id in latest:
+            continue
+        latest[suite_id] = entry
     return latest
 
 
@@ -5932,17 +5983,6 @@ def _execute_android_compatibility_sub_runs(
             if execution_mode == "dual-device":
                 master_serial = str(kwargs.get("master_serial") or "").strip()
                 child_serial = str(kwargs.get("child_serial") or "").strip()
-                if master_serial == "auto" or child_serial == "auto":
-                    provisioning = ensure_emulator_pool(
-                        recommended_profile or _recommended_profile_for_version(android_version, "dual-device"),
-                        android_version,
-                        device_count=2,
-                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                    )
-                    if master_serial == "auto" and len(provisioning) >= 1:
-                        master_serial = str(provisioning[0].get("serial") or "")
-                    if child_serial == "auto" and len(provisioning) >= 2:
-                        child_serial = str(provisioning[1].get("serial") or "")
                 run_scenario_ids = selected_scenario_ids or ([scenario_id] if scenario_id else [""])
                 for current_scenario_id in run_scenario_ids:
                     scenario_definition = scenario_index.get(current_scenario_id)
@@ -5953,21 +5993,47 @@ def _execute_android_compatibility_sub_runs(
                     ] if scenario_definition else []
                     if scenario_versions and android_version not in scenario_versions:
                         continue
-                    result = run_dual_device(
-                        master_serial=master_serial,
-                        child_serial=child_serial,
-                        install_apk=bool(kwargs.get("install_apk")),
-                        master_apk_path=str(kwargs.get("master_apk_path") or ""),
-                        child_apk_path=str(kwargs.get("child_apk_path") or ""),
-                        uninstall_first=bool(kwargs.get("uninstall_first")),
-                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
-                        parallel=bool(kwargs.get("parallel")),
-                        scenario_id=current_scenario_id,
-                        profile_id=recommended_profile,
-                        fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
-                        expected_android_version=android_version,
-                        verbose=False,
-                    )
+                    if master_serial == "auto" or child_serial == "auto":
+                        outcome = run_dual_device_matrix_entry(
+                            run_id=run_id,
+                            android_version=android_version,
+                            profile_id=recommended_profile,
+                            master_serial=master_serial,
+                            child_serial=child_serial,
+                            scenario_id=current_scenario_id,
+                            fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
+                            install_apk=bool(kwargs.get("install_apk")),
+                            master_apk_path=str(kwargs.get("master_apk_path") or ""),
+                            child_apk_path=str(kwargs.get("child_apk_path") or ""),
+                            uninstall_first=bool(kwargs.get("uninstall_first")),
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                            parallel=bool(kwargs.get("parallel")),
+                        )
+                        provisioning = cast(list[dict[str, object]], outcome.get("provisioning") or [])
+                        status = str(outcome.get("status") or "error")
+                        result_payload = cast(dict[str, object], outcome.get("result") or {})
+                        artifacts = cast(dict[str, object], outcome.get("artifacts") or {})
+                        reservation_id = str(outcome.get("reservationId") or "")
+                    else:
+                        result = run_dual_device(
+                            master_serial=master_serial,
+                            child_serial=child_serial,
+                            install_apk=bool(kwargs.get("install_apk")),
+                            master_apk_path=str(kwargs.get("master_apk_path") or ""),
+                            child_apk_path=str(kwargs.get("child_apk_path") or ""),
+                            uninstall_first=bool(kwargs.get("uninstall_first")),
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=7200, min_value=60, max_value=14400),
+                            parallel=bool(kwargs.get("parallel")),
+                            scenario_id=current_scenario_id,
+                            profile_id=recommended_profile,
+                            fault_modes=cast(list[str], kwargs.get("fault_modes") or []),
+                            expected_android_version=android_version,
+                            verbose=False,
+                        )
+                        status = result.overall_status
+                        result_payload = result.to_dict()
+                        artifacts = {}
+                        reservation_id = ""
                     collected_sub_runs.append({
                         "runId": f"{run_id}:{execution_mode}:{android_version}:{current_scenario_id or 'default'}",
                         "androidVersion": android_version,
@@ -5975,36 +6041,57 @@ def _execute_android_compatibility_sub_runs(
                         "scenarioId": current_scenario_id,
                         "profileId": recommended_profile,
                         "provisioning": provisioning,
-                        "status": result.overall_status,
-                        "result": result.to_dict(),
+                        "reservationId": reservation_id or None,
+                        "artifacts": artifacts,
+                        "status": status,
+                        "result": result_payload,
                     })
             else:
                 serial = str(kwargs.get("serial") or "auto").strip() or "auto"
-                if serial == "auto":
-                    provisioning = ensure_emulator_pool(
-                        recommended_profile or _recommended_profile_for_version(android_version, "single-device"),
-                        android_version,
-                        device_count=1,
-                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                    )
-                    serial = str(provisioning[0].get("serial") or "")
                 run_test_classes = selected_test_classes or ([str(kwargs.get("test_filter") or "").strip()] if str(kwargs.get("test_filter") or "").strip() else [""])
                 for current_test_class in run_test_classes:
                     selected_classes_for_run = [current_test_class] if current_test_class else None
-                    result = run_usb_test(
-                        app_id=app_id,
-                        serial=serial,
-                        suite=str(kwargs.get("suite") or "commissioning"),
-                        test_filter="",
-                        selected_test_classes=selected_classes_for_run,
-                        skip_activation=bool(kwargs.get("skip_activation")),
-                        install_apk=bool(kwargs.get("install_apk")),
-                        apk_path=str(kwargs.get("apk_path") or ""),
-                        uninstall_first=bool(kwargs.get("uninstall_first")),
-                        timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
-                        expected_android_version=android_version,
-                        verbose=False,
-                    )
+                    if serial == "auto":
+                        outcome = run_single_device_matrix_entry(
+                            run_id=run_id,
+                            android_version=android_version,
+                            app_id=app_id,
+                            profile_id=recommended_profile,
+                            serial=serial,
+                            suite=str(kwargs.get("suite") or "commissioning"),
+                            selected_test_classes=selected_classes_for_run,
+                            skip_activation=bool(kwargs.get("skip_activation")),
+                            install_apk=bool(kwargs.get("install_apk")),
+                            apk_path=str(kwargs.get("apk_path") or ""),
+                            uninstall_first=bool(kwargs.get("uninstall_first")),
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                            deep_link_url=str(kwargs.get("deep_link_url") or ""),
+                            deep_link_package=str(kwargs.get("deep_link_package") or ""),
+                        )
+                        provisioning = cast(list[dict[str, object]], outcome.get("provisioning") or [])
+                        status = str(outcome.get("status") or "error")
+                        result_payload = cast(dict[str, object], outcome.get("result") or {})
+                        artifacts = cast(dict[str, object], outcome.get("artifacts") or {})
+                        reservation_id = str(outcome.get("reservationId") or "")
+                    else:
+                        result = run_usb_test(
+                            app_id=app_id,
+                            serial=serial,
+                            suite=str(kwargs.get("suite") or "commissioning"),
+                            test_filter="",
+                            selected_test_classes=selected_classes_for_run,
+                            skip_activation=bool(kwargs.get("skip_activation")),
+                            install_apk=bool(kwargs.get("install_apk")),
+                            apk_path=str(kwargs.get("apk_path") or ""),
+                            uninstall_first=bool(kwargs.get("uninstall_first")),
+                            timeout_sec=parse_int(kwargs.get("timeout_sec"), default=3600, min_value=60, max_value=7200),
+                            expected_android_version=android_version,
+                            verbose=False,
+                        )
+                        status = result.overall_status
+                        result_payload = result.to_dict()
+                        artifacts = {}
+                        reservation_id = ""
                     collected_sub_runs.append({
                         "runId": f"{run_id}:{execution_mode}:{android_version}:{app_id}:{current_test_class or 'default'}",
                         "androidVersion": android_version,
@@ -6013,8 +6100,10 @@ def _execute_android_compatibility_sub_runs(
                         "testClass": current_test_class,
                         "profileId": recommended_profile,
                         "provisioning": provisioning,
-                        "status": result.overall_status,
-                        "result": result.to_dict(),
+                        "reservationId": reservation_id or None,
+                        "artifacts": artifacts,
+                        "status": status,
+                        "result": result_payload,
                     })
         except Exception as exc:
             collected_sub_runs.append({
@@ -6392,6 +6481,24 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 },
             )
 
+        if parsed.path == "/api/commissioning/remote-mac-runs":
+            query = parse_qs(parsed.query)
+            limit = parse_int(
+                query.get("limit", [DEFAULT_EVIDENCE_LIMIT])[0],
+                DEFAULT_EVIDENCE_LIMIT,
+                min_value=1,
+                max_value=MAX_EVIDENCE_LIMIT,
+            )
+            suite_id = str(query.get("suiteId", [""])[0]).strip() or None
+            return self._write_json(
+                HTTPStatus.OK,
+                {
+                    "entries": load_remote_mac_agent_run_history(limit, suite_id=suite_id),
+                    "latestBySuiteId": load_latest_remote_mac_agent_runs(),
+                    "count": limit,
+                },
+            )
+
         if parsed.path == "/admin-panel":
             self.path = "/admin-panel/"
 
@@ -6457,6 +6564,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_run_commissioning()
         if parsed.path == "/api/commissioning/evidence":
             return self._handle_save_commissioning_evidence()
+        if parsed.path == "/api/commissioning/remote-mac-run":
+            return self._handle_save_remote_mac_agent_run()
 
         # ── Testsuite-API (POST) ─────────────────────────────────────────
         if parsed.path == "/api/suites/run":
@@ -6538,6 +6647,18 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
         return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_save_remote_mac_agent_run(self) -> None:
+        try:
+            payload = self._read_json_body()
+            entry = build_remote_mac_agent_run_entry(payload)
+            append_remote_mac_agent_run_log(entry)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        return self._write_json(HTTPStatus.CREATED, entry)
 
     def _handle_save_commissioning_evidence(self) -> None:
         try:
