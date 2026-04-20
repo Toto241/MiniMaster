@@ -1419,7 +1419,7 @@ function ensurePythonAutomationSelectedTest() {
 function openPythonAutomationProtocol(encodedTestId) {
     pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
     renderPythonAutomationProtocolEditor();
-    document.getElementById("qa-protocol-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollQaSection("qa-protocol-card");
 }
 
 function clearPythonAutomationProtocolForm() {
@@ -2658,6 +2658,15 @@ function buildQaTestWorkspaceMeta(label, value) {
     return `<div class='qa-test-detail-meta-item'><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
+function getQaSectionDetailsContainer(sectionId) {
+    const target = document.getElementById(sectionId);
+    if (!target) return null;
+    if (target.tagName?.toLowerCase() === "details") {
+        return target;
+    }
+    return target.closest("details");
+}
+
 function getQaRefreshSectionEntries() {
     return Object.entries(qaRefreshState.sections || {});
 }
@@ -2839,7 +2848,7 @@ function buildQaTestWorkspaceRunItems() {
             detail: String(run?.pending?.[0]?.details || run?.evaluation?.checks?.find(item => item?.status === "fail")?.details || "Kein Fehlerdetail hinterlegt."),
             updatedAt: String(run?.finishedAt || run?.startedAt || ""),
             primaryActionLabel: "Im Ergebnisbereich öffnen",
-            secondaryActionLabel: "Zum Python-Lauf",
+            secondaryActionLabel: "Zum Commissioning-Drilldown",
             secondaryAction: "scrollQaSection('qa-python-run-card')",
             priority: status === "fail" ? 0 : status === "manual_required" ? 1 : 4,
             raw: run,
@@ -2899,7 +2908,7 @@ function buildQaTestWorkspaceFailureItems() {
             detail: buildTestingRegisterDetailText(item) || "Keine zusätzlichen Details vorhanden.",
             updatedAt: String(item?.updatedAt || ""),
             primaryActionLabel: String(item?.action || "") === "protocol" ? "Nachweis öffnen" : String(item?.action || "") === "suite-run" ? "Suite-Aktion prüfen" : "Commissioning-Lauf prüfen",
-            secondaryActionLabel: "Im Register anzeigen",
+            secondaryActionLabel: "Zum Register-Drilldown",
             secondaryAction: "scrollQaSection('qa-register-card')",
             priority: status === "fail" ? 0 : status === "manual_required" ? 1 : 2,
             raw: item,
@@ -2926,7 +2935,7 @@ function buildQaTestWorkspaceFailureItems() {
                 detail: String(item?.details || "Kein Fehlerdetail hinterlegt."),
                 updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
                 primaryActionLabel: "Im Ergebnisbereich öffnen",
-                secondaryActionLabel: "Zum Python-Lauf",
+                secondaryActionLabel: "Zum Commissioning-Drilldown",
                 secondaryAction: "scrollQaSection('qa-python-run-card')",
                 priority: status === "fail" ? 0 : 1,
                 raw: { run: activeRun, item },
@@ -2950,7 +2959,7 @@ function buildQaTestWorkspaceFailureItems() {
                 detail: String(item?.details || "Kein Fehlerdetail hinterlegt."),
                 updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
                 primaryActionLabel: "Im Ergebnisbereich öffnen",
-                secondaryActionLabel: "Zum Python-Lauf",
+                secondaryActionLabel: "Zum Commissioning-Drilldown",
                 secondaryAction: "scrollQaSection('qa-python-run-card')",
                 priority: status === "fail" ? 0 : 1,
                 raw: { run: activeRun, item },
@@ -2972,7 +2981,7 @@ function buildQaTestWorkspaceFailureItems() {
                 detail: String(item?.output || item?.error || "Keine Kommandoausgabe verfügbar."),
                 updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
                 primaryActionLabel: "Im Ergebnisbereich öffnen",
-                secondaryActionLabel: "Zum Python-Lauf",
+                secondaryActionLabel: "Zum Commissioning-Drilldown",
                 secondaryAction: "scrollQaSection('qa-python-run-card')",
                 priority: 0,
                 raw: { run: activeRun, item },
@@ -2994,7 +3003,7 @@ function buildQaTestWorkspaceFailureItems() {
                 detail: "Für diesen Testfall liegt noch kein belastbarer Nachweis vor.",
                 updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
                 primaryActionLabel: "Nachweis öffnen",
-                secondaryActionLabel: "Zum Protokoll",
+                secondaryActionLabel: "Zum Nachweis-Drilldown",
                 secondaryAction: "scrollQaSection('qa-protocol-card')",
                 priority: 1,
                 raw: { run: activeRun, item },
@@ -3015,7 +3024,7 @@ function buildQaTestWorkspaceFailureItems() {
                 detail: String(item?.details || "Der zuletzt gespeicherte Nachweis ist negativ bewertet."),
                 updatedAt: String(activeRun?.finishedAt || activeRun?.startedAt || ""),
                 primaryActionLabel: "Nachweis öffnen",
-                secondaryActionLabel: "Zum Protokoll",
+                secondaryActionLabel: "Zum Nachweis-Drilldown",
                 secondaryAction: "scrollQaSection('qa-protocol-card')",
                 priority: 0,
                 raw: { run: activeRun, item },
@@ -3260,6 +3269,70 @@ function renderSuiteRunStructuredDetail(item) {
     `;
 }
 
+function renderQaTestWorkspaceContextDetail(item) {
+    if (!item) return "";
+
+    if (item.kind === "register-item") {
+        const registerItem = item.raw || {};
+        const meta = [
+            buildQaTestWorkspaceMeta("Testebene", registerItem.testLevelLabel || registerItem.testLevel || "-"),
+            buildQaTestWorkspaceMeta("App-Rolle", registerItem.appRoleLabel || registerItem.appRole || "-"),
+            buildQaTestWorkspaceMeta("Android", Array.isArray(registerItem.androidVersions) && registerItem.androidVersions.length > 0 ? registerItem.androidVersions.join(", ") : "-"),
+            buildQaTestWorkspaceMeta("Profile", Array.isArray(registerItem.executionProfiles) && registerItem.executionProfiles.length > 0 ? registerItem.executionProfiles.join(", ") : "-"),
+        ].filter(Boolean).join("");
+        return `
+            <div class='qa-test-detail-block'>
+                <strong>Register-Kontext</strong>
+                <div class='qa-test-detail-meta'>${meta}</div>
+            </div>
+        `;
+    }
+
+    if (["commissioning-run", "python-check", "python-pending", "python-command", "python-evidence"].includes(item.kind)) {
+        const run = item.raw?.run || item.raw || {};
+        const counts = run?.evaluation?.statusCounts || {};
+        const meta = [
+            buildQaTestWorkspaceMeta("Run-ID", run.runId || item.id || "-"),
+            buildQaTestWorkspaceMeta("Pass", String(Number(counts.pass || 0))),
+            buildQaTestWorkspaceMeta("Fail", String(Number(counts.fail || 0))),
+            buildQaTestWorkspaceMeta("Offen", String(Number(counts.manual_required || 0))),
+        ].filter(Boolean).join("");
+        return `
+            <div class='qa-test-detail-block'>
+                <strong>Commissioning-Kontext</strong>
+                <div class='qa-test-detail-meta'>${meta}</div>
+            </div>
+        `;
+    }
+
+    if (item.kind === "suite-run") {
+        const run = item.raw || {};
+        const meta = [
+            buildQaTestWorkspaceMeta("Run-ID", run.runId || run.run_id || item.id || "-"),
+            buildQaTestWorkspaceMeta("Suite", run.suiteId || run.suite_id || run.type || "-"),
+            buildQaTestWorkspaceMeta("Lifecycle", run.status || "-"),
+            buildQaTestWorkspaceMeta("Ergebnis", run.result?.status || run.result?.overall_status || run.result?.overallStatus || "-"),
+        ].filter(Boolean).join("");
+        return `
+            <div class='qa-test-detail-block'>
+                <strong>Suite-Kontext</strong>
+                <div class='qa-test-detail-meta'>${meta}</div>
+            </div>
+        `;
+    }
+
+    return "";
+}
+
+function getQaTestWorkspaceDetailHeading(item) {
+    if (!item) return "Fehler- oder Statusdetail";
+    if (item.kind === "register-item") return "Registerstatus und Ursachenbild";
+    if (["commissioning-run", "python-check", "python-pending", "python-command"].includes(item.kind)) return "Commissioning-Detail";
+    if (item.kind === "python-evidence") return "Nachweisstatus";
+    if (item.kind === "suite-run") return "Suite-Detail";
+    return "Fehler- oder Statusdetail";
+}
+
 function renderQaTestWorkspaceDetail(container, item) {
     if (!container) return;
     if (!item) {
@@ -3275,6 +3348,7 @@ function renderQaTestWorkspaceDetail(container, item) {
     ].filter(Boolean).join("");
 
     const rawDebug = escapeHtml(JSON.stringify(item.raw, null, 2));
+    const contextDetailHtml = renderQaTestWorkspaceContextDetail(item);
     const structuredDetailHtml = renderSuiteRunStructuredDetail(item);
     const secondaryActionHtml = item.secondaryAction && item.secondaryActionLabel
         ? `<button type='button' class='btn btn-secondary btn-sm' onclick="${item.secondaryAction}">${escapeHtml(item.secondaryActionLabel)}</button>`
@@ -3287,9 +3361,10 @@ function renderQaTestWorkspaceDetail(container, item) {
         </div>
         <div class='qa-test-detail-meta'>${detailMeta}</div>
         <div class='qa-test-detail-block'>
-            <strong>Fehler- oder Statusdetail</strong>
+            <strong>${escapeHtml(getQaTestWorkspaceDetailHeading(item))}</strong>
             <p>${escapeHtml(item.detail || "Keine Detailbeschreibung vorhanden.")}</p>
         </div>
+        ${contextDetailHtml}
         ${structuredDetailHtml}
         <div class='setup-actions' style='margin-block-start: 12px'>
             <button type='button' class='btn btn-secondary btn-sm' onclick='openSelectedQaTestWorkspaceItem()'>${escapeHtml(item.primaryActionLabel || "Öffnen")}</button>
@@ -5152,6 +5227,10 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
 }
 
 function scrollQaSection(sectionId) {
+    const details = getQaSectionDetailsContainer(sectionId);
+    if (details) {
+        details.open = true;
+    }
     const target = document.getElementById(sectionId);
     if (!target) return;
     target.scrollIntoView({ behavior: "smooth", block: "start" });
