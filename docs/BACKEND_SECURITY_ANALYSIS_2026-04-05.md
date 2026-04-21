@@ -186,7 +186,7 @@ Restrisiko:
 
 - Die Rate Limits sind wie an anderer Stelle aktuell in-memory und damit nicht global wirksam.
 - Die Legacy-Pfade bleiben fachlich weiter vorhanden; die Härtung reduziert Missbrauch, ersetzt aber keinen vollständigen Cutover.
-- Fuer den Web-Cutover existiert bereits der sichere Browser-Pfad ueber `createMasterWebBootstrapToken` und `redeemMasterWebBootstrapToken`, aber im aktuell geprueften Frontend ist noch kein vollstaendig belegter Erzeuger-Flow fuer Endnutzer sichtbar. Ein harter Backend-Schnitt ohne diesen UI-Pfad wuerde bestehende Browser-Anmeldungen still brechen.
+- Der Web-Cutover fuer die Ziel-Panels ist umgesetzt: Das Eltern-Panel erzeugt sichere Bootstrap-Links fuer Web-Control und Kinder-Panel ueber `createMasterWebBootstrapToken`, waehrend beide Ziel-Panels keine Secret-Key-Anmeldung mehr akzeptieren und nur noch per `bootstrapToken`-Link einsteigen.
 
 ### Korrigierte Einordnung angrenzender Frontend-Befunde
 

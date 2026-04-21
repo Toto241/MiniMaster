@@ -514,36 +514,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- Authentication Functions ---
 
-/**
- * Handles the login process. It takes credentials from the input fields,
- * calls the 'generateCustomToken' Cloud Function to get a Firebase Auth token,
- * signs in with that token, and if successful, saves the session and loads the dashboard.
- */
 function login() {
-    const masterImei = document.getElementById('master-imei').value.trim();
-    const secretKey = document.getElementById('secret-key').value.trim();
-
-    if (!masterImei || !secretKey) {
-        showNotification('Please enter both Master IMEI and Secret Key.', 'error');
-        return;
-    }
-
-    const generateCustomToken = firebase.functions().httpsCallable('generateCustomToken');
-
-    showNotification('Authenticating...', 'info');
-
-    generateCustomToken({ masterImei: masterImei, secretKey: secretKey })
-        .then(result => {
-            const customToken = result.data.customToken;
-            return firebase.auth().signInWithCustomToken(customToken);
-        })
-        .then(() => {
-            showNotification('Login successful!', 'success');
-        })
-        .catch(error => {
-            console.error('Login error:', error);
-            showNotification('Login failed: ' + error.message, 'error');
-        });
+    showNotification('Direct secret-key login is disabled. Open this panel via the secure link from the Eltern-Panel.', 'error');
 }
 
 /**
@@ -561,10 +533,6 @@ function logout() {
         devicesListener();
         devicesListener = null;
     }
-
-    // Reset the login form fields.
-    document.getElementById('master-imei').value = '';
-    document.getElementById('secret-key').value = '';
 
     // Switch the view from the dashboard back to the login form.
     document.getElementById('login-form').style.display = 'flex';

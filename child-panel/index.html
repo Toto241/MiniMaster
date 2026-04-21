@@ -206,25 +206,14 @@
 
       <div id="ticket-auth-status" class="status">Nicht authentifiziert.</div>
 
-      <div class="form-grid">
-        <div>
-          <label for="ticket-master-imei">Master IMEI / Eltern-Benutzer-ID</label>
-          <input id="ticket-master-imei" type="text" placeholder="z. B. 123456789012345" title="Die IMEI oder Benutzer-ID des registrierten Elterngeräts eingeben" />
-        </div>
-        <div>
-          <label for="ticket-secret-key">Secret Key (Elternkonto)</label>
-          <input id="ticket-secret-key" type="password" placeholder="Secret Key" title="Den geheimen Schlüssel des Elternkontos eingeben" />
-        </div>
-      </div>
-
       <div class="inline">
-        <button class="btn btn-secondary" type="button" onclick="authenticateForTickets()" title="Mit Master IMEI und Secret Key beim System anmelden">Authentifizieren</button>
+        <a class="btn btn-secondary" href="../parent-panel/index.html" title="Zum Eltern-Panel wechseln und dort einen sicheren Sitzungslink erzeugen">Sicheren Sitzungslink ueber Eltern-Panel holen</a>
         <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
       </div>
 
       <p class="help">
-        Bevorzugt einen sicheren Web-Link mit <strong>bootstrapToken</strong> verwenden. Der Secret-Key-Login bleibt
-        voruebergehend nur als Fallback aktiv, bis die Browser-Anmeldung vollstaendig auf Bootstrap-Links umgestellt ist.
+        Dieses Panel akzeptiert keine Secret-Key-Anmeldung mehr. Oeffnen Sie es ueber einen sicheren Web-Link mit
+        <strong>bootstrapToken</strong>, zum Beispiel aus dem Eltern-Panel.
       </p>
 
       <div class="form-grid">
@@ -401,27 +390,7 @@
     }
 
     async function authenticateForTickets() {
-      try {
-        if (!functions || !auth) {
-          setStatus("ticket-auth-status", "Firebase ist nicht initialisiert.", "error");
-          return;
-        }
-        if (!ensureAppCheckConfigured(app, "ticket-auth-status")) {
-          return;
-        }
-        const masterImei = document.getElementById("ticket-master-imei").value.trim();
-        const secretKey = document.getElementById("ticket-secret-key").value.trim();
-        if (!masterImei || !secretKey) {
-          setStatus("ticket-auth-status", "Master IMEI und Secret Key sind erforderlich.", "error");
-          return;
-        }
-        setStatus("ticket-auth-status", "Authentifiziere...", "");
-        const tokenFn = functions.httpsCallable("generateCustomToken");
-        const tokenResult = await tokenFn({ masterImei, secretKey });
-        await auth.signInWithCustomToken(tokenResult.data.customToken);
-      } catch (error) {
-        setStatus("ticket-auth-status", "Authentifizierung fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
-      }
+      setStatus("ticket-auth-status", "Direkte Secret-Key-Anmeldung ist deaktiviert. Bitte das Kinder-Panel ueber einen sicheren Sitzungslink aus dem Eltern-Panel oeffnen.", "error");
     }
 
     async function submitSupportTicket() {
