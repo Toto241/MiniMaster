@@ -15,16 +15,36 @@ function loadParentPanel() {
   const source = extractInlineScript(html);
 
   const elements = new Map<string, any>();
+  const createNode = (tagName?: string) => ({
+    tagName: tagName ? tagName.toUpperCase() : undefined,
+    value: "",
+    disabled: false,
+    textContent: "",
+    className: "",
+    innerHTML: "",
+    id: "",
+    type: "",
+    placeholder: "",
+    attributes: new Map<string, string>(),
+    children: [] as any[],
+    appendChild(child: any) {
+      this.children.push(child);
+      return child;
+    },
+    replaceChildren(...children: any[]) {
+      this.children = [...children];
+    },
+    addEventListener: jest.fn(),
+    setAttribute(name: string, value: string) {
+      this.attributes.set(name, value);
+    },
+  });
   const getElement = (id: string) => {
     if (!elements.has(id)) {
-      elements.set(id, {
-        id,
-        value: "",
-        disabled: false,
-        textContent: "",
-        className: "status",
-        innerHTML: "",
-      });
+      const element = createNode();
+      element.id = id;
+      element.className = "status";
+      elements.set(id, element);
     }
     return elements.get(id);
   };
@@ -33,8 +53,6 @@ function loadParentPanel() {
     "ticket-auth-status",
     "ticket-submit-status",
     "ticket-list",
-    "ticket-master-imei",
-    "ticket-secret-key",
     "ticket-sender-name",
     "ticket-sender-email",
     "ticket-sender-role",
@@ -60,9 +78,6 @@ function loadParentPanel() {
     if (name === "redeemMasterWebBootstrapToken") {
       return jest.fn(() => Promise.resolve({ data: { customToken: "tok-parent" } }));
     }
-    if (name === "generateCustomToken") {
-      return jest.fn(() => Promise.resolve({ data: { customToken: "tok-legacy" } }));
-    }
     return jest.fn(() => Promise.resolve({ data: {} }));
   });
 
@@ -81,6 +96,8 @@ function loadParentPanel() {
       title: "Parent Panel",
       getElementById: jest.fn((id: string) => getElement(id)),
       querySelector: jest.fn(() => ({ value: "no" })),
+      createElement: jest.fn((tagName: string) => createNode(tagName)),
+      createTextNode: jest.fn((text: string) => ({ nodeType: 3, textContent: text })),
     },
     localStorage: {
       getItem: jest.fn((key: string) => {
@@ -181,7 +198,7 @@ describe("parent-panel bootstrap launch", () => {
     expect(locationMock.assign).toHaveBeenCalledWith("/child-panel/index.html?bootstrapToken=bridge-token");
   });
 
-  it("refuses secure launch before authentication and keeps legacy access visible", async () => {
+  it("refuses secure launch before authentication", async () => {
     const { context, callableFactory, locationMock, elements } = loadParentPanel();
 
     await context.__parentPanelTestExports.openSecureWebControl();
@@ -189,5 +206,13 @@ describe("parent-panel bootstrap launch", () => {
     expect(callableFactory).not.toHaveBeenCalledWith("createMasterWebBootstrapToken");
     expect(locationMock.assign).not.toHaveBeenCalled();
     expect(elements.get("ticket-auth-status").textContent).toContain("Bitte zuerst im Eltern-Panel authentifizieren");
+  });
+
+  it("surfaces a disabled message for direct ticket authentication", async () => {
+    const { context, elements } = loadParentPanel();
+
+    await context.__parentPanelTestExports.authenticateForTickets();
+
+    expect(elements.get("ticket-auth-status").textContent).toContain("Direkte Secret-Key-Anmeldung ist deaktiviert");
   });
 });
