@@ -125,8 +125,9 @@ Notes:
 ### Desktop Launcher Setup (PC)
 
 1.  Install dependencies in repository root: `npm install`
-2.  Start desktop launcher: `npm run desktop-start`
-3.  Use launcher to open:
+2.  Install desktop-specific dependencies: `cd desktop && npm install`
+3.  Start desktop launcher: `npm run desktop-start` (from repository root)
+4.  Use launcher to open:
     - Parent panel (`web-control`)
     - Operator dashboard (`admin-panel`)
 

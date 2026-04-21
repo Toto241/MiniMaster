@@ -19,6 +19,10 @@ const config = {
   collectCoverage: false,  // Disable coverage by default to save memory
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'cobertura', 'json'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/test/admin-panel-helpers.test.ts',
+  ],
   coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
   coverageThreshold: {
     global: {

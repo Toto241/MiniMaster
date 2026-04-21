@@ -51,7 +51,7 @@ You can get these values from your Firebase console:
 
 ### 2. Firebase Security Rules
 
-Ensure your Firestore security rules allow read access to the `masters` and `children` collections for authenticated users. The web app uses the same authentication method as the mobile apps (Master IMEI + Secret Key).
+Ensure your Firestore security rules allow read access to the `masters` and `children` collections for authenticated users. The web app uses Firebase Authentication via secure bootstrap tokens.
 
 ### 3. CORS Configuration
 
@@ -60,11 +60,14 @@ If you plan to host this on a different domain than your Firebase project, you m
 ## Usage
 
 ### Login
-1. Enter your Master Device IMEI
-2. Enter your Secret Key (same credentials used in the parent mobile app)
-3. Click "Login"
+The web panel no longer supports direct Secret-Key login. Instead, authentication is performed via secure session links:
 
-The credentials will be securely stored in your browser for convenience (localStorage).
+1. Open the **Parent Panel** (`parent-panel/index.html`) on your mobile device or desktop
+2. Log in with your credentials
+3. Generate a secure web control link (bootstrap token)
+4. Open the generated link in your browser — the web control panel will automatically authenticate you via Firebase Custom Token
+
+For local development or testing, the panel also supports Firebase Auth state restoration from `localStorage` when a valid session exists.
 
 ### Managing Devices
 - **View Devices**: All paired devices are displayed with their current status
@@ -91,10 +94,10 @@ The web interface uses Firebase Firestore real-time listeners to provide instant
 - Lock status changes
 
 ### Security
-- Uses the same authentication system as the mobile apps
-- Master IMEI and Secret Key validation through Firebase Functions
-- No sensitive data stored in client-side code
-- Credentials validation on every operation
+- Uses Firebase Authentication via secure bootstrap tokens
+- Direct secret-key login is disabled for security
+- Credentials are validated on every operation
+- Photo URLs are validated to ensure they use HTTPS only
 
 ### Browser Compatibility
 - Modern browsers with ES6+ support
@@ -157,9 +160,9 @@ For testing and development:
 - Check that the Firebase configuration in `app.js` is correct
 - Ensure your Firebase project is active
 
-**"Invalid credentials"**
-- Verify Master IMEI and Secret Key are correct
-- Check that the master device exists in your Firestore database
+**"Authentication failed"**
+- Make sure you are opening the panel via a valid secure link from the Parent Panel
+- Check that the bootstrap token has not expired
 
 **"Error loading devices"**
 - Verify Firestore security rules allow read access
@@ -186,6 +189,6 @@ Changes made in the web interface will immediately reflect in the mobile apps an
 
 - Always use HTTPS in production
 - Keep Firebase configuration secure
-- Regularly rotate Secret Keys
 - Monitor access logs in Firebase console
 - Consider implementing additional authentication layers for sensitive operations
+- Photo proof URLs are strictly validated to accept only HTTPS links

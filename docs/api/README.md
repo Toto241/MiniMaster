@@ -5,8 +5,6 @@ This directory contains OpenAPI specifications and API documentation for the Min
 ## Structure
 
 - `cloud-functions-api.yaml` - OpenAPI 3.0 specification for Cloud Functions
-- `examples/` - Request/response examples
-- `schemas/` - Reusable data schemas
 
 ## Usage
 

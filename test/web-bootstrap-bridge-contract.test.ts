@@ -20,7 +20,7 @@ describe("web bootstrap bridge contract", () => {
     expect(parentPanel).toContain("queryParamName");
     expect(parentPanel).toContain("../web-control/index.html");
     expect(parentPanel).toContain("openSecureChildPanel");
-    expect(parentPanel).not.toContain('httpsCallable("generateCustomToken")');
+    expect(parentPanel).not.toContain("httpsCallable(\"generateCustomToken\")");
   });
 
   it("web clients support bootstrapToken redemption without browser legacy login fallback", async () => {
@@ -33,8 +33,8 @@ describe("web bootstrap bridge contract", () => {
       expect(source).toContain("redeemMasterWebBootstrapToken");
     }
 
-    expect(webControl).not.toContain('httpsCallable("generateCustomToken")');
-    expect(parentPanel).not.toContain('httpsCallable("generateCustomToken")');
-    expect(childPanel).not.toContain('httpsCallable("generateCustomToken")');
+    expect(webControl).not.toContain("httpsCallable(\"generateCustomToken\")");
+    expect(parentPanel).not.toContain("httpsCallable(\"generateCustomToken\")");
+    expect(childPanel).not.toContain("httpsCallable(\"generateCustomToken\")");
   });
 });

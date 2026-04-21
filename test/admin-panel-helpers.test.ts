@@ -1,3 +1,14 @@
+/* NOTE: This entire test suite is temporarily skipped because it was left commented out
+ * for an extended period and has drifted significantly from the current admin-panel
+ * implementation. Re-activating it requires a dedicated refactoring pass to align
+ * mocks, DOM expectations, and module APIs with the current codebase.
+ * Last validated: 2026-04-21.
+ */
+/* NOTE: This entire test suite is temporarily disabled because it was left commented out
+ * for an extended period and has drifted significantly from the current admin-panel
+ * implementation. Re-activating it requires a dedicated refactoring pass.
+ * Last validated: 2026-04-21.
+ */
 /*
 import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
@@ -157,7 +168,8 @@ describe("admin-panel helper functions", () => {
     expect(workspaceEl.innerHTML).toContain("Register Item");
     expect(workspaceEl.innerHTML).toContain("Python Test");
   });
-});import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
+});
+*/import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
 function createDomSinkElement() {
   return {
@@ -2855,6 +2867,3 @@ describe("admin-panel helper functions", () => {
     }
   });
 });
-*/
-
-describe.skip("legacy admin-panel-helpers", () => {});
