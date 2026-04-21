@@ -626,6 +626,8 @@ describe("admin-panel current QA helpers", () => {
 
     expect(failuresEl.innerHTML).toContain("Register Item");
     expect(runOverviewEl.innerHTML).toContain("Python-Commissioning run-1");
+    expect(failuresEl.innerHTML).toContain("Testregister · QA");
+    expect(failuresEl.innerHTML).toContain("P1 · sofort prüfen");
     expect(detailEl.innerHTML).toContain("Registerstatus und Ursachenbild");
     expect(detailEl.innerHTML).toContain("Register-Kontext");
     expect(detailEl.innerHTML).toContain("Systemtests");
@@ -703,7 +705,10 @@ describe("admin-panel current QA helpers", () => {
     exports.renderQaTestWorkspace();
 
     expect(runOverviewEl.innerHTML).toContain("Android-Kompatibilität: Dual-Device");
+    expect(runOverviewEl.innerHTML).toContain("Suite-Verlauf");
+    expect(runOverviewEl.innerHTML).toContain("P1 · sofort prüfen");
     expect(detailEl.innerHTML).toContain("Android-Laufkontext");
+    expect(detailEl.innerHTML).toContain("Suite-Kontext");
     expect(detailEl.innerHTML).toContain("Sub-Läufe und Artefakte");
     expect(detailEl.innerHTML).toContain("offline-online-resync");
     expect(detailEl.innerHTML).toContain("emulator-5554");

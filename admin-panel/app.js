@@ -3073,6 +3073,22 @@ function resolveQaTestWorkspaceSelection(runs, failures) {
     return selected;
 }
 
+function getQaTestWorkspaceItemTone(item) {
+    const status = String(item?.status || "").toLowerCase();
+    if (status === "fail" || status === "failed" || status === "error") return "danger";
+    if (status === "manual_required" || status === "running" || status === "queued" || status === "pending") return "warning";
+    if (status === "pass" || status === "passed" || status === "ok" || status === "success") return "success";
+    return "neutral";
+}
+
+function getQaTestWorkspaceItemPriorityLabel(item) {
+    const tone = getQaTestWorkspaceItemTone(item);
+    if (tone === "danger") return "P1 · sofort prüfen";
+    if (tone === "warning") return "P2 · zeitnah prüfen";
+    if (tone === "success") return "Info · erfolgreich";
+    return "Info · beobachten";
+}
+
 function renderQaTestWorkspaceList(container, items, selected, emptyMessage) {
     if (!container) return;
     if (!Array.isArray(items) || items.length === 0) {
@@ -3087,12 +3103,16 @@ function renderQaTestWorkspaceList(container, items, selected, emptyMessage) {
                 const isSelected = selected && selected.kind === item.kind && selected.id === item.id;
                 const encodedKind = encodeInlineArgument(item.kind);
                 const encodedId = encodeInlineArgument(item.id);
+                const tone = getQaTestWorkspaceItemTone(item);
                 return `
-                    <article class='qa-test-list-item ${isSelected ? "is-selected" : ""}'>
+                    <article class='qa-test-list-item qa-test-list-item-${escapeHtml(tone)} ${isSelected ? "is-selected" : ""}'>
                         <div class='qa-register-item-header'>
                             <div>
+                                <div class='qa-test-list-eyebrow'>
+                                    <span class='qa-test-list-source'>${escapeHtml(item.sourceLabel)}</span>
+                                    <span class='qa-test-list-priority qa-test-list-priority-${escapeHtml(tone)}'>${escapeHtml(getQaTestWorkspaceItemPriorityLabel(item))}</span>
+                                </div>
                                 <h6>${escapeHtml(item.title)}</h6>
-                                <div class='python-muted-caption'>${escapeHtml(item.sourceLabel)}</div>
                             </div>
                             <span class='python-status-badge ${escapeHtml(item.statusClassName)}'>${escapeHtml(item.statusLabel)}</span>
                         </div>
@@ -5155,7 +5175,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 </div>
                 ${renderGroupList(data.commissioningAutomatic.groups, "Noch keine automatisch bewertbaren Commissioning-Prüffälle geladen.")}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.commissioningRuns || "-"))}</div>
-                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-python-run-card')">Zum Python-Lauf</button>
+                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-python-run-card')">Zum Commissioning-Drilldown</button>
             </article>
             <article class='qa-guide-card'>
                 <div class='qa-guide-card-header'>
@@ -5167,7 +5187,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 </div>
                 ${suiteItemsHtml}
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
-                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
+                <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur QA-Arbeitsfläche</button>
             </article>
             <article class='qa-guide-card'>
                 <div class='qa-guide-card-header'>
@@ -5198,7 +5218,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 <div class='qa-guide-footer'>Ablage: ${escapeHtml(String(data.storage?.suiteRuns || "-"))}</div>
                 <div class='setup-actions mm-u031'>
                     <button class='btn btn-secondary btn-sm' onclick="startAndroidAutomationSweep()" ${sweepDisabledAttr}>Sweep starten</button>
-                    <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
+                    <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur QA-Arbeitsfläche</button>
                 </div>
             </article>
             <article class='qa-guide-card'>
@@ -5219,7 +5239,7 @@ function renderQaExecutionGuide(catalog = pythonCommissioningCatalog, payload = 
                 <div class='setup-actions mm-u031'>
                     <button class='btn btn-secondary btn-sm' onclick="ensureAndroidCompatibilityPreflightLoaded({ forceRefresh: true }).then(() => rerenderQaExecutionGuideFromCache())">Preflight aktualisieren</button>
                     <button class='btn btn-secondary btn-sm' onclick="startAndroidCompatibilityRun()" ${compatibilityDisabledAttr}>Kompatibilität starten</button>
-                    <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur Laufübersicht</button>
+                    <button class='btn btn-secondary btn-sm' onclick="scrollQaSection('qa-suite-card')">Zur QA-Arbeitsfläche</button>
                 </div>
             </article>
         </div>
