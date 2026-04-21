@@ -82,17 +82,26 @@ This PR completes the following changes. Reviewers should pay attention to the a
 
 ## 3. Priorisierte Umsetzungsreihenfolge
 
+### Status 2026-04-21 - Security-Hardening Wave gestartet
+
+1. Das Kinder-Panel rendert Support-Tickets und Fehlerzustaende nicht mehr ueber unescaped HTML-Strings, sondern ueber DOM-APIs. Damit ist der bestaetigte DOM-XSS-Pfad aus dem Ticket-Listing unmittelbar reduziert.
+2. Die Workflow-Haertung wurde vereinheitlicht: bislang fehlende explizite `permissions`-Bloecke werden jetzt fuer die betroffenen CI-Workflows nachgezogen, waehrend strengere bestehende Workflows unveraendert bleiben.
+3. Die Firebase-Android-Konfigurationen sind im aktuellen Git-Stand nicht getrackt. Die Templates in [masterApp/google-services.template.json](masterApp/google-services.template.json) und [childApp/google-services.template.json](childApp/google-services.template.json) bleiben die alleinige Repository-Quelle.
+4. Der vollstaendige Legacy-Web-Auth-Cutover ist noch nicht abgeschlossen. Im Code existiert zwar die sichere Browser-Anmeldung ueber `createMasterWebBootstrapToken` und `redeemMasterWebBootstrapToken`, im Frontend ist aber noch kein durchgaengiger Erzeuger-Flow fuer Endnutzer belegt. Dieser Punkt bleibt bis zur vorhandenen Bootstrap-Link-Ausgabe ein kontrollierter Blocker fuer den harten Entfernen-Schritt.
+
 ### Phase A — Go-Live-Blocker zuerst
 
 1. Backend-Full-Validation ohne Fehler herstellen (Admin-Claim, Functions, Firestore, Runtime-Konfiguration).
 2. Child-App-Enforcement-Härtung abschließen: wirksames App-Blocking, Overlay-Sicherheit, Schutz gegen Abschalten/Deinstallation.
 3. Pflicht-Freigaben und Compliance-Nachweise dokumentiert abhaken.
+4. Legacy-Web-Auth von SecretKey/IMEI auf den Bootstrap-Link-Flow umstellen, sobald die Token-Erzeugung fuer Eltern-/Browser-Nutzer ueber einen bestaetigten UI-Pfad verfuegbar ist.
 
 ### Phase B — Hochpriorisierte Produktreife
 
 1. Storage/Foto-Upload und Task-Proof-Ende-zu-Ende absichern.
 2. Zeitfenster/Usage-Limits auf dem Child-Gerät belastbar testen und vervollständigen.
 3. Desktop-Sicherheitsbasis schließen (CSP, SRI, Credential-Speicherung, Session-Timeout).
+4. Admin-Panel-`innerHTML`-Flaechen weiter nach untrusted Datenquellen priorisieren und auf DOM-APIs oder zentral abgesichertes Rendering umstellen.
 
 ### Phase C — Skalierung und Betriebsreife
 

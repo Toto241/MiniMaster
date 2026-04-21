@@ -22,6 +22,9 @@ on:
       - 'jest.config.*'
       - '.github/workflows/firestore-rules-ci.yml'
 
+permissions:
+  contents: read
+
 jobs:
   firestore-rules:
     runs-on: ubuntu-latest

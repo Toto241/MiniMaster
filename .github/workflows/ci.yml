@@ -31,6 +31,9 @@ on:
       - 'jest.config.*'
       - 'tsconfig.json'
 
+permissions:
+  contents: read
+
 jobs:
   functions:
     runs-on: ubuntu-latest

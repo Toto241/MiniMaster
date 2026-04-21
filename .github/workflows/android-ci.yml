@@ -5,6 +5,9 @@ on:
   pull_request:
     paths: ['**/*.kt', '**/build.gradle', 'settings.gradle', 'gradle/**', '.github/workflows/android-ci.yml']
 
+permissions:
+  contents: read
+
 jobs:
   android:
     runs-on: ubuntu-latest

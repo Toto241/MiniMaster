@@ -16,6 +16,9 @@ concurrency:
   group: ios-ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   ios-structure-validate:
     name: Validate iOS package structure

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MiniMaster Kinder-Panel</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
@@ -221,6 +221,11 @@
         <button class="btn btn-secondary" type="button" onclick="authenticateForTickets()" title="Mit Master IMEI und Secret Key beim System anmelden">Authentifizieren</button>
         <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
       </div>
+
+      <p class="help">
+        Bevorzugt einen sicheren Web-Link mit <strong>bootstrapToken</strong> verwenden. Der Secret-Key-Login bleibt
+        voruebergehend nur als Fallback aktiv, bis die Browser-Anmeldung vollstaendig auf Bootstrap-Links umgestellt ist.
+      </p>
 
       <div class="form-grid">
         <div>
@@ -528,14 +533,129 @@
       }
     }
 
+    function renderTicketListState(listEl, message, type) {
+      listEl.replaceChildren();
+      if (!message) {
+        return;
+      }
+      const stateEl = document.createElement("div");
+      stateEl.className = type ? "status " + type : "status";
+      stateEl.textContent = message;
+      listEl.appendChild(stateEl);
+    }
+
+    function createTicketMetaLabel(label, value) {
+      const span = document.createElement("span");
+      span.textContent = label + ": " + value;
+      return span;
+    }
+
+    function createTicketActionButtons(docId) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "inline";
+
+      const allowBtn = document.createElement("button");
+      allowBtn.className = "btn btn-primary";
+      allowBtn.type = "button";
+      allowBtn.textContent = "Ja, Debug-Modus aktivieren";
+      allowBtn.addEventListener("click", () => {
+        handleDebugConsent(docId, true);
+      });
+
+      const denyBtn = document.createElement("button");
+      denyBtn.className = "btn btn-ghost";
+      denyBtn.type = "button";
+      denyBtn.textContent = "Nein, ohne Debug weiter";
+      denyBtn.addEventListener("click", () => {
+        handleDebugConsent(docId, false);
+      });
+
+      wrapper.appendChild(allowBtn);
+      wrapper.appendChild(denyBtn);
+      return wrapper;
+    }
+
+    function createTicketReplyBox(docId) {
+      const wrapper = document.createElement("div");
+
+      const label = document.createElement("label");
+      label.setAttribute("for", "reply-" + docId);
+      label.textContent = "Antwort an KI";
+
+      const textarea = document.createElement("textarea");
+      textarea.id = "reply-" + docId;
+      textarea.className = "reply-input";
+      textarea.placeholder = "Antwort oder weitere Beobachtung eingeben...";
+
+      const buttonRow = document.createElement("div");
+      buttonRow.className = "inline";
+
+      const submitBtn = document.createElement("button");
+      submitBtn.className = "btn btn-secondary";
+      submitBtn.type = "button";
+      submitBtn.textContent = "Antwort senden";
+      submitBtn.addEventListener("click", () => {
+        submitTicketReply(docId);
+      });
+
+      buttonRow.appendChild(submitBtn);
+      wrapper.appendChild(label);
+      wrapper.appendChild(textarea);
+      wrapper.appendChild(buttonRow);
+      return wrapper;
+    }
+
+    function createTicketItem(doc) {
+      const ticket = doc.data() || {};
+      const created = ticket.createdAt && ticket.createdAt.toDate ? ticket.createdAt.toDate().toLocaleString() : "-";
+      const status = String(ticket.status || "open");
+      const conversationStatus = String(ticket.conversationStatus || "-");
+      const response = ticket.adminResponse || ticket.aiGeneratedSolution || "Noch keine Rueckmeldung.";
+
+      const article = document.createElement("article");
+      article.className = "ticket-item";
+
+      const title = document.createElement("strong");
+      title.textContent = "Ticket " + doc.id;
+
+      const meta = document.createElement("div");
+      meta.className = "ticket-meta";
+      meta.appendChild(createTicketMetaLabel("Status", status));
+      meta.appendChild(createTicketMetaLabel("Conversation", conversationStatus));
+      meta.appendChild(createTicketMetaLabel("Erstellt", created));
+
+      const responseBox = document.createElement("div");
+      const responseLabel = document.createElement("strong");
+      responseLabel.textContent = "Rueckmeldung:";
+      const responseBreak = document.createElement("br");
+      const responseText = document.createTextNode(response);
+      responseBox.appendChild(responseLabel);
+      responseBox.appendChild(responseBreak);
+      responseBox.appendChild(responseText);
+
+      article.appendChild(title);
+      article.appendChild(meta);
+      article.appendChild(responseBox);
+
+      if (conversationStatus === "awaiting_debug_consent") {
+        article.appendChild(createTicketActionButtons(doc.id));
+      }
+
+      if (conversationStatus === "waiting_user_response" || status === "awaiting_user_feedback") {
+        article.appendChild(createTicketReplyBox(doc.id));
+      }
+
+      return article;
+    }
+
     async function loadOwnTickets() {
       const listEl = document.getElementById("ticket-list");
       if (!listEl) return;
       if (!db || !currentMasterImei) {
-        listEl.innerHTML = "";
+        listEl.replaceChildren();
         return;
       }
-      listEl.innerHTML = "<div class='status'>Lade Tickets...</div>";
+      renderTicketListState(listEl, "Lade Tickets...");
       try {
         const snapshot = await db.collection("supportTickets")
           .where("masterImei", "==", currentMasterImei)
@@ -544,50 +664,20 @@
           .get();
 
         if (snapshot.empty) {
-          listEl.innerHTML = "<div class='status'>Noch keine Tickets vorhanden.</div>";
+          renderTicketListState(listEl, "Noch keine Tickets vorhanden.");
           return;
         }
 
-        const html = [];
+        listEl.replaceChildren();
         snapshot.forEach((doc) => {
-          const t = doc.data();
-          const created = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate().toLocaleString() : "-";
-          const status = String(t.status || "open");
-          const conversationStatus = String(t.conversationStatus || "-");
-          const response = t.adminResponse || t.aiGeneratedSolution || "Noch keine Rueckmeldung.";
-
-          let actions = "";
-          if (conversationStatus === "awaiting_debug_consent") {
-            actions =
-              "<div class='inline'>" +
-                "<button class='btn btn-primary' type='button' onclick=\"handleDebugConsent('" + doc.id + "', true)\">Ja, Debug-Modus aktivieren</button>" +
-                "<button class='btn btn-ghost' type='button' onclick=\"handleDebugConsent('" + doc.id + "', false)\">Nein, ohne Debug weiter</button>" +
-              "</div>";
-          }
-
-          let replyBox = "";
-          if (conversationStatus === "waiting_user_response" || status === "awaiting_user_feedback") {
-            replyBox =
-              "<div>" +
-                "<label for='reply-" + doc.id + "'>Antwort an KI</label>" +
-                "<textarea id='reply-" + doc.id + "' class='reply-input' placeholder='Antwort oder weitere Beobachtung eingeben...'></textarea>" +
-                "<div class='inline'><button class='btn btn-secondary' type='button' onclick=\"submitTicketReply('" + doc.id + "')\">Antwort senden</button></div>" +
-              "</div>";
-          }
-
-          html.push(
-            "<article class='ticket-item'>" +
-              "<strong>Ticket " + doc.id + "</strong>" +
-              "<div class='ticket-meta'><span>Status: " + status + "</span><span>Conversation: " + conversationStatus + "</span><span>Erstellt: " + created + "</span></div>" +
-              "<div><strong>Rueckmeldung:</strong><br>" + escapeHtml(response) + "</div>" +
-              actions +
-              replyBox +
-            "</article>"
-          );
+          listEl.appendChild(createTicketItem(doc));
         });
-        listEl.innerHTML = html.join("");
       } catch (error) {
-        listEl.innerHTML = "<div class='status error'>Tickets konnten nicht geladen werden: " + (error.message || "Unbekannter Fehler") + "</div>";
+        renderTicketListState(
+          listEl,
+          "Tickets konnten nicht geladen werden: " + (error && error.message ? error.message : "Unbekannter Fehler"),
+          "error"
+        );
       }
     }
 

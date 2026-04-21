@@ -41,6 +41,10 @@ In einer sechsten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umge
 1. Die destruktiven Reset-Endpunkte in [src/auth.ts](src/auth.ts) sind jetzt zusätzlich über eine Projekt-Allowlist für Deployments abgesichert.
 2. Auch Reset-Aufrufe mit Admin-Kontext oder Recovery-Token erzwingen jetzt App Check, und [src/auth.ts](src/auth.ts) stellt den Guard-Status im Health-Endpunkt transparenter bereit.
 
+In einer siebten Härtungsrunde wurde zusaetzlich ein unmittelbar bestaetigter Web-Pfad entschaerft:
+
+1. Das Ticket-Rendering im [child-panel/index.html](child-panel/index.html) verwendet fuer Support-Tickets und Fehlerzustaende jetzt DOM-APIs statt zusammengebauter `innerHTML`-Strings.
+
 ## Angriffsflächen
 
 ### 1. Administrative Reset-Endpunkte
@@ -182,6 +186,15 @@ Restrisiko:
 
 - Die Rate Limits sind wie an anderer Stelle aktuell in-memory und damit nicht global wirksam.
 - Die Legacy-Pfade bleiben fachlich weiter vorhanden; die Härtung reduziert Missbrauch, ersetzt aber keinen vollständigen Cutover.
+- Fuer den Web-Cutover existiert bereits der sichere Browser-Pfad ueber `createMasterWebBootstrapToken` und `redeemMasterWebBootstrapToken`, aber im aktuell geprueften Frontend ist noch kein vollstaendig belegter Erzeuger-Flow fuer Endnutzer sichtbar. Ein harter Backend-Schnitt ohne diesen UI-Pfad wuerde bestehende Browser-Anmeldungen still brechen.
+
+### Korrigierte Einordnung angrenzender Frontend-Befunde
+
+Bewertung:
+
+- Die fruehere Annahme, im Electron-Desktop fehle eine explizite `contextIsolation`, trifft auf den geprueften Stand nicht zu. [desktop/main.js](desktop/main.js) setzt `contextIsolation: true` bereits explizit.
+- Die pauschale SRI-Kritik fuer das Web-Control-Panel war zu breit. [web-control/index.html](web-control/index.html) nutzt fuer seine externen Skripte bereits Integrity-Attribute.
+- Ein echter, unmittelbar bestaetigter DOM-XSS-Pfad lag dagegen im [child-panel/index.html](child-panel/index.html) vor und wurde deshalb priorisiert adressiert.
 
 ### Flaches Firestore-Modell
 
