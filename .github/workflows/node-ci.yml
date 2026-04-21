@@ -5,6 +5,9 @@ on:
   pull_request:
     paths: ['**/*.ts', 'package.json', 'jest.config.*', 'tsconfig.json']
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
