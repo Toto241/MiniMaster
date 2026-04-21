@@ -94,7 +94,7 @@ This PR completes the following changes. Reviewers should pay attention to the a
 1. Backend-Full-Validation ohne Fehler herstellen (Admin-Claim, Functions, Firestore, Runtime-Konfiguration).
 2. Child-App-Enforcement-Härtung abschließen: wirksames App-Blocking, Overlay-Sicherheit, Schutz gegen Abschalten/Deinstallation.
 3. Pflicht-Freigaben und Compliance-Nachweise dokumentiert abhaken.
-4. Parent-Panel als verbleibenden Browser-Einstieg weiter beobachten und den dortigen Legacy-Ticket-Login in einer Folgewelle ebenfalls auf einen nicht-secret-basierten Einstieg umstellen.
+4. Browser-Panels sind jetzt auf sichere Sitzungslinks beziehungsweise bootstrapToken-Einstiege umgestellt. Verbleibende Auth-Risiken liegen damit vor allem noch im serverseitigen Legacy-Pfad und nicht mehr in den Browser-Logins.
 
 ### Phase B — Hochpriorisierte Produktreife
 
