@@ -1,6 +1,7 @@
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import * as vm from "vm";
+import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
 /**
  * Welle 1 / Top-Down Step 1:
@@ -32,7 +33,7 @@ function makeLoader(globalScope: any) {
   const cache = new Map<string, any>();
   function load(absPath: string) {
     if (cache.has(absPath)) return cache.get(absPath);
-    const source = require("fs").readFileSync(absPath, "utf8");
+    const source = readFileSync(absPath, "utf8");
     const dir = path.dirname(absPath);
     const transformed = rewriteAsCommonJS(source, dir);
     const moduleObj: any = { exports: {} };
@@ -138,14 +139,14 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(cmd).toBeDefined();
     expect(cmd.buildPowerShellScript("Get-ChildItem", undefined)).toBe(
       [
-        '$ErrorActionPreference = "Stop"',
+        "$ErrorActionPreference = \"Stop\"",
         "Get-ChildItem",
       ].join("\n"),
     );
     expect(cmd.buildPowerShellScript("Get-ChildItem", "D:\\Tools\\MiniMaster")).toBe(
       [
-        '$ErrorActionPreference = "Stop"',
-        'Set-Location -Path "D:\\Tools\\MiniMaster"',
+        "$ErrorActionPreference = \"Stop\"",
+        "Set-Location -Path \"D:\\Tools\\MiniMaster\"",
         "Get-ChildItem",
       ].join("\n"),
     );
@@ -165,13 +166,12 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     const cmd = globalScope.MM.command;
     // Nutze die existierenden Originalfunktionen aus app.js via Test-Harness.
     // Lazy-Require, um den schweren Harness-Setup-Overhead nur fuer diesen Test zu zahlen.
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const samples = [
       { command: "Get-ChildItem", cwd: undefined },
       { command: "npm test", cwd: "D:\\Tools\\MiniMaster" },
-      { command: 'Write-Host "hi"', cwd: "C:/with spaces/path" },
+      { command: "Write-Host \"hi\"", cwd: "C:/with spaces/path" },
     ];
     for (const sample of samples) {
       expect(cmd.buildPowerShellScript(sample.command, sample.cwd)).toBe(
@@ -207,7 +207,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
   it("format.pythonAutomationTimestamp ist paritaetisch zu app.js", () => {
     load(path.join(MODULES_DIR, "core", "format.js"));
     const fmt = globalScope.MM.format;
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
     const samples = [undefined, null, "", "2026-04-18T10:00:00Z", "broken"];
     for (const value of samples) {
@@ -221,7 +220,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "automation-meta.js"));
     const meta = globalScope.MM.automationMeta;
     expect(meta).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const statusSamples = ["pass", "manual_required", "fail", "not_run", "weird", undefined];
@@ -253,7 +251,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "encoding.js"));
     const enc = globalScope.MM.encoding;
     expect(enc).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const inlineSamples = [undefined, null, "", "abc", "hallo welt 'X'", "&=?#"];
@@ -283,7 +280,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "error-codes.js"));
     const ec = globalScope.MM.errorCodes;
     expect(ec).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const codeSamples = [
@@ -335,7 +331,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "security.js"));
     const sec = globalScope.MM.security;
     expect(sec).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const samples = [
@@ -360,7 +355,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "firebase-config.js"));
     const fc = globalScope.MM.firebaseConfig;
     expect(fc).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const validConfig = {
@@ -440,7 +434,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "dates.js"));
     const d = globalScope.MM.dates;
     expect(d).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const fixedDate = new Date("2026-04-18T10:00:00Z");
@@ -480,7 +473,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "tabs", "legal-playstore.js"));
     const lp = globalScope.MM.legalPlaystore;
     expect(lp).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Storage-Konstanten + Default-Schluessel
@@ -572,7 +564,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "tabs", "qa-testing-register.js"));
     const qa = globalScope.MM.qaTestingRegister;
     expect(qa).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Direkte Paritaet zu im Harness exportierten Originalen
@@ -663,7 +654,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "tabs", "firebase-deployment.js"));
     const fd = globalScope.MM.firebaseDeployment;
     expect(fd).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // buildRecoveryCommands
@@ -715,7 +705,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "tabs", "commissioning-pending.js"));
     const cp = globalScope.MM.commissioningPending;
     expect(cp).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // isCoveredCommissioningPendingItem ist im Harness NICHT exportiert -
@@ -768,7 +757,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     const oc = globalScope.MM.operatorConfig;
     expect(oc).toBeDefined();
     expect(typeof oc.buildGuidance).toBe("function");
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     const cases = [
@@ -989,7 +977,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     const pq = globalScope.MM.platformQaReadiness;
     expect(pq).toBeDefined();
     expect(typeof pq.buildSummary).toBe("function");
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Empty
@@ -1064,7 +1051,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(eps).toBeDefined();
     expect(typeof eps.buildEffective).toBe("function");
     expect(eps.defaultMapping).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Empty payload - keine Veraenderung
@@ -1109,7 +1095,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(cq).toBeDefined();
     expect(typeof cq.summarizeApprovals).toBe("function");
     expect(typeof cq.buildValidationSummary).toBe("function");
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // summarizeApprovals: leer & defensiv
@@ -1186,7 +1171,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(typeof paa.buildActions).toBe("function");
     expect(typeof paa.isOpenStatus).toBe("function");
     expect(typeof paa.isPlayStoreItem).toBe("function");
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Predicates
@@ -1461,7 +1445,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(calls).toEqual([{ name: "saveBootstrapFirebaseConfig", args: [] }]);
 
     // mit JSON-Args
-    click!.fn({ target: makeNode("triggerJob", '["checkExpiredSubscriptions"]'), preventDefault() {} });
+    click!.fn({ target: makeNode("triggerJob", "[\"checkExpiredSubscriptions\"]"), preventDefault() {} });
     expect(calls[1]).toEqual({ name: "triggerJob", args: ["checkExpiredSubscriptions"] });
 
     // reservierte Aktion "logout" wird ignoriert (nav-bootstrap macht das)
@@ -1482,7 +1466,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     // _parseArgs Defensive: invalides JSON -> als String-Arg
     expect(gab._parseArgs(null)).toEqual([]);
     expect(gab._parseArgs("")).toEqual([]);
-    expect(gab._parseArgs('"hello"')).toEqual(["hello"]);
+    expect(gab._parseArgs("\"hello\"")).toEqual(["hello"]);
     expect(gab._parseArgs("[1,2,3]")).toEqual([1, 2, 3]);
     expect(gab._parseArgs("not json")).toEqual(["not json"]);
 
@@ -1524,7 +1508,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     expect(tri).toBeDefined();
     expect(typeof tri.buildDuplicates).toBe("function");
     expect(typeof tri.buildManual).toBe("function");
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Duplicates: defensiv
@@ -1586,7 +1569,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "tabs", "testing-register-priorities.js"));
     const trp = globalScope.MM.testingRegisterPriorities;
     expect(trp).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // Status-Priority
@@ -1653,7 +1635,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "core", "crypto-debug.js"));
     const cd = globalScope.MM.cryptoDebug;
     expect(cd).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // toBase64Url
@@ -1706,7 +1687,6 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
     load(path.join(MODULES_DIR, "tabs", "firebase-recovery.js"));
     const fr = globalScope.MM.firebaseRecovery;
     expect(fr).toBeDefined();
-    const { loadAdminPanelTestExports } = require("./utils/admin-panel-test-harness");
     const { exports: appJs } = loadAdminPanelTestExports();
 
     // buildCommands: 4 Zeilen, projectId interpoliert
@@ -1764,7 +1744,7 @@ describe("admin-panel module wiring", () => {
       "utf8",
     );
     const moduleIndex = html.indexOf("modules/index.js");
-    const appIndex = html.indexOf('src="app.js');
+    const appIndex = html.indexOf("src=\"app.js");
     expect(moduleIndex).toBeGreaterThan(0);
     expect(appIndex).toBeGreaterThan(moduleIndex);
   });

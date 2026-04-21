@@ -1,9 +1,8 @@
 package com.minimaster.masterapp
 
 import androidx.lifecycle.SavedStateHandle
-import com.google.android.gms.tasks.Tasks
-import com.google.firebase.functions.FirebaseFunctions
-import com.google.firebase.functions.HttpsCallableReference
+import com.minimaster.masterapp.core.rules.UsageRuleDraft
+import com.minimaster.masterapp.data.repositories.UsageRuleRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -18,7 +17,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
-import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
@@ -29,15 +27,12 @@ class UsageRulesViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
-    private lateinit var functions: FirebaseFunctions
-    private lateinit var callable: HttpsCallableReference
+    private lateinit var usageRuleRepository: UsageRuleRepository
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        functions = mock()
-        callable = mock()
-        whenever(functions.getHttpsCallable(eq("setUsageRules"))).thenReturn(callable)
+        usageRuleRepository = mock()
     }
 
     @After
@@ -47,7 +42,7 @@ class UsageRulesViewModelTest {
 
     @Test
     fun saveRules_withoutChildId_setsErrorImmediately() = runTest {
-        val viewModel = UsageRulesViewModel(functions, SavedStateHandle())
+        val viewModel = UsageRulesViewModel(usageRuleRepository, SavedStateHandle())
 
         viewModel.saveRules()
         advanceUntilIdle()
@@ -58,8 +53,8 @@ class UsageRulesViewModelTest {
 
     @Test
     fun saveRules_withUsageRules_callsBackendWithConvertedPayload() = runTest {
-        whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
-        val viewModel = UsageRulesViewModel(functions, SavedStateHandle(mapOf("childId" to "child-1")))
+        whenever(usageRuleRepository.saveRules(any(), any())).thenReturn(Unit)
+        val viewModel = UsageRulesViewModel(usageRuleRepository, SavedStateHandle(mapOf("childId" to "child-1")))
 
         viewModel.updateDailyLimit(15)
         viewModel.updateAllowedStartTime("08:00")
@@ -69,23 +64,21 @@ class UsageRulesViewModelTest {
         viewModel.saveRules()
         advanceUntilIdle()
 
-        val payloadCaptor = argumentCaptor<Any>()
-        verify(callable).call(payloadCaptor.capture())
-        val payload = payloadCaptor.firstValue as Map<*, *>
-        val usageRules = payload["usageRules"] as Map<*, *>
-
-        assertEquals("child-1", payload["childId"])
-        assertEquals(900, usageRules["dailyLimitSeconds"])
-        assertEquals(mapOf("start" to "08:00", "end" to "18:00"), usageRules["allowedHours"])
-        assertEquals(mapOf("com.example.video" to 1200), usageRules["appLimits"])
+        val expectedDraft = UsageRuleDraft(
+            dailyLimitMinutes = 15,
+            allowedStartTime = "08:00",
+            allowedEndTime = "18:00",
+            perAppLimits = mapOf("com.example.video" to 20)
+        )
+        verify(usageRuleRepository).saveRules(eq("child-1"), eq(expectedDraft))
         assertTrue(viewModel.state.value.saveSuccess)
         assertEquals(null, viewModel.state.value.error)
     }
 
     @Test
     fun saveRules_whenBackendFails_exposesUserVisibleError() = runTest {
-        whenever(callable.call(any())).thenReturn(Tasks.forException(IllegalStateException("offline")))
-        val viewModel = UsageRulesViewModel(functions, SavedStateHandle(mapOf("childId" to "child-1")))
+        whenever(usageRuleRepository.saveRules(any(), any())).thenThrow(IllegalStateException("offline"))
+        val viewModel = UsageRulesViewModel(usageRuleRepository, SavedStateHandle(mapOf("childId" to "child-1")))
 
         viewModel.updateDailyLimit(10)
         viewModel.saveRules()

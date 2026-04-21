@@ -14,6 +14,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
+import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
@@ -135,7 +136,7 @@ class BlockingOverlayService : Service() {
         try {
             windowManager.addView(overlayView, params)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("BlockingOverlayService", "Failed to add overlay view", e)
         }
     }
 
@@ -144,7 +145,7 @@ class BlockingOverlayService : Service() {
             try {
                 windowManager.removeView(overlayView)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("BlockingOverlayService", "Failed to remove overlay view", e)
             }
             overlayView = null
         }

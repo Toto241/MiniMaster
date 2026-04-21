@@ -761,7 +761,7 @@ function saveCommandBuilderConfig(showMessage = true) {
 }
 
 function escapePowerShellString(value) {
-    return String(value || "").replace(/`/g, "``").replace(/"/g, "`\"");
+    return String(value || "").replace(/`/g, "``").replace(/\$/g, "`$").replace(/"/g, "`\"");
 }
 
 function sanitizeAdbSerial(value) {
@@ -9465,6 +9465,16 @@ document.addEventListener("DOMContentLoaded", async function() {
         element.addEventListener("change", () => renderOperatorConfigGuidance());
         element.__operatorGuidanceBound = true;
     });
+
+    // QA dashboard buttons (migrated from inline onclick for CSP hardening)
+    const qaRefreshBtn = document.getElementById("qa-refresh-dashboard-btn");
+    if (qaRefreshBtn) qaRefreshBtn.addEventListener("click", refreshQaDashboard);
+    const qaRerunBtn = document.getElementById("qa-test-rerun-btn");
+    if (qaRerunBtn) qaRerunBtn.addEventListener("click", rerunSelectedQaTestWorkspaceItem);
+    const qaCopyCompactBtn = document.getElementById("qa-test-copy-compact-btn");
+    if (qaCopyCompactBtn) qaCopyCompactBtn.addEventListener("click", copySelectedQaTestItemCompact);
+    const qaCopyDebugBtn = document.getElementById("qa-test-copy-debug-btn");
+    if (qaCopyDebugBtn) qaCopyDebugBtn.addEventListener("click", copySelectedQaTestItemDebug);
 
     // Operator-Laufzeit-Badge anzeigen
     if (canExecuteCommandsDirectly()) {

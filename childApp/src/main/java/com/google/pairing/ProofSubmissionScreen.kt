@@ -160,7 +160,7 @@ suspend fun uploadProofAndSubmit(taskId: String, uri: Uri, context: android.cont
             .await()
         true
     } catch (e: Exception) {
-        e.printStackTrace()
+        android.util.Log.e("ProofSubmission", "Task completion failed", e)
         false
     }
 }

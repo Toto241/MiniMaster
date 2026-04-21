@@ -8,8 +8,8 @@ describe("Android security configuration", () => {
     const childMainManifest = read("childApp", "src", "main", "AndroidManifest.xml");
     const masterMainManifest = read("masterApp", "src", "main", "AndroidManifest.xml");
 
-    expect(childMainManifest).toContain('android:allowBackup="false"');
-    expect(masterMainManifest).toContain('android:allowBackup="false"');
+    expect(childMainManifest).toContain("android:allowBackup=\"false\"");
+    expect(masterMainManifest).toContain("android:allowBackup=\"false\"");
     expect(childMainManifest).not.toContain("DebugBroadcastReceiver");
     expect(masterMainManifest).not.toContain("DebugBroadcastReceiver");
   });
@@ -20,7 +20,7 @@ describe("Android security configuration", () => {
 
     expect(childDebugManifest).toContain("DebugBroadcastReceiver");
     expect(masterDebugManifest).toContain("DebugBroadcastReceiver");
-    expect(childDebugManifest).toContain('android:exported="false"');
-    expect(masterDebugManifest).toContain('android:exported="false"');
+    expect(childDebugManifest).toContain("android:exported=\"false\"");
+    expect(masterDebugManifest).toContain("android:exported=\"false\"");
   });
 });

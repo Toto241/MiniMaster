@@ -93,7 +93,7 @@ class TaskRepository @Inject constructor(
                 .await()
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("TaskRepository", "completeTask failed", e)
             false
         }
     }

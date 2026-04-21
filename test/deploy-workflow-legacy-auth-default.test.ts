@@ -8,8 +8,8 @@ async function readUtf8(rel: string): Promise<string> {
 describe("deploy workflow legacy auth default", () => {
   it("deploy.yml defaults DISABLE_LEGACY_SECRETKEY_AUTH to false", async () => {
     const workflow = await readUtf8(".github/workflows/deploy.yml");
-    expect(workflow).toContain('echo "DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-false}"');
-    expect(workflow).not.toContain('echo "DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-true}"');
+    expect(workflow).toContain("echo \"DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-false}\"");
+    expect(workflow).not.toContain("echo \"DISABLE_LEGACY_SECRETKEY_AUTH=${DISABLE_LEGACY_SECRETKEY_AUTH:-true}\"");
   });
 
   it(".env.example documents the same safe default", async () => {

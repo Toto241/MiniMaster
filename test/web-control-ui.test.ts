@@ -15,6 +15,9 @@ type MockElement = {
   className?: string;
   disabled?: boolean;
   getContext?: jest.Mock;
+  querySelectorAll?: jest.Mock;
+  addEventListener?: jest.Mock;
+  closest?: jest.Mock;
 };
 
 function createElement(id?: string): MockElement {
@@ -29,6 +32,9 @@ function createElement(id?: string): MockElement {
     className: "",
     disabled: false,
     getContext: jest.fn(() => ({})),
+    querySelectorAll: jest.fn(() => []),
+    addEventListener: jest.fn(),
+    closest: jest.fn(() => null),
   };
 }
 
@@ -399,8 +405,8 @@ describe("web-control browser flows", () => {
     expect(context.__webControlTestExports.buildLegalLocale("", "")).toBe("en-US");
   });
 
-  it("logs into web-control via custom token and blocks on legal context selection first", async () => {
-    const { context, elements, storage, firebaseMock, authMock, domContentLoadedHandlers } = loadWebControl({
+  it("blocks direct secret-key login and shows an error message", async () => {
+    const { context, elements, firebaseMock, domContentLoadedHandlers } = loadWebControl({
       operatorFirebaseConfigOverride: JSON.stringify({
         apiKey: "key-1",
         authDomain: "demo.firebaseapp.com",
@@ -411,35 +417,15 @@ describe("web-control browser flows", () => {
       }),
     });
 
-    context.setTimeout = jest.fn(() => 1);
-    context.__webControlTestExports.setDbForTesting({
-      collection: jest.fn(() => ({
-        where: jest.fn().mockReturnThis(),
-        onSnapshot: jest.fn(() => jest.fn()),
-      })),
-    });
     domContentLoadedHandlers[0]?.();
     elements.get("master-imei")!.value = "master-imei-1";
     elements.get("secret-key")!.value = "secret-key-1";
 
     context.__webControlTestExports.login();
     await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
 
-    const authHandler = authMock.onAuthStateChanged.mock.calls[0][0] as (user: any) => Promise<void> | void;
-    await authHandler({ uid: "m1" });
-
-    expect(firebaseMock.auth().signInWithCustomToken).toHaveBeenCalledWith("tok-login");
-    expect(elements.get("login-form")?.style?.display).toBe("none");
-    expect(elements.get("user-info")?.style?.display).toBe("flex");
-    expect(elements.get("main-content")?.style?.display).toBe("none");
-    expect(elements.get("legal-gate")?.style?.display).toBe("block");
-    expect(elements.get("legal-context-form")?.style?.display).toBe("flex");
-    expect(elements.get("master-id")?.textContent).toBe("m1");
-    expect(storage.get("minimaster-credentials")).toContain("m1");
-    expect(elements.get("notification")?.textContent).toContain("Login successful");
+    expect(firebaseMock.auth().signInWithCustomToken).not.toHaveBeenCalled();
+    expect(elements.get("notification")?.textContent).toContain("Direct secret-key login is disabled");
   });
 
   it("redeems a one-time web bootstrap token from the URL before legacy login", async () => {

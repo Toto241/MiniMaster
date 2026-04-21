@@ -115,7 +115,7 @@ service cloud.firestore {
           && d.description.size() < 1000
           && d.status is string
           && d.status in ['pending', 'pending_approval', 'approved', 'rejected']
-          && (!('photoUrl' in d) || d.photoUrl is string || d.photoUrl == null)
+          && (!('photoUrl' in d) || d.photoUrl == null || (d.photoUrl is string && d.photoUrl.matches('^https://.*')))
           && (!('rejectionReason' in d) || d.rejectionReason is string)
           && (!('deadline' in d) || d.deadline is timestamp)
           && (!('createdAt' in d) || d.createdAt is timestamp)

@@ -13,6 +13,20 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/**
+ * Validates that a photo URL is safe to render (must be HTTPS).
+ * @param {string} url - The URL to validate.
+ * @returns {boolean} True if the URL is a safe HTTPS URL.
+ */
+function isSafePhotoUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
 const FIREBASE_CONFIG_STORAGE_KEY = "operatorFirebaseConfigOverride";
 const LEGAL_PREFS_STORAGE_KEY = "minimaster-legal-context";
 const WEB_CONTROL_APP_VERSION = "web-control";
@@ -540,6 +554,12 @@ function logout() {
     document.getElementById('main-content').style.display = 'none';
     setLegalGateVisible(false);
 
+    // Clear login input fields for security and UX.
+    const masterImeiInput = document.getElementById('master-imei');
+    const secretKeyInput = document.getElementById('secret-key');
+    if (masterImeiInput) masterImeiInput.value = '';
+    if (secretKeyInput) secretKeyInput.value = '';
+
     showNotification('Logged out successfully.', 'info');
 }
 
@@ -666,7 +686,7 @@ function renderDevices(devices) {
         const safeId = escapeHtml(device.id);
 
         return `
-            <div class="device-card">
+            <div class="device-card" data-device-id="${safeId}">
                 <div class="device-header">
                     <div class="device-info">
                         <h3>Device: ${safeId}</h3>
@@ -679,18 +699,18 @@ function renderDevices(devices) {
                         <div class="lock-control">
                             <span>Locked</span>
                             <label class="switch">
-                                <input type="checkbox" ${device.isLocked ? 'checked' : ''}
-                                       onchange="toggleDeviceLock('${safeId}', this.checked)">
+                                <input type="checkbox" class="mm-lock-toggle" ${device.isLocked ? 'checked' : ''}
+                                       data-child-id="${safeId}">
                                 <span class="slider"></span>
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="device-actions">
-                    <button class="btn btn-primary" onclick="openTaskModal('${safeId}')">
+                    <button class="btn btn-primary mm-action-task" data-child-id="${safeId}">
                         Create Task
                     </button>
-                    <button class="btn btn-secondary" onclick='openRulesModal(${escapeHtml(JSON.stringify(device))})'>
+                    <button class="btn btn-secondary mm-action-rules" data-child-id="${safeId}">
                         Configure Rules
                     </button>
                 </div>
@@ -699,6 +719,27 @@ function renderDevices(devices) {
     }).join('');
 
     devicesListElement.innerHTML = devicesHtml;
+
+    // Wire up device-card actions without inline event handlers (CSP / XSS hardening)
+    devicesListElement.querySelectorAll('.mm-lock-toggle').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const childId = e.target.dataset.childId;
+            if (childId) toggleDeviceLock(childId, e.target.checked);
+        });
+    });
+    devicesListElement.querySelectorAll('.mm-action-task').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const childId = e.target.dataset.childId;
+            if (childId) openTaskModal(childId);
+        });
+    });
+    devicesListElement.querySelectorAll('.mm-action-rules').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const childId = e.target.dataset.childId;
+            const device = cachedDevices.find(d => d.id === childId);
+            if (device) openRulesModal(device);
+        });
+    });
 }
 
 /**
@@ -1030,9 +1071,9 @@ function renderTasksToReview(tasks) {
         const safeChildId = escapeHtml(childId);
         const safeDesc = escapeHtml(task.description || '');
         const safeTaskId = escapeHtml(task.taskId || '');
-        const safePhotoUrl = task.photoUrl ? encodeURI(task.photoUrl) : '';
+        const safePhotoUrl = task.photoUrl && isSafePhotoUrl(task.photoUrl) ? task.photoUrl : '';
         return `
-            <div class="task-card">
+            <div class="task-card" data-task-id="${safeTaskId}" data-child-id="${safeChildId}">
                 <div class="task-header">
                     <div class="task-info">
                         <h4>Child ID: ${safeChildId}</h4>
@@ -1040,9 +1081,9 @@ function renderTasksToReview(tasks) {
                         <p><strong>Created:</strong> ${createdTime}</p>
                     </div>
                 </div>
-                ${safePhotoUrl ? `<a href="${safePhotoUrl}" target="_blank" rel="noopener noreferrer"><img src="${safePhotoUrl}" alt="Task proof" class="task-photo"></a>` : '<p>No photo proof submitted.</p>'}
+                ${safePhotoUrl ? `<a href="${escapeHtml(safePhotoUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(safePhotoUrl)}" alt="Task proof" class="task-photo"></a>` : '<p>No photo proof submitted.</p>'}
                 <div class="task-actions">
-                    <button class="btn btn-success" onclick="approveTaskReview('${safeTaskId}', '${safeChildId}')">
+                    <button class="btn btn-success mm-action-approve">
                         Approve (Unlock)
                     </button>
                 </div>
@@ -1051,6 +1092,18 @@ function renderTasksToReview(tasks) {
     }).join('');
 
     tasksListElement.innerHTML = tasksHtml;
+
+    // Wire up approve buttons without inline onclick (CSP / XSS hardening)
+    tasksListElement.querySelectorAll('.mm-action-approve').forEach(button => {
+        const card = button.closest('.task-card');
+        if (card) {
+            button.addEventListener('click', () => {
+                const taskId = card.dataset.taskId;
+                const childId = card.dataset.childId;
+                if (taskId && childId) approveTaskReview(taskId, childId);
+            });
+        }
+    });
 }
 
 /**
@@ -1249,15 +1302,15 @@ async function loadSupportTickets() {
                                 <p>${escapeHtml(ticket.aiGeneratedSolution).replace(/\n/g, '<br>')}</p>
                                 ${ticket.status === 'awaiting_user_feedback' ?
                                     `<div class="feedback-buttons">
-                                        <button onclick="provideFeedback('${safeDocId}', 'accepted')" class="btn btn-success">✓ This solved my problem</button>
-                                        <button onclick="showRejectFeedbackForm('${safeDocId}')" class="btn btn-warning">✗ I still need help</button>
+                                        <button class="btn btn-success mm-feedback-accept" data-doc-id="${safeDocId}">✓ This solved my problem</button>
+                                        <button class="btn btn-warning mm-feedback-reject" data-doc-id="${safeDocId}">✗ I still need help</button>
                                     </div>` :
                                     ''
                                 }
                                 <div id="reject-feedback-form-${safeDocId}" class="reject-feedback-form" style="display:none;">
                                     <label for="reject-comment-${safeDocId}"><strong>Please tell us what is still not working:</strong></label>
                                     <textarea id="reject-comment-${safeDocId}" rows="3" placeholder="Required comment..."></textarea>
-                                    <button onclick="submitRejectedFeedback('${safeDocId}')" class="btn btn-warning">Submit No + Comment</button>
+                                    <button class="btn btn-warning mm-feedback-submit-reject" data-doc-id="${safeDocId}">Submit No + Comment</button>
                                 </div>
                             </div>` :
                             ''
@@ -1265,9 +1318,9 @@ async function loadSupportTickets() {
 
                         ${ticket.accessGranted ?
                             `<p class="access-granted">✓ Support access granted (expires in 48h)</p>
-                             <button onclick="revokeAccess('${safeGrantId}')" class="btn btn-danger">Revoke Access</button>` :
+                             <button class="btn btn-danger mm-access-revoke" data-grant-id="${safeGrantId}">Revoke Access</button>` :
                             (ticket.status === 'escalated' || ticket.status === 'in_progress') ?
-                            `<button onclick="grantAccess('${safeDocId}')" class="btn btn-primary">Grant Support Access</button>` :
+                            `<button class="btn btn-primary mm-access-grant" data-doc-id="${safeDocId}">Grant Support Access</button>` :
                             ''
                         }
                     </div>
@@ -1276,6 +1329,23 @@ async function loadSupportTickets() {
         });
 
         ticketsContainer.innerHTML = html;
+
+        // Wire up support-ticket actions without inline onclick (CSP / XSS hardening)
+        ticketsContainer.querySelectorAll('.mm-feedback-accept').forEach(button => {
+            button.addEventListener('click', () => provideFeedback(button.dataset.docId, 'accepted'));
+        });
+        ticketsContainer.querySelectorAll('.mm-feedback-reject').forEach(button => {
+            button.addEventListener('click', () => showRejectFeedbackForm(button.dataset.docId));
+        });
+        ticketsContainer.querySelectorAll('.mm-feedback-submit-reject').forEach(button => {
+            button.addEventListener('click', () => submitRejectedFeedback(button.dataset.docId));
+        });
+        ticketsContainer.querySelectorAll('.mm-access-revoke').forEach(button => {
+            button.addEventListener('click', () => revokeAccess(button.dataset.grantId));
+        });
+        ticketsContainer.querySelectorAll('.mm-access-grant').forEach(button => {
+            button.addEventListener('click', () => grantAccess(button.dataset.docId));
+        });
     } catch (error) {
         console.error('Error loading support tickets:', error);
         ticketsContainer.innerHTML = '<p>Error loading tickets.</p>';
