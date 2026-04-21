@@ -25,9 +25,17 @@
             <h1>Mini-Master Control Panel</h1>
             <div class="auth-section">
                 <div id="login-form" class="login-form">
-                    <input type="text" id="master-imei" placeholder="Master Device IMEI" required title="IMEI-Nummer des registrierten Elterngeräts eingeben">
-                    <input type="password" id="secret-key" placeholder="Secret Key" required title="Geheimer Schlüssel für die Anmeldung">
-                    <button onclick="login()" title="Mit IMEI und Secret Key anmelden">Login</button>
+                    <div class="legal-gate-card">
+                        <p class="legal-gate-eyebrow">Secure Browser Access</p>
+                        <h2>Sichere Sitzung erforderlich</h2>
+                        <p id="web-control-login-hint" class="legal-gate-message">
+                            Dieses Panel akzeptiert keine Secret-Key-Anmeldung mehr. Oeffnen Sie es ueber das Eltern-Panel
+                            mit einem kurzlebigen sicheren Link oder direkt mit einem gueltigen <strong>bootstrapToken</strong>.
+                        </p>
+                        <div class="legal-actions">
+                            <a class="btn btn-primary" href="../parent-panel/index.html" title="Zum Eltern-Panel wechseln und dort einen sicheren Sitzungslink erzeugen">Zum Eltern-Panel</a>
+                        </div>
+                    </div>
                 </div>
                 <div id="user-info" class="user-info" style="display: none;">
                     <span id="logged-user">Logged in as: <span id="master-id"></span></span>

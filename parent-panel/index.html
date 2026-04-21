@@ -236,7 +236,13 @@
         <button class="btn btn-primary" type="button" onclick="authenticateForTickets()" title="Mit Master IMEI und Secret Key beim System anmelden">Authentifizieren</button>
         <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
         <button id="secure-web-control-btn" class="btn btn-green" type="button" onclick="openSecureWebControl()" title="Web-Control mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Web-Control mit Sitzung öffnen</button>
+        <button id="secure-child-panel-btn" class="btn btn-ghost" type="button" onclick="openSecureChildPanel()" title="Kinder-Panel mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Kinder-Panel mit Sitzung öffnen</button>
       </div>
+
+      <p class="help">
+        Web-Control und Kinder-Panel werden ueber kurzlebige sichere Sitzungslinks geoeffnet. Direkte
+        Secret-Key-Anmeldungen in diesen Ziel-Panels sind nicht mehr der bevorzugte Einstieg.
+      </p>
 
       <div class="form-grid">
         <div>
@@ -344,9 +350,11 @@
     }
 
     function updateSecureWebControlButtonState() {
-      const button = document.getElementById("secure-web-control-btn");
-      if (!button) return;
-      button.disabled = !(functions && auth && currentMasterImei);
+      ["secure-web-control-btn", "secure-child-panel-btn"].forEach((id) => {
+        const button = document.getElementById(id);
+        if (!button) return;
+        button.disabled = !(functions && auth && currentMasterImei);
+      });
     }
 
     function escapeHtml(value) {
@@ -391,7 +399,18 @@
       return true;
     }
 
-    async function openSecureWebControl() {
+    function getSecurePanelFallbackPath(target) {
+      if (target === "child-panel") {
+        return "/child-panel/index.html";
+      }
+      return "/web-control/index.html";
+    }
+
+    function getSecurePanelLabel(target) {
+      return target === "child-panel" ? "Kinder-Panel" : "Web-Control";
+    }
+
+    async function openSecurePanel(target) {
       try {
         if (!functions || !auth || !currentMasterImei) {
           setStatus("ticket-auth-status", "Bitte zuerst im Eltern-Panel authentifizieren.", "error");
@@ -401,14 +420,15 @@
           return false;
         }
 
-        setStatus("ticket-auth-status", "Erzeuge sicheren Web-Control-Link...", "");
+        const targetLabel = getSecurePanelLabel(target);
+        setStatus("ticket-auth-status", "Erzeuge sicheren " + targetLabel + "-Link...", "");
         const createBootstrapFn = functions.httpsCallable("createMasterWebBootstrapToken");
-        const result = await createBootstrapFn({ target: "web-control" });
+        const result = await createBootstrapFn({ target });
         const payload = result && result.data ? result.data : {};
         const bootstrapToken = typeof payload.bootstrapToken === "string" ? payload.bootstrapToken.trim() : "";
         const targetPath = typeof payload.targetPath === "string" && payload.targetPath.trim()
           ? payload.targetPath.trim()
-          : "/web-control/index.html";
+          : getSecurePanelFallbackPath(target);
         const queryParamName = typeof payload.queryParamName === "string" && payload.queryParamName.trim()
           ? payload.queryParamName.trim()
           : "bootstrapToken";
@@ -421,7 +441,7 @@
         targetUrl.searchParams.set(queryParamName, bootstrapToken);
         const nextLocation = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
 
-        setStatus("ticket-auth-status", "Öffne Web-Control mit bestehender Sitzung...", "success");
+        setStatus("ticket-auth-status", "Öffne " + targetLabel + " mit bestehender Sitzung...", "success");
         if (window.location && typeof window.location.assign === "function") {
           window.location.assign(nextLocation);
         } else if (window.location) {
@@ -429,9 +449,18 @@
         }
         return true;
       } catch (error) {
-        setStatus("ticket-auth-status", "Sicherer Web-Control-Start fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
+        const targetLabel = getSecurePanelLabel(target);
+        setStatus("ticket-auth-status", "Sicherer " + targetLabel + "-Start fehlgeschlagen: " + (error.message || "Unbekannter Fehler"), "error");
         return false;
       }
+    }
+
+    async function openSecureWebControl() {
+      return openSecurePanel("web-control");
+    }
+
+    async function openSecureChildPanel() {
+      return openSecurePanel("child-panel");
     }
 
     function initFirebase() {
@@ -667,6 +696,7 @@
     initFirebase();
     window.authenticateForTickets = authenticateForTickets;
     window.openSecureWebControl = openSecureWebControl;
+    window.openSecureChildPanel = openSecureChildPanel;
     window.handleDebugConsent = handleDebugConsent;
     window.submitTicketReply = submitTicketReply;
     window.submitSupportTicket = submitSupportTicket;

@@ -40,6 +40,7 @@ function loadParentPanel() {
     "ticket-sender-role",
     "ticket-problem",
     "secure-web-control-btn",
+    "secure-child-panel-btn",
   ].forEach((id) => getElement(id));
 
   const authMock = {
@@ -48,10 +49,10 @@ function loadParentPanel() {
   };
   const callableFactory = jest.fn((name: string) => {
     if (name === "createMasterWebBootstrapToken") {
-      return jest.fn(() => Promise.resolve({
+      return jest.fn((payload?: { target?: string }) => Promise.resolve({
         data: {
           bootstrapToken: "bridge-token",
-          targetPath: "/web-control/index.html",
+          targetPath: payload?.target === "child-panel" ? "/child-panel/index.html" : "/web-control/index.html",
           queryParamName: "bootstrapToken",
         },
       }));
@@ -129,6 +130,7 @@ function loadParentPanel() {
     "",
     ";globalThis.__parentPanelTestExports = {",
     "  openSecureWebControl,",
+    "  openSecureChildPanel,",
     "  authenticateForTickets,",
     "  loadOwnTickets,",
     "  getCurrentMasterImeiForTesting: function() { return currentMasterImei; },",
@@ -159,6 +161,24 @@ describe("parent-panel bootstrap launch", () => {
     expect(createCallable).toBeDefined();
     expect(createCallable).toHaveBeenCalledWith({ target: "web-control" });
     expect(locationMock.assign).toHaveBeenCalledWith("/web-control/index.html?bootstrapToken=bridge-token");
+  });
+
+  it("opens child-panel via server-issued bootstrap link for authenticated users", async () => {
+    const { context, authMock, callableFactory, locationMock, elements } = loadParentPanel();
+
+    const authStateHandler = authMock.onAuthStateChanged.mock.calls[0][0] as (user: any) => void;
+    authStateHandler({ uid: "m-parent" });
+
+    await context.__parentPanelTestExports.openSecureChildPanel();
+
+    expect(elements.get("secure-child-panel-btn").disabled).toBe(false);
+    const createCallable = callableFactory.mock.results.find((entry: { value: unknown }) => {
+      const fn = entry.value as jest.Mock;
+      return fn && fn.mock && fn.mock.calls[0]?.[0]?.target === "child-panel";
+    })?.value as jest.Mock | undefined;
+    expect(createCallable).toBeDefined();
+    expect(createCallable).toHaveBeenCalledWith({ target: "child-panel" });
+    expect(locationMock.assign).toHaveBeenCalledWith("/child-panel/index.html?bootstrapToken=bridge-token");
   });
 
   it("refuses secure launch before authentication and keeps legacy access visible", async () => {
