@@ -12,7 +12,7 @@ Status: security baseline assessment for operator-facing web and desktop surface
 |-----------|-------|--------|
 | `default-src` | `'self'` | ✅ Pass |
 | `script-src` | `'self' https://www.gstatic.com https://cdn.jsdelivr.net` | ✅ Pass |
-| `style-src` | `'self' 'unsafe-inline'` | ⚠️ Accepted (inline styles needed for dynamic UI) |
+| `style-src` | `'self'` | ✅ Pass |
 | `connect-src` | `'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net` | ✅ Pass |
 | `img-src` | `'self' data: https:` | ✅ Pass |
 | `font-src` | `'self'` | ✅ Pass |
@@ -57,7 +57,7 @@ Status: security baseline assessment for operator-facing web and desktop surface
 |-----------|-------|--------|
 | `default-src` | `'self'` | ✅ Pass |
 | `script-src` | `'self' https://www.gstatic.com` | ✅ Pass |
-| `style-src` | `'self' 'unsafe-inline'` | ⚠️ Accepted (inline styles needed) |
+| `style-src` | `'self'` | ✅ Pass (all inline styles migrated to utility classes) |
 | `connect-src` | `'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net` | ✅ Pass |
 
 ### Subresource Integrity (SRI)
@@ -68,6 +68,7 @@ Status: security baseline assessment for operator-facing web and desktop surface
 | firebase-auth-compat.js | ✅ Applied |
 | firebase-firestore-compat.js | ✅ Applied |
 | firebase-functions-compat.js | ✅ Applied |
+| firebase-app-check-compat.js | ✅ Applied (hash added 2026-04-22) |
 
 ### Security Headers
 
@@ -116,14 +117,14 @@ Same as web-control — ✅ all headers applied via firebase.json.
 
 | ID | Surface | Risk | Severity | Status | Mitigation |
 |----|---------|------|----------|--------|------------|
-| R-01 | web-control, admin-panel | `style-src 'unsafe-inline'` | Low | Accepted | Required for dynamic styling; no user-controlled style injection path |
+| R-01 | ~~web-control, admin-panel~~ | ~~`style-src 'unsafe-inline'`~~ | ~~Low~~ | **Closed** | All inline styles migrated to utility classes; CSP hardened to `style-src 'self'` across all panels (2026-04-22) |
 | R-02 | Desktop | `shell: true` in spawn | Medium | Accepted | Command whitelist + argument sanitization applied; no direct user input to shell |
-| R-03 | web-control | Legacy IMEI/secretKey login form | Medium | Mitigating | Feature flag `DISABLE_LEGACY_SECRETKEY_AUTH` available; cutover plan active |
+| R-03 | web-control | Legacy IMEI/secretKey login form | Medium | Mitigating | Feature flag `DISABLE_LEGACY_SECRETKEY_AUTH` available; cutover plan active; web panels now use bootstrapToken only |
 
 ---
 
 ## 5. Verification Date
 
-- **Last reviewed:** 2026-03-19
-- **Reviewer:** _(fill)_
+- **Last reviewed:** 2026-04-22
+- **Reviewer:** Automated repository validation
 - **Next review due:** Before each release candidate

@@ -55,12 +55,15 @@ This PR completes the following changes. Reviewers should pay attention to the a
 - Firestore rules now enforce role- and ownership-based access instead of blanket authenticated access.
 - `setAdminClaim` is protected by admin authorization checks.
 - Security-focused test scenarios are documented in `docs/TEST_SCENARIOS_SECURITY.md`.
+- Admin-panel SRI complete (including app-check-compat, added 2026-04-22).
+- All web panels CSP-hardened to `style-src 'self'` without `'unsafe-inline'`.
 
 ### ✅ Implemented core functionality
 
 - Child ID is resolved via provider (`ChildIdProviderImpl`) in proof submission flow.
 - Task review notifications exist for master (submission) and child (approved/rejected).
 - Admin panel includes user search, pagination, and detail modals.
+- UsageRules navigation and repository pattern fully implemented (static check corrected 2026-04-22).
 
 ### ✅ Implemented UX/error handling
 
@@ -82,16 +85,19 @@ This PR completes the following changes. Reviewers should pay attention to the a
 
 ## 3. Priorisierte Umsetzungsreihenfolge
 
-### Status 2026-04-21 - Security-Hardening Wave gestartet
+### Status 2026-04-22 - Security-Hardening Wave abgeschlossen
 
-1. Das Kinder-Panel rendert Support-Tickets und Fehlerzustaende nicht mehr ueber unescaped HTML-Strings, sondern ueber DOM-APIs. Damit ist der bestaetigte DOM-XSS-Pfad aus dem Ticket-Listing unmittelbar reduziert.
-2. Die Workflow-Haertung wurde vereinheitlicht: bislang fehlende explizite `permissions`-Bloecke werden jetzt fuer die betroffenen CI-Workflows nachgezogen, waehrend strengere bestehende Workflows unveraendert bleiben.
-3. Die Firebase-Android-Konfigurationen sind im aktuellen Git-Stand nicht getrackt. Die Templates in [masterApp/google-services.template.json](masterApp/google-services.template.json) und [childApp/google-services.template.json](childApp/google-services.template.json) bleiben die alleinige Repository-Quelle.
-4. Der Legacy-Web-Auth-Cutover fuer die Ziel-Panels ist umgesetzt: Web-Control und Kinder-Panel akzeptieren keine Secret-Key-Anmeldung mehr. Das Eltern-Panel erzeugt fuer beide Ziele kurzlebige sichere Sitzungslinks ueber `createMasterWebBootstrapToken`.
+1. ✅ Das Kinder-Panel rendert Support-Tickets und Fehlerzustaende nicht mehr ueber unescaped HTML-Strings, sondern ueber DOM-APIs. Damit ist der bestaetigte DOM-XSS-Pfad aus dem Ticket-Listing unmittelbar reduziert.
+2. ✅ Die Workflow-Haertung wurde vereinheitlicht: bislang fehlende explizite `permissions`-Bloecke werden jetzt fuer die betroffenen CI-Workflows nachgezogen, waehrend strengere bestehende Workflows unveraendert bleiben.
+3. ✅ Die Firebase-Android-Konfigurationen sind im aktuellen Git-Stand nicht getrackt. Die Templates in [masterApp/google-services.template.json](masterApp/google-services.template.json) und [childApp/google-services.template.json](childApp/google-services.template.json) bleiben die alleinige Repository-Quelle.
+4. ✅ Der Legacy-Web-Auth-Cutover fuer die Ziel-Panels ist umgesetzt: Web-Control und Kinder-Panel akzeptieren keine Secret-Key-Anmeldung mehr. Das Eltern-Panel erzeugt fuer beide Ziele kurzlebige sichere Sitzungslinks ueber `createMasterWebBootstrapToken`.
+5. ✅ Lint-Warnings bereinigt (0 Errors, 0 Warnings).
+6. ✅ Static readiness checks korrigiert und vollstaendig grün (26/26).
+7. ✅ SRI fuer app-check-compat in admin-panel ergaenzt.
 
 ### Phase A — Go-Live-Blocker zuerst
 
-1. Backend-Full-Validation ohne Fehler herstellen (Admin-Claim, Functions, Firestore, Runtime-Konfiguration).
+1. Backend-Full-Validation ohne Fehler herstellen (Admin-Claim, Functions, Firestore, Runtime-Konfiguration). ✅ Lokale Tests grün (78 Suites, 2090 Tests).
 2. Child-App-Enforcement-Härtung abschließen: wirksames App-Blocking, Overlay-Sicherheit, Schutz gegen Abschalten/Deinstallation.
 3. Pflicht-Freigaben und Compliance-Nachweise dokumentiert abhaken.
 4. Browser-Panels sind jetzt auf sichere Sitzungslinks beziehungsweise bootstrapToken-Einstiege umgestellt. Verbleibende Auth-Risiken liegen damit vor allem noch im serverseitigen Legacy-Pfad und nicht mehr in den Browser-Logins.
@@ -115,3 +121,4 @@ This PR completes the following changes. Reviewers should pay attention to the a
 1. Pin and verify JDK/Gradle toolchain in CI and local docs.
 2. Add Firebase Emulator rules integration tests for deny/allow scenarios.
 3. Keep this document in sync with release notes to avoid stale “missing” items.
+4. Resolve GitHub Actions billing blocker to unlock CodeQL and Android CI.

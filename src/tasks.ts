@@ -283,7 +283,7 @@ export const completeTask = functions.https.onCall(
     let decodedPath: string;
     try {
       decodedPath = decodeURIComponent(objectMatch[1]);
-    } catch (_err) {
+    } catch {
       throw new functions.https.HttpsError("invalid-argument", "photoUrl object path is not properly URL-encoded.");
     }
     const allowedPrefixes = [`children/${childId}/photos/`, `proofs/${childId}/`];

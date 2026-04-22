@@ -8,7 +8,7 @@ function loadParentPanelScript(): string {
     // Read the externalized app.js file
     const appSource = readFileSync(appPath, "utf8");
     return appSource.trim();
-  } catch (_error) {
+  } catch {
     // Fallback: try to extract from HTML (legacy support)
     const html = readFileSync(path.join(__dirname, "..", "parent-panel", "index.html"), "utf8");
     const match = html.match(/<script>\s*const FIREBASE_STORAGE_KEY[\s\S]*?<\/script>/);

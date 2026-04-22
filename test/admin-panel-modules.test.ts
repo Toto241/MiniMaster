@@ -14,7 +14,7 @@ import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
 
 const MODULES_DIR = path.resolve(__dirname, "..", "admin-panel", "modules");
 
-function rewriteAsCommonJS(source: string, baseDir: string): string {
+function rewriteAsCommonJS(source: string, _baseDir: string): string {
   return source
     .replace(/^\s*import\s+["']([^"']+)["'];?\s*$/gm,
       (_m, spec) => `__loadRelative(${JSON.stringify(spec)});`)

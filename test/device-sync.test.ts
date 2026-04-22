@@ -114,11 +114,6 @@ beforeEach(() => {
   setStub = jest.fn().mockResolvedValue(undefined);
   addStub = jest.fn().mockResolvedValue({ id: "new-event-id" });
 
-  const eventsDocs = {
-    id: "evt-1",
-    data: () => ({ eventId: "evt-1", createdAt: "mock-ts" }),
-  };
-
   const commandsDocs = [makeCommandDoc()];
 
   // Sub-collection mock (commands / events / usageHistory)

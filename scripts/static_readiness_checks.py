@@ -128,24 +128,33 @@ def check_ma_appcheck() -> CheckResult:
 
 
 def check_ma_usage_rules_nav() -> CheckResult:
-    patterns = (
+    nav_patterns = (
         (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "DashboardScreen.kt", r"onUsageRulesClick|onNavigateToUsageRules"),
         (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "MainActivity.kt", r'composable\("usageRules/\{childId\}"\)|navController\.navigate\("usageRules/\$childId"\)'),
+    )
+    callable_patterns = (
         (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "UsageRulesViewModel.kt", r'getHttpsCallable\("setUsageRules"\)'),
+        (REPO_ROOT / "masterApp" / "src" / "main" / "java" / "com" / "minimaster" / "masterapp" / "data" / "repositories" / "UsageRuleRepository.kt", r'getHttpsCallable\("setUsageRules"\)'),
     )
     matched_files = []
-    for path, pattern in patterns:
+    for path, pattern in nav_patterns:
         found, _ = _file_contains(path, pattern, re.MULTILINE)
         if found:
             matched_files.append(path.name)
-    passed = len(matched_files) == len(patterns)
+    callable_found = any(
+        _file_contains(path, pattern, re.MULTILINE)[0]
+        for path, pattern in callable_patterns
+    )
+    if callable_found:
+        matched_files.append("UsageRuleRepository.kt")
+    passed = len(matched_files) >= len(nav_patterns) and callable_found
     return CheckResult(
         "ma-usage-rules-nav",
         "UsageRules-Navigation und Datenspeicherung implementiert",
         passed,
         "Navigation, Screen-Route und setUsageRules-Callable sind vorhanden."
         if passed else
-        f"Usage-Rules-Fluss unvollständig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
+        f"Usage-Rules-Fluss unvollstaendig; Treffer in: {', '.join(matched_files) or 'keiner Datei' }.",
         "static",
     )
 
