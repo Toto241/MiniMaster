@@ -2,17 +2,25 @@ import { readFileSync } from "fs";
 import * as path from "path";
 import vm from "vm";
 
-function extractInlineScript(html: string): string {
-  const match = html.match(/<script>\s*const FIREBASE_STORAGE_KEY[\s\S]*?<\/script>/);
-  if (!match) {
-    throw new Error("Parent-panel inline script not found.");
+function loadParentPanelScript(): string {
+  const appPath = path.join(__dirname, "..", "parent-panel", "app.js");
+  try {
+    // Read the externalized app.js file
+    const appSource = readFileSync(appPath, "utf8");
+    return appSource.trim();
+  } catch (e) {
+    // Fallback: try to extract from HTML (legacy support)
+    const html = readFileSync(path.join(__dirname, "..", "parent-panel", "index.html"), "utf8");
+    const match = html.match(/<script>\s*const FIREBASE_STORAGE_KEY[\s\S]*?<\/script>/);
+    if (!match) {
+      throw new Error("Parent-panel script not found in app.js or index.html");
+    }
+    return match[0].replace(/^<script>/, "").replace(/<\/script>$/, "");
   }
-  return match[0].replace(/^<script>/, "").replace(/<\/script>$/, "");
 }
 
 function loadParentPanel() {
-  const html = readFileSync(path.join(__dirname, "..", "parent-panel", "index.html"), "utf8");
-  const source = extractInlineScript(html);
+  const source = loadParentPanelScript();
 
   const elements = new Map<string, any>();
   const createNode = (tagName?: string) => ({

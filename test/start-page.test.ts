@@ -19,9 +19,20 @@ type ElementLike = {
   select?: jest.Mock;
 };
 
-function extractInlineScript(html: string): string {
+function loadStartPageScript(): string {
+  const scriptPath = path.join(__dirname, "..", "start.js");
+  if (fs.existsSync(scriptPath)) {
+    // Extract the main script content before the event binding code
+    const fullScript = fs.readFileSync(scriptPath, "utf8");
+    // Split at the binding code and take the first part (the original inline script)
+    const parts = fullScript.split("// Initialize event listeners for UI actions");
+    return parts[0].trim();
+  }
+  // Fallback: try to extract from HTML (legacy support)
+  const htmlPath = path.join(__dirname, "..", "start.html");
+  const html = fs.readFileSync(htmlPath, "utf8");
   const match = html.match(/<script>([\s\S]*)<\/script>/);
-  if (!match) throw new Error("Inline script not found in start.html");
+  if (!match) throw new Error("Script not found in start.js or start.html");
   return match[1];
 }
 
@@ -42,9 +53,7 @@ function createElement(id?: string): ElementLike {
 }
 
 function loadStartPage(initialStorage: StorageMap = {}, pathname = "/workspace/MiniMaster/start.html") {
-  const htmlPath = path.join(__dirname, "..", "start.html");
-  const html = fs.readFileSync(htmlPath, "utf8");
-  const scriptSource = extractInlineScript(html);
+  const scriptSource = loadStartPageScript();
 
   const storage = new Map(Object.entries(initialStorage));
   const elements = new Map<string, ElementLike>();

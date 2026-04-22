@@ -13,28 +13,30 @@ describe("web bootstrap bridge contract", () => {
   });
 
   it("parent-panel launches web-control via server-issued bootstrap links", async () => {
-    const parentPanel = await readUtf8("parent-panel/index.html");
+    const parentPanelHtml = await readUtf8("parent-panel/index.html");
+    const parentPanelApp = await readUtf8("parent-panel/app.js");
+    const parentPanelSource = parentPanelHtml + "\n" + parentPanelApp;
 
-    expect(parentPanel).toContain("createMasterWebBootstrapToken");
-    expect(parentPanel).toContain("targetPath");
-    expect(parentPanel).toContain("queryParamName");
-    expect(parentPanel).toContain("../web-control/index.html");
-    expect(parentPanel).toContain("openSecureChildPanel");
-    expect(parentPanel).not.toContain("httpsCallable(\"generateCustomToken\")");
+    expect(parentPanelSource).toContain("createMasterWebBootstrapToken");
+    expect(parentPanelSource).toContain("targetPath");
+    expect(parentPanelSource).toContain("queryParamName");
+    expect(parentPanelHtml).toContain("../web-control/index.html");
+    expect(parentPanelSource).toContain("openSecureChildPanel");
+    expect(parentPanelSource).not.toContain("httpsCallable(\"generateCustomToken\")");
   });
 
   it("web clients support bootstrapToken redemption without browser legacy login fallback", async () => {
     const webControl = await readUtf8("web-control/app.js");
-    const parentPanel = await readUtf8("parent-panel/index.html");
-    const childPanel = await readUtf8("child-panel/index.html");
+    const parentPanelApp = await readUtf8("parent-panel/app.js");
+    const childPanelApp = await readUtf8("child-panel/app.js");
 
-    for (const source of [webControl, parentPanel, childPanel]) {
+    for (const source of [webControl, parentPanelApp, childPanelApp]) {
       expect(source).toContain("bootstrapToken");
       expect(source).toContain("redeemMasterWebBootstrapToken");
     }
 
     expect(webControl).not.toContain("httpsCallable(\"generateCustomToken\")");
-    expect(parentPanel).not.toContain("httpsCallable(\"generateCustomToken\")");
-    expect(childPanel).not.toContain("httpsCallable(\"generateCustomToken\")");
+    expect(parentPanelApp).not.toContain("httpsCallable(\"generateCustomToken\")");
+    expect(childPanelApp).not.toContain("httpsCallable(\"generateCustomToken\")");
   });
 });

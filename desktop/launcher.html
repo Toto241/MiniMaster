@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'">
   <title>MiniMaster – Start</title>
   <style>
     :root {
@@ -232,27 +232,6 @@
     <p class="hint">Hinweis: Für volle Funktionalität muss die Firebase-Konfiguration in den Panels hinterlegt sein.</p>
   </main>
   <script src="../shared-ui-tooltips.js"></script>
-  <script>
-    (function () {
-      const idleTimeoutMs = 30 * 60 * 1000;
-      let timer = null;
-
-      function resetTimer() {
-        if (timer) {
-          clearTimeout(timer);
-        }
-        timer = setTimeout(function () {
-          alert("Sitzung wegen Inaktivitaet beendet. Bitte Launcher erneut oeffnen.");
-          window.close();
-        }, idleTimeoutMs);
-      }
-
-      ["click", "keydown", "mousemove", "touchstart", "scroll"].forEach(function (eventName) {
-        window.addEventListener(eventName, resetTimer, { passive: true });
-      });
-
-      resetTimer();
-    })();
-  </script>
+  <script src="./launcher.js"></script>
 </body>
 </html>

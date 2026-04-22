@@ -562,6 +562,24 @@ function showNoResults() {
     updatePaginationControls(0);
 }
 
+// Initialize event listeners for UI actions
+function bindLogsUiActions() {
+    const bindClick = (id, handler) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.addEventListener('click', handler);
+    };
+
+    // Bind filter and pagination buttons
+    bindClick('apply-logs-filter-btn', loadLogs);
+    bindClick('logs-prev-page-btn', previousPage);
+    bindClick('logs-next-page-btn', nextPage);
+    bindClick('logs-modal-close', closeModal);
+}
+
+// Attach event listeners when DOM is ready
+document.addEventListener('DOMContentLoaded', bindLogsUiActions);
+
 // Close modal when clicking outside of it
 window.onclick = function(event) {
     const modal = document.getElementById('detailsModal');
