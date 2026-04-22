@@ -96,14 +96,98 @@ Same as DE — no AT-specific technical requirements.
 
 ---
 
-## 3. Countries Not Yet Assessed
+## 3. Phase 1 Expansion — In Progress
+
+### Country: United Kingdom (UK)
+
+#### Legal Readiness
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Terms in UK English | ✅ Pass | Template in [AGB_TEMPLATE_EN_UK.md](AGB_TEMPLATE_EN_UK.md) |
+| Privacy Policy in UK English | ✅ Pass | Template in [PRIVACY_POLICY_EN_UK.md](PRIVACY_POLICY_EN_UK.md) |
+| UK GDPR + DPA 2018 compliance | ✅ Pass | ICO references, UK SCCs, TRA |
+| AADC (children's design code) | ✅ Pass | High privacy defaults, no profiling |
+| Android Strings (en) | ✅ Pass | `values` (default) |
+
+#### Go/No-Go Decision
+- **Overall:** Conditional Go — store listing artifacts pending
+
+---
+
+### Country: United States (US)
+
+#### Legal Readiness
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Terms in US English | ✅ Pass | COPPA, CCPA/CPRA, state law clauses in [AGB_TEMPLATE_EN_US.md](AGB_TEMPLATE_EN_US.md) |
+| Privacy Policy in US English | ✅ Pass | COPPA, CCPA/CPRA, VCDPA, CPA in [PRIVACY_POLICY_EN_US.md](PRIVACY_POLICY_EN_US.md) |
+| COPPA compliance | ✅ Pass | Verifiable parental consent, no direct child collection |
+| Android Strings (en) | ✅ Pass | `values` (default) |
+
+#### Go/No-Go Decision
+- **Overall:** Conditional Go — state-specific legal review recommended, store listing pending
+
+---
+
+### Country: France (FR)
+
+#### Legal Readiness
+
+| Item | Status | Notes |
+|------|--------|-------|
+| CGU en français | ✅ Pass | CNIL, DSGVO, Code de la consommation in [AGB_TEMPLATE_FR.md](AGB_TEMPLATE_FR.md) |
+| Politique de confidentialité en français | ✅ Pass | RGPD + CNIL in [PRIVACY_POLICY_FR.md](PRIVACY_POLICY_FR.md) |
+| Android Strings (fr) | ✅ Pass | `values-fr` — legal consent gate + usage rules added |
+
+#### Go/No-Go Decision
+- **Overall:** Conditional Go — store listing (FR) pending, CNIL cookie banner review
+
+---
+
+### Country: Spain (ES)
+
+#### Legal Readiness
+
+| Item | Status | Notes |
+|------|--------|-------|
+| CGU en español | ✅ Pass | RGPD + LOPDGDD + LSSI in [AGB_TEMPLATE_ES.md](AGB_TEMPLATE_ES.md) |
+| Política de privacidad en español | ✅ Pass | RGPD + LOPDGDD in [PRIVACY_POLICY_ES.md](PRIVACY_POLICY_ES.md) |
+| Android Strings (es) | ✅ Pass | `values-es` — legal consent gate + usage rules added |
+
+#### Go/No-Go Decision
+- **Overall:** Conditional Go — store listing (ES) pending
+
+---
+
+### Country: Italy (IT)
+
+#### Legal Readiness
+
+| Item | Status | Notes |
+|------|--------|-------|
+| ToS in italiano | ✅ Pass | GDPR + Codice Privacy + Codice del Consumo in [AGB_TEMPLATE_IT.md](AGB_TEMPLATE_IT.md) |
+| Informativa privacy in italiano | ✅ Pass | GDPR + Garante in [PRIVACY_POLICY_IT.md](PRIVACY_POLICY_IT.md) |
+| Android Strings (it) | ✅ Pass | `values-it` — fully translated, legal + usage rules added |
+
+#### Go/No-Go Decision
+- **Overall:** Conditional Go — store listing (IT) pending
+
+---
+
+## 4. Countries Not Yet Assessed
 
 The following countries require full legal assessment before rollout:
 
-- United Kingdom (UK) — UK GDPR + AADC assessment needed
-- United States (US) — COPPA + state privacy laws assessment needed
-- France (FR) — CNIL-specific requirements assessment needed
-- Other EU countries — DSGVO baseline applies, localization needed
+- Brazil (BR) — LGPD assessment needed
+- Canada (CA) — PIPEDA + provincial law assessment needed
+- Netherlands (NL) — AP-specific requirements assessment needed
+- Poland (PL) — UODO-specific requirements assessment needed
+- Mexico (MX) — LFPDPPP assessment needed
+- Japan (JP) — APPI assessment needed
+- South Korea (KR) — PIPA assessment needed
+- India (IN) — DPDP Act assessment needed
 
 ## 4. Process
 
