@@ -46,6 +46,9 @@
 
             <!-- Navigation Tabs -->
             <nav id="dashboard-nav" class="dashboard-nav mm-u010">
+                <button id="nav-toggle" class="nav-toggle" type="button" aria-label="Navigation ein- oder ausblenden" title="Menü">
+                    <span></span><span></span><span></span>
+                </button>
                 <button
                     class="nav-tab active"
                     type="button"
@@ -1964,6 +1967,39 @@
             </div>
         </div>
 
+        <div id="help-overlay" class="help-overlay hidden" role="dialog" aria-modal="true" aria-label="Tastaturkürzel und Hilfe">
+            <div class="help-overlay-content">
+                <div class="help-overlay-header">
+                    <h3>⌨️ Tastaturkürzel &amp; Hilfe</h3>
+                    <button id="help-overlay-close" class="help-overlay-close" type="button" aria-label="Hilfe schließen">✕</button>
+                </div>
+                <div class="help-overlay-body">
+                    <section>
+                        <h4>Navigation</h4>
+                        <dl class="help-shortcut-list">
+                            <div><dt>Alt + 1</dt><dd>Übersicht</dd></div>
+                            <div><dt>Alt + 2</dt><dd>Benutzer</dd></div>
+                            <div><dt>Alt + 3</dt><dd>Geräte</dd></div>
+                            <div><dt>Alt + 4</dt><dd>Abonnements</dd></div>
+                            <div><dt>Alt + 5</dt><dd>Kopplung</dd></div>
+                            <div><dt>Alt + 6</dt><dd>Support</dd></div>
+                            <div><dt>Alt + 7</dt><dd>Fehlerprotokoll</dd></div>
+                            <div><dt>Alt + 8</dt><dd>Compliance</dd></div>
+                            <div><dt>Alt + 9</dt><dd>Einrichtung</dd></div>
+                            <div><dt>Alt + 0</dt><dd>Qualitätssicherung</dd></div>
+                        </dl>
+                    </section>
+                    <section>
+                        <h4>Aktionen</h4>
+                        <dl class="help-shortcut-list">
+                            <div><dt>?</dt><dd>Diese Hilfe anzeigen</dd></div>
+                            <div><dt>Esc</dt><dd>Hilfe schließen / Modal schließen</dd></div>
+                            <div><dt>Alt + S</dt><dd>Fokus auf die erste Suche im aktuellen Tab</dd></div>
+                        </dl>
+                    </section>
+                </div>
+            </div>
+        </div>
         <script type="module" src="modules/index.js?v=20260418"></script>
         <script src="app.js?v=20260326"></script>
         <script src="pwa-register.js"></script>
