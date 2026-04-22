@@ -1,45 +1,38 @@
 # CI Revalidation Report
 
-Generated: 2026-04-22 16:30:00 +02:00
+Generated: 2026-04-22 19:10:05 +02:00
 Repository: Toto241/MiniMaster
-
-## Summary
-
-- **Local validation:** ✅ All 78 Jest test suites passing (2090 tests)
-- **Lint:** ✅ 0 errors, 14 warnings (unused variables only)
-- **Git status:** Clean working tree
-- **GitHub Actions Billing:** ⛔ Still blocked externally (pending payment/spending limit fix)
+Rerun requested for latest failures: false
 
 ## CodeQL Security Analysis
 
-- Latest run: [24559307544](https://github.com/Toto241/MiniMaster/actions/runs/24559307544)
-- Latest status: queued / pending (blocked by billing)
-- Head SHA: e5ca6dc8a3bf760ba8dc0da423ae0d5d0b4735a4
+- Latest run: [24790478476](https://github.com/Toto241/MiniMaster/actions/runs/24790478476)
+- Latest status: completed / failure
+- Head SHA: edbd78fdc701830f276f7efe5840fecb0f736350
+- Updated at: 04/22/2026 16:38:08
 - Latest success: none in inspected history
 
-Billing blocker detected: pending
-Repository code scanning blocker detected: pending
+### Latest Failure Annotations
+- [Analyze Code (javascript)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
+- [Analyze Code (java)] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
 
-**Note:** Local security test suites (`test/run-security-tests.test.ts`, `test/security-*.test.ts`) all pass. CodeQL cannot execute until GitHub Actions billing is resolved.
+Billing blocker detected: yes
+Repository code scanning blocker detected: no
 
 ## Android CI
 
-- Latest run: [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803)
-- Latest status: queued / pending (blocked by billing)
-- Head SHA: e7260d47ec541ae359aab55029859d663ca34518
+- Latest run: [24746653860](https://github.com/Toto241/MiniMaster/actions/runs/24746653860)
+- Latest status: completed / failure
+- Head SHA: dbd3068f03019b7d75fa4c99e5b6632a2e42f73f
+- Updated at: 04/21/2026 21:11:53
 - Latest success: none in inspected history
 
-Billing blocker detected: pending
+### Latest Failure Annotations
+- [android] The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings
 
-**Note:** Local Android static readiness checks (`scripts/static_readiness_checks.py`) pass with 26/26 checks (100%). Full Gradle-based Android CI requires GitHub Actions billing fix.
-
-## Firebase Emulator Rules Tests
-
-- Firestore rules structural tests: ✅ Passing (included in Jest suite)
-- Storage rules emulator tests: ⚠️ Skipped when emulator is offline (expected in CI-less local runs)
+Billing blocker detected: yes
+Repository code scanning blocker detected: no
 
 ## Recommendation
-
-1. **External blocker:** GitHub Actions billing/spending limit must be resolved by repo owner to unblock CodeQL and Android CI.
-2. **Local readiness:** Repository is in a clean, validated state. All backend tests, lint, and static readiness checks pass.
-3. **Next step after billing fix:** Re-run `pwsh ./scripts/revalidate-release-gates.ps1` to refresh CI evidence.
+- Immediate action: Resolve GitHub Actions billing/spending-limit issue in account settings.
+- Then rerun this script with -RerunLatestFailed to request reruns and regenerate evidence.
