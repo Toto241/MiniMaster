@@ -10855,6 +10855,7 @@ function showDashboard(user) {
     document.getElementById("logout-btn").style.display = "inline-block";
     const roleLabel = currentUserRole ? ` (${currentUserRole.toUpperCase()})` : "";
     document.getElementById("user-email").textContent = (user.email || "") + roleLabel;
+    setQaWorkspaceVisibility(false);
     startSessionMonitoring();
 }
 
@@ -10889,6 +10890,18 @@ function applyRoleRestrictions(role) {
 
 // ==================== TAB NAVIGATION ====================
 
+function setQaWorkspaceVisibility(isQaTabActive) {
+    const qaHeading = document.getElementById("qa-section-heading");
+    const qaCard = document.getElementById("qa-suite-card");
+
+    if (qaHeading) {
+        qaHeading.toggleAttribute("hidden", !isQaTabActive);
+    }
+    if (qaCard) {
+        qaCard.toggleAttribute("hidden", !isQaTabActive);
+    }
+}
+
 function switchTab(tabName, evt) {
     // Hide all tabs
     document.querySelectorAll(".tab-content").forEach(tab => {
@@ -10900,6 +10913,7 @@ function switchTab(tabName, evt) {
     });
     // Show selected tab
     document.getElementById("tab-" + tabName).style.display = "block";
+    setQaWorkspaceVisibility(tabName === "qa");
     // Set active button
     if (evt && evt.target) {
         evt.target.classList.add("active");
