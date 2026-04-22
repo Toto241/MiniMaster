@@ -10,6 +10,12 @@
         ],
         "admin-panel": [
           "minimaster-admin-panel"
+        ],
+        "parent-panel": [
+          "minimaster-parent-panel"
+        ],
+        "child-panel": [
+          "minimaster-child-panel"
         ]
       }
     }
