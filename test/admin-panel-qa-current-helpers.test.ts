@@ -29,6 +29,8 @@ describe("admin-panel current QA helpers", () => {
     expect(html).toContain("Letzte Testläufe, Fehler &amp; Detailansicht");
     expect(html).toContain("qa-test-metrics");
     expect(html).toContain("qa-test-rerun-btn");
+    expect(html).toContain('id="qa-copy-run-log-btn"');
+    expect(html).toContain("Protokoll kopieren");
     expect(html).toContain("qa-secondary-details");
     expect(html).toContain("Nur bei Bedarf öffnen");
     expect(html).toContain("Nur für tiefe Ursachenanalyse und Nachweisarbeit");
@@ -715,5 +717,47 @@ describe("admin-panel current QA helpers", () => {
     expect(detailEl.innerHTML).toContain("offline-online-resync");
     expect(detailEl.innerHTML).toContain("emulator-5554");
     expect(detailEl.innerHTML).toContain("logs/master.txt");
+  });
+
+  it("shows tab running indicator and copy-log button state via updatePythonAutomationRunState", () => {
+    const { exports, elements } = loadAdminPanelTestExports();
+
+    // Mock-Element für python-automation-run-state (Pflicht, sonst early-return)
+    const runStateEl = {
+      className: "",
+      textContent: "",
+      appendChild: jest.fn(),
+      replaceChildren: jest.fn(),
+      classList: {
+        add: jest.fn(),
+        remove: jest.fn(),
+        contains: jest.fn(() => false),
+      },
+    };
+    elements.set("python-automation-run-state", runStateEl);
+
+    // Mock-Element für qa-copy-run-log-btn
+    const copyLogBtn: any = { hidden: true, disabled: true };
+    elements.set("qa-copy-run-log-btn", copyLogBtn);
+
+    // Kein Protokoll – Lauf startet
+    exports.setPythonCommissioningLastRunForTests(null);
+    exports.updatePythonAutomationRunState({ isRunning: true, message: "Läuft…", detail: "" });
+
+    expect(copyLogBtn.hidden).toBe(true);
+    expect(copyLogBtn.disabled).toBe(true);
+
+    // Lauf abgeschlossen, Protokoll vorhanden
+    exports.setPythonCommissioningLastRunForTests({ runId: "test-1", overall: "pass" });
+    exports.updatePythonAutomationRunState({ isRunning: false, message: "Fertig.", detail: "" });
+
+    expect(copyLogBtn.hidden).toBe(false);
+    expect(copyLogBtn.disabled).toBe(false);
+
+    // Erneuter Lauf ohne Protokoll-Reset – Button wieder verstecken
+    exports.updatePythonAutomationRunState({ isRunning: true, message: "Läuft erneut…", detail: "" });
+
+    expect(copyLogBtn.hidden).toBe(true);
+    expect(copyLogBtn.disabled).toBe(true);
   });
 });
