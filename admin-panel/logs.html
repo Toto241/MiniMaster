@@ -295,12 +295,12 @@
                 <input type="text" id="userFilter" placeholder="Filter by user ID..." title="Audit-Logs nach bestimmter Benutzer-ID filtern" />
             </div>
             <div class="filter-group">
-                <button onclick="loadLogs()" title="Ausgewählte Filter auf die Audit-Logs anwenden">Apply Filters</button>
+                <button id="apply-logs-filter-btn" title="Ausgewählte Filter auf die Audit-Logs anwenden">Apply Filters</button>
             </div>
         </div>
 
         <div id="errorContainer"></div>
-        <div id="loadingContainer" class="loading" style="display:none;">Loading logs...</div>
+        <div id="loadingContainer" class="loading is-hidden">Loading logs...</div>
 
         <table id="logsTable">
             <thead>
@@ -320,16 +320,16 @@
         </table>
 
         <div class="pagination">
-            <button onclick="previousPage()" id="prevButton">Previous</button>
+            <button id="logs-prev-page-btn" title="Zur vorherigen Seite der Audit-Logs">Previous</button>
             <span id="pageInfo">Page 1</span>
-            <button onclick="nextPage()" id="nextButton">Next</button>
+            <button id="logs-next-page-btn" title="Zur nächsten Seite der Audit-Logs">Next</button>
         </div>
     </div>
 
     <!-- Modal for log details -->
     <div id="detailsModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
+            <span id="logs-modal-close" class="close" title="Logdetails schließen">&times;</span>
             <h2>Log Details</h2>
             <pre id="logDetails"></pre>
         </div>

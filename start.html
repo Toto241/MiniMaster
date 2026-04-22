@@ -551,6 +551,12 @@
       .btn { inline-size: 100%; justify-content: center; }
       .actions .btn, .quick-links .btn, .modal-actions .btn { inline-size: auto; }
     }
+
+    /* CSS Utility Classes for CSP Compliance */
+    .panel-grid-spaced { margin-block-start: 12px; }
+    .callout-warning { background: #fffbeb; border-left-color: #f59e0b; margin-block-start: 8px; }
+    .details-compact-spaced { margin-block-start: 12px; }
+    .test-grid-spaced { margin-block-start: 14px; }
   </style>
 </head>
 <body>
@@ -579,7 +585,7 @@
           <a class="btn btn-primary" href="http://127.0.0.1:8765/admin-panel/">🛡️ Operator-Dashboard öffnen</a>
           <a class="btn btn-green" href="parent-panel/index.html">👨‍👩‍👧 Eltern-Panel öffnen</a>
           <a class="btn btn-green" href="child-panel/index.html">📱 Kinder-Panel öffnen</a>
-          <button class="btn btn-outline" type="button" onclick="openFirebaseModal()">🔥 Firebase-Konfiguration bearbeiten</button>
+          <button class="btn btn-outline" type="button" id="open-firebase-modal-btn-1">🔥 Firebase-Konfiguration bearbeiten</button>
         </div>
       </div>
 
@@ -643,7 +649,7 @@
           <p>Erweiterte Android- und Debug-Aktionen erst nutzen, wenn Schritt 1 und 2 gr&uuml;n sind.</p>
         </div>
       </div>
-      <div class="panel-grid" style="margin-block-start: 12px">
+      <div class="panel-grid panel-grid-spaced">
         <div class="mini-card">
           <strong>Operator</strong>
           <p>Admin-Rollen, Audit, Betrieb, Kommandos und Commissioning.</p>
@@ -677,14 +683,14 @@
           <strong>Empfehlung</strong>
           <p>Vor jedem Testlauf zuerst die Firebase-Werte prüfen und anschließend den Health-/Commissioning-Bereich im Dashboard öffnen.</p>
         </div>
-        <div class="callout" style="background:#fffbeb; border-left-color: #f59e0b; margin-block-start: 8px">
+        <div class="callout callout-warning">
           <strong>⚙️ Python-Server erforderlich</strong>
           <p>Die <strong>Python-basierte Testzentrale</strong> (Commissioning, Automationsläufe, Nachweise) ist nur verfügbar, wenn das Dashboard über <code>start.bat</code> oder <code>python -m python_admin.app</code> gestartet wurde. Der Link "Admin öffnen" verweist auf <code>http://127.0.0.1:8765</code>.</p>
         </div>
         <div class="actions">
           <a class="btn btn-purple" href="http://127.0.0.1:8765/admin-panel/">Admin öffnen</a>
           <a class="btn btn-outline" href="admin-panel/logs.html">Audit-Logs</a>
-          <button class="btn btn-outline" type="button" onclick="openFirebaseModal()">Firebase-Config laden</button>
+          <button class="btn btn-outline" type="button" id="open-firebase-modal-btn-1">Firebase-Config laden</button>
         </div>
       </article>
 
@@ -704,7 +710,7 @@
         <div class="apk-path">
           <span class="apk-label">Master-APK:</span>
           <code id="master-apk-path">masterApp\build\outputs\apk\debug\masterApp-debug.apk</code>
-          <button class="btn-copy" type="button" onclick="copyPath('master-apk-path')">📋 Kopieren</button>
+          <button class="btn-copy" type="button" id="copy-master-apk-path-btn">📋 Kopieren</button>
         </div>
         <div class="actions">
           <a class="btn btn-primary" href="parent-panel/index.html">Eltern-Panel öffnen</a>
@@ -730,7 +736,7 @@
         <div class="apk-path">
           <span class="apk-label">Child-APK:</span>
           <code id="child-apk-path">childApp\build\outputs\apk\debug\childApp-debug.apk</code>
-          <button class="btn-copy" type="button" onclick="copyPath('child-apk-path')">📋 Kopieren</button>
+          <button class="btn-copy" type="button" id="copy-child-apk-path-btn">📋 Kopieren</button>
         </div>
         <div class="actions">
           <a class="btn btn-green" href="child-panel/index.html">Kinder-Panel öffnen</a>
@@ -767,9 +773,9 @@
           <p>Nach Tests immer deaktivieren. Sp&auml;testens nach 30 Minuten endet die Session automatisch.</p>
         </div>
       </div>
-      <details class="details-compact" style="margin-block-start: 12px">
+      <details class="details-compact details-compact-spaced">
         <summary>Erweiterte USB-Details anzeigen</summary>
-      <div class="test-grid" style="margin-block-start:14px">
+      <div class="test-grid test-grid-spaced">
         <section>
           <h3>Eltern-App &middot; ADB-Aktionen</h3>
           <ul>
@@ -924,157 +930,13 @@
       </div>
       <div class="modal-status" id="fb-status"></div>
       <div class="modal-actions">
-        <button class="btn btn-outline" type="button" onclick="closeFirebaseModal()">Abbrechen</button>
-        <button class="btn btn-purple" type="button" onclick="saveFirebaseConfig()">💾 Konfiguration speichern</button>
+        <button class="btn btn-outline" type="button" id="close-firebase-modal-btn">Abbrechen</button>
+        <button class="btn btn-purple" type="button" id="save-firebase-config-btn">💾 Konfiguration speichern</button>
       </div>
     </div>
   </div>
 
   <script src="shared-ui-tooltips.js"></script>
-  <script>
-    var FIREBASE_STORAGE_KEY = 'operatorFirebaseConfigOverride';
-    var FIREBASE_FIELDS = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
-    var FIREBASE_FIELD_IDS = ['fb-apiKey', 'fb-authDomain', 'fb-projectId', 'fb-storageBucket', 'fb-messagingSenderId', 'fb-appId'];
-
-    function getStoredFirebaseConfig() {
-      try {
-        var raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function isValidFirebaseConfig(config) {
-      if (!config || typeof config !== 'object') return false;
-      for (var i = 0; i < FIREBASE_FIELDS.length; i++) {
-        var field = FIREBASE_FIELDS[i];
-        var value = config[field];
-        if (typeof value !== 'string' || !value.trim() || value.indexOf('your-') !== -1) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    function setModalStatus(message, type) {
-      var statusEl = document.getElementById('fb-status');
-      statusEl.textContent = message;
-      statusEl.className = type ? 'modal-status ' + type : 'modal-status';
-    }
-
-    function populateFirebaseModal(config) {
-      for (var i = 0; i < FIREBASE_FIELDS.length; i++) {
-        var fieldName = FIREBASE_FIELDS[i];
-        var input = document.getElementById(FIREBASE_FIELD_IDS[i]);
-        input.value = config && config[fieldName] ? config[fieldName] : '';
-      }
-    }
-
-    function renderConfigStatus() {
-      var config = getStoredFirebaseConfig();
-      var ready = isValidFirebaseConfig(config);
-      var projectId = ready ? config.projectId : 'Nicht konfiguriert';
-      var statusText = ready ? 'Vollständige Web-Konfiguration erkannt' : 'Konfiguration fehlt oder enthält Platzhalter';
-      var nextStep = ready ? 'Panels öffnen und End-to-End prüfen' : 'Firebase-Werte aus Console übernehmen';
-      var pill = document.getElementById('config-status-pill');
-      var infoBar = document.getElementById('info-bar-text');
-
-      document.getElementById('config-status-text').textContent = statusText;
-      document.getElementById('config-project-text').textContent = projectId;
-      document.getElementById('next-step-text').textContent = nextStep;
-
-      if (ready) {
-        pill.textContent = '✅ Firebase-Konfiguration gespeichert · Projekt: ' + config.projectId;
-        pill.className = 'status-pill config-pill-ready';
-        infoBar.textContent = 'MiniMaster ist mit lokaler Firebase-Webkonfiguration vorbereitet. Empfohlen: Admin-Panel und Eltern-Panel kurz gegentesten.';
-      } else {
-        pill.textContent = '⚠️ Keine produktive Firebase-Konfiguration erkannt';
-        pill.className = 'status-pill config-pill-missing';
-        infoBar.textContent = 'Es wurden noch keine vollständigen Firebase-Webwerte erkannt. Bitte Konfiguration speichern, bevor Panels produktiv genutzt werden.';
-      }
-    }
-
-    function openFirebaseModal() {
-      populateFirebaseModal(getStoredFirebaseConfig());
-      setModalStatus('', '');
-      document.getElementById('fb-modal').classList.add('open');
-    }
-
-    function closeFirebaseModal() {
-      document.getElementById('fb-modal').classList.remove('open');
-    }
-
-    function collectFirebaseConfigFromInputs() {
-      var config = {};
-      for (var i = 0; i < FIREBASE_FIELDS.length; i++) {
-        var input = document.getElementById(FIREBASE_FIELD_IDS[i]);
-        var value = input.value.trim();
-        if (!value || value.indexOf('your-') !== -1) {
-          input.focus();
-          throw new Error('Bitte alle Felder vollständig und ohne Platzhalter ausfüllen.');
-        }
-        config[FIREBASE_FIELDS[i]] = value;
-      }
-      return config;
-    }
-
-    function saveFirebaseConfig() {
-      try {
-        var config = collectFirebaseConfigFromInputs();
-        localStorage.setItem(FIREBASE_STORAGE_KEY, JSON.stringify(config));
-        setModalStatus('✅ Firebase-Konfiguration gespeichert. Admin-Dashboard und Eltern-Panel verwenden diese Werte beim nächsten Laden.', 'success');
-        renderConfigStatus();
-        setTimeout(closeFirebaseModal, 2200);
-      } catch (e) {
-        setModalStatus(e.message || 'Fehler beim Speichern der Firebase-Konfiguration.', 'error');
-      }
-    }
-
-    function normalizeBasePath(pathname) {
-      return decodeURIComponent(String(pathname || '').replace(/\/[^\/]*$/, '').replace(/^\//, '')).replace(/\//g, '\\');
-    }
-
-    function buildFullPath(relativePath, pathname) {
-      var basePath = normalizeBasePath(pathname || location.pathname);
-      return (basePath ? basePath + '\\' : '') + relativePath;
-    }
-
-    function copyPath(elementId) {
-      var codeEl = document.getElementById(elementId);
-      var relativePath = codeEl.textContent;
-      var fullPath = buildFullPath(relativePath, location.pathname);
-      var btn = codeEl.nextElementSibling;
-
-      function markCopied() {
-        btn.textContent = '✅ Kopiert!';
-        btn.classList.add('copied');
-        setTimeout(function () {
-          btn.textContent = '📋 Kopieren';
-          btn.classList.remove('copied');
-        }, 1500);
-      }
-
-      return navigator.clipboard.writeText(fullPath).then(function () {
-        markCopied();
-      }).catch(function () {
-        var ta = document.createElement('textarea');
-        ta.value = fullPath;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        markCopied();
-      });
-    }
-
-    document.getElementById('fb-modal').addEventListener('click', function (e) {
-      if (e.target === this) closeFirebaseModal();
-    });
-
-    renderConfigStatus();
-  </script>
-</body>
+  <script src="./start.js"></script>
+  </body>
 </html>
