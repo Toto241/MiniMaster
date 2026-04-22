@@ -180,6 +180,46 @@ async function tryBootstrapLoginFromUrl() {
     await firebase.auth().signInWithCustomToken(result.data.customToken);
     return true;
 }
+
+function bindStaticUiActions() {
+    const bindClick = (id, handler) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.addEventListener("click", handler);
+    };
+
+    const bindSubmit = (id, handler) => {
+        const form = document.getElementById(id);
+        if (!form) return;
+        form.addEventListener("submit", handler);
+    };
+
+    bindClick("logout-btn", () => logout());
+    bindClick("legal-context-continue", () => continueLegalSetup());
+    bindClick("legal-terms-link", () => openLegalTerms());
+    bindClick("legal-privacy-link", () => openLegalPrivacy());
+    bindClick("legal-accept-btn", () => acceptLegalConsent());
+    bindClick("legal-retry-btn", () => retryLegalGate());
+    bindClick("show-review-tasks-btn", () => showReviewTasks());
+    bindClick("show-task-assignment-btn", () => showTaskAssignment());
+    bindClick("show-subscription-btn", () => showSubscription());
+    bindClick("show-support-btn", () => showSupport());
+    bindClick("task-modal-close", () => closeTaskModal());
+    bindClick("task-modal-cancel", () => closeTaskModal());
+    bindClick("rules-modal-close", () => closeRulesModal());
+    bindClick("rules-modal-cancel", () => closeRulesModal());
+    bindClick("review-back-btn", () => showDashboard());
+    bindClick("subscription-back-btn", () => showDashboard());
+    bindClick("support-back-btn", () => showDashboard());
+    bindClick("upgrade-android-app-btn", () => {
+        showNotification("Please complete upgrades in the parent Android app. This panel shows the live subscription state only.", "info");
+    });
+
+    bindSubmit("task-create-form", createTask);
+    bindSubmit("rules-save-form", saveRules);
+    bindSubmit("support-ticket-form", createSupportTicket);
+}
+
 function isPlaceholderFirebaseConfig(config) {
     if (!hasCompleteFirebaseConfig(config)) return true;
     return Object.values(config).some(value =>
@@ -499,6 +539,8 @@ async function handleAuthenticatedUser(user) {
  * session from localStorage when the DOM is fully loaded.
  */
 document.addEventListener('DOMContentLoaded', function() {
+    bindStaticUiActions();
+
     try {
         if (isPlaceholderFirebaseConfig(firebaseConfig)) {
             throw new Error('Firebase-Webkonfiguration fehlt. Bitte zuerst die Bootstrap-Konfiguration im Operator-Dashboard speichern.');
@@ -1317,7 +1359,7 @@ async function loadSupportTickets() {
                                     </div>` :
                                     ''
                                 }
-                                <div id="reject-feedback-form-${safeDocId}" class="reject-feedback-form" style="display:none;">
+                                <div id="reject-feedback-form-${safeDocId}" class="reject-feedback-form is-hidden">
                                     <label for="reject-comment-${safeDocId}"><strong>Please tell us what is still not working:</strong></label>
                                     <textarea id="reject-comment-${safeDocId}" rows="3" placeholder="Required comment..."></textarea>
                                     <button class="btn btn-warning mm-feedback-submit-reject" data-doc-id="${safeDocId}">Submit No + Comment</button>

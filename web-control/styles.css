@@ -1,5 +1,13 @@
 /* Mini-Master Web Control Panel Styles */
 
+.is-hidden {
+    display: none;
+}
+
+.chart-container-spaced {
+    margin-block-start: 20px;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
