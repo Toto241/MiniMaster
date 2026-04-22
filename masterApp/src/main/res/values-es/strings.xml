@@ -50,5 +50,40 @@
 
     <string name="language_setup_title">Elige el idioma de la app</string>
     <string name="language_setup_description">Selecciona tu idioma preferido para MiniMaster. Podrás cambiarlo más adelante en una futura pantalla de ajustes.</string>
+    <string name="language_setup_list_title">Idioma de la app</string>
+    <string name="country_setup_title">País de uso</string>
+    <string name="country_setup_description">Usamos este país para cargar los términos legales y la política de privacidad correctos.</string>
     <string name="language_continue">Continuar</string>
+
+    <!-- Consentimiento legal -->
+    <string name="legal_loading_message">Comprobando requisitos legales...</string>
+    <string name="legal_retry">Reintentar comprobación legal</string>
+    <string name="legal_error_title">Error en la comprobación legal</string>
+    <string name="legal_consent_title">Acepta los términos legales para continuar</string>
+    <string name="legal_consent_description">En el primer inicio tras la instalación, debes revisar y aceptar los Términos de Servicio y la Política de Privacidad actuales.</string>
+    <string name="legal_open_terms">Abrir Términos (v%1$s)</string>
+    <string name="legal_open_privacy">Abrir Política de Privacidad (v%1$s)</string>
+    <string name="legal_accept_terms">Acepto los Términos de Servicio.</string>
+    <string name="legal_accept_privacy">He tomado conocimiento de la Política de Privacidad.</string>
+    <string name="legal_accept_continue">Aceptar y continuar</string>
+    <string name="legal_country_locale">País: %1$s, Idioma: %2$s</string>
+
+    <!-- Reglas de uso -->
+    <string name="usage_rules">Reglas de uso</string>
+    <string name="rules_saved_successfully">Reglas guardadas correctamente</string>
+    <string name="usage_rules_back">Volver</string>
+    <string name="daily_screen_time_limit">Límite diario de pantalla</string>
+    <string name="minutes_per_day">Minutos al día (0 = ilimitado)</string>
+    <string name="allowed_time_window">Ventana de tiempo permitida</string>
+    <string name="allowed_time_window_description">Establece una ventana de tiempo en la que se puede usar el dispositivo.</string>
+    <string name="start_time_label">Inicio (HH:MM)</string>
+    <string name="end_time_label">Fin (HH:MM)</string>
+    <string name="per_app_time_limits">Límites de tiempo por app</string>
+    <string name="per_app_time_limits_description">Establece límites individuales para aplicaciones específicas.</string>
+    <string name="minutes_per_day_short">%1$d min/día</string>
+    <string name="remove_limit">Eliminar límite</string>
+    <string name="package_name">Nombre del paquete</string>
+    <string name="minutes_short">Min</string>
+    <string name="add">Añadir</string>
+    <string name="save_rules">Guardar reglas</string>
 </resources>

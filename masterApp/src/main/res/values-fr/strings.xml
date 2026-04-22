@@ -60,5 +60,40 @@
     <!-- Configuration initiale de la langue -->
     <string name="language_setup_title">Choisissez la langue de l\'application</string>
     <string name="language_setup_description">Sélectionnez votre langue préférée pour MiniMaster. Vous pourrez la modifier plus tard dans un futur écran de paramètres.</string>
+    <string name="language_setup_list_title">Langue de l\'application</string>
+    <string name="country_setup_title">Pays d\'utilisation</string>
+    <string name="country_setup_description">Nous utilisons ce pays pour charger les conditions légales et la politique de confidentialité appropriées.</string>
     <string name="language_continue">Continuer</string>
+
+    <!-- Consentement juridique -->
+    <string name="legal_loading_message">Vérification des exigences juridiques...</string>
+    <string name="legal_retry">Réessayer la vérification juridique</string>
+    <string name="legal_error_title">Échec de la vérification juridique</string>
+    <string name="legal_consent_title">Acceptez les conditions légales pour continuer</string>
+    <string name="legal_consent_description">Lors du premier démarrage après l\'installation, vous devez examiner et accepter les conditions d\'utilisation et la politique de confidentialité actuelles.</string>
+    <string name="legal_open_terms">Ouvrir les CGU (v%1$s)</string>
+    <string name="legal_open_privacy">Ouvrir la politique de confidentialité (v%1$s)</string>
+    <string name="legal_accept_terms">J\'accepte les conditions d\'utilisation.</string>
+    <string name="legal_accept_privacy">J\'ai pris connaissance de la politique de confidentialité.</string>
+    <string name="legal_accept_continue">Accepter et continuer</string>
+    <string name="legal_country_locale">Pays : %1$s, Locale : %2$s</string>
+
+    <!-- Règles d\'utilisation -->
+    <string name="usage_rules">Règles d\'utilisation</string>
+    <string name="rules_saved_successfully">Règles enregistrées avec succès</string>
+    <string name="usage_rules_back">Retour</string>
+    <string name="daily_screen_time_limit">Limite quotidienne d\'écran</string>
+    <string name="minutes_per_day">Minutes par jour (0 = illimité)</string>
+    <string name="allowed_time_window">Plage horaire autorisée</string>
+    <string name="allowed_time_window_description">Définissez une plage horaire pendant laquelle l\'appareil peut être utilisé.</string>
+    <string name="start_time_label">Début (HH:MM)</string>
+    <string name="end_time_label">Fin (HH:MM)</string>
+    <string name="per_app_time_limits">Limites de temps par application</string>
+    <string name="per_app_time_limits_description">Définissez des limites individuelles pour des applications spécifiques.</string>
+    <string name="minutes_per_day_short">%1$d min/jour</string>
+    <string name="remove_limit">Supprimer la limite</string>
+    <string name="package_name">Nom du package</string>
+    <string name="minutes_short">Min</string>
+    <string name="add">Ajouter</string>
+    <string name="save_rules">Enregistrer les règles</string>
 </resources>
