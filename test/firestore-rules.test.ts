@@ -117,7 +117,7 @@ describe("Firestore Security Rules - Structural Validation", () => {
     });
 
     it("should enforce lowercase task status values", () => {
-      expect(rulesContent).toContain("['pending', 'pending_approval', 'approved', 'rejected']");
+      expect(rulesContent).toContain("['open', 'pending', 'pending_approval', 'approved', 'rejected']");
     });
 
     it("should validate task proof field as photoUrl", () => {
@@ -141,7 +141,8 @@ describe("Firestore Security Rules - Structural Validation", () => {
     it("should validate task schema via a dedicated helper function", () => {
       expect(rulesContent).toContain("function isValidTaskSchema()");
       expect(rulesContent).toContain("isMasterOfChild() && isValidTaskSchema()");
-      expect(rulesContent).toContain("isChildDevice()) && isValidTaskSchema()");
+      expect(rulesContent).toContain("function isChildTaskCompletionUpdate()");
+      expect(rulesContent).toContain("isMasterTaskUpdate() || isChildTaskCompletionUpdate()");
     });
   });
 

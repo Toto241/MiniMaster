@@ -63,7 +63,7 @@ service cloud.firestore {
     // Admins can read master data ONLY through the support interface (no blanket access)
     match /masters/{masterId} {
       allow read: if isSignedIn() && (request.auth.uid == masterId || isAdmin());
-      allow write: if isSignedIn() && request.auth.uid == masterId;
+      allow create, update, delete: if false; // Managed via callable functions / Admin SDK only.
     }
 
     // --- CHILDREN COLLECTION ---
@@ -79,7 +79,7 @@ service cloud.firestore {
         isAdmin()
       );
       allow create: if false; // Only Cloud Functions (Admin SDK) can create
-      allow update: if isSignedIn() && (resource.data.masterImei == request.auth.uid || childId == request.auth.uid);
+      allow update: if false; // Child state updates are handled by callable functions / Admin SDK only.
       allow delete: if isSignedIn() && (resource.data.masterImei == request.auth.uid || isAdmin());
     }
 
@@ -114,7 +114,7 @@ service cloud.firestore {
           && d.description.size() > 0
           && d.description.size() < 1000
           && d.status is string
-          && d.status in ['pending', 'pending_approval', 'approved', 'rejected']
+          && d.status in ['open', 'pending', 'pending_approval', 'approved', 'rejected']
           && (!('photoUrl' in d) || d.photoUrl == null || (d.photoUrl is string && d.photoUrl.matches('^https://.*')))
           && (!('rejectionReason' in d) || d.rejectionReason is string)
           && (!('deadline' in d) || d.deadline is timestamp)
@@ -126,12 +126,39 @@ service cloud.firestore {
           && d.masterImei is string;
       }
 
+      function isMasterTaskUpdate() {
+        return isMasterOfChild()
+          && isValidTaskSchema()
+          && request.resource.data.masterImei == resource.data.masterImei;
+      }
+
+      function isChildTaskCompletionUpdate() {
+        return isChildDevice()
+          && isValidTaskSchema()
+          && request.resource.data.masterImei == resource.data.masterImei
+          && request.resource.data.description == resource.data.description
+          && request.resource.data.deadline == resource.data.deadline
+          && request.resource.data.rejectionReason == resource.data.rejectionReason
+          && request.resource.data.aiAnalysis == resource.data.aiAnalysis
+          && request.resource.data.unlockDuration == resource.data.unlockDuration
+          && request.resource.data.unlockUntil == resource.data.unlockUntil
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'photoUrl',
+            'completedAt',
+            'updatedAt',
+          ])
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'pending_approval';
+      }
+
       allow read: if isMasterOfChild() || isChildDevice() || isAdmin();
       // Only master can create tasks, and the task document must satisfy the schema.
       allow create: if isMasterOfChild() && isValidTaskSchema();
 
-      // Both master and child device can update, but updates must satisfy the same schema.
-      allow update: if (isMasterOfChild() || isChildDevice()) && isValidTaskSchema();
+      // Master can manage task updates; child device can only submit completion proof.
+      allow update: if isMasterTaskUpdate() || isChildTaskCompletionUpdate();
 
       allow delete: if isMasterOfChild(); // Only master can delete tasks
     }
