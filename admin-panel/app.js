@@ -9725,6 +9725,9 @@ document.addEventListener("DOMContentLoaded", async function() {
         console.error("Firebase initialization error:", error);
         showNotification("Firebase-Konfigurationsfehler. Bitte Einrichtung prüfen.", "error");
     }
+
+    initKeyboardShortcuts();
+    initResponsiveNav();
 });
 
 // ==================== ONBOARDING FLOW ====================
@@ -9750,6 +9753,167 @@ function showOnboardingPhase(phase) {
         const el = document.getElementById("onboarding-phase-" + i);
         if (el) el.style.display = i === phase ? "block" : "none";
     }
+}
+
+function validateOnboardingStep(step) {
+    const issues = [];
+    if (step === 1) {
+        if (isPlaceholderFirebaseConfig(firebaseConfig)) {
+            issues.push("Firebase-Konfiguration ist noch auf Platzhalter-Werte. Bitte im Einrichtungstab konfigurieren.");
+        }
+    }
+    if (step === 2) {
+        if (!auth || !auth.currentUser) {
+            issues.push("Noch nicht angemeldet. Bitte einloggen oder registrieren.");
+        }
+    }
+    if (step === 3) {
+        const status = computeGoLiveStatus();
+        if (status.ampel !== "green") {
+            issues.push(`Go-Live noch nicht freigegeben (Ampel: ${status.ampelLabel}). Offene Punkte im Einrichtungstab prüfen.`);
+        }
+        if (!localStorage.getItem("finalGoLiveConfirmation")) {
+            issues.push("Go-Live wurde noch nicht final bestätigt.");
+        }
+    }
+    return issues;
+}
+
+function showOnboardingValidationIssues(step) {
+    const issues = validateOnboardingStep(step);
+    if (issues.length === 0) return true;
+    const message = `Schritt ${step} kann nicht abgeschlossen werden:\n\n• ${issues.join("\n• ")}`;
+    showNotification(message, "error");
+    return false;
+}
+
+// ==================== KEYBOARD SHORTCUTS & HELP OVERLAY ====================
+
+const TAB_SHORTCUTS = [
+    { key: "1", tab: "overview", label: "Übersicht" },
+    { key: "2", tab: "users", label: "Benutzer" },
+    { key: "3", tab: "devices", label: "Geräte" },
+    { key: "4", tab: "subscriptions", label: "Abonnements" },
+    { key: "5", tab: "pairing", label: "Kopplung" },
+    { key: "6", tab: "support", label: "Support" },
+    { key: "7", tab: "errorlogs", label: "Fehlerprotokoll" },
+    { key: "8", tab: "compliance", label: "Compliance" },
+    { key: "9", tab: "setup", label: "Einrichtung" },
+    { key: "0", tab: "qa", label: "Qualitätssicherung" },
+];
+
+function showHelpOverlay() {
+    const overlay = document.getElementById("help-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("hidden");
+    const closeBtn = document.getElementById("help-overlay-close");
+    if (closeBtn) closeBtn.focus();
+}
+
+function hideHelpOverlay() {
+    const overlay = document.getElementById("help-overlay");
+    if (!overlay) return;
+    overlay.classList.add("hidden");
+}
+
+function focusFirstSearchInTab() {
+    const activeTab = document.querySelector(".tab-content[style*='block']") || document.querySelector(".tab-content:not([style*='none'])");
+    if (!activeTab) return;
+    const searchInput = activeTab.querySelector("input[type='text'][placeholder*='Suche' i], input[type='text'][placeholder*='suchen' i], input[type='text'][placeholder*='filter' i], input[type='text'][id*='search' i]");
+    if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+    }
+}
+
+function initKeyboardShortcuts() {
+    document.addEventListener("keydown", (e) => {
+        // Ignore if typing in input/textarea
+        const tag = (e.target?.tagName || "").toLowerCase();
+        const isTyping = tag === "input" || tag === "textarea" || tag === "select" || e.target?.isContentEditable;
+
+        // Escape: close help overlay or modals
+        if (e.key === "Escape") {
+            const overlay = document.getElementById("help-overlay");
+            if (overlay && !overlay.classList.contains("hidden")) {
+                e.preventDefault();
+                hideHelpOverlay();
+                return;
+            }
+            // Close device details modal if open
+            const deviceModal = document.getElementById("device-details-modal");
+            if (deviceModal && deviceModal.style.display === "block") {
+                e.preventDefault();
+                closeDeviceDetailsModal();
+                return;
+            }
+            // Close ticket details modal if open
+            const ticketModal = document.getElementById("ticket-details-modal");
+            if (ticketModal && ticketModal.style.display === "block") {
+                e.preventDefault();
+                closeTicketDetailsModal();
+                return;
+            }
+            return;
+        }
+
+        // ? key: show help (not when typing)
+        if (e.key === "?" && !isTyping) {
+            e.preventDefault();
+            showHelpOverlay();
+            return;
+        }
+
+        // Alt+S: focus first search
+        if (e.altKey && (e.key === "s" || e.key === "S") && !isTyping) {
+            e.preventDefault();
+            focusFirstSearchInTab();
+            return;
+        }
+
+        // Alt+1..0: switch tabs
+        if (e.altKey && !isTyping) {
+            const shortcut = TAB_SHORTCUTS.find(s => s.key === e.key);
+            if (shortcut) {
+                e.preventDefault();
+                const tabBtn = document.querySelector(".nav-tab[data-tab='" + shortcut.tab + "']");
+                if (tabBtn) {
+                    switchTab(shortcut.tab, { target: tabBtn });
+                    tabBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+                }
+                return;
+            }
+        }
+    });
+
+    // Help overlay close button
+    const closeBtn = document.getElementById("help-overlay-close");
+    if (closeBtn) closeBtn.addEventListener("click", hideHelpOverlay);
+
+    // Click outside to close
+    const overlay = document.getElementById("help-overlay");
+    if (overlay) {
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) hideHelpOverlay();
+        });
+    }
+}
+
+function initResponsiveNav() {
+    const toggle = document.getElementById("nav-toggle");
+    const nav = document.getElementById("dashboard-nav");
+    if (!toggle || !nav) return;
+    toggle.addEventListener("click", () => {
+        nav.classList.toggle("nav-expanded");
+    });
+    // Auto-collapse on tab selection on small screens
+    nav.querySelectorAll(".nav-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            if (window.innerWidth <= 560) {
+                nav.classList.remove("nav-expanded");
+            }
+        });
+    });
 }
 
 function showAuthMode(mode) {
