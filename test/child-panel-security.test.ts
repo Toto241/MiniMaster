@@ -19,4 +19,10 @@ describe("child-panel security regressions", () => {
     expect(indexSource).not.toMatch(/<script(?![^>]*\ssrc=)[^>]*>[\s\S]*?<\/script>/g);
     expect(indexSource).toContain('<script src="./app.js"></script>');
   });
+
+  it("does not contain inline style blocks or style attributes in index.html", () => {
+    expect(indexSource).not.toMatch(/<style[^>]*>[\s\S]*?<\/style>/g);
+    expect(indexSource).not.toContain(' style="');
+    expect(indexSource).toContain('<link rel="stylesheet" href="./styles.css" />');
+  });
 });
