@@ -96,15 +96,6 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       });
     }
 
-    function escapeHtml(value) {
-      return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
     function getMasterWebBootstrapTokenFromLocation() {
       try {
         if (!window.location || !window.location.search) return "";

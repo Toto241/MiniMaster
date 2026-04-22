@@ -86,7 +86,7 @@ let state: Record<string, any> = {};
 
 const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
 const asAdmin = { auth: { uid: "admin1", token: { role: "admin" } } };
-const asOther = { auth: { uid: "other1", token: { role: "master" } } };
+
 const asMasterWithApp = { auth: { uid: "m1", token: { role: "master" } }, app: { appId: "test-app" } };
 
 function makeExpiresAt(offsetSeconds: number) {
@@ -714,8 +714,8 @@ describe("onTicketCreated — error catch (lines 799-810)", () => {
     let callCount = 0;
     adminMod.firestore = Object.assign(
       () => ({
-        collection: (coll: string) => ({
-          doc: (id: string) => ({
+        collection: (_coll: string) => ({
+          doc: (_id: string) => ({
             update: jest.fn(() => {
               callCount++;
               if (callCount === 1) {

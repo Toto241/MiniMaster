@@ -16,13 +16,6 @@ const mockAuth: any = {
   createCustomToken: jest.fn().mockResolvedValue("mock-custom-token"),
 };
 
-class MockTimestamp {
-  constructor(private readonly ms: number) {}
-  static now() { return new MockTimestamp(Date.now()); }
-  static fromMillis(ms: number) { return new MockTimestamp(ms); }
-  toMillis() { return this.ms; }
-}
-
 let docCounter = 0;
 let state: {
   masters: Map<string, any>;

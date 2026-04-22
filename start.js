@@ -6,7 +6,7 @@ var FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       try {
         var raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
         return raw ? JSON.parse(raw) : null;
-      } catch (_error) {
+      } catch {
         return null;
       }
     }

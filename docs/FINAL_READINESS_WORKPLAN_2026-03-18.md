@@ -1,6 +1,6 @@
 # Final Readiness Workplan (2026-03-18)
 
-Stand: 2026-03-18
+Stand: 2026-04-22 (aktualisiert)
 
 Dieses Dokument leitet aus den aktuellen Findings einen priorisierten Arbeitspaketeplan ab und trennt zwischen:
 
@@ -25,6 +25,8 @@ Dieses Dokument leitet aus den aktuellen Findings einen priorisierten Arbeitspak
 - Reproduzierbare E2E-Nachweise auf Referenzgeräten.
 - Support/QA-Checkliste für Enforcement vorhanden.
 
+---
+
 ### AP-2 — Legacy-Auth auf Token-/Claim-Modell migrieren (**Blocker**)
 
 **Ziel:** Das verbleibende `secretKey`-Modell wird kontrolliert durch Firebase Auth / Claims ersetzt.
@@ -39,6 +41,8 @@ Dieses Dokument leitet aus den aktuellen Findings einen priorisierten Arbeitspak
 - Keine produktiven privilegierten Flows mehr mit client-passed `secretKey`.
 - Monitoring für Restnutzung des Legacy-Modells vorhanden.
 - Migrations-/Rollback-Plan dokumentiert.
+
+---
 
 ### AP-3 — Country Compliance & Store-Go-Live schließen (**Blocker**)
 
@@ -55,20 +59,33 @@ Dieses Dokument leitet aus den aktuellen Findings einen priorisierten Arbeitspak
 - Freigabepaket pro Markt vollständig.
 - Store Listing, In-App-Texte und Policies konsistent.
 
+---
+
 ### AP-4 — CI, Toolchain und Security-Gates härten (**hoch, sofort umsetzbar**)
 
 **Ziel:** Reproduzierbare Qualitätssicherung mit echten Sicherheits- und Integrations-Gates.
 
 **Umfang:**
-- Node-/JDK-Versionen zwischen Repo und CI angleichen.
+- Node-/JDK-Versionen zwischen Repo und CI angleichen. ✅ Node 22 abgeglichen.
 - Firestore-Regeln im Emulator automatisiert testen.
 - Bestehende Strukturtests beibehalten, aber nicht als einziges Gate nutzen.
 - Artefakte und Check-Sequenzen in CI-Dokumentation verankern.
+- Lint sauber halten. ✅ 0 Errors, 0 Warnings (Stand 2026-04-22).
+- Static readiness checks auf 100% bringen. ✅ 26/26 passing (Stand 2026-04-22).
 
 **Abnahmekriterien:**
 - CI läuft mit gepinnter Laufzeit passend zum Repo.
 - Firestore-Regeln werden in CI gegen den Emulator geprüft.
 - Fehlerhafte Rollen-/Ownership-Regeln brechen die Pipeline.
+- Lint blockiert bei Errors.
+
+**Status 2026-04-22:**
+- Lokale Backend-Tests: 78/78 Suites grün, 2090 Tests passing.
+- Lint: 0 Errors, 0 Warnings.
+- Static readiness: 26/26 passing.
+- Blocker: GitHub Actions Billing blockiert CodeQL und Android CI.
+
+---
 
 ### AP-5 — Runbook, Monitoring und Incident Response produktionsreif machen (**hoch, sofort umsetzbar**)
 
@@ -84,12 +101,14 @@ Dieses Dokument leitet aus den aktuellen Findings einen priorisierten Arbeitspak
 - Runbook enthält belastbare Erstmaßnahmen und Eskalationspfade.
 - Support/Ops können häufige Störungen ohne Tribal Knowledge bearbeiten.
 
+---
+
 ### AP-6 — Desktop-/Web-Sicherheitsbasis schließen (**hoch**)
 
 **Ziel:** Operator- und Web-Flächen erfüllen eine robuste Mindesthärtung.
 
 **Umfang:**
-- CSP/SRI-Review, Session-Timeout, Credential-Handling.
+- CSP/SRI-Review, Session-Timeout, Credential-Handling. ✅ CSP strict, SRI vollständig (2026-04-22).
 - Operator-CLI-Zugriffe weiter einschränken und auditieren.
 - UI-Smoke-Checks automatisieren.
 
@@ -97,21 +116,27 @@ Dieses Dokument leitet aus den aktuellen Findings einen priorisierten Arbeitspak
 - Web-/Desktop-Oberflächen haben definierte Security-Baseline.
 - Kritische Operator-Aktionen sind nachweisbar eingeschränkt und auditierbar.
 
+**Status 2026-04-22:**
+- Admin-Panel SRI vollständig (inkl. app-check-compat).
+- Alle Panels CSP-hardened (`style-src 'self'`).
+- Security Baseline Checklist aktualisiert (R-01 geschlossen).
+
 ## 2. Umsetzung in dieser Iteration
 
-In dieser Iteration werden die **kurzfristig umsetzbaren High-Impact-Pakete AP-4 und AP-5** gestartet, weil sie ohne tiefen Produktumbau direkt im Repository umgesetzt und in der Pipeline verankert werden können.
+In dieser Iteration wurden die **kurzfristig umsetzbaren High-Impact-Pakete AP-4 und AP-6** weiter vorangetrieben:
 
-### Iterationsziel
+### Iterationsziel (2026-04-22)
 
-1. **CI/Toolchain angleichen**
-2. **Firestore-Regeltests im Emulator automatisieren**
-3. **Runbook von Placeholder auf produktionsnahe Fassung anheben**
+1. ✅ **Lint sauber** — 14 Warnings auf 0 reduziert.
+2. ✅ **Static readiness checks korrigiert** — `ma-usage-rules-nav` erkennt Repository-Pattern.
+3. ✅ **SRI vervollständigt** — app-check-compat im Admin-Panel.
+4. ✅ **Dokumentation synchronisiert** — CI-Revalidation, Evidence Register, Security Baseline.
 
 ## 3. Nächste Iterationen
 
 ### Iteration 2
 - AP-2: `secretKey`-Restflächen inventarisieren und Migrations-Rollout vorbereiten.
-- AP-6: Session- und Desktop-Härtung konkretisieren.
+- AP-6: Session- und Desktop-Härtung konkretisieren (innerHTML-Flächen, UI-Smoke-Tests).
 
 ### Iteration 3
 - AP-1: Child-Enforcement-Fokus (Bypass-Tests, OEM-Matrix, Anti-Tamper).

@@ -93,7 +93,6 @@ let db: any;
 let state: Record<string, any> = {};
 
 const asMaster = { auth: { uid: "m1", token: { role: "master" } } };
-const asSupport = { auth: { uid: "s1", token: { role: "support" } } };
 
 function resetState() {
   state = {
