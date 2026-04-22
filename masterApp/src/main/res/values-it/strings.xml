@@ -1,64 +1,99 @@
 <resources>
     <!-- App name for the master (parent) application -->
-    <string name="app_name">MiniMaster (Master)</string>
+    <string name="app_name">MiniMaster (Genitore)</string>
 
     <!-- Main UI strings -->
-    <string name="parent_device_setup">Parent Device Setup</string>
-    <string name="setup_description">First, we need to register this device as the primary parent controller. The app will use a stable app-scoped device ID.</string>
-    <string name="register_device">Register This Device</string>
-    <string name="registering_device">Registering device...</string>
+    <string name="parent_device_setup">Configurazione dispositivo genitore</string>
+    <string name="setup_description">Per prima cosa dobbiamo registrare questo dispositivo come controller genitore principale. L\'app utilizzerà un ID dispositivo stabile nell\'ambito dell\'app.</string>
+    <string name="register_device">Registra questo dispositivo</string>
+    <string name="registering_device">Registrazione del dispositivo...</string>
 
     <!-- Dashboard strings -->
-    <string name="paired_devices">Paired Devices</string>
-    <string name="child_id_label">Child ID: %1$s</string>
-    <string name="device_locked">Locked</string>
+    <string name="paired_devices">Dispositivi accoppiati</string>
+    <string name="child_id_label">ID bambino: %1$s</string>
+    <string name="device_locked">Bloccato</string>
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>
-    <string name="create_task">Create Task</string>
-    <string name="review_tasks">Review Tasks</string>
-    <string name="go_premium">Go Premium</string>
+    <string name="create_task">Crea attività</string>
+    <string name="review_tasks">Rivedi attività</string>
+    <string name="go_premium">Passa a Premium</string>
 
     <!-- Pairing and link generation -->
-    <string name="generate_pairing_link">Generate Pairing Link</string>
-    <string name="generating_link">Generating link...</string>
-    <string name="retry_link_generation">Retry Link Generation</string>
-    <string name="link_generated_success">Link generated successfully!</string>
-    <string name="link_status">Link Status: %1$s</string>
+    <string name="generate_pairing_link">Genera link di accoppiamento</string>
+    <string name="generating_link">Generazione del link...</string>
+    <string name="retry_link_generation">Riprova generazione link</string>
+    <string name="link_generated_success">Link generato con successo!</string>
+    <string name="link_status">Stato link: %1$s</string>
 
     <!-- Task creation -->
-    <string name="create_new_task">Create New Task</string>
-    <string name="task_description">Task Description</string>
-    <string name="deadline_unix">Deadline (Unix Timestamp)</string>
-    <string name="cancel">Cancel</string>
+    <string name="create_new_task">Crea nuova attività</string>
+    <string name="task_description">Descrizione attività</string>
+    <string name="deadline_unix">Scadenza (timestamp Unix)</string>
+    <string name="cancel">Annulla</string>
 
     <!-- Task review -->
-    <string name="review_completed_tasks">Review Completed Tasks</string>
-    <string name="no_tasks_to_review">No tasks to review.</string>
-    <string name="child_label">Child: %1$s</string>
-    <string name="proof_for_task">Proof for task: %1$s</string>
-    <string name="approve_task">Approve Task</string>
-    <string name="back_to_dashboard">Back to Dashboard</string>
+    <string name="review_completed_tasks">Rivedi attività completate</string>
+    <string name="no_tasks_to_review">Nessuna attività da rivedere.</string>
+    <string name="child_label">Bambino: %1$s</string>
+    <string name="proof_for_task">Prova per attività: %1$s</string>
+    <string name="approve_task">Approva attività</string>
+    <string name="back_to_dashboard">Torna alla dashboard</string>
 
     <!-- Subscription -->
-    <string name="get_premium">Get Premium</string>
-    <string name="loading_subscription">Loading subscription options...</string>
-    <string name="subscribe_for_price">Subscribe for %1$s</string>
+    <string name="get_premium">Ottieni Premium</string>
+    <string name="loading_subscription">Caricamento opzioni di abbonamento...</string>
+    <string name="subscribe_for_price">Abbonati per %1$s</string>
 
     <!-- Error messages -->
-    <string name="failed_update_lock_state">Failed to update lock state. Please try again.</string>
-    <string name="failed_create_task">Failed to create task. Please try again.</string>
-    <string name="failed_approve_task">Failed to approve task. Please try again.</string>
-    <string name="unknown_error">An unknown error occurred.</string>
-    <string name="error_format">Error (%1$s): %2$s</string>
+    <string name="failed_update_lock_state">Impossibile aggiornare lo stato di blocco. Riprova.</string>
+    <string name="failed_create_task">Impossibile creare l\'attività. Riprova.</string>
+    <string name="failed_approve_task">Impossibile approvare l\'attività. Riprova.</string>
+    <string name="unknown_error">Si è verificato un errore sconosciuto.</string>
+    <string name="error_format">Errore (%1$s): %2$s</string>
 
     <!-- Debug info -->
-    <string name="debug_info">---- DEBUG INFO ----</string>
-    <string name="debug_imei">Device ID: %1$s</string>
-    <string name="debug_secret_key">Secret Key: %1$s</string>
-    <string name="debug_not_set">Not set</string>
+    <string name="debug_info">---- INFO DEBUG ----</string>
+    <string name="debug_imei">ID dispositivo: %1$s</string>
+    <string name="debug_secret_key">Chiave segreta: %1$s</string>
+    <string name="debug_not_set">Non impostato</string>
 
     <!-- First start language setup -->
-    <string name="language_setup_title">Choose your app language</string>
-    <string name="language_setup_description">Select your preferred language for MiniMaster. You can change it later in a future settings screen.</string>
-    <string name="language_continue">Continue</string>
+    <string name="language_setup_title">Scegli la lingua dell\'app</string>
+    <string name="language_setup_description">Seleziona la lingua preferita per MiniMaster. Potrai modificarla in seguito in una futura schermata delle impostazioni.</string>
+    <string name="language_setup_list_title">Lingua app</string>
+    <string name="country_setup_title">Paese di utilizzo</string>
+    <string name="country_setup_description">Utilizziamo questo paese per caricare i termini legali e l\'informativa sulla privacy corretti.</string>
+    <string name="language_continue">Continua</string>
+
+    <!-- Legal consent gate -->
+    <string name="legal_loading_message">Verifica dei requisiti legali...</string>
+    <string name="legal_retry">Riprova verifica legale</string>
+    <string name="legal_error_title">Verifica legale fallita</string>
+    <string name="legal_consent_title">Accetta i termini legali per continuare</string>
+    <string name="legal_consent_description">Al primo avvio dopo l\'installazione, devi esaminare e accettare i Termini di Servizio e l\'Informativa sulla Privacy attuali.</string>
+    <string name="legal_open_terms">Apri Termini (v%1$s)</string>
+    <string name="legal_open_privacy">Apri Informativa Privacy (v%1$s)</string>
+    <string name="legal_accept_terms">Accetto i Termini di Servizio.</string>
+    <string name="legal_accept_privacy">Ho preso visione dell\'Informativa sulla Privacy.</string>
+    <string name="legal_accept_continue">Accetta e continua</string>
+    <string name="legal_country_locale">Paese: %1$s, Locale: %2$s</string>
+
+    <!-- Usage Rules -->
+    <string name="usage_rules">Regole di utilizzo</string>
+    <string name="rules_saved_successfully">Regole salvate con successo</string>
+    <string name="usage_rules_back">Indietro</string>
+    <string name="daily_screen_time_limit">Limite giornaliero di tempo sullo schermo</string>
+    <string name="minutes_per_day">Minuti al giorno (0 = illimitato)</string>
+    <string name="allowed_time_window">Finestra temporale consentita</string>
+    <string name="allowed_time_window_description">Imposta una finestra temporale in cui il dispositivo può essere utilizzato.</string>
+    <string name="start_time_label">Inizio (HH:MM)</string>
+    <string name="end_time_label">Fine (HH:MM)</string>
+    <string name="per_app_time_limits">Limiti di tempo per app</string>
+    <string name="per_app_time_limits_description">Imposta limiti individuali per app specifiche.</string>
+    <string name="minutes_per_day_short">%1$d min/giorno</string>
+    <string name="remove_limit">Rimuovi limite</string>
+    <string name="package_name">Nome pacchetto</string>
+    <string name="minutes_short">Min</string>
+    <string name="add">Aggiungi</string>
+    <string name="save_rules">Salva regole</string>
 </resources>
