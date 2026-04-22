@@ -1002,6 +1002,33 @@
                             </div>
                         </div>
 
+                        <div id="qa-artifact-explorer-card" class="setup-card admin-only qa-secondary-card mm-u029">
+                            <details class="qa-secondary-details" open>
+                                <summary>
+                                    <span>🔍 Artefakt-Explorer</span>
+                                    <small>Durchsuche alle QA-Artefakte zentral</small>
+                                </summary>
+                                <p>
+                                    Zentrale Suche über alle geladenen QA-Artefakte: Testkatalog, Register-Einträge,
+                                    Suite-Läufe und Nachweis-Einträge.
+                                </p>
+                                <div class="python-automation-toolbar mm-u033">
+                                    <input type="text" id="qa-artifact-search" class="form-control" placeholder="Artefakte durchsuchen..." title="Suche über alle QA-Artefakte">
+                                    <select id="qa-artifact-type-filter" title="Nach Artefakttyp filtern">
+                                        <option value="all">Alle Typen</option>
+                                        <option value="catalog">Testkatalog</option>
+                                        <option value="register">Testregister</option>
+                                        <option value="suite">Suite-Läufe</option>
+                                        <option value="evidence">Nachweise</option>
+                                    </select>
+                                    <button data-action="refreshQaArtifacts" class="btn btn-secondary" title="Artefakte neu laden">Aktualisieren</button>
+                                </div>
+                                <div id="qa-artifact-results" class="data-list mm-u036">
+                                    <div class="info">Noch keine Artefakte geladen. Klicken Sie auf "Aktualisieren" oder laden Sie die QA-Datenquellen.</div>
+                                </div>
+                            </details>
+                        </div>
+
                         <div id="qa-start-guide-card" class="setup-card admin-only qa-secondary-card mm-u029">
                             <details class="qa-secondary-details">
                                 <summary>
