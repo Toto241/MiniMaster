@@ -3,9 +3,14 @@
  *
  * All function implementations are in src/ modules.
  * This file re-exports them so Firebase CLI can discover them.
+ *
+ * Architecture:
+ * - v1 Callable Functions: Auth, Device, Tasks, Subscription, Support, Legal, Admin
+ * - v2 Firestore Triggers: FCM sync, photo analysis, task notifications
+ * - Shared: Validation, Resilience (Circuit Breaker), Rate Limiting, Error Handling
  */
 
-// Auth & Registration
+// ==================== AUTH & REGISTRATION ====================
 export {
   setAdminClaim,
   setUserRole,
@@ -22,17 +27,28 @@ export {
   resetAllAuthUsersHealth,
 } from "./src/auth";
 
-// Pairing
-export { createPairingCode, validatePairingCode, generatePairingLink, validatePairingToken } from "./src/pairing";
-
-// Device Management
+// ==================== PAIRING ====================
 export {
-  setDeviceLocked, updateAppBlacklist, setUsageRules, getRulesForChild,
-  recordHeartbeat, registerFcmToken, updateFCMToken, reportDailyUsage,
+  createPairingCode,
+  validatePairingCode,
+  generatePairingLink,
+  validatePairingToken,
+} from "./src/pairing";
+
+// ==================== DEVICE MANAGEMENT ====================
+export {
+  setDeviceLocked,
+  updateAppBlacklist,
+  setUsageRules,
+  getRulesForChild,
+  recordHeartbeat,
+  registerFcmToken,
+  updateFCMToken,
+  reportDailyUsage,
   reportTamperEvent,
 } from "./src/device";
 
-// Deterministic decisioning layer
+// ==================== DETERMINISTIC DECISIONING ====================
 export {
   ingestEvent,
   getRules,
@@ -40,7 +56,7 @@ export {
   logDecision,
 } from "./src/controllers/decisioning";
 
-// Cross-Platform Control-Plane (Android + iOS bidirectional interface)
+// ==================== CROSS-PLATFORM CONTROL-PLANE ====================
 export {
   registerDeviceEndpoint,
   publishDeviceEvent,
@@ -49,42 +65,133 @@ export {
   syncPolicySnapshot,
 } from "./src/device-sync";
 
-// Tasks
-export { createTask, completeTask, approveTask, rejectTask } from "./src/tasks";
-
-// Subscriptions
+// ==================== TASKS ====================
 export {
-  verifyPurchase, getSubscriptionStatus, revokeSubscription, checkExpiredSubscriptions,
-  onPlayBillingNotification, reverifyActiveSubscriptions,
+  createTask,
+  completeTask,
+  approveTask,
+  rejectTask,
+} from "./src/tasks";
+
+// ==================== SUBSCRIPTIONS ====================
+export {
+  verifyPurchase,
+  getSubscriptionStatus,
+  revokeSubscription,
+  checkExpiredSubscriptions,
+  onPlayBillingNotification,
+  reverifyActiveSubscriptions,
 } from "./src/subscription";
 
-// Support & AI
+// ==================== SUPPORT & AI ====================
 export {
-  createSupportTicket, grantSupportAccess, revokeSupportAccess, cleanupExpiredGrants,
-  onTicketCreated, onSupportTicketUpdated, provideSolutionFeedback, getTicketUserData, aiExplainProblem,
-  grantDebugAccess, skipDebugMode, analyzeWithDebugData, processUserReplyMessage, getDebugInfo,
+  createSupportTicket,
+  grantSupportAccess,
+  revokeSupportAccess,
+  cleanupExpiredGrants,
+  onTicketCreated,
+  onSupportTicketUpdated,
+  provideSolutionFeedback,
+  getTicketUserData,
+  aiExplainProblem,
+  grantDebugAccess,
+  skipDebugMode,
+  analyzeWithDebugData,
+  processUserReplyMessage,
+  getDebugInfo,
 } from "./src/support";
 
-// Legal Policies & Consent
+// ==================== LEGAL POLICIES & CONSENT ====================
 export {
-  getActiveLegalPolicies, needsLegalReconsent, recordLegalConsent,
-  publishLegalPolicy, markLegalReconsentRequired,
+  getActiveLegalPolicies,
+  needsLegalReconsent,
+  recordLegalConsent,
+  publishLegalPolicy,
+  markLegalReconsentRequired,
 } from "./src/legal";
 
-// Triggers (FCM sync, photo analysis, task notifications)
-export { onChildDeviceUpdateV2, analyzeTaskPhoto, onTaskStatusChange } from "./src/triggers";
-
-// Admin (account deletion, error reports, DSAR export, Firebase management)
+// ==================== TRIGGERS ====================
 export {
-  deleteUserAccount, sendDailyErrorReport, exportUserData, adminHealthCheck,
-  testGeminiConnection, getKnowledgeBase, updateKnowledgeBase,
-  sendTestFcmMessage, triggerScheduledJob,
-  analyzeSystemErrors, executeAutoFix,
+  onChildDeviceUpdateV2,
+  analyzeTaskPhoto,
+  onTaskStatusChange,
+} from "./src/triggers";
+
+// ==================== ADMIN ====================
+export {
+  deleteUserAccount,
+  sendDailyErrorReport,
+  exportUserData,
+  adminHealthCheck,
+  testGeminiConnection,
+  getKnowledgeBase,
+  updateKnowledgeBase,
+  sendTestFcmMessage,
+  triggerScheduledJob,
+  analyzeSystemErrors,
+  executeAutoFix,
 } from "./src/admin";
 
-// Operator-Setup ("Inbetriebnahme") – Admin-Panel + PowerShell-Tooling
+// ==================== OPERATOR SETUP ====================
 export {
   getOperatorSetupStatus,
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
 
+// ==================== INFRASTRUCTURE EXPORTS ====================
+// These are used by other modules but also available for testing/admin
+
+// Validation utilities
+export {
+  escapeHtml,
+  stripHtml,
+  validateString,
+  validateDeviceId,
+  validateTaskDescription,
+  validateRejectionReason,
+  validateUrl,
+  validateFirebaseStorageUrl,
+  validateBoolean,
+  validateNumber,
+  validateTimestamp,
+  validateISODate,
+  validateStringArray,
+  validateObject,
+  validateUsageRules,
+  validateToken,
+  validateEventType,
+  validateSku,
+  validateSafe,
+} from "./src/validation";
+
+// Resilience patterns (Circuit Breaker, Retry, Timeout)
+export {
+  withResilience,
+  withRetry,
+  withTimeout,
+  fetchWithTimeout,
+  getCircuitBreaker,
+  resetCircuitBreaker,
+  getAllCircuitMetrics,
+} from "./src/resilience";
+
+// Rate limiting
+export {
+  checkDistributedRateLimit,
+  requireRateLimit,
+  checkRateLimitLegacy,
+  getRateLimitMetrics,
+  resetRateLimit,
+} from "./src/rate-limiter";
+
+// Error handling
+export {
+  withErrorHandling,
+  classifyError,
+  logStructuredError,
+  buildErrorResponse,
+  getHealthStatus,
+  getFunctionMetrics,
+  getAllMetrics,
+  recordInvocation,
+} from "./src/error-handler";

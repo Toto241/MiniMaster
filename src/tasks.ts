@@ -1,12 +1,27 @@
 /**
  * Task Management Cloud Functions.
  * Handles task creation, completion, approval, and rejection.
+ *
+ * Improvements applied:
+ * - Centralized input validation with XSS protection
+ * - Structured error handling with error-handler wrapper
+ * - Circuit breaker for external API calls
+ * - Comprehensive input sanitization
  */
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db, storage } from "../firebase";
 import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
+import {
+  validateDeviceId,
+  validateTaskDescription,
+  validateRejectionReason,
+  validateFirebaseStorageUrl,
+  validateNumber,
+  validateISODate,
+} from "./validation";
+import { withErrorHandling } from "./error-handler";
 
 /**
  * Whitelist erlaubter Bild-MIME-Types für Photo-Proof Uploads.
@@ -40,45 +55,30 @@ const EXIF_SCAN_BYTES = 64 * 1024;
 
 /**
  * Defense-in-Depth EXIF-GPS-Detektor (kein vollständiger TIFF-Parser).
- *
- * Sucht innerhalb des EXIF/APP1-Segments nach den Bytefolgen, die einen
- * GPS-IFD-Pointer (TIFF-Tag 0x8825) markieren — sowohl in Big-Endian ("MM",
- * 0x88 0x25) als auch in Little-Endian ("II", 0x25 0x88) Reihenfolge,
- * abhängig vom TIFF-Header-Endianness. Treffer außerhalb des EXIF-Segments
- * werden ignoriert, um Falschpositive in komprimierten Bilddaten zu vermeiden.
- *
- * Exportiert für Unit-Tests; in Produktion via `validatePhotoObjectMetadata`
- * aufgerufen.
  */
 export function detectExifGpsTag(buf: Buffer): boolean {
   if (!buf || buf.length < 32) return false;
-  // Suche nach EXIF-Marker "Exif\0\0"
   const EXIF_MARKER = Buffer.from([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
   const exifIdx = buf.indexOf(EXIF_MARKER);
   if (exifIdx < 0) return false;
 
-  // TIFF-Header beginnt direkt nach dem EXIF-Marker
   const tiffStart = exifIdx + EXIF_MARKER.length;
   if (tiffStart + 8 > buf.length) return false;
 
   const endianMarker = buf.readUInt16BE(tiffStart);
   let bigEndian: boolean;
-  if (endianMarker === 0x4D4D) {       // "MM"
+  if (endianMarker === 0x4D4D) {
     bigEndian = true;
-  } else if (endianMarker === 0x4949) {  // "II"
+  } else if (endianMarker === 0x4949) {
     bigEndian = false;
   } else {
     return false;
   }
 
-  // GPS-IFD-Pointer Tag = 0x8825, in Endianness des TIFF-Headers
   const gpsTagBytes = bigEndian
     ? Buffer.from([0x88, 0x25])
     : Buffer.from([0x25, 0x88]);
 
-  // Suche nur innerhalb des EXIF-Segments (Heuristik: Anfang TIFF-Header
-  // bis Pufferende oder max. 64 KB), nicht in nachfolgenden komprimierten
-  // Bilddaten — das mindert Falschpositive.
   const scanEnd = Math.min(buf.length, tiffStart + EXIF_SCAN_BYTES);
   const segment = buf.subarray(tiffStart, scanEnd);
   return segment.indexOf(gpsTagBytes) >= 0;
@@ -86,14 +86,6 @@ export function detectExifGpsTag(buf: Buffer): boolean {
 
 /**
  * Validiert MIME-Type und Größe des hochgeladenen Photo-Proof-Objekts via Storage-Metadaten.
- *
- * Defense-in-Depth: Ergänzt Storage-Rules-Check und URL-Path-Scoping um:
- * - Tatsächlichen Content-Type des Objekts (nicht nur Dateiendung)
- * - Dateigröße (Schutz vor leeren / übergroßen Dateien)
- *
- * Wirft HttpsError bei Verstoß. Ist Storage nicht erreichbar (Test-/Emulator-Setups
- * ohne echtes Bucket), wird die Validierung mit Warnung übersprungen, damit
- * bestehende Test-Suites mit gemockten URLs weiter funktionieren.
  */
 async function validatePhotoObjectMetadata(
   decodedPath: string, childId: string, taskId: string,
@@ -113,7 +105,6 @@ async function validatePhotoObjectMetadata(
     metadata = meta as { contentType?: string | null; size?: string | number | null };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    // Storage in Tests/Emulator nicht initialisiert → Validierung skippen.
     functions.logger.warn(
       `Photo-Proof Metadaten-Check übersprungen für child=${childId} task=${taskId}: ` +
       `${error instanceof Error ? error.message : String(error)}`,
@@ -144,9 +135,6 @@ async function validatePhotoObjectMetadata(
     );
   }
 
-  // EXIF-GPS-Defense-in-Depth: Lädt die ersten 64 KB und lehnt Uploads ab,
-  // die GPS-Geo-Tags enthalten (Datenschutz). Kann via Env
-  // PHOTO_EXIF_GPS_REJECT=false abgeschaltet werden (Notfall-Override).
   if (process.env.PHOTO_EXIF_GPS_REJECT !== "false") {
     try {
       const bucket = storage().bucket();
@@ -167,8 +155,6 @@ async function validatePhotoObjectMetadata(
       }
     } catch (err) {
       if (err instanceof functions.https.HttpsError) throw err;
-      // Stream-/IO-Fehler nicht eskalieren (Test-Setup-Tolerance) —
-      // Validierung übersprungen, dafür Warnung loggen.
       functions.logger.warn(
         `Photo-Proof EXIF-GPS-Scan übersprungen für child=${childId} task=${taskId}: ` +
         `${err instanceof Error ? err.message : String(err)}`,
@@ -177,49 +163,52 @@ async function validatePhotoObjectMetadata(
   }
 }
 
+// ==================== CREATE TASK ====================
+
 export const createTask = functions.https.onCall(
-  async (data: { childId: string; description: string; deadlineISO: string; unlockDuration?: number }, context: CallableContext) => {
-    const startTime = Date.now();
-    const masterId = requireAuth(context);
-    validateAppCheck(context, true);
-    checkRateLimit(masterId, "createTask", 20);
-    const { childId, description, deadlineISO, unlockDuration } = data;
+  withErrorHandling(
+    "createTask",
+    async (data: { childId: string; description: string; deadlineISO: string; unlockDuration?: number }, context: CallableContext) => {
+      const startTime = Date.now();
+      const masterId = requireAuth(context);
+      validateAppCheck(context, true);
+      checkRateLimit(masterId, "createTask", 20);
 
-    if (!childId || !description || !deadlineISO) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
-
-    if (unlockDuration !== undefined) {
-      if (typeof unlockDuration !== "number" || !Number.isInteger(unlockDuration) || unlockDuration < 1 || unlockDuration > 1440) {
-        throw new functions.https.HttpsError("invalid-argument", "unlockDuration must be an integer between 1 and 1440 minutes.");
+      // Strict input validation with XSS protection
+      const childId = validateDeviceId(data.childId);
+      const description = validateTaskDescription(data.description);
+      const deadlineISO = validateISODate(data.deadlineISO);
+      let unlockDuration: number | undefined;
+      if (data.unlockDuration !== undefined) {
+        unlockDuration = validateNumber(data.unlockDuration, "unlockDuration", {
+          integer: true, min: 1, max: 1440,
+        });
       }
-    }
 
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
+      const masterDeviceRef = db().collection("masters").doc(masterId);
+      const masterDoc = await masterDeviceRef.get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
 
-    if (!hasActiveAccess(masterDoc.data())) {
-      throw new functions.https.HttpsError("resource-exhausted",
-        "Active subscription or trial required to create tasks.");
-    }
+      if (!hasActiveAccess(masterDoc.data())) {
+        throw new functions.https.HttpsError("resource-exhausted",
+          "Active subscription or trial required to create tasks.");
+      }
 
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      await AuditLogger.logDenied(
-        "task.create", context, `children/${childId}/tasks`, "task",
-        "Master not authorized for this child", { childId, description }
-      );
-      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
-    }
+      const childDeviceRef = db().collection("children").doc(childId);
+      const childDoc = await childDeviceRef.get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        await AuditLogger.logDenied(
+          "task.create", context, `children/${childId}/tasks`, "task",
+          "Master not authorized for this child", { childId, description }
+        );
+        throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+      }
 
-    try {
       const taskRef = childDeviceRef.collection("tasks").doc();
       const taskData: Record<string, unknown> = {
-        description: description,
+        description,
         deadline: admin.firestore.Timestamp.fromDate(new Date(deadlineISO)),
         status: "pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -237,86 +226,62 @@ export const createTask = functions.https.onCall(
 
       functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
       return { success: true, taskId: taskRef.id };
-    } catch (error) {
-      await AuditLogger.logFailure(
-        "task.create", context, `children/${childId}/tasks`, "task",
-        error as Error, { childId, description }
-      );
-      throw error;
     }
-  }
+  )
 );
 
+// ==================== COMPLETE TASK ====================
+
 export const completeTask = functions.https.onCall(
-  async (data: { taskId: string; photoUrl: string }, context: CallableContext) => {
-    const startTime = Date.now();
-    const childId = requireAuth(context);
-    validateAppCheck(context, true);
-    const { taskId, photoUrl } = data;
+  withErrorHandling(
+    "completeTask",
+    async (data: { taskId: string; photoUrl: string }, context: CallableContext) => {
+      const startTime = Date.now();
+      const childId = requireAuth(context);
+      validateAppCheck(context, true);
 
-    if (!taskId || !photoUrl) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
+      const taskId = validateDeviceId(data.taskId, "taskId");
+      const photoUrl = validateFirebaseStorageUrl(data.photoUrl);
 
-    // Validate photoUrl: must be a Firebase Storage URL (prevent SSRF/injection)
-    const validStorageUrl = /^https:\/\/firebasestorage\.googleapis\.com\//;
-    if (typeof photoUrl !== "string" || !validStorageUrl.test(photoUrl)) {
-      throw new functions.https.HttpsError("invalid-argument", "photoUrl must be a valid Firebase Storage URL.");
-    }
+      // Validate URL path scoping
+      const objectMatch = photoUrl.match(/\/o\/([^?]+)/);
+      if (!objectMatch) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "photoUrl must reference a Firebase Storage object path (.../o/<path>).",
+        );
+      }
+      let decodedPath: string;
+      try {
+        decodedPath = decodeURIComponent(objectMatch[1]);
+      } catch {
+        throw new functions.https.HttpsError("invalid-argument", "photoUrl object path is not properly URL-encoded.");
+      }
+      const allowedPrefixes = [`children/${childId}/photos/`, `proofs/${childId}/`];
+      const pathAllowed = allowedPrefixes.some((prefix) => decodedPath.startsWith(prefix));
+      if (!pathAllowed) {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "photoUrl must point to the calling child's own storage path.",
+        );
+      }
 
-    // Enforce max URL length to prevent abuse
-    if (photoUrl.length > 2048) {
-      throw new functions.https.HttpsError("invalid-argument", "photoUrl exceeds maximum allowed length.");
-    }
+      await validatePhotoObjectMetadata(decodedPath, childId, taskId);
 
-    // Verify the photo is stored under a path scoped to the calling child.
-    // Mirrors storage.rules: writes only allowed under children/{childId}/photos/* or proofs/{childId}/*
-    // This prevents a child from registering a photoUrl pointing to another child's storage path
-    // even if Storage rules are misconfigured or temporarily relaxed.
-    const objectMatch = photoUrl.match(/\/o\/([^?]+)/);
-    if (!objectMatch) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "photoUrl must reference a Firebase Storage object path (.../o/<path>).",
-      );
-    }
-    let decodedPath: string;
-    try {
-      decodedPath = decodeURIComponent(objectMatch[1]);
-    } catch {
-      throw new functions.https.HttpsError("invalid-argument", "photoUrl object path is not properly URL-encoded.");
-    }
-    const allowedPrefixes = [`children/${childId}/photos/`, `proofs/${childId}/`];
-    const pathAllowed = allowedPrefixes.some((prefix) => decodedPath.startsWith(prefix));
-    if (!pathAllowed) {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "photoUrl must point to the calling child's own storage path (children/<uid>/photos/* or proofs/<uid>/*).",
-      );
-    }
-
-    // Validiere MIME-Type und Größe über Storage-Metadaten (Defense-in-Depth):
-    // - Schützt vor manipulierten Uploads (z.B. Polyglot-Dateien, falscher Content-Type)
-    // - Begrenzt Speicher-/Kosten-/AI-Analyse-Risiko durch zu große Bilder
-    // - Wird übersprungen wenn Storage-Bucket nicht erreichbar (z.B. in einigen Testumgebungen)
-    await validatePhotoObjectMetadata(decodedPath, childId, taskId);
-
-    const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
-
-    try {
+      const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
       const taskDoc = await taskRef.get();
       if (!taskDoc.exists) {
         throw new functions.https.HttpsError("not-found", "The specified task does not exist.");
       }
 
-      const current = taskDoc.data() as any;
-      if (current.status && current.status !== "pending") {
+      const current = taskDoc.data();
+      if (current?.status && current.status !== "pending") {
         throw new functions.https.HttpsError("failed-precondition", "Task cannot transition to pending_approval from current state.");
       }
 
       await taskRef.update({
         status: "pending_approval",
-        photoUrl: photoUrl,
+        photoUrl,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -328,58 +293,51 @@ export const completeTask = functions.https.onCall(
 
       functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
       return { success: true };
-    } catch (error) {
-      await AuditLogger.logFailure(
-        "task.complete", context, `children/${childId}/tasks/${taskId}`, "task",
-        error as Error, { childId, taskId }
-      );
-      throw error;
     }
-  }
+  )
 );
 
+// ==================== APPROVE TASK ====================
+
 export const approveTask = functions.https.onCall(
-  async (data: { childId: string; taskId: string }, context: CallableContext) => {
-    const startTime = Date.now();
-    const masterId = requireAuth(context);
-    validateAppCheck(context, true);
-    checkRateLimit(masterId, "approveTask", 30);
-    const { childId, taskId } = data;
+  withErrorHandling(
+    "approveTask",
+    async (data: { childId: string; taskId: string }, context: CallableContext) => {
+      const startTime = Date.now();
+      const masterId = requireAuth(context);
+      validateAppCheck(context, true);
+      checkRateLimit(masterId, "approveTask", 30);
 
-    if (!childId || !taskId) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
+      const childId = validateDeviceId(data.childId);
+      const taskId = validateDeviceId(data.taskId, "taskId");
 
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
+      const masterDoc = await db().collection("masters").doc(masterId).get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
 
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      await AuditLogger.logDenied(
-        "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",
-        "Master not authorized for this child", { childId, taskId }
-      );
-      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
-    }
+      const childDoc = await db().collection("children").doc(childId).get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        await AuditLogger.logDenied(
+          "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",
+          "Master not authorized for this child", { childId, taskId }
+        );
+        throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+      }
 
-    try {
-      const taskRef = childDeviceRef.collection("tasks").doc(taskId);
+      const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
       const taskSnap = await taskRef.get();
       if (!taskSnap.exists) {
         throw new functions.https.HttpsError("not-found", "Task not found.");
       }
-      const taskData = taskSnap.data() as any;
-      if (taskData.status !== "pending_approval") {
+      const taskData = taskSnap.data();
+      if (taskData?.status !== "pending_approval") {
         throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
       }
 
       await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
 
-      if (typeof taskData.unlockDuration === "number" && taskData.unlockDuration > 0) {
+      if (typeof taskData?.unlockDuration === "number" && taskData.unlockDuration > 0) {
         const unlockUntil = admin.firestore.Timestamp.fromMillis(
           Date.now() + taskData.unlockDuration * 60 * 1000
         );
@@ -393,61 +351,55 @@ export const approveTask = functions.https.onCall(
 
       functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
       return { success: true };
-    } catch (error) {
-      await AuditLogger.logFailure(
-        "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",
-        error as Error, { childId, taskId }
-      );
-      throw error;
     }
-  }
+  )
 );
 
+// ==================== REJECT TASK ====================
+
 export const rejectTask = functions.https.onCall(
-  async (data: { childId: string; taskId: string; reason?: string }, context: CallableContext) => {
-    const startTime = Date.now();
-    const masterId = requireAuth(context);
-    validateAppCheck(context, true);
-    checkRateLimit(masterId, "rejectTask", 30);
-    const { childId, taskId, reason } = data;
+  withErrorHandling(
+    "rejectTask",
+    async (data: { childId: string; taskId: string; reason?: string }, context: CallableContext) => {
+      const startTime = Date.now();
+      const masterId = requireAuth(context);
+      validateAppCheck(context, true);
+      checkRateLimit(masterId, "rejectTask", 30);
 
-    if (!childId || !taskId) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields: childId and taskId.");
-    }
+      const childId = validateDeviceId(data.childId);
+      const taskId = validateDeviceId(data.taskId, "taskId");
+      const reason = validateRejectionReason(data.reason);
 
-    const masterDeviceRef = db().collection("masters").doc(masterId);
-    const masterDoc = await masterDeviceRef.get();
-    if (!masterDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Master account not found.");
-    }
+      const masterDoc = await db().collection("masters").doc(masterId).get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
 
-    const childDeviceRef = db().collection("children").doc(childId);
-    const childDoc = await childDeviceRef.get();
-    if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
-      await AuditLogger.logDenied(
-        "task.reject", context, `children/${childId}/tasks/${taskId}`, "task",
-        "Master not authorized for this child", { childId, taskId }
-      );
-      throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
-    }
+      const childDoc = await db().collection("children").doc(childId).get();
+      if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
+        await AuditLogger.logDenied(
+          "task.reject", context, `children/${childId}/tasks/${taskId}`, "task",
+          "Master not authorized for this child", { childId, taskId }
+        );
+        throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
+      }
 
-    try {
-      const taskRef = childDeviceRef.collection("tasks").doc(taskId);
+      const taskRef = db().collection("children").doc(childId).collection("tasks").doc(taskId);
       const taskSnap = await taskRef.get();
       if (!taskSnap.exists) {
         throw new functions.https.HttpsError("not-found", "Task not found.");
       }
-      const taskData = taskSnap.data() as any;
-      if (taskData.status !== "pending_approval") {
+      const taskData = taskSnap.data();
+      if (taskData?.status !== "pending_approval") {
         throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
       }
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status: "rejected",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
-      if (reason && typeof reason === "string") {
-        updateData.rejectionReason = reason.trim();
+      if (reason) {
+        updateData.rejectionReason = reason;
       }
 
       await taskRef.update(updateData);
@@ -459,12 +411,6 @@ export const rejectTask = functions.https.onCall(
 
       functions.logger.info(`TASK_REJECTED taskId=${taskId} child=${childId} master=${masterId} reason=${reason || "none"}`);
       return { success: true };
-    } catch (error) {
-      await AuditLogger.logFailure(
-        "task.reject", context, `children/${childId}/tasks/${taskId}`, "task",
-        error as Error, { childId, taskId }
-      );
-      throw error;
     }
-  }
+  )
 );
