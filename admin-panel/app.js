@@ -1283,6 +1283,26 @@ function updatePythonAutomationRunState({ isRunning, message, detail }) {
         runButton.disabled = Boolean(isRunning);
         runButton.textContent = isRunning ? "Python-Testlauf läuft…" : "Python-Testlauf starten";
     }
+
+    // Tab-Reiter-Indikator: Laufendes-Signal am QA-Tab-Button
+    const qaTabBtn = document.querySelector ? document.querySelector("[data-tab='qa']") : null;
+    if (qaTabBtn) {
+        if (isRunning) {
+            qaTabBtn.classList.add("has-running-indicator");
+            qaTabBtn.setAttribute("aria-label", "Qualitätssicherung – Testlauf läuft");
+        } else {
+            qaTabBtn.classList.remove("has-running-indicator");
+            qaTabBtn.removeAttribute("aria-label");
+        }
+    }
+
+    // Protokoll-Kopieren-Button: nach Laufabschluss einblenden
+    const copyLogBtn = document.getElementById("qa-copy-run-log-btn");
+    if (copyLogBtn) {
+        const hasResult = Boolean(pythonCommissioningLastRun);
+        copyLogBtn.hidden = isRunning || !hasResult;
+        copyLogBtn.disabled = isRunning;
+    }
 }
 
 function getPythonRunElapsedText() {
@@ -9467,6 +9487,8 @@ document.addEventListener("DOMContentLoaded", async function() {
     });
 
     // QA dashboard buttons (migrated from inline onclick for CSP hardening)
+    const qaCopyRunLogBtn = document.getElementById("qa-copy-run-log-btn");
+    if (qaCopyRunLogBtn) qaCopyRunLogBtn.addEventListener("click", copyLatestPythonAutomationRunToClipboard);
     const qaRefreshBtn = document.getElementById("qa-refresh-dashboard-btn");
     if (qaRefreshBtn) qaRefreshBtn.addEventListener("click", refreshQaDashboard);
     const qaRerunBtn = document.getElementById("qa-test-rerun-btn");
