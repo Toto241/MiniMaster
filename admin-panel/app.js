@@ -206,8 +206,12 @@ let commissioningSummary = null;
 const PAGE_SIZE = 25;
 let userLastDoc = null;
 let userFirstDoc = null;
+let userPageDepth = 0;
 let subLastDoc = null;
+let subFirstDoc = null;
+let subPageDepth = 0;
 let ticketLastDoc = null;
+let ticketFirstDoc = null;
 let currentSubFilter = "all";
 let currentTicketFilter = "all";
 let setupValidationResults = [];
@@ -11941,6 +11945,8 @@ async function loadUsers(direction) {
 
         if (direction === "next" && userLastDoc) {
             query = db.collection("masters").orderBy("createdAt", "desc").startAfter(userLastDoc).limit(PAGE_SIZE);
+        } else if (direction === "prev" && userFirstDoc) {
+            query = db.collection("masters").orderBy("createdAt", "desc").endBefore(userFirstDoc).limitToLast(PAGE_SIZE);
         }
 
         const snapshot = await query.get();
@@ -11952,6 +11958,8 @@ async function loadUsers(direction) {
 
         userFirstDoc = snapshot.docs[0];
         userLastDoc = snapshot.docs[snapshot.docs.length - 1];
+        if (direction === "next") userPageDepth++;
+        if (direction === "prev") userPageDepth--;
 
         let html = "<table><tr><th>Master ID</th><th>Email</th><th>Subscription</th><th>Created</th><th>Actions</th></tr>";
         snapshot.forEach(doc => {
@@ -11975,19 +11983,25 @@ async function loadUsers(direction) {
         html += "</table>";
         userListElement.innerHTML = html;
 
-        // Pagination controls
+        // Pagination controls with Previous + Next
         const paginationEl = document.getElementById("user-pagination");
-        paginationEl.innerHTML = "";
-        if (snapshot.docs.length === PAGE_SIZE) {
-            paginationEl.innerHTML = `<button onclick="loadUsers('next')" class="btn btn-secondary">Next Page</button>`;
+        let paginationHtml = "";
+        const hasPrevious = userPageDepth > 0;
+        const hasNext = snapshot.docs.length === PAGE_SIZE;
+        if (hasPrevious) {
+            paginationHtml += `<button onclick="loadUsers('prev')" class="btn btn-secondary">← Previous</button> `;
         }
+        if (hasNext) {
+            paginationHtml += `<button onclick="loadUsers('next')" class="btn btn-secondary">Next →</button>`;
+        }
+        paginationEl.innerHTML = paginationHtml;
     } catch (error) {
         console.error("Error loading users:", error);
         userListElement.innerHTML = `<div class='error'>Error loading users: ${escapeHtml(error.message)}</div>`;
     }
 }
 
-function searchUsers() {
+async function searchUsers() {
     const query = document.getElementById("user-search-input").value.trim().toLowerCase();
     if (query.length < 3) {
         showNotification("Bitte mindestens 3 Zeichen eingeben.", "info");
@@ -11997,32 +12011,38 @@ function searchUsers() {
     const userListElement = document.getElementById("user-list");
     userListElement.innerHTML = "<div class='loading'>Searching users...</div>";
 
-    db.collection("masters").get().then(snapshot => {
-        const results = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const email = (data.email || "").toLowerCase();
+    try {
+        // Server-side search by email prefix
+        let q = db.collection("masters")
+            .where("email", ">=", query)
+            .where("email", "<=", query + "\uf8ff")
+            .limit(PAGE_SIZE);
+        let snapshot = await q.get();
 
-            if (email.includes(query) || doc.id.toLowerCase().includes(query)) {
-                results.push({ id: doc.id, data: data });
-            }
-        });
+        // Fallback: search by document ID
+        if (snapshot.empty) {
+            q = db.collection("masters")
+                .where("__name__", ">=", query)
+                .where("__name__", "<=", query + "\uf8ff")
+                .limit(PAGE_SIZE);
+            snapshot = await q.get();
+        }
 
-        if (results.length === 0) {
+        if (snapshot.empty) {
             userListElement.innerHTML = "<div class='info'>No users found matching your search.</div>";
             return;
         }
 
         let html = "<table><tr><th>Master ID</th><th>Email</th><th>Subscription</th><th>Created</th><th>Actions</th></tr>";
-        results.forEach(result => {
-            const data = result.data;
+        snapshot.forEach(doc => {
+            const data = doc.data();
             const created = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
             const email = data.email || "N/A";
             const subStatus = data.subscription ? data.subscription.status : "none";
-            const encodedMasterId = encodeInlineArgument(result.id);
+            const encodedMasterId = encodeInlineArgument(doc.id);
 
             html += `<tr>
-                <td title="${escapeHtml(result.id)}">${escapeHtml(result.id.substring(0, 12))}...</td>
+                <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
                 <td>${escapeHtml(email)}</td>
                 <td>${escapeHtml(subStatus)}</td>
                 <td>${created}</td>
@@ -12031,10 +12051,18 @@ function searchUsers() {
         });
         html += "</table>";
         userListElement.innerHTML = html;
-        showNotification(`Found ${results.length} user(s) matching "${query}".`, "success");
-    }).catch(error => {
+        showNotification(`Found ${snapshot.size} user(s) matching "${query}".`, "success");
+
+        // Reset pagination and show back button
+        userPageDepth = 0;
+        userFirstDoc = null;
+        userLastDoc = null;
+        const paginationEl = document.getElementById("user-pagination");
+        paginationEl.innerHTML = `<button onclick="loadUsers()" class="btn btn-secondary">← Zurück zur Liste</button>`;
+    } catch (error) {
+        console.error("Error searching users:", error);
         userListElement.innerHTML = `<div class='error'>Error searching users: ${escapeHtml(error.message)}</div>`;
-    });
+    }
 }
 
 // ==================== USER DETAILS MODAL ====================
@@ -12163,6 +12191,9 @@ function closeUserDetailsModal() {
 
 function filterSubscriptions(status) {
     currentSubFilter = status;
+    subPageDepth = 0;
+    subFirstDoc = null;
+    subLastDoc = null;
     loadSubscriptions();
 }
 
@@ -12174,13 +12205,15 @@ async function loadSubscriptions(direction) {
         let query = db.collection("masters").orderBy("createdAt", "desc");
 
         if (currentSubFilter !== "all") {
-            query = db.collection("masters").where("subscription.status", "==", currentSubFilter);
+            query = db.collection("masters").where("subscription.status", "==", currentSubFilter).orderBy("createdAt", "desc");
         }
 
         query = query.limit(PAGE_SIZE);
 
         if (direction === "next" && subLastDoc) {
             query = query.startAfter(subLastDoc);
+        } else if (direction === "prev" && subFirstDoc) {
+            query = query.endBefore(subFirstDoc).limitToLast(PAGE_SIZE);
         }
 
         const snapshot = await query.get();
@@ -12190,7 +12223,10 @@ async function loadSubscriptions(direction) {
             return;
         }
 
+        subFirstDoc = snapshot.docs[0];
         subLastDoc = snapshot.docs[snapshot.docs.length - 1];
+        if (direction === "next") subPageDepth++;
+        if (direction === "prev") subPageDepth--;
 
         let html = "<table><tr><th>Master ID</th><th>Status</th><th>Type</th><th>Started</th><th>Expires</th><th>Actions</th></tr>";
         snapshot.forEach(doc => {
@@ -12217,12 +12253,18 @@ async function loadSubscriptions(direction) {
         html += "</table>";
         subListElement.innerHTML = html;
 
-        // Pagination
+        // Pagination with Previous + Next
         const paginationEl = document.getElementById("sub-pagination");
-        paginationEl.innerHTML = "";
-        if (snapshot.docs.length === PAGE_SIZE) {
-            paginationEl.innerHTML = `<button onclick="loadSubscriptions('next')" class="btn btn-secondary">Next Page</button>`;
+        const hasPrevious = subPageDepth > 0;
+        const hasNext = snapshot.docs.length === PAGE_SIZE;
+        let paginationHtml = "";
+        if (hasPrevious) {
+            paginationHtml += `<button onclick="loadSubscriptions('prev')" class="btn btn-secondary">← Previous</button> `;
         }
+        if (hasNext) {
+            paginationHtml += `<button onclick="loadSubscriptions('next')" class="btn btn-secondary">Next →</button>`;
+        }
+        paginationEl.innerHTML = paginationHtml;
     } catch (error) {
         subListElement.innerHTML = `<div class='error'>Error loading subscriptions: ${escapeHtml(error.message)}</div>`;
     }
@@ -12706,6 +12748,8 @@ async function loadLegacyAuthUsage() {
 // ==================== DEVICES (CHILDREN) TAB ====================
 
 let deviceLastDoc = null;
+let deviceFirstDoc = null;
+let devicePageDepth = 0;
 
 async function loadDevices(direction) {
     const listEl = document.getElementById("device-list");
@@ -12716,6 +12760,8 @@ async function loadDevices(direction) {
         let query = db.collection("children").orderBy("lastSeen", "desc").limit(PAGE_SIZE);
         if (direction === "next" && deviceLastDoc) {
             query = db.collection("children").orderBy("lastSeen", "desc").startAfter(deviceLastDoc).limit(PAGE_SIZE);
+        } else if (direction === "prev" && deviceFirstDoc) {
+            query = db.collection("children").orderBy("lastSeen", "desc").endBefore(deviceFirstDoc).limitToLast(PAGE_SIZE);
         }
 
         const snapshot = await query.get();
@@ -12724,7 +12770,10 @@ async function loadDevices(direction) {
             return;
         }
 
+        deviceFirstDoc = snapshot.docs[0];
         deviceLastDoc = snapshot.docs[snapshot.docs.length - 1];
+        if (direction === "next") devicePageDepth++;
+        if (direction === "prev") devicePageDepth--;
 
         let html = "<table><tr><th>Child ID</th><th>Master</th><th>Locked</th><th>Blacklist</th><th>Last Seen</th><th>Status</th><th>FCM</th><th>Actions</th></tr>";
         snapshot.forEach(doc => {
@@ -12734,6 +12783,8 @@ async function loadDevices(direction) {
             const blacklistCount = Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0;
             const hasFcm = d.fcmToken ? "✅" : "❌";
             const encodedChildId = encodeInlineArgument(doc.id);
+            const lockLabel = d.isLocked ? "Entsperren" : "Sperren";
+            const lockBtnClass = d.isLocked ? "btn-success" : "btn-warning";
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 16))}${doc.id.length > 16 ? "..." : ""}</td>
@@ -12743,7 +12794,10 @@ async function loadDevices(direction) {
                 <td>${lastSeen ? lastSeen.toLocaleString() : "N/A"}</td>
                 <td>${onlineStatus}</td>
                 <td>${hasFcm}</td>
-                <td><button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button></td>
+                <td>
+                    <button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button>
+                    <button onclick="toggleDeviceLock(decodeInlineArgument('${encodedChildId}'), ${d.isLocked ? 'true' : 'false'})" class="btn ${lockBtnClass} btn-sm">${lockLabel}</button>
+                </td>
             </tr>`;
         });
         html += "</table>";
@@ -12751,16 +12805,23 @@ async function loadDevices(direction) {
 
         const paginationEl = document.getElementById("device-pagination");
         if (paginationEl) {
-            paginationEl.innerHTML = snapshot.docs.length === PAGE_SIZE
-                ? `<button onclick="loadDevices('next')" class="btn btn-secondary">Next Page</button>`
-                : "";
+            const hasPrevious = devicePageDepth > 0;
+            const hasNext = snapshot.docs.length === PAGE_SIZE;
+            let paginationHtml = "";
+            if (hasPrevious) {
+                paginationHtml += `<button onclick="loadDevices('prev')" class="btn btn-secondary">← Previous</button> `;
+            }
+            if (hasNext) {
+                paginationHtml += `<button onclick="loadDevices('next')" class="btn btn-secondary">Next →</button>`;
+            }
+            paginationEl.innerHTML = paginationHtml;
         }
     } catch (error) {
         listEl.innerHTML = `<div class='error'>Error loading devices: ${escapeHtml(error.message)}</div>`;
     }
 }
 
-function searchDevices() {
+async function searchDevices() {
     const query = (document.getElementById("device-search-input")?.value || "").trim().toLowerCase();
     if (query.length < 3) {
         showNotification("Bitte mindestens 3 Zeichen eingeben.", "info");
@@ -12770,43 +12831,66 @@ function searchDevices() {
     const listEl = document.getElementById("device-list");
     listEl.innerHTML = "<div class='loading'>Suche Geräte...</div>";
 
-    db.collection("children").get().then(snapshot => {
-        const results = [];
-        snapshot.forEach(doc => {
-            const d = doc.data();
-            if (doc.id.toLowerCase().includes(query) || (d.masterImei || "").toLowerCase().includes(query)) {
-                results.push({ id: doc.id, data: d });
-            }
-        });
+    try {
+        // Server-side search by masterImei
+        let q = db.collection("children")
+            .where("masterImei", ">=", query)
+            .where("masterImei", "<=", query + "\uf8ff")
+            .limit(PAGE_SIZE);
+        let snapshot = await q.get();
 
-        if (results.length === 0) {
+        // Fallback: search by document ID (childId)
+        if (snapshot.empty) {
+            q = db.collection("children")
+                .where("__name__", ">=", query)
+                .where("__name__", "<=", query + "\uf8ff")
+                .limit(PAGE_SIZE);
+            snapshot = await q.get();
+        }
+
+        if (snapshot.empty) {
             listEl.innerHTML = "<div class='info'>Keine Geräte gefunden.</div>";
             return;
         }
 
         let html = "<table><tr><th>Child ID</th><th>Master</th><th>Locked</th><th>Blacklist</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>";
-        results.forEach(r => {
-            const d = r.data;
+        snapshot.forEach(doc => {
+            const d = doc.data();
             const lastSeen = d.lastSeen ? new Date(d.lastSeen.seconds * 1000) : null;
             const onlineStatus = getOnlineStatus(lastSeen);
             const blacklistCount = Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0;
-            const encodedChildId = encodeInlineArgument(r.id);
+            const encodedChildId = encodeInlineArgument(doc.id);
+            const lockLabel = d.isLocked ? "Entsperren" : "Sperren";
+            const lockBtnClass = d.isLocked ? "btn-success" : "btn-warning";
+
             html += `<tr>
-                <td>${escapeHtml(r.id)}</td>
+                <td>${escapeHtml(doc.id)}</td>
                 <td>${escapeHtml((d.masterImei || "").substring(0, 12))}...</td>
                 <td>${d.isLocked ? "🔒" : "🔓"}</td>
                 <td>${blacklistCount} Apps</td>
                 <td>${lastSeen ? lastSeen.toLocaleString() : "N/A"}</td>
                 <td>${onlineStatus}</td>
-                <td><button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button></td>
+                <td>
+                    <button onclick="viewDeviceDetails(decodeInlineArgument('${encodedChildId}'))" class="btn btn-secondary btn-sm">Details</button>
+                    <button onclick="toggleDeviceLock(decodeInlineArgument('${encodedChildId}'), ${d.isLocked ? 'true' : 'false'})" class="btn ${lockBtnClass} btn-sm">${lockLabel}</button>
+                </td>
             </tr>`;
         });
         html += "</table>";
         listEl.innerHTML = html;
-        showNotification(`${results.length} Gerät(e) gefunden.`, "success");
-    }).catch(error => {
+        showNotification(`${snapshot.size} Gerät(e) gefunden.`, "success");
+
+        devicePageDepth = 0;
+        deviceFirstDoc = null;
+        deviceLastDoc = null;
+        const paginationEl = document.getElementById("device-pagination");
+        if (paginationEl) {
+            paginationEl.innerHTML = `<button onclick="loadDevices()" class="btn btn-secondary">← Zurück zur Liste</button>`;
+        }
+    } catch (error) {
+        console.error("Error searching devices:", error);
         listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
-    });
+    }
 }
 
 async function viewDeviceDetails(childId) {
@@ -12838,13 +12922,24 @@ async function viewDeviceDetails(childId) {
         html += `<p><strong>FCM Token:</strong> ${d.fcmToken ? "✅ Vorhanden" : "❌ Nicht registriert"}</p>`;
         html += `</div>`;
 
-        // App Blacklist
-        html += `<h4>App Blacklist (${Array.isArray(d.appBlacklist) ? d.appBlacklist.length : 0} Apps)</h4>`;
-        if (Array.isArray(d.appBlacklist) && d.appBlacklist.length > 0) {
-            html += `<div class="ticket-description">${d.appBlacklist.map(a => escapeHtml(a)).join("<br>")}</div>`;
+        // App Blacklist — editable
+        const blacklist = Array.isArray(d.appBlacklist) ? d.appBlacklist : [];
+        html += `<h4>App Blacklist (${blacklist.length} Apps)</h4>`;
+        if (blacklist.length > 0) {
+            html += `<table class="table-sm"><tr><th>App-Name</th><th>Aktion</th></tr>`;
+            blacklist.forEach(app => {
+                const encApp = encodeInlineArgument(app);
+                html += `<tr><td>${escapeHtml(app)}</td><td><button onclick="removeFromBlacklist(decodeInlineArgument('${encodedChildId}'), decodeInlineArgument('${encApp}'))" class="btn btn-danger btn-sm">Entfernen</button></td></tr>`;
+            });
+            html += `</table>`;
         } else {
             html += `<p>Keine Apps gesperrt.</p>`;
         }
+        html += `<div class="ticket-actions" style="margin-top:8px;">`;
+        html += `<input type="text" id="blacklist-input-${escapeHtml(childId)}" placeholder="App-Paketname (z.B. com.example.app)" style="flex:1;min-width:200px;" class="form-control">`;
+        html += `<button onclick="updateDeviceBlacklist(decodeInlineArgument('${encodedChildId}'))" class="btn btn-primary btn-sm">Hinzufügen</button>`;
+        html += `</div>`;
+        html += `<p class="text-muted" style="font-size:12px;margin-top:4px;">Mehrere Apps mit Komma trennen</p>`;
 
         // Usage Rules
         html += `<h4>Usage Rules</h4>`;
@@ -12893,10 +12988,11 @@ async function viewDeviceDetails(childId) {
             html += "<p>Keine Usage-Daten vorhanden.</p>";
         }
 
-        // Link to Master
+        // Link to Master + Device Control
         html += `<h4>Actions</h4>`;
         html += `<div class="ticket-actions">`;
         html += `<button onclick="viewUserDetails(decodeInlineArgument('${encodeInlineArgument(d.masterImei || "")}'))" class="btn btn-primary">Master anzeigen</button>`;
+        html += `<button onclick="toggleDeviceLock(decodeInlineArgument('${encodedChildId}'), ${d.isLocked ? 'true' : 'false'})" class="btn ${d.isLocked ? 'btn-success' : 'btn-warning'}">${d.isLocked ? '🔓 Entsperren' : '🔒 Sperren'}</button>`;
         html += `</div>`;
 
         content.innerHTML = html;
@@ -12918,6 +13014,54 @@ function getTaskStatusClass(status) {
 function closeDeviceDetailsModal() {
     const modal = document.getElementById("device-details-modal");
     if (modal) modal.style.display = "none";
+}
+
+async function toggleDeviceLock(childId, currentState) {
+    if (!confirm(`Gerät ${childId} ${currentState ? "entsperren" : "sperren"}?`)) return;
+    try {
+        const result = await functions.httpsCallable("setDeviceLocked")({ childId, isLocked: !currentState });
+        showNotification(result.data.isLocked ? "Gerät gesperrt" : "Gerät entsperrt", "success");
+        await viewDeviceDetails(childId);
+        await loadDevices();
+    } catch (error) {
+        showNotification(`Fehler: ${error.message}`, "error");
+    }
+}
+
+async function updateDeviceBlacklist(childId) {
+    const input = document.getElementById("blacklist-input-" + childId);
+    if (!input) return;
+    const raw = input.value.trim();
+    if (!raw) return;
+    const newApps = raw.split(",").map(s => s.trim()).filter(Boolean);
+    if (newApps.length === 0) return;
+
+    const childDoc = await db.collection("children").doc(childId).get();
+    const current = Array.isArray(childDoc.data()?.appBlacklist) ? childDoc.data().appBlacklist : [];
+    const updated = Array.from(new Set([...current, ...newApps]));
+
+    try {
+        await functions.httpsCallable("updateAppBlacklist")({ childId, appBlacklist: updated });
+        showNotification(`${newApps.length} App(s) zur Blacklist hinzugefügt`, "success");
+        input.value = "";
+        await viewDeviceDetails(childId);
+    } catch (error) {
+        showNotification(`Fehler: ${error.message}`, "error");
+    }
+}
+
+async function removeFromBlacklist(childId, appName) {
+    if (!confirm(`"${appName}" aus der Blacklist entfernen?`)) return;
+    try {
+        const childDoc = await db.collection("children").doc(childId).get();
+        const current = Array.isArray(childDoc.data()?.appBlacklist) ? childDoc.data().appBlacklist : [];
+        const updated = current.filter(a => a !== appName);
+        await functions.httpsCallable("updateAppBlacklist")({ childId, appBlacklist: updated });
+        showNotification(`"${appName}" entfernt`, "success");
+        await viewDeviceDetails(childId);
+    } catch (error) {
+        showNotification(`Fehler: ${error.message}`, "error");
+    }
 }
 
 // ==================== PAIRING OVERVIEW ====================
@@ -13006,6 +13150,8 @@ async function loadPairingOverview(type) {
 // ==================== ERROR LOGS (SEARCHABLE) ====================
 
 let errorLogLastDoc = null;
+let errorLogFirstDoc = null;
+let errorLogPageDepth = 0;
 
 async function loadErrorLogs(direction) {
     const listEl = document.getElementById("errorlog-list");
@@ -13014,9 +13160,6 @@ async function loadErrorLogs(direction) {
 
     try {
         let query = db.collection("error_logs").orderBy("timestamp", "desc").limit(PAGE_SIZE);
-        if (direction === "next" && errorLogLastDoc) {
-            query = db.collection("error_logs").orderBy("timestamp", "desc").startAfter(errorLogLastDoc).limit(PAGE_SIZE);
-        }
 
         const dateFilter = document.getElementById("errorlog-date-filter")?.value;
         if (dateFilter) {
@@ -13029,20 +13172,36 @@ async function loadErrorLogs(direction) {
                 .limit(PAGE_SIZE);
         }
 
+        if (direction === "next" && errorLogLastDoc) {
+            query = query.startAfter(errorLogLastDoc);
+        } else if (direction === "prev" && errorLogFirstDoc) {
+            query = query.endBefore(errorLogFirstDoc).limitToLast(PAGE_SIZE);
+        }
+
         const snapshot = await query.get();
         if (snapshot.empty) {
             listEl.innerHTML = "<div class='info'>Keine Error Logs gefunden.</div>";
             return;
         }
 
+        errorLogFirstDoc = snapshot.docs[0];
         errorLogLastDoc = snapshot.docs[snapshot.docs.length - 1];
+        if (direction === "next") errorLogPageDepth++;
+        if (direction === "prev") errorLogPageDepth--;
         renderErrorLogTable(listEl, snapshot.docs);
 
         const paginationEl = document.getElementById("errorlog-pagination");
         if (paginationEl) {
-            paginationEl.innerHTML = snapshot.docs.length === PAGE_SIZE
-                ? `<button onclick="loadErrorLogs('next')" class="btn btn-secondary">Next Page</button>`
-                : "";
+            const hasPrevious = errorLogPageDepth > 0;
+            const hasNext = snapshot.docs.length === PAGE_SIZE;
+            let paginationHtml = "";
+            if (hasPrevious) {
+                paginationHtml += `<button onclick="loadErrorLogs('prev')" class="btn btn-secondary">← Previous</button> `;
+            }
+            if (hasNext) {
+                paginationHtml += `<button onclick="loadErrorLogs('next')" class="btn btn-secondary">Next →</button>`;
+            }
+            paginationEl.innerHTML = paginationHtml;
         }
     } catch (error) {
         listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
@@ -13062,15 +13221,25 @@ function searchErrorLogs() {
 
     listEl.innerHTML = "<div class='loading'>Suche Error Logs...</div>";
 
-    let query = db.collection("error_logs").orderBy("timestamp", "desc").limit(200);
-    if (dateFilter) {
-        const start = firebase.firestore.Timestamp.fromDate(new Date(dateFilter));
-        const end = firebase.firestore.Timestamp.fromDate(new Date(dateFilter + "T23:59:59"));
+    // Server-side search by functionName when possible
+    let query;
+    if (searchQuery && !dateFilter) {
         query = db.collection("error_logs")
-            .where("timestamp", ">=", start)
-            .where("timestamp", "<=", end)
+            .where("functionName", ">=", searchQuery)
+            .where("functionName", "<=", searchQuery + "\uf8ff")
             .orderBy("timestamp", "desc")
-            .limit(200);
+            .limit(PAGE_SIZE);
+    } else {
+        query = db.collection("error_logs").orderBy("timestamp", "desc").limit(500);
+        if (dateFilter) {
+            const start = firebase.firestore.Timestamp.fromDate(new Date(dateFilter));
+            const end = firebase.firestore.Timestamp.fromDate(new Date(dateFilter + "T23:59:59"));
+            query = db.collection("error_logs")
+                .where("timestamp", ">=", start)
+                .where("timestamp", "<=", end)
+                .orderBy("timestamp", "desc")
+                .limit(500);
+        }
     }
 
     query.get().then(snapshot => {
@@ -13091,6 +13260,14 @@ function searchErrorLogs() {
 
         renderErrorLogTable(listEl, filtered);
         showNotification(`${filtered.length} Error Log(s) gefunden.`, "success");
+        errorLogPageDepth = 0;
+        errorLogFirstDoc = null;
+        errorLogLastDoc = null;
+
+        const paginationEl = document.getElementById("errorlog-pagination");
+        if (paginationEl) {
+            paginationEl.innerHTML = `<button onclick="loadErrorLogs()" class="btn btn-secondary">← Zurück zur Liste</button>`;
+        }
     }).catch(error => {
         listEl.innerHTML = `<div class='error'>Fehler: ${escapeHtml(error.message)}</div>`;
     });
