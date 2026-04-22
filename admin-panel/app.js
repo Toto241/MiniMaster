@@ -11187,6 +11187,10 @@ function initOperatorReadinessCard() {
     if (downloadBtn) {
         downloadBtn.addEventListener("click", () => downloadOperatorReadiness());
     }
+    const exportEvidenceBtn = document.querySelector("[data-action='exportReleaseEvidenceBundle']");
+    if (exportEvidenceBtn) exportEvidenceBtn.addEventListener("click", exportReleaseEvidenceBundle);
+    const exportArtefactBtn = document.querySelector("[data-action='exportReleaseArtefact']");
+    if (exportArtefactBtn) exportArtefactBtn.addEventListener("click", exportReleaseArtefact);
 }
 
 async function loadOperatorReadiness() {
@@ -15217,6 +15221,139 @@ function exportReleaseArtefact() {
     URL.revokeObjectURL(url);
 
     showNotification("Release-Artefakt (kombinierter Nachweis) exportiert.", "success");
+}
+
+// --- Release Evidence Bundle Export ---
+
+function exportReleaseEvidenceBundle() {
+    const playStoreState = getPlayStoreReadinessState();
+    const p0BlockerState = getP0BlockerCockpitState();
+    const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
+    const attestations = getCommissioningAttestations();
+    const status = computeGoLiveStatus();
+
+    // QA Catalog summary
+    const catalogTests = Array.isArray(pythonCommissioningCatalog?.tests) ? pythonCommissioningCatalog.tests : [];
+    const catalogSummary = {
+        totalTests: catalogTests.length,
+        automated: catalogTests.filter(t => t.automationType === "automated" || t.type === "automated").length,
+        manual: catalogTests.filter(t => t.automationType === "manual" || t.type === "manual").length,
+        byStatus: {},
+        byGroup: {},
+    };
+    catalogTests.forEach(t => {
+        const s = t.status || "unknown";
+        catalogSummary.byStatus[s] = (catalogSummary.byStatus[s] || 0) + 1;
+        const g = t.groupTitle || t.groupId || "Ungruppiert";
+        catalogSummary.byGroup[g] = (catalogSummary.byGroup[g] || 0) + 1;
+    });
+
+    // Testing Register summary
+    const registerItems = Array.isArray(testingRegisterPayload?.items) ? testingRegisterPayload.items : [];
+    const registerSummary = {
+        totalItems: registerItems.length,
+        openItems: registerItems.filter(i => {
+            const s = String(i?.status || "not_run");
+            return s === "fail" || s === "manual_required" || s === "not_run";
+        }).length,
+        passedItems: registerItems.filter(i => String(i?.status || "") === "pass").length,
+        blockingItems: registerItems.filter(i => isTestingRegisterReleaseBlockerOpen(i)).length,
+        byStatus: {},
+        byGroup: {},
+    };
+    registerItems.forEach(i => {
+        const s = i.status || "not_run";
+        registerSummary.byStatus[s] = (registerSummary.byStatus[s] || 0) + 1;
+        const g = i.groupTitle || i.groupId || "Ungruppiert";
+        registerSummary.byGroup[g] = (registerSummary.byGroup[g] || 0) + 1;
+    });
+
+    // Suite Run History summary
+    const suiteRuns = Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : [];
+    const suiteSummary = {
+        totalRuns: suiteRuns.length,
+        passedRuns: suiteRuns.filter(r => (r.status || r.result?.status) === "pass").length,
+        failedRuns: suiteRuns.filter(r => (r.status || r.result?.status) === "fail").length,
+        latestRuns: suiteRuns.slice(0, 10).map(r => ({
+            runId: r.runId || r.run_id,
+            suiteName: r.suiteName || r.suite_id,
+            status: r.status || r.result?.status,
+            startedAt: r.startedAt,
+            completedAt: r.completedAt,
+        })),
+    };
+
+    // Evidence History summary
+    const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
+    const evidenceSummary = {
+        totalEntries: evidenceEntries.length,
+        passEntries: evidenceEntries.filter(e => e.status === "pass").length,
+        failEntries: evidenceEntries.filter(e => e.status === "fail").length,
+        manualRequiredEntries: evidenceEntries.filter(e => e.status === "manual_required").length,
+        latestEntries: evidenceEntries.slice(0, 20).map(e => ({
+            evidenceId: e.evidenceId || e.id,
+            testId: e.testId,
+            testTitle: e.testTitle,
+            status: e.status,
+            recordedAt: e.recordedAt,
+            recordedBy: e.recordedBy,
+        })),
+    };
+
+    // Commissioning History summary
+    const commissioningRuns = Array.isArray(pythonCommissioningHistoryRuns) ? pythonCommissioningHistoryRuns : [];
+    const commissioningHistorySummary = {
+        totalRuns: commissioningRuns.length,
+        latestRuns: commissioningRuns.slice(0, 10).map(r => ({
+            runId: r.runId,
+            startedAt: r.startedAt,
+            completedAt: r.completedAt,
+            overallStatus: r.overallStatus || r.result?.overall_status,
+            testCount: r.tests?.length || 0,
+            passCount: r.tests?.filter(t => t.status === "pass").length || 0,
+            failCount: r.tests?.filter(t => t.status === "fail").length || 0,
+        })),
+    };
+
+    const payload = {
+        exportedAt: new Date().toISOString(),
+        tool: "MiniMaster Admin Panel",
+        version: "1.0",
+        type: "release-evidence-bundle",
+        goLiveStatus: {
+            ampel: status.ampel,
+            ampelLabel: status.ampelLabel,
+            ampelDescription: status.ampelDescription,
+            backendReady: status.backendReady,
+            allAttestationsOk: status.allAttestationsOk,
+            playStoreReady: status.playStoreReady,
+            totals: status.totals,
+        },
+        commissioningSummary: commissioningSummary || null,
+        commissioningHistory: commissioningHistorySummary,
+        p0BlockerCockpit: p0BlockerState,
+        playStoreReadiness: playStoreState,
+        platformChecksSummary: status.platformStatus,
+        platformChecksDetail: platformState,
+        attestations,
+        qaCatalogSummary: catalogSummary,
+        testingRegisterSummary: registerSummary,
+        suiteRunSummary: suiteSummary,
+        evidenceSummary: evidenceSummary,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "minimaster-release-evidence-" + safeDate + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification("Release-Evidence-Bundle exportiert.", "success");
 }
 
 // --- Finale Go-Live-Bestätigung ---
