@@ -10,6 +10,9 @@ import * as admin from "firebase-admin";
 import { google } from "googleapis";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
+import { validateSku, validateString } from "./validation";
+import { withResilience } from "./resilience";
+import { withErrorHandling } from "./error-handler";
 
 const DEFAULT_PARENT_APP_LIMIT = 2;
 const DEFAULT_CHILD_LIMIT = 4;
@@ -55,15 +58,12 @@ export const verifyPurchase = functions.https.onCall(
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
     checkRateLimit(masterId, "verifyPurchase", 10);
-    const { purchaseToken, sku } = data;
 
-    if (!purchaseToken || !sku) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
-    }
-
-    if (!VALID_PRODUCT_IDS.includes(sku)) {
-      throw new functions.https.HttpsError("invalid-argument", `Unknown product ID: ${sku}`);
-    }
+    // Strict input validation
+    const purchaseToken = validateString(data.purchaseToken, "purchaseToken", {
+      required: true, maxLength: 2048, minLength: 10, sanitize: "none",
+    });
+    const sku = validateSku(data.sku);
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
 
@@ -73,8 +73,10 @@ export const verifyPurchase = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
 
-      const isPurchaseValid = await verifyPlaySubscription(
-        "com.minimaster.masterapp", sku, purchaseToken
+      const isPurchaseValid = await withResilience(
+        "play-store-verify",
+        async () => verifyPlaySubscription("com.minimaster.masterapp", sku, purchaseToken),
+        { timeoutMs: 15000, retry: { maxAttempts: 3, baseDelayMs: 1000 } }
       ).catch((e) => {
         functions.logger.error("Error verifying Google Play purchase:", e);
         return false;
