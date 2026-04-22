@@ -398,6 +398,24 @@ describe("web-control browser flows", () => {
     expect(html).toContain("type=\"datetime-local\"");
   });
 
+  it("keeps web-control index free of inline event handlers and inline style attributes", () => {
+    const html = fs.readFileSync(path.join(__dirname, "..", "web-control", "index.html"), "utf8");
+
+    expect(html).not.toContain("onclick=");
+    expect(html).not.toContain("onsubmit=");
+    expect(html).not.toContain(" style=");
+  });
+
+  it("enforces web-control CSP style-src self without unsafe-inline", () => {
+    const firebaseJson = fs.readFileSync(path.join(__dirname, "..", "firebase.json"), "utf8");
+    const webControlCspMatch = firebaseJson.match(/"target"\s*:\s*"web-control"[\s\S]*?"Content-Security-Policy"[\s\S]*?"value"\s*:\s*"([^"]+)"/);
+
+    expect(webControlCspMatch).not.toBeNull();
+    const csp = webControlCspMatch![1];
+    expect(csp).toContain("style-src 'self'");
+    expect(csp).not.toContain("'unsafe-inline'");
+  });
+
   it("builds a legal locale from language tag and country code", () => {
     const { context } = loadWebControl();
 

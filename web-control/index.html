@@ -37,14 +37,14 @@
                         </div>
                     </div>
                 </div>
-                <div id="user-info" class="user-info" style="display: none;">
+                <div id="user-info" class="user-info is-hidden">
                     <span id="logged-user">Logged in as: <span id="master-id"></span></span>
-                    <button onclick="logout()" class="logout-btn" title="Vom Control Panel abmelden">Logout</button>
+                    <button id="logout-btn" class="logout-btn" title="Vom Control Panel abmelden">Logout</button>
                 </div>
             </div>
         </header>
 
-        <section id="legal-gate" class="legal-gate" style="display: none;">
+        <section id="legal-gate" class="legal-gate is-hidden">
             <div class="legal-gate-card">
                 <p class="legal-gate-eyebrow">Legal Gate</p>
                 <h2 id="legal-gate-title">Legal configuration required</h2>
@@ -52,7 +52,7 @@
                     Choose the app language and country of use before the control panel can unlock the dashboard.
                 </p>
 
-                <div id="legal-context-form" class="legal-context-form" style="display: none;">
+                <div id="legal-context-form" class="legal-context-form is-hidden">
                     <div class="form-group">
                         <label for="legal-language-select">App language</label>
                         <select id="legal-language-select" title="App-Sprache für die rechtlichen Dokumente auswählen"></select>
@@ -63,14 +63,14 @@
                     </div>
                     <div class="legal-context-summary" id="legal-context-summary"></div>
                     <div class="legal-actions">
-                        <button id="legal-context-continue" class="btn btn-primary" onclick="continueLegalSetup()" title="Sprach- und Länderauswahl speichern und rechtliche Prüfung starten">Continue</button>
+                        <button id="legal-context-continue" class="btn btn-primary" title="Sprach- und Länderauswahl speichern und rechtliche Prüfung starten">Continue</button>
                     </div>
                 </div>
 
-                <div id="legal-consent-view" class="legal-consent-view" style="display: none;">
+                <div id="legal-consent-view" class="legal-consent-view is-hidden">
                     <div class="legal-links">
-                        <button id="legal-terms-link" class="btn btn-secondary" onclick="openLegalTerms()" title="Aktuelle AGB öffnen">Open Terms</button>
-                        <button id="legal-privacy-link" class="btn btn-secondary" onclick="openLegalPrivacy()" title="Aktuelle Datenschutzerklärung öffnen">Open Privacy Policy</button>
+                        <button id="legal-terms-link" class="btn btn-secondary" title="Aktuelle AGB öffnen">Open Terms</button>
+                        <button id="legal-privacy-link" class="btn btn-secondary" title="Aktuelle Datenschutzerklärung öffnen">Open Privacy Policy</button>
                     </div>
                     <label class="legal-checkbox-row" title="Bestätigung der aktuellen AGB-Version">
                         <input type="checkbox" id="legal-terms-checkbox">
@@ -82,22 +82,22 @@
                     </label>
                     <div class="legal-context-summary" id="legal-policy-meta"></div>
                     <div class="legal-actions">
-                        <button id="legal-accept-btn" class="btn btn-primary" onclick="acceptLegalConsent()" title="Zustimmen und Dashboard freischalten">Accept and continue</button>
-                        <button id="legal-retry-btn" class="btn btn-secondary" onclick="retryLegalGate()" title="Rechtliche Prüfung erneut versuchen">Retry</button>
+                        <button id="legal-accept-btn" class="btn btn-primary" title="Zustimmen und Dashboard freischalten">Accept and continue</button>
+                        <button id="legal-retry-btn" class="btn btn-secondary" title="Rechtliche Prüfung erneut versuchen">Retry</button>
                     </div>
                 </div>
             </div>
         </section>
 
-        <main class="main-content" id="main-content" style="display: none;">
+        <main class="main-content is-hidden" id="main-content">
             <div class="dashboard">
                 <div class="action-bar" id="dashboard-action-bar">
                     <h2>Paired Devices</h2>
                     <div class="action-buttons">
-                        <button onclick="showReviewTasks()" class="btn btn-secondary" title="Eingereichte Aufgaben der Kinder überprüfen und freigeben">Review Tasks</button>
-                        <button onclick="showTaskAssignment()" class="btn btn-secondary" title="Neue Aufgabe an ein Kindergerät vergeben">Assign Task</button>
-                        <button onclick="showSubscription()" class="btn btn-secondary" title="Premium-Abonnement für erweiterte Funktionen anzeigen">Go Premium</button>
-                        <button onclick="showSupport()" class="btn btn-secondary" title="Support-Bereich öffnen und Hilfe anfordern">Support</button>
+                        <button id="show-review-tasks-btn" class="btn btn-secondary" title="Eingereichte Aufgaben der Kinder überprüfen und freigeben">Review Tasks</button>
+                        <button id="show-task-assignment-btn" class="btn btn-secondary" title="Neue Aufgabe an ein Kindergerät vergeben">Assign Task</button>
+                        <button id="show-subscription-btn" class="btn btn-secondary" title="Premium-Abonnement für erweiterte Funktionen anzeigen">Go Premium</button>
+                        <button id="show-support-btn" class="btn btn-secondary" title="Support-Bereich öffnen und Hilfe anfordern">Support</button>
                     </div>
                 </div>
 
@@ -105,13 +105,13 @@
                     <div class="loading">Loading devices...</div>
                 </div>
 
-                <div id="task-creation-modal" class="modal" style="display: none;">
+                <div id="task-creation-modal" class="modal is-hidden">
                     <div class="modal-content">
-                        <span class="close" onclick="closeTaskModal()" title="Dialog schließen">&times;</span>
+                        <span id="task-modal-close" class="close" title="Dialog schließen">&times;</span>
                         <h3>Create New Task</h3>
-                        <form onsubmit="createTask(event)">
+                        <form id="task-create-form">
                             <input type="hidden" id="task-child-id">
-                            <div class="form-group" id="task-child-selector-group" style="display: none;">
+                            <div class="form-group is-hidden" id="task-child-selector-group">
                                 <label for="task-child-select">Child Device:</label>
                                 <select id="task-child-select" title="Kindergerät auswählen, dem die Aufgabe zugewiesen wird"></select>
                             </div>
@@ -124,18 +124,18 @@
                                 <input type="datetime-local" id="task-deadline" required title="Frist setzen, bis wann die Aufgabe erledigt sein muss">
                             </div>
                             <div class="form-actions">
-                                <button type="button" onclick="closeTaskModal()" class="btn btn-secondary" title="Aufgabenerstellung abbrechen und Dialog schließen">Cancel</button>
+                                <button id="task-modal-cancel" type="button" class="btn btn-secondary" title="Aufgabenerstellung abbrechen und Dialog schließen">Cancel</button>
                                 <button type="submit" class="btn btn-primary" title="Aufgabe erstellen und an das Kindergerät senden">Create Task</button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div id="rules-modal" class="modal" style="display: none;">
+                <div id="rules-modal" class="modal is-hidden">
                     <div class="modal-content">
-                        <span class="close" onclick="closeRulesModal()" title="Dialog schließen">&times;</span>
+                        <span id="rules-modal-close" class="close" title="Dialog schließen">&times;</span>
                         <h3>Configure Device Rules</h3>
-                        <form onsubmit="saveRules(event)">
+                        <form id="rules-save-form">
                             <input type="hidden" id="rules-child-id">
                             <div class="form-group">
                                 <label for="daily-limit">Daily Screen Time Limit (minutes):</label>
@@ -146,31 +146,31 @@
                                 <textarea id="blocked-apps" placeholder="com.example.game, com.social.app" title="Paketnamen der zu sperrenden Apps eingeben, durch Komma getrennt"></textarea>
                             </div>
                             <div class="form-actions">
-                                <button type="button" onclick="closeRulesModal()" class="btn btn-secondary" title="Regeländerungen verwerfen und Dialog schließen">Cancel</button>
+                                <button id="rules-modal-cancel" type="button" class="btn btn-secondary" title="Regeländerungen verwerfen und Dialog schließen">Cancel</button>
                                 <button type="submit" class="btn btn-primary" title="Geräteregeln speichern und auf dem Kindergerät anwenden">Save Rules</button>
                             </div>
                         </form>
-                        <div class="chart-container" style="margin-block-start: 20px;">
+                        <div class="chart-container chart-container-spaced">
                              <h4>Usage History (Last 7 Days)</h4>
                              <canvas id="usageChart"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <div id="task-review-section" class="section" style="display: none;">
+                <div id="task-review-section" class="section is-hidden">
                     <div class="section-header">
                         <h3>Review Completed Tasks</h3>
-                        <button onclick="showDashboard()" class="btn btn-secondary" title="Zurück zur Geräteübersicht">Back to Dashboard</button>
+                        <button id="review-back-btn" class="btn btn-secondary" title="Zurück zur Geräteübersicht">Back to Dashboard</button>
                     </div>
                     <div id="tasks-to-review" class="tasks-list">
                         <div class="loading">Loading tasks...</div>
                     </div>
                 </div>
 
-                <div id="subscription-section" class="section" style="display: none;">
+                <div id="subscription-section" class="section is-hidden">
                     <div class="section-header">
                         <h3>Subscription Management</h3>
-                        <button onclick="showDashboard()" class="btn btn-secondary" title="Zurück zur Geräteübersicht">Back to Dashboard</button>
+                        <button id="subscription-back-btn" class="btn btn-secondary" title="Zurück zur Geräteübersicht">Back to Dashboard</button>
                     </div>
                     <div class="subscription-content">
                         <div id="subscription-status-card" class="subscription-status-card">
@@ -183,19 +183,19 @@
                             <li>Custom app blocking rules</li>
                             <li>Priority support</li>
                         </ul>
-                        <button class="btn btn-primary" onclick="showNotification('Please complete upgrades in the parent Android app. This panel shows the live subscription state only.', 'info')" title="Hinweis: Premium-Upgrade erfolgt über die Android-Eltern-App">Upgrade via Android App</button>
+                        <button id="upgrade-android-app-btn" class="btn btn-primary" title="Hinweis: Premium-Upgrade erfolgt über die Android-Eltern-App">Upgrade via Android App</button>
                     </div>
                 </div>
 
-                <div id="support-section" class="section" style="display: none;">
+                <div id="support-section" class="section is-hidden">
                     <div class="section-header">
                         <h3>Support</h3>
-                        <button onclick="showDashboard()" class="btn btn-secondary" title="Zurück zur Geräteübersicht">Back to Dashboard</button>
+                        <button id="support-back-btn" class="btn btn-secondary" title="Zurück zur Geräteübersicht">Back to Dashboard</button>
                     </div>
                     <div class="support-content">
                         <div class="create-ticket-form">
                             <h4>Create Support Ticket</h4>
-                            <form onsubmit="createSupportTicket(event)">
+                            <form id="support-ticket-form">
                                 <textarea id="problem-description" placeholder="Describe your problem..." rows="5" required title="Beschreibung des Problems oder der Frage für den Support"></textarea>
                                 <div class="support-consent-box">
                                     <p><strong>Darf der Support bei Bedarf auf Ihr Konto zugreifen (max. 48h)?</strong></p>
@@ -216,7 +216,7 @@
             </div>
         </main>
 
-        <div id="notification" class="notification" style="display: none;"></div>
+        <div id="notification" class="notification is-hidden"></div>
     </div>
 
     <script src="appcheck-init.js"></script>
