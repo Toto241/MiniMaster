@@ -2642,6 +2642,7 @@ async function loadQaDashboardData(reason = "manuell") {
         }
 
         updateQaRefreshSummary(reason, results);
+        renderQaArtifactExplorer();
         qaDashboardLoadPromise = null;
         return results;
     })();
@@ -2651,6 +2652,177 @@ async function loadQaDashboardData(reason = "manuell") {
 
 async function refreshQaDashboard() {
     await loadQaDashboardData("manueller Refresh");
+}
+
+// ==================== QA ARTIFACT EXPLORER ====================
+
+function getQaArtifacts() {
+    const artifacts = [];
+
+    // Catalog tests
+    if (pythonCommissioningCatalog?.tests && Array.isArray(pythonCommissioningCatalog.tests)) {
+        pythonCommissioningCatalog.tests.forEach((test, idx) => {
+            artifacts.push({
+                type: "catalog",
+                typeLabel: "Testkatalog",
+                id: test.id || `catalog-${idx}`,
+                title: test.title || test.name || "Unbenannter Test",
+                status: test.status || "unknown",
+                group: test.groupTitle || test.groupId || "",
+                description: test.description || "",
+                updatedAt: test.updatedAt || "",
+                raw: test,
+            });
+        });
+    }
+
+    // Register items
+    const registerItems = Array.isArray(testingRegisterPayload?.items) ? testingRegisterPayload.items : [];
+    registerItems.forEach((item, idx) => {
+        artifacts.push({
+            type: "register",
+            typeLabel: "Testregister",
+            id: item.id || `register-${idx}`,
+            title: item.title || item.name || "Unbenannter Eintrag",
+            status: item.status || "not_run",
+            group: item.groupTitle || item.groupId || "",
+            description: item.description || item.details || "",
+            updatedAt: item.updatedAt || item.lastRunAt || "",
+            raw: item,
+        });
+    });
+
+    // Suite runs
+    const suiteRuns = Array.isArray(suiteRunHistoryPayload) ? suiteRunHistoryPayload : [];
+    suiteRuns.forEach((run, idx) => {
+        artifacts.push({
+            type: "suite",
+            typeLabel: "Suite-Lauf",
+            id: run.runId || run.run_id || `suite-${idx}`,
+            title: run.suiteName || run.suite_id || `Suite-Lauf ${idx + 1}`,
+            status: run.status || run.result?.status || "unknown",
+            group: run.suiteGroup || "",
+            description: run.result?.reason || run.result?.error || run.error || "",
+            updatedAt: run.startedAt || run.completedAt || "",
+            raw: run,
+        });
+    });
+
+    // Evidence entries
+    const evidenceEntries = Array.isArray(pythonCommissioningEvidenceHistory) ? pythonCommissioningEvidenceHistory : [];
+    evidenceEntries.forEach((entry, idx) => {
+        artifacts.push({
+            type: "evidence",
+            typeLabel: "Nachweis",
+            id: entry.evidenceId || entry.id || `evidence-${idx}`,
+            title: entry.testTitle || entry.testId || entry.title || "Unbenannter Nachweis",
+            status: entry.status || "unknown",
+            group: entry.suiteId || entry.groupId || "",
+            description: entry.notes || entry.details || "",
+            updatedAt: entry.recordedAt || entry.updatedAt || "",
+            raw: entry,
+        });
+    });
+
+    return artifacts;
+}
+
+function renderQaArtifactExplorer() {
+    const container = document.getElementById("qa-artifact-results");
+    if (!container) return;
+
+    const searchInput = document.getElementById("qa-artifact-search");
+    const typeFilter = document.getElementById("qa-artifact-type-filter");
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    const selectedType = typeFilter?.value || "all";
+
+    const allArtifacts = getQaArtifacts();
+    let filtered = allArtifacts;
+
+    if (selectedType !== "all") {
+        filtered = filtered.filter(a => a.type === selectedType);
+    }
+    if (query.length >= 2) {
+        filtered = filtered.filter(a =>
+            (a.title || "").toLowerCase().includes(query) ||
+            (a.id || "").toLowerCase().includes(query) ||
+            (a.group || "").toLowerCase().includes(query) ||
+            (a.description || "").toLowerCase().includes(query)
+        );
+    }
+
+    if (allArtifacts.length === 0) {
+        container.innerHTML = `<div class="info">Noch keine Artefakte geladen. Laden Sie zuerst die QA-Datenquellen über "QA-Daten aktualisieren".</div>`;
+        return;
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="info">Keine Artefakte passen zur aktuellen Filterung.</div>`;
+        return;
+    }
+
+    const statusClass = (status) => {
+        const s = String(status || "").toLowerCase();
+        if (s === "pass" || s === "success" || s === "active" || s === "approved") return "status-active";
+        if (s === "fail" || s === "error" || s === "expired" || s === "rejected") return "status-expired";
+        if (s === "manual_required" || s === "pending" || s === "pending_approval" || s === "awaiting") return "status-awaiting";
+        if (s === "not_run" || s === "none" || s === "unknown") return "status-open";
+        return "";
+    };
+
+    const typeIcon = (type) => {
+        switch (type) {
+            case "catalog": return "📋";
+            case "register": return "📒";
+            case "suite": return "🧪";
+            case "evidence": return "📝";
+            default: return "📄";
+        }
+    };
+
+    let html = `<div class="info" style="margin-block-end:8px">${filtered.length} von ${allArtifacts.length} Artefakten sichtbar</div>`;
+    html += `<div class="qa-register-card-list">`;
+    filtered.forEach(artifact => {
+        const sc = statusClass(artifact.status);
+        const dateStr = artifact.updatedAt ? new Date(artifact.updatedAt).toLocaleString() : "";
+        html += `
+            <article class="qa-register-item">
+                <div class="qa-register-item-header">
+                    <span class="qa-register-item-title">${typeIcon(artifact.type)} ${escapeHtml(artifact.title)}</span>
+                    <span class="python-status-badge ${sc}">${escapeHtml(artifact.status)}</span>
+                </div>
+                <div class="qa-register-item-body">
+                    <p><strong>Typ:</strong> ${escapeHtml(artifact.typeLabel)} · <strong>ID:</strong> ${escapeHtml(artifact.id)}</p>
+                    ${artifact.group ? `<p><strong>Gruppe:</strong> ${escapeHtml(artifact.group)}</p>` : ""}
+                    ${artifact.description ? `<p>${escapeHtml(artifact.description.substring(0, 200))}${artifact.description.length > 200 ? "..." : ""}</p>` : ""}
+                    ${dateStr ? `<p class="python-muted-caption">Aktualisiert: ${escapeHtml(dateStr)}</p>` : ""}
+                </div>
+            </article>
+        `;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+async function refreshQaArtifacts() {
+    const container = document.getElementById("qa-artifact-results");
+    if (container) {
+        container.innerHTML = `<div class="loading">Lade Artefakte...</div>`;
+    }
+    // Ensure all data sources are loaded first
+    const sections = getQaDashboardSectionLoaders();
+    const results = [];
+    for (const [sectionKey, loader] of sections) {
+        try {
+            const result = await loader();
+            results.push({ sectionKey, ok: Boolean(result?.ok), message: result?.message || "" });
+        } catch (error) {
+            results.push({ sectionKey, ok: false, message: error?.message || "Fehler" });
+        }
+    }
+    renderQaArtifactExplorer();
+    const successCount = results.filter(r => r.ok).length;
+    showNotification(`${successCount}/${results.length} QA-Bereiche geladen. ${getQaArtifacts().length} Artefakte im Explorer.`, "success");
 }
 
 /**
@@ -9490,11 +9662,27 @@ document.addEventListener("DOMContentLoaded", async function() {
         element.__operatorGuidanceBound = true;
     });
 
+    function debounce(fn, ms) {
+        let timer;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), ms);
+        };
+    }
+
     // QA dashboard buttons (migrated from inline onclick for CSP hardening)
     const qaCopyRunLogBtn = document.getElementById("qa-copy-run-log-btn");
     if (qaCopyRunLogBtn) qaCopyRunLogBtn.addEventListener("click", copyLatestPythonAutomationRunToClipboard);
     const qaRefreshBtn = document.getElementById("qa-refresh-dashboard-btn");
     if (qaRefreshBtn) qaRefreshBtn.addEventListener("click", refreshQaDashboard);
+    const qaArtifactRefreshBtn = document.querySelector("[data-action='refreshQaArtifacts']");
+    if (qaArtifactRefreshBtn) qaArtifactRefreshBtn.addEventListener("click", refreshQaArtifacts);
+    const qaArtifactSearch = document.getElementById("qa-artifact-search");
+    if (qaArtifactSearch) {
+        qaArtifactSearch.addEventListener("input", debounce(renderQaArtifactExplorer, 250));
+    }
+    const qaArtifactTypeFilter = document.getElementById("qa-artifact-type-filter");
+    if (qaArtifactTypeFilter) qaArtifactTypeFilter.addEventListener("change", renderQaArtifactExplorer);
     const qaRerunBtn = document.getElementById("qa-test-rerun-btn");
     if (qaRerunBtn) qaRerunBtn.addEventListener("click", rerunSelectedQaTestWorkspaceItem);
     const qaCopyCompactBtn = document.getElementById("qa-test-copy-compact-btn");
