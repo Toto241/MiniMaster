@@ -1,0 +1,46 @@
+
+> minimaster@1.0.0 test:rules:structural
+> jest --config jest.config.cjs --runInBand test/firestore-rules.test.ts
+
+PASS test/firestore-rules.test.ts (52 MB heap size)
+  Firestore Security Rules - Structural Validation
+    Rule definitions exist
+      ÔêÜ should have rules for masters collection (2 ms)
+      ÔêÜ should have rules for children collection
+      ÔêÜ should have rules for tasks subcollection
+      ÔêÜ should have rules for supportTickets collection
+      ÔêÜ should have rules for audit_logs collection (1 ms)
+      ÔêÜ should have rules for error_logs collection
+    Role-based access control
+      ÔêÜ should define isSignedIn helper function
+      ÔêÜ should define isAdmin helper function
+      ÔêÜ should reference role-based token claims (1 ms)
+      ÔêÜ should check authentication status (1 ms)
+    Security constraints
+      ÔêÜ should deny access by default (no wildcard allow) (1 ms)
+      ÔêÜ should restrict admin-only collections
+      ÔêÜ should have rules version 2 (2 ms)
+      ÔêÜ should deny writes to pairing codes from clients (1 ms)
+      ÔêÜ should deny writes to subscriptions from clients (1 ms)
+    Data validation in rules
+      ÔêÜ should validate data fields on write operations
+      ÔêÜ should enforce lowercase task status values
+      ÔêÜ should validate task proof field as photoUrl (1 ms)
+      ÔêÜ should type-check optional timestamp fields
+      ÔêÜ should accept optional timestamp fields when absent (1 ms)
+      ÔêÜ should validate task schema via a dedicated helper function (1 ms)
+    Support ticket access
+      ÔêÜ should allow masters to create support tickets (1 ms)
+      ÔêÜ should allow admins to read support tickets
+  Firestore Indexes - Validation
+    ÔêÜ should have indexes defined (1 ms)
+    ÔêÜ should have index for tasks collection group (1 ms)
+    ÔêÜ should have index for supportTickets by status and createdAt
+    ÔêÜ should have index for audit_logs by userId and timestamp (1 ms)
+    ÔêÜ should have index for masters by subscription status (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       28 passed, 28 total
+Snapshots:   0 total
+Time:        0.895 s, estimated 1 s
+Ran all test suites matching /test\\firestore-rules.test.ts/i.

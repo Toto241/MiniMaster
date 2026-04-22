@@ -1,0 +1,162 @@
+
+> minimaster@1.0.0 lint
+> eslint . --ext .js,.ts
+
+
+D:\Tools\MiniMaster\child-panel\app.js
+  0:0  error  Parsing error: "parserOptions.project" has been provided for @typescript-eslint/parser.
+The file was not found in any of the provided project(s): child-panel\app.js
+
+D:\Tools\MiniMaster\parent-panel\app.js
+  0:0  error  Parsing error: "parserOptions.project" has been provided for @typescript-eslint/parser.
+The file was not found in any of the provided project(s): parent-panel\app.js
+
+D:\Tools\MiniMaster\src\tasks.ts
+  286:14  warning  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\start.js
+    1:28   error    Strings must use doublequote      quotes
+    2:28   error    Strings must use doublequote      quotes
+    2:38   error    Strings must use doublequote      quotes
+    2:52   error    Strings must use doublequote      quotes
+    2:65   error    Strings must use doublequote      quotes
+    2:82   error    Strings must use doublequote      quotes
+    2:103  error    Strings must use doublequote      quotes
+    3:31   error    Strings must use doublequote      quotes
+    3:44   error    Strings must use doublequote      quotes
+    3:61   error    Strings must use doublequote      quotes
+    3:77   error    Strings must use doublequote      quotes
+    3:97   error    Strings must use doublequote      quotes
+    3:121  error    Strings must use doublequote      quotes
+    7:19   error    'localStorage' is not defined     no-undef
+    9:16   warning  'e' is defined but never used     @typescript-eslint/no-unused-vars
+   15:40   error    Strings must use doublequote      quotes
+   19:30   error    Strings must use doublequote      quotes
+   19:73   error    Strings must use doublequote      quotes
+   27:22   error    'document' is not defined         no-undef
+   27:46   error    Strings must use doublequote      quotes
+   29:35   error    Strings must use doublequote      quotes
+   29:60   error    Strings must use doublequote      quotes
+   35:21   error    'document' is not defined         no-undef
+   36:73   error    Strings must use doublequote      quotes
+   43:50   error    Strings must use doublequote      quotes
+   44:32   error    Strings must use doublequote      quotes
+   44:75   error    Strings must use doublequote      quotes
+   45:30   error    Strings must use doublequote      quotes
+   45:70   error    Strings must use doublequote      quotes
+   46:18   error    'document' is not defined         no-undef
+   46:42   error    Strings must use doublequote      quotes
+   47:21   error    'document' is not defined         no-undef
+   47:45   error    Strings must use doublequote      quotes
+   49:7    error    'document' is not defined         no-undef
+   49:31   error    Strings must use doublequote      quotes
+   50:7    error    'document' is not defined         no-undef
+   50:31   error    Strings must use doublequote      quotes
+   51:7    error    'document' is not defined         no-undef
+   51:31   error    Strings must use doublequote      quotes
+   54:28   error    Strings must use doublequote      quotes
+   55:26   error    Strings must use doublequote      quotes
+   56:31   error    Strings must use doublequote      quotes
+   58:28   error    Strings must use doublequote      quotes
+   59:26   error    Strings must use doublequote      quotes
+   60:31   error    Strings must use doublequote      quotes
+   66:22   error    Strings must use doublequote      quotes
+   66:26   error    Strings must use doublequote      quotes
+   67:7    error    'document' is not defined         no-undef
+   67:31   error    Strings must use doublequote      quotes
+   67:57   error    Strings must use doublequote      quotes
+   71:7    error    'document' is not defined         no-undef
+   71:31   error    Strings must use doublequote      quotes
+   71:60   error    Strings must use doublequote      quotes
+   77:21   error    'document' is not defined         no-undef
+   79:37   error    Strings must use doublequote      quotes
+   81:27   error    Strings must use doublequote      quotes
+   91:9    error    'localStorage' is not defined     no-undef
+   92:24   error    Strings must use doublequote      quotes
+   92:141  error    Strings must use doublequote      quotes
+   96:37   error    Strings must use doublequote      quotes
+   96:90   error    Strings must use doublequote      quotes
+  101:52   error    Strings must use doublequote      quotes
+  101:69   error    Unnecessary escape character: \/  no-useless-escape
+  101:77   error    Strings must use doublequote      quotes
+  101:96   error    Strings must use doublequote      quotes
+  101:116  error    Strings must use doublequote      quotes
+  105:52   error    'location' is not defined         no-undef
+  106:37   error    Strings must use doublequote      quotes
+  106:44   error    Strings must use doublequote      quotes
+  110:20   error    'document' is not defined         no-undef
+  112:50   error    'location' is not defined         no-undef
+  116:27   error    Strings must use doublequote      quotes
+  117:27   error    Strings must use doublequote      quotes
+  119:29   error    Strings must use doublequote      quotes
+  120:32   error    Strings must use doublequote      quotes
+  124:14   error    'navigator' is not defined        no-undef
+  127:18   error    'document' is not defined         no-undef
+  127:41   error    Strings must use doublequote      quotes
+  129:29   error    Strings must use doublequote      quotes
+  130:28   error    Strings must use doublequote      quotes
+  131:9    error    'document' is not defined         no-undef
+  133:9    error    'document' is not defined         no-undef
+  133:30   error    Strings must use doublequote      quotes
+  134:9    error    'document' is not defined         no-undef
+  139:5    error    'document' is not defined         no-undef
+  139:29   error    Strings must use doublequote      quotes
+  139:58   error    Strings must use doublequote      quotes
+  148:20   error    'document' is not defined         no-undef
+  150:29   error    Strings must use doublequote      quotes
+  156:15   error    Strings must use doublequote      quotes
+  157:15   error    Strings must use doublequote      quotes
+  158:15   error    Strings must use doublequote      quotes
+  158:58   error    Strings must use doublequote      quotes
+  159:15   error    Strings must use doublequote      quotes
+  159:57   error    Strings must use doublequote      quotes
+  160:15   error    Strings must use doublequote      quotes
+  161:15   error    Strings must use doublequote      quotes
+  165:1    error    'document' is not defined         no-undef
+  165:27   error    Strings must use doublequote      quotes
+
+D:\Tools\MiniMaster\test\additional-panels-csp-hardening.test.ts
+  38:46  error  Parsing error: ',' expected
+
+D:\Tools\MiniMaster\test\admin-panel-modules.test.ts
+  17:44  warning  'baseDir' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\admin-panel-qa-current-helpers.test.ts
+  26:28  error  Strings must use doublequote  quotes
+  27:28  error  Strings must use doublequote  quotes
+  32:28  error  Strings must use doublequote  quotes
+
+D:\Tools\MiniMaster\test\branch-coverage-support-gaps.test.ts
+  95:7  warning  'asAdmin' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  97:7  warning  'asSupport' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\branch-coverage-support.test.ts
+   89:7   warning  'asOther' is assigned a value but never used                            @typescript-eslint/no-unused-vars
+  717:22  warning  'coll' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  718:17  warning  'id' is defined but never used. Allowed unused args must match /^_/u    @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\child-panel-security.test.ts
+  20:35  error  Strings must use doublequote  quotes
+  25:39  error  Strings must use doublequote  quotes
+  26:35  error  Strings must use doublequote  quotes
+
+D:\Tools\MiniMaster\test\device-sync.test.ts
+  117:9  warning  'eventsDocs' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\e2e-ticket-lifecycle.test.ts
+  96:7  warning  'asSupport' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\master-web-bootstrap-auth.test.ts
+  19:7  warning  'MockTimestamp' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\parent-panel-bootstrap-launch.test.ts
+  11:12  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\Tools\MiniMaster\test\parent-panel-security.test.ts
+  21:35  error  Strings must use doublequote  quotes
+  26:39  error  Strings must use doublequote  quotes
+  27:35  error  Strings must use doublequote  quotes
+
+Ô£û 122 problems (110 errors, 12 warnings)
+  83 errors and 0 warnings potentially fixable with the `--fix` option.
+
