@@ -208,7 +208,7 @@
 
       <div class="inline">
         <a class="btn btn-secondary" href="../parent-panel/index.html" title="Zum Eltern-Panel wechseln und dort einen sicheren Sitzungslink erzeugen">Sicheren Sitzungslink ueber Eltern-Panel holen</a>
-        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
+        <button id="load-own-tickets-btn" class="btn btn-ghost" type="button" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
       </div>
 
       <p class="help">
@@ -250,7 +250,7 @@
       </p>
 
       <div class="inline">
-        <button class="btn btn-primary" type="button" onclick="submitSupportTicket()" title="Support-Ticket einreichen und an den Anbieter senden">Ticket erstellen</button>
+        <button id="submit-support-ticket-btn" class="btn btn-primary" type="button" title="Support-Ticket einreichen und an den Anbieter senden">Ticket erstellen</button>
       </div>
 
       <div id="ticket-submit-status" class="status">Noch kein Ticket gesendet.</div>
@@ -278,7 +278,30 @@
 
     function getAppCheckSiteKey() {
       const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
-      return globalSiteKey || localStorage.getItem("minimasterAppCheckSiteKey");
+      if (globalSiteKey) {
+        return globalSiteKey;
+      }
+
+      const host = typeof window !== "undefined" && window.location ? String(window.location.hostname || "") : "";
+      const isLocalDev = host === "localhost" || host === "127.0.0.1";
+      if (!isLocalDev) {
+        return null;
+      }
+
+      try {
+        return localStorage.getItem("minimasterAppCheckSiteKey");
+      } catch {
+        return null;
+      }
+    }
+
+    function bindUiActions() {
+      document.getElementById("load-own-tickets-btn")?.addEventListener("click", () => {
+        loadOwnTickets();
+      });
+      document.getElementById("submit-support-ticket-btn")?.addEventListener("click", () => {
+        submitSupportTicket();
+      });
     }
 
     function ensureAppCheckConfigured(appInstance, statusElementId) {
@@ -650,6 +673,7 @@
       }
     }
 
+    bindUiActions();
     initFirebase();
     window.authenticateForTickets = authenticateForTickets;
     window.handleDebugConsent = handleDebugConsent;

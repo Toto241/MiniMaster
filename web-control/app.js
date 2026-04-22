@@ -18,10 +18,20 @@ function escapeHtml(text) {
  * @param {string} url - The URL to validate.
  * @returns {boolean} True if the URL is a safe HTTPS URL.
  */
+const SAFE_PHOTO_HOSTS = new Set([
+    "firebasestorage.googleapis.com",
+    "storage.googleapis.com",
+]);
+
 function isSafePhotoUrl(url) {
     try {
         const parsed = new URL(url);
-        return parsed.protocol === "https:";
+        if (parsed.protocol !== "https:") {
+            return false;
+        }
+
+        const hostname = String(parsed.hostname || "").toLowerCase();
+        return SAFE_PHOTO_HOSTS.has(hostname);
     } catch {
         return false;
     }

@@ -1,4 +1,4 @@
-<!D OCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -223,9 +223,9 @@
 
       <div class="inline">
         <a class="btn btn-primary" href="../start.html" title="Von der Startseite oder App mit bestehender Sitzung ins Eltern-Panel wechseln">Sichere Sitzung starten</a>
-        <button class="btn btn-ghost" type="button" onclick="loadOwnTickets()" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
-        <button id="secure-web-control-btn" class="btn btn-green" type="button" onclick="openSecureWebControl()" title="Web-Control mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Web-Control mit Sitzung öffnen</button>
-        <button id="secure-child-panel-btn" class="btn btn-ghost" type="button" onclick="openSecureChildPanel()" title="Kinder-Panel mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Kinder-Panel mit Sitzung öffnen</button>
+        <button id="load-own-tickets-btn" class="btn btn-ghost" type="button" title="Alle bisher eingereichten Tickets abrufen und anzeigen">Meine Tickets laden</button>
+        <button id="secure-web-control-btn" class="btn btn-green" type="button" title="Web-Control mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Web-Control mit Sitzung öffnen</button>
+        <button id="secure-child-panel-btn" class="btn btn-ghost" type="button" title="Kinder-Panel mit bestehender Sitzung sicher öffnen, ohne Secret Key erneut einzugeben" disabled>Kinder-Panel mit Sitzung öffnen</button>
       </div>
 
       <p class="help">
@@ -268,7 +268,7 @@
       </p>
 
       <div class="inline">
-        <button class="btn btn-green" type="button" onclick="submitSupportTicket()" title="Support-Ticket einreichen und an den Anbieter senden">Ticket erstellen</button>
+        <button id="submit-support-ticket-btn" class="btn btn-green" type="button" title="Support-Ticket einreichen und an den Anbieter senden">Ticket erstellen</button>
       </div>
 
       <div id="ticket-submit-status" class="status">Noch kein Ticket gesendet.</div>
@@ -296,7 +296,36 @@
 
     function getAppCheckSiteKey() {
       const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
-      return globalSiteKey || localStorage.getItem("minimasterAppCheckSiteKey");
+      if (globalSiteKey) {
+        return globalSiteKey;
+      }
+
+      const host = typeof window !== "undefined" && window.location ? String(window.location.hostname || "") : "";
+      const isLocalDev = host === "localhost" || host === "127.0.0.1";
+      if (!isLocalDev) {
+        return null;
+      }
+
+      try {
+        return localStorage.getItem("minimasterAppCheckSiteKey");
+      } catch {
+        return null;
+      }
+    }
+
+    function bindUiActions() {
+      document.getElementById("load-own-tickets-btn")?.addEventListener("click", () => {
+        loadOwnTickets();
+      });
+      document.getElementById("secure-web-control-btn")?.addEventListener("click", () => {
+        openSecureWebControl();
+      });
+      document.getElementById("secure-child-panel-btn")?.addEventListener("click", () => {
+        openSecureChildPanel();
+      });
+      document.getElementById("submit-support-ticket-btn")?.addEventListener("click", () => {
+        submitSupportTicket();
+      });
     }
 
     function ensureAppCheckConfigured(appInstance, statusElementId) {
@@ -747,6 +776,7 @@
       }
     }
 
+    bindUiActions();
     initFirebase();
     window.authenticateForTickets = authenticateForTickets;
     window.openSecureWebControl = openSecureWebControl;
