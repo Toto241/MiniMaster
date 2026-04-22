@@ -8,7 +8,7 @@ function loadParentPanelScript(): string {
     // Read the externalized app.js file
     const appSource = readFileSync(appPath, "utf8");
     return appSource.trim();
-  } catch (e) {
+  } catch (_error) {
     // Fallback: try to extract from HTML (legacy support)
     const html = readFileSync(path.join(__dirname, "..", "parent-panel", "index.html"), "utf8");
     const match = html.match(/<script>\s*const FIREBASE_STORAGE_KEY[\s\S]*?<\/script>/);
@@ -90,8 +90,9 @@ function loadParentPanel() {
   });
 
   const locationMock = {
-    href: "https://minimaster.app/parent-panel/index.html",
+    href: "http://localhost/parent-panel/index.html",
     search: "",
+    hostname: "localhost",
     pathname: "/parent-panel/index.html",
     assign: jest.fn(),
   };

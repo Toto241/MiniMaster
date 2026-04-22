@@ -15,8 +15,8 @@ describe("Additional Panels CSP Hardening", () => {
     });
 
     it("replaces inline style display:none with is-hidden class", () => {
-      expect(adminPanelLogsHtml).not.toContain('style="display:none"');
-      expect(adminPanelLogsHtml).toContain('is-hidden');
+      expect(adminPanelLogsHtml).not.toContain("style=\"display:none\"");
+      expect(adminPanelLogsHtml).toContain("is-hidden");
     });
 
     it("has event binding functions in logs.js", () => {
@@ -35,7 +35,7 @@ describe("Additional Panels CSP Hardening", () => {
     });
 
     it("references external start.js file", () => {
-      expect(startHtml).toContain('\''<script src="./start.js"></script>'\'');
+      expect(startHtml).toContain("<script src=\"./start.js\"></script>");
     });
 
     it("has event binding functions in start.js", () => {
@@ -49,7 +49,7 @@ describe("Additional Panels CSP Hardening", () => {
     });
 
     it("references external launcher.js file", () => {
-      expect(launcherHtml).toContain('\''<script src="./launcher.js"></script>'\'');
+      expect(launcherHtml).toContain("<script src=\"./launcher.js\"></script>");
     });
 
     it("has idle timeout setup in launcher.js", () => {

@@ -23,13 +23,13 @@ describe("admin-panel current QA helpers", () => {
   it("keeps the visible QA tab focused on runs, failures and details", () => {
     const html = fs.readFileSync(path.join(process.cwd(), "admin-panel", "index.html"), "utf8");
 
-    expect(html).toContain('id="tab-qa"');
-    expect(html).toContain('id="qa-section-heading"');
+    expect(html).toContain("id=\"tab-qa\"");
+    expect(html).toContain("id=\"qa-section-heading\"");
     expect(html).toContain("QA-Arbeitsfläche");
     expect(html).toContain("Letzte Testläufe, Fehler &amp; Detailansicht");
     expect(html).toContain("qa-test-metrics");
     expect(html).toContain("qa-test-rerun-btn");
-    expect(html).toContain('id="qa-copy-run-log-btn"');
+    expect(html).toContain("id=\"qa-copy-run-log-btn\"");
     expect(html).toContain("Protokoll kopieren");
     expect(html).toContain("qa-secondary-details");
     expect(html).toContain("Nur bei Bedarf öffnen");

@@ -18,7 +18,7 @@ module.exports = {
   ],
   overrides: [
     {
-      files: ['shared-ui-tooltips.js'],
+      files: ['shared-ui-tooltips.js', 'start.js', 'parent-panel/app.js', 'child-panel/app.js'],
       env: {
         browser: true,
       },
@@ -28,6 +28,10 @@ module.exports = {
       globals: {
         MutationObserver: 'readonly',
         Node: 'readonly',
+        firebase: 'readonly',
+        localStorage: 'readonly',
+        navigator: 'readonly',
+        location: 'readonly',
       },
     },
   ],
