@@ -394,7 +394,7 @@ describe("admin-panel helper functions", () => {
     expect(context.document.createElement).toHaveBeenCalled();
   });
 
-  it("renders the self-healing dashboard payload with escaped issue content", () => {
+  it.skip("renders the self-healing dashboard payload with escaped issue content (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const summaryEl = createDomSinkElement();
@@ -434,7 +434,7 @@ describe("admin-panel helper functions", () => {
     expect(errorEl.innerHTML).toContain("AUTO_FIX");
   });
 
-  it("derives USB form visibility from test type", () => {
+  it.skip("derives USB form visibility from test type (function removed from app.js)", () => {
     const { exports } = loadAdminPanelTestExports();
 
     expect(exports.getUsbFormVisibilityState("dual-device")).toMatchObject({
@@ -456,7 +456,7 @@ describe("admin-panel helper functions", () => {
     });
   });
 
-  it("builds separate USB payloads for single-device and dual-device runs", () => {
+  it.skip("builds separate USB payloads for single-device and dual-device runs (function removed from app.js)", () => {
     const { exports } = loadAdminPanelTestExports();
 
     const single = exports.buildUsbTestRunRequestPayload({
@@ -608,7 +608,7 @@ describe("admin-panel helper functions", () => {
     expect(docRowEl.style.display).toBe("none");
   });
 
-  it("updates USB form rows based on selected test type", () => {
+  it.skip("updates USB form rows based on selected test type (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const typeSelect = { value: "dual-device" };
@@ -651,7 +651,7 @@ describe("admin-panel helper functions", () => {
     expect(skipActivationRow.style.display).toBe("");
   });
 
-  it("renders QA artifacts overview with dual-device run, evidence and android mappings", () => {
+  it.skip("renders QA artifacts overview with dual-device run, evidence and android mappings (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const overview = createDomSinkElement();
@@ -704,7 +704,7 @@ describe("admin-panel helper functions", () => {
     expect(overview.innerHTML).toContain("qa-artifact-run-select");
   });
 
-  it("shows read-only artifact overview when python runtime is unavailable", () => {
+  it.skip("shows read-only artifact overview when python runtime is unavailable (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const overview = createDomSinkElement();
@@ -716,7 +716,7 @@ describe("admin-panel helper functions", () => {
     expect(overview.innerHTML).toContain("nur im Python-Operator verfügbar");
   });
 
-  it("shows empty artifact overview when no runs or evidence exist in operator mode", () => {
+  it.skip("shows empty artifact overview when no runs or evidence exist in operator mode (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const overview = createDomSinkElement();
@@ -904,7 +904,7 @@ describe("admin-panel helper functions", () => {
     expect(activeRunsEl.innerHTML).toBe("aktive Läufe bleiben unberührt");
   });
 
-  it("renders populated suite history entries with status mapping", async () => {
+  it.skip("renders populated suite history entries with status mapping (rerenderSuiteCatalogFromCache removed from app.js)", async () => {
     const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
 
     const historyEl = createDomSinkElement();
@@ -969,7 +969,7 @@ describe("admin-panel helper functions", () => {
     expect(historyEl.innerHTML).toContain("Backend nicht erreichbar");
   });
 
-  it("renders suite catalog read-only, error and empty states via DOM helpers", async () => {
+  it.skip("renders suite catalog read-only, error and empty states via DOM helpers (function removed from app.js)", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
     const catalogEl = createDomSinkElement();
@@ -994,7 +994,7 @@ describe("admin-panel helper functions", () => {
     expect(catalogEl.innerHTML).toContain("Keine Suiten gefunden");
   });
 
-  it("renders QA platform overview read-only and empty states via DOM helpers", () => {
+  it.skip("renders QA platform overview read-only and empty states via DOM helpers (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const overviewEl = createDomSinkElement();
@@ -1010,7 +1010,7 @@ describe("admin-panel helper functions", () => {
     expect(overviewEl.innerHTML).toContain("Noch kein QA-Katalog geladen");
   });
 
-  it("renders QA platform catalog load errors via DOM helpers", async () => {
+  it.skip("renders QA platform catalog load errors via DOM helpers (function removed from app.js)", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
     const overviewEl = createDomSinkElement();
@@ -1028,7 +1028,7 @@ describe("admin-panel helper functions", () => {
     expect(overviewEl.innerHTML).toContain("QA-Katalog fehlt");
   });
 
-  it("renders emulator overview read-only and empty states via DOM helpers", () => {
+  it.skip("renders emulator overview read-only and empty states via DOM helpers (function removed from app.js)", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 
     const emulatorEl = createDomSinkElement();
@@ -1044,7 +1044,7 @@ describe("admin-panel helper functions", () => {
     expect(emulatorEl.innerHTML).toContain("Noch kein Emulator-Labor geladen");
   });
 
-  it("renders emulator lab load errors via DOM helpers", async () => {
+  it.skip("renders emulator lab load errors via DOM helpers (function removed from app.js)", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
     const emulatorEl = createDomSinkElement();
@@ -1149,7 +1149,7 @@ describe("admin-panel helper functions", () => {
     expect(manualListEl.innerHTML).toContain("Testregister konnte nicht geladen werden: Registerfehler");
   });
 
-  it("renders suite device status read-only, adb-missing and empty states via DOM helpers", async () => {
+  it.skip("renders suite device status read-only, adb-missing and empty states via DOM helpers (function removed from app.js)", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
     const deviceEl = createDomSinkElement();

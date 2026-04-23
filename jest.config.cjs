@@ -21,7 +21,6 @@ const config = {
   coverageReporters: ['text', 'lcov', 'cobertura', 'json'],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/test/admin-panel-helpers.test.ts',
   ],
   coveragePathIgnorePatterns: ['/node_modules/', '/test/', '/src/affiliate.ts', '/src/b2b-licensing.ts'],
   coverageThreshold: {
