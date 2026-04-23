@@ -5,8 +5,6 @@
  * Legal note: All prices are stored net (without VAT). VAT is added at checkout
  * based on the customer's billing country per EU VAT OSS rules.
  */
-import * as functions from "firebase-functions/v1";
-
 // ==================== B2C TIER CONFIGURATION ====================
 
 export interface B2CTier {

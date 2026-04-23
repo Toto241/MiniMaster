@@ -23,8 +23,8 @@ import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../firebase";
 import { requireAuth, validateAppCheck, AuditLogger } from "./shared";
-import { validateString, validateNumber, validateBoolean, validateObject } from "./validation";
-import { withErrorHandling } from "./error-handler";
+
+
 
 // ------------------------------------------------------------------ Types --
 
@@ -280,7 +280,7 @@ export const publishDeviceEvent = functions.https.onCall(
     const eventsRef = childRef.collection("events");
     const existing = await eventsRef.where("idempotencyKey", "==", idempotencyKey).limit(1).get();
     if (!existing.empty) {
-      const doc = existing.docs[0];
+      const doc = existing.docs[0]!;
       functions.logger.info(`Duplicate event suppressed for child ${childId}, key: ${idempotencyKey}`);
       return { eventId: doc.id, receivedAt: doc.data().createdAt };
     }
@@ -363,7 +363,7 @@ export const fetchPendingCommands = functions.https.onCall(
     const snap = await query.get();
     const commands = snap.docs.map((d) => ({ ...d.data() }));
     const nextCursor = snap.docs.length === maxItems
-      ? snap.docs[snap.docs.length - 1].id
+      ? snap.docs[snap.docs.length - 1]!.id
       : null;
 
     const policyVersion = (childDoc.data()?.policyVersion as number) || 0;

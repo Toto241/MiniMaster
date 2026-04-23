@@ -12,10 +12,10 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
-import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
-import { validateString, validateNumber, validateBoolean } from "./validation";
+import { requireAuth, requireAdmin, validateAppCheck, AuditLogger } from "./shared";
+import { validateString } from "./validation";
 import { withErrorHandling } from "./error-handler";
-import { B2B_TIERS, getTierBySku, isB2BSku } from "./pricing-config";
+import { B2B_TIERS } from "./pricing-config";
 
 // ==================== TYPES ====================
 
@@ -107,9 +107,9 @@ export const createB2BOrganization = functions.https.onCall(
         type: orgType,
         licenseTier,
         status: "pending",
-        maxDevices: tier.maxDevices,
+        maxDevices: tier!.maxDevices,
         currentDevices: 0,
-        maxAdmins: tier.maxAdmins,
+        maxAdmins: tier!.maxAdmins,
         billingEmail,
         billingAddress: data.billingAddress || "",
         vatId: data.vatId || "",
@@ -183,7 +183,7 @@ export const activateB2BLicense = functions.https.onCall(
 
       const now = admin.firestore.Timestamp.now();
       const tier = B2B_TIERS[orgData.licenseTier];
-      const durationMs = tier.billingPeriod === "yearly"
+      const durationMs = tier!.billingPeriod === "yearly"
         ? 365 * 24 * 60 * 60 * 1000
         : 30 * 24 * 60 * 60 * 1000;
       const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + durationMs);
@@ -225,7 +225,7 @@ export const getB2BLicenseStatus = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "No organization found for this user.");
       }
 
-      const adminData = adminSnapshot.docs[0].data();
+      const adminData = adminSnapshot.docs[0]!.data();
       const orgId = adminData.orgId;
 
       const orgDoc = await db().collection("b2b_organizations").doc(orgId).get();

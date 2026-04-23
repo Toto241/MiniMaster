@@ -112,7 +112,7 @@ async function validatePhotoObjectMetadata(
     return;
   }
 
-  const contentType = String(metadata.contentType || "").toLowerCase().split(";")[0].trim();
+  const contentType = String(metadata!.contentType || "").toLowerCase().split(";")[0]!.trim();
   if (!contentType || !ALLOWED_PHOTO_MIME_TYPES.has(contentType)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -253,7 +253,7 @@ export const completeTask = functions.https.onCall(
       }
       let decodedPath: string;
       try {
-        decodedPath = decodeURIComponent(objectMatch[1]);
+        decodedPath = decodeURIComponent(objectMatch[1]!);
       } catch {
         throw new functions.https.HttpsError("invalid-argument", "photoUrl object path is not properly URL-encoded.");
       }

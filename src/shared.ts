@@ -165,7 +165,15 @@ export type AuditAction =
   | "subscription.reverify"
   | "system.heartbeat"
   | "system.error"
-  | "operator.setup_checklist_update";
+  | "operator.setup_checklist_update"
+  | "affiliate.register"
+  | "admin.affiliate.review"
+  | "admin.affiliate.payouts"
+  | "admin.b2b.create"
+  | "admin.b2b.activate"
+  | "admin.b2b.add_device"
+  | "admin.b2b.remove_device"
+  | "admin.b2b.revoke";
 
 export interface AuditLog {
   timestamp: admin.firestore.Timestamp;

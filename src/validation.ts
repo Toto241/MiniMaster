@@ -8,12 +8,10 @@ import * as functions from "firebase-functions/v1";
 // ==================== CONSTANTS ====================
 
 const MAX_STRING_LENGTH = 4096;
-const MAX_DESCRIPTION_LENGTH = 2000;
 const MAX_TASK_DESCRIPTION_LENGTH = 500;
 const MAX_REASON_LENGTH = 500;
 const MAX_URL_LENGTH = 2048;
 const MAX_ID_LENGTH = 256;
-const ALLOWED_HTML_TAGS: string[] = [];
 
 // ==================== SANITIZATION ====================
 

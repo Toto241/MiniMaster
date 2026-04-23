@@ -78,8 +78,6 @@ setInterval(() => {
 // ==================== FIRESTORE BACKEND ====================
 
 const RATE_LIMIT_COLLECTION = "_rate_limits";
-const FIRESTORE_BACKOFF_MS = 500; // max time to wait for Firestore
-
 async function checkFirestoreRateLimit(
   key: string,
   config: RateLimitConfig,
@@ -213,9 +211,9 @@ export async function checkDistributedRateLimit(
   const configKey = `${userRole}_${action}`;
   const defaultConfig = DEFAULT_LIMITS[configKey] || DEFAULT_LIMITS[`${userRole}_default`] || DEFAULT_LIMITS.master_default;
   const config: RateLimitConfig = {
-    ...defaultConfig,
+    ...(defaultConfig || { maxRequests: 100, windowMs: 60000 }),
     ...options,
-  };
+  } as RateLimitConfig;
 
   const result = await checkFirestoreRateLimit(key, config, now);
 
@@ -300,7 +298,7 @@ export async function getRateLimitMetrics(): Promise<{
     for (const doc of snapshot.docs) {
       const parts = doc.id.split(":");
       if (parts.length >= 2) {
-        const action = parts[1];
+        const action = parts[1]!;
         actionCounts[action] = (actionCounts[action] || 0) + 1;
       }
     }

@@ -19,7 +19,7 @@ export function getAdminApp(): App {
       initializeApp({ credential: applicationDefault() });
     }
   }
-  return getApps()[0];
+  return getApps()[0]!;
 }
 
 /**
