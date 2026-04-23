@@ -17,12 +17,13 @@ import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
 import { validateSku, validateString } from "./validation";
 import { withResilience, fetchWithTimeout } from "./resilience";
-import { withErrorHandling } from "./error-handler";
 import {
   B2C_TIERS, B2B_TIERS, VALID_PRODUCT_IDS,
   getChildLimit, getParentAppLimit, getSubscriptionDurationMs,
-  isB2CSku, isB2BSku,
 } from "./pricing-config";
+
+const DEFAULT_PARENT_APP_LIMIT = 2;
+const DEFAULT_CHILD_LIMIT = 4;
 
 // Re-export for backward compatibility
 export { VALID_PRODUCT_IDS, getChildLimit, getParentAppLimit, getSubscriptionDurationMs };
@@ -98,7 +99,7 @@ export const verifyPurchase = functions.https.onCall(
             status: "active",
             type: sku,
             tierName: tier?.name || sku,
-            isPremium: tier?.isPremium || false,
+            isPremium: (tier as any)?.isPremium || false,
             parentAppLimit: getParentAppLimit(sku),
             childLimit: getChildLimit(sku),
             startedAt: now,
@@ -222,7 +223,7 @@ export const revokeSubscription = functions.https.onCall(
           .limit(1)
           .get();
         if (!candidate.empty) {
-          subscriptionId = candidate.docs[0].id;
+          subscriptionId = candidate.docs[0]!.id;
         }
       }
 
@@ -415,7 +416,7 @@ type AppleTransactionResponse = {
  * @param originalTransactionId The StoreKit 2 `transaction.originalID`.
  * @returns { valid: boolean; expiresDateMs?: number }
  */
-async function verifyAppleTransaction(
+export async function verifyAppleTransaction(
   originalTransactionId: string
 ): Promise<{ valid: boolean; expiresDateMs?: number }> {
   const jwt = signAppleJWT();
@@ -555,7 +556,7 @@ export async function applyRtdnNotification(
     return { handled: false, reason: "master_not_found", notificationType: sub.notificationType };
   }
 
-  const doc = snapshot.docs[0];
+  const doc = snapshot.docs[0]!;
   const masterId = doc.id;
   const now = admin.firestore.Timestamp.now();
 

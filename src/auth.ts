@@ -8,11 +8,8 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
-import { requireAdmin, AuditLogger, checkRateLimit, validateAppCheck } from "./shared";
+import { requireAdmin, requireAuth, AuditLogger, checkRateLimit, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
-import { validateString, validateNumber, validateDeviceId } from "./validation";
-import { withErrorHandling } from "./error-handler";
-
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
 const MASTER_WEB_BOOTSTRAP_QUERY_PARAM = "bootstrapToken";
 const DEFAULT_MASTER_WEB_BOOTSTRAP_TTL_MINUTES = 10;
@@ -401,7 +398,7 @@ export const redeemMasterWebBootstrapToken = functions.https.onCall(
         throw new functions.https.HttpsError("permission-denied", "Bootstrap-Token ist ungültig oder wurde widerrufen.");
       }
 
-      const tokenRef = querySnapshot.docs[0].ref;
+      const tokenRef = querySnapshot.docs[0]!.ref;
 
       const redeemed = await db().runTransaction(async (tx) => {
         const tokenDoc = await tx.get(tokenRef);
@@ -566,7 +563,7 @@ export const redeemOperatorAccessKey = functions.https.onCall(
       throw new functions.https.HttpsError("permission-denied", "Schlüssel ist ungültig oder wurde widerrufen.");
     }
 
-    const keyRef = querySnapshot.docs[0].ref;
+    const keyRef = querySnapshot.docs[0]!.ref;
 
     const grantedRole = await db().runTransaction(async (tx) => {
       const keyDoc = await tx.get(keyRef);
