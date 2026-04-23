@@ -13,7 +13,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
-import { validateString, validateNumber } from "./validation";
+import { validateString } from "./validation";
 import { withErrorHandling } from "./error-handler";
 import { AFFILIATE_CONFIG, B2C_TIERS } from "./pricing-config";
 
@@ -72,7 +72,7 @@ export const registerAffiliate = functions.https.onCall(
         .get();
 
       if (!existing.empty) {
-        const existingData = existing.docs[0].data();
+        const existingData = existing.docs[0]!.data();
         if (existingData.status === "active") {
           throw new functions.https.HttpsError("already-exists", "An affiliate account with this email already exists.");
         }
@@ -189,7 +189,7 @@ export const trackAffiliateConversion = functions.https.onCall(
         return { success: false, reason: "affiliate_not_found_or_inactive" };
       }
 
-      const affiliateDoc = affiliateSnapshot.docs[0];
+      const affiliateDoc = affiliateSnapshot.docs[0]!;
       const affiliateData = affiliateDoc.data();
 
       // Check for duplicate referral
@@ -211,7 +211,7 @@ export const trackAffiliateConversion = functions.https.onCall(
 
       // Create referral record
       await db().collection("affiliate_referrals").add({
-        affiliateId: affiliateDoc.id,
+        affiliateId: affiliateDoc!.id,
         masterId,
         subscriptionId,
         sku: data.sku,
@@ -223,7 +223,7 @@ export const trackAffiliateConversion = functions.https.onCall(
       });
 
       // Update affiliate stats
-      await affiliateDoc.ref.update({
+      await affiliateDoc!.ref.update({
         totalReferrals: admin.firestore.FieldValue.increment(1),
         pendingEarningsCents: admin.firestore.FieldValue.increment(commissionCents),
         totalEarningsCents: admin.firestore.FieldValue.increment(commissionCents),
@@ -232,7 +232,7 @@ export const trackAffiliateConversion = functions.https.onCall(
 
       // Link master to affiliate for recurring commissions
       await db().collection("masters").doc(masterId).update({
-        affiliateId: affiliateDoc.id,
+        affiliateId: affiliateDoc!.id,
         affiliateCode: code,
         referredAt: now,
       });
@@ -262,7 +262,7 @@ export const getAffiliateDashboard = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "No affiliate account found.");
       }
 
-      const affiliateDoc = affiliateSnapshot.docs[0];
+      const affiliateDoc = affiliateSnapshot.docs[0]!;
       const affiliateData = affiliateDoc.data();
 
       // Get recent referrals

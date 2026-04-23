@@ -171,7 +171,7 @@ function mapPolicyDoc(doc: admin.firestore.DocumentSnapshot): EffectivePolicy | 
 }
 
 async function findActivePolicy(policyType: PolicyType, country: string, locale: string): Promise<EffectivePolicy> {
-  const language = locale.split("-")[0].toLowerCase();
+  const language = locale.split("-")[0]!.toLowerCase();
   const normalizedLocale = locale;
   const localeCandidates = [
     normalizedLocale,
@@ -190,7 +190,7 @@ async function findActivePolicy(policyType: PolicyType, country: string, locale:
       .get();
 
     if (!snap.empty) {
-      const policy = mapPolicyDoc(snap.docs[0]);
+      const policy = mapPolicyDoc(snap.docs[0]!);
       if (policy) return policy;
     }
   }
@@ -204,7 +204,7 @@ async function findActivePolicy(policyType: PolicyType, country: string, locale:
     .get();
 
   if (!globalSnap.empty) {
-    const policy = mapPolicyDoc(globalSnap.docs[0]);
+    const policy = mapPolicyDoc(globalSnap.docs[0]!);
     if (policy) return policy;
   }
 
