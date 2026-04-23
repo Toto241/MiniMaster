@@ -211,7 +211,6 @@ private struct TaskRowView: View {
 // MARK: - CommandSyncService extension (task fetch convenience)
 
 extension CommandSyncService {
-    var pendingCommandCount: Int { 0 } // Replace with actual published state
     func fetchTasks(childId: String) async throws -> [ChildTask] {
         let raw = try await client.getTasks(childId: childId)
         return raw.map {

@@ -16,6 +16,8 @@ final class CommandSyncService: ObservableObject {
 
     @Published private(set) var isSyncing = false
     @Published private(set) var syncError: Error?
+    @Published private(set) var lastSyncDate: Date?
+    @Published private(set) var pendingCommandCount: Int = 0
 
     let client: ChildCloudFunctionsClient
     private let policyStore: PolicyStore
@@ -94,11 +96,12 @@ final class CommandSyncService: ObservableObject {
 
             // Also apply pending critical commands in snapshot
             let criticals = snapshot["pendingCriticalCommands"] as? [[String: Any]] ?? []
+            pendingCommandCount = criticals.count
             for raw in criticals {
                 guard let command = DeviceCommand.from(raw) else { continue }
                 await applyAndAck(command: command, childId: childId)
             }
-
+            pendingCommandCount = 0
             lastSyncDate = Date()
         } catch {
             syncError = error
@@ -119,6 +122,7 @@ final class CommandSyncService: ObservableObject {
             if let next = nextCursor {
                 await fetchAndApplyAllCommands(childId: childId, cursor: next)
             }
+            pendingCommandCount = 0
             lastSyncDate = Date()
         } catch {
             syncError = error

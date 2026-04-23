@@ -21,11 +21,13 @@ final class PolicyStore: ObservableObject {
             policy = PolicyState()
         }
     }
-            @Published private(set) var lastSyncDate: Date?
+
+    @Published private(set) var lastSyncDate: Date?
+
     func apply(_ newPolicy: PolicyState) {
         policy = newPolicy
         persist()
-            lastSyncDate = Date()
+        lastSyncDate = Date()
     }
 
     func apply(command: DeviceCommand) {
