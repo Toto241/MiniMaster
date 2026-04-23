@@ -4963,3 +4963,27 @@ input:focus, select:focus, textarea:focus {
 #operator-readiness-card .status-badge.status-ok { background: #d6f5d6; color: #1a6e1a; }
 #operator-readiness-card .status-badge.status-warning { background: #fff3cd; color: #8a6d00; }
 #operator-readiness-card .status-badge.status-error { background: #fde2e2; color: #a01818; }
+
+/* ==================== PLATFORM BADGES ==================== */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.badge-active { background: #d6f5d6; color: #1a6e1a; }
+.badge-expired { background: #fde2e2; color: #a01818; }
+.badge-android { background: #e8f5e9; color: #2e7d32; }
+.badge-ios { background: #f3e5f5; color: #6a1b9a; }
+
+/* ==================== PRICING PLATFORM LABELS ==================== */
+.pricing-platforms {
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+.pricing-platforms .badge {
+    margin-right: 4px;
+}

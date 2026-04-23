@@ -55,18 +55,25 @@ export function createPricingManagement(container) {
 function renderPricing() {
   // B2C tiers (hardcoded from pricing-config.ts)
   const b2cTiers = [
-    { sku: "single_child_monthly", name: "Single Child (Monthly)", price: "4,99 €", period: "monthly", childLimit: 1, parentLimit: 2 },
-    { sku: "family_monthly", name: "Family (Monthly)", price: "9,99 €", period: "monthly", childLimit: 4, parentLimit: 2 },
-    { sku: "single_child_yearly", name: "Single Child (Yearly)", price: "39,99 €", period: "yearly", childLimit: 1, parentLimit: 2 },
-    { sku: "family_yearly", name: "Family (Yearly)", price: "79,99 €", period: "yearly", childLimit: 4, parentLimit: 2 },
-    { sku: "family_yearly_premium", name: "Family Premium (Yearly)", price: "99,99 €", period: "yearly", childLimit: 6, parentLimit: 3, isPremium: true },
+    { sku: "single_child_monthly", name: "Single Child (Monthly)", price: "4,99 €", period: "monthly", childLimit: 1, parentLimit: 2, platforms: ["android", "ios"] },
+    { sku: "family_monthly", name: "Family (Monthly)", price: "9,99 €", period: "monthly", childLimit: 4, parentLimit: 2, platforms: ["android", "ios"] },
+    { sku: "single_child_yearly", name: "Single Child (Yearly)", price: "39,99 €", period: "yearly", childLimit: 1, parentLimit: 2, platforms: ["android", "ios"] },
+    { sku: "family_yearly", name: "Family (Yearly)", price: "79,99 €", period: "yearly", childLimit: 4, parentLimit: 2, platforms: ["android", "ios"] },
+    { sku: "family_yearly_premium", name: "Family Premium (Yearly)", price: "99,99 €", period: "yearly", childLimit: 6, parentLimit: 3, isPremium: true, platforms: ["android", "ios"] },
   ];
+
+  function platformBadge(platform) {
+    if (platform === "android") return '<span class="badge badge-android" title="Google Play">🤖 Android</span>';
+    if (platform === "ios") return '<span class="badge badge-ios" title="Apple App Store">🍎 iOS</span>';
+    return '';
+  }
 
   document.getElementById("b2c-pricing").innerHTML = b2cTiers.map((tier) => `
     <div class="pricing-card ${tier.isPremium ? "premium" : ""}">
       <div class="pricing-name">${escapeHtml(tier.name)}</div>
       <div class="pricing-price">${tier.price}<span class="pricing-period">/${tier.period}</span></div>
       <div class="pricing-limits">${tier.childLimit} children · ${tier.parentLimit} parent apps</div>
+      <div class="pricing-platforms">${tier.platforms.map(platformBadge).join(" ")}</div>
       <div class="pricing-sku"><code>${tier.sku}</code></div>
     </div>
   `).join("");
