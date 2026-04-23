@@ -174,7 +174,7 @@ beforeEach(() => {
                 return Promise.resolve({ exists: !!d, data: () => d, id, ref: docRef });
               }),
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             return { id, exists: true, data: () => data, ref: docRef };
           });
@@ -249,7 +249,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [], empty: true, size: 0 })) })),
           },
         }));
@@ -258,12 +258,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -272,7 +272,7 @@ beforeEach(() => {
     };
   });
 
-  (db as any).runTransaction = jest.fn(async (callback: (tx: any) => Promise<any>) => {
+  (db).runTransaction = jest.fn(async (callback: (tx: any) => Promise<any>) => {
     const tx = {
       get: jest.fn(async (ref: any) => {
         const snap = await ref.get();

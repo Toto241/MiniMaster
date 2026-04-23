@@ -152,7 +152,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             docRef.collection = jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
@@ -249,7 +249,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [], empty: true, size: 0 })) })),
           },
         }));
@@ -260,12 +260,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -1324,7 +1324,7 @@ describe("device.ts branch coverage", () => {
       await expect(wrapped({
         childId: "c1",
         usageRules: { dailyLimit: 120, bedtimeStart: "abc", bedtimeEnd: "07:00" },
-      }, asMaster)).rejects.toThrow(/HH:MM/);
+      }, asMaster)).rejects.toThrow(/bedtimeStart format is invalid./);
     });
 
     it("throws invalid-argument for bad bedtimeEnd", async () => {
@@ -1332,7 +1332,7 @@ describe("device.ts branch coverage", () => {
       await expect(wrapped({
         childId: "c1",
         usageRules: { dailyLimit: 120, bedtimeStart: "21:00", bedtimeEnd: "abc" },
-      }, asMaster)).rejects.toThrow(/HH:MM/);
+      }, asMaster)).rejects.toThrow(/bedtimeEnd format is invalid./);
     });
 
     it("throws permission-denied for foreign child", async () => {
@@ -1450,10 +1450,10 @@ describe("pairing.ts – generatePairingLink & validatePairingToken", () => {
     it("validates token successfully", async () => {
       const adminMod = require("firebase-admin");
       const futureTs = new adminMod.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-      state.pairingTokens.tok1 = { expiresAt: futureTs, masterId: "m1" };
+      state.pairingTokens["11111111-1111-1111-1111-111111111111"] = { expiresAt: futureTs, masterId: "m1" };
       state.masters.m1.subscription = { status: "active", childLimit: 5 };
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      const res = await wrapped({ pairingToken: "tok1" }, asChild);
+      const res = await wrapped({ pairingToken: "11111111-1111-1111-1111-111111111111" }, asChild);
       expect(res.childId).toBeDefined();
     });
 
@@ -1466,52 +1466,52 @@ describe("pairing.ts – generatePairingLink & validatePairingToken", () => {
     it("throws when token expired", async () => {
       const adminMod = require("firebase-admin");
       const pastTs = new adminMod.firestore.Timestamp(100, 0);
-      state.pairingTokens.tok_exp = { expiresAt: pastTs, masterId: "m1" };
+      state.pairingTokens["66666666-6666-6666-6666-666666666666"] = { expiresAt: pastTs, masterId: "m1" };
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      await expect(wrapped({ pairingToken: "tok_exp" }, asChild))
+      await expect(wrapped({ pairingToken: "66666666-6666-6666-6666-666666666666" }, asChild))
         .rejects.toThrow(/expired/);
     });
 
     it("throws when token data is missing (null data)", async () => {
-      state.pairingTokens.tok_empty = null;
+      state.pairingTokens["77777777-7777-7777-7777-777777777777"] = null;
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      await expect(wrapped({ pairingToken: "tok_empty" }, asChild))
+      await expect(wrapped({ pairingToken: "77777777-7777-7777-7777-777777777777" }, asChild))
         .rejects.toThrow(/missing|invalid/);
     });
 
     it("throws when expiresAt not a Timestamp", async () => {
-      state.pairingTokens.tok_bad = { expiresAt: "not-a-timestamp", masterId: "m1" };
+      state.pairingTokens["88888888-8888-8888-8888-888888888888"] = { expiresAt: "not-a-timestamp", masterId: "m1" };
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      await expect(wrapped({ pairingToken: "tok_bad" }, asChild))
+      await expect(wrapped({ pairingToken: "88888888-8888-8888-8888-888888888888" }, asChild))
         .rejects.toThrow(/data structure/);
     });
 
     it("throws when masterId missing", async () => {
       const adminMod = require("firebase-admin");
       const futureTs = new adminMod.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-      state.pairingTokens.tok_noid = { expiresAt: futureTs };
+      state.pairingTokens["99999999-9999-9999-9999-999999999999"] = { expiresAt: futureTs };
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      await expect(wrapped({ pairingToken: "tok_noid" }, asChild))
+      await expect(wrapped({ pairingToken: "99999999-9999-9999-9999-999999999999" }, asChild))
         .rejects.toThrow(/masterId/);
     });
 
     it("throws when master has expired subscription", async () => {
       const adminMod = require("firebase-admin");
       const futureTs = new adminMod.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-      state.pairingTokens.tok_sub = { expiresAt: futureTs, masterId: "m1" };
+      state.pairingTokens["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"] = { expiresAt: futureTs, masterId: "m1" };
       state.masters.m1.subscription = { status: "expired" };
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      await expect(wrapped({ pairingToken: "tok_sub" }, asChild))
+      await expect(wrapped({ pairingToken: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }, asChild))
         .rejects.toThrow(/subscription|trial/);
     });
 
     it("throws when child limit reached", async () => {
       const adminMod = require("firebase-admin");
       const futureTs = new adminMod.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-      state.pairingTokens.tok_lim = { expiresAt: futureTs, masterId: "m1" };
+      state.pairingTokens["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"] = { expiresAt: futureTs, masterId: "m1" };
       state.masters.m1.subscription = { status: "active", childLimit: 1 };
       const wrapped = testEnv.wrap(fns.validatePairingToken);
-      await expect(wrapped({ pairingToken: "tok_lim" }, asChild))
+      await expect(wrapped({ pairingToken: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" }, asChild))
         .rejects.toThrow(/Child limit/);
     });
 
@@ -1533,8 +1533,8 @@ describe("triggers.ts branch coverage", () => {
         const event = {
           params: { childId: "c1" },
           data: {
-            before: { data: () => ({ fcmToken: "tok1", isLocked: false, appBlacklist: [], usageRules: {} }) },
-            after: { data: () => ({ fcmToken: "tok1", isLocked: true, appBlacklist: [], usageRules: {} }) },
+            before: { data: () => ({ fcmToken: "child-fcm-tok1", isLocked: false, appBlacklist: [], usageRules: {} }) },
+            after: { data: () => ({ fcmToken: "child-fcm-tok1", isLocked: true, appBlacklist: [], usageRules: {} }) },
           },
         };
         await fns.onChildDeviceUpdateV2.run(event);
@@ -1547,8 +1547,8 @@ describe("triggers.ts branch coverage", () => {
         const event = {
           params: { childId: "c1" },
           data: {
-            before: { data: () => ({ fcmToken: "tok2", isLocked: false, appBlacklist: [], usageRules: {} }) },
-            after: { data: () => ({ fcmToken: "tok2", isLocked: false, appBlacklist: ["com.game"], usageRules: {} }) },
+            before: { data: () => ({ fcmToken: "child-fcm-tok2", isLocked: false, appBlacklist: [], usageRules: {} }) },
+            after: { data: () => ({ fcmToken: "child-fcm-tok2", isLocked: false, appBlacklist: ["com.game"], usageRules: {} }) },
           },
         };
         await fns.onChildDeviceUpdateV2.run(event);
@@ -1561,8 +1561,8 @@ describe("triggers.ts branch coverage", () => {
         const event = {
           params: { childId: "c1" },
           data: {
-            before: { data: () => ({ fcmToken: "tok3", isLocked: false, appBlacklist: [], usageRules: {} }) },
-            after: { data: () => ({ fcmToken: "tok3", isLocked: false, appBlacklist: [], usageRules: { dailyLimit: 60 } }) },
+            before: { data: () => ({ fcmToken: "child-fcm-tok3", isLocked: false, appBlacklist: [], usageRules: {} }) },
+            after: { data: () => ({ fcmToken: "child-fcm-tok3", isLocked: false, appBlacklist: [], usageRules: { dailyLimit: 60 } }) },
           },
         };
         await fns.onChildDeviceUpdateV2.run(event);
@@ -1575,8 +1575,8 @@ describe("triggers.ts branch coverage", () => {
         const event = {
           params: { childId: "c1" },
           data: {
-            before: { data: () => ({ fcmToken: "tok4", isLocked: false, appBlacklist: [], usageRules: {}, name: "old" }) },
-            after: { data: () => ({ fcmToken: "tok4", isLocked: false, appBlacklist: [], usageRules: {}, name: "new" }) },
+            before: { data: () => ({ fcmToken: "child-fcm-tok4", isLocked: false, appBlacklist: [], usageRules: {}, name: "old" }) },
+            after: { data: () => ({ fcmToken: "child-fcm-tok4", isLocked: false, appBlacklist: [], usageRules: {}, name: "new" }) },
           },
         };
         await fns.onChildDeviceUpdateV2.run(event);
@@ -1603,7 +1603,7 @@ describe("triggers.ts branch coverage", () => {
         const event = {
           params: { childId: "c1" },
           data: {
-            before: { data: () => ({ fcmToken: "tok", isLocked: false }) },
+            before: { data: () => ({ fcmToken: "child-fcm-token", isLocked: false }) },
             after: { data: () => null },
           },
         };
@@ -1618,7 +1618,7 @@ describe("triggers.ts branch coverage", () => {
           params: { childId: "c1" },
           data: {
             before: { data: () => null },
-            after: { data: () => ({ fcmToken: "tok", isLocked: true }) },
+            after: { data: () => ({ fcmToken: "child-fcm-token", isLocked: true }) },
           },
         };
         await fns.onChildDeviceUpdateV2.run(event);

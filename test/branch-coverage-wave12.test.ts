@@ -157,7 +157,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             docRef.collection = jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
@@ -262,13 +262,13 @@ beforeEach(() => {
     };
   });
 
-  (db as any).batch = jest.fn(() => ({
+  (db).batch = jest.fn(() => ({
     update: jest.fn(),
     delete: jest.fn(),
     commit: jest.fn().mockResolvedValue(undefined),
   }));
 
-  (db as any).collectionGroup = jest.fn(() => ({
+  (db).collectionGroup = jest.fn(() => ({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   }));
@@ -452,7 +452,7 @@ describe("pairing.ts validatePairingToken subscription denied path", () => {
   it("validatePairingToken when master has no active subscription → resource-exhausted (L224)", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 86400, 0);
-    state.pairingTokens["token-abc"] = { masterId: "m1", expiresAt: futureTs };
+    state.pairingTokens["22222222-2222-2222-2222-222222222222"] = { masterId: "m1", expiresAt: futureTs };
     state.masters["m1"] = {
       imei: "m1",
       subscription: {
@@ -461,7 +461,7 @@ describe("pairing.ts validatePairingToken subscription denied path", () => {
       },
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "token-abc" }, { auth: { uid: "new-child", token: {} } }))
+    await expect(wrapped({ pairingToken: "22222222-2222-2222-2222-222222222222" }, { auth: { uid: "new-child", token: {} } }))
       .rejects.toThrow(/exhausted|subscription|trial/i);
   });
 });
@@ -501,7 +501,7 @@ describe("pairing.ts validatePairingToken childLimit fallback", () => {
   it("validatePairingToken when subscription has no childLimit → defaults to 4", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 86400, 0);
-    state.pairingTokens["tok123"] = {
+    state.pairingTokens["33333333-3333-3333-3333-333333333333"] = {
       masterId: "m1",
       expiresAt: futureTs,
     };
@@ -516,7 +516,7 @@ describe("pairing.ts validatePairingToken childLimit fallback", () => {
     state.children["existing-child-2"] = { masterImei: "m1", childImei: "existing-2" };
     state.children["existing-child-3"] = { masterImei: "m1", childImei: "existing-3" };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok123" }, { auth: { uid: "new-child", token: {} } }))
+    await expect(wrapped({ pairingToken: "33333333-3333-3333-3333-333333333333" }, { auth: { uid: "new-child", token: {} } }))
       .rejects.toThrow(/limit|exhausted/i);
   });
 });

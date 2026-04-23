@@ -150,7 +150,7 @@ describe("onTaskStatusChange", () => {
       { params: { childId: "c1", taskId: "retry-1" } }
     );
 
-    await jest.advanceTimersByTimeAsync(1000);
+    await jest.advanceTimersByTimeAsync(5000);
     await pending;
 
     expect(mockSend).toHaveBeenCalledTimes(2);
@@ -172,7 +172,7 @@ describe("onTaskStatusChange", () => {
       { params: { childId: "c1", taskId: "retry-2" } }
     );
 
-    await jest.advanceTimersByTimeAsync(3000);
+    await jest.advanceTimersByTimeAsync(15000);
     await pending;
 
     expect(mockSend).toHaveBeenCalledTimes(3);

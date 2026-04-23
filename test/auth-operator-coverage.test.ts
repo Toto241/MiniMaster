@@ -186,7 +186,7 @@ beforeEach(() => {
                     const d = collData[id];
                     return Promise.resolve({ exists: !!d, data: () => d, id });
                   },
-                  update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+                  update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
                 },
               }));
             return Promise.resolve({ empty: matches.length === 0, size: matches.length, docs: matches });
@@ -206,7 +206,7 @@ beforeEach(() => {
                   const d = collData[id];
                   return Promise.resolve({ exists: !!d, data: () => d, id });
                 },
-                update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+                update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
               },
             }));
           return Promise.resolve({ empty: matches.length === 0, size: matches.length, docs: matches });
@@ -220,7 +220,7 @@ beforeEach(() => {
           ref: {
             id,
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
           },
         }));
         return Promise.resolve({ empty: docs.length === 0, size: docs.length, docs });
@@ -228,7 +228,7 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -237,7 +237,7 @@ beforeEach(() => {
     };
   });
 
-  (db as any).runTransaction = jest.fn(async (fn: any) => {
+  (db).runTransaction = jest.fn(async (fn: any) => {
     const tx = {
       get: jest.fn(async (ref: any) => ref.get()),
       update: jest.fn((ref: any, data: any) => ref.update(data)),
@@ -246,7 +246,7 @@ beforeEach(() => {
     return fn(tx);
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
@@ -415,8 +415,8 @@ describe("createOperatorAccessKey — falsy input defaults (lines 137-140)", () 
     const asNoRole = { auth: { uid: "u-norole", token: {} } };
     const wrapped = testEnv.wrap(fns.createOperatorAccessKey);
     // Without admin, tries bootstrap: if no admin users exist, allows admin key creation
-    (mockAuth.listUsers as jest.Mock).mockReset();
-    (mockAuth.listUsers as jest.Mock).mockResolvedValue({ users: [], pageToken: undefined });
+    (mockAuth.listUsers).mockReset();
+    (mockAuth.listUsers).mockResolvedValue({ users: [], pageToken: undefined });
     const res = await wrapped({ keyHash: TEST_KEY_HASH }, asNoRole);
     expect(res.keyId).toBeDefined();
     expect(res.role).toBe("admin");

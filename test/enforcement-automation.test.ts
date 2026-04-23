@@ -201,7 +201,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
           },
         }));
         return Promise.resolve({ empty: docs.length === 0, size: docs.length, docs });
@@ -209,7 +209,7 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
@@ -333,28 +333,28 @@ describe("C: Usage Rules — Backend", () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
     await expect(wrapped({
       childId: "c1", usageRules: { unknownKey: "value" },
-    }, asMaster)).rejects.toThrow(/Unknown usageRules keys/);
+    }, asMaster)).rejects.toThrow(/contains unknown keys/);
   });
 
   it("C-XX: setUsageRules validiert dailyLimit — kein negativer Wert", async () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
     await expect(wrapped({
       childId: "c1", usageRules: { dailyLimit: -5 },
-    }, asMaster)).rejects.toThrow(/non-negative/);
+    }, asMaster)).rejects.toThrow(/must be at least 0/);
   });
 
   it("C-XX: setUsageRules validiert bedtimeStart Format", async () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
     await expect(wrapped({
       childId: "c1", usageRules: { bedtimeStart: "abc" },
-    }, asMaster)).rejects.toThrow(/HH:MM/);
+    }, asMaster)).rejects.toThrow(/format is invalid/);
   });
 
   it("C-XX: setUsageRules validiert bedtimeEnd Format", async () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
     await expect(wrapped({
       childId: "c1", usageRules: { bedtimeEnd: "abc" },
-    }, asMaster)).rejects.toThrow(/HH:MM/);
+    }, asMaster)).rejects.toThrow(/format is invalid/);
   });
 
   it("C-XX: setUsageRules verweigert fremdes Kind", async () => {
@@ -532,7 +532,7 @@ describe("Device Management — zusätzliche Coverage", () => {
 
   it("registerFcmToken wirft not-found bei unbekanntem Kind", async () => {
     const wrapped = testEnv.wrap(fns.registerFcmToken);
-    await expect(wrapped({ token: "tok" }, { auth: { uid: "unknown", token: {} } }))
+    await expect(wrapped({ token: "tok-unknown-child" }, { auth: { uid: "unknown", token: {} } }))
       .rejects.toThrow(/not found/i);
   });
 
@@ -551,9 +551,9 @@ describe("Device Management — zusätzliche Coverage", () => {
   it("updateFCMToken wirft internal bei unbekanntem Master", async () => {
     const wrapped = testEnv.wrap(fns.updateFCMToken);
     await expect(wrapped(
-      { fcmToken: "tok" },
+      { fcmToken: "tok-unknown-master" },
       { auth: { uid: "unknown", token: { role: "master" } } }
-    )).rejects.toThrow(/unexpected error/i);
+    )).rejects.toThrow(/Master account not found/i);
   });
 
   it("reportDailyUsage speichert Nutzungsbericht", async () => {
@@ -566,6 +566,6 @@ describe("Device Management — zusätzliche Coverage", () => {
 
   it("reportDailyUsage wirft invalid-argument bei fehlenden Feldern", async () => {
     const wrapped = testEnv.wrap(fns.reportDailyUsage);
-    await expect(wrapped({ date: "2026-03-19" }, asChild)).rejects.toThrow(/Missing/);
+    await expect(wrapped({ date: "2026-03-19" }, asChild)).rejects.toThrow(/usageMillis is required/);
   });
 });

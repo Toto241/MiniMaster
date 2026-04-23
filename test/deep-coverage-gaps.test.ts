@@ -173,24 +173,24 @@ beforeEach(() => {
             return {
               add: jest.fn((data: any) => {
                 const subId = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-                (state[key] as any)[subId] = data;
+                (state[key])[subId] = data;
                 return Promise.resolve({ id: subId });
               }),
               get: jest.fn(() => Promise.resolve({
                 empty: Object.keys(state[key]).length === 0,
                 size: Object.keys(state[key]).length,
                 docs: Object.entries(state[key]).map(([id, data]) => ({
-                  id, data: () => data, ref: { delete: jest.fn(() => Promise.resolve()), update: jest.fn((u: any) => { Object.assign((state[key] as any)[id], u); return Promise.resolve(); }) },
+                  id, data: () => data, ref: { delete: jest.fn(() => Promise.resolve()), update: jest.fn((u: any) => { Object.assign((state[key])[id], u); return Promise.resolve(); }) },
                 })),
               })),
               doc: jest.fn((subId: string) => ({
                 get: jest.fn(() => {
-                  const sd = (state[key] as any)?.[subId];
+                  const sd = (state[key])?.[subId];
                   return Promise.resolve({ exists: !!sd, data: () => sd, id: subId });
                 }),
-                set: jest.fn((data: any) => { (state[key] as any)[subId] = data; return Promise.resolve(); }),
+                set: jest.fn((data: any) => { (state[key])[subId] = data; return Promise.resolve(); }),
                 update: jest.fn((upd: any) => {
-                  if ((state[key] as any)?.[subId]) Object.assign((state[key] as any)[subId], upd);
+                  if ((state[key])?.[subId]) Object.assign((state[key])[subId], upd);
                   return Promise.resolve();
                 }),
               })),
@@ -211,7 +211,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [] })) })),
           },
         }));
@@ -224,7 +224,7 @@ beforeEach(() => {
   // Ensure admin.firestore().collection() uses the same mock
   sharedFirestore.collection = jest.fn(collectionImpl);
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -233,7 +233,7 @@ beforeEach(() => {
     };
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });

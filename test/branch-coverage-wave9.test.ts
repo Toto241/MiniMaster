@@ -152,7 +152,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             docRef.collection = jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
@@ -258,13 +258,13 @@ beforeEach(() => {
     };
   });
 
-  (db as any).batch = jest.fn(() => ({
+  (db).batch = jest.fn(() => ({
     update: jest.fn(),
     delete: jest.fn(),
     commit: jest.fn().mockResolvedValue(undefined),
   }));
 
-  (db as any).collectionGroup = jest.fn(() => ({
+  (db).collectionGroup = jest.fn(() => ({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   }));
@@ -451,13 +451,13 @@ describe("|| fallback branches", () => {
   it("validatePairingToken with master having no subscription", async () => {
     delete state.masters["m1"].subscription;
     const admin = require("firebase-admin");
-    state.pairingTokens["token-1"] = {
+    state.pairingTokens["11111111-1111-1111-1111-111111111111"] = {
       masterId: "m1",
       createdAt: admin.firestore.Timestamp.now(),
       expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 300000),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "token-1" }, asMaster))
+    await expect(wrapped({ pairingToken: "11111111-1111-1111-1111-111111111111" }, asMaster))
       .rejects.toThrow(/trial.*expired|subscribe|subscription/i);
   });
 

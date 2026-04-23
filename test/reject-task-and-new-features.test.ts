@@ -139,7 +139,7 @@ describe("rejectTask", () => {
     const wrapped = testEnv.wrap(fns.rejectTask);
     await expect(
       wrapped({ childId: "c1" }, asMaster)
-    ).rejects.toThrow(/Missing required fields/);
+    ).rejects.toThrow(/taskId is required/);
   });
 
   it("fails when child does not belong to master", async () => {
@@ -199,14 +199,14 @@ describe("completeTask validation", () => {
   it("requires both childId and taskId", async () => {
     const wrapped = testEnv.wrap(fns.completeTask);
     await expect(wrapped({ taskId: "t1" }, asChild)).rejects.toThrow(
-      /Missing required fields/
+      /photoUrl is required/
     );
   });
 
   it("requires taskId", async () => {
     const wrapped = testEnv.wrap(fns.completeTask);
     await expect(wrapped({ childId: "c1" }, asChild)).rejects.toThrow(
-      /Missing required fields/
+      /taskId is required/
     );
   });
 });

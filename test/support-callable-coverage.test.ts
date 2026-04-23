@@ -289,7 +289,7 @@ beforeEach(() => {
           id, data: () => data, ref: {
             id,
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [] })) })),
           },
         }));
@@ -298,7 +298,7 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -307,7 +307,7 @@ beforeEach(() => {
     };
   });
 
-  (db as any).runTransaction = jest.fn(async (fn: any) => {
+  (db).runTransaction = jest.fn(async (fn: any) => {
     const tx = {
       get: jest.fn(async (ref: any) => ref.get()),
       update: jest.fn((ref: any, data: any) => ref.update(data)),
@@ -316,7 +316,7 @@ beforeEach(() => {
     return fn(tx);
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });

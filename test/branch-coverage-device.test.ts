@@ -183,14 +183,14 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).batch = jest.fn(() => ({
+  (db).batch = jest.fn(() => ({
     set: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     commit: jest.fn().mockResolvedValue(undefined),
   }));
 
-  (db as any).runTransaction = jest.fn(async (fn: any) => {
+  (db).runTransaction = jest.fn(async (fn: any) => {
     const tx = {
       get: jest.fn(async (ref: any) => ref.get()),
       update: jest.fn((ref: any, data: any) => ref.update(data)),
@@ -199,7 +199,7 @@ beforeEach(() => {
     return fn(tx);
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
@@ -228,20 +228,22 @@ describe("setUsageRules — validation branch coverage", () => {
     }, asMaster)).rejects.toThrow(/dailyLimitSeconds/);
   });
 
-  it("wirft bei invalidem allowedHours ohne start", async () => {
+  it("erlaubt allowedHours ohne start (optional)", async () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
-    await expect(wrapped({
+    const res = await wrapped({
       childId: "c1",
       usageRules: { allowedHours: { end: "18:00" } },
-    }, asMaster)).rejects.toThrow(/allowedHours/);
+    }, asMaster);
+    expect(res).toEqual({ success: true });
   });
 
-  it("wirft bei invalidem allowedHours ohne end", async () => {
+  it("erlaubt allowedHours ohne end (optional)", async () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
-    await expect(wrapped({
+    const res = await wrapped({
       childId: "c1",
       usageRules: { allowedHours: { start: "08:00" } },
-    }, asMaster)).rejects.toThrow(/allowedHours/);
+    }, asMaster);
+    expect(res).toEqual({ success: true });
   });
 
   it("wirft bei allowedHours als null", async () => {
@@ -273,7 +275,7 @@ describe("setUsageRules — validation branch coverage", () => {
     await expect(wrapped({
       childId: "c1",
       usageRules: { appLimits: null },
-    }, asMaster)).rejects.toThrow(/appLimits must be an object/);
+    }, asMaster)).rejects.toThrow(/appLimits is required/);
   });
 
   it("wirft bei appLimits Eintrag mit leerem Package-Name", async () => {

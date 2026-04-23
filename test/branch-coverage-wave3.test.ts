@@ -178,7 +178,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             docRef.collection = jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
@@ -271,7 +271,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [], empty: true, size: 0 })) })),
           },
         }));
@@ -280,12 +280,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -369,7 +369,7 @@ describe("admin.ts branch coverage", () => {
     it("returns error when FCM send fails", async () => {
       mockSend.mockRejectedValueOnce(new Error("FCM failure"));
       const wrapped = testEnv.wrap(fns.sendTestFcmMessage);
-      const res = await wrapped({ token: "bad-tok" }, asAdmin);
+      const res = await wrapped({ token: "bad-token-123" }, asAdmin);
       expect(res.success).toBe(false);
       expect(res.error).toContain("FCM");
     });
@@ -833,12 +833,12 @@ describe("subscription.ts branch coverage", () => {
   describe("verifyPurchase – subscription activation", () => {
     it("throws when purchaseToken is missing", async () => {
       const wrapped = testEnv.wrap(fns.verifyPurchase);
-      await expect(wrapped({ sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/Missing required/);
+      await expect(wrapped({ sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/purchaseToken is required./);
     });
 
     it("throws when sku is invalid", async () => {
       const wrapped = testEnv.wrap(fns.verifyPurchase);
-      await expect(wrapped({ purchaseToken: "tok", sku: "invalid_sku" }, asMaster)).rejects.toThrow(/Unknown product/);
+      await expect(wrapped({ purchaseToken: "purchase-tok", sku: "invalid_sku" }, asMaster)).rejects.toThrow(/Invalid product ID/);
     });
   });
 });
@@ -864,7 +864,7 @@ describe("tasks.ts branch coverage", () => {
       await expect(wrapped({
         childId: "c1",
         deadlineISO: new Date().toISOString(),
-      }, asMaster)).rejects.toThrow(/Missing required/);
+      }, asMaster)).rejects.toThrow(/description is required./);
     });
 
     it("throws when childId is missing", async () => {
@@ -872,7 +872,7 @@ describe("tasks.ts branch coverage", () => {
       await expect(wrapped({
         description: "Test",
         deadlineISO: new Date().toISOString(),
-      }, asMaster)).rejects.toThrow(/Missing required/);
+      }, asMaster)).rejects.toThrow(/childId is required./);
     });
 
     it("throws permission-denied when child not owned by master", async () => {
@@ -918,7 +918,7 @@ describe("tasks.ts branch coverage", () => {
 
     it("throws when taskId is missing", async () => {
       const wrapped = testEnv.wrap(fns.approveTask);
-      await expect(wrapped({ childId: "c1" }, asMaster)).rejects.toThrow(/Missing required/);
+      await expect(wrapped({ childId: "c1" }, asMaster)).rejects.toThrow(/taskId is required./);
     });
 
     it("throws when task not found", async () => {
@@ -950,7 +950,7 @@ describe("tasks.ts branch coverage", () => {
 
     it("throws when childId is missing", async () => {
       const wrapped = testEnv.wrap(fns.rejectTask);
-      await expect(wrapped({ taskId: "task1" }, asMaster)).rejects.toThrow(/Missing required/);
+      await expect(wrapped({ taskId: "task1" }, asMaster)).rejects.toThrow(/childId is required./);
     });
 
     it("throws when task not in pending_approval state", async () => {
@@ -990,12 +990,12 @@ describe("tasks.ts branch coverage", () => {
       await expect(wrapped({
         taskId: "task4",
         photoUrl: "https://firebasestorage.googleapis.com/" + "a".repeat(2050),
-      }, asChild)).rejects.toThrow(/maximum allowed length/);
+      }, asChild)).rejects.toThrow(/must not exceed 2048 characters/);
     });
 
     it("throws when taskId/photoUrl is missing", async () => {
       const wrapped = testEnv.wrap(fns.completeTask);
-      await expect(wrapped({ taskId: "task4" }, asChild)).rejects.toThrow(/Missing required/);
+      await expect(wrapped({ taskId: "task4" }, asChild)).rejects.toThrow(/photoUrl is required./);
     });
 
     it("throws when task is not in pending state", async () => {

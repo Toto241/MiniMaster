@@ -191,7 +191,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [], empty: true, size: 0 })) })),
           },
         }));
@@ -200,12 +200,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -928,84 +928,84 @@ describe("validatePairingToken – Branch-Coverage", () => {
 
   it("wirft deadline-exceeded bei abgelaufenem Token", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["expired-uuid"] = {
+    state.pairingTokens["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"] = {
       masterId: "m1",
       createdAt: new admin.firestore.Timestamp(1000, 0),
       expiresAt: new admin.firestore.Timestamp(1001, 0),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "expired-uuid" }, asChild)).rejects.toThrow(/expired/i);
+    await expect(wrapped({ pairingToken: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }, asChild)).rejects.toThrow(/expired/i);
   });
 
   it("löscht korruptes Token mit ungültigem expiresAt", async () => {
-    state.pairingTokens["bad-exp-token"] = {
+    state.pairingTokens["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"] = {
       masterId: "m1",
       createdAt: { seconds: 1, nanoseconds: 0 },
       expiresAt: "not-a-timestamp",
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "bad-exp-token" }, asChild)).rejects.toThrow(/data structure/i);
-    expect(state.pairingTokens["bad-exp-token"]).toBeUndefined();
+    await expect(wrapped({ pairingToken: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" }, asChild)).rejects.toThrow(/data structure/i);
+    expect(state.pairingTokens["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]).toBeUndefined();
   });
 
   it("löscht korruptes Token ohne masterId", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["missing-master-token"] = {
+    state.pairingTokens["cccccccc-cccc-cccc-cccc-cccccccccccc"] = {
       createdAt: admin.firestore.Timestamp.now(),
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "missing-master-token" }, asChild)).rejects.toThrow(/missing masterId/i);
-    expect(state.pairingTokens["missing-master-token"]).toBeUndefined();
+    await expect(wrapped({ pairingToken: "cccccccc-cccc-cccc-cccc-cccccccccccc" }, asChild)).rejects.toThrow(/missing masterId/i);
+    expect(state.pairingTokens["cccccccc-cccc-cccc-cccc-cccccccccccc"]).toBeUndefined();
   });
 
   it("wirft not-found wenn referenzierter Master fehlt", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["ghost-master-token"] = {
+    state.pairingTokens["dddddddd-dddd-dddd-dddd-dddddddddddd"] = {
       masterId: "ghost-master",
       createdAt: admin.firestore.Timestamp.now(),
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "ghost-master-token" }, asChild)).rejects.toThrow(/Master account not found/);
+    await expect(wrapped({ pairingToken: "dddddddd-dddd-dddd-dddd-dddddddddddd" }, asChild)).rejects.toThrow(/Master account not found/);
   });
 
   it("wirft resource-exhausted ohne aktiven Zugang", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["expired-sub-token"] = {
+    state.pairingTokens["eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"] = {
       masterId: "m1",
       createdAt: admin.firestore.Timestamp.now(),
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     state.masters.m1.subscription = { status: "expired", childLimit: 1 };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "expired-sub-token" }, asChild)).rejects.toThrow(/Active subscription or trial required/i);
+    await expect(wrapped({ pairingToken: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, asChild)).rejects.toThrow(/Active subscription or trial required/i);
   });
 
   it("wirft resource-exhausted bei erreichtem Kinderlimit", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0);
-    state.pairingTokens["valid-uuid"] = {
+    state.pairingTokens["ffffffff-ffff-ffff-ffff-ffffffffffff"] = {
       masterId: "m1",
       createdAt: admin.firestore.Timestamp.now(),
       expiresAt: futureTs,
     };
     state.masters.m1.subscription.childLimit = 1;
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "valid-uuid" }, asChild)).rejects.toThrow(/Child limit reached/);
+    await expect(wrapped({ pairingToken: "ffffffff-ffff-ffff-ffff-ffffffffffff" }, asChild)).rejects.toThrow(/Child limit reached/);
   });
 
   it("pairt Kind erfolgreich mit gültigem Token", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0);
-    state.pairingTokens["good-uuid"] = {
+    state.pairingTokens["55555555-5555-5555-5555-555555555555"] = {
       masterId: "m1",
       createdAt: admin.firestore.Timestamp.now(),
       expiresAt: futureTs,
     };
     state.masters.m1.subscription.childLimit = 99;
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    const res = await wrapped({ pairingToken: "good-uuid" }, asChild);
+    const res = await wrapped({ pairingToken: "55555555-5555-5555-5555-555555555555" }, asChild);
     expect(res.childId).toBe("c1");
     expect(res.masterId).toBe("m1");
   });
@@ -1109,7 +1109,7 @@ describe("generateCustomToken – Branch-Coverage", () => {
             update: jest.fn().mockRejectedValueOnce(new Error("db unavailable")),
           };
         }),
-      } as any;
+      };
     });
 
     const wrapped = testEnv.wrap(fns.generateCustomToken);

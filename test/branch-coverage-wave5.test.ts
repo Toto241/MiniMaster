@@ -164,7 +164,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             docRef.collection = jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
@@ -261,7 +261,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, exists: true, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
               if (!state[subKey]) state[subKey] = {};
@@ -282,12 +282,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -532,7 +532,7 @@ describe("sendTestFcmMessage", () => {
   it("FCM send failure returns success=false", async () => {
     mockSend.mockRejectedValueOnce(new Error("FCM error"));
     const wrapped = testEnv.wrap(fns.sendTestFcmMessage);
-    const res = await wrapped({ token: "bad-token" }, asAdmin);
+    const res = await wrapped({ token: "bad-token-123" }, asAdmin);
     expect(res.success).toBe(false);
   });
 });
@@ -1084,28 +1084,28 @@ describe("getSubscriptionStatus", () => {
 describe("verifyPurchase", () => {
   it("missing purchaseToken throws invalid-argument", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/Missing required fields/);
+    await expect(wrapped({ sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/purchaseToken is required./);
   });
 
   it("invalid sku throws invalid-argument", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "token", sku: "invalid_sku" }, asMaster)).rejects.toThrow(/Unknown product ID/);
+    await expect(wrapped({ purchaseToken: "purchase-token", sku: "invalid_sku" }, asMaster)).rejects.toThrow(/Invalid product ID/);
   });
 
   it("family_monthly sku is accepted", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
     // Will fail at Google Play verification (mock), but tests the sku validation path
-    await expect(wrapped({ purchaseToken: "token", sku: "family_monthly" }, asMaster)).rejects.toThrow(/Purchase verification failed/);
+    await expect(wrapped({ purchaseToken: "purchase-token", sku: "family_monthly" }, asMaster)).rejects.toThrow(/Purchase verification failed/);
   });
 
   it("yearly sku is accepted", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "token", sku: "single_child_yearly" }, asMaster)).rejects.toThrow(/Purchase verification failed/);
+    await expect(wrapped({ purchaseToken: "purchase-token", sku: "single_child_yearly" }, asMaster)).rejects.toThrow(/Purchase verification failed/);
   });
 
   it("family_yearly sku is accepted", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "token", sku: "family_yearly" }, asMaster)).rejects.toThrow(/Purchase verification failed/);
+    await expect(wrapped({ purchaseToken: "purchase-token", sku: "family_yearly" }, asMaster)).rejects.toThrow(/Purchase verification failed/);
   });
 });
 
@@ -1212,7 +1212,7 @@ describe("completeTask edge cases", () => {
     state["children/c1/tasks"]["t1"] = { status: "pending", description: "Test" };
     const wrapped = testEnv.wrap(fns.completeTask);
     const longUrl = "https://firebasestorage.googleapis.com/v0/b/" + "a".repeat(2100);
-    await expect(wrapped({ taskId: "t1", photoUrl: longUrl }, asChild)).rejects.toThrow(/photoUrl exceeds/);
+    await expect(wrapped({ taskId: "t1", photoUrl: longUrl }, asChild)).rejects.toThrow(/must not exceed 2048 characters/);
   });
 });
 
@@ -1767,13 +1767,13 @@ describe("registerFcmToken", () => {
 
   it("missing token throws invalid-argument", async () => {
     const wrapped = testEnv.wrap(fns.registerFcmToken);
-    await expect(wrapped({}, asChild)).rejects.toThrow(/valid.*token/i);
+    await expect(wrapped({}, asChild)).rejects.toThrow(/token is required./);
   });
 
   it("child not found throws not-found", async () => {
     delete state.children["c1"];
     const wrapped = testEnv.wrap(fns.registerFcmToken);
-    await expect(wrapped({ token: "tok" }, asChild)).rejects.toThrow(/Child device not found/);
+    await expect(wrapped({ token: "child-fcm-token-123" }, asChild)).rejects.toThrow(/Child device not found/);
   });
 });
 
@@ -1794,7 +1794,7 @@ describe("reportDailyUsage", () => {
 
   it("missing date throws invalid-argument", async () => {
     const wrapped = testEnv.wrap(fns.reportDailyUsage);
-    await expect(wrapped({ usageMillis: 100 }, asChild)).rejects.toThrow(/Missing required fields/);
+    await expect(wrapped({ usageMillis: 100 }, asChild)).rejects.toThrow(/date is required./);
   });
 });
 

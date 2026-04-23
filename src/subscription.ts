@@ -50,7 +50,7 @@ export const verifyPurchase = functions.https.onCall(
       required: true, maxLength: 2048, minLength: 10, sanitize: "none",
     });
     const sku = validateSku(data.sku);
-    const platform = (data.platform ?? "android") as "android" | "ios";
+    const platform = (data.platform ?? "android");
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
 
@@ -542,7 +542,7 @@ export async function applyRtdnNotification(
     return { handled: true, reason: "test_notification" };
   }
   const sub = payload.subscriptionNotification;
-  if (!sub || !sub.purchaseToken || typeof sub.notificationType !== "number") {
+  if (!sub?.purchaseToken || typeof sub.notificationType !== "number") {
     return { handled: false, reason: "missing_subscription_notification" };
   }
 

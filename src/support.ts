@@ -1257,7 +1257,7 @@ export const getDebugInfo = functions.https.onCall(
     }
 
     const debugScope = Array.isArray(grant.debugScope) ? grant.debugScope : null;
-    if (!debugScope || !debugScope.includes("diagnostic_logs")) {
+    if (!debugScope?.includes("diagnostic_logs")) {
       throw new functions.https.HttpsError(
         "permission-denied",
         "Debug scope does not allow diagnostic data access."

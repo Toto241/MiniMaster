@@ -195,13 +195,13 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).batch = jest.fn(() => ({
+  (db).batch = jest.fn(() => ({
     update: jest.fn(),
     delete: jest.fn(),
     commit: jest.fn().mockResolvedValue(undefined),
   }));
 
-  (db as any).runTransaction = jest.fn(async (fn: any) => {
+  (db).runTransaction = jest.fn(async (fn: any) => {
     const tx = {
       get: jest.fn(async (ref: any) => ref.get()),
       update: jest.fn((ref: any, data: any) => ref.update(data)),
@@ -210,7 +210,7 @@ beforeEach(() => {
     return fn(tx);
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
@@ -281,26 +281,26 @@ describe("validatePairingCode — masterId missing branch", () => {
 
 describe("validatePairingToken — masterId missing branch", () => {
   it("wirft internal bei fehlendem masterId im Token-Dokument", async () => {
-    state.pairingTokens["tok-no-master"] = {
+    state.pairingTokens["11111111-1111-1111-1111-111111111111"] = {
       // No masterId/masterImei field
       createdAt: makeTimestamp(-60),
       expiresAt: makeTimestamp(3600),
     };
 
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-no-master" }, asChild))
+    await expect(wrapped({ pairingToken: "11111111-1111-1111-1111-111111111111" }, asChild))
       .rejects.toThrow(/masterId|missing/i);
   });
 
   it("wirft internal bei null masterId im Token", async () => {
-    state.pairingTokens["tok-null-master"] = {
+    state.pairingTokens["22222222-2222-2222-2222-222222222222"] = {
       masterId: null,
       createdAt: makeTimestamp(-60),
       expiresAt: makeTimestamp(3600),
     };
 
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-null-master" }, asChild))
+    await expect(wrapped({ pairingToken: "22222222-2222-2222-2222-222222222222" }, asChild))
       .rejects.toThrow(/masterId|missing/i);
   });
 });
@@ -334,14 +334,14 @@ describe("validatePairingToken — trial activation via token", () => {
   it("aktiviert Trial bei validatePairingToken mit trial_pending Master", async () => {
     // Master must have trial_pending to trigger activateTrialIfPending body (lines 24-29)
     state.masters.m1.subscription = { status: "trial_pending" };
-    state.pairingTokens["tok-valid"] = {
+    state.pairingTokens["33333333-3333-3333-3333-333333333333"] = {
       masterId: "m1",
       createdAt: makeTimestamp(-60),
       expiresAt: makeTimestamp(300),
     };
 
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    const res = await wrapped({ pairingToken: "tok-valid" }, asChild);
+    const res = await wrapped({ pairingToken: "33333333-3333-3333-3333-333333333333" }, asChild);
     expect(res.childId).toBeDefined();
     expect(state.masters.m1.subscription.status).toBe("trial");
   });
@@ -406,14 +406,14 @@ describe("pairing — childLimit/parentAppLimit truthy branches", () => {
 
   it("validatePairingToken nutzt subscription.childLimit (line 364)", async () => {
     state.masters.m1.subscription = { status: "active", childLimit: 3, parentAppLimit: 2 };
-    state.pairingTokens["tok-limit"] = {
+    state.pairingTokens["44444444-4444-4444-4444-444444444444"] = {
       masterId: "m1",
       createdAt: makeTimestamp(-60),
       expiresAt: makeTimestamp(300),
     };
 
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    const res = await wrapped({ pairingToken: "tok-limit" }, asChild);
+    const res = await wrapped({ pairingToken: "44444444-4444-4444-4444-444444444444" }, asChild);
     expect(res.childId).toBeDefined();
   });
 
@@ -443,14 +443,14 @@ describe("pairing — childLimit/parentAppLimit truthy branches", () => {
 
   it("validatePairingToken nutzt DEFAULT wenn childLimit nicht gesetzt", async () => {
     state.masters.m1.subscription = { status: "active" };
-    state.pairingTokens["tok-default"] = {
+    state.pairingTokens["55555555-5555-5555-5555-555555555555"] = {
       masterId: "m1",
       createdAt: makeTimestamp(-60),
       expiresAt: makeTimestamp(300),
     };
 
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    const res = await wrapped({ pairingToken: "tok-default" }, asChild);
+    const res = await wrapped({ pairingToken: "55555555-5555-5555-5555-555555555555" }, asChild);
     expect(res.childId).toBeDefined();
   });
 });

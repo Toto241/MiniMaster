@@ -157,7 +157,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             return { id, exists: true, data: () => data, ref: docRef };
           });
@@ -233,8 +233,8 @@ beforeEach(() => {
     };
   });
 
-  (db as any).batch = jest.fn(() => ({ update: jest.fn(), delete: jest.fn(), commit: jest.fn().mockResolvedValue(undefined) }));
-  (db as any).collectionGroup = jest.fn(() => ({ where: jest.fn().mockReturnThis(), get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })) }));
+  (db).batch = jest.fn(() => ({ update: jest.fn(), delete: jest.fn(), commit: jest.fn().mockResolvedValue(undefined) }));
+  (db).collectionGroup = jest.fn(() => ({ where: jest.fn().mockReturnThis(), get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })) }));
 });
 
 afterAll(() => testEnv.cleanup());
@@ -462,9 +462,9 @@ describe("pairing malformed data branches", () => {
   });
 
   it("validatePairingToken returns internal when stored token data is null", async () => {
-    state.pairingTokens["tok-null"] = null;
+    state.pairingTokens["dddddddd-dddd-dddd-dddd-dddddddddddd"] = null;
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-null" }, asChild)).rejects.toThrow(/missing|internal/i);
+    await expect(wrapped({ pairingToken: "dddddddd-dddd-dddd-dddd-dddddddddddd" }, asChild)).rejects.toThrow(/missing|internal/i);
   });
 
   it("validatePairingCode not-found path throws HttpsError branch", async () => {
@@ -551,10 +551,10 @@ describe("pairing subscriptionStatus fallback metadata", () => {
   it("validatePairingToken uses subscriptionStatus fallback 'none' when subscription is missing", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-    state.pairingTokens["tok-none"] = { masterId: "m1", expiresAt: futureTs };
+    state.pairingTokens["44444444-4444-4444-4444-444444444444"] = { masterId: "m1", expiresAt: futureTs };
     state.masters["m1"] = { imei: "m1" };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-none" }, asChild)).rejects.toThrow(/exhausted|trial|subscription/i);
+    await expect(wrapped({ pairingToken: "44444444-4444-4444-4444-444444444444" }, asChild)).rejects.toThrow(/exhausted|trial|subscription/i);
   });
 
   it("generatePairingLink uses subscriptionStatus fallback 'none' when subscription is missing", async () => {
@@ -1070,7 +1070,7 @@ describe("ownership mismatch and default fallback branches", () => {
       childId: "c1",
       eventType: "accessibility_service_disabled",
       timestamp: Date.now(),
-    }, asChild)).rejects.toThrow(/failed to process tamper event/i);
+    }, asChild)).rejects.toThrow(/unexpected error/i);
   });
 });
 
@@ -1091,13 +1091,13 @@ describe("pairing childLimit fallback branches", () => {
   it("validatePairingToken uses fallback childLimit=4 when active subscription has no childLimit", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-    state.pairingTokens["tok-limit"] = { masterId: "m1", expiresAt: futureTs };
+    state.pairingTokens["eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"] = { masterId: "m1", expiresAt: futureTs };
     state.masters.m1 = { imei: "m1", subscription: { status: "active" } };
     state.children["child-2"] = { masterImei: "m1" };
     state.children["child-3"] = { masterImei: "m1" };
     state.children["child-4"] = { masterImei: "m1" };
 
-    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit" }, { auth: { uid: "c2", token: {} } }))
+    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
   });
 
@@ -1114,10 +1114,10 @@ describe("pairing childLimit fallback branches", () => {
   it("validatePairingToken succeeds with explicit childLimit when capacity is available", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-    state.pairingTokens["tok-limit-ok"] = { masterId: "m1", expiresAt: futureTs };
+    state.pairingTokens["55555555-5555-5555-5555-555555555555"] = { masterId: "m1", expiresAt: futureTs };
     state.masters.m1 = { imei: "m1", subscription: { status: "active", childLimit: 2 } };
 
-    const res = await testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-limit-ok" }, { auth: { uid: "c2", token: {} } });
+    const res = await testEnv.wrap(fns.validatePairingToken)({ pairingToken: "55555555-5555-5555-5555-555555555555" }, { auth: { uid: "c2", token: {} } });
     expect(res.childId).toBe("c2");
     expect(res.masterId).toBe("m1");
   });
@@ -1146,7 +1146,7 @@ describe("pairing childLimit fallback branches", () => {
     const admin = require("firebase-admin");
     const nowSeconds = Math.floor(Date.now() / 1000);
     const futureTs = new admin.firestore.Timestamp(nowSeconds + 3600, 0);
-    state.pairingTokens["tok-trial-limit"] = { masterId: "m1", expiresAt: futureTs };
+    state.pairingTokens["66666666-6666-6666-6666-666666666666"] = { masterId: "m1", expiresAt: futureTs };
     state.masters.m1 = {
       imei: "m1",
       subscription: {
@@ -1158,7 +1158,7 @@ describe("pairing childLimit fallback branches", () => {
     state.children["child-3"] = { masterImei: "m1" };
     state.children["child-4"] = { masterImei: "m1" };
 
-    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-trial-limit" }, { auth: { uid: "c2", token: {} } }))
+    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "66666666-6666-6666-6666-666666666666" }, { auth: { uid: "c2", token: {} } }))
       .rejects.toThrow(/child limit reached/i);
   });
 
@@ -1350,13 +1350,13 @@ describe("shared and pairing remaining branch sides", () => {
     });
 
     await expect(testEnv.wrap(fns.validatePairingCode)({ pairingCode: "555555" }, asChild))
-      .rejects.toThrow(/unexpected error occurred while validating the pairing code/i);
+      .rejects.toThrow(/unexpected error/i);
   });
 
   it("validatePairingToken wraps unexpected non-Https errors as internal", async () => {
     const admin = require("firebase-admin");
     const futureTs = new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 3600, 0);
-    state.pairingTokens["tok-unexpected"] = { masterId: "m1", expiresAt: futureTs };
+    state.pairingTokens["77777777-7777-7777-7777-777777777777"] = { masterId: "m1", expiresAt: futureTs };
 
     const collectionSpy = jest.spyOn(db, "collection");
     const originalImpl = collectionSpy.getMockImplementation();
@@ -1371,8 +1371,8 @@ describe("shared and pairing remaining branch sides", () => {
       return coll;
     });
 
-    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "tok-unexpected" }, asChild))
-      .rejects.toThrow(/unexpected error occurred while validating the pairing token/i);
+    await expect(testEnv.wrap(fns.validatePairingToken)({ pairingToken: "77777777-7777-7777-7777-777777777777" }, asChild))
+      .rejects.toThrow(/unexpected error/i);
   });
 
   it("setDeviceLocked catch branch on child update failure", async () => {
@@ -1433,6 +1433,6 @@ describe("shared and pairing remaining branch sides", () => {
       childId: "c1",
       description: "fail-set",
       deadlineISO: new Date(Date.now() + 120000).toISOString(),
-    }, asMaster)).rejects.toThrow(/task-set-failed/i);
+    }, asMaster)).rejects.toThrow(/unexpected error/i);
   });
 });

@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import * as path from "path";
 
 const loadDesktopModule = createRequire(__filename);
-const actualFs = jest.requireActual("fs") as typeof import("fs");
+const actualFs = jest.requireActual("fs");
 
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),

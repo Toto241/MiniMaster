@@ -69,7 +69,7 @@ beforeEach(() => {
     };
     return collectionMock;
   });
-  (db as any).batch = jest.fn(() => ({
+  (db).batch = jest.fn(() => ({
     set: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -86,15 +86,15 @@ describe("registerFcmToken", () => {
     getMock.mockResolvedValue({ exists: true, data: () => ({}) });
     updateMock.mockResolvedValue(undefined);
     const wrapped = testEnv.wrap(fns.registerFcmToken);
-    const res = await wrapped({ token: "tok" }, asChild);
+    const res = await wrapped({ token: "child-fcm-tok" }, asChild);
     expect(res).toEqual({ success: true });
-    expect(updateMock).toHaveBeenCalledWith({ fcmToken: "tok" });
+    expect(updateMock).toHaveBeenCalledWith({ fcmToken: "child-fcm-tok" });
   });
 
   it("fails with not-found when child missing", async () => {
     getMock.mockResolvedValue({ exists: false });
     const wrapped = testEnv.wrap(fns.registerFcmToken);
-    await expect(wrapped({ token: "tok" }, asChild)).rejects.toThrow(/Child device not found/);
+    await expect(wrapped({ token: "child-fcm-tok" }, asChild)).rejects.toThrow(/Child device not found/);
   });
 });
 
@@ -139,7 +139,7 @@ describe("task state machine", () => {
   it("completeTask rejects oversized photo URLs", async () => {
     const longUrl = `https://firebasestorage.googleapis.com/${"a".repeat(2050)}`;
     const wrapped = testEnv.wrap(fns.completeTask);
-    await expect(wrapped({ taskId: "t1", photoUrl: longUrl }, asChild)).rejects.toThrow(/maximum allowed length/);
+    await expect(wrapped({ taskId: "t1", photoUrl: longUrl }, asChild)).rejects.toThrow(/must not exceed 2048 characters/);
   });
 
   it("completeTask throws not-found when task does not exist", async () => {
@@ -193,7 +193,7 @@ describe("updateAppBlacklist", () => {
 
   it("throws invalid-argument for missing fields", async () => {
     const wrapped = testEnv.wrap(fns.updateAppBlacklist);
-    await expect(wrapped({}, asMaster)).rejects.toThrow(/must include valid/);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/childId is required/);
   });
 
   it("normalizes and deduplicates blacklist entries", async () => {
@@ -208,7 +208,7 @@ describe("updateAppBlacklist", () => {
 
   it("rejects non-string blacklist entries", async () => {
     const wrapped = testEnv.wrap(fns.updateAppBlacklist);
-    await expect(wrapped({ childId: "c1", appBlacklist: [123] }, asMaster)).rejects.toThrow(/entries must be strings/);
+    await expect(wrapped({ childId: "c1", appBlacklist: [123] }, asMaster)).rejects.toThrow(/must be a string/);
   });
 });
 
@@ -218,7 +218,7 @@ describe("setUsageRules", () => {
     getMock.mockResolvedValueOnce({ exists: true, data: () => ({ masterImei: "m1" }) });
     updateMock.mockResolvedValue(undefined);
     const wrapped = testEnv.wrap(fns.setUsageRules);
-    const usageRules = { dailyLimit: 3600000, bedtimeStart: "21:00", bedtimeEnd: "07:00" };
+    const usageRules = { dailyLimit: 60, bedtimeStart: "21:00", bedtimeEnd: "07:00" };
     const res = await wrapped({ childId: "c1", usageRules }, asMaster);
     expect(res).toEqual({ success: true });
     expect(updateMock).toHaveBeenCalledWith({ usageRules, updatedAt: "mock-server-timestamp" });
@@ -232,7 +232,7 @@ describe("setUsageRules", () => {
 
   it("throws invalid-argument for missing usageRules", async () => {
     const wrapped = testEnv.wrap(fns.setUsageRules);
-    await expect(wrapped({ childId: "c" }, asMaster)).rejects.toThrow(/must include valid/);
+    await expect(wrapped({ childId: "c" }, asMaster)).rejects.toThrow(/usageRules is required/);
   });
 });
 
@@ -305,7 +305,7 @@ describe("createTask", () => {
 
   it("throws invalid-argument for missing fields", async () => {
     const wrapped = testEnv.wrap(fns.createTask);
-    await expect(wrapped({ childId: "c1" }, asMaster)).rejects.toThrow(/Missing required fields/);
+    await expect(wrapped({ childId: "c1" }, asMaster)).rejects.toThrow(/description is required/);
   });
 });
 
@@ -317,14 +317,14 @@ describe("getSubscriptionStatus", () => {
     });
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
-    expect(res).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true, childLimit: 4, parentAppLimit: 2 });
+    expect(res).toEqual({ subscriptionStatus: { status: "active", type: "premium" }, hasAccess: true, childLimit: 4, parentAppLimit: 2, expiresDateMs: null, originalTransactionId: null, platform: "unknown" });
   });
 
   it("returns none status if no subscription", async () => {
     getMock.mockResolvedValue({ exists: true, data: () => ({ secretKey: "sec" }) });
     const wrapped = testEnv.wrap(fns.getSubscriptionStatus);
     const res = await wrapped({}, asMaster);
-    expect(res).toEqual({ subscriptionStatus: { status: "none" }, hasAccess: false, childLimit: 4, parentAppLimit: 2 });
+    expect(res).toEqual({ subscriptionStatus: { status: "none" }, hasAccess: false, childLimit: 4, parentAppLimit: 2, expiresDateMs: null, originalTransactionId: null, platform: "unknown" });
   });
 
   it("throws not-found if master document is missing", async () => {
@@ -344,12 +344,12 @@ describe("reportDailyUsage", () => {
 
   it("throws invalid-argument for missing date", async () => {
     const wrapped = testEnv.wrap(fns.reportDailyUsage);
-    await expect(wrapped({ usageMillis: 1000 }, asChild)).rejects.toThrow(/Missing required fields/);
+    await expect(wrapped({ usageMillis: 1000 }, asChild)).rejects.toThrow(/date is required/);
   });
 
   it("throws invalid-argument for invalid usageMillis type", async () => {
     const wrapped = testEnv.wrap(fns.reportDailyUsage);
-    await expect(wrapped({ date: "2025-12-08", usageMillis: "not-a-number" }, asChild)).rejects.toThrow(/Missing required fields/);
+    await expect(wrapped({ date: "2025-12-08", usageMillis: "not-a-number" }, asChild)).rejects.toThrow(/usageMillis must be a number/);
   });
 });
 
