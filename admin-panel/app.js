@@ -267,6 +267,8 @@ const setupChecklistItems = [
     { key: "functions-access", label: "Alle Callable Functions erreichbar" },
     { key: "appcheck-active", label: "App Check konfiguriert und aktiv" },
     { key: "android-apps", label: "Android-Apps registriert (Master + Child)" },
+    { key: "ios-apps", label: "iOS-Apps registriert (Master + Child)" },
+    { key: "apple-app-store-api", label: "Apple App Store Server API konfiguriert (JWT, Bundle ID, Environment)" },
     { key: "ai-config", label: "KI-Provider konfiguriert (Google Gemini 3.0)" },
     { key: "support-workflow", label: "Support-Ticket-Workflow getestet" },
     { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" },
@@ -281,6 +283,8 @@ const commissioningQaRegisterDefinitions = [
     { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt", automationType: "manual" },
     { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert", automationType: "manual" },
     { key: "android-child-registered", label: "Android-App com.google.pairing registriert", automationType: "manual" },
+    { key: "ios-master-registered", label: "iOS-App MiniMasterParent registriert (App Store Connect)", automationType: "manual" },
+    { key: "ios-child-registered", label: "iOS-App MiniMasterChild registriert (App Store Connect + Family Controls)", automationType: "manual" },
     { key: "firebase-project-bound", label: "firebase use --add lokal durchgeführt", automationType: "automatic" },
     { key: "service-account-ready", label: "serviceAccountKey.json lokal für setup-admin verfügbar", automationType: "automatic" },
     { key: "parent-panel-verified", label: "Parent Web Panel Login geprüft", automationType: "manual" },
@@ -12317,18 +12321,21 @@ async function loadUsers(direction) {
         if (direction === "next") userPageDepth++;
         if (direction === "prev") userPageDepth--;
 
-        let html = "<table><tr><th>Master ID</th><th>Email</th><th>Subscription</th><th>Created</th><th>Actions</th></tr>";
+        let html = "<table><tr><th>Master ID</th><th>Email</th><th>Platform</th><th>Subscription</th><th>Created</th><th>Actions</th></tr>";
         snapshot.forEach(doc => {
             const data = doc.data();
             const created = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
             const email = data.email || "N/A";
             const subStatus = data.subscription ? data.subscription.status : "none";
             const subClass = subStatus === "active" ? "status-active" : subStatus === "expired" ? "status-expired" : "";
+            const platform = data.subscription?.platform || "unknown";
+            const platformLabel = platform === "android" ? "🤖 Android" : platform === "ios" ? "🍎 iOS" : platform === "web" ? "🌐 Web" : "❓ " + platform;
             const encodedMasterId = encodeInlineArgument(doc.id);
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
                 <td>${escapeHtml(email)}</td>
+                <td>${escapeHtml(platformLabel)}</td>
                 <td><span class="${subClass}">${escapeHtml(subStatus)}</span></td>
                 <td>${created}</td>
                 <td>
@@ -12389,17 +12396,20 @@ async function searchUsers() {
             return;
         }
 
-        let html = "<table><tr><th>Master ID</th><th>Email</th><th>Subscription</th><th>Created</th><th>Actions</th></tr>";
+        let html = "<table><tr><th>Master ID</th><th>Email</th><th>Platform</th><th>Subscription</th><th>Created</th><th>Actions</th></tr>";
         snapshot.forEach(doc => {
             const data = doc.data();
             const created = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
             const email = data.email || "N/A";
             const subStatus = data.subscription ? data.subscription.status : "none";
+            const platform = data.subscription?.platform || "unknown";
+            const platformLabel = platform === "android" ? "🤖 Android" : platform === "ios" ? "🍎 iOS" : platform === "web" ? "🌐 Web" : "❓ " + platform;
             const encodedMasterId = encodeInlineArgument(doc.id);
 
             html += `<tr>
                 <td title="${escapeHtml(doc.id)}">${escapeHtml(doc.id.substring(0, 12))}...</td>
                 <td>${escapeHtml(email)}</td>
+                <td>${escapeHtml(platformLabel)}</td>
                 <td>${escapeHtml(subStatus)}</td>
                 <td>${created}</td>
                 <td><button onclick="viewUserDetails(decodeInlineArgument('${encodedMasterId}'))" class="btn btn-secondary btn-sm">View</button></td>
@@ -12451,10 +12461,18 @@ async function viewUserDetails(masterId) {
         if (masterData.subscription) {
             const sub = masterData.subscription;
             const statusLabel = sub.status === "trial" ? "🟡 Trial (7 Tage)" : sub.status === "active" ? "🟢 Active" : "🔴 " + (sub.status || "none");
+            const platformLabel = sub.platform === "android" ? "🤖 Google Play" : sub.platform === "ios" ? "🍎 Apple App Store" : sub.platform === "web" ? "🌐 Web" : "❓ Unknown";
             html += `<h4>Subscription</h4>`;
             html += `<div class="ticket-detail-grid">`;
             html += `<p><strong>Status:</strong> ${escapeHtml(statusLabel)}</p>`;
             html += `<p><strong>Type:</strong> ${escapeHtml(sub.type || "N/A")}</p>`;
+            html += `<p><strong>Platform:</strong> ${escapeHtml(platformLabel)}</p>`;
+            if (sub.platform === "ios" && sub.originalTransactionId) {
+                html += `<p><strong>Apple Transaction ID:</strong> <code>${escapeHtml(sub.originalTransactionId)}</code></p>`;
+            }
+            if (sub.platform === "android" && sub.purchaseToken) {
+                html += `<p><strong>Play Purchase Token:</strong> <code>${escapeHtml(sub.purchaseToken.substring(0, 24))}...</code></p>`;
+            }
             if (sub.trialStartedAt) {
                 html += `<p><strong>Trial Start:</strong> ${new Date(sub.trialStartedAt.seconds * 1000).toLocaleString()}</p>`;
             }
@@ -12471,6 +12489,11 @@ async function viewUserDetails(masterId) {
                 const isExpired = expDate < new Date();
                 html += `<p><strong>Abo Ablauf:</strong> <span style="color:${isExpired ? "red" : "green"}">${expDate.toLocaleString()}${isExpired ? " (ABGELAUFEN)" : ""}</span></p>`;
             }
+            if (sub.expiresDateMs) {
+                const expDate = new Date(sub.expiresDateMs);
+                const isExpired = expDate < new Date();
+                html += `<p><strong>Apple Expires:</strong> <span style="color:${isExpired ? "red" : "green"}">${expDate.toLocaleString()}${isExpired ? " (ABGELAUFEN)" : ""}</span></p>`;
+            }
             if (sub.type) {
                 const childLimit = sub.type.startsWith("family") ? "Unbegrenzt (99)" : "1";
                 html += `<p><strong>Child-Limit:</strong> ${childLimit}</p>`;
@@ -12486,15 +12509,17 @@ async function viewUserDetails(masterId) {
         if (childrenSnapshot.empty) {
             html += "<p>No children linked.</p>";
         } else {
-            html += "<table><tr><th>Child ID</th><th>Locked</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>";
+            html += "<table><tr><th>Child ID</th><th>Platform</th><th>Locked</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>";
             childrenSnapshot.forEach(childDoc => {
                 const childData = childDoc.data();
                 const lastSeen = childData.lastSeen ? new Date(childData.lastSeen.seconds * 1000) : null;
                 const lastSeenStr = lastSeen ? lastSeen.toLocaleString() : "N/A";
                 const onlineStatus = getOnlineStatus(lastSeen);
+                const childPlatform = childData.platform === "android" ? "🤖 Android" : childData.platform === "ios" ? "🍎 iOS" : "❓ Unknown";
                 const encodedChildId = encodeInlineArgument(childDoc.id);
                 html += `<tr>
                     <td>${escapeHtml(childDoc.id)}</td>
+                    <td>${escapeHtml(childPlatform)}</td>
                     <td>${childData.isLocked ? "🔒 Yes" : "🔓 No"}</td>
                     <td>${lastSeenStr}</td>
                     <td>${onlineStatus}</td>
