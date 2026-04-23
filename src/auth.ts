@@ -1272,6 +1272,82 @@ export const registerMasterDevice = functions.https.onCall(
 );
 
 /**
+ * Registers a master device using an already-authenticated Firebase user.
+ *
+ * This is the modern replacement for `registerMasterDevice` (legacy IMEI flow).
+ * The caller must be authenticated (anonymous or email/password) and the
+ * master document is created under `masters/{context.auth.uid}`.
+ *
+ * Returns `{ masterId }` — no custom token is needed because the caller
+ * is already signed in.
+ */
+export const registerAuthenticatedMaster = functions.https.onCall(
+  async (data: { deviceId?: string; deviceName?: string }, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    validateAppCheck(context, true);
+    checkRateLimit(masterId, "auth.register_authenticated_master", 5, 60 * 60 * 1000);
+
+    const deviceId = data.deviceId || masterId;
+    const deviceName = data.deviceName || "Master Device";
+
+    const masterDeviceRef = db().collection("masters").doc(masterId);
+
+    try {
+      const doc = await masterDeviceRef.get();
+      if (doc.exists) {
+        // Just refresh metadata
+        await masterDeviceRef.update({
+          lastSeenAt: admin.firestore.Timestamp.now(),
+          appVersion: data.deviceName ? deviceName : (doc.data()?.appVersion || ""),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        await AuditLogger.logSuccess(
+          "device.register", context, `masters/${masterId}`, "device",
+          { deviceId, alreadyExists: true, modernFlow: true, duration: Date.now() - startTime }
+        );
+        return { masterId };
+      }
+
+      const now = admin.firestore.Timestamp.now();
+      await masterDeviceRef.set({
+        deviceId,
+        deviceName,
+        uid: masterId,
+        role: "master",
+        createdAt: now,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        subscription: {
+          status: "trial_pending",
+          parentAppLimit: 2,
+          childLimit: 4,
+        },
+      });
+
+      await auth().setCustomUserClaims(masterId, {
+        role: "master",
+        masterId,
+      });
+
+      await AuditLogger.logSuccess(
+        "device.register", context, `masters/${masterId}`, "device",
+        { deviceId, modernFlow: true, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`Authenticated master registered: ${masterId}`);
+      return { masterId };
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "device.register", context, `masters/${masterId}`, "device",
+        error as Error, { deviceId, modernFlow: true }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError("internal", "Failed to register authenticated master.");
+    }
+  }
+);
+
+/**
  * Revokes all refresh tokens for a user, forcing re-authentication.
  * Admin-only action for security incidents.
  */

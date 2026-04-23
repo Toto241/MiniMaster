@@ -373,3 +373,97 @@ export const validatePairingToken = functions.https.onCall(
     }
   )
 );
+
+/**
+ * Authenticated child-device pairing (modern flow).
+ *
+ * The caller must already be signed in to Firebase (anonymous auth is fine).
+ * The child's Firebase UID becomes the canonical `childId`.
+ *
+ * Supports both `pairingCode` (6-digit) and `pairingToken` (UUID deep-link).
+ */
+export const pairAuthenticatedChild = functions.https.onCall(
+  withErrorHandling(
+    "pairAuthenticatedChild",
+    async (data: { pairingCode?: string; pairingToken?: string }, context: CallableContext) => {
+      const startTime = Date.now();
+      const childId = requireAuth(context);
+      validateAppCheck(context, true);
+
+      if (!data.pairingCode && !data.pairingToken) {
+        throw new functions.https.HttpsError("invalid-argument", "Either pairingCode or pairingToken is required.");
+      }
+
+      let masterId: string;
+
+      if (data.pairingCode) {
+        const pairingCode = validateString(data.pairingCode, "pairingCode", {
+          required: true, pattern: /^\d{6}$/, sanitize: "none",
+        });
+        const codeDoc = await db().collection("pairingCodes").doc(pairingCode).get();
+        if (!codeDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "Invalid pairing code.");
+        }
+        const codeData = codeDoc.data();
+        const expiresAt = codeData?.expiresAt as admin.firestore.Timestamp;
+        masterId = (codeData?.masterId || codeData?.masterImei) as string;
+        if (!masterId || !expiresAt || admin.firestore.Timestamp.now().seconds > expiresAt.seconds) {
+          await db().collection("pairingCodes").doc(pairingCode).delete();
+          throw new functions.https.HttpsError("deadline-exceeded", "Pairing code has expired.");
+        }
+        await db().collection("pairingCodes").doc(pairingCode).delete();
+      } else {
+        const pairingToken = validateString(data.pairingToken!, "pairingToken", {
+          required: true,
+          pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+          sanitize: "none",
+        });
+        const tokenDoc = await db().collection("pairingTokens").doc(pairingToken).get();
+        if (!tokenDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "Invalid pairing token.");
+        }
+        const tokenData = tokenDoc.data();
+        const expiresAt = tokenData?.expiresAt as admin.firestore.Timestamp;
+        masterId = (tokenData?.masterId || tokenData?.masterImei) as string;
+        if (!masterId || !expiresAt || admin.firestore.Timestamp.now().seconds > expiresAt.seconds) {
+          await db().collection("pairingTokens").doc(pairingToken).delete();
+          throw new functions.https.HttpsError("deadline-exceeded", "Pairing token has expired.");
+        }
+        await db().collection("pairingTokens").doc(pairingToken).delete();
+      }
+
+      const masterDoc = await db().collection("masters").doc(masterId).get();
+      if (!masterDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Master account not found.");
+      }
+      const masterData = masterDoc.data();
+      if (!hasPairingAccess(masterData)) {
+        throw new functions.https.HttpsError("resource-exhausted", "Active subscription or trial required for pairing.");
+      }
+
+      const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
+      const existingChildren = await db().collection("children")
+        .where("masterImei", "==", masterId).get();
+      if (existingChildren.size >= childLimit) {
+        throw new functions.https.HttpsError("resource-exhausted", `Child limit reached (${childLimit}).`);
+      }
+
+      const now = admin.firestore.Timestamp.now();
+      await db().collection("children").doc(childId).set({
+        childId,
+        masterImei: masterId,
+        pairedAt: now,
+        modernFlow: true,
+      }, { merge: true });
+      await activateTrialIfPending(masterId, masterData);
+
+      await AuditLogger.logSuccess(
+        "device.pair", context, `children/${childId}`, "device",
+        { masterId, pairingMethod: data.pairingCode ? "code" : "token", modernFlow: true, duration: Date.now() - startTime }
+      );
+
+      functions.logger.info(`Authenticated child ${childId} paired with master ${masterId}.`);
+      return { childId, masterId };
+    }
+  )
+);

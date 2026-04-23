@@ -3,6 +3,7 @@ package com.google.pairing
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.pairing.di.IoDispatcher
@@ -61,13 +62,13 @@ class PairingViewModel @Inject constructor(
     val childImeiForDebug: StateFlow<String?> = _childImeiForDebug.asStateFlow()
 
     /**
-     * Initiates the token validation process.
+     * Initiates the token validation process using the modern authenticated flow.
      *
-     * It calls the `validatePairingToken` cloud function with the provided token and the
-     * device's IMEI. The ViewModel's state is updated based on the outcome of this call.
+     * Ensures the device is anonymously signed in to Firebase, then calls
+     * `pairAuthenticatedChild` so the Firebase UID becomes the canonical childId.
      *
      * @param token The pairing token received from the deep link.
-     * @param childImei The unique identifier (e.g., IMEI) of the child device.
+     * @param childImei The unique identifier (e.g., IMEI) of the child device (stored for reference).
      */
     fun validateToken(token: String, childImei: String) {
         _childImeiForDebug.value = childImei
@@ -75,14 +76,22 @@ class PairingViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             _pairingState.value = PairingState.Loading
 
-            val data = hashMapOf(
-                "pairingToken" to token,
-                "childImei" to childImei
-            )
-
             try {
-                val result = functions.getHttpsCallable("validatePairingToken").call(data).await()
-                val childId = (result.getData() as? Map<String, Any>)?.get("childId") as? String
+                // Modern flow: anonymous auth first
+                val auth = FirebaseAuth.getInstance()
+                val firebaseUser = auth.currentUser ?: auth.signInAnonymously().await().user
+                if (firebaseUser == null) {
+                    _pairingState.value = PairingState.Error("Firebase authentication failed.")
+                    return@launch
+                }
+
+                val data = hashMapOf(
+                    "pairingToken" to token
+                )
+
+                val result = functions.getHttpsCallable("pairAuthenticatedChild").call(data).await()
+                val payload = result.getData() as? Map<String, Any>
+                val childId = payload?.get("childId") as? String
 
                 if (childId != null) {
                     childIdRepository.saveChildId(childId)

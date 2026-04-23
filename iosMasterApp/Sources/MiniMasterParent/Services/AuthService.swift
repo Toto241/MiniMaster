@@ -29,24 +29,29 @@ final class AuthService: ObservableObject {
 
     // MARK: - Registration & Login
 
-    /// Registers a new master device and signs in immediately.
+    /// Registers a new master device using the modern authenticated flow.
+    /// Ensures Firebase anonymous auth first, then calls `registerAuthenticatedMaster`.
     func registerAndLogin(imei: String, deviceName: String? = nil) async {
         do {
+            // Modern flow: anonymous auth first
+            if Auth.auth().currentUser == nil {
+                let authResult = try await Auth.auth().signInAnonymously()
+                print("Master app signed in anonymously: \(authResult.user.uid)")
+            }
+
             let params: [String: Any] = {
-                var p: [String: Any] = ["imei": imei]
+                var p: [String: Any] = ["deviceId": imei]
                 if let name = deviceName { p["deviceName"] = name }
                 return p
             }()
-            let result = try await functions.httpsCallable("registerMasterDevice").call(params)
+            let result = try await functions.httpsCallable("registerAuthenticatedMaster").call(params)
             guard let data = result.data as? [String: Any],
-                  let customToken = data["customToken"] as? String else {
-                throw AuthError.missingCustomToken
+                  let masterId = data["masterId"] as? String else {
+                throw AuthError.missingMasterId
             }
 
-            let resolvedMasterId = (data["masterId"] as? String) ?? imei
-            masterImei = resolvedMasterId
-            try await signInWithCustomToken(customToken)
-            syncFromCurrentUser(fallbackMasterId: resolvedMasterId)
+            masterImei = masterId
+            syncFromCurrentUser(fallbackMasterId: masterId)
             self.error = nil
         } catch {
             self.error = error
@@ -78,11 +83,14 @@ final class AuthService: ObservableObject {
 
 enum AuthError: LocalizedError {
     case missingCustomToken
+    case missingMasterId
 
     var errorDescription: String? {
         switch self {
         case .missingCustomToken:
             return "Der Server hat keinen Firebase Custom Token zurückgegeben."
+        case .missingMasterId:
+            return "Der Server hat keine Master-ID zurückgegeben."
         }
     }
 }

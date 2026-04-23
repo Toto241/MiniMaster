@@ -1,10 +1,7 @@
 // swift-tools-version: 5.10
 // MiniMasterParent – iOS Parent App (SwiftUI)
 // Requires: Xcode 15+, iOS 17+
-// Before opening in Xcode, add the following Firebase SPM packages:
-//   https://github.com/firebase/firebase-ios-sdk  (FirebaseFirestore, FirebaseFunctions, FirebaseMessaging, FirebaseAuth)
-//   https://github.com/openid/AppAuth-iOS  (for StoreKit2 if needed)
-// Then add google-services GoogleService-Info.plist to the app target.
+// Add google-services GoogleService-Info.plist to the app target in Xcode.
 
 import PackageDescription
 
@@ -14,10 +11,18 @@ let package = Package(
     products: [
         .library(name: "MiniMasterParent", targets: ["MiniMasterParent"])
     ],
-    dependencies: [],   // Firebase added as Xcode framework targets (not as SPM deps here)
+    dependencies: [
+        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "11.0.0")
+    ],
     targets: [
         .target(
             name: "MiniMasterParent",
+            dependencies: [
+                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseFunctions", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
+            ],
             path: "Sources/MiniMasterParent"
         ),
         .testTarget(

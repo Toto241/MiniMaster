@@ -54,7 +54,7 @@ final class ChildAuthService: ObservableObject {
     func pairWithCode(_ code: String) async {
         do {
             try await ensureAnonymousAuth()
-            let result = try await client.validatePairingCode(code)
+            let result = try await client.pairAuthenticatedChild(pairingCode: code)
             try await completePairing(childId: result.childId)
         } catch {
             self.error = ChildAuthError.pairingFailed(error.localizedDescription)
@@ -65,7 +65,7 @@ final class ChildAuthService: ObservableObject {
     func pairWithToken(_ token: String) async {
         do {
             try await ensureAnonymousAuth()
-            let result = try await client.validatePairingToken(token)
+            let result = try await client.pairAuthenticatedChild(pairingToken: token)
             try await completePairing(childId: result.childId)
         } catch {
             self.error = ChildAuthError.pairingFailed(error.localizedDescription)
