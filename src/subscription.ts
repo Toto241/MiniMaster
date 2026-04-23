@@ -13,41 +13,14 @@ import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogge
 import { validateSku, validateString } from "./validation";
 import { withResilience } from "./resilience";
 import { withErrorHandling } from "./error-handler";
+import {
+  B2C_TIERS, B2B_TIERS, VALID_PRODUCT_IDS,
+  getChildLimit, getParentAppLimit, getSubscriptionDurationMs,
+  isB2CSku, isB2BSku,
+} from "./pricing-config";
 
-const DEFAULT_PARENT_APP_LIMIT = 2;
-const DEFAULT_CHILD_LIMIT = 4;
-
-/** Valid subscription product IDs (current monetization model). */
-const VALID_PRODUCT_IDS = [
-  "single_child_monthly",
-  "family_monthly",
-  "single_child_yearly",
-  "family_yearly",
-];
-
-/**
- * Returns the child limit for a given subscription product.
- */
-function getChildLimit(sku: string): number {
-  if (VALID_PRODUCT_IDS.includes(sku)) return DEFAULT_CHILD_LIMIT;
-  return DEFAULT_CHILD_LIMIT;
-}
-
-/**
- * Returns the parent app limit for a given subscription product.
- */
-function getParentAppLimit(sku: string): number {
-  if (VALID_PRODUCT_IDS.includes(sku)) return DEFAULT_PARENT_APP_LIMIT;
-  return DEFAULT_PARENT_APP_LIMIT;
-}
-
-/**
- * Returns subscription duration in milliseconds for a given product.
- */
-function getSubscriptionDurationMs(sku: string): number {
-  if (sku.includes("yearly")) return 365 * 24 * 60 * 60 * 1000;
-  return 30 * 24 * 60 * 60 * 1000; // monthly default
-}
+// Re-export for backward compatibility
+export { VALID_PRODUCT_IDS, getChildLimit, getParentAppLimit, getSubscriptionDurationMs };
 
 /**
  * Verifies a Google Play subscription purchase and grants entitlement.
@@ -87,10 +60,14 @@ export const verifyPurchase = functions.https.onCall(
         const durationMs = getSubscriptionDurationMs(sku);
         const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + durationMs);
 
+        const tier = B2C_TIERS[sku] || B2B_TIERS[sku];
+
         await masterDeviceRef.update({
           subscription: {
             status: "active",
             type: sku,
+            tierName: tier?.name || sku,
+            isPremium: tier?.isPremium || false,
             parentAppLimit: getParentAppLimit(sku),
             childLimit: getChildLimit(sku),
             startedAt: now,
@@ -99,6 +76,26 @@ export const verifyPurchase = functions.https.onCall(
             purchaseVerifiedAt: now,
           },
         });
+
+        // Track affiliate conversion if referred
+        const masterData = (await masterDeviceRef.get()).data();
+        if (masterData?.affiliateCode) {
+          try {
+            await db().collection("affiliate_conversions").add({
+              affiliateId: masterData.affiliateId,
+              affiliateCode: masterData.affiliateCode,
+              masterId,
+              sku,
+              priceCents: tier?.priceCents || 0,
+              commissionCents: Math.round((tier?.priceCents || 0) * 0.30),
+              status: "pending",
+              createdAt: now,
+            });
+            functions.logger.info(`Affiliate conversion tracked for ${masterId} via ${masterData.affiliateCode}`);
+          } catch (affErr) {
+            functions.logger.warn("Affiliate tracking failed (non-critical):", affErr);
+          }
+        }
 
         await AuditLogger.logSuccess(
           "subscription.verify_purchase", context, `masters/${masterId}`, "subscription",
