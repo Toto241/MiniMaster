@@ -207,10 +207,18 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       functions = firebase.app("parent-panel-app").functions();
       auth = firebase.app("parent-panel-app").auth();
 
-      auth.onAuthStateChanged((user) => {
+      auth.onAuthStateChanged(async (user) => {
         if (user) {
           currentMasterImei = user.uid;
-          setStatus("ticket-auth-status", "Authentifiziert als " + user.uid, "success");
+          let platformLabel = "";
+          try {
+            const masterDoc = await db.collection("masters").doc(user.uid).get();
+            if (masterDoc.exists) {
+              const platform = masterDoc.data()?.subscription?.platform || "unknown";
+              platformLabel = platform === "android" ? "🤖 Android" : platform === "ios" ? "🍎 iOS" : platform === "web" ? "🌐 Web" : "❓ " + platform;
+            }
+          } catch (e) { /* ignore */ }
+          setStatus("ticket-auth-status", "Authentifiziert als " + user.uid + (platformLabel ? " · " + platformLabel : ""), "success");
           updateSecureWebControlButtonState();
           loadOwnTickets();
           return;

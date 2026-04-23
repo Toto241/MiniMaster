@@ -194,6 +194,9 @@ export const getSubscriptionStatus = functions.https.onCall(
     result.hasAccess = hasActiveAccess(masterData);
     result.parentAppLimit = subscription.parentAppLimit || DEFAULT_PARENT_APP_LIMIT;
     result.childLimit = subscription.childLimit || DEFAULT_CHILD_LIMIT;
+    result.platform = subscription.platform || "unknown";
+    result.originalTransactionId = subscription.originalTransactionId || null;
+    result.expiresDateMs = subscription.expiresDateMs || null;
     return result;
   }
 );

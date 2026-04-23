@@ -4987,3 +4987,43 @@ input:focus, select:focus, textarea:focus {
 .pricing-platforms .badge {
     margin-right: 4px;
 }
+
+/* ==================== AUTOMATED SETUP CHECKLIST ==================== */
+.setup-checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.setup-checklist-item:last-child {
+    border-bottom: none;
+}
+.setup-checklist-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+.setup-checklist-item input[type="checkbox"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.setup-checklist-item label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    flex: 1;
+}
+.setup-checklist-item label.check-pass {
+    color: #1a6e1a;
+}
+.setup-checklist-item label.check-fail {
+    color: #a01818;
+}
+.setup-checklist-item .check-note {
+    font-size: 0.75rem;
+    color: #888;
+    margin-left: auto;
+}

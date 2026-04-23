@@ -307,3 +307,52 @@ export function applyPromoCode(priceCents: number, promoCode: PromoCode | null):
     discountPercent: promoCode.discountPercent,
   };
 }
+
+// ==================== ADMIN API ====================
+
+import * as functions from "firebase-functions/v1";
+import type { CallableContext } from "firebase-functions/v1/https";
+import { requireAdmin, validateAppCheck } from "./shared";
+
+export const getPricingConfig = functions.https.onCall(
+  async (_data: unknown, context: CallableContext) => {
+    validateAppCheck(context, true);
+    requireAdmin(context);
+
+    return {
+      b2c: Object.values(B2C_TIERS).map((t) => ({
+        sku: t.sku,
+        name: t.name,
+        description: t.description,
+        priceCents: t.priceCents,
+        currency: t.currency,
+        billingPeriod: t.billingPeriod,
+        childLimit: t.childLimit,
+        parentAppLimit: t.parentAppLimit,
+        features: t.features,
+        isPremium: t.isPremium,
+        platforms: ["android", "ios"],
+      })),
+      b2b: Object.values(B2B_TIERS).map((t) => ({
+        sku: t.sku,
+        name: t.name,
+        description: t.description,
+        priceCents: t.priceCents,
+        currency: t.currency,
+        billingPeriod: t.billingPeriod,
+        maxDevices: t.maxDevices,
+        maxAdmins: t.maxAdmins,
+        features: t.features,
+        orgTypes: t.orgTypes,
+        requiresContract: t.requiresContract,
+      })),
+      affiliate: {
+        commissionRate: 0.30,
+        commissionDurationMonths: 12,
+        minimumPayoutCents: 5000,
+        cookieDurationDays: 30,
+        payoutMethod: "PayPal",
+      },
+    };
+  }
+);

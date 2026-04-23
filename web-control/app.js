@@ -1209,21 +1209,39 @@ async function loadSubscriptionStatus() {
         const data = result.data || {};
         const subscription = data.subscriptionStatus || {};
         const status = escapeHtml(subscription.status || 'none');
+        const platform = data.platform || 'unknown';
+        const platformLabel = platform === 'android' ? '🤖 Google Play' : platform === 'ios' ? '🍎 Apple App Store' : platform === 'web' ? '🌐 Web' : escapeHtml(platform);
         const expiresAt = subscription.expiresAt?.seconds
             ? new Date(subscription.expiresAt.seconds * 1000).toLocaleString()
             : 'N/A';
+        const appleExpires = data.expiresDateMs
+            ? new Date(data.expiresDateMs).toLocaleString()
+            : null;
         const trialDays = Number.isFinite(data.trialDaysRemaining) ? data.trialDaysRemaining : null;
         const accessText = data.hasAccess ? 'Active access' : 'No active access';
+
+        let appleHtml = '';
+        if (platform === 'ios' && data.originalTransactionId) {
+            appleHtml = `<p><strong>Apple Transaction ID:</strong> <code>${escapeHtml(data.originalTransactionId)}</code></p>`;
+            if (appleExpires) {
+                appleHtml += `<p><strong>Apple Expires:</strong> ${escapeHtml(appleExpires)}</p>`;
+            }
+        }
+        if (platform === 'android' && subscription.purchaseToken) {
+            appleHtml = `<p><strong>Play Purchase Token:</strong> <code>${escapeHtml(subscription.purchaseToken.substring(0, 24))}...</code></p>`;
+        }
 
         statusCard.innerHTML = `
             <h4>Current Subscription</h4>
             <p><strong>Status:</strong> ${status}</p>
+            <p><strong>Platform:</strong> ${platformLabel}</p>
+            ${appleHtml}
             <p><strong>Access:</strong> ${accessText}</p>
             <p><strong>Child device limit:</strong> ${escapeHtml(String(data.childLimit || 0))}</p>
             <p><strong>Parent app limit:</strong> ${escapeHtml(String(data.parentAppLimit || 0))}</p>
             <p><strong>Expires:</strong> ${expiresAt}</p>
             ${trialDays !== null ? `<p><strong>Trial days remaining:</strong> ${escapeHtml(String(trialDays))}</p>` : ''}
-            <p class="help-text">Purchases are currently completed via the parent Android app. Use this panel to inspect the live entitlement state.</p>
+            <p class="help-text">Purchases are completed via the parent Android or iOS app. Use this panel to inspect the live entitlement state.</p>
         `;
     } catch (error) {
         console.error('Error loading subscription status:', error);
