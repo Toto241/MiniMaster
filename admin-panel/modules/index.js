@@ -32,6 +32,12 @@ import "./tabs/python-automation-actions.js";
 import "./tabs/testing-register-insights.js";
 import "./tabs/testing-register-priorities.js";
 
+// === MONETISATION TABS (B2B, Affiliate, Pricing, Revenue) ===
+import "./tabs/b2b-dashboard.js";
+import "./tabs/pricing-management.js";
+import "./tabs/affiliate-dashboard.js";
+import "./tabs/revenue-analytics.js";
+
 // Bootstrap-Marker fuer Diagnostik / kuenftige Smoke-Checks.
 if (typeof window !== "undefined" && window.MM) {
   window.MM.bootstrappedAt = Date.now();
