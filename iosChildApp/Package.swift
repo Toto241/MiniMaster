@@ -9,10 +9,6 @@
 //   - FamilyControls
 //   - ManagedSettings
 //   - DeviceActivity
-//
-// Firebase SPM:
-//   https://github.com/firebase/firebase-ios-sdk
-//   Products: FirebaseAuth, FirebaseFunctions, FirebaseMessaging
 
 import PackageDescription
 
@@ -22,10 +18,17 @@ let package = Package(
     products: [
         .library(name: "MiniMasterChild", targets: ["MiniMasterChild"])
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "11.0.0")
+    ],
     targets: [
         .target(
             name: "MiniMasterChild",
+            dependencies: [
+                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseFunctions", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
+            ],
             path: "Sources/MiniMasterChild"
         ),
         .testTarget(

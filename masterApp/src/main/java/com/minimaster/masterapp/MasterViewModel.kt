@@ -123,26 +123,35 @@ class MasterViewModel @Inject constructor(
 
     /**
      * Registers the device with the backend using its IMEI.
-     * On success, it signs in using the returned Firebase custom token and stores the
-     * canonical master id for follow-up authenticated calls.
+     * Uses the modern authenticated flow: anonymous Firebase Auth first,
+     * then calls `registerAuthenticatedMaster` so the UID becomes the canonical masterId.
      * @param imei The unique identifier of the device to register.
      */
     fun registerDevice(imei: String) {
         viewModelScope.launch {
             _registrationState.value = RegistrationState.Loading
-            val data = hashMapOf("imei" to imei)
             try {
-                val result = functions.getHttpsCallable("registerMasterDevice").call(data).await()
+                // Modern flow: ensure anonymous auth, then register with UID
+                val currentUser = auth().currentUser
+                val firebaseUser = currentUser ?: auth().signInAnonymously().await().user
+                if (firebaseUser == null) {
+                    _registrationState.value = RegistrationState.Error("Firebase authentication failed.")
+                    return@launch
+                }
+
+                val data = hashMapOf(
+                    "deviceId" to imei,
+                    "deviceName" to android.os.Build.MODEL
+                )
+                val result = functions.getHttpsCallable("registerAuthenticatedMaster").call(data).await()
                 val payload = result.getData() as? Map<*, *>
                 val masterId = payload?.get("masterId") as? String
-                val customToken = payload?.get("customToken") as? String
-                if (masterId != null && customToken != null) {
-                    auth().signInWithCustomToken(customToken).await()
+                if (masterId != null) {
                     credentialsRepository.saveCredentials(masterId, "")
                     _debugState.value = DebugState(imei = masterId, secretKey = null)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
-                     _registrationState.value = RegistrationState.Error("Backend returned no registration token.")
+                    _registrationState.value = RegistrationState.Error("Backend returned no masterId.")
                 }
             } catch (e: Exception) {
                 val errorMessage = if (e is FirebaseFunctionsException) "Error (${e.code}): ${e.message}" else e.message ?: "An unknown error occurred."

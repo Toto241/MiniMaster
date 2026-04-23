@@ -16,17 +16,20 @@ final class ChildCloudFunctionsClient {
         let masterId: String?
     }
 
-    func validatePairingCode(_ code: String) async throws -> PairingResult {
-        let result = try await functions.httpsCallable("validatePairingCode")
-            .call(["pairingCode": code])
+    func pairAuthenticatedChild(pairingCode: String?) async throws -> PairingResult {
+        var params: [String: Any] = [:]
+        if let code = pairingCode { params["pairingCode"] = code }
+        let result = try await functions.httpsCallable("pairAuthenticatedChild").call(params)
         let data = try cast(result.data)
         let childId = try require(data["childId"] as? String, key: "childId")
-        return PairingResult(childId: childId, masterId: nil)
+        let masterId = data["masterId"] as? String
+        return PairingResult(childId: childId, masterId: masterId)
     }
 
-    func validatePairingToken(_ token: String) async throws -> PairingResult {
-        let result = try await functions.httpsCallable("validatePairingToken")
-            .call(["pairingToken": token])
+    func pairAuthenticatedChild(pairingToken: String?) async throws -> PairingResult {
+        var params: [String: Any] = [:]
+        if let token = pairingToken { params["pairingToken"] = token }
+        let result = try await functions.httpsCallable("pairAuthenticatedChild").call(params)
         let data = try cast(result.data)
         let childId = try require(data["childId"] as? String, key: "childId")
         let masterId = data["masterId"] as? String
