@@ -53,8 +53,9 @@ final class ChildAuthService: ObservableObject {
     /// Use a 6-digit code shown in the parent app.
     func pairWithCode(_ code: String) async {
         do {
-            let result = try await client.validatePairingCode(code: code)
-            try await completePairing(masterImei: result.masterImei, customToken: result.firebaseToken)
+            try await ensureAnonymousAuth()
+            let result = try await client.validatePairingCode(code)
+            try await completePairing(childId: result.childId)
         } catch {
             self.error = ChildAuthError.pairingFailed(error.localizedDescription)
         }
@@ -63,8 +64,9 @@ final class ChildAuthService: ObservableObject {
     /// Use a deep-link token (e.g. from a QR code URL).
     func pairWithToken(_ token: String) async {
         do {
-            let result = try await client.validatePairingToken(token: token)
-            try await completePairing(masterImei: result.childId, customToken: result.firebaseToken)
+            try await ensureAnonymousAuth()
+            let result = try await client.validatePairingToken(token)
+            try await completePairing(childId: result.childId)
         } catch {
             self.error = ChildAuthError.pairingFailed(error.localizedDescription)
         }
@@ -95,21 +97,22 @@ final class ChildAuthService: ObservableObject {
 
     // MARK: - Private
 
-    private func completePairing(masterImei: String, customToken: String?) async throws {
-        // The backend returns the "childId" field (legacy quirk: equals masterImei).
-        let resolvedChildId = masterImei
-        persist(childId: resolvedChildId)
-        syncService.configure(childId: resolvedChildId)
-
-        if let token = customToken {
-            do {
-                try await Auth.auth().signIn(withCustomToken: token)
-                isSignedInToFirebase = true
-            } catch {
-                throw ChildAuthError.customTokenSignInFailed(error)
-            }
+    private func ensureAnonymousAuth() async throws {
+        guard Auth.auth().currentUser == nil else { return }
+        do {
+            let result = try await Auth.auth().signInAnonymously()
+            isSignedInToFirebase = true
+            print("Child app signed in anonymously: \(result.user.uid)")
+        } catch {
+            throw ChildAuthError.customTokenSignInFailed(error)
         }
+    }
+
+    private func completePairing(childId: String) async throws {
+        persist(childId: childId)
+        syncService.configure(childId: childId)
         isPaired = true
+        isSignedInToFirebase = Auth.auth().currentUser != nil
         // Register endpoint now that we have a resolved childId
         await syncService.registerEndpoint()
     }

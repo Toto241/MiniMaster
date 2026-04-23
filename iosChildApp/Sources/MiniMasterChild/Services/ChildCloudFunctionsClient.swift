@@ -11,19 +11,26 @@ final class ChildCloudFunctionsClient {
 
     // MARK: - Pairing
 
-    func validatePairingCode(_ code: String) async throws -> String {
-        let result = try await functions.httpsCallable("validatePairingCode")
-            .call(["code": code])
-        let data = try cast(result.data)
-        // Legacy quirk: server returns childId field but value is masterImei
-        return try require(data["childId"] as? String, key: "childId")
+    struct PairingResult {
+        let childId: String
+        let masterId: String?
     }
 
-    func validatePairingToken(_ token: String) async throws -> String {
+    func validatePairingCode(_ code: String) async throws -> PairingResult {
+        let result = try await functions.httpsCallable("validatePairingCode")
+            .call(["pairingCode": code])
+        let data = try cast(result.data)
+        let childId = try require(data["childId"] as? String, key: "childId")
+        return PairingResult(childId: childId, masterId: nil)
+    }
+
+    func validatePairingToken(_ token: String) async throws -> PairingResult {
         let result = try await functions.httpsCallable("validatePairingToken")
             .call(["pairingToken": token])
         let data = try cast(result.data)
-        return try require(data["childId"] as? String, key: "childId")
+        let childId = try require(data["childId"] as? String, key: "childId")
+        let masterId = data["masterId"] as? String
+        return PairingResult(childId: childId, masterId: masterId)
     }
 
     // MARK: - Control-Plane (Pull)

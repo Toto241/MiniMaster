@@ -94,7 +94,8 @@ final class SubscriptionService: ObservableObject {
         do {
             _ = try await functions.httpsCallable("verifyPurchase").call([
                 "purchaseToken": transaction.originalID.description,
-                "sku": transaction.productID
+                "sku": transaction.productID,
+                "platform": "ios"
             ])
             purchasedProductId = transaction.productID
         } catch {

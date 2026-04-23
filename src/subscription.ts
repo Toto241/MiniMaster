@@ -3,15 +3,20 @@
  * Handles purchase verification, subscription status, revocation, and expiry checks.
  * Aligned with current monetization: one subscription includes up to
  * 2 parent apps and up to 4 child apps.
+ *
+ * Platform coverage:
+ *  - Google Play  → verifyPlaySubscription + RTDN Pub/Sub
+ *  - Apple App Store → verifyAppleTransaction + StoreKit 2 server-side verification
  */
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { google } from "googleapis";
+import * as crypto from "crypto";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
 import { validateSku, validateString } from "./validation";
-import { withResilience } from "./resilience";
+import { withResilience, fetchWithTimeout } from "./resilience";
 import { withErrorHandling } from "./error-handler";
 import {
   B2C_TIERS, B2B_TIERS, VALID_PRODUCT_IDS,
@@ -23,10 +28,17 @@ import {
 export { VALID_PRODUCT_IDS, getChildLimit, getParentAppLimit, getSubscriptionDurationMs };
 
 /**
- * Verifies a Google Play subscription purchase and grants entitlement.
+ * Verifies a subscription purchase (Google Play or Apple App Store) and grants entitlement.
+ *
+ * Client payload:
+ *   { purchaseToken: string; sku: string; platform?: "android" | "ios" }
+ *
+ * For Apple the `purchaseToken` is the original transaction ID (StoreKit 2
+ * `transaction.originalID`). The backend calls Apple's App Store Server API v2
+ * to validate the transaction and read `expiresDate`.
  */
 export const verifyPurchase = functions.https.onCall(
-  async (data: { purchaseToken: string; sku: string }, context: CallableContext) => {
+  async (data: { purchaseToken: string; sku: string; platform?: "android" | "ios" }, context: CallableContext) => {
     const startTime = Date.now();
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
@@ -37,6 +49,7 @@ export const verifyPurchase = functions.https.onCall(
       required: true, maxLength: 2048, minLength: 10, sanitize: "none",
     });
     const sku = validateSku(data.sku);
+    const platform = (data.platform ?? "android") as "android" | "ios";
 
     const masterDeviceRef = db().collection("masters").doc(masterId);
 
@@ -46,19 +59,37 @@ export const verifyPurchase = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
 
-      const isPurchaseValid = await withResilience(
-        "play-store-verify",
-        async () => verifyPlaySubscription("com.minimaster.masterapp", sku, purchaseToken),
-        { timeoutMs: 15000, retry: { maxAttempts: 3, baseDelayMs: 1000 } }
-      ).catch((e) => {
-        functions.logger.error("Error verifying Google Play purchase:", e);
-        return false;
-      });
+      let isPurchaseValid = false;
+      let appleExpiresAtMs: number | undefined;
+
+      if (platform === "ios") {
+        const appleResult = await withResilience(
+          "apple-store-verify",
+          async () => verifyAppleTransaction(purchaseToken),
+          { timeoutMs: 15000, retry: { maxAttempts: 3, baseDelayMs: 1000 } }
+        ).catch((e) => {
+          functions.logger.error("Error verifying Apple purchase:", e);
+          return null;
+        });
+        isPurchaseValid = appleResult?.valid ?? false;
+        appleExpiresAtMs = appleResult?.expiresDateMs;
+      } else {
+        isPurchaseValid = await withResilience(
+          "play-store-verify",
+          async () => verifyPlaySubscription("com.minimaster.masterapp", sku, purchaseToken),
+          { timeoutMs: 15000, retry: { maxAttempts: 3, baseDelayMs: 1000 } }
+        ).catch((e) => {
+          functions.logger.error("Error verifying Google Play purchase:", e);
+          return false;
+        }) ?? false;
+      }
 
       if (isPurchaseValid) {
         const now = admin.firestore.Timestamp.now();
         const durationMs = getSubscriptionDurationMs(sku);
-        const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + durationMs);
+        const expiresAt = appleExpiresAtMs
+          ? admin.firestore.Timestamp.fromMillis(appleExpiresAtMs)
+          : admin.firestore.Timestamp.fromMillis(now.toMillis() + durationMs);
 
         const tier = B2C_TIERS[sku] || B2B_TIERS[sku];
 
@@ -74,6 +105,7 @@ export const verifyPurchase = functions.https.onCall(
             expiresAt: expiresAt,
             purchaseToken: purchaseToken,
             purchaseVerifiedAt: now,
+            platform: platform,
           },
         });
 
@@ -102,28 +134,29 @@ export const verifyPurchase = functions.https.onCall(
           {
             masterId,
             sku,
+            platform,
             parentAppLimit: getParentAppLimit(sku),
             childLimit: getChildLimit(sku),
             duration: Date.now() - startTime,
           }
         );
 
-        functions.logger.info(`Subscription ${sku} activated for master ${masterId}.`);
+        functions.logger.info(`Subscription ${sku} activated for master ${masterId} (platform=${platform}).`);
         return { success: true, subscriptionStatus: "active" };
       } else {
         await AuditLogger.logFailure(
           "subscription.verify_purchase", context, `masters/${masterId}`, "subscription",
-          new Error("Purchase verification failed"), { masterId, sku }
+          new Error("Purchase verification failed"), { masterId, sku, platform }
         );
 
-        functions.logger.warn(`Invalid purchase token received for master ${masterId}.`);
+        functions.logger.warn(`Invalid purchase token received for master ${masterId} (platform=${platform}).`);
         throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
       }
     } catch (error) {
       if (!(error instanceof functions.https.HttpsError)) {
         await AuditLogger.logFailure(
           "subscription.verify_purchase", context, `masters/${masterId}`, "subscription",
-          error as Error, { masterId, sku }
+          error as Error, { masterId, sku, platform }
         );
       }
       throw error;
@@ -311,6 +344,133 @@ async function verifyPlaySubscription(
   });
   const body = res.data;
   return body && (body as any).purchaseState === 0 && (body as any).expiryTimeMillis > Date.now();
+}
+
+/**
+ * Apple App Store Server API configuration (from environment).
+ */
+const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || "com.minimaster.masterapp";
+const APPLE_ISSUER_ID = process.env.APPLE_ISSUER_ID || "";
+const APPLE_KEY_ID = process.env.APPLE_KEY_ID || "";
+const APPLE_PRIVATE_KEY = process.env.APPLE_PRIVATE_KEY || "";
+const APPLE_ENVIRONMENT = process.env.APPLE_ENVIRONMENT || "production"; // "production" | "sandbox"
+
+const APPLE_API_BASE = APPLE_ENVIRONMENT === "sandbox"
+  ? "https://api.storekit-sandbox.itunes.apple.com"
+  : "https://api.storekit.itunes.apple.com";
+
+/**
+ * Signs a JWT for Apple App Store Server API v2.
+ * Uses ES256 (ECDSA using P-256 and SHA-256).
+ */
+function signAppleJWT(): string {
+  if (!APPLE_ISSUER_ID || !APPLE_KEY_ID || !APPLE_PRIVATE_KEY) {
+    throw new functions.https.HttpsError("failed-precondition", "Apple App Store Server API credentials are not configured.");
+  }
+
+  const header = Buffer.from(JSON.stringify({ alg: "ES256", kid: APPLE_KEY_ID, typ: "JWT" })).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const payload = Buffer.from(JSON.stringify({
+    iss: APPLE_ISSUER_ID,
+    iat: now,
+    exp: now + 600,
+    aud: "appstoreconnect-v1",
+    bid: APPLE_BUNDLE_ID,
+  })).toString("base64url");
+
+  const signingInput = `${header}.${payload}`;
+  const signature = crypto.createSign("SHA256").update(signingInput).sign(APPLE_PRIVATE_KEY, "base64url");
+  return `${signingInput}.${signature}`;
+}
+
+/**
+ * Apple App Store Server API transaction response (v2).
+ */
+type AppleTransactionResponse = {
+  transactionId: string;
+  originalTransactionId: string;
+  webOrderLineItemId: string;
+  bundleId: string;
+  productId: string;
+  subscriptionGroupIdentifier: string;
+  purchaseDate: number;
+  originalPurchaseDate: number;
+  expiresDate: number;
+  quantity: number;
+  type: string; // "Auto-Renewable Subscription"
+  inAppOwnershipType: string;
+  signedDate: number;
+  environment: string;
+  recentSubscriptionStartDate: number;
+  transactionReason?: string;
+  storefront?: string;
+  storefrontId?: string;
+  price?: number;
+  currency?: string;
+};
+
+/**
+ * Verifies an Apple transaction via the App Store Server API v2.
+ *
+ * @param originalTransactionId The StoreKit 2 `transaction.originalID`.
+ * @returns { valid: boolean; expiresDateMs?: number }
+ */
+async function verifyAppleTransaction(
+  originalTransactionId: string
+): Promise<{ valid: boolean; expiresDateMs?: number }> {
+  const jwt = signAppleJWT();
+  const url = `${APPLE_API_BASE}/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`;
+
+  const response = await fetchWithTimeout(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+    timeoutMs: 15000,
+  });
+
+  if (response.status === 404) {
+    functions.logger.warn("Apple transaction not found", { originalTransactionId });
+    return { valid: false };
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    functions.logger.error("Apple API error", { status: response.status, body });
+    throw new Error(`Apple API returned ${response.status}: ${body}`);
+  }
+
+  const data = await response.json() as {
+    data?: AppleTransactionResponse[];
+    errorMessage?: string;
+  };
+
+  if (!data.data || data.data.length === 0) {
+    return { valid: false };
+  }
+
+  // Find the most recent active transaction
+  const latest = data.data
+    .filter((t) => t.expiresDate > 0)
+    .sort((a, b) => b.expiresDate - a.expiresDate)[0];
+
+  if (!latest) {
+    return { valid: false };
+  }
+
+  const nowMs = Date.now();
+  const expiresDateMs = latest.expiresDate;
+  const isActive = expiresDateMs > nowMs;
+
+  functions.logger.info("Apple transaction verified", {
+    originalTransactionId,
+    productId: latest.productId,
+    expiresDateMs,
+    isActive,
+  });
+
+  return { valid: isActive, expiresDateMs };
 }
 
 /**

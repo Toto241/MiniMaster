@@ -21,12 +21,11 @@ final class CloudFunctionsClient {
     func generatePairingLink() async throws -> String {
         let result = try await functions.httpsCallable("generatePairingLink").call()
         let data = try cast(result.data, to: [String: Any].self)
-        return try require(data["pairingToken"] as? String, key: "pairingToken")
+        return try require(data["pairingLink"] as? String, key: "pairingLink")
     }
 
-    func createPairingCode(childId: String) async throws -> String {
-        let result = try await functions.httpsCallable("createPairingCode")
-            .call(["childId": childId])
+    func createPairingCode() async throws -> String {
+        let result = try await functions.httpsCallable("createPairingCode").call()
         let data = try cast(result.data, to: [String: Any].self)
         return try require(data["pairingCode"] as? String, key: "pairingCode")
     }
