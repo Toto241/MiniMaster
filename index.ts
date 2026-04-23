@@ -138,6 +138,46 @@ export {
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
 
+// ==================== MONETIZATION ====================
+export {
+  B2C_TIERS,
+  B2B_TIERS,
+  VALID_PRODUCT_IDS,
+  AFFILIATE_CONFIG,
+  VAT_RATES,
+  calculatePrice,
+  getTierBySku,
+  isB2BSku,
+  isB2CSku,
+  getChildLimit,
+  getParentAppLimit,
+  getSubscriptionDurationMs,
+  formatPriceCents,
+  applyPromoCode,
+} from "./src/pricing-config";
+
+// B2B Licensing
+export {
+  createB2BOrganization,
+  activateB2BLicense,
+  getB2BLicenseStatus,
+  addB2BDevice,
+  removeB2BDevice,
+  getB2BUsageReport,
+  revokeB2BLicense,
+  listB2BOrganizations,
+} from "./src/b2b-licensing";
+
+// Affiliate Program
+export {
+  registerAffiliate,
+  reviewAffiliate,
+  trackAffiliateConversion,
+  getAffiliateDashboard,
+  listAffiliates,
+  processAffiliatePayouts,
+} from "./src/affiliate";
+
 // ==================== INFRASTRUCTURE EXPORTS ====================
 // These are used by other modules but also available for testing/admin
 
