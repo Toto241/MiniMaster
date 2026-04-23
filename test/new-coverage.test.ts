@@ -214,12 +214,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const updates: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => {
@@ -475,19 +475,19 @@ describe("getSubscriptionStatus edge cases", () => {
 describe("verifyPurchase edge cases", () => {
   it("wirft invalid-argument bei fehlenden Pflichtfeldern", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "pt" }, asMaster)).rejects.toThrow(/Missing required fields/i);
+    await expect(wrapped({ purchaseToken: "purchase-tok" }, asMaster)).rejects.toThrow(/sku is required/i);
   });
 
   it("wirft invalid-argument bei unbekannter SKU", async () => {
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "pt", sku: "unknown_sku" }, asMaster)).rejects.toThrow(/Unknown product ID/i);
+    await expect(wrapped({ purchaseToken: "purchase-tok", sku: "unknown_sku" }, asMaster)).rejects.toThrow(/Invalid product ID/i);
   });
 
   it("wirft not-found wenn Master nicht existiert", async () => {
     state.masters = {};
 
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster))
+    await expect(wrapped({ purchaseToken: "purchase-tok", sku: "single_child_monthly" }, asMaster))
       .rejects.toThrow(/Master account not found/i);
   });
 
@@ -513,7 +513,7 @@ describe("verifyPurchase edge cases", () => {
     });
 
     const wrapped = testEnv.wrap(fns.verifyPurchase);
-    await expect(wrapped({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster))
+    await expect(wrapped({ purchaseToken: "purchase-tok", sku: "single_child_monthly" }, asMaster))
       .rejects.toThrow(/master read failed/i);
   });
 });

@@ -95,7 +95,7 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const operations: Array<() => void> = [];
     return {
       set: jest.fn((ref: any, data: any, options?: { merge?: boolean }) => {
@@ -188,7 +188,7 @@ describe("decisioning controller", () => {
 
     expect(result).toHaveProperty("traceId");
     expect(Object.keys(state.decision_traces)).toHaveLength(1);
-    const trace = Object.values(state.decision_traces)[0] as any;
+    const trace = Object.values(state.decision_traces)[0];
     expect(trace.ruleId).toBe("daily-limit");
     expect(trace.userId).toBe("m1");
   });

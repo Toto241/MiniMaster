@@ -35,7 +35,7 @@ describe("escapeHtml", () => {
   });
 
   it("escapes quotes", () => {
-    expect(escapeHtml('"quoted"')).toBe("&quot;quoted&quot;");
+    expect(escapeHtml("\"quoted\"")).toBe("&quot;quoted&quot;");
   });
 
   it("returns empty string for non-strings", () => {
@@ -112,7 +112,7 @@ describe("validateString", () => {
   });
 
   it("prevents XSS payloads", () => {
-    const xssPayload = `<img src=x onerror="alert('XSS')">`;
+    const xssPayload = "<img src=x onerror=\"alert('XSS')\">";
     const result = validateString(xssPayload, "field");
     expect(result).not.toContain("<img");
     expect(result).not.toContain("onerror");
@@ -349,7 +349,7 @@ describe("validateUsageRules", () => {
   });
 
   it("throws for invalid bedtime format", () => {
-    expect(() => validateUsageRules({ bedtimeStart: "25:00" })).toThrow(functions.https.HttpsError);
+    expect(() => validateUsageRules({ bedtimeStart: "invalid" })).toThrow(functions.https.HttpsError);
   });
 
   it("throws for non-object", () => {

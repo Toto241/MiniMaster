@@ -174,7 +174,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn(() => ({ get: jest.fn(() => Promise.resolve({ docs: [] })) })),
           },
         }));
@@ -185,7 +185,7 @@ beforeEach(() => {
   });
 
   // batch mock
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -194,7 +194,7 @@ beforeEach(() => {
     };
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
@@ -791,7 +791,7 @@ describe("resetOperatorAccounts", () => {
       key2: { role: "support" },
     };
 
-    (mockAuth.listUsers as jest.Mock)
+    (mockAuth.listUsers)
       .mockResolvedValueOnce({
         users: [
           { uid: "admin-a", customClaims: { role: "admin" } },
@@ -824,7 +824,7 @@ describe("resetOperatorAccounts", () => {
       key1: { role: "admin" },
     };
 
-    (mockAuth.listUsers as jest.Mock)
+    (mockAuth.listUsers)
       .mockResolvedValueOnce({
         users: [
           { uid: "admin-old", customClaims: { role: "admin" } },
@@ -867,7 +867,7 @@ describe("resetAllAuthUsers", () => {
       key2: { role: "support" },
     };
 
-    (mockAuth.listUsers as jest.Mock)
+    (mockAuth.listUsers)
       .mockResolvedValueOnce({
         users: [
           { uid: "admin-a", customClaims: { role: "admin" } },
@@ -890,7 +890,7 @@ describe("resetAllAuthUsers", () => {
     const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
     process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
 
-    (mockAuth.listUsers as jest.Mock)
+    (mockAuth.listUsers)
       .mockResolvedValueOnce({
         users: [
           { uid: "admin1", customClaims: { role: "admin" } },
@@ -954,8 +954,8 @@ describe("resetOperatorAccounts — env config truthy branches (lines 309-406)",
     const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
     delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
 
-    (mockAuth.listUsers as jest.Mock).mockReset();
-    (mockAuth.listUsers as jest.Mock).mockResolvedValue({
+    (mockAuth.listUsers).mockReset();
+    (mockAuth.listUsers).mockResolvedValue({
       users: [{ uid: "op1", customClaims: { role: "support" } }],
       pageToken: undefined,
     });
@@ -973,12 +973,12 @@ describe("resetOperatorAccounts — env config truthy branches (lines 309-406)",
   it("fängt deleteUser Fehler auf (lines 366-370)", async () => {
     process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
 
-    (mockAuth.listUsers as jest.Mock).mockReset();
-    (mockAuth.listUsers as jest.Mock).mockResolvedValue({
+    (mockAuth.listUsers).mockReset();
+    (mockAuth.listUsers).mockResolvedValue({
       users: [{ uid: "fail-op", customClaims: { role: "admin" } }],
       pageToken: undefined,
     });
-    (mockAuth.deleteUser as jest.Mock).mockRejectedValueOnce(new Error("Delete refused"));
+    (mockAuth.deleteUser).mockRejectedValueOnce(new Error("Delete refused"));
 
     const wrapped = testEnv.wrap(fns.resetOperatorAccounts);
     const res = await wrapped({ confirmText: "RESET_OPERATOR_ACCOUNTS" }, asAdmin);
@@ -1001,8 +1001,8 @@ describe("resetAllAuthUsers — env config truthy branches (lines 440-589)", () 
     const oldEnable = process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
     delete process.env.ENABLE_OPERATOR_ACCOUNT_RESET;
 
-    (mockAuth.listUsers as jest.Mock).mockReset();
-    (mockAuth.listUsers as jest.Mock).mockResolvedValue({ users: [], pageToken: undefined });
+    (mockAuth.listUsers).mockReset();
+    (mockAuth.listUsers).mockResolvedValue({ users: [], pageToken: undefined });
 
     try {
       const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
@@ -1035,9 +1035,9 @@ describe("resetAllAuthUsers — env config truthy branches (lines 440-589)", () 
 
   it("löscht mit Paginierung und includeCurrentSessionUser (lines 499,536)", async () => {
     process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
-    (mockAuth.listUsers as jest.Mock).mockReset();
+    (mockAuth.listUsers).mockReset();
     let callCount = 0;
-    (mockAuth.listUsers as jest.Mock).mockImplementation(() => {
+    (mockAuth.listUsers).mockImplementation(() => {
       callCount++;
       if (callCount === 1) return Promise.resolve({
         users: [{ uid: "u1", customClaims: {} }, { uid: "u2", customClaims: {} }],
@@ -1056,12 +1056,12 @@ describe("resetAllAuthUsers — env config truthy branches (lines 440-589)", () 
 
   it("fängt deleteUser Fehler auf (line 521)", async () => {
     process.env.ENABLE_OPERATOR_ACCOUNT_RESET = "true";
-    (mockAuth.listUsers as jest.Mock).mockReset();
-    (mockAuth.listUsers as jest.Mock).mockResolvedValue({
+    (mockAuth.listUsers).mockReset();
+    (mockAuth.listUsers).mockResolvedValue({
       users: [{ uid: "bad-u", customClaims: {} }],
       pageToken: undefined,
     });
-    (mockAuth.deleteUser as jest.Mock).mockRejectedValueOnce(new Error("Auth delete error"));
+    (mockAuth.deleteUser).mockRejectedValueOnce(new Error("Auth delete error"));
 
     const wrapped = testEnv.wrap(fns.resetAllAuthUsers);
     const res = await wrapped({ confirmText: "RESET_ALL_AUTH_USERS" }, asAdmin);

@@ -217,7 +217,7 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
               const platform = masterDoc.data()?.subscription?.platform || "unknown";
               platformLabel = platform === "android" ? "🤖 Android" : platform === "ios" ? "🍎 iOS" : platform === "web" ? "🌐 Web" : "❓ " + platform;
             }
-          } catch (e) { /* ignore */ }
+          } catch { /* ignore */ }
           setStatus("ticket-auth-status", "Authentifiziert als " + user.uid + (platformLabel ? " · " + platformLabel : ""), "success");
           updateSecureWebControlButtonState();
           loadOwnTickets();

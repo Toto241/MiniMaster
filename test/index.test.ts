@@ -110,7 +110,7 @@ describe("callable contracts", () => {
 
   it("completeTask validiert benötigte Felder", async () => {
     const wrapped = testEnv.wrap(fns.completeTask);
-    await expect(wrapped({ taskId: "t1" }, asChild)).rejects.toThrow(/Missing required fields/);
+    await expect(wrapped({ taskId: "t1" }, asChild)).rejects.toThrow(/photoUrl is required./);
   });
 
   it("approveTask setzt approved bei pending_approval", async () => {

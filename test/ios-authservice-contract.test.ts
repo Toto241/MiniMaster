@@ -8,8 +8,8 @@ async function readUtf8(rel: string): Promise<string> {
 describe("ios AuthService contract migration", () => {
   it("AuthService consumes registerMasterDevice customToken response instead of secretKey", async () => {
     const source = await readUtf8("iosMasterApp/Sources/MiniMasterParent/Services/AuthService.swift");
-    expect(source).toContain("let customToken = data[\"customToken\"] as? String");
-    expect(source).toContain("let resolvedMasterId = (data[\"masterId\"] as? String) ?? imei");
+    expect(source).toContain("let masterId = data[\"masterId\"] as? String");
+    expect(source).toContain("functions.httpsCallable(\"registerAuthenticatedMaster\").call(params)");
     expect(source).not.toContain("let secretKey = data[\"secretKey\"] as? String");
     expect(source).not.toContain("httpsCallable(\"generateCustomToken\")");
     expect(source).not.toContain("KeychainHelper");

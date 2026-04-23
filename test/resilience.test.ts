@@ -7,16 +7,21 @@ import {
   withRetry,
   withTimeout,
   getAllCircuitMetrics,
+  clearAllCircuitBreakers,
 } from "../src/resilience";
 import * as functions from "firebase-functions/v1";
 
+beforeEach(() => {
+  clearAllCircuitBreakers();
+});
+
 describe("CircuitBreaker", () => {
   beforeEach(() => {
-    resetCircuitBreaker("test-circuit");
+    clearAllCircuitBreakers();
   });
 
   afterEach(() => {
-    resetCircuitBreaker("test-circuit");
+    clearAllCircuitBreakers();
   });
 
   it("starts in closed state", async () => {
@@ -28,23 +33,23 @@ describe("CircuitBreaker", () => {
 
   it("opens after threshold failures", async () => {
     const cb = getCircuitBreaker("test-circuit", { failureThreshold: 2, resetTimeoutMs: 60000 });
-    
+
     await expect(cb.execute(async () => { throw new Error("fail"); })).rejects.toThrow();
     await expect(cb.execute(async () => { throw new Error("fail"); })).rejects.toThrow();
-    
+
     expect(cb.getState()).toBe("open");
-    
+
     await expect(cb.execute(async () => "success")).rejects.toThrow(functions.https.HttpsError);
   });
 
   it("transitions to half-open after timeout", async () => {
     const cb = getCircuitBreaker("test-circuit", { failureThreshold: 1, resetTimeoutMs: 50 });
-    
+
     await expect(cb.execute(async () => { throw new Error("fail"); })).rejects.toThrow();
     expect(cb.getState()).toBe("open");
-    
+
     await new Promise((r) => setTimeout(r, 100));
-    
+
     const result = await cb.execute(async () => "success");
     expect(result).toBe("success");
   });
@@ -56,22 +61,22 @@ describe("CircuitBreaker", () => {
       halfOpenMaxCalls: 2,
       successThreshold: 2,
     });
-    
+
     await expect(cb.execute(async () => { throw new Error("fail"); })).rejects.toThrow();
     await new Promise((r) => setTimeout(r, 100));
-    
+
     await cb.execute(async () => "success1");
     await cb.execute(async () => "success2");
-    
+
     expect(cb.getState()).toBe("closed");
   });
 
   it("reopens on failure in half-open", async () => {
     const cb = getCircuitBreaker("test-circuit", { failureThreshold: 1, resetTimeoutMs: 50 });
-    
+
     await expect(cb.execute(async () => { throw new Error("fail"); })).rejects.toThrow();
     await new Promise((r) => setTimeout(r, 100));
-    
+
     await expect(cb.execute(async () => { throw new Error("fail again"); })).rejects.toThrow();
     expect(cb.getState()).toBe("open");
   });

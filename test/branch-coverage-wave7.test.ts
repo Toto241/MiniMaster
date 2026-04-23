@@ -154,7 +154,7 @@ beforeEach(() => {
             const docRef: any = {
               id,
               delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+              update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             };
             docRef.collection = jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
@@ -251,7 +251,7 @@ beforeEach(() => {
         const docs = Object.entries(collData).map(([id, data]) => ({
           id, data: () => data, exists: true, ref: {
             delete: jest.fn(() => { delete collData[id]; return Promise.resolve(); }),
-            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id] as any, upd); return Promise.resolve(); }),
+            update: jest.fn((upd: any) => { if (collData[id]) Object.assign(collData[id], upd); return Promise.resolve(); }),
             collection: jest.fn((sub: string) => {
               const subKey = `${coll}/${id}/${sub}`;
               if (!state[subKey]) state[subKey] = {};
@@ -272,12 +272,12 @@ beforeEach(() => {
     } as any;
   });
 
-  (db as any).collectionGroup = jest.fn().mockReturnValue({
+  (db).collectionGroup = jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     get: jest.fn(() => Promise.resolve({ empty: true, size: 0, docs: [] })),
   });
 
-  (db as any).batch = jest.fn(() => {
+  (db).batch = jest.fn(() => {
     const ops: Array<() => Promise<void>> = [];
     return {
       update: (ref: any, data: any) => { ops.push(() => ref.update(data)); },
@@ -393,89 +393,89 @@ describe("validatePairingCode corrupted data", () => {
 
 describe("validatePairingToken corrupted data", () => {
   it("expiresAt not a Timestamp instance → deletes and throws internal", async () => {
-    state.pairingTokens["tok-bad-1"] = {
+    state.pairingTokens["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"] = {
       masterId: "m1",
       expiresAt: { seconds: 9999999999 }, // plain object
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-bad-1" }, asChild))
+    await expect(wrapped({ pairingToken: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" }, asChild))
       .rejects.toThrow(/Invalid pairing token data/);
-    expect(state.pairingTokens["tok-bad-1"]).toBeUndefined();
+    expect(state.pairingTokens["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]).toBeUndefined();
   });
 
   it("masterId missing → deletes and throws internal", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["tok-bad-2"] = {
+    state.pairingTokens["cccccccc-cccc-cccc-cccc-cccccccccccc"] = {
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
       // no masterId
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-bad-2" }, asChild))
+    await expect(wrapped({ pairingToken: "cccccccc-cccc-cccc-cccc-cccccccccccc" }, asChild))
       .rejects.toThrow(/masterId/);
-    expect(state.pairingTokens["tok-bad-2"]).toBeUndefined();
+    expect(state.pairingTokens["cccccccc-cccc-cccc-cccc-cccccccccccc"]).toBeUndefined();
   });
 
   it("token expired → deletes and throws deadline-exceeded", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["tok-expired"] = {
+    state.pairingTokens["dddddddd-dddd-dddd-dddd-dddddddddddd"] = {
       masterId: "m1",
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) - 600, 0),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-expired" }, asChild))
+    await expect(wrapped({ pairingToken: "dddddddd-dddd-dddd-dddd-dddddddddddd" }, asChild))
       .rejects.toThrow(/expired/i);
   });
 
   it("tokenData undefined → throws internal", async () => {
-    state.pairingTokens["tok-null"] = undefined;
+    state.pairingTokens["dddddddd-dddd-dddd-dddd-dddddddddddd"] = undefined;
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-null" }, asChild))
+    await expect(wrapped({ pairingToken: "dddddddd-dddd-dddd-dddd-dddddddddddd" }, asChild))
       .rejects.toThrow(/invalid|not found/i);
   });
 
   it("master not found → throws not-found", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["tok-no-master"] = {
+    state.pairingTokens["eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"] = {
       masterId: "nonexistent",
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-no-master" }, asChild))
+    await expect(wrapped({ pairingToken: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, asChild))
       .rejects.toThrow(/Master account not found/);
   });
 
   it("master trial expired → throws resource-exhausted", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["tok-no-sub"] = {
+    state.pairingTokens["ffffffff-ffff-ffff-ffff-ffffffffffff"] = {
       masterId: "m1",
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     state.masters["m1"].subscription = { status: "expired" };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-no-sub" }, asChild))
+    await expect(wrapped({ pairingToken: "ffffffff-ffff-ffff-ffff-ffffffffffff" }, asChild))
       .rejects.toThrow(/subscription|trial/i);
   });
 
   it("child limit reached → throws resource-exhausted", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["tok-limit"] = {
+    state.pairingTokens["eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"] = {
       masterId: "m1",
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     state.masters["m1"].subscription.childLimit = 1;
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    await expect(wrapped({ pairingToken: "tok-limit" }, asChild))
+    await expect(wrapped({ pairingToken: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, asChild))
       .rejects.toThrow(/limit/i);
   });
 
   it("valid token full success → pairs child", async () => {
     const admin = require("firebase-admin");
-    state.pairingTokens["tok-valid"] = {
+    state.pairingTokens["ffffffff-ffff-ffff-ffff-ffffffffffff"] = {
       masterId: "m1",
       expiresAt: new admin.firestore.Timestamp(Math.floor(Date.now() / 1000) + 300, 0),
     };
     const wrapped = testEnv.wrap(fns.validatePairingToken);
-    const res = await wrapped({ pairingToken: "tok-valid" }, asChild);
+    const res = await wrapped({ pairingToken: "ffffffff-ffff-ffff-ffff-ffffffffffff" }, asChild);
     expect(res.childId).toBe("c1");
     expect(res.masterId).toBe("m1");
   });
@@ -1150,7 +1150,7 @@ describe("onChildDeviceUpdateV2 edge cases", () => {
     const event = {
       params: { childId: "c1" },
       data: {
-        before: { data: () => ({ masterImei: "m1", fcmToken: "tok", isLocked: false }) },
+        before: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", isLocked: false }) },
         after: { data: () => null },
       },
     };
@@ -1164,7 +1164,7 @@ describe("onChildDeviceUpdateV2 edge cases", () => {
       params: { childId: "c1" },
       data: {
         before: { data: () => null },
-        after: { data: () => ({ masterImei: "m1", fcmToken: "tok", isLocked: true }) },
+        after: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", isLocked: true }) },
       },
     };
     await fn.run(event);
@@ -1189,8 +1189,8 @@ describe("onChildDeviceUpdateV2 edge cases", () => {
     const event = {
       params: { childId: "c1" },
       data: {
-        before: { data: () => ({ masterImei: "m1", fcmToken: "tok", isLocked: false, appBlacklist: ["a"] }) },
-        after: { data: () => ({ masterImei: "m1", fcmToken: "tok", isLocked: false, appBlacklist: ["a"] }) },
+        before: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", isLocked: false, appBlacklist: ["a"] }) },
+        after: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", isLocked: false, appBlacklist: ["a"] }) },
       },
     };
     await fn.run(event);
@@ -1202,8 +1202,8 @@ describe("onChildDeviceUpdateV2 edge cases", () => {
     const event = {
       params: { childId: "c1" },
       data: {
-        before: { data: () => ({ masterImei: "m1", fcmToken: "tok", appBlacklist: ["a"] }) },
-        after: { data: () => ({ masterImei: "m1", fcmToken: "tok", appBlacklist: ["a", "b"] }) },
+        before: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", appBlacklist: ["a"] }) },
+        after: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", appBlacklist: ["a", "b"] }) },
       },
     };
     await fn.run(event);
@@ -1215,8 +1215,8 @@ describe("onChildDeviceUpdateV2 edge cases", () => {
     const event = {
       params: { childId: "c1" },
       data: {
-        before: { data: () => ({ masterImei: "m1", fcmToken: "tok", usageRules: { dailyLimit: 60 } }) },
-        after: { data: () => ({ masterImei: "m1", fcmToken: "tok", usageRules: { dailyLimit: 120 } }) },
+        before: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", usageRules: { dailyLimit: 60 } }) },
+        after: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", usageRules: { dailyLimit: 120 } }) },
       },
     };
     await fn.run(event);
@@ -1229,8 +1229,8 @@ describe("onChildDeviceUpdateV2 edge cases", () => {
     const event = {
       params: { childId: "c1" },
       data: {
-        before: { data: () => ({ masterImei: "m1", fcmToken: "tok", isLocked: false }) },
-        after: { data: () => ({ masterImei: "m1", fcmToken: "tok", isLocked: true }) },
+        before: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", isLocked: false }) },
+        after: { data: () => ({ masterImei: "m1", fcmToken: "child-fcm-token", isLocked: true }) },
       },
     };
     // Should not throw despite FCM error

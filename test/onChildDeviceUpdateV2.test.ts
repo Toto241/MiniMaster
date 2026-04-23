@@ -52,7 +52,7 @@ describe("onChildDeviceUpdateV2", () => {
     const newData = { fcmToken: "test-token", isLocked: true, appBlacklist: [], usageRules: {} };
 
     const wrapped = wrapV2(myFunctions.onChildDeviceUpdateV2);
-    
+
     // For v2 firestore triggers, provide data before/after with data() methods
     await wrapped({
       data: {

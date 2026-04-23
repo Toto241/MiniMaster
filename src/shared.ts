@@ -27,7 +27,7 @@ export function requireAuth(context: CallableContext): string {
 export type OperatorRole = "admin" | "support" | "auditor";
 
 export function requireAdmin(context: CallableContext): void {
-  if (!context.auth || context.auth.token.role !== "admin") {
+  if (context.auth?.token.role !== "admin") {
     throw new functions.https.HttpsError("permission-denied", "Admin privileges required.");
   }
 }
@@ -72,8 +72,8 @@ let hasLoggedBestEffortRateLimit = false;
 export function checkRateLimit(
   userId: string,
   action: string,
-  maxRequests: number = 30,
-  windowMs: number = 60000
+  maxRequests = 30,
+  windowMs = 60000
 ): void {
   if (!hasLoggedBestEffortRateLimit && process.env.NODE_ENV === "production") {
     hasLoggedBestEffortRateLimit = true;
@@ -104,7 +104,7 @@ export function checkRateLimit(
 
 // ==================== APP CHECK ====================
 
-export function validateAppCheck(context: CallableContext, enforce: boolean = false): void {
+export function validateAppCheck(context: CallableContext, enforce = false): void {
   if (!context.app && enforce) {
     if (process.env.NODE_ENV === "test") {
       functions.logger.info("App Check bypassed in test mode.", {

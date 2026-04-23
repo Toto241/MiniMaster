@@ -161,6 +161,10 @@ export function resetCircuitBreaker(name: string): void {
   circuitBreakers.delete(name);
 }
 
+export function clearAllCircuitBreakers(): void {
+  circuitBreakers.clear();
+}
+
 // ==================== RETRY WITH EXPONENTIAL BACKOFF ====================
 
 /**
@@ -215,21 +219,24 @@ export async function withTimeout<T>(
   operationName = "operation"
 ): Promise<T> {
   const controller = new AbortController();
-  const timerId = setTimeout(() => controller.abort(), timeoutMs);
+  let timerId: ReturnType<typeof setTimeout> | null = null;
 
-  try {
-    const result = await fn(controller.signal);
-    clearTimeout(timerId);
-    return result;
-  } catch (error) {
-    clearTimeout(timerId);
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new functions.https.HttpsError(
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(() => {
+      controller.abort();
+      reject(new functions.https.HttpsError(
         "deadline-exceeded",
         `${operationName} timed out after ${timeoutMs}ms`
-      );
+      ));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([fn(controller.signal), timeoutPromise]);
+  } finally {
+    if (timerId !== null) {
+      clearTimeout(timerId);
     }
-    throw error;
   }
 }
 

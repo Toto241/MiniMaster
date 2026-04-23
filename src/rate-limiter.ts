@@ -60,20 +60,22 @@ interface CacheEntry {
 const memoryCache = new Map<string, CacheEntry>();
 const CACHE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-// Periodic cleanup of stale cache entries
-setInterval(() => {
-  const now = Date.now();
-  let cleaned = 0;
-  for (const [key, entry] of memoryCache.entries()) {
-    if (entry.windowStart + 2 * 60000 < now) {
-      memoryCache.delete(key);
-      cleaned++;
+// Periodic cleanup of stale cache entries (skipped in test mode to avoid Jest open-handle timeouts)
+if (process.env.NODE_ENV !== "test") {
+  setInterval(() => {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [key, entry] of memoryCache.entries()) {
+      if (entry.windowStart + 2 * 60000 < now) {
+        memoryCache.delete(key);
+        cleaned++;
+      }
     }
-  }
-  if (cleaned > 0) {
-    functions.logger.debug(`Rate limiter cache cleanup: removed ${cleaned} stale entries`);
-  }
-}, CACHE_CLEANUP_INTERVAL_MS);
+    if (cleaned > 0) {
+      functions.logger.debug(`Rate limiter cache cleanup: removed ${cleaned} stale entries`);
+    }
+  }, CACHE_CLEANUP_INTERVAL_MS);
+}
 
 // ==================== FIRESTORE BACKEND ====================
 
@@ -197,7 +199,7 @@ export interface RateLimitResult {
 export async function checkDistributedRateLimit(
   userId: string,
   action: string,
-  userRole: string = "master",
+  userRole = "master",
   options?: {
     maxRequests?: number;
     windowMs?: number;
@@ -231,7 +233,7 @@ export async function checkDistributedRateLimit(
 export async function requireRateLimit(
   userId: string,
   action: string,
-  userRole: string = "master",
+  userRole = "master",
   options?: {
     maxRequests?: number;
     windowMs?: number;
@@ -258,8 +260,8 @@ export async function requireRateLimit(
 export function checkRateLimitLegacy(
   userId: string,
   action: string,
-  maxRequests: number = 30,
-  windowMs: number = 60000
+  maxRequests = 30,
+  windowMs = 60000
 ): void {
   const key = `${action}:${userId}`;
   const now = Date.now();

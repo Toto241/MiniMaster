@@ -82,7 +82,7 @@ function childSubCollectionDoc(childId: string, sub: "tasks" | "usageHistory", d
     async delete() {
       const child = state.children[childId];
       if (!child) return;
-      const store = child[sub] as Record<string, DocData> | undefined;
+      const store = child[sub];
       if (store) delete store[id];
     },
   };
@@ -108,7 +108,7 @@ function docRef(collection: string, id: string) {
     collection(sub: string) {
       if (collection === "children" && (sub === "tasks" || sub === "usageHistory")) {
         return {
-          doc: (subId?: string) => childSubCollectionDoc(id, sub as "tasks" | "usageHistory", subId),
+          doc: (subId?: string) => childSubCollectionDoc(id, sub, subId),
         };
       }
       return { doc: () => ({ get: async () => ({ exists: false, data: () => undefined }) }) };
@@ -310,7 +310,7 @@ beforeEach(() => {
 
   const expiresMs = Date.now() + 24 * 60 * 60 * 1000;
   const validUntil = admin.firestore.Timestamp.fromMillis(expiresMs);
-  state.pairingTokens["tok-valid"] = { masterImei: "m1", expiresAt: validUntil };
+  state.pairingTokens["33333333-3333-3333-3333-333333333333"] = { masterImei: "m1", expiresAt: validUntil };
 
   mockSubscriptionGet.mockResolvedValue({
     data: {
@@ -360,7 +360,7 @@ describe("coverage high impact callable suite", () => {
     const tokenRes = await generatePairingLink({}, asMaster);
     expect(typeof tokenRes.pairingToken).toBe("string");
 
-    const valRes = await validatePairingToken({ pairingToken: "tok-valid" }, asChild);
+    const valRes = await validatePairingToken({ pairingToken: "33333333-3333-3333-3333-333333333333" }, asChild);
     expect(valRes).toHaveProperty("masterId", "m1");
     expect(valRes).toHaveProperty("childId", "c1");
   });
@@ -369,7 +369,7 @@ describe("coverage high impact callable suite", () => {
     const verifyPurchase = testEnv.wrap(fns.verifyPurchase);
     const updateFCMToken = testEnv.wrap(fns.updateFCMToken);
 
-    const verifyRes = await verifyPurchase({ purchaseToken: "pt", sku: "single_child_monthly" }, asMaster);
+    const verifyRes = await verifyPurchase({ purchaseToken: "purchase-tok", sku: "single_child_monthly" }, asMaster);
     expect(verifyRes).toEqual({ success: true, subscriptionStatus: "active" });
 
     const fcmRes = await updateFCMToken({ fcmToken: "master-fcm" }, asMaster);
@@ -431,7 +431,7 @@ describe("coverage high impact callable suite", () => {
     const validatePairingToken = testEnv.wrap(fns.validatePairingToken);
     const provideSolutionFeedback = testEnv.wrap(fns.provideSolutionFeedback);
 
-    await expect(validatePairingToken({ pairingToken: "does-not-exist" }, asChild)).rejects.toThrow(/invalid/);
+    await expect(validatePairingToken({ pairingToken: "66666666-6666-6666-6666-666666666666" }, asChild)).rejects.toThrow(/invalid/);
 
     await expect(
       provideSolutionFeedback({ ticketId: "ticket-1", feedback: "invalid" }, asMaster)
@@ -447,25 +447,25 @@ describe("coverage high impact callable suite", () => {
     const updateFCMToken = testEnv.wrap(fns.updateFCMToken);
 
     const expiredMs = Date.now() - 60_000;
-    state.pairingTokens["tok-expired"] = {
+    state.pairingTokens["77777777-7777-7777-7777-777777777777"] = {
       masterImei: "m1",
       expiresAt: admin.firestore.Timestamp.fromMillis(expiredMs),
     };
 
-    await expect(validatePairingToken({ pairingToken: "tok-expired" }, asChild)).rejects.toThrow(/expired/);
+    await expect(validatePairingToken({ pairingToken: "77777777-7777-7777-7777-777777777777" }, asChild)).rejects.toThrow(/expired/);
     await expect(updateFCMToken({ fcmToken: "" }, asMaster)).rejects.toThrow(/fcmToken/);
   });
 
   it("bereinigt beschädigte Pairing-Token mit ungültigem expiresAt", async () => {
     const validatePairingToken = testEnv.wrap(fns.validatePairingToken);
-    state.pairingTokens["tok-corrupt"] = {
+    state.pairingTokens["88888888-8888-8888-8888-888888888888"] = {
       masterImei: "m1",
       expiresAt: { seconds: 123, nanoseconds: 0 },
     };
 
-    await expect(validatePairingToken({ pairingToken: "tok-corrupt" }, asChild))
+    await expect(validatePairingToken({ pairingToken: "88888888-8888-8888-8888-888888888888" }, asChild))
       .rejects.toThrow(/Invalid pairing token data structure/);
-    expect(state.pairingTokens["tok-corrupt"]).toBeUndefined();
+    expect(state.pairingTokens["88888888-8888-8888-8888-888888888888"]).toBeUndefined();
   });
 
   it("deckt negative Purchase-Verifikation ab", async () => {
@@ -477,7 +477,7 @@ describe("coverage high impact callable suite", () => {
       },
     });
 
-    await expect(verifyPurchase({ purchaseToken: "pt-invalid", sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/verification failed/i);
+    await expect(verifyPurchase({ purchaseToken: "pt-invalid-12", sku: "single_child_monthly" }, asMaster)).rejects.toThrow(/verification failed/i);
   });
 
   it("deckt Support-Feedback-Permission-Fehlerpfad ab", async () => {

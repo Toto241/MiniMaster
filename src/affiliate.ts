@@ -211,7 +211,7 @@ export const trackAffiliateConversion = functions.https.onCall(
 
       // Create referral record
       await db().collection("affiliate_referrals").add({
-        affiliateId: affiliateDoc!.id,
+        affiliateId: affiliateDoc.id,
         masterId,
         subscriptionId,
         sku: data.sku,
@@ -223,7 +223,7 @@ export const trackAffiliateConversion = functions.https.onCall(
       });
 
       // Update affiliate stats
-      await affiliateDoc!.ref.update({
+      await affiliateDoc.ref.update({
         totalReferrals: admin.firestore.FieldValue.increment(1),
         pendingEarningsCents: admin.firestore.FieldValue.increment(commissionCents),
         totalEarningsCents: admin.firestore.FieldValue.increment(commissionCents),
@@ -232,7 +232,7 @@ export const trackAffiliateConversion = functions.https.onCall(
 
       // Link master to affiliate for recurring commissions
       await db().collection("masters").doc(masterId).update({
-        affiliateId: affiliateDoc!.id,
+        affiliateId: affiliateDoc.id,
         affiliateCode: code,
         referredAt: now,
       });
