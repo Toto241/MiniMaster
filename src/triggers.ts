@@ -8,23 +8,27 @@ import { getMessaging, Message } from "firebase-admin/messaging";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { writeCommand, incrementPolicyVersion } from "./device-sync";
-import { withRetry } from "./resilience";
-import { classifyError } from "./error-handler";
 
 /**
- * Sends an FCM message with centralized resilience retry (max 3 attempts).
+ * Sends an FCM message with exponential backoff retry (max 3 attempts).
  * Only retries on transient/server errors (5xx, UNAVAILABLE, INTERNAL).
  */
 async function sendFcmWithRetry(message: Message, maxAttempts = 3): Promise<string> {
-  return withRetry(
-    async () => getMessaging().send(message),
-    {
-      maxAttempts,
-      baseDelayMs: 1000,
-      maxDelayMs: 4000,
-      retryableErrors: ["unavailable", "internal", "deadline-exceeded", "messaging/server-unavailable"],
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await getMessaging().send(message);
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code || "";
+      const isTransient = code.includes("unavailable") || code.includes("internal") ||
+        code.includes("deadline-exceeded") || code === "messaging/server-unavailable";
+      if (!isTransient || attempt === maxAttempts) {
+        throw error;
+      }
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+      await new Promise((r) => setTimeout(r, delay));
     }
-  );
+  }
+  throw new Error("FCM retry exhausted");
 }
 
 /**

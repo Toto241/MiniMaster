@@ -10,8 +10,6 @@ import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
 import { requireAdmin, AuditLogger, checkRateLimit, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
-import { validateString, validateNumber, validateDeviceId } from "./validation";
-import { withErrorHandling } from "./error-handler";
 
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
 const MASTER_WEB_BOOTSTRAP_QUERY_PARAM = "bootstrapToken";

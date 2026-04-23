@@ -82,20 +82,17 @@ class BillingClientWrapper @Inject constructor(
      * The product IDs are hardcoded here for simplicity.
      */
     companion object {
-        /** v2 monetisation product IDs matching the backend (VALID_PRODUCT_IDS).
-         *  Updated April 2026: Added FAMILY_YEARLY_PREMIUM tier (99.99 EUR/year).
-         */
-        const val SINGLE_CHILD_MONTHLY = "single_child_monthly"     // €4.99/month – 1 child
-        const val FAMILY_MONTHLY       = "family_monthly"            // €9.99/month – 4 children
-        const val SINGLE_CHILD_YEARLY  = "single_child_yearly"       // €39.99/year – 1 child
-        const val FAMILY_YEARLY        = "family_yearly"             // €79.99/year – 4 children
-        const val FAMILY_YEARLY_PREMIUM = "family_yearly_premium"   // €99.99/year – 6 children, beta access
+        /** v2 monetisation product IDs matching the backend (VALID_PRODUCT_IDS). */
+        const val SINGLE_CHILD_MONTHLY = "single_child_monthly"   // €1.99/month – 1 child
+        const val FAMILY_MONTHLY       = "family_monthly"          // €4.99/month – unlimited
+        const val SINGLE_CHILD_YEARLY  = "single_child_yearly"     // €19.99/year – 1 child
+        const val FAMILY_YEARLY        = "family_yearly"           // €49.99/year – unlimited
     }
 
     private fun queryProducts() {
         val productList = listOf(
             SINGLE_CHILD_MONTHLY, FAMILY_MONTHLY,
-            SINGLE_CHILD_YEARLY, FAMILY_YEARLY, FAMILY_YEARLY_PREMIUM
+            SINGLE_CHILD_YEARLY, FAMILY_YEARLY
         ).map { id ->
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(id)
