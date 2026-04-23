@@ -23,8 +23,6 @@ import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../firebase";
 import { requireAuth, validateAppCheck, AuditLogger } from "./shared";
-import { validateString, validateNumber, validateBoolean, validateObject } from "./validation";
-import { withErrorHandling } from "./error-handler";
 
 // ------------------------------------------------------------------ Types --
 

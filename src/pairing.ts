@@ -1,11 +1,6 @@
 /**
  * Pairing Cloud Functions.
  * Handles pairing code/token generation and validation for linking parent-child devices.
- *
- * Improvements:
- * - Centralized input validation with XSS protection
- * - Structured error handling with withErrorHandling wrapper
- * - Strict input sanitization for all string fields
  */
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
@@ -14,8 +9,6 @@ import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
 import { db } from "../firebase";
 import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
-import { validateString } from "./validation";
-import { withErrorHandling } from "./error-handler";
 
 const DEFAULT_CHILD_APP_LIMIT = 4;
 const DEFAULT_PARENT_APP_LIMIT = 2;
@@ -47,186 +40,208 @@ async function activateTrialIfPending(masterId: string, masterData: admin.firest
 /**
  * Creates a new, unique 6-digit pairing code. The code expires after 24 hours.
  */
-export const createPairingCode = functions.https.onCall(
-  withErrorHandling(
-    "createPairingCode",
-    async (_data: Record<string, never>, context: CallableContext) => {
-      const startTime = Date.now();
-      const masterId = requireAuth(context);
-      validateAppCheck(context, true);
+export const createPairingCode = functions.https.onCall(async (_data: Record<string, never>, context: CallableContext) => {
+  const startTime = Date.now();
+  const masterId = requireAuth(context);
+  validateAppCheck(context, true);
 
-      const masterDoc = await db().collection("masters").doc(masterId).get();
-      if (!masterDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "Master account not found.");
-      }
-      if (!hasPairingAccess(masterDoc.data())) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "Active subscription, pending trial, or active trial required to create pairing codes."
+  const masterDoc = await db().collection("masters").doc(masterId).get();
+  if (!masterDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "Master account not found.");
+  }
+  if (!hasPairingAccess(masterDoc.data())) {
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Active subscription, pending trial, or active trial required to create pairing codes."
+    );
+  }
+
+  const pairingCodesRef = db().collection("pairingCodes");
+  const maxAttempts = 50;
+
+  try {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const pairingCode = crypto.randomInt(100000, 999999).toString();
+      const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
+
+      const doc = await pairingCodeDocRef.get();
+      if (!doc.exists) {
+        const now = admin.firestore.Timestamp.now();
+        const expiresAtSeconds = now.seconds + 24 * 60 * 60;
+        const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
+
+        await pairingCodeDocRef.set({
+          masterId: masterId,
+          createdAt: now,
+          expiresAt: expiresAt,
+        });
+
+        await AuditLogger.logSuccess(
+          "device.pair", context, `pairingCodes/${pairingCode}`, "device",
+          { codeType: "6digit", expiresIn: "24h", duration: Date.now() - startTime }
         );
+
+        functions.logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
+        return { pairingCode: pairingCode };
       }
+    }
 
-      const pairingCodesRef = db().collection("pairingCodes");
-      const maxAttempts = 50;
+    await AuditLogger.logFailure(
+      "device.pair", context, `masters/${masterId}`, "device",
+      new Error("Could not create unique pairing code after 10 attempts"),
+      { codeType: "6digit", maxAttempts }
+    );
 
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const pairingCode = crypto.randomInt(100000, 999999).toString();
-        const pairingCodeDocRef = pairingCodesRef.doc(pairingCode);
-
-        const doc = await pairingCodeDocRef.get();
-        if (!doc.exists) {
-          const now = admin.firestore.Timestamp.now();
-          const expiresAtSeconds = now.seconds + 24 * 60 * 60;
-          const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
-
-          await pairingCodeDocRef.set({
-            masterId: masterId,
-            createdAt: now,
-            expiresAt: expiresAt,
-          });
-
-          await AuditLogger.logSuccess(
-            "device.pair", context, `pairingCodes/${pairingCode}`, "device",
-            { codeType: "6digit", expiresIn: "24h", duration: Date.now() - startTime }
-          );
-
-          functions.logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
-          return { pairingCode: pairingCode };
-        }
-      }
-
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Could not create a unique pairing code. Please try again later."
+    );
+  } catch (error) {
+    if (!(error instanceof functions.https.HttpsError)) {
       await AuditLogger.logFailure(
         "device.pair", context, `masters/${masterId}`, "device",
-        new Error("Could not create unique pairing code after max attempts"),
-        { codeType: "6digit", maxAttempts }
+        error as Error, { codeType: "6digit" }
       );
-
-      throw new functions.https.HttpsError(
-        "resource-exhausted",
-        "Could not create a unique pairing code. Please try again later."
-      );
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while creating the pairing code.", error);
     }
-  )
-);
+    throw error;
+  }
+});
 
 /**
  * Validates a 6-digit pairing code and links the child device to the master.
  */
-export const validatePairingCode = functions.https.onCall(
-  withErrorHandling(
-    "validatePairingCode",
-    async (data: { pairingCode: string }, context: CallableContext) => {
-      const startTime = Date.now();
-      const childId = requireAuth(context);
-      validateAppCheck(context, true);
+export const validatePairingCode = functions.https.onCall(async (data: { pairingCode: string }, context: CallableContext) => {
+  const startTime = Date.now();
+  const { pairingCode } = data;
+  const childId = requireAuth(context);
+  validateAppCheck(context, true);
 
-      const pairingCode = validateString(data.pairingCode, "pairingCode", {
-        required: true,
-        pattern: /^\d{6}$/,
-        sanitize: "none",
-      });
+  if (!pairingCode || typeof pairingCode !== "string") {
+    throw new functions.https.HttpsError("invalid-argument", "The function must be called with a 'pairingCode' string.");
+  }
 
-      const pairingCodeRef = db().collection("pairingCodes").doc(pairingCode);
+  const pairingCodeRef = db().collection("pairingCodes").doc(pairingCode);
 
-      const doc = await pairingCodeRef.get();
+  try {
+    const doc = await pairingCodeRef.get();
 
-      if (!doc.exists) {
-        functions.logger.warn(`Pairing code ${pairingCode} not found.`);
-        throw new functions.https.HttpsError("not-found", "Invalid pairing code.");
-      }
-
-      const codeData = doc.data();
-      if (!codeData) {
-        functions.logger.error(`Pairing code ${pairingCode} exists but data is undefined.`);
-        throw new functions.https.HttpsError("internal", "Pairing code data is missing.");
-      }
-
-      const expiresAt = codeData.expiresAt as admin.firestore.Timestamp;
-      const masterId = (codeData.masterId || codeData.masterImei) as string | undefined;
-
-      if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
-        functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
-        await pairingCodeRef.delete();
-        throw new functions.https.HttpsError("internal", "Invalid pairing code data structure.");
-      }
-
-      if (!masterId || typeof masterId !== "string") {
-        functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'masterId' field.`);
-        await pairingCodeRef.delete();
-        throw new functions.https.HttpsError("internal", "Invalid pairing code data structure (masterId).");
-      }
-
-      const now = admin.firestore.Timestamp.now();
-
-      if (now.seconds > expiresAt.seconds) {
-        functions.logger.info(`Pairing code ${pairingCode} has expired.`);
-        await pairingCodeRef.delete();
-        throw new functions.https.HttpsError("deadline-exceeded", "Pairing code has expired.");
-      }
-
-      const masterDoc = await db().collection("masters").doc(masterId).get();
-      if (!masterDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "Master account not found.");
-      }
-
-      const masterData = masterDoc.data();
-      if (!hasPairingAccess(masterData)) {
-        await AuditLogger.logDenied(
-          "device.pair", context, `children/${childId}`, "device",
-          "No active subscription or trial. Please subscribe to continue.",
-          { masterId, subscriptionStatus: masterData?.subscription?.status || "none" }
-        );
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "Your trial has expired. Please subscribe to continue using Mini-Master."
-        );
-      }
-
-      const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
-        );
-      }
-
-      const childDeviceRef = db().collection("children").doc(childId);
-      await childDeviceRef.set({
-        childImei: childId,
-        masterImei: masterId,
-        pairedAt: now,
-      }, { merge: true });
-      await activateTrialIfPending(masterId, masterData);
-      functions.logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
-
-      await pairingCodeRef.delete();
-      functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
-
-      await AuditLogger.logSuccess(
-        "device.pair", context, `children/${childId}`, "device",
-        { masterId, pairingMethod: "code", duration: Date.now() - startTime }
-      );
-
-      return { childId: childId };
+    if (!doc.exists) {
+      functions.logger.warn(`Pairing code ${pairingCode} not found.`);
+      throw new functions.https.HttpsError("not-found", "Invalid pairing code.");
     }
-  )
-);
+
+    const codeData = doc.data();
+    if (!codeData) {
+      functions.logger.error(`Pairing code ${pairingCode} exists but data is undefined.`);
+      throw new functions.https.HttpsError("internal", "Pairing code data is missing.");
+    }
+
+    const expiresAt = codeData.expiresAt as admin.firestore.Timestamp;
+    const masterId = (codeData.masterId || codeData.masterImei) as string | undefined;
+
+    if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
+      functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
+      await pairingCodeRef.delete();
+      functions.logger.info(`Malformed pairing code ${pairingCode} deleted.`);
+      throw new functions.https.HttpsError("internal", "Invalid pairing code data structure.");
+    }
+
+    if (!masterId || typeof masterId !== "string") {
+      functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'masterId' field.`);
+      await pairingCodeRef.delete();
+      functions.logger.info(`Malformed pairing code ${pairingCode} deleted.`);
+      throw new functions.https.HttpsError("internal", "Invalid pairing code data structure (masterId).");
+    }
+
+    const now = admin.firestore.Timestamp.now();
+
+    if (now.seconds > expiresAt.seconds) {
+      functions.logger.info(`Pairing code ${pairingCode} has expired.`);
+      await pairingCodeRef.delete();
+      functions.logger.info(`Expired pairing code ${pairingCode} deleted.`);
+      throw new functions.https.HttpsError("deadline-exceeded", "Pairing code has expired.");
+    }
+
+    const masterDoc = await db().collection("masters").doc(masterId).get();
+    if (!masterDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Master account not found.");
+    }
+
+    const masterData = masterDoc.data();
+    if (!hasPairingAccess(masterData)) {
+      await AuditLogger.logDenied(
+        "device.pair", context, `children/${childId}`, "device",
+        "No active subscription or trial. Please subscribe to continue.",
+        { masterId, subscriptionStatus: masterData?.subscription?.status || "none" }
+      );
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        "Your trial has expired. Please subscribe to continue using Mini-Master."
+      );
+    }
+
+    const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
+    const existingChildren = await db().collection("children")
+      .where("masterImei", "==", masterId).get();
+    if (existingChildren.size >= childLimit) {
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
+      );
+    }
+
+    const childDeviceRef = db().collection("children").doc(childId);
+    await childDeviceRef.set({
+      childImei: childId,
+      masterImei: masterId,
+      pairedAt: now,
+    }, { merge: true });
+    await activateTrialIfPending(masterId, masterData);
+    functions.logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
+
+    await pairingCodeRef.delete();
+    functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
+
+    await AuditLogger.logSuccess(
+      "device.pair", context, `children/${childId}`, "device",
+      { masterId, pairingMethod: "code", duration: Date.now() - startTime }
+    );
+
+    return { childId: childId };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError && error.code === "resource-exhausted") {
+      throw error;
+    }
+
+    await AuditLogger.logFailure(
+      "device.pair", context, `children/${childId}`, "device",
+      error as Error, { pairingMethod: "code" }
+    );
+
+    if (error instanceof functions.https.HttpsError) {
+      functions.logger.warn(`Validation failed for code ${pairingCode}:`, error.message, error.code, error.details);
+      throw error;
+    }
+
+    functions.logger.error(`Unexpected error validating code ${pairingCode}:`, error);
+    throw new functions.https.HttpsError("internal", "An unexpected error occurred while validating the pairing code.", error);
+  }
+});
 
 /**
  * Generates a single-use pairing token (UUID, valid for 5 minutes).
  */
 export const generatePairingLink = functions.https.onCall(
-  withErrorHandling(
-    "generatePairingLink",
-    async (_data: Record<string, never>, context: CallableContext) => {
-      const startTime = Date.now();
-      const masterId = requireAuth(context);
-      validateAppCheck(context, true);
+  async (_data: Record<string, never>, context: CallableContext) => {
+    const startTime = Date.now();
+    const masterId = requireAuth(context);
+    validateAppCheck(context, true);
 
-      const masterDeviceRef = db().collection("masters").doc(masterId);
+    const masterDeviceRef = db().collection("masters").doc(masterId);
 
+    try {
       const doc = await masterDeviceRef.get();
       if (!doc.exists) {
         throw new functions.https.HttpsError("not-found", "Master account not found.");
@@ -277,29 +292,36 @@ export const generatePairingLink = functions.https.onCall(
           childAppLimit: childLimit,
         },
       };
+
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "device.pair", context, `masters/${masterId}`, "device",
+        error as Error, { tokenType: "link" }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error("Error generating pairing link:", error);
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while generating the pairing link.", error);
     }
-  )
+  }
 );
 
 /**
  * Validates a single-use pairing token and links the child to the master.
  */
 export const validatePairingToken = functions.https.onCall(
-  withErrorHandling(
-    "validatePairingToken",
-    async (data: { pairingToken: string }, context: CallableContext) => {
-      const startTime = Date.now();
-      const childId = requireAuth(context);
-      validateAppCheck(context, true);
+  async (data: { pairingToken: string }, context: CallableContext) => {
+    const startTime = Date.now();
+    const { pairingToken } = data;
+    const childId = requireAuth(context);
+    validateAppCheck(context, true);
 
-      const pairingToken = validateString(data.pairingToken, "pairingToken", {
-        required: true,
-        pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-        sanitize: "none",
-      });
+    if (!pairingToken || typeof pairingToken !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Request must include a valid 'pairingToken'.");
+    }
 
-      const tokenRef = db().collection("pairingTokens").doc(pairingToken);
+    const tokenRef = db().collection("pairingTokens").doc(pairingToken);
 
+    try {
       const tokenDoc = await tokenRef.get();
 
       if (!tokenDoc.exists) {
@@ -370,6 +392,15 @@ export const validatePairingToken = functions.https.onCall(
 
       functions.logger.info(`Child device ${childId} successfully paired with master ${masterId}.`);
       return { childId: childId, masterId: masterId };
+
+    } catch (error) {
+      await AuditLogger.logFailure(
+        "device.pair", context, `children/${childId}`, "device",
+        error as Error, { pairingMethod: "token" }
+      );
+      if (error instanceof functions.https.HttpsError) throw error;
+      functions.logger.error("Error validating pairing token:", error);
+      throw new functions.https.HttpsError("internal", "An unexpected error occurred while validating the pairing token.", error);
     }
-  )
+  }
 );
