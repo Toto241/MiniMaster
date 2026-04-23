@@ -1,9 +1,6 @@
 /**
  * Revenue Analytics Tab for MiniMaster Admin Panel.
- * Displays MRR, ARR, revenue breakdown by source/platform, and growth trends.
- *
- * Note: Revenue data is aggregated from Firestore subscription documents.
- * No individual user data is exposed - only anonymized, aggregated metrics.
+ * Fully automated — aggregates live data from Firestore.
  */
 export function createRevenueAnalytics(container) {
   container.innerHTML = `
@@ -21,91 +18,55 @@ export function createRevenueAnalytics(container) {
             <option value="android">Google Play</option>
             <option value="ios">Apple App Store</option>
           </select>
+          <span id="revenue-last-updated" class="muted">Loading...</span>
           <button id="revenue-refresh" class="btn-secondary">↻ Refresh</button>
         </div>
       </div>
 
-      <!-- Primary KPIs -->
       <div class="kpi-grid kpi-large" id="revenue-kpis">
         <div class="kpi-card loading">Loading...</div>
       </div>
 
-      <!-- Charts Row -->
       <div class="charts-row">
         <div class="chart-container">
           <h4>Revenue by Platform</h4>
-          <div class="chart-placeholder" id="source-chart">Loading chart...</div>
+          <div class="chart-placeholder" id="source-chart">Loading...</div>
         </div>
         <div class="chart-container">
           <h4>MRR Trend</h4>
-          <div class="chart-placeholder" id="mrr-chart">Loading chart...</div>
+          <div class="chart-placeholder" id="mrr-chart">Loading...</div>
         </div>
       </div>
 
-      <!-- Platform Breakdown -->
       <div class="table-section">
         <h4>Active Subscriptions by Platform</h4>
         <table class="data-table" id="platform-table">
-          <thead>
-            <tr>
-              <th>Platform</th>
-              <th>Active</th>
-              <th>Revenue/Month</th>
-              <th>% of MRR</th>
-            </tr>
-          </thead>
-          <tbody id="platform-tbody"></tbody>
+          <thead><tr><th>Platform</th><th>Active</th><th>Revenue/Month</th><th>% of MRR</th></tr></thead>
+          <tbody id="platform-tbody"><tr><td colspan="4" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
 
-      <!-- Subscription Breakdown -->
       <div class="table-section">
         <h4>Active Subscriptions by Tier</h4>
         <table class="data-table" id="tier-table">
-          <thead>
-            <tr>
-              <th>Tier</th>
-              <th>Platform</th>
-              <th>Active</th>
-              <th>Revenue/Month</th>
-              <th>% of MRR</th>
-              <th>Trend</th>
-            </tr>
-          </thead>
-          <tbody id="tier-tbody"></tbody>
+          <thead><tr><th>Tier</th><th>Platform</th><th>Active</th><th>Revenue/Month</th><th>% of MRR</th></tr></thead>
+          <tbody id="tier-tbody"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
 
-      <!-- B2B Revenue -->
       <div class="table-section">
         <h4>B2B Revenue</h4>
         <table class="data-table" id="b2b-revenue-table">
-          <thead>
-            <tr>
-              <th>Organization</th>
-              <th>Tier</th>
-              <th>Monthly Fee</th>
-              <th>Status</th>
-              <th>Started</th>
-            </tr>
-          </thead>
-          <tbody id="b2b-revenue-tbody"></tbody>
+          <thead><tr><th>Organization</th><th>Tier</th><th>Monthly Fee</th><th>Status</th><th>Started</th></tr></thead>
+          <tbody id="b2b-revenue-tbody"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
 
-      <!-- Affiliate Revenue -->
       <div class="table-section">
         <h4>Affiliate Performance</h4>
         <table class="data-table" id="aff-revenue-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Referrals</th>
-              <th>Commission Paid</th>
-              <th>Commission Pending</th>
-            </tr>
-          </thead>
-          <tbody id="aff-revenue-tbody"></tbody>
+          <thead><tr><th>Code</th><th>Referrals</th><th>Commission Paid</th><th>Commission Pending</th></tr></thead>
+          <tbody id="aff-revenue-tbody"><tr><td colspan="4" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -117,62 +78,136 @@ export function createRevenueAnalytics(container) {
   container.querySelector("#revenue-platform").addEventListener("change", loadRevenueData);
 }
 
+// --- Price lookup (sync with pricing-config.ts) ---
+const SKU_PRICES = {
+  single_child_monthly: 1.99,
+  family_monthly: 4.99,
+  single_child_yearly: 19.99,
+  family_yearly: 49.99,
+  family_yearly_premium: 99.99,
+};
+const SKU_PERIOD = {
+  single_child_monthly: "monthly",
+  family_monthly: "monthly",
+  single_child_yearly: "yearly",
+  family_yearly: "yearly",
+  family_yearly_premium: "yearly",
+};
+
+function monthlyEquivalent(sku) {
+  const price = SKU_PRICES[sku] || 0;
+  return SKU_PERIOD[sku] === "yearly" ? price / 12 : price;
+}
+
 async function loadRevenueData() {
+  const platformFilter = document.getElementById("revenue-platform")?.value || "all";
+  const periodDays = parseInt(document.getElementById("revenue-period")?.value || "30", 10);
+  const cutoff = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
+
   try {
-    const platformFilter = document.getElementById("revenue-platform")?.value || "all";
+    const db = window.db;
+    if (!db) throw new Error("Firestore not available");
 
-    // In production, these would be actual Cloud Function calls
-    // For now, showing the structure with sample calculations
-    // Platform-filtered sample data
-    const allKpis = { mrr: 8750, arr: 105000, activeSubscriptions: 520, b2bMrr: 2990, affiliateCost: 1250, netMrr: 10490 };
-    const androidKpis = { mrr: 6125, arr: 73500, activeSubscriptions: 364, b2bMrr: 2990, affiliateCost: 875, netMrr: 8240 };
-    const iosKpis = { mrr: 2625, arr: 31500, activeSubscriptions: 156, b2bMrr: 0, affiliateCost: 375, netMrr: 2250 };
+    // --- Aggregate from masters collection ---
+    const mastersSnap = await db.collection("masters").get();
+    let totalMrr = 0;
+    let totalArr = 0;
+    let activeSubs = 0;
+    const platformStats = { android: { active: 0, revenue: 0 }, ios: { active: 0, revenue: 0 }, web: { active: 0, revenue: 0 }, unknown: { active: 0, revenue: 0 } };
+    const tierStats = {};
 
-    const kpis = platformFilter === "android" ? androidKpis : platformFilter === "ios" ? iosKpis : allKpis;
-    renderRevenueKPIs(kpis);
+    mastersSnap.forEach(doc => {
+      const data = doc.data();
+      const sub = data.subscription;
+      if (!sub) return;
 
-    const platformBreakdown = [
-      { platform: "Google Play", active: 364, revenue: 6125, pct: 70.0 },
-      { platform: "Apple App Store", active: 156, revenue: 2625, pct: 30.0 },
+      const platform = sub.platform || "unknown";
+      const isActive = sub.status === "active" || (sub.status === "trial" && sub.trialEndsAt?.toMillis() > Date.now());
+      if (!isActive) return;
+
+      activeSubs++;
+      const sku = sub.type || "unknown";
+      const monthly = monthlyEquivalent(sku);
+      totalMrr += monthly;
+      totalArr += monthly * 12;
+
+      // Platform stats
+      const p = platformStats[platform] || platformStats.unknown;
+      p.active++;
+      p.revenue += monthly;
+
+      // Tier stats
+      const key = `${sku}__${platform}`;
+      if (!tierStats[key]) tierStats[key] = { tier: sku, platform, active: 0, revenue: 0 };
+      tierStats[key].active++;
+      tierStats[key].revenue += monthly;
+    });
+
+    // --- B2B ---
+    const b2bSnap = await db.collection("b2b_organizations").where("status", "==", "active").get();
+    let b2bMrr = 0;
+    const b2bRows = [];
+    b2bSnap.forEach(doc => {
+      const d = doc.data();
+      const fee = d.monthlyFee || 0;
+      b2bMrr += fee;
+      totalMrr += fee;
+      totalArr += fee * 12;
+      b2bRows.push({ name: d.name || doc.id, tier: d.licenseTier || "—", fee: fee.toLocaleString("de-DE") + " €", status: "active", started: d.createdAt ? new Date(d.createdAt.toDate()).toISOString().split("T")[0] : "N/A" });
+    });
+
+    // --- Affiliates ---
+    const affSnap = await db.collection("affiliates").get();
+    let affiliateCost = 0;
+    const affRows = [];
+    affSnap.forEach(doc => {
+      const d = doc.data();
+      const paid = d.totalPaidCents || 0;
+      const pending = d.pendingEarningsCents || 0;
+      affiliateCost += paid / 100;
+      affRows.push({ code: d.code || doc.id, referrals: d.totalReferrals || 0, paid: (paid / 100).toLocaleString("de-DE") + " €", pending: (pending / 100).toLocaleString("de-DE") + " €" });
+    });
+
+    // Apply platform filter
+    const filterMrr = platformFilter === "all" ? totalMrr : (platformStats[platformFilter]?.revenue || 0);
+    const filterArr = filterMrr * 12;
+    const filterActive = platformFilter === "all" ? activeSubs : (platformStats[platformFilter]?.active || 0);
+    const filterB2b = platformFilter === "all" ? b2bMrr : 0;
+    const filterAff = platformFilter === "all" ? affiliateCost : 0;
+    const filterNet = filterMrr + filterB2b - filterAff;
+
+    renderRevenueKPIs({ mrr: Math.round(filterMrr), arr: Math.round(filterArr), activeSubscriptions: filterActive, b2bMrr: Math.round(filterB2b), affiliateCost: Math.round(filterAff), netMrr: Math.round(filterNet) });
+
+    // Platform breakdown
+    const platformRows = [
+      { platform: "Google Play", active: platformStats.android.active, revenue: Math.round(platformStats.android.revenue), pct: totalMrr > 0 ? Math.round((platformStats.android.revenue / totalMrr) * 100) : 0 },
+      { platform: "Apple App Store", active: platformStats.ios.active, revenue: Math.round(platformStats.ios.revenue), pct: totalMrr > 0 ? Math.round((platformStats.ios.revenue / totalMrr) * 100) : 0 },
     ];
-    renderPlatformBreakdown(platformBreakdown);
+    renderPlatformBreakdown(platformRows);
 
-    const tierBreakdown = [
-      { tier: "Single Child Monthly", platform: "Google Play", active: 126, revenue: 628, pct: 10.3 },
-      { tier: "Single Child Monthly", platform: "Apple App Store", active: 54, revenue: 270, pct: 4.4 },
-      { tier: "Family Monthly", platform: "Google Play", active: 84, revenue: 839, pct: 13.7 },
-      { tier: "Family Monthly", platform: "Apple App Store", active: 36, revenue: 360, pct: 5.9 },
-      { tier: "Single Child Yearly", platform: "Google Play", active: 56, revenue: 187, pct: 3.1 },
-      { tier: "Single Child Yearly", platform: "Apple App Store", active: 24, revenue: 80, pct: 1.3 },
-      { tier: "Family Yearly", platform: "Google Play", active: 70, revenue: 466, pct: 7.6 },
-      { tier: "Family Yearly", platform: "Apple App Store", active: 30, revenue: 200, pct: 3.3 },
-      { tier: "Family Premium Yearly", platform: "Google Play", active: 28, revenue: 233, pct: 3.8 },
-      { tier: "Family Premium Yearly", platform: "Apple App Store", active: 12, revenue: 100, pct: 1.6 },
-    ];
-    const filteredTiers = platformFilter === "all"
-      ? tierBreakdown
-      : tierBreakdown.filter(t => t.platform.toLowerCase().includes(platformFilter === "ios" ? "apple" : "google"));
-    renderTierBreakdown(filteredTiers);
+    // Tier breakdown
+    let tierRows = Object.values(tierStats).map(t => ({
+      tier: t.tier,
+      platform: t.platform === "android" ? "Google Play" : t.platform === "ios" ? "Apple App Store" : "Web",
+      active: t.active,
+      revenue: Math.round(t.revenue),
+      pct: totalMrr > 0 ? Math.round((t.revenue / totalMrr) * 100) : 0,
+    }));
+    if (platformFilter !== "all") {
+      tierRows = tierRows.filter(t => t.platform.toLowerCase().includes(platformFilter === "ios" ? "apple" : "google"));
+    }
+    renderTierBreakdown(tierRows);
 
-    renderB2BRevenue([
-      { name: "Gymnasium München-Ost", tier: "School Basic", fee: "199,00 €", status: "active", started: "2026-01-15" },
-      { name: "Kita Sonnenschein", tier: "Kita Basic", fee: "99,00 €", status: "active", started: "2026-02-01" },
-      { name: "Jugendzentrum Nord", tier: "School Professional", fee: "499,00 €", status: "active", started: "2026-03-10" },
-    ]);
+    renderB2BRevenue(b2bRows);
+    renderAffiliateRevenue(affRows);
 
-    renderAffiliateRevenue([
-      { code: "MM1001", referrals: 12, paid: "125,40 €", pending: "43,80 €" },
-      { code: "MM1002", referrals: 8, paid: "76,00 €", pending: "28,50 €" },
-      { code: "MM1003", referrals: 15, paid: "187,50 €", pending: "62,25 €" },
-    ]);
+    // Charts
+    const androidPct = platformFilter === "ios" ? 0 : (totalMrr > 0 ? Math.round((platformStats.android.revenue / totalMrr) * 100) : 0);
+    const iosPct = platformFilter === "android" ? 0 : (totalMrr > 0 ? Math.round((platformStats.ios.revenue / totalMrr) * 100) : 0);
+    const b2bPct = platformFilter === "all" && totalMrr > 0 ? Math.round((b2bMrr / totalMrr) * 100) : 0;
+    const affPct = platformFilter === "all" && totalMrr > 0 ? Math.round((affiliateCost / totalMrr) * 100) : 0;
 
-    // Placeholder for charts (would use Chart.js in production)
-    const sourceChart = document.getElementById("source-chart");
-    const androidPct = platformFilter === "ios" ? 0 : 65;
-    const iosPct = platformFilter === "android" ? 0 : 30;
-    const b2bPct = platformFilter === "all" ? 25 : 0;
-    const affPct = platformFilter === "all" ? 10 : 0;
-    sourceChart.innerHTML = `
+    document.getElementById("source-chart").innerHTML = `
       <div class="source-breakdown">
         ${platformFilter !== "ios" ? `<div class="source-bar"><span>Google Play</span><div class="bar" style="width:${androidPct}%"></div><span>${androidPct}%</span></div>` : ""}
         ${platformFilter !== "android" ? `<div class="source-bar"><span>Apple App Store</span><div class="bar" style="width:${iosPct}%"></div><span>${iosPct}%</span></div>` : ""}
@@ -183,92 +218,61 @@ async function loadRevenueData() {
 
     document.getElementById("mrr-chart").innerHTML = `
       <div class="mrr-trend">
-        <div class="trend-line">MRR Trend (sample data)</div>
+        <div class="trend-line">MRR Trend (aggregated live)</div>
         <div class="trend-values">
-          <span>Jan: 4,200 €</span> → <span>Feb: 5,100 €</span> → <span>Mar: 6,300 €</span> → 
-          <span>Apr: 7,800 €</span> → <span>May: 8,200 €</span> → <span>Jun: 8,750 €</span>
+          <span>Current MRR: ${Math.round(totalMrr).toLocaleString("de-DE")} €</span>
+          <span>Active Subs: ${activeSubs}</span>
+          <span>B2B: ${b2bMrr.toLocaleString("de-DE")} €</span>
         </div>
       </div>
     `;
 
+    document.getElementById("revenue-last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
   } catch (err) {
     console.error("Failed to load revenue data:", err);
+    document.getElementById("revenue-kpis").innerHTML = `<div class="kpi-card error">Error loading data: ${escapeHtml(err.message)}</div>`;
   }
 }
 
 function renderRevenueKPIs(data) {
   document.getElementById("revenue-kpis").innerHTML = `
-    <div class="kpi-card primary">
-      <div class="kpi-value">${data.mrr.toLocaleString("de-DE")} €</div>
-      <div class="kpi-label">MRR (Monthly Recurring Revenue)</div>
-    </div>
-    <div class="kpi-card primary">
-      <div class="kpi-value">${data.arr.toLocaleString("de-DE")} €</div>
-      <div class="kpi-label">ARR (Annual Run Rate)</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-value">${data.activeSubscriptions}</div>
-      <div class="kpi-label">Active Subscriptions</div>
-    </div>
-    <div class="kpi-card b2b">
-      <div class="kpi-value">${data.b2bMrr.toLocaleString("de-DE")} €</div>
-      <div class="kpi-label">B2B MRR</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-value">${data.netMrr.toLocaleString("de-DE")} €</div>
-      <div class="kpi-label">Net MRR (after affiliate costs)</div>
-    </div>
+    <div class="kpi-card primary"><div class="kpi-value">${data.mrr.toLocaleString("de-DE")} €</div><div class="kpi-label">MRR</div></div>
+    <div class="kpi-card primary"><div class="kpi-value">${data.arr.toLocaleString("de-DE")} €</div><div class="kpi-label">ARR</div></div>
+    <div class="kpi-card"><div class="kpi-value">${data.activeSubscriptions}</div><div class="kpi-label">Active Subscriptions</div></div>
+    <div class="kpi-card b2b"><div class="kpi-value">${data.b2bMrr.toLocaleString("de-DE")} €</div><div class="kpi-label">B2B MRR</div></div>
+    <div class="kpi-card"><div class="kpi-value">${data.netMrr.toLocaleString("de-DE")} €</div><div class="kpi-label">Net MRR (after affiliate)</div></div>
   `;
 }
 
 function renderPlatformBreakdown(platforms) {
   const tbody = document.getElementById("platform-tbody");
+  if (!platforms.length) { tbody.innerHTML = `<tr><td colspan="4" class="info">No data</td></tr>`; return; }
   tbody.innerHTML = platforms.map((p) => `
-    <tr>
-      <td>${escapeHtml(p.platform)}</td>
-      <td>${p.active}</td>
-      <td>${p.revenue.toLocaleString("de-DE")} €</td>
-      <td>${p.pct}%</td>
-    </tr>
+    <tr><td>${escapeHtml(p.platform)}</td><td>${p.active}</td><td>${p.revenue.toLocaleString("de-DE")} €</td><td>${p.pct}%</td></tr>
   `).join("");
 }
 
 function renderTierBreakdown(tiers) {
   const tbody = document.getElementById("tier-tbody");
+  if (!tiers.length) { tbody.innerHTML = `<tr><td colspan="5" class="info">No data</td></tr>`; return; }
   tbody.innerHTML = tiers.map((t) => `
-    <tr>
-      <td>${escapeHtml(t.tier)}</td>
-      <td>${escapeHtml(t.platform)}</td>
-      <td>${t.active}</td>
-      <td>${t.revenue.toLocaleString("de-DE")} €</td>
-      <td>${t.pct}%</td>
-      <td><span class="trend-up">↑ Growing</span></td>
-    </tr>
+    <tr><td>${escapeHtml(t.tier)}</td><td>${escapeHtml(t.platform)}</td><td>${t.active}</td><td>${t.revenue.toLocaleString("de-DE")} €</td><td>${t.pct}%</td></tr>
   `).join("");
 }
 
 function renderB2BRevenue(orgs) {
   const tbody = document.getElementById("b2b-revenue-tbody");
+  if (!orgs.length) { tbody.innerHTML = `<tr><td colspan="5" class="info">No B2B organizations</td></tr>`; return; }
   tbody.innerHTML = orgs.map((o) => `
-    <tr>
-      <td>${escapeHtml(o.name)}</td>
-      <td>${o.tier}</td>
-      <td>${o.fee}</td>
-      <td><span class="badge badge-active">${o.status}</span></td>
-      <td>${o.started}</td>
-    </tr>
+    <tr><td>${escapeHtml(o.name)}</td><td>${o.tier}</td><td>${o.fee}</td><td><span class="badge badge-active">${o.status}</span></td><td>${o.started}</td></tr>
   `).join("");
 }
 
 function renderAffiliateRevenue(affiliates) {
   const tbody = document.getElementById("aff-revenue-tbody");
+  if (!affiliates.length) { tbody.innerHTML = `<tr><td colspan="4" class="info">No affiliates</td></tr>`; return; }
   tbody.innerHTML = affiliates.map((a) => `
-    <tr>
-      <td><code>${escapeHtml(a.code)}</code></td>
-      <td>${a.referrals}</td>
-      <td>${a.paid}</td>
-      <td>${a.pending}</td>
-    </tr>
+    <tr><td><code>${escapeHtml(a.code)}</code></td><td>${a.referrals}</td><td>${a.paid}</td><td>${a.pending}</td></tr>
   `).join("");
 }
 
@@ -276,11 +280,4 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
-}
-
-async function callFunction(name, data) {
-  if (typeof window.callFunction === "function") {
-    return window.callFunction(name, data);
-  }
-  throw new Error("Function caller not available");
 }

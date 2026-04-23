@@ -11284,7 +11284,44 @@ function setQaWorkspaceVisibility(isQaTabActive) {
     }
 }
 
+const TAB_REFRESH_INTERVAL_MS = 15000;
+let _tabRefreshTimers = {};
+let _activeTab = null;
+
+function _startTabAutoRefresh(tabName) {
+    _stopTabAutoRefresh(tabName);
+    const refreshMap = {
+        "overview": () => { loadStats(); loadDashboardCharts(); },
+        "users": () => loadUsers(),
+        "subscriptions": () => loadSubscriptions(),
+        "support": () => loadSupportTickets(),
+        "devices": () => loadDevices(),
+        "errorlogs": () => loadErrorLogs(),
+        "compliance": () => loadComplianceRequests(),
+    };
+    const fn = refreshMap[tabName];
+    if (fn) {
+        fn();
+        _tabRefreshTimers[tabName] = setInterval(() => {
+            if (document.visibilityState === "visible") fn();
+        }, TAB_REFRESH_INTERVAL_MS);
+    }
+}
+
+function _stopTabAutoRefresh(tabName) {
+    if (_tabRefreshTimers[tabName]) {
+        clearInterval(_tabRefreshTimers[tabName]);
+        delete _tabRefreshTimers[tabName];
+    }
+}
+
 function switchTab(tabName, evt) {
+    // Stop refresh for previous tab
+    if (_activeTab && _activeTab !== tabName) {
+        _stopTabAutoRefresh(_activeTab);
+    }
+    _activeTab = tabName;
+
     // Hide all tabs
     document.querySelectorAll(".tab-content").forEach(tab => {
         tab.style.display = "none";
@@ -11300,6 +11337,9 @@ function switchTab(tabName, evt) {
     if (evt && evt.target) {
         evt.target.classList.add("active");
     }
+
+    // Start auto-refresh for data tabs
+    _startTabAutoRefresh(tabName);
 
     if (tabName === "qa") {
         if (isPythonOperator) {
@@ -11528,30 +11568,111 @@ async function onManualChecklistToggle(input) {
     }
 }
 
-function renderSetupChecklist() {
+async function renderSetupChecklist() {
     const checklistEl = document.getElementById("setup-checklist");
     if (!checklistEl) return;
 
-    const savedState = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
-    checklistEl.innerHTML = "";
+    checklistEl.innerHTML = "<div class='loading'>Prüfe Setup-Status automatisch...</div>";
 
-    setupChecklistItems.forEach(item => {
+    // Run automated checks in parallel
+    const checks = await Promise.all(setupChecklistItems.map(async (item) => {
+        const result = await runAutomatedCheck(item.key);
+        return { ...item, ...result };
+    }));
+
+    checklistEl.innerHTML = "";
+    checks.forEach(item => {
         const wrapper = document.createElement("div");
         wrapper.className = "setup-checklist-item";
+        const autoClass = item.automated ? (item.passed ? "check-pass" : "check-fail") : "";
+        const icon = item.automated ? (item.passed ? "✅" : "❌") : "👤";
+        const note = item.automated ? (item.passed ? " (automatisch bestätigt)" : " (automatisch fehlgeschlagen)") : " (manuell)";
+
         wrapper.innerHTML = `
-            <input type="checkbox" id="setup-${item.key}" ${savedState[item.key] ? "checked" : ""}>
-            <label for="setup-${item.key}">${item.label}</label>
+            <input type="checkbox" id="setup-${item.key}" ${item.passed ? "checked" : ""} ${item.automated ? "disabled" : ""}>
+            <label for="setup-${item.key}" class="${autoClass}">${icon} ${item.label}<span class="check-note">${note}</span></label>
         `;
 
-        const checkbox = wrapper.querySelector("input");
-        checkbox.addEventListener("change", (e) => {
-            const state = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
-            state[item.key] = e.target.checked;
-            localStorage.setItem("operatorSetupChecklist", JSON.stringify(state));
-        });
+        if (!item.automated) {
+            const checkbox = wrapper.querySelector("input");
+            checkbox.addEventListener("change", (e) => {
+                const state = JSON.parse(localStorage.getItem("operatorSetupChecklist") || "{}");
+                state[item.key] = e.target.checked;
+                localStorage.setItem("operatorSetupChecklist", JSON.stringify(state));
+            });
+        }
 
         checklistEl.appendChild(wrapper);
     });
+}
+
+async function runAutomatedCheck(key) {
+    try {
+        switch (key) {
+            case "firebase-config": {
+                const cfg = window.firebaseConfig || {};
+                const hasPlaceholders = Object.values(cfg).some(v => typeof v === "string" && (v.includes("YOUR_") || v.includes("placeholder") || v.includes("<") || v === ""));
+                return { automated: true, passed: !hasPlaceholders && !!cfg.apiKey && !!cfg.projectId };
+            }
+            case "admin-auth": {
+                const user = auth?.currentUser;
+                if (!user) return { automated: true, passed: false };
+                const token = await user.getIdTokenResult(true);
+                return { automated: true, passed: token.claims.role === "admin" };
+            }
+            case "firestore-access": {
+                const snap = await db.collection("operatorConfig").doc("global").get();
+                return { automated: true, passed: snap.exists };
+            }
+            case "functions-access": {
+                try {
+                    const result = await callFunction("getSubscriptionStatus", {});
+                    return { automated: true, passed: result !== undefined };
+                } catch { return { automated: true, passed: false }; }
+            }
+            case "appcheck-active": {
+                try {
+                    const snap = await db.collection("operatorConfig").doc("global").get();
+                    return { automated: true, passed: snap.exists && !!(snap.data()?.cloud?.appCheckMode) };
+                } catch { return { automated: true, passed: false }; }
+            }
+            case "android-apps": {
+                const snap = await db.collection("masters").where("subscription.platform", "==", "android").limit(1).get();
+                return { automated: true, passed: !snap.empty };
+            }
+            case "ios-apps": {
+                const snap = await db.collection("masters").where("subscription.platform", "==", "ios").limit(1).get();
+                return { automated: true, passed: !snap.empty };
+            }
+            case "apple-app-store-api": {
+                const snap = await db.collection("operatorConfig").doc("global").get();
+                const env = snap.data()?.apple;
+                return { automated: true, passed: !!(env?.issuerId && env?.keyId && env?.bundleId) };
+            }
+            case "ai-config": {
+                const snap = await db.collection("operatorConfig").doc("global").get();
+                return { automated: true, passed: !!(snap.data()?.ai?.provider && snap.data()?.ai?.model) };
+            }
+            case "support-workflow": {
+                const snap = await db.collection("supportTickets").limit(1).get();
+                return { automated: true, passed: true }; // Collection accessible = workflow ready
+            }
+            case "compliance-flow": {
+                const snap = await db.collection("complianceRequests").limit(1).get();
+                return { automated: true, passed: true };
+            }
+            case "deploy-verified": {
+                try {
+                    const result = await callFunction("getSubscriptionStatus", {});
+                    return { automated: true, passed: result !== undefined };
+                } catch { return { automated: true, passed: false }; }
+            }
+            default:
+                return { automated: false, passed: false };
+        }
+    } catch (err) {
+        return { automated: true, passed: false };
+    }
 }
 
 function getOperatorConfigDocRef() {

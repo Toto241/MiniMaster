@@ -129,10 +129,18 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       functions = firebase.app("child-panel-app").functions();
       auth = firebase.app("child-panel-app").auth();
 
-      auth.onAuthStateChanged((user) => {
+      auth.onAuthStateChanged(async (user) => {
         if (user) {
           currentMasterImei = user.uid;
-          setStatus("ticket-auth-status", "Authentifiziert als " + user.uid, "success");
+          let platformLabel = "";
+          try {
+            const childDoc = await db.collection("children").doc(user.uid).get();
+            if (childDoc.exists) {
+              const platform = childDoc.data()?.platform || "unknown";
+              platformLabel = platform === "android" ? "🤖 Android" : platform === "ios" ? "🍎 iOS" : "❓ " + platform;
+            }
+          } catch (e) { /* ignore */ }
+          setStatus("ticket-auth-status", "Authentifiziert als " + user.uid + (platformLabel ? " · " + platformLabel : ""), "success");
           loadOwnTickets();
         }
       });
