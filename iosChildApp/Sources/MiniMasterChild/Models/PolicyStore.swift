@@ -12,6 +12,12 @@ final class PolicyStore: ObservableObject {
 
     private let defaults = UserDefaults.standard
     private let storeKey = "minimaster.policy"
+    private let cachedAtKey = "minimaster.policy.cachedAt"
+    private let cacheVersionKey = "minimaster.policy.cacheVersion"
+
+    @Published private(set) var lastSyncDate: Date?
+    @Published private(set) var cachedAt: Date?
+    @Published private(set) var cacheVersion: Int
 
     init() {
         if let data = defaults.data(forKey: storeKey),
@@ -20,14 +26,25 @@ final class PolicyStore: ObservableObject {
         } else {
             policy = PolicyState()
         }
-    }
 
-    @Published private(set) var lastSyncDate: Date?
+        // Backward compatibility: missing keys default gracefully
+        if let dateData = defaults.data(forKey: cachedAtKey),
+           let date = try? JSONDecoder().decode(Date.self, from: dateData) {
+            cachedAt = date
+        } else {
+            cachedAt = nil
+        }
+
+        cacheVersion = defaults.integer(forKey: cacheVersionKey)
+    }
 
     func apply(_ newPolicy: PolicyState) {
         policy = newPolicy
         persist()
         lastSyncDate = Date()
+        cachedAt = Date()
+        cacheVersion += 1
+        persistMetadata()
     }
 
     func apply(command: DeviceCommand) {
@@ -62,5 +79,12 @@ final class PolicyStore: ObservableObject {
         if let data = try? JSONEncoder().encode(policy) {
             defaults.set(data, forKey: storeKey)
         }
+    }
+
+    private func persistMetadata() {
+        if let dateData = try? JSONEncoder().encode(cachedAt) {
+            defaults.set(dateData, forKey: cachedAtKey)
+        }
+        defaults.set(cacheVersion, forKey: cacheVersionKey)
     }
 }

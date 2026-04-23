@@ -61,6 +61,13 @@ struct MainChildView: View {
                     label: "Letzte Synchronisierung: \(lastSync.formatted(.relative(presentation: .named)))"
                 )
             }
+            if syncService.isOffline && isPolicyStale {
+                statusRow(
+                    icon: "wifi.slash",
+                    tint: .orange,
+                    label: "Offline – Richtlinie veraltet"
+                )
+            }
         }
     }
 
@@ -140,6 +147,11 @@ struct MainChildView: View {
     }
 
     // MARK: - Helpers
+
+    private var isPolicyStale: Bool {
+        guard let cachedAt = policyStore.cachedAt ?? policyStore.lastSyncDate else { return true }
+        return Date().timeIntervalSince(cachedAt) > 300
+    }
 
     private func statusRow(icon: String, tint: Color, label: String) -> some View {
         HStack(spacing: 12) {

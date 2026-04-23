@@ -55,4 +55,10 @@
     <string name="your_tasks_title">Your Tasks</string>
     <string name="no_tasks_for_now">No tasks for now, good job!</string>
     <string name="task_complete_button">Complete</string>
+
+    <!-- Battery optimisation dialog -->
+    <string name="battery_optimization_dialog_title">Battery Optimisation</string>
+    <string name="battery_optimization_dialog_body">Mini-Master must run in the background to protect your child. Please disable battery optimisation for this app.</string>
+    <string name="battery_optimization_open_settings">Open Battery Settings</string>
+    <string name="battery_optimization_skip">Skip</string>
 </resources>

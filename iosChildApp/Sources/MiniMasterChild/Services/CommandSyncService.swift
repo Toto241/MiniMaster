@@ -1,5 +1,7 @@
 import Foundation
 import FirebaseMessaging
+import Network
+import os.log
 
 /// Drives the Control-Plane pull loop on iOS.
 ///
@@ -18,11 +20,17 @@ final class CommandSyncService: ObservableObject {
     @Published private(set) var syncError: Error?
     @Published private(set) var lastSyncDate: Date?
     @Published private(set) var pendingCommandCount: Int = 0
+    @Published var isOffline: Bool = false
 
     let client: ChildCloudFunctionsClient
     private let policyStore: PolicyStore
     private let blockingManager: AppBlockingManager
+    private let offlinePolicyCache: OfflinePolicyCache
     private var childId: String?
+
+    private let networkMonitor = NWPathMonitor()
+    private let networkQueue = DispatchQueue(label: "minimaster.sync.network")
+    private var previousPathStatus: NWPath.Status = .satisfied
 
     init(
         client: ChildCloudFunctionsClient,
@@ -32,12 +40,28 @@ final class CommandSyncService: ObservableObject {
         self.client = client
         self.policyStore = policyStore
         self.blockingManager = blockingManager
+        self.offlinePolicyCache = OfflinePolicyCache(policyStore: policyStore)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(onFcmTokenRefreshed(_:)),
             name: .childFcmTokenRefreshed,
             object: nil
         )
+
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in
+                guard let self = self else { return }
+                let wasAvailable = self.previousPathStatus == .satisfied
+                self.previousPathStatus = path.status
+                self.isOffline = path.status != .satisfied
+
+                if path.status == .satisfied && !wasAvailable, let childId = self.childId {
+                    await self.syncPolicySnapshot(childId: childId)
+                    await self.fetchAndApplyAllCommands(childId: childId)
+                }
+            }
+        }
+        networkMonitor.start(queue: networkQueue)
     }
 
     /// Store the childId after successful pairing.
@@ -90,8 +114,9 @@ final class CommandSyncService: ObservableObject {
                     ),
                     policyVersion: policyVersion
                 )
-                policyStore.apply(newState)
-                appBlockingManager.applyPolicy(newState)
+                let resolved = offlinePolicyCache.resolveConflict(serverPolicy: newState, serverVersion: policyVersion)
+                policyStore.apply(resolved)
+                appBlockingManager.applyPolicy(resolved)
             }
 
             // Also apply pending critical commands in snapshot
@@ -105,6 +130,15 @@ final class CommandSyncService: ObservableObject {
             lastSyncDate = Date()
         } catch {
             syncError = error
+            if policyStore.lastSyncDate == nil ||
+               Date().timeIntervalSince(policyStore.lastSyncDate!) > 300 {
+                os_log(
+                    "Policy sync failed and local policy is stale (lastSync: %@). Keeping local policy active.",
+                    log: .default,
+                    type: .fault,
+                    policyStore.lastSyncDate?.description ?? "never"
+                )
+            }
         }
     }
 

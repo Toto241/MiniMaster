@@ -40,4 +40,10 @@
     <string name="your_tasks_title">Your Tasks</string>
     <string name="no_tasks_for_now">No tasks for now, good job!</string>
     <string name="task_complete_button">Complete</string>
+
+    <!-- Akku-Optimierungsdialog -->
+    <string name="battery_optimization_dialog_title">Akku-Optimierung</string>
+    <string name="battery_optimization_dialog_body">Mini-Master muss im Hintergrund laufen, um Ihr Kind zu schützen. Bitte deaktivieren Sie die Akku-Optimierung für diese App.</string>
+    <string name="battery_optimization_open_settings">Akku-Einstellungen öffnen</string>
+    <string name="battery_optimization_skip">Überspringen</string>
 </resources>

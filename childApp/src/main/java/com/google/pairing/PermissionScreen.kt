@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.Checkbox
 import androidx.compose.material.MaterialTheme
@@ -29,6 +30,9 @@ import com.google.pairing.child.MiniMasterAccessibilityService
  * The Accessibility Service is essential for the app's core functionality of monitoring
  * and blocking other applications.
  *
+ * After the accessibility service is confirmed, the screen also guides the user to
+ * disable battery optimisation so that MiniMaster can keep running in the background.
+ *
  * @param onPermissionGranted A callback function invoked only after the user confirms
  * they enabled the accessibility service and the app can verify it is enabled.
  */
@@ -37,6 +41,7 @@ fun PermissionScreen(onPermissionGranted: () -> Unit) {
     val context = LocalContext.current
     var disclosureAccepted by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var showBatteryDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -85,7 +90,11 @@ fun PermissionScreen(onPermissionGranted: () -> Unit) {
 
         Button(onClick = {
             if (isAccessibilityServiceEnabled(context)) {
-                onPermissionGranted()
+                if (BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) {
+                    onPermissionGranted()
+                } else {
+                    showBatteryDialog = true
+                }
             } else {
                 statusMessage = context.getString(R.string.permission_status_not_enabled)
             }
@@ -101,6 +110,29 @@ fun PermissionScreen(onPermissionGranted: () -> Unit) {
                 textAlign = TextAlign.Center
             )
         }
+    }
+
+    if (showBatteryDialog) {
+        AlertDialog(
+            onDismissRequest = { /* Non-cancellable */ },
+            title = { Text(stringResource(R.string.battery_optimization_dialog_title)) },
+            text = { Text(stringResource(R.string.battery_optimization_dialog_body)) },
+            confirmButton = {
+                Button(onClick = {
+                    BatteryOptimizationHelper.requestBatteryOptimizationExemption(context)
+                }) {
+                    Text(stringResource(R.string.battery_optimization_open_settings))
+                }
+            },
+            dismissButton = {
+                Button(onClick = {
+                    showBatteryDialog = false
+                    onPermissionGranted()
+                }) {
+                    Text(stringResource(R.string.battery_optimization_skip))
+                }
+            }
+        )
     }
 }
 

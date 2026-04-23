@@ -37,11 +37,19 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
         Log.d(TAG, "Device Admin Disabled")
         Toast.makeText(context, "MiniMaster protection disabled", Toast.LENGTH_SHORT).show()
         reportAdminEvent(context, "device_admin_disabled")
+
+        // Graceful degradation: immediately try to re-activate admin.
+        tryReactivateAdmin(context)
     }
 
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
         Log.w(TAG, "Device Admin disable requested — potential tamper attempt")
         reportAdminEvent(context, "device_admin_disable_requested")
+        Toast.makeText(
+            context,
+            "Warnung: Deaktivierung entfernt den Kinderschutz. Die Eltern werden benachrichtigt.",
+            Toast.LENGTH_LONG
+        ).show()
         return "Disabling this will remove parental controls. Your parents will be notified."
     }
 
@@ -56,6 +64,30 @@ class MiniMasterDeviceAdminReceiver : DeviceAdminReceiver() {
             logInfo = { Log.i(TAG, it) },
             logWarning = { message, error -> Log.w(TAG, message, error) },
         )
+    }
+
+    /**
+     * Attempts to re-activate device admin after it has been disabled.
+     * This is best-effort; the user must still confirm the system dialog.
+     */
+    private fun tryReactivateAdmin(context: Context) {
+        try {
+            val reactivateIntent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(
+                    DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                    ComponentName(context, MiniMasterDeviceAdminReceiver::class.java)
+                )
+                putExtra(
+                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "MiniMaster Schutz muss für die Kindersicherung aktiv bleiben."
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(reactivateIntent)
+            Log.d(TAG, "Reactivation intent launched after admin disable")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch reactivation intent", e)
+        }
     }
 
     /**
