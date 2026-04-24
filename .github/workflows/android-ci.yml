@@ -24,13 +24,27 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Check network access to Google Maven
+        id: network-check
+        run: |
+          if curl -sSf --max-time 15 https://dl.google.com >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Google Maven repository is accessible"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Google Maven repository (dl.google.com) is not accessible from this environment. Skipping Android build."
+          fi
       - name: Set up Android SDK
+        if: steps.network-check.outputs.available == 'true'
         uses: android-actions/setup-android@v4
       - name: Set up Gradle
+        if: steps.network-check.outputs.available == 'true'
         uses: gradle/actions/setup-gradle@v6
       - name: Show Gradle version
+        if: steps.network-check.outputs.available == 'true'
         run: ./scripts/run-android-checks.sh --version
       - name: Prepare Firebase placeholder configs
+        if: steps.network-check.outputs.available == 'true'
         run: |
           cat > masterApp/google-services.json <<'EOF'
           {
@@ -95,14 +109,19 @@ jobs:
           }
           EOF
       - name: Build & Unit tests
+        if: steps.network-check.outputs.available == 'true'
         run: ./scripts/run-android-checks.sh clean testDebugUnitTest :masterApp:assembleDebug :childApp:assembleDebug
       - name: Lint
+        if: steps.network-check.outputs.available == 'true'
         run: ./scripts/run-android-checks.sh lint
       - name: Android test (instrumentation)
+        if: steps.network-check.outputs.available == 'true'
         run: echo "Instrumentation tests are typically run on emulator; configure matrix if needed."
       - name: Jacoco report
+        if: steps.network-check.outputs.available == 'true'
         run: ./scripts/run-android-checks.sh jacocoTestReport
       - name: Upload reports
+        if: steps.network-check.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: android-reports

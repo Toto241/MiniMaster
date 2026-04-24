@@ -69,12 +69,24 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Set up Android SDK
+      - name: Check network access to Google Maven
         if: ${{ matrix.language == 'java' }}
+        id: network-check
+        run: |
+          if curl -sSf --max-time 15 https://dl.google.com >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Google Maven repository is accessible"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Google Maven repository (dl.google.com) is not accessible. Skipping Android build for CodeQL."
+          fi
+
+      - name: Set up Android SDK
+        if: ${{ matrix.language == 'java' && steps.network-check.outputs.available == 'true' }}
         uses: android-actions/setup-android@v4
 
       - name: Set up Gradle
-        if: ${{ matrix.language == 'java' }}
+        if: ${{ matrix.language == 'java' && steps.network-check.outputs.available == 'true' }}
         uses: gradle/actions/setup-gradle@v6
 
       - name: Install Node.js dependencies
@@ -152,7 +164,7 @@ jobs:
           EOF
 
       - name: Build Android sources for CodeQL
-        if: ${{ matrix.language == 'java' }}
+        if: ${{ matrix.language == 'java' && steps.network-check.outputs.available == 'true' }}
         run: ./scripts/run-android-checks.sh :masterApp:assembleDebug :childApp:assembleDebug
 
       # Perform the analysis on the generated database
