@@ -15,11 +15,11 @@ Dieses Inventar uebernimmt aus PR #152 nur die sinnvolle Struktur der internatio
 
 | Land | Terms / AGB | Privacy Policy | Zentrale Pruefpunkte | Status |
 |---|---|---|---|---|
-| UK | `AGB_TEMPLATE_EN_UK.md` geplant | `PRIVACY_POLICY_EN_UK.md` geplant | UK GDPR, Data Protection Act 2018, AADC, ICO, internationale Transfers | Draft required |
-| USA | `AGB_TEMPLATE_EN_US.md` geplant | `PRIVACY_POLICY_EN_US.md` geplant | COPPA, CCPA/CPRA, VCDPA, CPA, Auto-Renewal, Subscriptions | Draft required |
-| Frankreich | `AGB_TEMPLATE_FR.md` geplant | `PRIVACY_POLICY_FR.md` geplant | RGPD, CNIL, Verbraucherrecht, Vertragssprache | Draft required |
-| Spanien | `AGB_TEMPLATE_ES.md` geplant | `PRIVACY_POLICY_ES.md` geplant | RGPD, LOPDGDD, AEPD, LSSI | Draft required |
-| Italien | `AGB_TEMPLATE_IT.md` geplant | `PRIVACY_POLICY_IT.md` geplant | GDPR, Garante, Codice del Consumo | Draft required |
+| UK | `AGB_TEMPLATE_EN_UK.md` vorhanden (unreviewed) | `PRIVACY_POLICY_EN_UK.md` vorhanden (unreviewed) | UK GDPR, Data Protection Act 2018, AADC, ICO, internationale Transfers | Draft vorhanden (unreviewed) |
+| USA | `AGB_TEMPLATE_EN_US.md` vorhanden (unreviewed) | `PRIVACY_POLICY_EN_US.md` vorhanden (unreviewed) | COPPA, CCPA/CPRA, VCDPA, CPA, Auto-Renewal, Subscriptions | Draft vorhanden (unreviewed) |
+| Frankreich | `AGB_TEMPLATE_FR.md` vorhanden (unreviewed) | `PRIVACY_POLICY_FR.md` vorhanden (unreviewed) | RGPD, CNIL, Verbraucherrecht, Vertragssprache | Draft vorhanden (unreviewed) |
+| Spanien | `AGB_TEMPLATE_ES.md` vorhanden (unreviewed) | `PRIVACY_POLICY_ES.md` vorhanden (unreviewed) | RGPD, LOPDGDD, AEPD, LSSI | Draft vorhanden (unreviewed) |
+| Italien | `AGB_TEMPLATE_IT.md` vorhanden (unreviewed) | `PRIVACY_POLICY_IT.md` vorhanden (unreviewed) | GDPR, Garante, Codice del Consumo | Draft vorhanden (unreviewed) |
 
 ## Mindestinhalt je Privacy Policy Draft
 

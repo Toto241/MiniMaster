@@ -292,7 +292,7 @@ describe("admin-panel gap fillers", () => {
         apiKey: "k", authDomain: "d", projectId: "p", storageBucket: "s", messagingSenderId: "m", appId: "a",
       });
 
-      const jsObj = `const firebaseConfig = { apiKey: "k", authDomain: "d", projectId: "p", storageBucket: "s", messagingSenderId: "m", appId: "a" };`;
+      const jsObj = "const firebaseConfig = { apiKey: \"k\", authDomain: \"d\", projectId: \"p\", storageBucket: \"s\", messagingSenderId: \"m\", appId: \"a\" };";
       expect(exports.extractFirebaseConfigFromText(jsObj)).toEqual({
         apiKey: "k", authDomain: "d", projectId: "p", storageBucket: "s", messagingSenderId: "m", appId: "a",
       });
