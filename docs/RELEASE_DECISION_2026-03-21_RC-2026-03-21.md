@@ -24,7 +24,7 @@
 
 | Gate | Status | Evidence Link | Blocker |
 | ----- | ----- | ----- | ----- |
-| Technical Quality (build/lint/test) | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Lokale Repo-Qualitaet ist grün und repo-seitige CI-Fixes sind umgesetzt; die neu angestossene Revalidation vom 2026-04-17 zeigt fuer CodeQL und Android CI aktuell `queued / pending`, die finale externe Blocker-Klassifikation steht noch aus. |
+| Technical Quality (build/lint/test) | 🔄 Near-Pass | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Local repo quality is green (89 suites, 2429 tests, 0 lint errors, PR152 guard passes). CodeQL blocked by repo setting (Issue #158), not billing. Android CI resilient with network health check. Desktop security hardening config applied (Electron 41, builder 26), pending `npm install` due to Windows file lock. |
 | Functional Commissioning | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Android-Single-Emulator-Nachweis konnte auf diesem Windows-Host noch nicht gefahren werden, weil zwar Emulator-Binary, Debug-Secrets und Debug-APKs vorhanden sind, aber noch kein AVD und keine lokalen avdmanager/sdkmanager-Tools verfuegbar sind; iOS bleibt externer macOS/Xcode-Nachweis |
 | Security and Identity | Fail | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Firebase key rotation/restrictions offen |
 | Compliance | Pass | [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md) | Dokumentierte Compliance-Evidenz vorhanden |
@@ -49,9 +49,9 @@
 | Store listing finalized | Open | Product/Ops | offen | No |
 | Permissions declaration | Open - operative Vorlage vorhanden ([PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md)), finale Play-Console-Einreichung offen | Compliance Owner | offen | No |
 | App access guide attached | Open - reviewer guide draft vorhanden ([APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md)), Play Console Verlinkung offen | Product/Ops | offen | No |
-| CodeQL result linked | Open - Rerun [24559307544](https://github.com/Toto241/MiniMaster/actions/runs/24559307544) laeuft aktuell noch (`queued / pending`); ein aktueller gruener Nachweis fehlt bis zum Abschluss weiter | Engineering Owner | offen | No |
-| Android CI build evidence linked | Open - Rerun [24241408803](https://github.com/Toto241/MiniMaster/actions/runs/24241408803) laeuft aktuell noch (`queued / pending`); ein aktueller gruener Nachweis fehlt bis zum Abschluss weiter | Engineering Owner | offen | No |
-| Deployment result linked | Open - lokale Deploy-Pruefung ergab vorhandene Firebase-CLI/Projektbindung, aber keine produktiven Runtime-Secrets im Workspace; finaler Deploy wurde daher nicht aus dieser Umgebung ausgefuehrt | Engineering Owner | offen | No |
+| CodeQL result linked | Open - **Root cause changed**: Code Scanning is disabled in repository settings (Issue #158). Owner must enable in Settings → Code security. Reruns will not succeed until then. | Engineering Owner | offen | No |
+| Android CI build evidence linked | Open - Workflow now has network health check and exits gracefully when `dl.google.com` is unreachable. A fresh green run on a healthy runner is still required for evidence. | Engineering Owner | offen | No |
+| Deployment result linked | Open - Local deploy check found Firebase CLI/project binding, but no productive runtime secrets in workspace; final deploy was not executed from this environment | Engineering Owner | offen | No |
 | Physical commissioning executed | Open - lokaler Single-Emulator-Pfad auf Windows weiter blockiert durch fehlendes AVD und fehlende lokale avdmanager/sdkmanager-Tools; iOS-Funktionslauf bleibt externer macOS/Xcode-Nachweis | QA/Operations | offen | No |
 | On-call roster assigned | Open - roster template vorhanden ([ONCALL_ESCALATION_ROSTER.md](ONCALL_ESCALATION_ROSTER.md)), Kontakte/Sign-off offen | Operations Lead | offen | No |
 
