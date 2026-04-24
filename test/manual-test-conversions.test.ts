@@ -68,7 +68,7 @@ const mockDb = {
     }
     if (name === "masters") {
       return {
-        doc: jest.fn((id: string) => ({
+        doc: jest.fn((_id: string) => ({
           get: jest.fn(() => Promise.resolve({
             exists: true,
             data: () => ({ subscription: { status: "active", type: "family_monthly" } }),
@@ -78,7 +78,7 @@ const mockDb = {
     }
     if (name === "children") {
       return {
-        doc: jest.fn((id: string) => ({
+        doc: jest.fn((_id: string) => ({
           get: jest.fn(() => Promise.resolve({
             exists: true,
             data: () => ({ masterImei: "m1" }),
