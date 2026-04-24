@@ -1,0 +1,95 @@
+/* MiniMaster Parent App — German Base Localization */
+
+/* LoginView */
+"login.navTitle" = "MiniMaster";
+"login.section.register" = "Gerät registrieren";
+"login.field.imei" = "Geräte-ID (IMEI / UUID)";
+"login.field.deviceName" = "Gerätename (optional)";
+"login.button.register" = "Registrieren & Anmelden";
+
+/* DashboardView */
+"dashboard.navTitle" = "Meine Geräte";
+"dashboard.loading" = "Lade Geräte…";
+"dashboard.empty.title" = "Keine Geräte";
+"dashboard.empty.description" = "Verbinde ein Kinder-Gerät über den Pairing-Code.";
+"dashboard.status.platform" = "Plattform";
+"dashboard.status.policyVersion" = "Policy-Version";
+"dashboard.status.lastSeen" = "Zuletzt gesehen";
+"dashboard.status.online" = "Online";
+"dashboard.quickActions.title" = "Schnellaktionen";
+"dashboard.quickActions.lock" = "Sperren";
+"dashboard.quickActions.unlock" = "Entsperren";
+"dashboard.rules.title" = "Regeln";
+"dashboard.rules.appBlacklist" = "App-Blacklist (%d)";
+"dashboard.rules.usageRules" = "Nutzungsregeln";
+"dashboard.alert.error" = "Fehler";
+"dashboard.alert.ok" = "OK";
+
+/* PairingView */
+"pairing.navTitle" = "Gerät koppeln";
+"pairing.section.new" = "Neues Gerät koppeln";
+"pairing.description" = "Erstelle einen 6-stelligen Code oder einen Kopplungslink. Das Kind-Gerät kann damit mit deinem Konto verbunden werden.";
+"pairing.button.code" = "6-stelligen Code erstellen";
+"pairing.button.link" = "Kopplungslink erstellen";
+"pairing.loading" = "Wird erstellt…";
+"pairing.section.code" = "Pairing-Code";
+"pairing.button.copy" = "Kopieren";
+"pairing.section.link" = "Kopplungslink";
+"pairing.button.share" = "Teilen…";
+
+/* SubscriptionView */
+"subscription.navTitle" = "Abonnement";
+"subscription.loading" = "Lade Abonnements…";
+"subscription.section.status" = "Status";
+"subscription.status.active" = "Aktiv: %@";
+"subscription.status.none" = "Kein aktives Abonnement";
+"subscription.section.plans" = "Verfügbare Pläne";
+
+/* TaskListView */
+"tasks.navTitle" = "Aufgaben prüfen";
+"tasks.loading" = "Lade Aufgaben…";
+"tasks.empty.title" = "Keine offenen Aufgaben";
+"tasks.empty.description" = "Alle Aufgaben wurden bearbeitet.";
+"tasks.detail.navTitle" = "Aufgabe prüfen";
+"tasks.detail.aiAnalysis" = "KI-Analyse";
+"tasks.detail.confidence" = "Konfidenz";
+"tasks.detail.approve" = "Genehmigen";
+"tasks.detail.reject" = "Ablehnen";
+"tasks.reject.title" = "Ablehnen";
+"tasks.reject.reason" = "Ablehnungsgrund (optional)";
+"tasks.reject.cancel" = "Abbrechen";
+"tasks.reject.confirm" = "Bestätigen";
+"tasks.ai.completed" = "KI: Aufgabe erfüllt";
+"tasks.ai.notCompleted" = "KI: Nicht erfüllt";
+"tasks.ai.unclear" = "KI: Unklar";
+
+/* AppBlacklistView */
+"blacklist.navTitle" = "App-Blacklist";
+"blacklist.section.hint" = "Hinweis";
+"blacklist.field.bundleId" = "Bundle-ID (z.B. com.example.app)";
+"blacklist.button.add" = "Hinzufügen";
+"blacklist.section.iosSelection" = "iOS App-Auswahl";
+"blacklist.button.openPicker" = "Screen-Time-Auswahl öffnen";
+"blacklist.section.saved" = "Gespeicherte iOS-Blacklist";
+"blacklist.saved.tokens" = "Screen-Time-Tokens: %d";
+"blacklist.saved.unmigrated" = "Nicht migrierte Bundle-IDs: %d";
+"blacklist.section.blocked" = "Blockierte Apps (%d)";
+"blacklist.warning.manualBundleIds" = "Vorhandene manuelle Bundle-IDs werden auf iOS nicht durchgesetzt und sollten ersetzt werden.";
+"blacklist.noSelection" = "Noch keine iOS-Apps ueber Screen Time ausgewaehlt.";
+"blacklist.selectedCount" = "Aktuell sind %d App-Tokens ausgewaehlt.";
+"blacklist.unavailable.title" = "iOS App-Auswahl";
+"blacklist.unavailable.message" = "FamilyControls ist in dieser Build-Umgebung nicht verfuegbar. Die gespeicherte iOS-Auswahl kann hier nicht bearbeitet werden.";
+"blacklist.unavailable.tokens" = "Gespeicherte Token: %d";
+
+/* UsageRulesView */
+"usage.navTitle" = "Nutzungsregeln";
+"usage.section.dailyLimit" = "Tageslimit";
+"usage.field.minutes" = "Minuten";
+"usage.unit.perDay" = "Minuten/Tag";
+"usage.section.bedtime" = "Schlafenszeit";
+"usage.field.bedtimeStart" = "Anfang (HH:MM)";
+"usage.field.bedtimeEnd" = "Ende   (HH:MM)";
+"usage.button.save" = "Speichern";
+
+/* Common */
+"common.error" = "Fehler";

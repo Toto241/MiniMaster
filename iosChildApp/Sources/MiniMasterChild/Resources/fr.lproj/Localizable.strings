@@ -1,0 +1,32 @@
+/* MiniMaster Child App — French Localization */
+
+/* ChildPairingView */
+"childPairing.navTitle" = "MiniMaster";
+"childPairing.header.title" = "Enregistrer l'appareil";
+"childPairing.header.description" = "Saisissez le code à 6 chiffres que vous voyez dans\nl'application parent.";
+"childPairing.field.code" = "Code";
+"childPairing.digits" = "%d / 6 chiffres";
+"childPairing.button.connect" = "Connecter";
+
+/* MainChildView */
+"childMain.navTitle" = "MiniMaster";
+"childMain.section.status" = "Statut";
+"childMain.status.locked" = "Appareil verrouillé";
+"childMain.status.unlocked" = "Appareil déverrouillé";
+"childMain.status.policyVersion" = "Version de la politique %@";
+"childMain.status.lastSync" = "Dernière synchro : %@";
+"childMain.status.offlineStale" = "Hors ligne – politique obsolète";
+"childMain.section.blacklist" = "Liste noire d'apps";
+"childMain.sync.progress" = "Application des commandes…";
+"childMain.section.tasks" = "Mes tâches";
+"childMain.tasks.loading" = "Chargement des tâches…";
+"childMain.tasks.empty" = "Aucune tâche ouverte";
+"childMain.task.status.pending" = "Ouverte";
+"childMain.task.status.pendingApproval" = "En attente de révision";
+"childMain.task.status.approved" = "Approuvée";
+"childMain.task.status.rejected" = "Rejetée";
+"childMain.task.due" = "Échéance : %@";
+"childMain.unpair.alert.title" = "Désenregistrer l'appareil ?";
+"childMain.unpair.alert.message" = "L'appareil sera déconnecté de l'application parent.";
+"childMain.unpair.alert.confirm" = "Désenregistrer";
+"childMain.unpair.alert.cancel" = "Annuler";

@@ -11,11 +11,11 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Gerät registrieren") {
-                    TextField("Geräte-ID (IMEI / UUID)", text: $imei)
+                Section(header: Text("login.section.register")) {
+                    TextField("login.field.imei", text: $imei)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    TextField("Gerätename (optional)", text: $deviceName)
+                    TextField("login.field.deviceName", text: $deviceName)
                 }
                 Section {
                     Button {
@@ -33,7 +33,7 @@ struct LoginView: View {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                         } else {
-                            Text("Registrieren & Anmelden")
+                            Text("login.button.register")
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -47,7 +47,7 @@ struct LoginView: View {
                     }
                 }
             }
-            .navigationTitle("MiniMaster")
+            .navigationTitle("login.navTitle")
         }
     }
 }

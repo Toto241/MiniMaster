@@ -29,7 +29,10 @@ let package = Package(
                 .product(name: "FirebaseFunctions", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
             ],
-            path: "Sources/MiniMasterChild"
+            path: "Sources/MiniMasterChild",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "MiniMasterChildTests",

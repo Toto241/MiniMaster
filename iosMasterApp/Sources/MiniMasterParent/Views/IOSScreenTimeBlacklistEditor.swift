@@ -17,11 +17,11 @@ struct IOSScreenTimeBlacklistEditor: View {
     }
 
     var body: some View {
-        Section("iOS App-Auswahl") {
+        Section(header: Text("blacklist.section.iosSelection")) {
             Text(DevicePlatform.ios.appBlacklistEditorHint)
                 .foregroundStyle(.secondary)
 
-            Button("Screen-Time-Auswahl öffnen") {
+            Button("blacklist.button.openPicker") {
                 isPickerPresented = true
             }
 
@@ -29,7 +29,7 @@ struct IOSScreenTimeBlacklistEditor: View {
                 .foregroundStyle(.secondary)
 
             if !ScreenTimeAppSelection.bundleIDs(from: storedValues).isEmpty {
-                Text("Vorhandene manuelle Bundle-IDs werden auf iOS nicht durchgesetzt und sollten ersetzt werden.")
+                Text("blacklist.warning.manualBundleIds")
                     .foregroundStyle(.orange)
             }
         }
@@ -42,9 +42,9 @@ struct IOSScreenTimeBlacklistEditor: View {
     private var summaryText: String {
         let tokenCount = selection.applicationTokens.count
         if tokenCount == 0 {
-            return "Noch keine iOS-Apps ueber Screen Time ausgewaehlt."
+            return NSLocalizedString("blacklist.noSelection", comment: "")
         }
-        return "Aktuell sind \(tokenCount) App-Tokens ausgewaehlt."
+        return String(format: NSLocalizedString("blacklist.selectedCount", comment: ""), tokenCount)
     }
 }
 #else
@@ -53,10 +53,10 @@ struct IOSScreenTimeBlacklistEditor: View {
     let onSave: ([String]) -> Void
 
     var body: some View {
-        Section("iOS App-Auswahl") {
-            Text("FamilyControls ist in dieser Build-Umgebung nicht verfuegbar. Die gespeicherte iOS-Auswahl kann hier nicht bearbeitet werden.")
+        Section(header: Text("blacklist.unavailable.title")) {
+            Text("blacklist.unavailable.message")
                 .foregroundStyle(.orange)
-            Text("Gespeicherte Token: \(ScreenTimeAppSelection.encodedTokenCount(in: storedValues))")
+            Text(String(format: NSLocalizedString("blacklist.unavailable.tokens", comment: ""), ScreenTimeAppSelection.encodedTokenCount(in: storedValues)))
                 .foregroundStyle(.secondary)
         }
     }

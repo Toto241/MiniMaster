@@ -26,13 +26,13 @@ struct MainChildView: View {
                 }
                 tasksSection
             }
-            .navigationTitle("MiniMaster")
+            .navigationTitle("childMain.navTitle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
             .refreshable { await refresh() }
-            .alert("Gerät abmelden?", isPresented: $showUnpairAlert) {
-                Button("Abmelden", role: .destructive) { authService.unpair() }
-                Button("Abbrechen", role: .cancel) {}
+            .alert("childMain.unpair.alert.title", isPresented: $showUnpairAlert) {
+                Button("childMain.unpair.alert.confirm", role: .destructive) { authService.unpair() }
+                Button("childMain.unpair.alert.cancel", role: .cancel) {}
             } message: {
                 Text("Das Gerät wird von der Eltern-App getrennt.")
             }
@@ -43,7 +43,7 @@ struct MainChildView: View {
     // MARK: - Sections
 
     private var statusSection: some View {
-        Section("Status") {
+        Section(header: Text("childMain.section.status")) {
             statusRow(
                 icon: policyStore.policy.isLocked ? "lock.fill" : "lock.open.fill",
                 tint: policyStore.policy.isLocked ? .red : .green,
@@ -94,11 +94,11 @@ struct MainChildView: View {
     }
 
     private var tasksSection: some View {
-        Section("Meine Aufgaben") {
+        Section(header: Text("childMain.section.tasks")) {
             if isLoadingTasks {
-                ProgressView("Aufgaben laden…")
+                ProgressView("childMain.tasks.loading")
             } else if tasks.isEmpty {
-                Text("Keine offenen Aufgaben")
+                Text("childMain.tasks.empty")
                     .foregroundColor(.secondary)
             } else {
                 ForEach(tasks) { task in
@@ -201,10 +201,10 @@ private struct TaskRowView: View {
 
     private var statusLabel: String {
         switch task.status {
-        case "pending": return "Offen"
-        case "pending_approval": return "Zur Prüfung"
-        case "approved": return "Genehmigt"
-        case "rejected": return "Abgelehnt"
+        case "pending": return NSLocalizedString("childMain.task.status.pending", comment: "")
+        case "pending_approval": return NSLocalizedString("childMain.task.status.pendingApproval", comment: "")
+        case "approved": return NSLocalizedString("childMain.task.status.approved", comment: "")
+        case "rejected": return NSLocalizedString("childMain.task.status.rejected", comment: "")
         default: return task.status
         }
     }
