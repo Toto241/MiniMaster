@@ -1,60 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- The official name of the application, displayed in the app launcher and system settings. -->
-    <string name="app_name">Mini-Master Child App</string>
+    <string name="app_name">App Bambino Mini-Master</string>
 
     <!-- Title text displayed at the top of the pairing screen. -->
-    <string name="pairing_screen_title">Pairing Screen</string>
-
+    <string name="pairing_screen_title">Schermata di accoppiamento</string>
     <!-- Label for the text input field where the user enters the pairing code received from the parent app. -->
-    <string name="pairing_code_input_label">Enter Pairing Code</string>
-
+    <string name="pairing_code_input_label">Inserisci il codice di accoppiamento</string>
     <!-- Text for the button that the user clicks to initiate the pairing process after entering the code. -->
-    <string name="pairing_button_text">Pair Device</string>
-    <string name="pairing_status_idle">Bitte Pairing-Code eingeben oder Deep Link öffnen.</string>
-    <string name="pairing_status_loading">Pairing wird verarbeitet...</string>
-    <string name="pairing_status_success">Geraet erfolgreich gekoppelt.</string>
+    <string name="pairing_button_text">Accoppia dispositivo</string>
+    <string name="pairing_status_idle">Inserisci il codice di accoppiamento o apri il deep link.</string>
+    <string name="pairing_status_loading">Elaborazione accoppiamento...</string>
+    <string name="pairing_status_success">Dispositivo accoppiato con successo.</string>
 
     <!-- Message displayed on the lock screen. The %1$s placeholder will be replaced by the unique Child ID. -->
     <!-- Example: "App is locked. Child ID: child12345" -->
-    <string name="lock_screen_title">Device Locked</string>
-    <string name="lock_screen_message">App is locked. Child ID: %1$s</string>
-    <string name="view_tasks_button">View Tasks</string>
+    <string name="lock_screen_title">Dispositivo bloccato</string>
+    <string name="lock_screen_message">L\'app è bloccata. ID bambino: %1$s</string>
+    <string name="view_tasks_button">Vedi attività</string>
 
     <!-- Error message displayed when the entered pairing code has passed its expiration time. -->
-    <string name="error_code_expired">Pairing code has expired.</string>
-
+    <string name="error_code_expired">Il codice di accoppiamento è scaduto.</string>
     <!-- Error message displayed when the entered pairing code is not found, syntactically incorrect, or otherwise invalid. -->
-    <string name="error_invalid_code">Invalid pairing code.</string>
-
+    <string name="error_invalid_code">Codice di accoppiamento non valido.</string>
     <!-- Error message displayed if saving the device/child ID to local storage fails after successful pairing. -->
-    <string name="error_saving_child_id">Error saving device ID.</string>
+    <string name="error_saving_child_id">Errore nel salvare l\'ID del dispositivo.</string>
 
     <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Mini-Master parental control service that monitors app usage and enforces blocking rules to ensure safe device usage for children.</string>
+    <string name="accessibility_service_description">Servizio di controllo parentale Mini-Master che monitora l\'utilizzo delle app e applica regole di blocco per garantire un uso sicuro del dispositivo da parte dei bambini.</string>
 
     <!-- Permission onboarding disclosure -->
-    <string name="permission_title">Important Permission Needed</string>
-    <string name="permission_disclosure_body">Mini-Master needs Accessibility access to enforce parental rules such as app blocking and task-based locks. The service observes foreground app usage to apply rules in real time. This access is used only for parental-control features.</string>
-    <string name="permission_disclosure_consent">I understand how this permission is used for parental control.</string>
-    <string name="permission_open_settings">Open Accessibility Settings</string>
-    <string name="permission_confirm_enabled">I enabled accessibility service</string>
-    <string name="permission_status_opened_settings">Settings opened. Enable Mini-Master accessibility service, then return and confirm.</string>
-    <string name="permission_status_not_enabled">Accessibility service is not enabled yet. Please enable it in system settings first.</string>
+    <string name="permission_title">Autorizzazione importante necessaria</string>
+    <string name="permission_disclosure_body">Mini-Master necessita dell\'accesso Accessibilità per applicare regole parentali come il blocco delle app e i blocchi basati sulle attività. Il servizio osserva l\'app in primo piano per applicare le regole in tempo reale. Questo accesso è utilizzato solo per funzioni di controllo parentale.</string>
+    <string name="permission_disclosure_consent">Comprendo come questa autorizzazione viene utilizzata per il controllo parentale.</string>
+    <string name="permission_open_settings">Apri impostazioni accessibilità</string>
+    <string name="permission_confirm_enabled">Ho abilitato il servizio di accessibilità</string>
+    <string name="permission_status_opened_settings">Impostazioni aperte. Abilita il servizio di accessibilità Mini-Master, poi torna e conferma.</string>
+    <string name="permission_status_not_enabled">Il servizio di accessibilità non è ancora abilitato. Abilitalo prima nelle impostazioni di sistema.</string>
 
     <!-- First start language setup -->
-    <string name="language_setup_title">Choose your app language</string>
-    <string name="language_setup_description">Select your preferred language for Mini-Master Child App. You can change it later in a future settings screen.</string>
-    <string name="language_continue">Continue</string>
+    <string name="language_setup_title">Scegli la lingua dell\'app</string>
+    <string name="language_setup_description">Seleziona la lingua preferita per l\'app bambino Mini-Master. Potrai modificarla in seguito in una futura schermata delle impostazioni.</string>
+    <string name="language_continue">Continua</string>
 
     <!-- Task lock and proof flow -->
-    <string name="task_required_title">Task Required</string>
-    <string name="task_proof_rejected">Proof rejected. Please submit again.</string>
-    <string name="task_complete_to_unlock">To unlock the device, please complete this task.</string>
-    <string name="task_submit_proof">Submit Proof</string>
-    <string name="task_waiting_for_approval">Proof submitted. Waiting for parent approval.</string>
-    <string name="task_status_format">Status: %1$s</string>
-    <string name="your_tasks_title">Your Tasks</string>
-    <string name="no_tasks_for_now">No tasks for now, good job!</string>
-    <string name="task_complete_button">Complete</string>
+    <string name="task_required_title">Attività richiesta</string>
+    <string name="task_proof_rejected">Prova rifiutata. Invia di nuovo.</string>
+    <string name="task_complete_to_unlock">Per sbloccare il dispositivo, completa questa attività.</string>
+    <string name="task_submit_proof">Invia prova</string>
+    <string name="task_waiting_for_approval">Prova inviata. In attesa dell\'approvazione del genitore.</string>
+    <string name="task_status_format">Stato: %1$s</string>
+    <string name="your_tasks_title">Le tue attività</string>
+    <string name="no_tasks_for_now">Nessuna attività per ora, ottimo lavoro!</string>
+    <string name="task_complete_button">Completa</string>
 </resources>

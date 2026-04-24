@@ -31,13 +31,13 @@
     <string name="language_continue">Continuer</string>
 
     <!-- Task lock and proof flow -->
-    <string name="task_required_title">Task Required</string>
-    <string name="task_proof_rejected">Proof rejected. Please submit again.</string>
-    <string name="task_complete_to_unlock">To unlock the device, please complete this task.</string>
-    <string name="task_submit_proof">Submit Proof</string>
-    <string name="task_waiting_for_approval">Proof submitted. Waiting for parent approval.</string>
-    <string name="task_status_format">Status: %1$s</string>
-    <string name="your_tasks_title">Your Tasks</string>
-    <string name="no_tasks_for_now">No tasks for now, good job!</string>
-    <string name="task_complete_button">Complete</string>
+    <string name="task_required_title">Tâche requise</string>
+    <string name="task_proof_rejected">Preuve rejetée. Veuillez soumettre à nouveau.</string>
+    <string name="task_complete_to_unlock">Pour déverrouiller l\'appareil, veuillez accomplir cette tâche.</string>
+    <string name="task_submit_proof">Soumettre la preuve</string>
+    <string name="task_waiting_for_approval">Preuve soumise. En attente de l\'approbation parentale.</string>
+    <string name="task_status_format">Statut : %1$s</string>
+    <string name="your_tasks_title">Vos tâches</string>
+    <string name="no_tasks_for_now">Pas de tâches pour l\'instant, bon travail !</string>
+    <string name="task_complete_button">Terminer</string>
 </resources>
