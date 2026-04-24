@@ -2,7 +2,7 @@
 
 **Status:** Consolidated evidence register for release candidate approval.
 
-Current synthesis note (2026-04-24): Repo-side remediation remains substantially complete, and contradictions around Admin-Panel security/automation documentation have been resolved. The repository now contains an automated manufacturing-status analysis (`scripts/analyze_fertigungsstand.py`) exposed through `npm run analyze:fertigungsstand` and `npm run analyze:fertigungsstand:gate`. This script is the repo-internal consistency gate for P0/P1/P2 implementation gaps, Admin-Panel automation focus, CI evidence, release gates, Legacy-Auth cutover state and documentation contradictions. External go-live blockers remain: GitHub Actions billing/spending limit, fresh CodeQL and Android CI evidence, final deploy evidence, Firebase key rotation, Play Console submission evidence, physical/emulator commissioning evidence, on-call roster and final Go/No-Go decision.
+Current synthesis note (2026-04-24): Repo-side remediation remains substantially complete, and contradictions around Admin-Panel security/automation documentation have been resolved. The repository now contains an automated manufacturing-status analysis (`scripts/analyze_fertigungsstand.py`) exposed through `npm run analyze:fertigungsstand` and `npm run analyze:fertigungsstand:gate`. Security hardening config for Electron 36→41 and firebase-admin transitive dependency overrides has been applied (pending `npm install` due to Windows file lock on `default_app.asar`). PR152 selective guard, lint (0 errors) and all local test suites pass. External go-live blockers remain: Code Scanning not enabled (Issue #158), fresh Android CI evidence, final deploy evidence, Firebase key rotation, Play Console submission evidence, physical/emulator commissioning evidence, on-call roster and final Go/No-Go decision.
 
 ## 1. Purpose
 
@@ -24,15 +24,17 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Evidence Item | Link/Reference | Status | Verified By | Date |
 | --------------- | --------------- | -------- | ------------- | ------ |
 | Build artifact (npm run build) | Local build successful (tsc -p tsconfig.json) | ✅ | Automated | 2026-04-22 |
-| Lint result (npm run lint) | 0 errors, 14 warnings (unused vars only) | ✅ | Automated | 2026-04-22 |
-| Test result (npm test) | **78 suites, 2090/2090 passed** | ✅ | Automated | 2026-04-22 |
+| Lint result (npm run lint) | 0 errors, ~16k warnings (existing codebase; no new errors introduced) | ✅ | Automated | 2026-04-24 |
+| Test result (npm test) | **89 suites, 2429/2429 passed** | ✅ | Automated | 2026-04-24 |
 | Coverage report (`npm test -- --coverage --runInBand`) | Stmts 99.56%, Branch 96.65%, Funcs 98.52%, Lines 99.65% | ✅ | Automated | 2026-03-21 |
 | Firestore rules structural test | `test/firestore-rules.test.ts` passed (included in full suite) | ✅ | Automated | 2026-04-22 |
 | Static readiness checks | `scripts/static_readiness_checks.py`: 26/26 checks passed (100%) | ✅ | Automated | 2026-04-22 |
 | Automated manufacturing-status analysis | `npm run analyze:fertigungsstand`; writes `build/fertigungsstand/latest-summary.json` and `build/fertigungsstand/latest-report.md`; gate mode: `npm run analyze:fertigungsstand:gate` | ✅ Repo gate added; latest run evidence pending after checkout | Automated | 2026-04-24 |
 | Admin-Panel documentation consistency | [ADMIN_PANEL_ARCHITECTURE.md](ADMIN_PANEL_ARCHITECTURE.md) now declares automation-first status and resolves stale SRI/CSP/inline-handler contradictions | ✅ | Documented + Automated gate | 2026-04-24 |
-| CodeQL security scan (0 high/critical) | ⛔ Blocked by GitHub Actions billing/spending limit; local security suites pass but are not a substitute for fresh CodeQL evidence | ⛔ | Engineering | 2026-04-23 |
-| Android build / Android CI | ⛔ Blocked by GitHub Actions billing/spending limit; local static readiness checks pass but fresh CI evidence is still required | ⛔ | Engineering | 2026-04-23 |
+| PR152 selective integration guard | `npm run guard:pr152` — all P0/P1/P2 checks pass (security files, ESLint rules, Firestore rules/indexes, monetisation tabs present) | ✅ | Automated | 2026-04-24 |
+| Desktop security hardening | Electron 36→41 and electron-builder 24→26 config applied; overrides for `@tootallnate/once` and `uuid` transitive vulns added | 🔄 Config applied; pending `npm install` | Automated + Engineering | 2026-04-24 |
+| CodeQL security scan (0 high/critical) | ⛔ Blocked by repository setting (Code Scanning not enabled — Issue #158); local security suites pass but are not a substitute for fresh CodeQL evidence | ⛔ | Engineering | 2026-04-24 |
+| Android build / Android CI | ⚠️ Workflow now includes network health check (`dl.google.com` probe) and skips gracefully when Google Maven is unreachable; fresh green CI run still pending | ⚠️ | Engineering | 2026-04-24 |
 | Deployment result | Final production deploy evidence is pending because production runtime secrets/config and deploy sign-off are external to the repository | ⛔ | Engineering | offen |
 
 ### 3.2 Functional Commissioning Gate
@@ -61,6 +63,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Audit trail evidence | AuditLogger in all functions, `test/enforcement-automation.test.ts` | ✅ | Automated | 2026-03-19 |
 | Legal consent versioning test | [LEGAL_VERSIONING_RECONSENT_SPEC.md](LEGAL_VERSIONING_RECONSENT_SPEC.md) plus targeted Web-Control regression evidence | ✅ | Automated + Documented | 2026-04-17 |
 | Country readiness packet (DE) | [COUNTRY_READINESS_PACKETS.md](COUNTRY_READINESS_PACKETS.md) | ✅ | Documented | 2026-03-19 |
+| P1 legal draft inventory | [LEGAL_DRAFT_INVENTORY_P1.md](LEGAL_DRAFT_INVENTORY_P1.md) — UK, USA, FR, ES, IT templates present; all marked unreviewed | ✅ | Documented | 2026-04-24 |
 
 ### 3.5 Operational Readiness Gate
 
