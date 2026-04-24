@@ -17,6 +17,10 @@ Das Panel kann jetzt auch als Python-Webanwendung ueber `python_admin/app.py` be
 - Automatisches Markieren von P0-Checks bei erfolgreichen Support-/Compliance-Aktionen und Readiness-Signalen
 - QA-Register mit Risiko-Fokus: Frischegrad der Nachweise, offene Release-Blocker, Unsupported-Test-Mappings und Schnellfilter direkt im Bereich Qualitaetssicherung
 - Befehlszentrale mit USB-Debug/Commissioning-Kommandos inkl. APK-Installations-Schnittstelle (`run-usb-tests.ps1 -InstallApk`, Dual-Runner)
+- **Lightweight Admin Panel** (`simple.html`): Modulare ES-Module-Ansicht mit Support- & Debug-Panel, eigenem `style.css` und PWA-Icons
+- **Support-Panel** (`support.js`): Support-Zugriff gewaehren/entziehen, Debug-Zugriff und Analyse mit Debug-Daten ueber Backend-APIs
+- **Debug-Panel** (`debug.js`): Erweiterbarer Platzhalter fuer Debugging-Tools
+- **Firebase-Konfigurationsmodul** (`firebase-config.js`): Zentrale, umgebungsbasierte Firebase-Konfiguration fuer neue Module
 
 ## Setup
 
@@ -65,3 +69,14 @@ python3 python_admin/app.py
 ```
 
 Dann `http://127.0.0.1:8765/admin-panel/` aufrufen. In diesem Modus lassen sich die bisherigen freigegebenen CLI- und PowerShell-Kommandos direkt aus der Befehlszentrale starten.
+
+## Lightweight Admin Panel
+
+Eine schlanke, modulare Alternative zum vollstaendigen Dashboard befindet sich unter:
+
+```
+http://localhost:8080/admin-panel/simple.html
+```
+
+Die Light-Version nutzt ES Modules (`app-simple.js`, `support.js`, `debug.js`) und ein eigenes Stylesheet (`style.css`).
+Sie eignet sich fuer schnelle Support- und Debug-Aufgaben ohne Laden des gesamten Dashboards.
