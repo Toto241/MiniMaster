@@ -95,7 +95,6 @@ describe("admin-panel tab modules", () => {
   let load: (absPath: string) => any;
 
   beforeEach(() => {
-    const docListeners = new Map<string, Array<(event?: any) => void>>();
     globalScope = {
       document: {
         getElementById: jest.fn(() => ({
@@ -232,13 +231,11 @@ describe("admin-panel tab modules", () => {
 describe("admin-panel core modules", () => {
   let globalScope: any;
   let load: (absPath: string) => any;
-  let registry: Map<string, any>;
 
   beforeEach(() => {
     globalScope = {} as any;
     const loader = makeLoader(globalScope);
     load = loader.load;
-    registry = loader.reg;
   });
 
   it("crypto-debug exports base64url, fingerprint, stringify, priority", () => {
@@ -259,7 +256,7 @@ describe("admin-panel core modules", () => {
     expect(mod.buildKeyFingerprint("GGGG".repeat(16))).toBe("unbekannt"); // 64 chars but invalid hex
 
     // safeDebugStringify
-    expect(mod.safeDebugStringify({ a: 1 })).toContain('"a": 1');
+    expect(mod.safeDebugStringify({ a: 1 })).toContain("\"a\": 1");
     expect(mod.safeDebugStringify(BigInt(1))).toBe("1"); // falls kein Fehler, sondern String
 
     // getPriorityWeight
@@ -306,7 +303,7 @@ describe("admin-panel core modules", () => {
   it("global-action-bootstrap parses args and resolves actions", () => {
     load(path.join(MODULES_DIR, "core", "registry.js"));
     load(path.join(MODULES_DIR, "core", "global-action-bootstrap.js"));
-    const mod = globalScope.MM && globalScope.MM.get("globalActionBootstrap");
+    const mod = globalScope.MM?.get("globalActionBootstrap");
     expect(mod).toBeDefined();
     expect(typeof mod.bind).toBe("function");
     expect(typeof mod._onDocClick).toBe("function");
@@ -314,17 +311,17 @@ describe("admin-panel core modules", () => {
 
     // _parseArgs
     expect(mod._parseArgs(null)).toEqual([]);
-    expect(mod._parseArgs('')).toEqual([]);
-    expect(mod._parseArgs('["a", 1]')).toEqual(["a", 1]);
-    expect(mod._parseArgs('plain')).toEqual(["plain"]);
-    expect(mod._parseArgs('{"x":1}')).toEqual([{"x":1}]);
+    expect(mod._parseArgs("")).toEqual([]);
+    expect(mod._parseArgs("[\"a\", 1]")).toEqual(["a", 1]);
+    expect(mod._parseArgs("plain")).toEqual(["plain"]);
+    expect(mod._parseArgs("{\"x\":1}")).toEqual([{"x":1}]);
 
     // _onDocClick with valid action
     globalScope.testAction = jest.fn();
     const target = {
       getAttribute: jest.fn((attr: string) => {
         if (attr === "data-action") return "testAction";
-        if (attr === "data-args") return '["arg1", 2]';
+        if (attr === "data-args") return "[\"arg1\", 2]";
         return null;
       }),
     };
@@ -339,7 +336,7 @@ describe("admin-panel core modules", () => {
   it("global-action-bootstrap skips reserved actions", () => {
     load(path.join(MODULES_DIR, "core", "registry.js"));
     load(path.join(MODULES_DIR, "core", "global-action-bootstrap.js"));
-    const mod = globalScope.MM && globalScope.MM.get("globalActionBootstrap");
+    const mod = globalScope.MM?.get("globalActionBootstrap");
     globalScope.logout = jest.fn();
     const target = {
       getAttribute: jest.fn((attr: string) => attr === "data-action" ? "logout" : null),
@@ -355,7 +352,7 @@ describe("admin-panel core modules", () => {
   it("nav-bootstrap resolves switchTab and logout from window", () => {
     load(path.join(MODULES_DIR, "core", "registry.js"));
     load(path.join(MODULES_DIR, "core", "nav-bootstrap.js"));
-    const mod = globalScope.MM && globalScope.MM.get("navBootstrap");
+    const mod = globalScope.MM?.get("navBootstrap");
     expect(mod).toBeDefined();
     expect(typeof mod.bind).toBe("function");
     expect(typeof mod._onNavClick).toBe("function");
