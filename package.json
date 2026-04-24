@@ -17,7 +17,9 @@
     "test:security:ci": "node scripts/run-security-tests.js --mode ci",
     "analyze:fertigungsstand": "python scripts/analyze_fertigungsstand.py",
     "analyze:fertigungsstand:gate": "python scripts/analyze_fertigungsstand.py --fail-on-p0",
-    "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand",
+    "analyze:admin-qa": "python scripts/admin_panel_qa_audit.py",
+    "analyze:admin-qa:gate": "python scripts/admin_panel_qa_audit.py --fail-on-p1-open",
+    "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand && npm run analyze:admin-qa",
     "ci:revalidate": "pwsh ./scripts/revalidate-release-gates.ps1",
     "ci:revalidate:rerun": "pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed"
   },
