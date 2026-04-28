@@ -180,6 +180,11 @@ export {
   processAffiliatePayouts,
 } from "./src/affiliate";
 
+// ==================== MONITORING & CUTOVER ====================
+export {
+  legacyAuthCutoverMonitor,
+} from "./src/cutover-monitor";
+
 // ==================== INFRASTRUCTURE EXPORTS ====================
 // These are used by other modules but also available for testing/admin
 
