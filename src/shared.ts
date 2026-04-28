@@ -62,13 +62,18 @@ export async function requireMasterOwnership(context: CallableContext, childId: 
 // ==================== RATE LIMITING ====================
 
 // Cloud Functions instances are ephemeral and horizontally scaled.
-// This in-memory limiter is therefore only a best-effort fallback, mainly useful
-// for local development, emulator runs, and reducing accidental bursts on a single instance.
-// Strict multi-instance throttling requires a shared backend limiter.
+// The shared rate limiter (src/rate-limiter.ts) provides strict cross-instance
+// enforcement via Firestore. The in-memory fallback below is kept only for
+// bootstrapping and local dev.
 
 const rateLimitStore: Map<string, { count: number; windowStart: number }> = new Map();
 let hasLoggedBestEffortRateLimit = false;
 
+/**
+ * Best-effort in-memory rate limiter.
+ * DEPRECATED: Use requireRateLimit from rate-limiter.ts for production code.
+ * Kept for backward compatibility and local dev / emulator.
+ */
 export function checkRateLimit(
   userId: string,
   action: string,
@@ -78,7 +83,7 @@ export function checkRateLimit(
   if (!hasLoggedBestEffortRateLimit && process.env.NODE_ENV === "production") {
     hasLoggedBestEffortRateLimit = true;
     functions.logger.warn(
-      "Using best-effort in-memory rate limiting. Configure a shared backend limiter for strict cross-instance enforcement.",
+      "Using best-effort in-memory rate limiting. Use requireRateLimit for strict cross-instance enforcement.",
       { action }
     );
   }
@@ -100,6 +105,24 @@ export function checkRateLimit(
       "Too many requests. Please try again later."
     );
   }
+}
+
+/**
+ * STRICT cross-instance rate limiter (wrapper around rate-limiter.ts).
+ * Uses Firestore-backed distributed enforcement. This should be used
+ * for all security-critical endpoints (auth, pairing, admin).
+ */
+export async function checkRateLimitShared(
+  userId: string,
+  action: string,
+  maxRequests = 30,
+  windowMs = 60000
+): Promise<void> {
+  const { requireRateLimit } = await import("./rate-limiter");
+  await requireRateLimit(userId, action, "master", {
+    maxRequests,
+    windowMs,
+  });
 }
 
 // ==================== APP CHECK ====================

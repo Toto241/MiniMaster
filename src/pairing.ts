@@ -13,7 +13,7 @@ import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
+import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess, checkRateLimitShared } from "./shared";
 import { validateString } from "./validation";
 import { withErrorHandling } from "./error-handler";
 
@@ -54,6 +54,7 @@ export const createPairingCode = functions.https.onCall(
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
+      await checkRateLimitShared(masterId, "pairing.create_code", 10, 60 * 60 * 1000);
 
       const masterDoc = await db().collection("masters").doc(masterId).get();
       if (!masterDoc.exists) {
@@ -119,6 +120,7 @@ export const validatePairingCode = functions.https.onCall(
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
+      await checkRateLimitShared(childId, "pairing.validate_code", 10, 15 * 60 * 1000);
 
       const pairingCode = validateString(data.pairingCode, "pairingCode", {
         required: true,

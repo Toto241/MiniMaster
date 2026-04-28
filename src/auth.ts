@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
-import { requireAdmin, requireAuth, AuditLogger, checkRateLimit, validateAppCheck } from "./shared";
+import { requireAdmin, requireAuth, AuditLogger, checkRateLimit, checkRateLimitShared, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
 const MASTER_WEB_BOOTSTRAP_QUERY_PARAM = "bootstrapToken";
@@ -330,7 +330,7 @@ export const createMasterWebBootstrapToken = functions.https.onCall(
       );
     }
 
-    checkRateLimit(masterId, "auth.create_master_web_bootstrap_token", 5, 15 * 60 * 1000);
+    await checkRateLimitShared(masterId, "auth.create_master_web_bootstrap_token", 5, 15 * 60 * 1000);
 
     const masterDoc = await db().collection("masters").doc(masterId).get();
     if (!masterDoc.exists) {
@@ -385,7 +385,7 @@ export const redeemMasterWebBootstrapToken = functions.https.onCall(
     }
 
     const keyHash = sha256Hex(rawToken);
-    checkRateLimit(keyHash.slice(0, 16), "auth.redeem_master_web_bootstrap_token", 10, 15 * 60 * 1000);
+    await checkRateLimitShared(keyHash.slice(0, 16), "auth.redeem_master_web_bootstrap_token", 10, 15 * 60 * 1000);
 
     try {
       const querySnapshot = await db()
@@ -1114,7 +1114,8 @@ export const generateCustomToken = functions.https.onCall(
       }
 
       validateAppCheck(context, true);
-      checkRateLimit(masterImei, "auth.generate_custom_token_legacy", 10, 15 * 60 * 1000);
+      await checkRateLimitShared(masterImei, "auth.generate_custom_token_legacy", 10, 15 * 60 * 1000);
+      await logLegacyAuthUsage(masterImei, "generate_custom_token");
 
       const masterDoc = await db().collection("masters").doc(masterImei).get();
       const storedSecretKey = masterDoc.data()?.secretKey;
@@ -1185,7 +1186,8 @@ export const registerMasterDevice = functions.https.onCall(
     validateAppCheck(context, true);
 
     if (!context.auth) {
-      checkRateLimit(imei, "auth.register_master_device_legacy", 5, 60 * 60 * 1000);
+      await checkRateLimitShared(imei, "auth.register_master_device_legacy", 5, 60 * 60 * 1000);
+      await logLegacyAuthUsage(imei, "register_master_device");
       functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
       await logLegacyAuthUsage("registerMasterDevice", "imei_registration", imei);
     }
@@ -1283,7 +1285,7 @@ export const registerAuthenticatedMaster = functions.https.onCall(
     const startTime = Date.now();
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
-    checkRateLimit(masterId, "auth.register_authenticated_master", 5, 60 * 60 * 1000);
+    await checkRateLimitShared(masterId, "auth.register_authenticated_master", 5, 60 * 60 * 1000);
 
     const deviceId = data.deviceId || masterId;
     const deviceName = data.deviceName || "Master Device";
@@ -1320,6 +1322,28 @@ export const registerAuthenticatedMaster = functions.https.onCall(
           childLimit: 4,
         },
       });
+
+      // DUAL-WRITE: Also create family document for future schema migration
+      // Phase 1 of families/{familyId} migration — write to both paths
+      try {
+        const familyRef = db().collection("families").doc(masterId);
+        await familyRef.set({
+          masterId,
+          deviceId,
+          deviceName,
+          createdAt: now,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          subscription: {
+            status: "trial_pending",
+            parentAppLimit: 2,
+            childLimit: 4,
+          },
+          children: [],
+          schemaVersion: 1,
+        }, { merge: true });
+      } catch (e) {
+        functions.logger.warn("Dual-write to families/ failed (non-fatal)", { error: e, masterId });
+      }
 
       await auth().setCustomUserClaims(masterId, {
         role: "master",
@@ -1379,5 +1403,144 @@ export const revokeUserTokens = functions.https.onCall(
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to revoke tokens.");
     }
+  }
+);
+/**
+ * Logs legacy auth usage for migration analytics.
+ * Writes to legacy_auth_usage/{date}/{masterId} for 14-day window tracking.
+ */
+async function logLegacyAuthUsage(masterId: string, action: string): Promise<void> {
+  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const docRef = db().collection("legacy_auth_usage").doc(date).collection("users").doc(masterId);
+  try {
+    await docRef.set({
+      masterId,
+      lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+      action,
+      count: admin.firestore.FieldValue.increment(1),
+    }, { merge: true });
+  } catch (e) {
+    functions.logger.warn("Failed to log legacy auth usage", { error: e, masterId, action });
+  }
+}
+
+/**
+ * Admin endpoint: Migrates existing master/child data to the new families/ schema.
+ * Phase 2 of migration: backfill families/ from existing masters/ and children/ docs.
+ * Idempotent — safe to run multiple times.
+ */
+export const migrateToFamiliesSchema = functions.https.onCall(
+  async (_data: void, context: CallableContext) => {
+    requireAdmin(context);
+    validateAppCheck(context, true);
+
+    const results = {
+      familiesCreated: 0,
+      childrenLinked: 0,
+      errors: [] as string[],
+    };
+
+    try {
+      const mastersSnap = await db().collection("masters").get();
+
+      for (const masterDoc of mastersSnap.docs) {
+        const masterId = masterDoc.id;
+        const masterData = masterDoc.data();
+
+        try {
+          const familyRef = db().collection("families").doc(masterId);
+          const familySnap = await familyRef.get();
+
+          if (!familySnap.exists) {
+            await familyRef.set({
+              masterId,
+              deviceId: masterData.deviceId || masterId,
+              deviceName: masterData.deviceName || "Master Device",
+              createdAt: masterData.createdAt || admin.firestore.Timestamp.now(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              subscription: masterData.subscription || {
+                status: "trial_pending",
+                parentAppLimit: 2,
+                childLimit: 4,
+              },
+              children: [],
+              schemaVersion: 1,
+            });
+            results.familiesCreated++;
+          }
+
+          // Link existing children to this family
+          const childrenSnap = await db()
+            .collection("children")
+            .where("masterId", "==", masterId)
+            .get();
+
+          const childIds = childrenSnap.docs.map((d) => d.id);
+          if (childIds.length > 0) {
+            await familyRef.update({
+              children: admin.firestore.FieldValue.arrayUnion(...childIds),
+            });
+            results.childrenLinked += childIds.length;
+          }
+        } catch (e) {
+          const msg = `Migration failed for master ${masterId}: ${(e as Error).message}`;
+          functions.logger.error(msg);
+          results.errors.push(msg);
+        }
+      }
+
+      return results;
+    } catch (e) {
+      throw new functions.https.HttpsError(
+        "internal",
+        `Migration failed: ${(e as Error).message}`
+      );
+    }
+  }
+);
+
+/**
+ * Admin endpoint: Returns legacy auth usage stats for the last N days.
+ * Used to determine if the 14-day zero-usage gate for legacy auth cutover is met.
+ */
+export const getLegacyAuthUsageStats = functions.https.onCall(
+  async (data: { days?: number }, context: CallableContext) => {
+    requireAdmin(context);
+    validateAppCheck(context, true);
+
+    const days = Number.isFinite(data?.days) ? Math.min(Number(data.days), 30) : 14;
+    const results: { date: string; uniqueUsers: number; totalCalls: number }[] = [];
+
+    const now = new Date();
+    for (let i = 0; i < days; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+
+      try {
+        const snapshot = await db().collection("legacy_auth_usage").doc(dateStr).collection("users").get();
+        let totalCalls = 0;
+        snapshot.forEach((doc) => {
+          totalCalls += (doc.data().count || 0) as number;
+        });
+        results.push({ date: dateStr, uniqueUsers: snapshot.size, totalCalls });
+      } catch {
+        results.push({ date: dateStr, uniqueUsers: 0, totalCalls: 0 });
+      }
+    }
+
+    const totalUniqueUsers = new Set(results.flatMap((r) => r.uniqueUsers > 0 ? [r.date] : [])).size;
+    const totalCallsAll = results.reduce((sum, r) => sum + r.totalCalls, 0);
+    const cutoverReady = totalCallsAll === 0 && results.length >= 14;
+
+    return {
+      days,
+      daily: results,
+      summary: {
+        totalCalls: totalCallsAll,
+        totalDaysWithUsage: totalUniqueUsers,
+        cutoverReady,
+      },
+    };
   }
 );

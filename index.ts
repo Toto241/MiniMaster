@@ -25,6 +25,8 @@ export {
   resetOperatorAccounts,
   resetAllAuthUsers,
   resetAllAuthUsersHealth,
+  getLegacyAuthUsageStats,
+  migrateToFamiliesSchema,
 } from "./src/auth";
 
 // ==================== PAIRING ====================
