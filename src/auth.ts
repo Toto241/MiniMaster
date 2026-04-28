@@ -10,7 +10,17 @@ import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
 import { requireAdmin, requireAuth, AuditLogger, checkRateLimit, checkRateLimitShared, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
+import { isLegacyAuthCutoverEnabled } from "./cutover-monitor";
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
+
+/**
+ * Checks if legacy auth is disabled (env var OR dynamic Firestore config).
+ * Prefer this over the LEGACY_AUTH_DISABLED constant for runtime decisions.
+ */
+async function isLegacyAuthDisabled(): Promise<boolean> {
+  if (LEGACY_AUTH_DISABLED) return true;
+  return await isLegacyAuthCutoverEnabled();
+}
 const MASTER_WEB_BOOTSTRAP_QUERY_PARAM = "bootstrapToken";
 const DEFAULT_MASTER_WEB_BOOTSTRAP_TTL_MINUTES = 10;
 const MAX_MASTER_WEB_BOOTSTRAP_TTL_MINUTES = 30;
@@ -1098,7 +1108,7 @@ export const generateCustomToken = functions.https.onCall(
       validateAppCheck(context, true);
       uid = context.auth.uid;
     } else {
-      if (LEGACY_AUTH_DISABLED) {
+      if (await isLegacyAuthDisabled()) {
         throw new functions.https.HttpsError(
           "failed-precondition",
           "Legacy secretKey login is disabled. Please sign in via Firebase Auth."
@@ -1176,7 +1186,7 @@ export const registerMasterDevice = functions.https.onCall(
     }
 
     const masterId = context.auth?.uid || imei;
-    if (!context.auth && LEGACY_AUTH_DISABLED) {
+    if (!context.auth && await isLegacyAuthDisabled()) {
       throw new functions.https.HttpsError(
         "failed-precondition",
         "Legacy IMEI-only registration is disabled. Please register while authenticated."
