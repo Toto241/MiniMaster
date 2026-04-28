@@ -32,7 +32,11 @@
   "type": "commonjs",
   "overrides": {
     "@tootallnate/once": "^3.0.1",
-    "uuid": "^11.1.0"
+    "uuid": "^14.0.0",
+    "google-gax": "^5.0.6",
+    "gaxios": "^7.0.0",
+    "teeny-request": "^10.0.0",
+    "retry-request": "^8.0.0"
   },
   "engines": {
     "node": ">=22"
@@ -41,7 +45,7 @@
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^7.2.3",
     "googleapis": "^155.0.1",
-    "uuid": "^11.1.0"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
