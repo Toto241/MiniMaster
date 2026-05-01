@@ -11563,7 +11563,7 @@ async function onManualChecklistToggle(input) {
     } catch (err) {
         input.checked = !done;
         const msg = err && err.message ? err.message : String(err);
-        alert(`Aktualisierung fehlgeschlagen: ${msg}`);
+        showNotification(`Aktualisierung fehlgeschlagen: ${msg}`, "error");
     } finally {
         input.disabled = false;
     }
@@ -11621,9 +11621,99 @@ const EXTERNAL_INTEGRATIONS_FIELDS = [
 function initExternalIntegrationsCard() {
     const refreshBtn = document.getElementById("btn-refresh-external-integrations");
     const saveOemBtn = document.getElementById("btn-save-oem-matrix");
-    if (!refreshBtn) return;
-    refreshBtn.addEventListener("click", () => loadExternalIntegrations());
+    const backendReadinessBtn = document.getElementById("btn-load-backend-release-readiness");
+    if (refreshBtn) refreshBtn.addEventListener("click", () => loadExternalIntegrations());
     if (saveOemBtn) saveOemBtn.addEventListener("click", () => saveOemMatrix());
+    if (backendReadinessBtn) backendReadinessBtn.addEventListener("click", () => loadBackendReleaseReadiness());
+}
+
+// Calls the dedicated `getReleaseReadinessStatus` Cloud Function (slim
+// wrapper around the readiness computation in src/external-integrations.ts).
+// Renders progress, blocker count and per-category breakdown without having
+// to fetch the full external-integrations config payload.
+async function loadBackendReleaseReadiness() {
+    const summaryEl = document.getElementById("backend-readiness-summary");
+    const contentEl = document.getElementById("backend-readiness-content");
+    if (!contentEl || !summaryEl) return;
+    summaryEl.textContent = "lädt …";
+    summaryEl.className = "status-badge";
+    contentEl.innerHTML = "<p class=\"muted\">Backend-Readiness wird abgerufen …</p>";
+
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("getReleaseReadinessStatus");
+        const result = await callable({});
+        const data = result && result.data ? result.data : null;
+        if (!data) throw new Error("Leere Antwort vom Backend");
+        renderBackendReleaseReadiness(data);
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        summaryEl.textContent = "Fehler";
+        summaryEl.className = "status-badge status-error";
+        contentEl.innerHTML = `<p class="error">Backend-Readiness konnte nicht geladen werden: ${escapeHtml(msg)}</p>`;
+    }
+}
+
+function renderBackendReleaseReadiness(data) {
+    const summaryEl = document.getElementById("backend-readiness-summary");
+    const contentEl = document.getElementById("backend-readiness-content");
+    if (!contentEl || !summaryEl) return;
+
+    const ready = !!data.ready;
+    const progressPct = Number(data.progressPct) || 0;
+    const blockers = Array.isArray(data.blockers) ? data.blockers : [];
+    const byCategory = data.byCategory || {};
+
+    const badgeClass = ready ? "status-ok" : (progressPct >= 70 ? "status-warning" : "status-error");
+    summaryEl.textContent = ready
+        ? `✅ bereit (${progressPct}%)`
+        : `⏳ ${progressPct}% — ${blockers.length} Blocker`;
+    summaryEl.className = `status-badge ${badgeClass}`;
+
+    const categoryLabels = {
+        apple: "🍎 Apple",
+        play: "🎮 Google Play",
+        secrets: "🔐 Production-Secrets",
+        oem: "🛠️ OEM-Matrix",
+        release: "📋 Release-Checkliste",
+    };
+    const categoryRows = Object.entries(byCategory).map(([cat, summary]) => {
+        const total = summary && Number.isFinite(Number(summary.total)) ? Number(summary.total) : 0;
+        const complete = summary && Number.isFinite(Number(summary.complete)) ? Number(summary.complete) : 0;
+        const missing = Array.isArray(summary && summary.missing) ? summary.missing : [];
+        const missingHtml = missing.length === 0
+            ? "<span class=\"status-ok\">vollständig</span>"
+            : `<ul class="blocker-list" style="margin:0">${missing.map((m) => `<li>${escapeHtml(m)}</li>`).join("")}</ul>`;
+        return `
+            <tr>
+                <th scope="row">${escapeHtml(categoryLabels[cat] || cat)}</th>
+                <td>${complete}/${total}</td>
+                <td>${missingHtml}</td>
+            </tr>
+        `;
+    }).join("");
+
+    const blockersHtml = blockers.length === 0
+        ? "<p class=\"status-ok\">Keine offenen Blocker — Release-Pfad freigegeben.</p>"
+        : `<ul class="blocker-list">${blockers.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>`;
+
+    contentEl.innerHTML = `
+        <div class="readiness-grid">
+            <div class="readiness-block">
+                <h4>Backend-Status</h4>
+                <p><strong>Fortschritt:</strong> ${progressPct}%</p>
+                <progress max="100" value="${progressPct}" style="width:100%"></progress>
+                ${blockersHtml}
+            </div>
+            <div class="readiness-block">
+                <h4>Pro Kategorie</h4>
+                <table class="readiness-table">
+                    <thead><tr><th scope="col">Kategorie</th><th scope="col">Erledigt</th><th scope="col">Fehlt</th></tr></thead>
+                    <tbody>${categoryRows || "<tr><td colspan=\"3\">Keine Daten</td></tr>"}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
 }
 
 async function loadExternalIntegrations() {
@@ -12440,8 +12530,7 @@ function saveBootstrapFirebaseConfig() {
         initializeFirebaseAfterConfigSave();
     } catch (error) {
         console.error("[saveBootstrapFirebaseConfig] Fehler:", error);
-        showNotification(error.message, "error");
-        alert("Firebase-Konfiguration Fehler:\n\n" + error.message);
+        showNotification("Firebase-Konfiguration Fehler: " + error.message, "error");
     }
 }
 
@@ -12451,8 +12540,7 @@ function reloadWithBootstrapConfig() {
         window.location.reload();
     } catch (error) {
         console.error("[reloadWithBootstrapConfig] Fehler:", error);
-        showNotification(error.message, "error");
-        alert("Firebase-Konfiguration Fehler:\n\n" + error.message);
+        showNotification("Firebase-Konfiguration Fehler: " + error.message, "error");
     }
 }
 
