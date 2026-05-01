@@ -11627,6 +11627,17 @@ function initExternalIntegrationsCard() {
     if (backendReadinessBtn) backendReadinessBtn.addEventListener("click", () => loadBackendReleaseReadiness());
 }
 
+// Static labels for the per-category readiness breakdown. Hoisted out of
+// the renderer so it is allocated once at module load instead of on every
+// re-render.
+const BACKEND_READINESS_LABELS = {
+    apple: "🍎 Apple",
+    play: "🎮 Google Play",
+    secrets: "🔐 Production-Secrets",
+    oem: "🛠️ OEM-Matrix",
+    release: "📋 Release-Checkliste",
+};
+
 // Calls the dedicated `getReleaseReadinessStatus` Cloud Function (slim
 // wrapper around the readiness computation in src/external-integrations.ts).
 // Renders progress, blocker count and per-category breakdown without having
@@ -11670,23 +11681,16 @@ function renderBackendReleaseReadiness(data) {
         : `⏳ ${progressPct}% — ${blockers.length} Blocker`;
     summaryEl.className = `status-badge ${badgeClass}`;
 
-    const categoryLabels = {
-        apple: "🍎 Apple",
-        play: "🎮 Google Play",
-        secrets: "🔐 Production-Secrets",
-        oem: "🛠️ OEM-Matrix",
-        release: "📋 Release-Checkliste",
-    };
     const categoryRows = Object.entries(byCategory).map(([cat, summary]) => {
         const total = summary && Number.isFinite(Number(summary.total)) ? Number(summary.total) : 0;
         const complete = summary && Number.isFinite(Number(summary.complete)) ? Number(summary.complete) : 0;
         const missing = Array.isArray(summary && summary.missing) ? summary.missing : [];
         const missingHtml = missing.length === 0
             ? "<span class=\"status-ok\">vollständig</span>"
-            : `<ul class="blocker-list" style="margin:0">${missing.map((m) => `<li>${escapeHtml(m)}</li>`).join("")}</ul>`;
+            : `<ul class="blocker-list">${missing.map((m) => `<li>${escapeHtml(m)}</li>`).join("")}</ul>`;
         return `
             <tr>
-                <th scope="row">${escapeHtml(categoryLabels[cat] || cat)}</th>
+                <th scope="row">${escapeHtml(BACKEND_READINESS_LABELS[cat] || cat)}</th>
                 <td>${complete}/${total}</td>
                 <td>${missingHtml}</td>
             </tr>
