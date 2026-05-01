@@ -95,6 +95,20 @@ Blocked until: migration design (dual-write + backfill), updated rules, updated 
 
 Phased approach recommended: (1) Introduce families collection w/ deny rules lifted only for read via Cloud Functions. (2) Dual-write. (3) Backfill. (4) Switch reads. (5) Remove flat collections.
 
+## 5.2. Legacy `secretKey` Auth — Migrationsplan (Cutover)
+
+Bis Frühjahr 2026 nutzten Web-Clients (`web-control`, `parent-panel`, `child-panel`) und Teile der iOS-Apps einen serverseitig vergebenen `secretKey` als Sitzungsmerkmal. Der Cutover auf den serverauthentifizierten Bootstrap-Token-Flow (`createMasterWebBootstrapToken` + Firebase-ID-Token) erfolgt in drei Stufen, koordiniert durch `getLegacyAuthUsageStats` und `legacyAuthCutoverMonitor`.
+
+|Stufe|Status|Maßnahme|Akzeptanzkriterium|
+|-----|------|--------|------------------|
+|**1 — Inventur & Freeze**|✅ erledigt|Vollständige Liste aller `secretKey`-Aufrufer (Backend + Clients) im Inventar; keine neuen Aufrufer dürfen ergänzt werden (Lint-Regel + Code-Review-Gate). iOS-`AuthService` bereits auf Bootstrap-Vertrag umgestellt.|`getLegacyAuthUsageStats` zeigt stabile Aufrufer-Liste, keine neuen UID-Quellen über 30 Tage.|
+|**2 — Web-Client-Cutover**|🔄 in Arbeit|Web-Clients (`web-control`, `parent-panel`, `child-panel`) nutzen ausschließlich Bootstrap-Token + Firebase-Auth. `secretKey`-Login-Pfade werden durch Feature-Flag `legacyAuthEnabled=false` deaktiviert; Fallback nur via Operator-Override (Audit-geloggt).|`legacyAuthCutoverMonitor` meldet < 1 % Restnutzung pro 24 h über zwei Wochen.|
+|**3 — Hard-Cut & Cleanup**|🔒 wartend|Nach 14-Tage-Monitor mit 0 % Web-Restnutzung: Backend lehnt `secretKey`-basierte Aufrufe mit `unauthenticated` ab. `secretKey`-Felder im Firestore-Schema bleiben für Audit/DSAR 90 Tage lesbar, dann durch TTL-Sweep entfernt. Code-Pfade und Tests werden in einem dedizierten Cleanup-PR gelöscht.|`getLegacyAuthUsageStats.totalUsage = 0` über 14 Tage; alle `secretKey`-Code-Pfade entfernt; Firestore-Rules verbieten Schreiben auf `secretKey`.|
+
+**Rollback-Pfad pro Stufe:** Feature-Flag `legacyAuthEnabled` in `operatorConfig/runtime` schaltet Stufe 2 bei Inzident wieder aktiv (max. 24 h Window, danach Cutover-Plan neu starten). Stufe 3 ist nicht reversibel ohne erneuten Migrations-Sprint.
+
+**Beobachtbarkeit:** `getOperatorSetupStatus` aggregiert die Cutover-Telemetrie (Stage, last24hCallCount, lastCallerSample) und stellt sie im Admin-Panel dar.
+
 ## Compliance and retention status
 
 - Legal policy publishing and re-consent enforcement run on dedicated Cloud Functions with Firestore-backed `legalPolicies` and `masterLegalConsents` collections.
