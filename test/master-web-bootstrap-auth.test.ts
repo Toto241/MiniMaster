@@ -86,6 +86,8 @@ jest.mock("../src/shared", () => ({
   requireAdmin: jest.fn(),
   validateAppCheck: (...args: any[]) => mockValidateAppCheck(...args),
   checkRateLimit: (...args: any[]) => mockCheckRateLimit(...args),
+  checkRateLimitShared: (...args: any[]) => mockCheckRateLimit(...args),
+  hasActiveAccess: jest.fn().mockResolvedValue(true),
   AuditLogger: mockAudit,
 }));
 

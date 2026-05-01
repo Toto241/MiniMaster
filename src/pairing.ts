@@ -10,7 +10,6 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { v4 as uuidv4 } from "uuid";
 import * as crypto from "crypto";
 import { db } from "../firebase";
 import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess, checkRateLimitShared } from "./shared";
@@ -247,7 +246,7 @@ export const generatePairingLink = functions.https.onCall(
         );
       }
 
-      const pairingToken = uuidv4();
+      const pairingToken = crypto.randomUUID();
       const now = admin.firestore.Timestamp.now();
       const expiresAtSeconds = now.seconds + 5 * 60;
       const expiresAt = new admin.firestore.Timestamp(expiresAtSeconds, now.nanoseconds);
