@@ -208,6 +208,65 @@ For CI/CD-specific repository secrets and their exact names, use the deploy guid
 
 Never commit service account JSON files, `google-services.json`, API keys or copied console tokens.
 
+## Legacy `secretKey` Auth — Stufe-2-Cutover & Rollback
+
+Hintergrund: Migrationsplan in [ARCHITECTURE.md §5.2](ARCHITECTURE.md#52-legacy-secretkey-auth--migrationsplan-cutover).
+
+### Aktivierung Stufe 2 (nach Merge des Web-Control-Cleanups)
+
+1. **Pre-Check** — kurz vor dem Flag-Flip:
+
+   ```powershell
+   # Aktuelle Legacy-Aufrufrate (sollte bereits niedrig sein)
+   firebase --project <PROJECT> functions:shell
+   > getLegacyAuthUsageStats({})
+   ```
+
+   Erwartet: Aufrufrate < 1 % über die letzten 24 h.
+
+2. **Flag setzen** — eine der zwei Optionen:
+
+   - **Empfohlen (rückrollbar):** Firestore-Dokument `config/auth` setzen:
+
+     ```text
+     config/auth.legacyAuthCutoverEnabled = true
+     ```
+
+     Greift sofort, kein Re-Deploy. Über das Admin-Panel im Tab „⚙️ Einrichtung" → Karte „Legacy-Auth-Cutover-Status" sichtbar.
+
+   - **Alternative (Hard-Override):** Cloud-Function-Env setzen:
+
+     ```powershell
+     firebase --project <PROJECT> functions:secrets:set DISABLE_LEGACY_SECRETKEY_AUTH
+     # Wert: "true"
+     firebase --project <PROJECT> deploy --only functions
+     ```
+
+     Greift nach Re-Deploy. Schwerer rückgängig zu machen — nur wählen, wenn der Firestore-Switch nicht ausreicht.
+
+3. **Smoke-Test** (5 min nach Aktivierung):
+
+   - Aufruf eines Legacy-`secretKey`-Pfads von einem Testgerät → erwartet `failed-precondition` mit Fehlermeldung „Legacy secretKey login is disabled."
+   - Aufruf eines Bootstrap-Token-Pfads aus dem Eltern-Panel → erwartet erfolgreiche Sitzung.
+   - `audit_logs` filter `auth.legacy_used` → keine neuen Einträge in den nächsten 60 min.
+
+### Rollback (24-h-Notfall-Fenster)
+
+- **Symptom:** Legitime Web-Clients erreichen die App nicht mehr (z. B. wegen einer nicht migrierten Eltern-Workstation).
+- **Aktion:** Firestore-Dokument `config/auth.legacyAuthCutoverEnabled` auf `false` zurücksetzen — sofortige Wirkung, kein Deploy nötig.
+- Nur das **Firestore**-Feld ist im 24-h-Fenster reversibel; ein Hard-Cut über `DISABLE_LEGACY_SECRETKEY_AUTH=true` per Env-Var erfordert Re-Deploy.
+- Nach Rollback: 14-Tage-Monitor-Fenster zurücksetzen, Ursache analysieren, Cutover neu planen.
+
+### 14-Tage-Monitor (automatisch)
+
+Der Scheduler `legacyAuthCutoverMonitor` läuft täglich 03:00 UTC, prüft `getLegacyAuthUsageStats` und setzt nach 14 aufeinanderfolgenden Tagen mit 0 Aufrufen das Feld `config/auth.legacyAuthCutoverReady = true`. Erst dann ist Stufe 3 (Hard-Cut) freigeschaltet.
+
+### Verantwortlich
+
+- **Primär:** Lead-Operator (siehe On-Call-Roster, Sektion „On-Call-Roster (Template)").
+- **Backup:** Sicherheitsbeauftragter.
+- **Eskalation bei Rückfragen:** Geschäftsführung.
+
 ## Recovery-Token Rotation (ADMIN_RECOVERY_TOKEN) — Quartals-SOP
 
 Der `ADMIN_RECOVERY_TOKEN` schützt Notfall-Operationen (z. B. `resetOperatorAccounts`).

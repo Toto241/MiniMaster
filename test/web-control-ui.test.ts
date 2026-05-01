@@ -214,7 +214,6 @@ function loadWebControl(initialStorage: StorageMap = {}) {
     "  openRulesModal,",
     "  saveRules,",
     "  createSupportTicket,",
-    "  login,",
     "  logout,",
     "  showMainContent,",
     "  showTaskAssignment,",
@@ -423,28 +422,11 @@ describe("web-control browser flows", () => {
     expect(context.__webControlTestExports.buildLegalLocale("", "")).toBe("en-US");
   });
 
-  it("blocks direct secret-key login and shows an error message", async () => {
-    const { context, elements, firebaseMock, domContentLoadedHandlers } = loadWebControl({
-      operatorFirebaseConfigOverride: JSON.stringify({
-        apiKey: "key-1",
-        authDomain: "demo.firebaseapp.com",
-        projectId: "demo-project",
-        storageBucket: "demo.firebasestorage.app",
-        messagingSenderId: "123456",
-        appId: "1:123:web:abc",
-      }),
-    });
-
-    domContentLoadedHandlers[0]?.();
-    elements.get("master-imei")!.value = "master-imei-1";
-    elements.get("secret-key")!.value = "secret-key-1";
-
-    context.__webControlTestExports.login();
-    await Promise.resolve();
-
-    expect(firebaseMock.auth().signInWithCustomToken).not.toHaveBeenCalled();
-    expect(elements.get("notification")?.textContent).toContain("Direct secret-key login is disabled");
-  });
+  // Note: The test "blocks direct secret-key login and shows an error message"
+  // was removed in the Stage-2 cutover (ARCHITECTURE.md §5.2): the `login()`
+  // function and its disabled-message UI were deleted entirely. The structural
+  // guarantee is now covered by web-panels-bootstrap-auth.test.ts which asserts
+  // that no `login()` function or `secret-key` DOM lookups exist in app.js.
 
   it("redeems a one-time web bootstrap token from the URL before legacy login", async () => {
     const { context, authMock, callableFactory, domContentLoadedHandlers } = loadWebControl({
@@ -579,8 +561,6 @@ describe("web-control browser flows", () => {
     elements.get("login-form")!.style = { display: "none" };
     elements.get("user-info")!.style = { display: "flex" };
     elements.get("main-content")!.style = { display: "block" };
-    elements.get("master-imei")!.value = "m1";
-    elements.get("secret-key")!.value = "secret";
 
     context.__webControlTestExports.logout();
     await Promise.resolve();
@@ -591,8 +571,8 @@ describe("web-control browser flows", () => {
     expect(elements.get("login-form")?.style?.display).toBe("flex");
     expect(elements.get("user-info")?.style?.display).toBe("none");
     expect(elements.get("main-content")?.style?.display).toBe("none");
-    expect(elements.get("master-imei")?.value).toBe("");
-    expect(elements.get("secret-key")?.value).toBe("");
+    // master-imei / secret-key input clearing was removed in the Stage-2
+    // cutover — those inputs no longer exist in the HTML.
     expect(elements.get("notification")?.textContent).toContain("Logged out successfully");
   });
 

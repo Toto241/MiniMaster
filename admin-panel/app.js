@@ -13546,8 +13546,33 @@ async function loadLegacyAuthUsage() {
             .map(([day, count]) => `<tr><td>${day}</td><td>${count}</td></tr>`)
             .join("");
 
+        // Read the cutover flag state from `config/auth` so the operator
+        // sees Stage-2 (enabled) and Stage-3-readiness (ready) at a glance,
+        // alongside the raw usage telemetry above.
+        let flagBlock = "";
+        try {
+            const cfgDoc = await db.collection("config").doc("auth").get();
+            const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+            const stage2Active = cfg && cfg.legacyAuthCutoverEnabled === true;
+            const stage3Ready = cfg && cfg.legacyAuthCutoverReady === true;
+            const stage2Badge = stage2Active
+                ? "<span class=\"status-badge status-ok\">✅ Stufe 2 AKTIV — Legacy-Auth gesperrt</span>"
+                : "<span class=\"status-badge status-warning\">⏳ Stufe 2 INAKTIV — Legacy-Auth noch erreichbar</span>";
+            const stage3Badge = stage3Ready
+                ? "<span class=\"status-badge status-ok\">✅ Stufe 3 BEREIT — 14-Tage-Monitor grün</span>"
+                : "<span class=\"status-badge status-warning\">⏳ Stufe 3 NOCH NICHT BEREIT</span>";
+            flagBlock = `
+                <h4 style="margin-block-start:15px">Cutover-Flag-Status (config/auth)</h4>
+                <div class="mm-u011">${stage2Badge} ${stage3Badge}</div>
+                <p class="muted">Stufe 2 wird über Firestore <code>config/auth.legacyAuthCutoverEnabled</code> umgeschaltet (sofortige Wirkung, rückrollbar). Stufe 3 wird automatisch durch den 14-Tage-Monitor freigeschaltet (siehe RUNBOOK „Legacy <code>secretKey</code> Auth — Stufe-2-Cutover &amp; Rollback").</p>
+            `;
+        } catch (cfgErr) {
+            flagBlock = `<p class="muted">Cutover-Flag konnte nicht gelesen werden: ${escapeHtml(cfgErr.message || String(cfgErr))}</p>`;
+        }
+
         resultEl.innerHTML = `
             <div class="${statusClass}">${statusText}</div>
+            ${flagBlock}
             <h4 style="margin-block-start:15px">Nach Endpoint</h4>
             <table><tr><th>Endpoint</th><th>Aufrufe</th></tr>${endpointRows || "<tr><td colspan='2'>Keine Daten</td></tr>"}</table>
             <h4 style="margin-block-start:15px">Nach Tag (letzte 14 Tage)</h4>
