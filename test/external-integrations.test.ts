@@ -21,26 +21,14 @@ function deepMerge(target: any, source: any): any {
 }
 
 const mockDocSet = jest.fn(async (data: any, opts?: { merge?: boolean }) => {
-  // Translate dotted keys (e.g., "apple.developerTeamId") into nested paths.
-  const nested: Record<string, any> = {};
-  for (const [k, v] of Object.entries(data || {})) {
-    if (k.includes(".")) {
-      const parts = k.split(".");
-      let cur = nested;
-      for (let i = 0; i < parts.length - 1; i += 1) {
-        cur[parts[i]] = cur[parts[i]] || {};
-        cur = cur[parts[i]];
-      }
-      cur[parts[parts.length - 1]] = v;
-    } else {
-      nested[k] = v;
-    }
-  }
+  // Real Firestore `set({ merge: true })` deep-merges nested objects but does
+  // NOT interpret dot-notation keys — the backend therefore must send already
+  // nested structures, and the mock just deep-merges them.
   if (opts?.merge) {
-    deepMerge(mockDocData, nested);
+    deepMerge(mockDocData, data || {});
   } else {
     for (const k of Object.keys(mockDocData)) delete mockDocData[k];
-    Object.assign(mockDocData, nested);
+    Object.assign(mockDocData, data || {});
   }
 });
 const mockDocGet = jest.fn(async () => ({
@@ -180,6 +168,28 @@ describe("validateSecretManagerPath", () => {
   });
 });
 
+describe("validateIsoDate", () => {
+  it("accepts YYYY-MM-DD", () => {
+    expect(pure.validateIsoDate("2026-04-01").ok).toBe(true);
+  });
+  it("accepts full ISO 8601 with timezone", () => {
+    expect(pure.validateIsoDate("2026-04-01T12:34:56Z").ok).toBe(true);
+    expect(pure.validateIsoDate("2026-04-01T12:34:56+02:00").ok).toBe(true);
+  });
+  it("accepts empty as cleared", () => {
+    expect(pure.validateIsoDate("").ok).toBe(true);
+    expect(pure.validateIsoDate("").normalized).toBeNull();
+  });
+  it("rejects non-ISO formats", () => {
+    expect(pure.validateIsoDate("01.04.2026").ok).toBe(false);
+    expect(pure.validateIsoDate("2026/04/01").ok).toBe(false);
+    expect(pure.validateIsoDate("yesterday").ok).toBe(false);
+  });
+  it("rejects ISO-shaped but invalid calendar dates", () => {
+    expect(pure.validateIsoDate("2026-13-40").ok).toBe(false);
+  });
+});
+
 describe("looksLikeCleartextSecret", () => {
   it("flags AIza-prefixed values", () => {
     expect(pure.looksLikeCleartextSecret("AIzaSyABC")).toBe(true);
@@ -259,12 +269,15 @@ describeCallable("patchExternalIntegrationsField", () => {
     await expect(wrapped({ category: "apple", field: "developerTeamId", value: "ABCDE12345" }, asAuditor)).rejects.toThrow();
   });
 
-  it("persists a valid Apple Team ID", async () => {
+  it("persists a valid Apple Team ID via nested object (not dot-notation)", async () => {
     const wrapped = testEnv.wrap(fns.patchExternalIntegrationsField);
     await wrapped({ category: "apple", field: "developerTeamId", value: "ABCDE12345" }, asAdmin);
     expect(mockDocSet).toHaveBeenCalled();
     const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
-    expect(call["apple.developerTeamId"]).toBe("ABCDE12345");
+    // Must be nested — Firestore `set({merge:true})` does not expand dot keys.
+    expect(call.apple.developerTeamId).toBe("ABCDE12345");
+    expect(call["apple.developerTeamId"]).toBeUndefined();
+    expect(call.meta.lastUpdatedBy).toBe("admin1");
   });
 
   it("rejects an invalid Apple Team ID", async () => {
@@ -286,14 +299,14 @@ describeCallable("patchExternalIntegrationsField", () => {
       asAdmin
     );
     const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
-    expect(call["secrets.geminiApiKeyPath"]).toBe("projects/proj/secrets/gemini/versions/latest");
+    expect(call.secrets.geminiApiKeyPath).toBe("projects/proj/secrets/gemini/versions/latest");
   });
 
   it("toggles a release boolean", async () => {
     const wrapped = testEnv.wrap(fns.patchExternalIntegrationsField);
     await wrapped({ category: "release", field: "playDataSafetyComplete", value: true }, asAdmin);
     const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
-    expect(call["release.playDataSafetyComplete"]).toBe(true);
+    expect(call.release.playDataSafetyComplete).toBe(true);
   });
 
   it("rejects unknown category/field combinations", async () => {
@@ -305,7 +318,7 @@ describeCallable("patchExternalIntegrationsField", () => {
     const wrapped = testEnv.wrap(fns.patchExternalIntegrationsField);
     await wrapped({ category: "apple", field: "developerTeamId", value: "   " }, asAdmin);
     const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
-    expect(call["apple.developerTeamId"]).toBeNull();
+    expect(call.apple.developerTeamId).toBeNull();
   });
 });
 
@@ -328,12 +341,24 @@ describeCallable("setOemValidationMatrix", () => {
     expect(res.rowCount).toBe(2);
     const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
     expect(call.oem.matrix[0].deviceModel).toBe("Samsung S23");
+    expect(call.oem.matrix[0].testedAt).toBe("2026-04-01");
     expect(call.oem.matrix[1].status).toBe("pending"); // sanitised to default
+    expect(call.oem.matrix[1].testedAt).toBeNull();
   });
 
   it("rejects rows missing required fields", async () => {
     const wrapped = testEnv.wrap(fns.setOemValidationMatrix);
     await expect(wrapped({ rows: [{ deviceModel: "" }] }, asAdmin)).rejects.toThrow(/deviceModel|osVersion/);
+  });
+
+  it("rejects rows with malformed testedAt", async () => {
+    const wrapped = testEnv.wrap(fns.setOemValidationMatrix);
+    await expect(
+      wrapped(
+        { rows: [{ deviceModel: "Samsung S23", osVersion: "Android 14", testedAt: "yesterday" }] },
+        asAdmin
+      )
+    ).rejects.toThrow(/testedAt|ISO/);
   });
 
   it("caps matrix at 100 rows", async () => {

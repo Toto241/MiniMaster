@@ -11813,7 +11813,7 @@ async function onExternalIntegrationFieldChange(input) {
         await loadExternalIntegrations();
     } catch (err) {
         const msg = err && err.message ? err.message : String(err);
-        alert(`Aktualisierung fehlgeschlagen: ${msg}`);
+        showNotification(`Aktualisierung fehlgeschlagen: ${msg}`, "error");
         if (type === "bool") input.checked = !input.checked;
     } finally {
         input.disabled = false;
@@ -11831,7 +11831,9 @@ function readOemMatrixFromDom() {
         };
         const deviceModel = get("deviceModel");
         const osVersion = get("osVersion");
-        if (!deviceModel && !osVersion) return; // skip empty
+        // Skip rows that are empty OR partially filled — backend rejects
+        // half-rows and would fail the whole save.
+        if (!deviceModel || !osVersion) return;
         rows.push({
             deviceModel,
             osVersion,
@@ -11873,7 +11875,7 @@ async function saveOemMatrix() {
         await loadExternalIntegrations();
     } catch (err) {
         const msg = err && err.message ? err.message : String(err);
-        alert(`OEM-Matrix konnte nicht gespeichert werden: ${msg}`);
+        showNotification(`OEM-Matrix konnte nicht gespeichert werden: ${msg}`, "error");
     }
 }
 

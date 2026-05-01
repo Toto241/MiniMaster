@@ -162,6 +162,18 @@ export function looksLikeCleartextSecret(value: string): boolean {
   return false;
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+export function validateIsoDate(value: string): { ok: boolean; normalized: string | null } {
+  if (typeof value !== "string") return { ok: false, normalized: null };
+  const v = value.trim();
+  if (v.length === 0) return { ok: true, normalized: null };
+  if (!ISO_DATE_RE.test(v)) return { ok: false, normalized: null };
+  const parsed = new Date(v);
+  if (Number.isNaN(parsed.getTime())) return { ok: false, normalized: null };
+  return { ok: true, normalized: v };
+}
+
 function validateOemRow(row: unknown): { ok: boolean; reason?: string; sanitized?: OemValidationRow } {
   if (!row || typeof row !== "object") return { ok: false, reason: "OEM row must be an object." };
   const r = row as Record<string, unknown>;
@@ -171,7 +183,17 @@ function validateOemRow(row: unknown): { ok: boolean; reason?: string; sanitized
     return { ok: false, reason: "Each OEM row needs deviceModel and osVersion." };
   }
   const status = r.status === "passed" || r.status === "failed" ? r.status : "pending";
-  const testedAt = typeof r.testedAt === "string" ? r.testedAt.slice(0, 32) : null;
+  let testedAt: string | null = null;
+  if (r.testedAt !== null && r.testedAt !== undefined && r.testedAt !== "") {
+    const dateCheck = validateIsoDate(typeof r.testedAt === "string" ? r.testedAt : "");
+    if (!dateCheck.ok) {
+      return {
+        ok: false,
+        reason: `Row "${deviceModel}": testedAt must be ISO date (YYYY-MM-DD or full ISO 8601).`,
+      };
+    }
+    testedAt = dateCheck.normalized;
+  }
   const signoffBy = typeof r.signoffBy === "string" ? r.signoffBy.trim().slice(0, 80) : null;
   const notes = typeof r.notes === "string" ? r.notes.slice(0, 500) : null;
   return {
@@ -412,10 +434,15 @@ export const patchExternalIntegrationsField = functions.https.onCall(
       ? (data.value.trim() === "" ? null : data.value.trim())
       : data.value;
 
+    // `set({ merge: true })` does NOT interpret dot-notation in keys — they
+    // would be persisted as literal field names. Build a nested structure so
+    // the deep-merge semantics of `set({ merge: true })` apply correctly.
     const update: Record<string, unknown> = {
-      [`${data.category}.${data.field}`]: normalized,
-      "meta.lastUpdatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      "meta.lastUpdatedBy": adminUid,
+      [data.category]: { [data.field]: normalized },
+      meta: {
+        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdatedBy: adminUid,
+      },
     };
 
     await db().doc(EXTERNAL_INTEGRATIONS_DOC).set(update, { merge: true });
