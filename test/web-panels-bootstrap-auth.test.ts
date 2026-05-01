@@ -15,8 +15,7 @@ describe("web panels bootstrap-only auth", () => {
     // were removed entirely. The HTML form already had no secret-key input
     // (the legal-gate explains via prose). Verify both stay clean.
     expect(webControlSource).not.toMatch(/^function login\s*\(/m);
-    expect(webControlSource).not.toContain("getElementById('secret-key')");
-    expect(webControlSource).not.toContain('getElementById("secret-key")');
+    expect(webControlSource).not.toMatch(/getElementById\(\s*['"]secret-key['"]\s*\)/);
     expect(webControlHtml).not.toContain("id=\"master-imei\"");
     expect(webControlHtml).not.toContain("id=\"secret-key\"");
     // The legal-gate prose still informs the user that secret-key login is gone:

@@ -238,7 +238,7 @@ Hintergrund: Migrationsplan in [ARCHITECTURE.md §5.2](ARCHITECTURE.md#52-legacy
 
      ```powershell
      firebase --project <PROJECT> functions:secrets:set DISABLE_LEGACY_SECRETKEY_AUTH
-     # Wert: "true"
+     # Der Befehl ist interaktiv und fragt den Wert ab — "true" eingeben.
      firebase --project <PROJECT> deploy --only functions
      ```
 

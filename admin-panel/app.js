@@ -13553,8 +13553,8 @@ async function loadLegacyAuthUsage() {
         try {
             const cfgDoc = await db.collection("config").doc("auth").get();
             const cfg = cfgDoc.exists ? cfgDoc.data() : {};
-            const stage2Active = cfg && cfg.legacyAuthCutoverEnabled === true;
-            const stage3Ready = cfg && cfg.legacyAuthCutoverReady === true;
+            const stage2Active = !!cfg.legacyAuthCutoverEnabled;
+            const stage3Ready = !!cfg.legacyAuthCutoverReady;
             const stage2Badge = stage2Active
                 ? "<span class=\"status-badge status-ok\">✅ Stufe 2 AKTIV — Legacy-Auth gesperrt</span>"
                 : "<span class=\"status-badge status-warning\">⏳ Stufe 2 INAKTIV — Legacy-Auth noch erreichbar</span>";
