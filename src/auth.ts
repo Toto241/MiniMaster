@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
-import { requireAdmin, requireAuth, AuditLogger, checkRateLimit, checkRateLimitShared, validateAppCheck } from "./shared";
+import { requireAdmin, requireAuth, AuditLogger, checkRateLimitShared, validateAppCheck } from "./shared";
 import type { OperatorRole } from "./shared";
 import { isLegacyAuthCutoverEnabled } from "./cutover-monitor";
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";

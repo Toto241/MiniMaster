@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import { db } from "../../firebase";
 import {
   DECISIONING_COLLECTIONS,
@@ -27,7 +27,7 @@ export class DecisioningRepository {
   }
 
   async saveEvent(record: Omit<DeviceEventRecord, "eventId" | "createdAt">): Promise<string> {
-    const eventId = uuidv4();
+    const eventId = randomUUID();
     await this.database.collection(DECISIONING_COLLECTIONS.events).doc(eventId).set({
       ...record,
       eventId,
@@ -37,7 +37,7 @@ export class DecisioningRepository {
   }
 
   async saveDecisionTrace(record: Omit<DecisionTraceRecord, "traceId" | "createdAt">): Promise<string> {
-    const traceId = uuidv4();
+    const traceId = randomUUID();
     await this.database.collection(DECISIONING_COLLECTIONS.decisionTraces).doc(traceId).set({
       ...record,
       traceId,
@@ -47,7 +47,7 @@ export class DecisioningRepository {
   }
 
   async saveSuggestion(record: Omit<SuggestionRecord, "suggestionId" | "createdAt">): Promise<string> {
-    const suggestionId = uuidv4();
+    const suggestionId = randomUUID();
     await this.database.collection(DECISIONING_COLLECTIONS.suggestions).doc(suggestionId).set({
       ...record,
       suggestionId,
