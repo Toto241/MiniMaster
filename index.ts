@@ -140,6 +140,14 @@ export {
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
 
+// ==================== EXTERNAL INTEGRATIONS COCKPIT ====================
+export {
+  getExternalIntegrationsConfig,
+  patchExternalIntegrationsField,
+  setOemValidationMatrix,
+  getReleaseReadinessStatus,
+} from "./src/external-integrations";
+
 // ==================== MONETIZATION ====================
 export {
   B2C_TIERS,
