@@ -164,11 +164,11 @@ beforeEach(() => {
               }),
               doc: jest.fn((subDocId?: string) => {
                 const sid = subDocId || `auto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-                return {
+                const subRef: any = {
                   id: sid,
                   get: () => {
                     const d = state[key][sid];
-                    return Promise.resolve({ exists: !!d, data: () => d, id: sid });
+                    return Promise.resolve({ exists: !!d, data: () => d, id: sid, ref: subRef });
                   },
                   set: jest.fn((data: any, opts?: { merge?: boolean }) => {
                     state[key][sid] = opts?.merge ? { ...(state[key][sid] || {}), ...data } : { ...data };
@@ -178,7 +178,9 @@ beforeEach(() => {
                     if (state[key][sid]) Object.assign(state[key][sid], upd);
                     return Promise.resolve();
                   }),
+                  delete: jest.fn(() => { delete state[key][sid]; return Promise.resolve(); }),
                 };
+                return subRef;
               }),
             };
           }),

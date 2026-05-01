@@ -14,7 +14,6 @@ import * as admin from "firebase-admin";
 import { db } from "../firebase";
 
 const CUTOVER_WINDOW_DAYS = 14;
-const CONFIG_DOC_PATH = "config/auth";
 const CUTOVER_READY_FIELD = "legacyAuthCutoverReady";
 const CUTOVER_EXECUTED_FIELD = "legacyAuthCutoverExecutedAt";
 
