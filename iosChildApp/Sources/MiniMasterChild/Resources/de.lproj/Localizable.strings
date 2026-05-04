@@ -1,0 +1,32 @@
+/* MiniMaster Child App — German Base Localization */
+
+/* ChildPairingView */
+"childPairing.navTitle" = "MiniMaster";
+"childPairing.header.title" = "Gerät anmelden";
+"childPairing.header.description" = "Gib den 6-stelligen Code ein, den du in der\nEltern-App siehst.";
+"childPairing.field.code" = "Code";
+"childPairing.digits" = "%d / 6 Ziffern";
+"childPairing.button.connect" = "Verbinden";
+
+/* MainChildView */
+"childMain.navTitle" = "MiniMaster";
+"childMain.section.status" = "Status";
+"childMain.status.locked" = "Gerät gesperrt";
+"childMain.status.unlocked" = "Gerät entsperrt";
+"childMain.status.policyVersion" = "Richtlinien-Version %@";
+"childMain.status.lastSync" = "Letzte Synchronisierung: %@";
+"childMain.status.offlineStale" = "Offline – Richtlinie veraltet";
+"childMain.section.blacklist" = "App-Blacklist";
+"childMain.sync.progress" = "Befehle werden angewendet…";
+"childMain.section.tasks" = "Meine Aufgaben";
+"childMain.tasks.loading" = "Aufgaben laden…";
+"childMain.tasks.empty" = "Keine offenen Aufgaben";
+"childMain.task.status.pending" = "Offen";
+"childMain.task.status.pendingApproval" = "Zur Prüfung";
+"childMain.task.status.approved" = "Genehmigt";
+"childMain.task.status.rejected" = "Abgelehnt";
+"childMain.task.due" = "Fällig: %@";
+"childMain.unpair.alert.title" = "Gerät abmelden?";
+"childMain.unpair.alert.message" = "Das Gerät wird von der Eltern-App getrennt.";
+"childMain.unpair.alert.confirm" = "Abmelden";
+"childMain.unpair.alert.cancel" = "Abbrechen";

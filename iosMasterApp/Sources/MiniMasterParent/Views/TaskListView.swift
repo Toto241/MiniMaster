@@ -10,11 +10,11 @@ struct TaskListView: View {
         NavigationStack {
             Group {
                 if vm.isLoading {
-                    ProgressView("Lade Aufgaben…")
+                    ProgressView("tasks.loading")
                 } else if vm.pendingTasks.isEmpty {
-                    ContentUnavailableView("Keine offenen Aufgaben",
+                    ContentUnavailableView("tasks.empty.title",
                                           systemImage: "checklist.checked",
-                                          description: Text("Alle Aufgaben wurden bearbeitet."))
+                                          description: Text("tasks.empty.description"))
                 } else {
                     List(vm.pendingTasks) { task in
                         NavigationLink(destination: TaskDetailView(task: task, vm: vm)) {
@@ -23,7 +23,7 @@ struct TaskListView: View {
                     }
                 }
             }
-            .navigationTitle("Aufgaben prüfen")
+            .navigationTitle("tasks.navTitle")
             .badge(vm.pendingTasks.count)
         }
         .onAppear {
@@ -66,9 +66,9 @@ struct TaskRowView: View {
 
     private func aiLabel(_ c: String) -> String {
         switch c {
-        case "completed":     return "KI: Aufgabe erfüllt"
-        case "not_completed": return "KI: Nicht erfüllt"
-        default:              return "KI: Unklar"
+        case "completed":     return NSLocalizedString("tasks.ai.completed", comment: "")
+        case "not_completed": return NSLocalizedString("tasks.ai.notCompleted", comment: "")
+        default:              return NSLocalizedString("tasks.ai.unclear", comment: "")
         }
     }
     private func aiIcon(_ c: String) -> String {
@@ -113,13 +113,13 @@ struct TaskDetailView: View {
 
                 if let ai = task.aiAnalysis {
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("KI-Analyse", systemImage: "sparkles")
+                        Label("tasks.detail.aiAnalysis", systemImage: "sparkles")
                             .font(.headline)
                         if let summary = ai.summary {
                             Text(summary).font(.body)
                         }
                         if let confidence = ai.confidence {
-                            LabeledContent("Konfidenz", value: "\(Int(confidence * 100)) %")
+                            LabeledContent("tasks.detail.confidence", value: "\(Int(confidence * 100)) %")
                         }
                     }
                     .padding()
@@ -134,7 +134,7 @@ struct TaskDetailView: View {
                             dismiss()
                         }
                     } label: {
-                        Label("Genehmigen", systemImage: "checkmark")
+                        Label("tasks.detail.approve", systemImage: "checkmark")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -143,7 +143,7 @@ struct TaskDetailView: View {
                     Button {
                         showRejectSheet = true
                     } label: {
-                        Label("Ablehnen", systemImage: "xmark")
+                        Label("tasks.detail.reject", systemImage: "xmark")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -152,23 +152,23 @@ struct TaskDetailView: View {
             }
             .padding()
         }
-        .navigationTitle("Aufgabe prüfen")
+        .navigationTitle("tasks.detail.navTitle")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showRejectSheet) {
             NavigationStack {
                 Form {
-                    Section("Ablehnungsgrund (optional)") {
+                    Section(header: Text("tasks.reject.reason")) {
                         TextEditor(text: $rejectReason)
                             .frame(minHeight: 100)
                     }
                 }
-                .navigationTitle("Ablehnen")
+                .navigationTitle("tasks.reject.title")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Abbrechen") { showRejectSheet = false }
+                        Button("tasks.reject.cancel") { showRejectSheet = false }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Bestätigen") {
+                        Button("tasks.reject.confirm") {
                             showRejectSheet = false
                             Task {
                                 await vm.rejectTask(task, reason: rejectReason.isEmpty ? nil : rejectReason)
