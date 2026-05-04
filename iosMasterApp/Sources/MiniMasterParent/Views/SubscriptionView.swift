@@ -9,7 +9,7 @@ struct SubscriptionView: View {
         NavigationStack {
             Group {
                 if subscriptionService.isLoading {
-                    ProgressView("Lade Abonnements…")
+                    ProgressView("subscription.loading")
                 } else {
                     List {
                         currentStatusSection
@@ -19,25 +19,25 @@ struct SubscriptionView: View {
                     }
                 }
             }
-            .navigationTitle("Abonnement")
+            .navigationTitle("subscription.navTitle")
             .refreshable { await subscriptionService.refreshStatus() }
         }
     }
 
     private var currentStatusSection: some View {
-        Section("Status") {
+        Section(header: Text("subscription.section.status")) {
             if let productId = subscriptionService.purchasedProductId {
-                Label("Aktiv: \(displayName(for: productId))", systemImage: "checkmark.seal.fill")
+                Label(String(format: NSLocalizedString("subscription.status.active", comment: ""), displayName(for: productId)), systemImage: "checkmark.seal.fill")
                     .foregroundStyle(.green)
             } else {
-                Label("Kein aktives Abonnement", systemImage: "xmark.seal")
+                Label("subscription.status.none", systemImage: "xmark.seal")
                     .foregroundStyle(.secondary)
             }
         }
     }
 
     private var availableProductsSection: some View {
-        Section("Verfügbare Pläne") {
+        Section(header: Text("subscription.section.plans")) {
             ForEach(subscriptionService.products) { product in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {

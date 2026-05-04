@@ -1,0 +1,95 @@
+/* MiniMaster Parent App — Italian Localization */
+
+/* LoginView */
+"login.navTitle" = "MiniMaster";
+"login.section.register" = "Registra dispositivo";
+"login.field.imei" = "ID dispositivo (IMEI / UUID)";
+"login.field.deviceName" = "Nome dispositivo (facoltativo)";
+"login.button.register" = "Registra e accedi";
+
+/* DashboardView */
+"dashboard.navTitle" = "I miei dispositivi";
+"dashboard.loading" = "Caricamento dispositivi…";
+"dashboard.empty.title" = "Nessun dispositivo";
+"dashboard.empty.description" = "Collega un dispositivo bambino usando il codice di accoppiamento.";
+"dashboard.status.platform" = "Piattaforma";
+"dashboard.status.policyVersion" = "Versione policy";
+"dashboard.status.lastSeen" = "Visto l'ultima volta";
+"dashboard.status.online" = "Online";
+"dashboard.quickActions.title" = "Azioni rapide";
+"dashboard.quickActions.lock" = "Blocca";
+"dashboard.quickActions.unlock" = "Sblocca";
+"dashboard.rules.title" = "Regole";
+"dashboard.rules.appBlacklist" = "Blacklist app (%d)";
+"dashboard.rules.usageRules" = "Regole di utilizzo";
+"dashboard.alert.error" = "Errore";
+"dashboard.alert.ok" = "OK";
+
+/* PairingView */
+"pairing.navTitle" = "Accoppia dispositivo";
+"pairing.section.new" = "Accoppia nuovo dispositivo";
+"pairing.description" = "Crea un codice a 6 cifre o un link di accoppiamento. Il dispositivo bambino può usarlo per connettersi al tuo account.";
+"pairing.button.code" = "Crea codice a 6 cifre";
+"pairing.button.link" = "Crea link di accoppiamento";
+"pairing.loading" = "Creazione in corso…";
+"pairing.section.code" = "Codice di accoppiamento";
+"pairing.button.copy" = "Copia";
+"pairing.section.link" = "Link di accoppiamento";
+"pairing.button.share" = "Condividi…";
+
+/* SubscriptionView */
+"subscription.navTitle" = "Abbonamento";
+"subscription.loading" = "Caricamento abbonamenti…";
+"subscription.section.status" = "Stato";
+"subscription.status.active" = "Attivo: %@";
+"subscription.status.none" = "Nessun abbonamento attivo";
+"subscription.section.plans" = "Piani disponibili";
+
+/* TaskListView */
+"tasks.navTitle" = "Verifica attività";
+"tasks.loading" = "Caricamento attività…";
+"tasks.empty.title" = "Nessuna attività aperta";
+"tasks.empty.description" = "Tutte le attività sono state elaborate.";
+"tasks.detail.navTitle" = "Verifica attività";
+"tasks.detail.aiAnalysis" = "Analisi AI";
+"tasks.detail.confidence" = "Confidenza";
+"tasks.detail.approve" = "Approva";
+"tasks.detail.reject" = "Rifiuta";
+"tasks.reject.title" = "Rifiuta";
+"tasks.reject.reason" = "Motivo del rifiuto (facoltativo)";
+"tasks.reject.cancel" = "Annulla";
+"tasks.reject.confirm" = "Conferma";
+"tasks.ai.completed" = "AI: Attività completata";
+"tasks.ai.notCompleted" = "AI: Non completata";
+"tasks.ai.unclear" = "AI: Non chiaro";
+
+/* AppBlacklistView */
+"blacklist.navTitle" = "Blacklist app";
+"blacklist.section.hint" = "Suggerimento";
+"blacklist.field.bundleId" = "Bundle ID (es. com.example.app)";
+"blacklist.button.add" = "Aggiungi";
+"blacklist.section.iosSelection" = "Selezione app iOS";
+"blacklist.button.openPicker" = "Apri selezione Screen Time";
+"blacklist.section.saved" = "Blacklist iOS salvata";
+"blacklist.saved.tokens" = "Token Screen Time: %d";
+"blacklist.saved.unmigrated" = "Bundle IDs non migrati: %d";
+"blacklist.section.blocked" = "App bloccate (%d)";
+"blacklist.warning.manualBundleIds" = "I Bundle ID manuali esistenti non vengono applicati su iOS e dovrebbero essere sostituiti.";
+"blacklist.noSelection" = "Nessuna app iOS selezionata tramite Screen Time.";
+"blacklist.selectedCount" = "%d token app attualmente selezionati.";
+"blacklist.unavailable.title" = "Selezione app iOS";
+"blacklist.unavailable.message" = "FamilyControls non è disponibile in questo ambiente di build. La selezione iOS salvata non può essere modificata qui.";
+"blacklist.unavailable.tokens" = "Token salvati: %d";
+
+/* UsageRulesView */
+"usage.navTitle" = "Regole di utilizzo";
+"usage.section.dailyLimit" = "Limite giornaliero";
+"usage.field.minutes" = "Minuti";
+"usage.unit.perDay" = "Minuti/Giorno";
+"usage.section.bedtime" = "Ora di dormire";
+"usage.field.bedtimeStart" = "Inizio (HH:MM)";
+"usage.field.bedtimeEnd" = "Fine   (HH:MM)";
+"usage.button.save" = "Salva";
+
+/* Common */
+"common.error" = "Errore";

@@ -10,10 +10,10 @@ struct DashboardView: View {
         NavigationStack {
             Group {
                 if vm.isLoading {
-                    ProgressView("Lade Geräte…")
+                    ProgressView("dashboard.loading")
                 } else if vm.children.isEmpty {
-                    ContentUnavailableView("Keine Geräte", systemImage: "iphone",
-                                          description: Text("Verbinde ein Kinder-Gerät über den Pairing-Code."))
+                    ContentUnavailableView("dashboard.empty.title", systemImage: "iphone",
+                                          description: Text("dashboard.empty.description"))
                 } else {
                     List(vm.children) { child in
                         NavigationLink(destination: ChildDetailView(child: child, vm: vm)) {
@@ -22,7 +22,7 @@ struct DashboardView: View {
                     }
                 }
             }
-            .navigationTitle("Meine Geräte")
+            .navigationTitle("dashboard.navTitle")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: PairingView()) {
@@ -30,8 +30,8 @@ struct DashboardView: View {
                     }
                 }
             }
-            .alert("Fehler", isPresented: .constant(vm.errorMessage != nil)) {
-                Button("OK") { vm.errorMessage = nil }
+            .alert("common.error", isPresented: .constant(vm.errorMessage != nil)) {
+                Button("dashboard.alert.ok") { vm.errorMessage = nil }
             } message: {
                 Text(vm.errorMessage ?? "")
             }
@@ -64,7 +64,7 @@ struct ChildRowView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if child.isOnline {
-                        Label("Online", systemImage: "circle.fill")
+                        Label("dashboard.status.online", systemImage: "circle.fill")
                             .font(.caption)
                             .foregroundStyle(.green)
                     }
@@ -87,28 +87,28 @@ struct ChildDetailView: View {
 
     var body: some View {
         List {
-            Section("Gerätestatus") {
-                LabeledContent("Plattform", value: child.platform.rawValue.capitalized)
-                LabeledContent("Policy-Version", value: "\(child.policyVersion)")
-                LabeledContent("Zuletzt gesehen",
+            Section(header: Text("dashboard.section.status")) {
+                LabeledContent("dashboard.status.platform", value: child.platform.rawValue.capitalized)
+                LabeledContent("dashboard.status.policyVersion", value: "\(child.policyVersion)")
+                LabeledContent("dashboard.status.lastSeen",
                                value: child.lastSeen.map { $0.formatted(.relative(presentation: .named)) } ?? "–")
             }
-            Section("Schnellaktionen") {
-                Button(child.isLocked ? "Entsperren" : "Sperren") {
+            Section(header: Text("dashboard.quickActions.title")) {
+                Button(child.isLocked ? "dashboard.quickActions.unlock" : "dashboard.quickActions.lock") {
                     Task { await vm.setLocked(child, isLocked: !child.isLocked) }
                 }
                 .foregroundStyle(child.isLocked ? .green : .red)
             }
-            Section("Regeln") {
-                NavigationLink("App-Blacklist (\(child.appBlacklist.count))") {
+            Section(header: Text("dashboard.rules.title")) {
+                NavigationLink(String(format: NSLocalizedString("dashboard.rules.appBlacklist", comment: ""), child.appBlacklist.count)) {
                     AppBlacklistView(child: child, vm: vm)
                 }
-                NavigationLink("Nutzungsregeln") {
+                NavigationLink("dashboard.rules.usageRules") {
                     UsageRulesView(child: child, vm: vm)
                 }
             }
         }
-        .navigationTitle(child.deviceName)
+        .navigationTitle(Text(child.deviceName))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -131,16 +131,16 @@ struct AppBlacklistView: View {
     var body: some View {
         List {
             if child.platform.supportsBundleIdBlacklistEditing {
-                Section("Hinweis") {
+                Section(header: Text("blacklist.section.hint")) {
                     Text(child.platform.appBlacklistEditorHint)
                         .foregroundStyle(.secondary)
                 }
                 Section {
                     HStack {
-                        TextField("Bundle-ID (z.B. com.example.app)", text: $newApp)
+                        TextField("blacklist.field.bundleId", text: $newApp)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
-                        Button("Hinzufügen") {
+                        Button("blacklist.button.add") {
                             guard !newApp.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                             apps.append(newApp.trimmingCharacters(in: .whitespaces))
                             newApp = ""
@@ -154,16 +154,16 @@ struct AppBlacklistView: View {
                     apps = newValues
                     save()
                 }
-                Section("Gespeicherte iOS-Blacklist") {
-                    Text("Screen-Time-Tokens: \(ScreenTimeAppSelection.encodedTokenCount(in: apps))")
+                Section(header: Text("blacklist.section.saved")) {
+                    Text(String(format: NSLocalizedString("blacklist.saved.tokens", comment: ""), ScreenTimeAppSelection.encodedTokenCount(in: apps)))
                         .foregroundStyle(.secondary)
                     if !ScreenTimeAppSelection.bundleIDs(from: apps).isEmpty {
-                        Text("Nicht migrierte Bundle-IDs: \(ScreenTimeAppSelection.bundleIDs(from: apps).count)")
+                        Text(String(format: NSLocalizedString("blacklist.saved.unmigrated", comment: ""), ScreenTimeAppSelection.bundleIDs(from: apps).count))
                             .foregroundStyle(.orange)
                     }
                 }
             } else {
-                Section("Blockierte Apps (\(apps.count))") {
+                Section(header: Text(String(format: NSLocalizedString("blacklist.section.blocked", comment: ""), apps.count))) {
                     ForEach(apps, id: \.self) { app in
                         Text(app)
                     }
@@ -203,15 +203,15 @@ struct UsageRulesView: View {
 
     var body: some View {
         Form {
-            Section("Tageslimit") {
+            Section(header: Text("usage.section.dailyLimit")) {
                 HStack {
-                    TextField("Minuten", text: $dailyLimit)
+                    TextField("usage.field.minutes", text: $dailyLimit)
                         .keyboardType(.numberPad)
-                    Text("Minuten/Tag")
+                    Text("usage.unit.perDay")
                         .foregroundStyle(.secondary)
                 }
             }
-            Section("Schlafenszeit") {
+            Section(header: Text("usage.section.bedtime")) {
                 TextField("Anfang (HH:MM)", text: $bedtimeStart)
                     .keyboardType(.numbersAndPunctuation)
                 TextField("Ende   (HH:MM)", text: $bedtimeEnd)
@@ -220,12 +220,12 @@ struct UsageRulesView: View {
             Section {
                 HStack {
                     Spacer()
-                    Button("Speichern") { save() }
+                    Button("usage.button.save") { save() }
                     Spacer()
                 }
             }
         }
-        .navigationTitle("Nutzungsregeln")
+        .navigationTitle("usage.navTitle")
     }
 
     private func save() {

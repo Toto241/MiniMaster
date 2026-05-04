@@ -20,7 +20,7 @@ struct ChildPairingView: View {
                 errorText
             }
             .padding()
-            .navigationTitle("MiniMaster")
+            .navigationTitle("childPairing.navTitle")
             .navigationBarTitleDisplayMode(.large)
         }
         .onOpenURL { url in handleDeepLink(url) }
@@ -33,9 +33,9 @@ struct ChildPairingView: View {
             Image(systemName: "lock.shield")
                 .font(.system(size: 60))
                 .foregroundColor(.accentColor)
-            Text("Gerät anmelden")
+            Text("childPairing.header.title")
                 .font(.title2.bold())
-            Text("Gib den 6-stelligen Code ein, den du in der\nEltern-App siehst.")
+            Text("childPairing.header.description")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
         }
@@ -43,7 +43,7 @@ struct ChildPairingView: View {
 
     private var codeField: some View {
         VStack(spacing: 12) {
-            TextField("Code", text: $code)
+            TextField("childPairing.field.code", text: $code)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
                 .font(.title.monospacedDigit())
@@ -59,7 +59,7 @@ struct ChildPairingView: View {
                     if filtered.count == 6 { codeFocused = false }
                 }
 
-            Text("\(code.count) / 6 Ziffern")
+            Text(String(format: NSLocalizedString("childPairing.digits", comment: ""), code.count))
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -74,7 +74,7 @@ struct ChildPairingView: View {
                         ProgressView()
                             .tint(.white)
                     } else {
-                        Text("Verbinden")
+                        Text("childPairing.button.connect")
                             .fontWeight(.semibold)
                     }
                 }

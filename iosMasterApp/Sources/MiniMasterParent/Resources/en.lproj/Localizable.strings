@@ -1,0 +1,95 @@
+/* MiniMaster Parent App — English Localization */
+
+/* LoginView */
+"login.navTitle" = "MiniMaster";
+"login.section.register" = "Register Device";
+"login.field.imei" = "Device ID (IMEI / UUID)";
+"login.field.deviceName" = "Device Name (optional)";
+"login.button.register" = "Register & Sign In";
+
+/* DashboardView */
+"dashboard.navTitle" = "My Devices";
+"dashboard.loading" = "Loading devices…";
+"dashboard.empty.title" = "No Devices";
+"dashboard.empty.description" = "Connect a child device using the pairing code.";
+"dashboard.status.platform" = "Platform";
+"dashboard.status.policyVersion" = "Policy Version";
+"dashboard.status.lastSeen" = "Last Seen";
+"dashboard.status.online" = "Online";
+"dashboard.quickActions.title" = "Quick Actions";
+"dashboard.quickActions.lock" = "Lock";
+"dashboard.quickActions.unlock" = "Unlock";
+"dashboard.rules.title" = "Rules";
+"dashboard.rules.appBlacklist" = "App Blacklist (%d)";
+"dashboard.rules.usageRules" = "Usage Rules";
+"dashboard.alert.error" = "Error";
+"dashboard.alert.ok" = "OK";
+
+/* PairingView */
+"pairing.navTitle" = "Pair Device";
+"pairing.section.new" = "Pair New Device";
+"pairing.description" = "Create a 6-digit code or a pairing link. The child device can use it to connect to your account.";
+"pairing.button.code" = "Create 6-Digit Code";
+"pairing.button.link" = "Create Pairing Link";
+"pairing.loading" = "Creating…";
+"pairing.section.code" = "Pairing Code";
+"pairing.button.copy" = "Copy";
+"pairing.section.link" = "Pairing Link";
+"pairing.button.share" = "Share…";
+
+/* SubscriptionView */
+"subscription.navTitle" = "Subscription";
+"subscription.loading" = "Loading subscriptions…";
+"subscription.section.status" = "Status";
+"subscription.status.active" = "Active: %@";
+"subscription.status.none" = "No active subscription";
+"subscription.section.plans" = "Available Plans";
+
+/* TaskListView */
+"tasks.navTitle" = "Review Tasks";
+"tasks.loading" = "Loading tasks…";
+"tasks.empty.title" = "No Open Tasks";
+"tasks.empty.description" = "All tasks have been processed.";
+"tasks.detail.navTitle" = "Review Task";
+"tasks.detail.aiAnalysis" = "AI Analysis";
+"tasks.detail.confidence" = "Confidence";
+"tasks.detail.approve" = "Approve";
+"tasks.detail.reject" = "Reject";
+"tasks.reject.title" = "Reject";
+"tasks.reject.reason" = "Rejection reason (optional)";
+"tasks.reject.cancel" = "Cancel";
+"tasks.reject.confirm" = "Confirm";
+"tasks.ai.completed" = "AI: Task completed";
+"tasks.ai.notCompleted" = "AI: Not completed";
+"tasks.ai.unclear" = "AI: Unclear";
+
+/* AppBlacklistView */
+"blacklist.navTitle" = "App Blacklist";
+"blacklist.section.hint" = "Hint";
+"blacklist.field.bundleId" = "Bundle ID (e.g. com.example.app)";
+"blacklist.button.add" = "Add";
+"blacklist.section.iosSelection" = "iOS App Selection";
+"blacklist.button.openPicker" = "Open Screen Time Selection";
+"blacklist.section.saved" = "Saved iOS Blacklist";
+"blacklist.saved.tokens" = "Screen Time Tokens: %d";
+"blacklist.saved.unmigrated" = "Unmigrated Bundle IDs: %d";
+"blacklist.section.blocked" = "Blocked Apps (%d)";
+"blacklist.warning.manualBundleIds" = "Existing manual Bundle IDs are not enforced on iOS and should be replaced.";
+"blacklist.noSelection" = "No iOS apps selected via Screen Time yet.";
+"blacklist.selectedCount" = "%d app tokens currently selected.";
+"blacklist.unavailable.title" = "iOS App Selection";
+"blacklist.unavailable.message" = "FamilyControls is not available in this build environment. The saved iOS selection cannot be edited here.";
+"blacklist.unavailable.tokens" = "Saved Tokens: %d";
+
+/* UsageRulesView */
+"usage.navTitle" = "Usage Rules";
+"usage.section.dailyLimit" = "Daily Limit";
+"usage.field.minutes" = "Minutes";
+"usage.unit.perDay" = "Minutes/Day";
+"usage.section.bedtime" = "Bedtime";
+"usage.field.bedtimeStart" = "Start (HH:MM)";
+"usage.field.bedtimeEnd" = "End   (HH:MM)";
+"usage.button.save" = "Save";
+
+/* Common */
+"common.error" = "Error";

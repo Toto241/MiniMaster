@@ -15,8 +15,8 @@ struct PairingView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Neues Gerät koppeln") {
-                    Text("Erstelle einen 6-stelligen Code oder einen Kopplungslink. Das Kind-Gerät kann damit mit deinem Konto verbunden werden.")
+                Section(header: Text("pairing.section.new")) {
+                    Text("pairing.description")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -25,7 +25,7 @@ struct PairingView: View {
                     Button(action: generatePairingCode) {
                         HStack {
                             Image(systemName: "number")
-                            Text("6-stelligen Code erstellen")
+                            Text("pairing.button.code")
                         }
                     }
                     .disabled(isLoading)
@@ -33,7 +33,7 @@ struct PairingView: View {
                     Button(action: generatePairingLink) {
                         HStack {
                             Image(systemName: "link")
-                            Text("Kopplungslink erstellen")
+                            Text("pairing.button.link")
                         }
                     }
                     .disabled(isLoading)
@@ -43,20 +43,20 @@ struct PairingView: View {
                     Section {
                         HStack {
                             Spacer()
-                            ProgressView("Wird erstellt…")
+                            ProgressView("pairing.loading")
                             Spacer()
                         }
                     }
                 }
 
                 if let code = pairingCode {
-                    Section("Pairing-Code") {
+                    Section(header: Text("pairing.section.code")) {
                         HStack {
                             Text(code)
                                 .font(.title.monospacedDigit())
                                 .textSelection(.enabled)
                             Spacer()
-                            Button("Kopieren") {
+                            Button("pairing.button.copy") {
                                 UIPasteboard.general.string = code
                             }
                             .font(.caption)
@@ -65,13 +65,13 @@ struct PairingView: View {
                 }
 
                 if let link = pairingLink {
-                    Section("Kopplungslink") {
+                    Section(header: Text("pairing.section.link")) {
                         Text(link)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
 
-                        Button("Teilen…") {
+                        Button("pairing.button.share") {
                             showShareSheet = true
                         }
                     }
@@ -85,7 +85,7 @@ struct PairingView: View {
                     }
                 }
             }
-            .navigationTitle("Gerät koppeln")
+            .navigationTitle("pairing.navTitle")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showShareSheet) {
                 if let link = pairingLink, let url = URL(string: link) {
