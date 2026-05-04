@@ -25,6 +25,8 @@ export {
   resetOperatorAccounts,
   resetAllAuthUsers,
   resetAllAuthUsersHealth,
+  getLegacyAuthUsageStats,
+  migrateToFamiliesSchema,
 } from "./src/auth";
 
 // ==================== PAIRING ====================
@@ -138,6 +140,14 @@ export {
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
 
+// ==================== EXTERNAL INTEGRATIONS COCKPIT ====================
+export {
+  getExternalIntegrationsConfig,
+  patchExternalIntegrationsField,
+  setOemValidationMatrix,
+  getReleaseReadinessStatus,
+} from "./src/external-integrations";
+
 // ==================== MONETIZATION ====================
 export {
   B2C_TIERS,
@@ -177,6 +187,11 @@ export {
   listAffiliates,
   processAffiliatePayouts,
 } from "./src/affiliate";
+
+// ==================== MONITORING & CUTOVER ====================
+export {
+  legacyAuthCutoverMonitor,
+} from "./src/cutover-monitor";
 
 // ==================== INFRASTRUCTURE EXPORTS ====================
 // These are used by other modules but also available for testing/admin

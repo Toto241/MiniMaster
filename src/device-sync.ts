@@ -20,7 +20,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import { db } from "../firebase";
 import { requireAuth, validateAppCheck, AuditLogger } from "./shared";
 
@@ -103,7 +103,7 @@ export async function writeCommand(
   payload: Record<string, unknown>,
   policyVersion: number
 ): Promise<string> {
-  const commandId = uuidv4();
+  const commandId = randomUUID();
   const now = admin.firestore.Timestamp.now();
   const expiresAt = new admin.firestore.Timestamp(now.seconds + COMMAND_TTL_SECONDS, now.nanoseconds);
 
@@ -197,7 +197,7 @@ export const registerDeviceEndpoint = functions.https.onCall(
       .filter((e) => e.token !== token)
       .slice(0, MAX_ENDPOINTS_PER_DEVICE - 1);
 
-    const endpointId = uuidv4();
+    const endpointId = randomUUID();
     const newEndpoint: PushEndpoint = {
       endpointId,
       provider,
@@ -285,7 +285,7 @@ export const publishDeviceEvent = functions.https.onCall(
       return { eventId: doc.id, receivedAt: doc.data().createdAt };
     }
 
-    const eventId = uuidv4();
+    const eventId = randomUUID();
     const eventDoc = {
       eventId,
       eventType,

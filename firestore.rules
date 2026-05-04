@@ -337,10 +337,14 @@ service cloud.firestore {
 
     // --- OPERATOR CONFIG COLLECTION ---
     // Runtime configuration for operator dashboard (cloud + AI settings)
-    // All operators can read, only admins can write
+    // All operators can read, only admins can write.
+    // The `externalIntegrations` document holds Secret-Manager path references
+    // and Apple/Play identifiers; reads stay operator-wide for transparency,
+    // but direct client writes are blocked — only Cloud Functions may persist
+    // changes (via `patchExternalIntegrationsField` / `setOemValidationMatrix`).
     match /operatorConfig/{docId} {
       allow read: if isOperator();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && docId != "externalIntegrations";
     }
 
     // --- LEGAL POLICY COLLECTIONS ---

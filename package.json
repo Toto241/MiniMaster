@@ -19,8 +19,10 @@
     "analyze:fertigungsstand:gate": "python scripts/analyze_fertigungsstand.py --fail-on-p0",
     "analyze:admin-qa": "python scripts/admin_panel_qa_audit.py",
     "analyze:admin-qa:gate": "python scripts/admin_panel_qa_audit.py --fail-on-p1-open",
+    "plan:admin-qa": "python scripts/admin_panel_qa_plan.py",
+    "plan:admin-qa:gate": "python scripts/admin_panel_qa_plan.py --fail-on-p0-open",
     "guard:pr152": "python scripts/pr152_selective_guard.py",
-    "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand && npm run analyze:admin-qa && npm run guard:pr152",
+    "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand && npm run analyze:admin-qa && npm run plan:admin-qa && npm run guard:pr152",
     "ci:revalidate": "pwsh ./scripts/revalidate-release-gates.ps1",
     "ci:revalidate:rerun": "pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed"
   },
@@ -30,7 +32,10 @@
   "type": "commonjs",
   "overrides": {
     "@tootallnate/once": "^3.0.1",
-    "uuid": "^11.1.0"
+    "google-gax": "^5.0.6",
+    "gaxios": "^7.0.0",
+    "teeny-request": "^10.0.0",
+    "retry-request": "^8.0.0"
   },
   "engines": {
     "node": ">=22"
@@ -38,8 +43,7 @@
   "dependencies": {
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^7.2.3",
-    "googleapis": "^155.0.1",
-    "uuid": "^11.1.0"
+    "googleapis": "^155.0.1"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

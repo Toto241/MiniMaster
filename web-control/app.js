@@ -579,10 +579,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // --- Authentication Functions ---
-
-function login() {
-    showNotification('Direct secret-key login is disabled. Open this panel via the secure link from the Eltern-Panel.', 'error');
-}
+//
+// Direct `secretKey` login was removed in the Stage-2 cutover (see
+// ARCHITECTURE.md §5.2). This panel now only accepts sessions established
+// via the Bootstrap-Token flow handed off from the parent panel.
 
 /**
  * Logs the user out by clearing credentials, detaching Firestore listeners,
@@ -605,12 +605,6 @@ function logout() {
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('main-content').style.display = 'none';
     setLegalGateVisible(false);
-
-    // Clear login input fields for security and UX.
-    const masterImeiInput = document.getElementById('master-imei');
-    const secretKeyInput = document.getElementById('secret-key');
-    if (masterImeiInput) masterImeiInput.value = '';
-    if (secretKeyInput) secretKeyInput.value = '';
 
     showNotification('Logged out successfully.', 'info');
 }

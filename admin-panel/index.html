@@ -911,6 +911,31 @@
                             </div>
                         </div>
 
+                        <!-- ==================== Externe Integrationen ==================== -->
+                        <div class="setup-card mm-u043" id="external-integrations-card">
+                            <h3>🌐 Externe Integrationen (Apple, Play, Secrets, OEM, Release)</h3>
+                            <p>
+                                Pflege aller Daten, die nicht im Repository liegen, aber für den Go-Live nötig sind:
+                                Apple Developer Team-ID + Bundle-IDs, Google Play Package-IDs + RTDN-Topic,
+                                Pfade zu Secret-Manager-Geheimnissen (kein Klartext!), OEM-Hardware-Validierung
+                                und Release-Readiness-Checklisten. Persistiert über
+                                <code>patchExternalIntegrationsField</code> in
+                                <code>operatorConfig/externalIntegrations</code>.
+                            </p>
+                            <div class="mm-u011">
+                                <button id="btn-refresh-external-integrations" class="primary-btn" type="button">
+                                    🔄 Daten laden
+                                </button>
+                                <button id="btn-save-oem-matrix" class="secondary-btn" type="button" disabled>
+                                    💾 OEM-Matrix speichern
+                                </button>
+                                <span id="external-integrations-summary" class="status-badge" aria-live="polite">noch nicht geladen</span>
+                            </div>
+                            <div id="external-integrations-content" class="mm-u048">
+                                <p class="muted">Klicken Sie auf „Daten laden", um die externe Integrations-Konfiguration abzurufen.</p>
+                            </div>
+                        </div>
+
                         <div class="setup-card mm-u043">
                             <h3>🚦 Go-Live-Ampel &amp; Release-Status</h3>
                             <p>
@@ -928,6 +953,15 @@
                                 <button data-action="exportReleaseArtefact" class="btn btn-secondary" title="Kombinierten Release-Artefakt als JSON exportieren">
                                     📄 Release-Artefakt exportieren
                                 </button>
+                            </div>
+                            <div class="mm-u011">
+                                <button id="btn-load-backend-release-readiness" class="primary-btn" type="button" title="Backend-seitig berechnete Release-Readiness aus externen Integrationen abrufen (getReleaseReadinessStatus)">
+                                    🔍 Backend-Readiness prüfen
+                                </button>
+                                <span id="backend-readiness-summary" class="status-badge" aria-live="polite">noch nicht geprüft</span>
+                            </div>
+                            <div id="backend-readiness-content" class="mm-u048">
+                                <p class="muted">Klicken Sie auf „Backend-Readiness prüfen", um den serverseitig berechneten Release-Readiness-Status (Apple, Play, Secrets, OEM, Release-Checklisten) abzurufen.</p>
                             </div>
                         </div>
 

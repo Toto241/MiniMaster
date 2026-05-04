@@ -11366,6 +11366,7 @@ function initializeSetupAssistant() {
     renderGoLiveAmpel();
     renderPrioritizedActionPlan();
     initOperatorReadinessCard();
+    initExternalIntegrationsCard();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
@@ -11562,9 +11563,413 @@ async function onManualChecklistToggle(input) {
     } catch (err) {
         input.checked = !done;
         const msg = err && err.message ? err.message : String(err);
-        alert(`Aktualisierung fehlgeschlagen: ${msg}`);
+        showNotification(`Aktualisierung fehlgeschlagen: ${msg}`, "error");
     } finally {
         input.disabled = false;
+    }
+}
+
+// ==================== EXTERNAL INTEGRATIONS COCKPIT ====================
+//
+// UI for the Setup-Cockpit "Externe Integrationen". Persists via
+// `patchExternalIntegrationsField` (per field) and `setOemValidationMatrix`
+// (full matrix replace). Reads via `getExternalIntegrationsConfig` which
+// also returns the computed release readiness.
+
+let lastExternalIntegrationsSnapshot = null;
+
+const EXTERNAL_INTEGRATIONS_FIELDS = [
+    {
+        category: "apple", label: "🍎 Apple Developer", fields: [
+            { field: "developerTeamId", label: "Developer Team ID", type: "text", placeholder: "ABCDE12345 (10 Zeichen)" },
+            { field: "parentBundleId", label: "Parent Bundle ID", type: "text", placeholder: "com.minimaster.parent" },
+            { field: "childBundleId", label: "Child Bundle ID", type: "text", placeholder: "com.minimaster.child" },
+            { field: "appStoreConnectKeySecretPath", label: "App Store Connect API Key", type: "secret", placeholder: "projects/<proj>/secrets/asc-api-key/versions/latest" },
+            { field: "provisioningProfilesReady", label: "Provisioning Profiles bereit", type: "bool" },
+        ],
+    },
+    {
+        category: "play", label: "🎮 Google Play", fields: [
+            { field: "parentPackageId", label: "Parent Package ID", type: "text", placeholder: "com.minimaster.parent" },
+            { field: "childPackageId", label: "Child Package ID", type: "text", placeholder: "com.minimaster.child" },
+            { field: "serviceAccountSecretPath", label: "Service-Account JSON", type: "secret", placeholder: "projects/<proj>/secrets/play-sa/versions/latest" },
+            { field: "rtdnTopicName", label: "RTDN Pub/Sub Topic", type: "text", placeholder: "play-billing-notifications" },
+            { field: "iapContractsSigned", label: "IAP-Verträge unterzeichnet", type: "bool" },
+        ],
+    },
+    {
+        category: "secrets", label: "🔐 Production-Secrets (Pfad-Referenzen, kein Klartext)", fields: [
+            { field: "geminiApiKeyPath", label: "Gemini API Key", type: "secret", placeholder: "projects/<proj>/secrets/gemini-api-key/versions/latest" },
+            { field: "fcmServerKeyPath", label: "FCM Server Key", type: "secret", placeholder: "projects/<proj>/secrets/fcm-server-key/versions/latest" },
+            { field: "playIntegrityKeyPath", label: "Play Integrity Key", type: "secret", placeholder: "projects/<proj>/secrets/play-integrity/versions/latest" },
+            { field: "deviceCheckKeyPath", label: "Apple DeviceCheck Key", type: "secret", placeholder: "projects/<proj>/secrets/devicecheck/versions/latest" },
+            { field: "recaptchaV3SiteKey", label: "reCAPTCHA v3 Site Key (öffentlich)", type: "text", placeholder: "6Lc..." },
+        ],
+    },
+    {
+        category: "release", label: "📋 Release-Readiness", fields: [
+            { field: "playDataSafetyComplete", label: "Play Data Safety ausgefüllt", type: "bool" },
+            { field: "playIarcRatingComplete", label: "IARC Rating abgeschlossen", type: "bool" },
+            { field: "playStoreListingComplete", label: "Play Store Listing vollständig", type: "bool" },
+            { field: "appleAppPrivacyComplete", label: "Apple App Privacy ausgefüllt", type: "bool" },
+            { field: "appleScreenshotsComplete", label: "Apple Screenshots eingereicht", type: "bool" },
+            { field: "legalTextsPublished", label: "Rechtstexte veröffentlicht", type: "bool" },
+        ],
+    },
+];
+
+function initExternalIntegrationsCard() {
+    const refreshBtn = document.getElementById("btn-refresh-external-integrations");
+    const saveOemBtn = document.getElementById("btn-save-oem-matrix");
+    const backendReadinessBtn = document.getElementById("btn-load-backend-release-readiness");
+    if (refreshBtn) refreshBtn.addEventListener("click", () => loadExternalIntegrations());
+    if (saveOemBtn) saveOemBtn.addEventListener("click", () => saveOemMatrix());
+    if (backendReadinessBtn) backendReadinessBtn.addEventListener("click", () => loadBackendReleaseReadiness());
+}
+
+// Static labels for the per-category readiness breakdown. Hoisted out of
+// the renderer so it is allocated once at module load instead of on every
+// re-render.
+const BACKEND_READINESS_LABELS = {
+    apple: "🍎 Apple",
+    play: "🎮 Google Play",
+    secrets: "🔐 Production-Secrets",
+    oem: "🛠️ OEM-Matrix",
+    release: "📋 Release-Checkliste",
+};
+
+// Calls the dedicated `getReleaseReadinessStatus` Cloud Function (slim
+// wrapper around the readiness computation in src/external-integrations.ts).
+// Renders progress, blocker count and per-category breakdown without having
+// to fetch the full external-integrations config payload.
+async function loadBackendReleaseReadiness() {
+    const summaryEl = document.getElementById("backend-readiness-summary");
+    const contentEl = document.getElementById("backend-readiness-content");
+    if (!contentEl || !summaryEl) return;
+    summaryEl.textContent = "lädt …";
+    summaryEl.className = "status-badge";
+    contentEl.innerHTML = "<p class=\"muted\">Backend-Readiness wird abgerufen …</p>";
+
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("getReleaseReadinessStatus");
+        const result = await callable({});
+        const data = result && result.data ? result.data : null;
+        if (!data) throw new Error("Leere Antwort vom Backend");
+        renderBackendReleaseReadiness(data);
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        summaryEl.textContent = "Fehler";
+        summaryEl.className = "status-badge status-error";
+        contentEl.innerHTML = `<p class="error">Backend-Readiness konnte nicht geladen werden: ${escapeHtml(msg)}</p>`;
+    }
+}
+
+function renderBackendReleaseReadiness(data) {
+    const summaryEl = document.getElementById("backend-readiness-summary");
+    const contentEl = document.getElementById("backend-readiness-content");
+    if (!contentEl || !summaryEl) return;
+
+    const ready = !!data.ready;
+    const progressPct = Number(data.progressPct) || 0;
+    const blockers = Array.isArray(data.blockers) ? data.blockers : [];
+    const byCategory = data.byCategory || {};
+
+    const badgeClass = ready ? "status-ok" : (progressPct >= 70 ? "status-warning" : "status-error");
+    summaryEl.textContent = ready
+        ? `✅ bereit (${progressPct}%)`
+        : `⏳ ${progressPct}% — ${blockers.length} Blocker`;
+    summaryEl.className = `status-badge ${badgeClass}`;
+
+    const categoryRows = Object.entries(byCategory).map(([cat, summary]) => {
+        const total = summary && Number.isFinite(Number(summary.total)) ? Number(summary.total) : 0;
+        const complete = summary && Number.isFinite(Number(summary.complete)) ? Number(summary.complete) : 0;
+        const missing = Array.isArray(summary && summary.missing) ? summary.missing : [];
+        const missingHtml = missing.length === 0
+            ? "<span class=\"status-ok\">vollständig</span>"
+            : `<ul class="blocker-list">${missing.map((m) => `<li>${escapeHtml(m)}</li>`).join("")}</ul>`;
+        return `
+            <tr>
+                <th scope="row">${escapeHtml(BACKEND_READINESS_LABELS[cat] || cat)}</th>
+                <td>${complete}/${total}</td>
+                <td>${missingHtml}</td>
+            </tr>
+        `;
+    }).join("");
+
+    const blockersHtml = blockers.length === 0
+        ? "<p class=\"status-ok\">Keine offenen Blocker — Release-Pfad freigegeben.</p>"
+        : `<ul class="blocker-list">${blockers.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>`;
+
+    contentEl.innerHTML = `
+        <div class="readiness-grid">
+            <div class="readiness-block">
+                <h4>Backend-Status</h4>
+                <p><strong>Fortschritt:</strong> ${progressPct}%</p>
+                <progress max="100" value="${progressPct}" style="width:100%"></progress>
+                ${blockersHtml}
+            </div>
+            <div class="readiness-block">
+                <h4>Pro Kategorie</h4>
+                <table class="readiness-table">
+                    <thead><tr><th scope="col">Kategorie</th><th scope="col">Erledigt</th><th scope="col">Fehlt</th></tr></thead>
+                    <tbody>${categoryRows || "<tr><td colspan=\"3\">Keine Daten</td></tr>"}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+async function loadExternalIntegrations() {
+    const summaryEl = document.getElementById("external-integrations-summary");
+    const contentEl = document.getElementById("external-integrations-content");
+    const saveOemBtn = document.getElementById("btn-save-oem-matrix");
+    if (!contentEl || !summaryEl) return;
+    summaryEl.textContent = "lädt …";
+    contentEl.innerHTML = "<p class=\"muted\">Daten werden geladen …</p>";
+
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("getExternalIntegrationsConfig");
+        const result = await callable({});
+        const data = result && result.data ? result.data : null;
+        if (!data) throw new Error("Leere Antwort vom Backend");
+        lastExternalIntegrationsSnapshot = data;
+        if (saveOemBtn) saveOemBtn.disabled = false;
+        renderExternalIntegrations(data);
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        summaryEl.textContent = "Fehler";
+        summaryEl.className = "status-badge status-error";
+        contentEl.innerHTML = `<p class="error">Daten konnten nicht geladen werden: ${escapeHtml(msg)}</p>`;
+    }
+}
+
+function renderExternalIntegrations(data) {
+    const summaryEl = document.getElementById("external-integrations-summary");
+    const contentEl = document.getElementById("external-integrations-content");
+    if (!contentEl || !summaryEl) return;
+
+    const cfg = data.config || {};
+    const readiness = data.readiness || { ready: false, blockers: [], byCategory: {}, progressPct: 0 };
+
+    const badgeClass = readiness.ready ? "status-ok" : (readiness.progressPct >= 70 ? "status-warning" : "status-error");
+    summaryEl.textContent = readiness.ready
+        ? `✅ bereit (${readiness.progressPct}%)`
+        : `⏳ ${readiness.progressPct}% — ${readiness.blockers.length} Blocker`;
+    summaryEl.className = `status-badge ${badgeClass}`;
+
+    const groupsHtml = EXTERNAL_INTEGRATIONS_FIELDS.map((group) => {
+        const groupCfg = cfg[group.category] || {};
+        const fieldsHtml = group.fields.map((spec) => {
+            const value = groupCfg[spec.field];
+            const inputId = `ext-int-${group.category}-${spec.field}`;
+            if (spec.type === "bool") {
+                return `
+                    <div class="manual-checklist-item ${value ? "is-done" : ""}">
+                        <label>
+                            <input type="checkbox"
+                                   id="${escapeHtml(inputId)}"
+                                   data-ext-category="${escapeHtml(group.category)}"
+                                   data-ext-field="${escapeHtml(spec.field)}"
+                                   data-ext-type="bool"
+                                   ${value ? "checked" : ""} />
+                            <span>${escapeHtml(spec.label)}</span>
+                        </label>
+                    </div>
+                `;
+            }
+            const displayValue = typeof value === "string" ? value : "";
+            const ph = spec.placeholder ? ` placeholder="${escapeHtml(spec.placeholder)}"` : "";
+            const hint = spec.type === "secret"
+                ? `<small class="muted">⚠️ Nur Secret-Manager-Pfad eingeben — niemals den Klartext-Schlüssel.</small>`
+                : "";
+            return `
+                <div class="form-group">
+                    <label for="${escapeHtml(inputId)}" class="field-label">${escapeHtml(spec.label)}</label>
+                    <input type="text"
+                           id="${escapeHtml(inputId)}"
+                           data-ext-category="${escapeHtml(group.category)}"
+                           data-ext-field="${escapeHtml(spec.field)}"
+                           data-ext-type="text"
+                           value="${escapeHtml(displayValue)}"${ph} />
+                    ${hint}
+                </div>
+            `;
+        }).join("");
+
+        const catReadiness = readiness.byCategory && readiness.byCategory[group.category];
+        const catBadge = catReadiness
+            ? `<span class="muted">${catReadiness.complete}/${catReadiness.total} erledigt</span>`
+            : "";
+
+        return `
+            <fieldset class="manual-checklist-group">
+                <legend>${escapeHtml(group.label)} ${catBadge}</legend>
+                ${fieldsHtml}
+            </fieldset>
+        `;
+    }).join("");
+
+    const oemRows = Array.isArray(cfg.oem && cfg.oem.matrix) ? cfg.oem.matrix : [];
+    const oemHtml = renderOemMatrix(oemRows);
+
+    const blockersHtml = readiness.blockers && readiness.blockers.length > 0
+        ? `<ul class="blocker-list">${readiness.blockers.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>`
+        : "<p class=\"status-ok\">Keine offenen Blocker.</p>";
+
+    contentEl.innerHTML = `
+        <div class="readiness-grid">
+            <div class="readiness-block">
+                <h4>Release-Readiness</h4>
+                <p><strong>Fortschritt:</strong> ${readiness.progressPct}%</p>
+                <progress max="100" value="${readiness.progressPct}" style="width:100%"></progress>
+                ${blockersHtml}
+            </div>
+            <div class="readiness-block">
+                <h4>Letzte Änderung</h4>
+                <p><strong>Stand:</strong> ${escapeHtml(cfg.meta && cfg.meta.lastUpdatedAt || "—")}</p>
+                <p><strong>Bearbeiter:</strong> ${escapeHtml(cfg.meta && cfg.meta.lastUpdatedBy || "—")}</p>
+            </div>
+        </div>
+        <div class="manual-checklist-section" style="margin-block-start:20px">
+            ${groupsHtml}
+        </div>
+        <div class="manual-checklist-section" style="margin-block-start:20px">
+            <h4>🛠️ OEM-Hardware-Matrix</h4>
+            <p class="muted">Geräte, auf denen End-to-End-Validierung durchgeführt wurde. Mindestens ein „passed"-Eintrag wird als Release-Gate gefordert.</p>
+            ${oemHtml}
+        </div>
+    `;
+
+    contentEl.querySelectorAll("input[data-ext-field]").forEach((input) => {
+        const eventName = input.getAttribute("data-ext-type") === "bool" ? "change" : "blur";
+        input.addEventListener(eventName, (ev) => onExternalIntegrationFieldChange(ev.target));
+    });
+    contentEl.querySelectorAll("[data-ext-oem-action]").forEach((el) => {
+        el.addEventListener("click", (ev) => onOemAction(ev.target));
+    });
+}
+
+function renderOemMatrix(rows) {
+    const headerRow = `
+        <thead>
+            <tr>
+                <th>Gerät</th>
+                <th>OS-Version</th>
+                <th>Status</th>
+                <th>Test-Datum</th>
+                <th>Sign-off durch</th>
+                <th>Notizen</th>
+                <th></th>
+            </tr>
+        </thead>
+    `;
+    const bodyRows = rows.map((row, idx) => `
+        <tr data-ext-oem-row="${idx}">
+            <td><input type="text" data-ext-oem-field="deviceModel" value="${escapeHtml(row.deviceModel || "")}" placeholder="z.B. Samsung S23" /></td>
+            <td><input type="text" data-ext-oem-field="osVersion" value="${escapeHtml(row.osVersion || "")}" placeholder="One UI 6 / Android 14" /></td>
+            <td>
+                <select data-ext-oem-field="status">
+                    <option value="pending" ${row.status === "pending" ? "selected" : ""}>pending</option>
+                    <option value="passed" ${row.status === "passed" ? "selected" : ""}>passed</option>
+                    <option value="failed" ${row.status === "failed" ? "selected" : ""}>failed</option>
+                </select>
+            </td>
+            <td><input type="date" data-ext-oem-field="testedAt" value="${escapeHtml((row.testedAt || "").slice(0, 10))}" /></td>
+            <td><input type="text" data-ext-oem-field="signoffBy" value="${escapeHtml(row.signoffBy || "")}" /></td>
+            <td><input type="text" data-ext-oem-field="notes" value="${escapeHtml(row.notes || "")}" /></td>
+            <td><button type="button" class="btn btn-secondary" data-ext-oem-action="remove" data-ext-oem-index="${idx}">Entfernen</button></td>
+        </tr>
+    `).join("");
+    const addRow = `
+        <tr><td colspan="7"><button type="button" class="btn btn-secondary" data-ext-oem-action="add">➕ Zeile hinzufügen</button></td></tr>
+    `;
+    return `
+        <table class="readiness-table" id="oem-matrix-table">
+            ${headerRow}
+            <tbody>${bodyRows}${addRow}</tbody>
+        </table>
+    `;
+}
+
+async function onExternalIntegrationFieldChange(input) {
+    const category = input.getAttribute("data-ext-category");
+    const field = input.getAttribute("data-ext-field");
+    const type = input.getAttribute("data-ext-type");
+    if (!category || !field) return;
+    const value = type === "bool" ? !!input.checked : input.value;
+    input.disabled = true;
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("patchExternalIntegrationsField");
+        await callable({ category, field, value });
+        await loadExternalIntegrations();
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        showNotification(`Aktualisierung fehlgeschlagen: ${msg}`, "error");
+        if (type === "bool") input.checked = !input.checked;
+    } finally {
+        input.disabled = false;
+    }
+}
+
+function readOemMatrixFromDom() {
+    const tbody = document.querySelector("#oem-matrix-table tbody");
+    if (!tbody) return [];
+    const rows = [];
+    tbody.querySelectorAll("tr[data-ext-oem-row]").forEach((tr) => {
+        const get = (name) => {
+            const el = tr.querySelector(`[data-ext-oem-field="${name}"]`);
+            return el ? String(el.value || "").trim() : "";
+        };
+        const deviceModel = get("deviceModel");
+        const osVersion = get("osVersion");
+        // Skip rows that are empty OR partially filled — backend rejects
+        // half-rows and would fail the whole save.
+        if (!deviceModel || !osVersion) return;
+        rows.push({
+            deviceModel,
+            osVersion,
+            status: get("status") || "pending",
+            testedAt: get("testedAt") || null,
+            signoffBy: get("signoffBy") || null,
+            notes: get("notes") || null,
+        });
+    });
+    return rows;
+}
+
+function onOemAction(target) {
+    const action = target.getAttribute("data-ext-oem-action");
+    if (action === "add") {
+        const current = readOemMatrixFromDom();
+        current.push({ deviceModel: "", osVersion: "", status: "pending", testedAt: null, signoffBy: null, notes: null });
+        const fakeData = lastExternalIntegrationsSnapshot
+            ? { ...lastExternalIntegrationsSnapshot, config: { ...lastExternalIntegrationsSnapshot.config, oem: { matrix: current } } }
+            : null;
+        if (fakeData) renderExternalIntegrations(fakeData);
+    } else if (action === "remove") {
+        const idx = Number(target.getAttribute("data-ext-oem-index"));
+        const current = readOemMatrixFromDom();
+        current.splice(idx, 1);
+        const fakeData = lastExternalIntegrationsSnapshot
+            ? { ...lastExternalIntegrationsSnapshot, config: { ...lastExternalIntegrationsSnapshot.config, oem: { matrix: current } } }
+            : null;
+        if (fakeData) renderExternalIntegrations(fakeData);
+    }
+}
+
+async function saveOemMatrix() {
+    const rows = readOemMatrixFromDom();
+    try {
+        if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
+        const callable = firebase.functions().httpsCallable("setOemValidationMatrix");
+        await callable({ rows });
+        await loadExternalIntegrations();
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        showNotification(`OEM-Matrix konnte nicht gespeichert werden: ${msg}`, "error");
     }
 }
 
@@ -12129,8 +12534,7 @@ function saveBootstrapFirebaseConfig() {
         initializeFirebaseAfterConfigSave();
     } catch (error) {
         console.error("[saveBootstrapFirebaseConfig] Fehler:", error);
-        showNotification(error.message, "error");
-        alert("Firebase-Konfiguration Fehler:\n\n" + error.message);
+        showNotification("Firebase-Konfiguration Fehler: " + error.message, "error");
     }
 }
 
@@ -12140,8 +12544,7 @@ function reloadWithBootstrapConfig() {
         window.location.reload();
     } catch (error) {
         console.error("[reloadWithBootstrapConfig] Fehler:", error);
-        showNotification(error.message, "error");
-        alert("Firebase-Konfiguration Fehler:\n\n" + error.message);
+        showNotification("Firebase-Konfiguration Fehler: " + error.message, "error");
     }
 }
 
@@ -13235,8 +13638,33 @@ async function loadLegacyAuthUsage() {
             .map(([day, count]) => `<tr><td>${day}</td><td>${count}</td></tr>`)
             .join("");
 
+        // Read the cutover flag state from `config/auth` so the operator
+        // sees Stage-2 (enabled) and Stage-3-readiness (ready) at a glance,
+        // alongside the raw usage telemetry above.
+        let flagBlock = "";
+        try {
+            const cfgDoc = await db.collection("config").doc("auth").get();
+            const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+            const stage2Active = !!cfg.legacyAuthCutoverEnabled;
+            const stage3Ready = !!cfg.legacyAuthCutoverReady;
+            const stage2Badge = stage2Active
+                ? "<span class=\"status-badge status-ok\">✅ Stufe 2 AKTIV — Legacy-Auth gesperrt</span>"
+                : "<span class=\"status-badge status-warning\">⏳ Stufe 2 INAKTIV — Legacy-Auth noch erreichbar</span>";
+            const stage3Badge = stage3Ready
+                ? "<span class=\"status-badge status-ok\">✅ Stufe 3 BEREIT — 14-Tage-Monitor grün</span>"
+                : "<span class=\"status-badge status-warning\">⏳ Stufe 3 NOCH NICHT BEREIT</span>";
+            flagBlock = `
+                <h4 style="margin-block-start:15px">Cutover-Flag-Status (config/auth)</h4>
+                <div class="mm-u011">${stage2Badge} ${stage3Badge}</div>
+                <p class="muted">Stufe 2 wird über Firestore <code>config/auth.legacyAuthCutoverEnabled</code> umgeschaltet (sofortige Wirkung, rückrollbar). Stufe 3 wird automatisch durch den 14-Tage-Monitor freigeschaltet (siehe RUNBOOK „Legacy <code>secretKey</code> Auth — Stufe-2-Cutover &amp; Rollback").</p>
+            `;
+        } catch (cfgErr) {
+            flagBlock = `<p class="muted">Cutover-Flag konnte nicht gelesen werden: ${escapeHtml(cfgErr.message || String(cfgErr))}</p>`;
+        }
+
         resultEl.innerHTML = `
             <div class="${statusClass}">${statusText}</div>
+            ${flagBlock}
             <h4 style="margin-block-start:15px">Nach Endpoint</h4>
             <table><tr><th>Endpoint</th><th>Aufrufe</th></tr>${endpointRows || "<tr><td colspan='2'>Keine Daten</td></tr>"}</table>
             <h4 style="margin-block-start:15px">Nach Tag (letzte 14 Tage)</h4>
