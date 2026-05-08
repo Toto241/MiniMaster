@@ -87,9 +87,9 @@ final class AppBlockingManager: ObservableObject {
     private func applyLockState(_ isLocked: Bool) {
         guard isAuthorized else { return }
         if isLocked {
-            // Block all apps except Phone and Settings (emergency access)
-            store.shield.applications = ApplicationToken.all
+            store.shield.applicationCategories = .all(except: Set())
         } else {
+            store.shield.applicationCategories = nil
             store.shield.applications = nil
         }
     }
