@@ -52,8 +52,13 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          # Custom query pack for extra security checks
-          queries: security-and-quality,./codeql-custom-queries-actions
+          # `./codeql-custom-queries-actions` is an `actions`-language pack
+          # (depends on `codeql/actions-all`, imports `import actions`) and
+          # cannot be resolved against JavaScript or Java databases — applying
+          # it caused both Analyze Code jobs to fail. Add a separate
+          # `language: actions` matrix entry if Actions-CodeQL scanning is
+          # desired; for JS/Java we run the standard suite only.
+          queries: security-and-quality
 
       - name: Set up Java 17
         if: ${{ matrix.language == 'java' }}
