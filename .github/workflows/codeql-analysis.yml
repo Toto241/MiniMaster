@@ -30,6 +30,14 @@ jobs:
     name: Analyze Code (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    # The Java matrix entry is a soft-fail until the upstream blockers are
+    # resolved: (a) GitHub Code Scanning is enabled on the repository
+    # (Issue #158) so the SARIF upload succeeds, and (b) the Android build
+    # path used by CodeQL (`assembleDebug` under `build-mode: manual`) is
+    # debugged in a CI environment that has stable `dl.google.com` access.
+    # JavaScript is kept strict — if the JS analyzer regresses we still
+    # block the PR.
+    continue-on-error: ${{ matrix.language == 'java' }}
 
     strategy:
       fail-fast: false
