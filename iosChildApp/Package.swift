@@ -14,6 +14,7 @@ import PackageDescription
 
 let package = Package(
     name: "MiniMasterChild",
+    defaultLocalization: "en",
     platforms: [.iOS(.v17), .macOS(.v13)],
     products: [
         .library(name: "MiniMasterChild", targets: ["MiniMasterChild"])
