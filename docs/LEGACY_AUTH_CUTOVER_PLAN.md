@@ -20,7 +20,9 @@ Eliminate production dependency on client-passed legacy credentials (`masterImei
 
 ### Telemetry
 
-All legacy auth calls are recorded in `legacyAuthUsage` collection with fields: `endpoint`, `mode`, `identifier`, `timestamp`, `projectId`.
+Legacy auth calls are recorded in `legacy_auth_usage/{YYYY-MM-DD}/users/{masterId}` (read by `src/cutover-monitor.ts`) with fields `masterId`, `endpoint`, `mode`, `count`, `lastUsedAt`. The doc-ID is the real master/IMEI identifier so the 14-day window aggregator can reason per-master.
+
+> **2026-05-08 fix (Issue #162):** Two `logLegacyAuthUsage` definitions previously coexisted in `src/auth.ts`. JS function-hoisting silently routed every call to the 2-arg variant, which caused 3-arg call sites in `generateCustomToken` and `registerMasterDevice` to write the **endpoint name** into the doc-ID instead of the master IMEI — so the cutover monitor saw permanent fake traffic and Phase 3 could never trigger. The function is now declared once with signature `(masterId, endpoint, mode)`, enforced by `test/legacy-auth-telemetry-source.test.ts`.
 
 ### Monitoring
 
@@ -83,8 +85,8 @@ Rollback time: under 10 minutes (environment variable change + deploy).
 After 30 days with no rollback:
 
 1. Remove `LEGACY_AUTH_DISABLED` flag and code paths from `src/auth.ts`.
-2. Remove `logLegacyAuthUsage` function.
-3. Remove `legacyAuthUsage` collection (archive data first).
+2. Remove `logLegacyAuthUsage` function and the `test/legacy-auth-telemetry-source.test.ts` regression guard.
+3. Archive and drop the `legacy_auth_usage/*` collection.
 4. Remove `secretKey` field from `masters` documents (data migration required).
 5. Update `firestore.rules` to remove `secretKey` field validation.
 6. Update `LEGACY_AUTH_INVENTORY.md` to mark Phase 2 as complete.
