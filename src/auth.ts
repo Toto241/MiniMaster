@@ -168,20 +168,6 @@ function safeSecretEquals(expected: string, provided: string): boolean {
   return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-async function logLegacyAuthUsage(endpoint: string, mode: "secretKey" | "imei_registration", identifier: string): Promise<void> {
-  try {
-    await db().collection("legacyAuthUsage").add({
-      endpoint,
-      mode,
-      identifier,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      projectId: process.env.GCLOUD_PROJECT || null,
-    });
-  } catch (error) {
-    functions.logger.warn("Failed to write legacy auth usage telemetry.", error);
-  }
-}
-
 /**
  * Sets the custom claim 'role: admin' for a specified user UID.
  * Only callable by an existing admin.
@@ -1125,7 +1111,6 @@ export const generateCustomToken = functions.https.onCall(
 
       validateAppCheck(context, true);
       await checkRateLimitShared(masterImei, "auth.generate_custom_token_legacy", 10, 15 * 60 * 1000);
-      await logLegacyAuthUsage(masterImei, "generate_custom_token");
 
       const masterDoc = await db().collection("masters").doc(masterImei).get();
       const storedSecretKey = masterDoc.data()?.secretKey;
@@ -1134,7 +1119,7 @@ export const generateCustomToken = functions.https.onCall(
       }
 
       functions.logger.warn("LEGACY_AUTH_USED generateCustomToken via masterImei/secretKey.", { masterImei });
-      await logLegacyAuthUsage("generateCustomToken", "secretKey", masterImei);
+      await logLegacyAuthUsage(masterImei, "generateCustomToken", "secretKey");
 
       uid = masterImei;
     }
@@ -1197,9 +1182,8 @@ export const registerMasterDevice = functions.https.onCall(
 
     if (!context.auth) {
       await checkRateLimitShared(imei, "auth.register_master_device_legacy", 5, 60 * 60 * 1000);
-      await logLegacyAuthUsage(imei, "register_master_device");
       functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
-      await logLegacyAuthUsage("registerMasterDevice", "imei_registration", imei);
+      await logLegacyAuthUsage(imei, "registerMasterDevice", "imei_registration");
     }
 
     if (context.auth && context.auth.uid !== imei) {
@@ -1417,20 +1401,27 @@ export const revokeUserTokens = functions.https.onCall(
 );
 /**
  * Logs legacy auth usage for migration analytics.
- * Writes to legacy_auth_usage/{date}/{masterId} for 14-day window tracking.
+ * Writes to legacy_auth_usage/{date}/users/{masterId} for the 14-day cutover window
+ * read by cutover-monitor.ts. The doc-ID is the real master/IMEI identifier so the
+ * monitor can aggregate per-master.
  */
-async function logLegacyAuthUsage(masterId: string, action: string): Promise<void> {
+async function logLegacyAuthUsage(
+  masterId: string,
+  endpoint: string,
+  mode: "secretKey" | "imei_registration"
+): Promise<void> {
   const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const docRef = db().collection("legacy_auth_usage").doc(date).collection("users").doc(masterId);
   try {
     await docRef.set({
       masterId,
+      endpoint,
+      mode,
       lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
-      action,
       count: admin.firestore.FieldValue.increment(1),
     }, { merge: true });
   } catch (e) {
-    functions.logger.warn("Failed to log legacy auth usage", { error: e, masterId, action });
+    functions.logger.warn("Failed to log legacy auth usage", { error: e, masterId, endpoint, mode });
   }
 }
 

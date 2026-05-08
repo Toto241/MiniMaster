@@ -190,8 +190,7 @@ jobs:
             echo "✓ Google Maven repository is accessible"
           else
             echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
-            echo "::error::Google Maven repository (dl.google.com) is not accessible from this environment"
-            exit 1
+            echo "::warning::Google Maven repository (dl.google.com) is not accessible from this environment. Skipping Android build."
           fi
 
       - name: Build (fail on deprecations in CI)
@@ -320,8 +319,7 @@ jobs:
             echo "google-maven-accessible=true" >> $GITHUB_OUTPUT
           else
             echo "google-maven-accessible=false" >> $GITHUB_OUTPUT
-            echo "::error::Google Maven repository (dl.google.com) is not accessible from this environment"
-            exit 1
+            echo "::warning::Google Maven repository (dl.google.com) is not accessible from this environment. Skipping instrumentation."
           fi
       - name: Start AVD
         if: steps.network-test.outputs.google-maven-accessible == 'true'
