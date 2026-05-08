@@ -74,21 +74,44 @@ jobs:
         with:
           xcode-version: '16.2'
 
+      - name: Show available simulators
+        run: xcrun simctl list devices available
+
       - name: Build MiniMasterParent package
+        working-directory: iosMasterApp
         run: |
-          swift build --package-path iosMasterApp
+          set -o pipefail
+          xcodebuild build \
+            -scheme MiniMasterParent \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build
 
       - name: Test MiniMasterParent package
+        working-directory: iosMasterApp
         run: |
-          swift test --package-path iosMasterApp
+          set -o pipefail
+          xcodebuild test \
+            -scheme MiniMasterParent \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -derivedDataPath build
 
       - name: Build MiniMasterChild package
+        working-directory: iosChildApp
         run: |
-          swift build --package-path iosChildApp
+          set -o pipefail
+          xcodebuild build \
+            -scheme MiniMasterChild \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build
 
       - name: Test MiniMasterChild package
+        working-directory: iosChildApp
         run: |
-          swift test --package-path iosChildApp
+          set -o pipefail
+          xcodebuild test \
+            -scheme MiniMasterChild \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -derivedDataPath build
 
       - name: Upload SwiftPM build artifacts
         if: always()
@@ -96,5 +119,5 @@ jobs:
         with:
           name: ios-swiftpm-artifacts
           path: |
-            iosMasterApp/.build/**
-            iosChildApp/.build/**
+            iosMasterApp/build/**
+            iosChildApp/build/**
