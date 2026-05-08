@@ -172,8 +172,23 @@ jobs:
         if: ${{ matrix.language == 'java' && steps.network-check.outputs.available == 'true' }}
         run: ./scripts/run-android-checks.sh :masterApp:assembleDebug :childApp:assembleDebug
 
-      # Perform the analysis on the generated database
+      # Perform the analysis on the generated database.
+      #
+      # `continue-on-error` is a temporary workaround for Issue #158 (GitHub
+      # Code Scanning is not yet enabled on this repository). With Code
+      # Scanning off, the SARIF upload at the end of this step rejects with
+      # a permission error and the whole job goes red even when the analysis
+      # itself succeeded. The step output remains visible in the UI so the
+      # underlying error is not hidden — drop this flag once Code Scanning
+      # is enabled in Settings → Code security and analysis.
+      #
+      # For the Java matrix we additionally skip when the Android build was
+      # skipped (no `dl.google.com`): there is no extracted source for
+      # CodeQL to analyse and it would fail with a useless "no source code
+      # seen" error.
       - name: Perform CodeQL Analysis
+        if: ${{ matrix.language != 'java' || steps.network-check.outputs.available == 'true' }}
+        continue-on-error: true
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
