@@ -4,6 +4,10 @@ import Foundation
 import FamilyControls
 #endif
 
+#if canImport(ManagedSettings)
+import ManagedSettings
+#endif
+
 enum ScreenTimeAppSelection {
     static let tokenPrefix = "ios-app-token:"
 
