@@ -6325,6 +6325,295 @@ def _run_dual_device_background(run_id: str, kwargs: dict[str, object]) -> None:
     _persist_active_suite_run(run_id)
 
 
+# ─── Konfigurations-Transfer (.env + admin-panel/firebase-config.js) ───────────
+ENV_FILE = REPO_ROOT / ".env"
+ENV_EXAMPLE_FILE = REPO_ROOT / ".env.example"
+ADMIN_PANEL_FIREBASE_CONFIG_FILE = REPO_ROOT / "admin-panel" / "firebase-config.js"
+
+# Felder der Firebase-Web-Konfiguration, die im Browser landen.
+FIREBASE_WEB_KEYS: tuple[str, ...] = (
+    "apiKey",
+    "authDomain",
+    "projectId",
+    "storageBucket",
+    "messagingSenderId",
+    "appId",
+    "measurementId",
+)
+FIREBASE_APP_CHECK_KEY = "appCheckSiteKey"
+
+# .env-Schlüssel, die per Übertragung-Button geschrieben werden dürfen.
+ALLOWED_ENV_KEYS: tuple[str, ...] = (
+    "FIREBASE_API_KEY",
+    "FIREBASE_AUTH_DOMAIN",
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_STORAGE_BUCKET",
+    "FIREBASE_MESSAGING_SENDER_ID",
+    "FIREBASE_APP_ID",
+    "FIREBASE_MEASUREMENT_ID",
+    "FIREBASE_APP_CHECK_SITE_KEY",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "OPENAI_API_KEY",
+    "OPENAI_FALLBACK_ENABLED",
+    "LEGAL_POLICY_BASE_URL",
+    "PAIRING_LINK_BASE_URL",
+    "DISABLE_LEGACY_SECRETKEY_AUTH",
+    "APPLE_BUNDLE_ID",
+    "APPLE_ISSUER_ID",
+    "APPLE_KEY_ID",
+    "APPLE_PRIVATE_KEY",
+    "APPLE_ENVIRONMENT",
+    "KNOWLEDGE_BASE_PATH",
+)
+
+SECRET_ENV_KEYS: frozenset[str] = frozenset({
+    "GEMINI_API_KEY",
+    "OPENAI_API_KEY",
+    "APPLE_PRIVATE_KEY",
+    "APPLE_KEY_ID",
+    "APPLE_ISSUER_ID",
+    "FIREBASE_API_KEY",
+    "FIREBASE_APP_CHECK_SITE_KEY",
+})
+
+ENV_LINE_PATTERN = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*=(.*)$")
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    """Liest .env in ein Dict (ohne Kommentare). Fehlt die Datei, liefert {}."""
+    if not path.exists():
+        return {}
+    result: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        match = ENV_LINE_PATTERN.match(raw)
+        if not match:
+            continue
+        key = match.group(1)
+        raw_value = match.group(2).strip()
+        if (raw_value.startswith('"') and raw_value.endswith('"')) or (
+            raw_value.startswith("'") and raw_value.endswith("'")
+        ):
+            raw_value = raw_value[1:-1]
+        result[key] = raw_value
+    return result
+
+
+def _format_env_value(value: str) -> str:
+    """Quoted, falls Sonderzeichen (Whitespace, =, #, Zeilenumbrüche) im Wert."""
+    if value == "":
+        return ""
+    needs_quoting = any(ch in value for ch in (" ", "\t", "#", "\n", "\r", "\""))
+    if not needs_quoting:
+        return value
+    escaped = value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+    return f"\"{escaped}\""
+
+
+def _merge_env_file(
+    path: Path, updates: dict[str, str], *, template: Path | None = None
+) -> dict[str, str]:
+    """Merged updates in eine bestehende .env, behält Kommentare/Reihenfolge."""
+    seen: set[str] = set()
+    output_lines: list[str] = []
+
+    if path.exists():
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            match = ENV_LINE_PATTERN.match(raw)
+            if not match:
+                output_lines.append(raw)
+                continue
+            key = match.group(1)
+            if key in updates:
+                output_lines.append(f"{key}={_format_env_value(updates[key])}")
+                seen.add(key)
+            else:
+                output_lines.append(raw)
+    elif template and template.exists():
+        for raw in template.read_text(encoding="utf-8").splitlines():
+            match = ENV_LINE_PATTERN.match(raw)
+            if not match:
+                output_lines.append(raw)
+                continue
+            key = match.group(1)
+            if key in updates:
+                output_lines.append(f"{key}={_format_env_value(updates[key])}")
+                seen.add(key)
+            else:
+                output_lines.append(raw)
+
+    appended = [k for k in updates.keys() if k not in seen]
+    if appended:
+        if output_lines and output_lines[-1].strip() != "":
+            output_lines.append("")
+        output_lines.append("# Hinzugefügt vom Admin-Panel-Übertragen-Button")
+        for key in appended:
+            output_lines.append(f"{key}={_format_env_value(updates[key])}")
+
+    final_text = "\n".join(output_lines).rstrip("\n") + "\n"
+    path.write_text(final_text, encoding="utf-8")
+    return _parse_env_file(path)
+
+
+def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
+    """Schreibt admin-panel/firebase-config.js mit Literal-Werten (Browser-tauglich)."""
+    def js_string(raw: object) -> str:
+        text = "" if raw is None else str(raw)
+        escaped = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+        return f"'{escaped}'"
+
+    rendered = (
+        "/*\n"
+        " * Firebase configuration for the Admin Panel.\n"
+        " *\n"
+        " * Diese Datei wird vom Admin-Panel-Button \"Übertragen\" generiert.\n"
+        " * Direkte Bearbeitung ist möglich, wird aber bei der nächsten Übertragung\n"
+        " * überschrieben.\n"
+        " */\n"
+        "\n"
+        "export const firebaseConfig = {\n"
+        f"  apiKey: {js_string(values.get('apiKey'))},\n"
+        f"  authDomain: {js_string(values.get('authDomain'))},\n"
+        f"  projectId: {js_string(values.get('projectId'))},\n"
+        f"  storageBucket: {js_string(values.get('storageBucket'))},\n"
+        f"  messagingSenderId: {js_string(values.get('messagingSenderId'))},\n"
+        f"  appId: {js_string(values.get('appId'))},\n"
+        f"  measurementId: {js_string(values.get('measurementId'))},\n"
+        "  appCheck: {\n"
+        "    provider: 'reCaptchaV3',\n"
+        f"    siteKey: {js_string(values.get(FIREBASE_APP_CHECK_KEY))},\n"
+        "  },\n"
+        "};\n"
+    )
+    ADMIN_PANEL_FIREBASE_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ADMIN_PANEL_FIREBASE_CONFIG_FILE.write_text(rendered, encoding="utf-8")
+
+
+def _read_admin_panel_firebase_config() -> dict[str, str]:
+    """Liest die literalen Werte aus admin-panel/firebase-config.js, falls vorhanden."""
+    if not ADMIN_PANEL_FIREBASE_CONFIG_FILE.exists():
+        return {}
+    text = ADMIN_PANEL_FIREBASE_CONFIG_FILE.read_text(encoding="utf-8")
+    out: dict[str, str] = {}
+    pattern = re.compile(
+        r"(apiKey|authDomain|projectId|storageBucket|messagingSenderId|appId|measurementId|siteKey)\s*:\s*(['\"])(.*?)\2",
+        re.DOTALL,
+    )
+    for match in pattern.finditer(text):
+        key = match.group(1)
+        value = match.group(3)
+        # Werte mit process.env.* oder Platzhaltern aussortieren.
+        if "process.env" in value:
+            continue
+        if key == "siteKey":
+            out[FIREBASE_APP_CHECK_KEY] = value
+        else:
+            out[key] = value
+    return out
+
+
+def _mask_secret(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 6:
+        return "*" * len(value)
+    return value[:3] + "…" + value[-3:]
+
+
+def load_config_transfer_state() -> dict[str, object]:
+    env_values = _parse_env_file(ENV_FILE)
+    panel_values = _read_admin_panel_firebase_config()
+
+    firebase_view: dict[str, str] = {}
+    for key in FIREBASE_WEB_KEYS:
+        env_key = "FIREBASE_" + re.sub(r"(?<!^)(?=[A-Z])", "_", key).upper()
+        firebase_view[key] = env_values.get(env_key) or panel_values.get(key, "")
+    firebase_view[FIREBASE_APP_CHECK_KEY] = (
+        env_values.get("FIREBASE_APP_CHECK_SITE_KEY")
+        or panel_values.get(FIREBASE_APP_CHECK_KEY, "")
+    )
+
+    env_view: dict[str, str] = {}
+    for key in ALLOWED_ENV_KEYS:
+        raw_value = env_values.get(key, "")
+        if key in SECRET_ENV_KEYS and raw_value:
+            env_view[key] = _mask_secret(raw_value)
+        else:
+            env_view[key] = raw_value
+
+    return {
+        "envFileExists": ENV_FILE.exists(),
+        "envFile": str(ENV_FILE),
+        "adminPanelFirebaseConfigFile": str(ADMIN_PANEL_FIREBASE_CONFIG_FILE),
+        "firebase": firebase_view,
+        "env": env_view,
+        "secretKeys": sorted(SECRET_ENV_KEYS),
+        "allowedEnvKeys": list(ALLOWED_ENV_KEYS),
+    }
+
+
+def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
+    """Schreibt die übergebenen Werte in .env und admin-panel/firebase-config.js."""
+    firebase_payload = as_dict(payload.get("firebase"))
+    env_payload = as_dict(payload.get("env"))
+
+    firebase_normalized: dict[str, str] = {}
+    for key in FIREBASE_WEB_KEYS:
+        raw = firebase_payload.get(key)
+        if raw is None:
+            continue
+        firebase_normalized[key] = str(raw).strip()
+    if FIREBASE_APP_CHECK_KEY in firebase_payload:
+        firebase_normalized[FIREBASE_APP_CHECK_KEY] = str(
+            firebase_payload.get(FIREBASE_APP_CHECK_KEY) or ""
+        ).strip()
+
+    env_updates: dict[str, str] = {}
+    for key in ALLOWED_ENV_KEYS:
+        if key in env_payload:
+            value = env_payload.get(key)
+            if value is None:
+                continue
+            env_updates[key] = str(value)
+
+    # Firebase-Web-Konfiguration immer in .env spiegeln, damit Cloud Functions
+    # und Bundler dieselben Werte sehen.
+    web_to_env = {
+        "apiKey": "FIREBASE_API_KEY",
+        "authDomain": "FIREBASE_AUTH_DOMAIN",
+        "projectId": "FIREBASE_PROJECT_ID",
+        "storageBucket": "FIREBASE_STORAGE_BUCKET",
+        "messagingSenderId": "FIREBASE_MESSAGING_SENDER_ID",
+        "appId": "FIREBASE_APP_ID",
+        "measurementId": "FIREBASE_MEASUREMENT_ID",
+        FIREBASE_APP_CHECK_KEY: "FIREBASE_APP_CHECK_SITE_KEY",
+    }
+    for src_key, env_key in web_to_env.items():
+        if src_key in firebase_normalized:
+            env_updates[env_key] = firebase_normalized[src_key]
+
+    written_env: dict[str, str] = {}
+    if env_updates:
+        written_env = _merge_env_file(ENV_FILE, env_updates, template=ENV_EXAMPLE_FILE)
+
+    panel_written = False
+    if firebase_normalized:
+        merged_panel_values = _read_admin_panel_firebase_config()
+        merged_panel_values.update(firebase_normalized)
+        _write_admin_panel_firebase_config(merged_panel_values)
+        panel_written = True
+
+    return {
+        "ok": True,
+        "envWritten": sorted(env_updates.keys()),
+        "envFile": str(ENV_FILE),
+        "envFileExists": ENV_FILE.exists(),
+        "envKeyCount": len(written_env),
+        "adminPanelFirebaseConfigWritten": panel_written,
+        "adminPanelFirebaseConfigFile": str(ADMIN_PANEL_FIREBASE_CONFIG_FILE),
+    }
+
+
 class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(REPO_ROOT), **kwargs)
@@ -6350,6 +6639,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "repoRoot": str(REPO_ROOT),
                 },
             )
+
+        if parsed.path == "/api/config/transfer":
+            try:
+                return self._write_json(HTTPStatus.OK, load_config_transfer_state())
+            except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
         if parsed.path == "/api/commissioning/history":
             query = parse_qs(parsed.query)
@@ -6516,6 +6811,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path == "/api/config/transfer":
+            return self._handle_config_transfer()
         if parsed.path == "/api/commands/run":
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
@@ -6576,6 +6873,16 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # pragma: no cover - defensive HTTP boundary
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_config_transfer(self) -> None:
+        try:
+            payload = self._read_json_body()
+            result = apply_config_transfer(payload)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         return self._write_json(HTTPStatus.OK, result)
 
     def _handle_run_commissioning(self) -> None:

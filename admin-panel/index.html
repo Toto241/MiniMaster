@@ -201,6 +201,14 @@
                                     <label for="bootstrap-app-id">App ID</label>
                                     <input type="text" id="bootstrap-app-id" placeholder="1:123456789:web:abc123" title="Firebase Web-App-ID" />
                                 </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-measurement-id">Measurement ID (optional)</label>
+                                    <input type="text" id="bootstrap-measurement-id" placeholder="G-XXXXXXXXXX" title="Google Analytics Measurement-ID (optional)" />
+                                </div>
+                                <div class="config-field">
+                                    <label for="bootstrap-appcheck-site-key">App Check Site Key (reCAPTCHA v3, optional)</label>
+                                    <input type="text" id="bootstrap-appcheck-site-key" placeholder="6Lc..." title="reCAPTCHA-v3-Site-Key fuer Firebase App Check (optional)" />
+                                </div>
                             </div>
 
                             <div class="firebase-import-box">
@@ -244,7 +252,77 @@
                             <div class="phase-actions">
                                 <button type="button" data-action="saveBootstrapFirebaseConfig" class="btn btn-secondary" title="Firebase-Konfiguration nur lokal im Browser speichern">Lokal speichern</button>
                                 <button type="button" data-action="reloadWithBootstrapConfig" class="btn btn-primary" title="Konfiguration speichern und Verbindung zum Firebase-Projekt herstellen">Speichern &amp; verbinden</button>
+                                <button type="button" data-action="transferBootstrapConfig" class="btn btn-primary" title="Werte in .env und admin-panel/firebase-config.js auf der Festplatte schreiben">⬆️ Übertragen (in Dateien schreiben)</button>
+                                <button type="button" data-action="reloadConfigTransferState" class="btn btn-secondary" title="Aktuelle Werte aus .env / firebase-config.js neu laden">Aus Dateien laden</button>
                             </div>
+
+                            <details class="phase-help" id="config-transfer-secrets">
+                                <summary>Weitere Konfiguration / Secrets (werden bei „Übertragen" in <code>.env</code> geschrieben)</summary>
+                                <div class="phase-help-content">
+                                    <p class="text-muted">
+                                        Diese Felder werden – sobald gefüllt – beim Klick auf <strong>Übertragen</strong> in
+                                        die Datei <code>.env</code> im Projektstamm geschrieben.
+                                        Felder leer lassen heißt: <em>nichts ändern</em>.
+                                        Geheime Werte werden im Eingabefeld nicht zurückgespiegelt – beim Laden zeigen wir nur eine Maske.
+                                    </p>
+                                    <div class="firebase-config-form">
+                                        <div class="config-field">
+                                            <label for="env-GEMINI_API_KEY">GEMINI_API_KEY</label>
+                                            <input type="password" id="env-GEMINI_API_KEY" data-env-key="GEMINI_API_KEY" autocomplete="off" placeholder="aktuell: nicht angezeigt" title="Google AI Studio / Vertex AI API-Key fuer Gemini" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-GEMINI_MODEL">GEMINI_MODEL</label>
+                                            <input type="text" id="env-GEMINI_MODEL" data-env-key="GEMINI_MODEL" placeholder="gemini-2.0-flash" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-OPENAI_API_KEY">OPENAI_API_KEY</label>
+                                            <input type="password" id="env-OPENAI_API_KEY" data-env-key="OPENAI_API_KEY" autocomplete="off" placeholder="optionaler Fallback" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-OPENAI_FALLBACK_ENABLED">OPENAI_FALLBACK_ENABLED</label>
+                                            <input type="text" id="env-OPENAI_FALLBACK_ENABLED" data-env-key="OPENAI_FALLBACK_ENABLED" placeholder="true / false" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-LEGAL_POLICY_BASE_URL">LEGAL_POLICY_BASE_URL</label>
+                                            <input type="url" id="env-LEGAL_POLICY_BASE_URL" data-env-key="LEGAL_POLICY_BASE_URL" placeholder="https://minimaster.app/legal" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-PAIRING_LINK_BASE_URL">PAIRING_LINK_BASE_URL</label>
+                                            <input type="url" id="env-PAIRING_LINK_BASE_URL" data-env-key="PAIRING_LINK_BASE_URL" placeholder="https://minimaster.app/pair" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-DISABLE_LEGACY_SECRETKEY_AUTH">DISABLE_LEGACY_SECRETKEY_AUTH</label>
+                                            <input type="text" id="env-DISABLE_LEGACY_SECRETKEY_AUTH" data-env-key="DISABLE_LEGACY_SECRETKEY_AUTH" placeholder="true / false" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-APPLE_BUNDLE_ID">APPLE_BUNDLE_ID</label>
+                                            <input type="text" id="env-APPLE_BUNDLE_ID" data-env-key="APPLE_BUNDLE_ID" placeholder="com.minimaster.masterapp" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-APPLE_ISSUER_ID">APPLE_ISSUER_ID</label>
+                                            <input type="password" id="env-APPLE_ISSUER_ID" data-env-key="APPLE_ISSUER_ID" autocomplete="off" placeholder="App Store Connect Issuer ID" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-APPLE_KEY_ID">APPLE_KEY_ID</label>
+                                            <input type="password" id="env-APPLE_KEY_ID" data-env-key="APPLE_KEY_ID" autocomplete="off" placeholder="App Store Connect Key ID" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-APPLE_PRIVATE_KEY">APPLE_PRIVATE_KEY (PKCS8)</label>
+                                            <textarea id="env-APPLE_PRIVATE_KEY" data-env-key="APPLE_PRIVATE_KEY" rows="3" autocomplete="off" placeholder="-----BEGIN EC PRIVATE KEY----- ..."></textarea>
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-APPLE_ENVIRONMENT">APPLE_ENVIRONMENT</label>
+                                            <input type="text" id="env-APPLE_ENVIRONMENT" data-env-key="APPLE_ENVIRONMENT" placeholder="production / sandbox" />
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="env-KNOWLEDGE_BASE_PATH">KNOWLEDGE_BASE_PATH</label>
+                                            <input type="text" id="env-KNOWLEDGE_BASE_PATH" data-env-key="KNOWLEDGE_BASE_PATH" placeholder="./knowledge_base.txt" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <div id="config-transfer-status" class="phase-status"></div>
 
                             <div class="firebase-import-box mm-u040">
                                 <h4>Notfall-Neueinrichtung nach Cloud-Löschung</h4>
