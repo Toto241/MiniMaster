@@ -6,6 +6,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
+import { extractTraceContext, TracedLogger } from "./tracing";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const AUDIT_LOG_RETENTION_DAYS = 90;
@@ -243,10 +244,11 @@ export class AuditLogger {
 
       await this.collection().add(logEntry);
 
+      const logPayload = { action, userId, status, traceId: metadata?.traceId };
       if (status === "failure" || status === "denied") {
-        functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+        functions.logger.error("Audit Event", { ...logPayload, error: error?.message });
       } else {
-        functions.logger.info("Audit Event", { action, userId, status });
+        functions.logger.info("Audit Event", logPayload);
       }
     } catch (loggingError) {
       functions.logger.error("Failed to write audit log", { error: loggingError });
@@ -339,6 +341,25 @@ export async function handleError(
 }
 
 // ==================== SUBSCRIPTION / TRIAL ACCESS ====================
+
+/**
+ * Result of getTracedLogger containing both the logger and the raw trace context.
+ */
+export interface TracedLoggerResult {
+  logger: TracedLogger;
+  traceId: string;
+  spanId: string;
+}
+
+/**
+ * Creates a TracedLogger for a callable function invocation.
+ * Extracts trace context from the callable context (including GCP Cloud Trace header
+ * when available) and returns a logger that injects traceId/spanId into every log entry.
+ */
+export function getTracedLogger(context: CallableContext, functionName: string): TracedLoggerResult {
+  const trace = extractTraceContext(context, functionName);
+  return { logger: new TracedLogger(trace), traceId: trace.traceId, spanId: trace.spanId };
+}
 
 export function hasActiveAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
   if (!masterData) return false;

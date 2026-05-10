@@ -89,6 +89,11 @@ jest.mock("../src/shared", () => ({
   checkRateLimitShared: (...args: any[]) => mockCheckRateLimit(...args),
   hasActiveAccess: jest.fn().mockResolvedValue(true),
   AuditLogger: mockAudit,
+  getTracedLogger: jest.fn().mockReturnValue({
+    logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), elapsed: jest.fn().mockReturnValue(0), startSpan: jest.fn().mockReturnValue(jest.fn()) },
+    traceId: "test-trace-id",
+    spanId: "test-span-id",
+  }),
 }));
 
 jest.mock("../firebase", () => ({

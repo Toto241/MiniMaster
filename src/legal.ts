@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, requireAdmin, validateAppCheck } from "./shared";
+import { requireAuth, requireAdmin, validateAppCheck, getTracedLogger } from "./shared";
 
 type PolicyType = "terms" | "privacy";
 
@@ -225,6 +225,8 @@ function buildConsentDocId(masterImei: string, country: string, locale: string):
 
 export const getActiveLegalPolicies = functions.https.onCall(
   async (data: { country: string; locale: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "getActiveLegalPolicies");
+    void logger; void traceId;
     requireAuth(context);
     validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
@@ -251,6 +253,8 @@ export const getActiveLegalPolicies = functions.https.onCall(
 
 export const needsLegalReconsent = functions.https.onCall(
   async (data: { country: string; locale: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "needsLegalReconsent");
+    void logger; void traceId;
     const masterImei = requireAuth(context);
     validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
@@ -318,6 +322,8 @@ export const recordLegalConsent = functions.https.onCall(
     consentSource?: string;
     appVersion?: string;
   }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "recordLegalConsent");
+    void logger; void traceId;
     const masterImei = requireAuth(context);
     validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);
@@ -388,6 +394,8 @@ export const publishLegalPolicy = functions.https.onCall(
     isMajorChange?: boolean;
     status?: "draft" | "approved" | "active" | "retired";
   }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "publishLegalPolicy");
+    void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
     const { policyType, country, locale, version, contentUrl, status, effectiveAt, isMajorChange } = parsePublishPolicyInput(data);
@@ -437,6 +445,8 @@ export const publishLegalPolicy = functions.https.onCall(
 
 export const markLegalReconsentRequired = functions.https.onCall(
   async (data: { country: string; locale: string; masterImei?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "markLegalReconsentRequired");
+    void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
     const { country, locale } = parseCountryLocaleInput(data);

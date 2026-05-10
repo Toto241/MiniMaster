@@ -8,7 +8,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
-import { requireAdmin, requireAuth, AuditLogger, checkRateLimitShared, validateAppCheck } from "./shared";
+import { requireAdmin, requireAuth, AuditLogger, checkRateLimitShared, validateAppCheck, getTracedLogger } from "./shared";
 import type { OperatorRole } from "./shared";
 import { isLegacyAuthCutoverEnabled } from "./cutover-monitor";
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
@@ -173,6 +173,8 @@ function safeSecretEquals(expected: string, provided: string): boolean {
  * Only callable by an existing admin.
  */
 export const setAdminClaim = functions.https.onCall(async (data: { uid: string }, context: CallableContext) => {
+  const { logger, traceId } = getTracedLogger(context, "setAdminClaim");
+  void logger;
   const startTime = Date.now();
 
   try {
@@ -188,14 +190,14 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
 
     await AuditLogger.logSuccess(
       "admin.set_admin_claim", context, `users/${uid}`, "user",
-      { targetUserId: uid, duration: Date.now() - startTime }
+      { targetUserId: uid, duration: Date.now() - startTime, traceId }
     );
 
     return { message: `Success! Custom claim 'admin' set for user ${uid}` };
   } catch (error) {
     await AuditLogger.logFailure(
       "admin.set_admin_claim", context, `users/${data.uid || "unknown"}`, "user",
-      error as Error, { targetUserId: data.uid }
+      error as Error, { targetUserId: data.uid, traceId }
     );
     console.error("Error setting custom claim:", error);
     if (error instanceof functions.https.HttpsError) throw error;
@@ -308,6 +310,8 @@ async function ensureMasterClaims(masterId: string): Promise<Record<string, unkn
  */
 export const createMasterWebBootstrapToken = functions.https.onCall(
   async (data: { target?: string; ttlMinutes?: number }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "createMasterWebBootstrapToken");
+    void logger;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
@@ -354,7 +358,7 @@ export const createMasterWebBootstrapToken = functions.https.onCall(
       context,
       `masterWebBootstrapTokens/${docRef.id}`,
       "user",
-      { channel: "master_web_bootstrap", masterId, target, ttlMinutes }
+      { channel: "master_web_bootstrap", masterId, target, ttlMinutes, traceId }
     );
 
     return {
@@ -373,6 +377,7 @@ export const createMasterWebBootstrapToken = functions.https.onCall(
  */
 export const redeemMasterWebBootstrapToken = functions.https.onCall(
   async (data: { bootstrapToken?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "redeemMasterWebBootstrapToken");
     validateAppCheck(context, true);
 
     const rawToken = typeof data?.bootstrapToken === "string" ? data.bootstrapToken.trim() : "";
@@ -439,7 +444,7 @@ export const redeemMasterWebBootstrapToken = functions.https.onCall(
         { channel: "master_web_bootstrap", target: redeemed.target }
       );
 
-      functions.logger.info("Master web bootstrap redeemed.", {
+      logger.info("Master web bootstrap redeemed.", {
         masterId: redeemed.masterId,
         target: redeemed.target,
       });
@@ -456,7 +461,7 @@ export const redeemMasterWebBootstrapToken = functions.https.onCall(
         "masterWebBootstrapTokens/redeem",
         "user",
         error as Error,
-        { channel: "master_web_bootstrap" }
+        { channel: "master_web_bootstrap", traceId }
       );
 
       if (error instanceof functions.https.HttpsError) throw error;
@@ -475,6 +480,8 @@ export const createOperatorAccessKey = functions.https.onCall(
     data: { keyHash?: string; role?: string; ttlMinutes?: number; label?: string },
     context: CallableContext
   ) => {
+    const { logger, traceId } = getTracedLogger(context, "createOperatorAccessKey");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
@@ -538,6 +545,8 @@ export const createOperatorAccessKey = functions.https.onCall(
  */
 export const redeemOperatorAccessKey = functions.https.onCall(
   async (data: { key?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "redeemOperatorAccessKey");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
@@ -606,6 +615,8 @@ export const redeemOperatorAccessKey = functions.https.onCall(
  */
 export const setUserRole = functions.https.onCall(
   async (data: { uid: string; role: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "setUserRole");
+    void logger;
     const startTime = Date.now();
 
     try {
@@ -627,14 +638,14 @@ export const setUserRole = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "admin.set_admin_claim", context, `users/${uid}`, "user",
-        { targetUserId: uid, assignedRole: role, duration: Date.now() - startTime }
+        { targetUserId: uid, assignedRole: role, duration: Date.now() - startTime, traceId }
       );
 
       return { message: `Role '${role}' set for user ${uid}` };
     } catch (error) {
       await AuditLogger.logFailure(
         "admin.set_admin_claim", context, `users/${data?.uid || "unknown"}`, "user",
-        error as Error, { targetUserId: data?.uid, role: data?.role }
+        error as Error, { targetUserId: data?.uid, role: data?.role, traceId }
       );
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to set user role.");
@@ -648,6 +659,7 @@ export const setUserRole = functions.https.onCall(
  */
 export const resetOperatorAccounts = functions.https.onCall(
   async (data: { confirmText?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "resetOperatorAccounts");
     const startTime = Date.now();
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
@@ -669,7 +681,7 @@ export const resetOperatorAccounts = functions.https.onCall(
     assertResetDeploymentAllowed();
 
     if (!callerIsAdmin) {
-      functions.logger.warn("DEV resetOperatorAccounts invoked by non-admin user.", {
+      logger.warn("DEV resetOperatorAccounts invoked by non-admin user.", {
         uid: context.auth.uid,
         role: callerRole || "none",
       });
@@ -699,7 +711,7 @@ export const resetOperatorAccounts = functions.https.onCall(
         accessKeysDeleted = await deleteAllOperatorAccessKeys();
       } catch (cleanupError) {
         accessKeyCleanupWarning = (cleanupError as Error).message || "unknown operatorAccessKeys cleanup error";
-        functions.logger.error("resetOperatorAccounts operatorAccessKeys cleanup failed (non-fatal).", {
+        logger.error("resetOperatorAccounts operatorAccessKeys cleanup failed (non-fatal).", {
           requestedBy: callerUid,
           accessKeyCleanupWarning,
         });
@@ -712,7 +724,7 @@ export const resetOperatorAccounts = functions.https.onCall(
           await auth().deleteUser(user.uid);
           deletedUids.push(user.uid);
         } catch (error) {
-          functions.logger.error("Failed to delete operator user during reset.", {
+          logger.error("Failed to delete operator user during reset.", {
             uid: user.uid,
             error: (error as Error).message,
           });
@@ -733,6 +745,7 @@ export const resetOperatorAccounts = functions.https.onCall(
           failedUsers: failedUids.length,
           accessKeysDeleted,
           duration: Date.now() - startTime,
+          traceId,
         }
       );
 
@@ -751,7 +764,7 @@ export const resetOperatorAccounts = functions.https.onCall(
         "operatorAccounts/reset",
         "user",
         error as Error,
-        { requestedBy: callerUid }
+        { requestedBy: callerUid, traceId }
       );
 
       if (error instanceof functions.https.HttpsError) throw error;
@@ -770,8 +783,9 @@ export const resetOperatorAccounts = functions.https.onCall(
  */
 export const resetAllAuthUsers = functions.https.onCall(
   async (data: { confirmText?: string; requestId?: string; includeCurrentSessionUser?: boolean; recoveryToken?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "resetAllAuthUsers");
     const startTime = Date.now();
-    functions.logger.info("resetAllAuthUsers ENTRY — function invoked.", {
+    logger.info("resetAllAuthUsers ENTRY — function invoked.", {
       hasAuth: !!context.auth,
       callerUid: context.auth?.uid || "none",
       dataKeys: data ? Object.keys(data) : [],
@@ -827,7 +841,7 @@ export const resetAllAuthUsers = functions.https.onCall(
       );
     }
 
-    functions.logger.warn("DEV resetAllAuthUsers invoked.", {
+    logger.warn("DEV resetAllAuthUsers invoked.", {
       uid: context.auth?.uid || "recovery-token",
       role: callerRole || "none",
       requestId,
@@ -838,7 +852,7 @@ export const resetAllAuthUsers = functions.https.onCall(
     if (recoveryTokenAllowed) {
       const ageDays = getAdminRecoveryTokenAgeDays();
       if (ageDays !== null && ageDays > ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS) {
-        functions.logger.warn(
+        logger.warn(
           "Recovery-Token-Rotation überfällig: Token wurde vor mehr als " +
           `${ADMIN_RECOVERY_TOKEN_ROTATION_WARN_DAYS} Tagen rotiert (aktuell ${ageDays} Tage). ` +
           "Bitte ADMIN_RECOVERY_TOKEN rotieren und ADMIN_RECOVERY_TOKEN_ROTATED_AT aktualisieren.",
@@ -866,7 +880,7 @@ export const resetAllAuthUsers = functions.https.onCall(
         pageToken = listResult.pageToken;
       } while (pageToken);
 
-      functions.logger.info("resetAllAuthUsers user selection complete.", {
+      logger.info("resetAllAuthUsers user selection complete.", {
         requestId,
         callerUid,
         matchedUsers: usersToDelete.length,
@@ -880,7 +894,7 @@ export const resetAllAuthUsers = functions.https.onCall(
           await auth().deleteUser(user.uid);
           deletedUids.push(user.uid);
         } catch (error) {
-          functions.logger.error("Failed to delete user during all-user reset.", {
+          logger.error("Failed to delete user during all-user reset.", {
             uid: user.uid,
             error: (error as Error).message,
           });
@@ -894,7 +908,7 @@ export const resetAllAuthUsers = functions.https.onCall(
         accessKeysDeleted = await deleteAllOperatorAccessKeys();
       } catch (cleanupError) {
         accessKeyCleanupWarning = (cleanupError as Error).message || "unknown operatorAccessKeys cleanup error";
-        functions.logger.error("resetAllAuthUsers operatorAccessKeys cleanup failed (non-fatal).", {
+        logger.error("resetAllAuthUsers operatorAccessKeys cleanup failed (non-fatal).", {
           requestId,
           accessKeyCleanupWarning,
         });
@@ -920,11 +934,12 @@ export const resetAllAuthUsers = functions.https.onCall(
             accessKeysDeleted,
             accessKeyCleanupWarning,
             duration: Date.now() - startTime,
+            traceId,
           }
         );
       } catch (auditError) {
         auditLogWarning = (auditError as Error).message || "unknown audit logging error";
-        functions.logger.error("resetAllAuthUsers audit logging failed (non-fatal).", {
+        logger.error("resetAllAuthUsers audit logging failed (non-fatal).", {
           requestId,
           auditLogWarning,
         });
@@ -943,7 +958,7 @@ export const resetAllAuthUsers = functions.https.onCall(
         auditLogWarning,
       };
     } catch (error) {
-      functions.logger.error("resetAllAuthUsers failed.", {
+      logger.error("resetAllAuthUsers failed.", {
         requestId,
         requestedBy: callerUid,
         role: callerRole || "none",
@@ -958,10 +973,10 @@ export const resetAllAuthUsers = functions.https.onCall(
           "users/reset-all",
           "user",
           error as Error,
-          { requestedBy: callerUid, resetScope: "all_auth_users", requestId }
+          { requestedBy: callerUid, resetScope: "all_auth_users", requestId, traceId }
         );
       } catch (auditFailureError) {
-        functions.logger.error("resetAllAuthUsers failure-audit logging failed (non-fatal).", {
+        logger.error("resetAllAuthUsers failure-audit logging failed (non-fatal).", {
           requestId,
           message: (auditFailureError as Error).message,
         });
@@ -989,6 +1004,8 @@ export const resetAllAuthUsers = functions.https.onCall(
  */
 export const resetAllAuthUsersHealth = functions.https.onCall(
   async (data: { requestId?: string } | Record<string, never>, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "resetAllAuthUsersHealth");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
@@ -1039,6 +1056,7 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
  */
 export const bootstrapFirstAdmin = functions.https.onCall(
   async (_data: unknown, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "bootstrapFirstAdmin");
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
     }
@@ -1061,14 +1079,14 @@ export const bootstrapFirstAdmin = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "admin.set_admin_claim", context, `users/${callerUid}`, "user",
-        { targetUserId: callerUid, bootstrapFirstAdmin: true }
+        { targetUserId: callerUid, bootstrapFirstAdmin: true, traceId }
       );
 
-      functions.logger.info(`Bootstrap: First admin set for UID ${callerUid}`);
+      logger.info(`Bootstrap: First admin set for UID ${callerUid}`);
       return { success: true, message: "Sie sind jetzt Admin! Die Seite wird neu geladen." };
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
-      functions.logger.error("Bootstrap admin error:", error);
+      logger.error("Bootstrap admin error:", error);
       throw new functions.https.HttpsError(
         "internal",
         `Admin-Aktivierung fehlgeschlagen: ${(error as Error).message}`
@@ -1087,6 +1105,7 @@ export const bootstrapFirstAdmin = functions.https.onCall(
  */
 export const generateCustomToken = functions.https.onCall(
   async (data: { masterImei?: string; secretKey?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "generateCustomToken");
     const startTime = Date.now();
     let uid: string;
 
@@ -1118,7 +1137,7 @@ export const generateCustomToken = functions.https.onCall(
         throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
       }
 
-      functions.logger.warn("LEGACY_AUTH_USED generateCustomToken via masterImei/secretKey.", { masterImei });
+      logger.warn("LEGACY_AUTH_USED generateCustomToken via masterImei/secretKey.", { masterImei });
       await logLegacyAuthUsage(masterImei, "generateCustomToken", "secretKey");
 
       uid = masterImei;
@@ -1138,7 +1157,7 @@ export const generateCustomToken = functions.https.onCall(
       if (context.auth) {
         await AuditLogger.logSuccess(
           "auth.token_generated", context, `users/${uid}`, "user",
-          { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime }
+          { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime, traceId }
         );
       }
 
@@ -1146,10 +1165,10 @@ export const generateCustomToken = functions.https.onCall(
     } catch (error) {
       if (context.auth) {
         await AuditLogger.logFailure(
-          "auth.token_generated", context, `users/${uid}`, "user", error as Error
+          "auth.token_generated", context, `users/${uid}`, "user", error as Error, { traceId }
         );
       }
-      functions.logger.error("Error generating custom token:", error);
+      logger.error("Error generating custom token:", error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while generating the token.", error);
     }
   }
@@ -1164,6 +1183,7 @@ export const generateCustomToken = functions.https.onCall(
  */
 export const registerMasterDevice = functions.https.onCall(
   async (data: { imei: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "registerMasterDevice");
     const startTime = Date.now();
     const { imei } = data;
     if (!imei || typeof imei !== "string") {
@@ -1182,7 +1202,7 @@ export const registerMasterDevice = functions.https.onCall(
 
     if (!context.auth) {
       await checkRateLimitShared(imei, "auth.register_master_device_legacy", 5, 60 * 60 * 1000);
-      functions.logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
+      logger.warn("LEGACY_AUTH_USED registerMasterDevice without authenticated context.", { imei });
       await logLegacyAuthUsage(imei, "registerMasterDevice", "imei_registration");
     }
 
@@ -1217,7 +1237,7 @@ export const registerMasterDevice = functions.https.onCall(
         });
         await AuditLogger.logSuccess(
           "device.register", context, `masters/${masterId}`, "device",
-          { imei, alreadyExists: true, duration: Date.now() - startTime }
+          { imei, alreadyExists: true, duration: Date.now() - startTime, traceId }
         );
         return { masterId, customToken };
       }
@@ -1246,19 +1266,19 @@ export const registerMasterDevice = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "device.register", context, `masters/${masterId}`, "device",
-        { imei, duration: Date.now() - startTime }
+        { imei, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Master account registered for uid: ${masterId}`);
+      logger.info(`Master account registered for uid: ${masterId}`);
       return { masterId, customToken };
 
     } catch (error) {
       await AuditLogger.logFailure(
         "device.register", context, `masters/${masterId}`, "device",
-        error as Error, { imei }
+        error as Error, { imei, traceId }
       );
       if (error instanceof functions.https.HttpsError) throw error;
-      functions.logger.error("Error registering master device:", error);
+      logger.error("Error registering master device:", error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while registering the device.", error);
     }
   }
@@ -1276,6 +1296,7 @@ export const registerMasterDevice = functions.https.onCall(
  */
 export const registerAuthenticatedMaster = functions.https.onCall(
   async (data: { deviceId?: string; deviceName?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "registerAuthenticatedMaster");
     const startTime = Date.now();
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
@@ -1297,7 +1318,7 @@ export const registerAuthenticatedMaster = functions.https.onCall(
         });
         await AuditLogger.logSuccess(
           "device.register", context, `masters/${masterId}`, "device",
-          { deviceId, alreadyExists: true, modernFlow: true, duration: Date.now() - startTime }
+          { deviceId, alreadyExists: true, modernFlow: true, duration: Date.now() - startTime, traceId }
         );
         return { masterId };
       }
@@ -1336,7 +1357,7 @@ export const registerAuthenticatedMaster = functions.https.onCall(
           schemaVersion: 1,
         }, { merge: true });
       } catch (e) {
-        functions.logger.warn("Dual-write to families/ failed (non-fatal)", { error: e, masterId });
+        logger.warn("Dual-write to families/ failed (non-fatal)", { error: e, masterId });
       }
 
       await auth().setCustomUserClaims(masterId, {
@@ -1346,15 +1367,15 @@ export const registerAuthenticatedMaster = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "device.register", context, `masters/${masterId}`, "device",
-        { deviceId, modernFlow: true, duration: Date.now() - startTime }
+        { deviceId, modernFlow: true, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Authenticated master registered: ${masterId}`);
+      logger.info(`Authenticated master registered: ${masterId}`);
       return { masterId };
     } catch (error) {
       await AuditLogger.logFailure(
         "device.register", context, `masters/${masterId}`, "device",
-        error as Error, { deviceId, modernFlow: true }
+        error as Error, { deviceId, modernFlow: true, traceId }
       );
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to register authenticated master.");
@@ -1368,6 +1389,8 @@ export const registerAuthenticatedMaster = functions.https.onCall(
  */
 export const revokeUserTokens = functions.https.onCall(
   async (data: { uid: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "revokeUserTokens");
+    void logger;
     const startTime = Date.now();
     try {
       requireAdmin(context);
@@ -1385,14 +1408,14 @@ export const revokeUserTokens = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "auth.token_revoked", context, `users/${targetUid}`, "user",
-        { targetUid, duration: Date.now() - startTime }
+        { targetUid, duration: Date.now() - startTime, traceId }
       );
 
       return { message: `All tokens revoked for user ${targetUid}.` };
     } catch (error) {
       await AuditLogger.logFailure(
         "auth.token_revoked", context, `users/${data.uid || "unknown"}`, "user",
-        error as Error, { targetUid: data.uid }
+        error as Error, { targetUid: data.uid, traceId }
       );
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to revoke tokens.");
@@ -1432,6 +1455,8 @@ async function logLegacyAuthUsage(
  */
 export const migrateToFamiliesSchema = functions.https.onCall(
   async (_data: void, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "migrateToFamiliesSchema");
+    void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
@@ -1485,7 +1510,7 @@ export const migrateToFamiliesSchema = functions.https.onCall(
           }
         } catch (e) {
           const msg = `Migration failed for master ${masterId}: ${(e as Error).message}`;
-          functions.logger.error(msg);
+          logger.error(msg);
           results.errors.push(msg);
         }
       }
@@ -1506,6 +1531,8 @@ export const migrateToFamiliesSchema = functions.https.onCall(
  */
 export const getLegacyAuthUsageStats = functions.https.onCall(
   async (data: { days?: number }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "getLegacyAuthUsageStats");
+    void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
