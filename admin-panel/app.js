@@ -8584,6 +8584,8 @@ function getBootstrapFirebaseFormValues() {
         storageBucket: (document.getElementById("bootstrap-storage-bucket")?.value || "").trim(),
         messagingSenderId: (document.getElementById("bootstrap-messaging-sender-id")?.value || "").trim(),
         appId: (document.getElementById("bootstrap-app-id")?.value || "").trim(),
+        measurementId: (document.getElementById("bootstrap-measurement-id")?.value || "").trim(),
+        appCheckSiteKey: (document.getElementById("bootstrap-appcheck-site-key")?.value || "").trim(),
     };
 }
 
@@ -12546,6 +12548,124 @@ function reloadWithBootstrapConfig() {
         console.error("[reloadWithBootstrapConfig] Fehler:", error);
         showNotification("Firebase-Konfiguration Fehler: " + error.message, "error");
     }
+}
+
+function setConfigTransferStatus(message, level = "info") {
+    const node = document.getElementById("config-transfer-status");
+    if (!node) return;
+    node.textContent = message || "";
+    node.className = `phase-status phase-status-${level}`;
+}
+
+function collectEnvFormUpdates() {
+    const updates = {};
+    const inputs = document.querySelectorAll("[data-env-key]");
+    inputs.forEach(input => {
+        const key = input.getAttribute("data-env-key");
+        if (!key) return;
+        const value = (input.value ?? "").toString();
+        if (value.trim() === "") return;
+        // Mask-Platzhalter (z.B. "abc…xyz") nicht zurückübertragen.
+        if (/^[A-Za-z0-9]{0,3}…[A-Za-z0-9]{0,3}$/.test(value.trim())) return;
+        if (input.tagName === "TEXTAREA") {
+            updates[key] = value;
+        } else {
+            updates[key] = value.trim();
+        }
+    });
+    return updates;
+}
+
+async function transferBootstrapConfig() {
+    const firebase = getBootstrapFirebaseFormValues();
+    const env = collectEnvFormUpdates();
+
+    const hasFirebaseValue = Object.values(firebase).some(v => v && v.toString().trim() !== "");
+    if (!hasFirebaseValue && Object.keys(env).length === 0) {
+        setConfigTransferStatus("Keine Werte zum Übertragen – bitte mindestens ein Feld ausfüllen.", "error");
+        showNotification("Übertragen abgebrochen: keine Werte angegeben.", "warning");
+        return;
+    }
+
+    setConfigTransferStatus("Übertrage Konfiguration in .env und admin-panel/firebase-config.js …", "info");
+    try {
+        const response = await fetch("/api/config/transfer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ firebase, env }),
+        });
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        const wrote = result.envWritten || [];
+        const summary = [
+            result.adminPanelFirebaseConfigWritten ? "firebase-config.js geschrieben" : null,
+            wrote.length ? `${wrote.length} Werte in .env geschrieben` : null,
+        ].filter(Boolean).join(" – ") || "Keine Änderung erforderlich.";
+
+        // Lokale Bootstrap-Konfiguration aus dem Formular ebenfalls persistieren,
+        // damit der Browser dieselben Werte nutzt wie die Festplatte.
+        try { persistBootstrapFirebaseConfig(false); } catch (_err) { /* nicht kritisch */ }
+
+        setConfigTransferStatus(`✓ ${summary}`, "success");
+        showNotification("Konfiguration übertragen. " + summary, "success");
+    } catch (error) {
+        console.error("[transferBootstrapConfig] Fehler:", error);
+        setConfigTransferStatus("Fehler beim Übertragen: " + error.message
+            + " (Hinweis: nur im Python-Admin-Modus über http://127.0.0.1:8765 verfügbar.)", "error");
+        showNotification("Übertragen fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+async function reloadConfigTransferState() {
+    setConfigTransferStatus("Lade aktuelle Werte aus .env / firebase-config.js …", "info");
+    try {
+        const response = await fetch("/api/config/transfer");
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        const firebase = data.firebase || {};
+        const setVal = (id, value) => {
+            const node = document.getElementById(id);
+            if (node && typeof value === "string") node.value = value;
+        };
+        setVal("bootstrap-api-key", firebase.apiKey || "");
+        setVal("bootstrap-auth-domain", firebase.authDomain || "");
+        setVal("bootstrap-project-id", firebase.projectId || "");
+        setVal("bootstrap-storage-bucket", firebase.storageBucket || "");
+        setVal("bootstrap-messaging-sender-id", firebase.messagingSenderId || "");
+        setVal("bootstrap-app-id", firebase.appId || "");
+        setVal("bootstrap-measurement-id", firebase.measurementId || "");
+        setVal("bootstrap-appcheck-site-key", firebase.appCheckSiteKey || "");
+
+        const envValues = data.env || {};
+        document.querySelectorAll("[data-env-key]").forEach(input => {
+            const key = input.getAttribute("data-env-key");
+            const value = envValues[key];
+            if (typeof value === "string") {
+                input.value = value;
+            }
+        });
+        setConfigTransferStatus(
+            data.envFileExists
+                ? `✓ Geladen aus ${data.envFile}. Geheime Werte sind maskiert.`
+                : "ℹ Keine .env vorhanden. Felder sind leer; nach „Übertragen" wird sie angelegt.",
+            "success",
+        );
+    } catch (error) {
+        console.error("[reloadConfigTransferState] Fehler:", error);
+        setConfigTransferStatus("Laden fehlgeschlagen: " + error.message
+            + " (Nur im Python-Admin-Modus verfügbar.)", "error");
+    }
+}
+
+if (typeof window !== "undefined") {
+    window.transferBootstrapConfig = transferBootstrapConfig;
+    window.reloadConfigTransferState = reloadConfigTransferState;
 }
 
 function initializeFirebaseAfterConfigSave() {
