@@ -104,7 +104,7 @@ function initializeAuthStateObserver() {
         if (user) {
             user.getIdTokenResult(true).then(idTokenResult => {
                 const role = idTokenResult.claims.role;
-                console.log("Auth state: user=" + user.email + ", role=" + (role || "none"));
+                console.log("Auth state: role=" + (role || "none"));
                 if (role === "admin" || role === "support" || role === "auditor") {
                     currentUserRole = role;
                     showDashboard(user);
@@ -8059,7 +8059,14 @@ function renderGoLiveAmpel() {
                 const ts = new Date(conf.confirmedAt).toLocaleString("de-DE");
                 gateContainer.innerHTML =
                     "<div class='success-box'><p>✅ <strong>Go-Live bestätigt</strong> am " + escapeHtml(ts) + "</p>" +
-                    "<button onclick=\"localStorage.removeItem('finalGoLiveConfirmation');renderGoLiveAmpel()\" class='btn btn-secondary' style='margin-block-start:6px;font-size:0.8em'>Bestätigung zurücksetzen</button></div>";
+                    "<button data-action='reset-final-go-live' class='btn btn-secondary' style='margin-block-start:6px;font-size:0.8em'>Bestätigung zurücksetzen</button></div>";
+                const resetBtn = gateContainer.querySelector("[data-action='reset-final-go-live']");
+                if (resetBtn) {
+                    resetBtn.addEventListener("click", () => {
+                        localStorage.removeItem("finalGoLiveConfirmation");
+                        renderGoLiveAmpel();
+                    });
+                }
             } catch (_) {
                 localStorage.removeItem("finalGoLiveConfirmation");
             }
@@ -16251,11 +16258,11 @@ function _mmInstallFacade() {
         const swap = (currentName, replacement) => {
             if (typeof replacement !== "function") return;
             try {
-                // eslint-disable-next-line no-eval
-                eval(`${currentName} = replacement;`);
+                // Top-Level-Funktionen sind in diesem Klassik-Skript (kein Strict-Mode)
+                // Properties auf globalThis; daher direkter Property-Swap statt eval().
+                globalThis[currentName] = replacement;
             } catch (_error) {
-                // Reassignment kann in seltenen Konstellationen fehlschlagen
-                // (z.B. Strict Mode via spaeterem Module-Wrapper). Original bleibt.
+                // Reassignment kann in seltenen Konstellationen fehlschlagen. Original bleibt.
             }
         };
 

@@ -1,165 +1,170 @@
-var FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
-    var FIREBASE_FIELDS = ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"];
-    var FIREBASE_FIELD_IDS = ["fb-apiKey", "fb-authDomain", "fb-projectId", "fb-storageBucket", "fb-messagingSenderId", "fb-appId"];
+const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
+const FIREBASE_FIELDS = [
+  { key: "apiKey",            inputId: "fb-apiKey" },
+  { key: "authDomain",        inputId: "fb-authDomain" },
+  { key: "projectId",         inputId: "fb-projectId" },
+  { key: "storageBucket",     inputId: "fb-storageBucket" },
+  { key: "messagingSenderId", inputId: "fb-messagingSenderId" },
+  { key: "appId",             inputId: "fb-appId" },
+];
 
-    function getStoredFirebaseConfig() {
-      try {
-        var raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
-      }
-    }
-
-    function isValidFirebaseConfig(config) {
-      if (!config || typeof config !== "object") return false;
-      for (var i = 0; i < FIREBASE_FIELDS.length; i++) {
-        var field = FIREBASE_FIELDS[i];
-        var value = config[field];
-        if (typeof value !== "string" || !value.trim() || value.indexOf("your-") !== -1) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    function setModalStatus(message, type) {
-      var statusEl = document.getElementById("fb-status");
-      statusEl.textContent = message;
-      statusEl.className = type ? "modal-status " + type : "modal-status";
-    }
-
-    function populateFirebaseModal(config) {
-      for (var i = 0; i < FIREBASE_FIELDS.length; i++) {
-        var fieldName = FIREBASE_FIELDS[i];
-        var input = document.getElementById(FIREBASE_FIELD_IDS[i]);
-        input.value = config && config[fieldName] ? config[fieldName] : "";
-      }
-    }
-
-    function renderConfigStatus() {
-      var config = getStoredFirebaseConfig();
-      var ready = isValidFirebaseConfig(config);
-      var projectId = ready ? config.projectId : "Nicht konfiguriert";
-      var statusText = ready ? "Vollständige Web-Konfiguration erkannt" : "Konfiguration fehlt oder enthält Platzhalter";
-      var nextStep = ready ? "Panels öffnen und End-to-End prüfen" : "Firebase-Werte aus Console übernehmen";
-      var pill = document.getElementById("config-status-pill");
-      var infoBar = document.getElementById("info-bar-text");
-
-      document.getElementById("config-status-text").textContent = statusText;
-      document.getElementById("config-project-text").textContent = projectId;
-      document.getElementById("next-step-text").textContent = nextStep;
-
-      if (ready) {
-        pill.textContent = "✅ Firebase-Konfiguration gespeichert · Projekt: " + config.projectId;
-        pill.className = "status-pill config-pill-ready";
-        infoBar.textContent = "MiniMaster ist mit lokaler Firebase-Webkonfiguration vorbereitet. Empfohlen: Admin-Panel und Eltern-Panel kurz gegentesten.";
-      } else {
-        pill.textContent = "⚠️ Keine produktive Firebase-Konfiguration erkannt";
-        pill.className = "status-pill config-pill-missing";
-        infoBar.textContent = "Es wurden noch keine vollständigen Firebase-Webwerte erkannt. Bitte Konfiguration speichern, bevor Panels produktiv genutzt werden.";
-      }
-    }
-
-    function openFirebaseModal() {
-      populateFirebaseModal(getStoredFirebaseConfig());
-      setModalStatus("", "");
-      document.getElementById("fb-modal").classList.add("open");
-    }
-
-    function closeFirebaseModal() {
-      document.getElementById("fb-modal").classList.remove("open");
-    }
-
-    function collectFirebaseConfigFromInputs() {
-      var config = {};
-      for (var i = 0; i < FIREBASE_FIELDS.length; i++) {
-        var input = document.getElementById(FIREBASE_FIELD_IDS[i]);
-        var value = input.value.trim();
-        if (!value || value.indexOf("your-") !== -1) {
-          input.focus();
-          throw new Error("Bitte alle Felder vollständig und ohne Platzhalter ausfüllen.");
-        }
-        config[FIREBASE_FIELDS[i]] = value;
-      }
-      return config;
-    }
-
-    function saveFirebaseConfig() {
-      try {
-        var config = collectFirebaseConfigFromInputs();
-        localStorage.setItem(FIREBASE_STORAGE_KEY, JSON.stringify(config));
-        setModalStatus("✅ Firebase-Konfiguration gespeichert. Admin-Dashboard und Eltern-Panel verwenden diese Werte beim nächsten Laden.", "success");
-        renderConfigStatus();
-        setTimeout(closeFirebaseModal, 2200);
-      } catch (e) {
-        setModalStatus(e.message || "Fehler beim Speichern der Firebase-Konfiguration.", "error");
-      }
-    }
-
-    function normalizeBasePath(pathname) {
-      return decodeURIComponent(String(pathname || "").replace(/\/[^/]*$/, "").replace(/^\//, "")).replace(/\//g, "\\");
-    }
-
-    function buildFullPath(relativePath, pathname) {
-      var basePath = normalizeBasePath(pathname || location.pathname);
-      return (basePath ? basePath + "\\" : "") + relativePath;
-    }
-
-    function copyPath(elementId) {
-      var codeEl = document.getElementById(elementId);
-      var relativePath = codeEl.textContent;
-      var fullPath = buildFullPath(relativePath, location.pathname);
-      var btn = codeEl.nextElementSibling;
-
-      function markCopied() {
-        btn.textContent = "✅ Kopiert!";
-        btn.classList.add("copied");
-        setTimeout(function () {
-          btn.textContent = "📋 Kopieren";
-          btn.classList.remove("copied");
-        }, 1500);
-      }
-
-      return navigator.clipboard.writeText(fullPath).then(function () {
-        markCopied();
-      }).catch(function () {
-        var ta = document.createElement("textarea");
-        ta.value = fullPath;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        markCopied();
-      });
-    }
-
-    document.getElementById("fb-modal").addEventListener("click", function (e) {
-      if (e.target === this) closeFirebaseModal();
-    });
-
-    renderConfigStatus();
-
-// Initialize event listeners for UI actions
-function bindStartPageUiActions() {
-    const bindClick = (id, handler) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("click", (e) => {
-            handler(e);
-        });
-    };
-
-    // Firebase modal controls
-    bindClick("open-firebase-modal-btn-1", () => openFirebaseModal());
-    bindClick("open-firebase-modal-btn-2", () => openFirebaseModal());
-    bindClick("copy-master-apk-path-btn", () => copyPath("master-apk-path"));
-    bindClick("copy-child-apk-path-btn", () => copyPath("child-apk-path"));
-    bindClick("close-firebase-modal-btn", () => closeFirebaseModal());
-    bindClick("save-firebase-config-btn", () => saveFirebaseConfig());
+function getStoredFirebaseConfig() {
+  try {
+    const raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
-// Attach event listeners when DOM is ready
-document.addEventListener("DOMContentLoaded", bindStartPageUiActions);
+function isPlaceholder(value) {
+  return typeof value !== "string" || !value.trim() || value.includes("your-");
+}
+
+function isValidFirebaseConfig(config) {
+  if (!config || typeof config !== "object") return false;
+  return FIREBASE_FIELDS.every(({ key }) => !isPlaceholder(config[key]));
+}
+
+function setModalStatus(message, type) {
+  const statusEl = document.getElementById("fb-status");
+  statusEl.textContent = message;
+  statusEl.className = type ? "modal-status " + type : "modal-status";
+}
+
+function populateFirebaseModal(config) {
+  for (const { key, inputId } of FIREBASE_FIELDS) {
+    const input = document.getElementById(inputId);
+    input.value = config && config[key] ? config[key] : "";
+  }
+}
+
+function renderConfigStatus() {
+  const config = getStoredFirebaseConfig();
+  const ready = isValidFirebaseConfig(config);
+  const projectId = ready ? config.projectId : "Nicht konfiguriert";
+  const statusText = ready ? "Vollständige Web-Konfiguration erkannt" : "Konfiguration fehlt oder enthält Platzhalter";
+  const nextStep = ready ? "Panels öffnen und End-to-End prüfen" : "Firebase-Werte aus Console übernehmen";
+  const pill = document.getElementById("config-status-pill");
+  const infoBar = document.getElementById("info-bar-text");
+
+  document.getElementById("config-status-text").textContent = statusText;
+  document.getElementById("config-project-text").textContent = projectId;
+  document.getElementById("next-step-text").textContent = nextStep;
+
+  if (ready) {
+    pill.textContent = "✅ Firebase-Konfiguration gespeichert · Projekt: " + config.projectId;
+    pill.className = "status-pill config-pill-ready";
+    infoBar.textContent = "MiniMaster ist mit lokaler Firebase-Webkonfiguration vorbereitet. Empfohlen: Admin-Panel und Eltern-Panel kurz gegentesten.";
+  } else {
+    pill.textContent = "⚠️ Keine produktive Firebase-Konfiguration erkannt";
+    pill.className = "status-pill config-pill-missing";
+    infoBar.textContent = "Es wurden noch keine vollständigen Firebase-Webwerte erkannt. Bitte Konfiguration speichern, bevor Panels produktiv genutzt werden.";
+  }
+}
+
+function openFirebaseModal() {
+  populateFirebaseModal(getStoredFirebaseConfig());
+  setModalStatus("", "");
+  document.getElementById("fb-modal").classList.add("open");
+}
+
+function closeFirebaseModal() {
+  document.getElementById("fb-modal").classList.remove("open");
+}
+
+function collectFirebaseConfigFromInputs() {
+  const config = {};
+  for (const { key, inputId } of FIREBASE_FIELDS) {
+    const input = document.getElementById(inputId);
+    const value = input.value.trim();
+    if (isPlaceholder(value)) {
+      input.focus();
+      throw new Error("Bitte alle Felder vollständig und ohne Platzhalter ausfüllen.");
+    }
+    config[key] = value;
+  }
+  return config;
+}
+
+function saveFirebaseConfig() {
+  try {
+    const config = collectFirebaseConfigFromInputs();
+    localStorage.setItem(FIREBASE_STORAGE_KEY, JSON.stringify(config));
+    setModalStatus("✅ Firebase-Konfiguration gespeichert. Admin-Dashboard und Eltern-Panel verwenden diese Werte beim nächsten Laden.", "success");
+    renderConfigStatus();
+    setTimeout(closeFirebaseModal, 2200);
+  } catch (e) {
+    setModalStatus(e.message || "Fehler beim Speichern der Firebase-Konfiguration.", "error");
+  }
+}
+
+function normalizeBasePath(pathname) {
+  return decodeURIComponent(String(pathname || "").replace(/\/[^/]*$/, "").replace(/^\//, "")).replace(/\//g, "\\");
+}
+
+function buildFullPath(relativePath, pathname) {
+  const basePath = normalizeBasePath(pathname || location.pathname);
+  return (basePath ? basePath + "\\" : "") + relativePath;
+}
+
+function copyPath(elementId) {
+  const codeEl = document.getElementById(elementId);
+  const relativePath = codeEl.textContent;
+  const fullPath = buildFullPath(relativePath, location.pathname);
+  const btn = codeEl.nextElementSibling;
+
+  function markCopied() {
+    btn.textContent = "✅ Kopiert!";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = "📋 Kopieren";
+      btn.classList.remove("copied");
+    }, 1500);
+  }
+
+  return navigator.clipboard.writeText(fullPath).then(markCopied).catch(() => {
+    // Fallback für file:// und ältere Browser ohne Clipboard-API-Permission.
+    const ta = document.createElement("textarea");
+    ta.value = fullPath;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      markCopied();
+    } finally {
+      document.body.removeChild(ta);
+    }
+  });
+}
+
+function bindStartPageUiActions() {
+  const bindClick = (id, handler) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("click", handler);
+  };
+
+  bindClick("open-firebase-modal-btn-1", openFirebaseModal);
+  bindClick("open-firebase-modal-btn-2", openFirebaseModal);
+  bindClick("copy-master-apk-path-btn", () => copyPath("master-apk-path"));
+  bindClick("copy-child-apk-path-btn", () => copyPath("child-apk-path"));
+  bindClick("close-firebase-modal-btn", closeFirebaseModal);
+  bindClick("save-firebase-config-btn", saveFirebaseConfig);
+
+  const modal = document.getElementById("fb-modal");
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeFirebaseModal();
+    });
+  }
+
+  renderConfigStatus();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bindStartPageUiActions);
+} else {
+  bindStartPageUiActions();
+}
