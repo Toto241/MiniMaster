@@ -394,112 +394,8 @@ describe("admin-panel helper functions", () => {
     expect(context.document.createElement).toHaveBeenCalled();
   });
 
-  it.skip("renders the self-healing dashboard payload with escaped issue content (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
 
-    const summaryEl = createDomSinkElement();
-    const activityEl = createDomSinkElement();
-    const errorEl = createDomSinkElement();
-    elements.set("qa-self-healing-summary", summaryEl);
-    elements.set("qa-self-healing-activity", activityEl);
-    elements.set("qa-self-healing-errors", errorEl);
 
-    exports.renderQaSelfHealingStatus({
-      systemHealth: "DEGRADED",
-      triggeredBy: "http-post",
-      generatedAt: "2026-04-10T10:00:00.000Z",
-      detectedIssues: [
-        {
-          id: "stale-run:run-1",
-          title: "<script>alert(1)</script>",
-          message: "Run hängt",
-          severity: "HIGH",
-          severityRank: 1,
-          fixType: "AUTO_FIX",
-          rootCause: "Kein Terminalstatus",
-          reproduction: "Run starten und offen lassen",
-          exactLocation: "suite-run:active:run-1",
-        },
-      ],
-      fixesApplied: [{ runId: "run-1", action: "mark-stale-run-error" }],
-      pendingFixes: [],
-      validationResults: [{ runId: "run-1", status: "passed", details: "Keine Restprobleme erkannt." }],
-      agentActivities: [{ agent: "gap-closer", action: "mark-stale-run-error", target: "run-1", result: "success", details: "Run beendet" }],
-      monitor: { enabled: true, intervalSec: 60 },
-    });
-
-    expect(summaryEl.innerHTML).toContain("Self-Healing aktiv, Restprobleme vorhanden");
-    expect(activityEl.innerHTML).toContain("gap-closer");
-    expect(errorEl.innerHTML).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
-    expect(errorEl.innerHTML).toContain("AUTO_FIX");
-  });
-
-  it.skip("derives USB form visibility from test type (function removed from app.js)", () => {
-    const { exports } = loadAdminPanelTestExports();
-
-    expect(exports.getUsbFormVisibilityState("dual-device")).toMatchObject({
-      isDual: true,
-      showChildSerial: true,
-      showScenario: true,
-      showProfile: true,
-      showFaultModes: true,
-      showSuite: false,
-      showSkipActivation: false,
-      showParallel: true,
-    });
-    expect(exports.getUsbFormVisibilityState("single-master")).toMatchObject({
-      isDual: false,
-      showChildSerial: false,
-      showSuite: true,
-      showSkipActivation: true,
-      showParallel: false,
-    });
-  });
-
-  it.skip("builds separate USB payloads for single-device and dual-device runs (function removed from app.js)", () => {
-    const { exports } = loadAdminPanelTestExports();
-
-    const single = exports.buildUsbTestRunRequestPayload({
-      testType: "single-child",
-      masterSerial: "auto",
-      suite: "default",
-      installApk: true,
-      skipActivation: true,
-    });
-    expect(single.endpoint).toBe("/api/suites/usb-test");
-    expect(single.payload).toMatchObject({
-      appId: "child",
-      serial: "auto",
-      suite: "default",
-      installApk: true,
-      skipActivation: true,
-    });
-
-    const dual = exports.buildUsbTestRunRequestPayload({
-      testType: "dual-device",
-      masterSerial: "auto",
-      childSerial: "child-123",
-      scenarioId: "offline-online-resync",
-      profileId: "dual-device-balanced",
-      faultModes: ["disconnect"],
-      installApk: true,
-      parallel: true,
-      suite: "default",
-      skipActivation: true,
-    });
-    expect(dual.endpoint).toBe("/api/suites/dual-device");
-    expect(dual.payload).toMatchObject({
-      masterSerial: "auto",
-      childSerial: "child-123",
-      scenarioId: "offline-online-resync",
-      profileId: "dual-device-balanced",
-      faultModes: ["disconnect"],
-      installApk: true,
-      parallel: true,
-    });
-    expect(dual.payload.suite).toBeUndefined();
-    expect(dual.payload.skipActivation).toBeUndefined();
-  });
 
   it("requires stronger evidence fields for manual and documented QA proofs", () => {
     const { exports } = loadAdminPanelTestExports();
@@ -608,129 +504,9 @@ describe("admin-panel helper functions", () => {
     expect(docRowEl.style.display).toBe("none");
   });
 
-  it.skip("updates USB form rows based on selected test type (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
 
-    const typeSelect = { value: "dual-device" };
-    const childRow = { style: { display: "none" } };
-    const scenarioRow = { style: { display: "none" } };
-    const profileRow = { style: { display: "none" } };
-    const faultModesRow = { style: { display: "none" } };
-    const suiteRow = { style: { display: "" } };
-    const skipActivationRow = { style: { display: "" } };
-    const parallelRow = { style: { display: "none" } };
 
-    elements.set("suite-usb-test-type", typeSelect);
-    elements.set("suite-usb-child-serial-row", childRow);
-    elements.set("suite-usb-dual-scenario-row", scenarioRow);
-    elements.set("suite-usb-dual-profile-row", profileRow);
-    elements.set("suite-usb-fault-modes-row", faultModesRow);
-    elements.set("suite-usb-suite-row", suiteRow);
-    elements.set("suite-usb-skip-activation-row", skipActivationRow);
-    elements.set("suite-usb-parallel-row", parallelRow);
 
-    exports.updateUsbTestTypeFormState();
-
-    expect(childRow.style.display).toBe("");
-    expect(scenarioRow.style.display).toBe("");
-    expect(profileRow.style.display).toBe("");
-    expect(faultModesRow.style.display).toBe("");
-    expect(parallelRow.style.display).toBe("");
-    expect(suiteRow.style.display).toBe("none");
-    expect(skipActivationRow.style.display).toBe("none");
-
-    typeSelect.value = "single-master";
-    exports.updateUsbTestTypeFormState();
-
-    expect(childRow.style.display).toBe("none");
-    expect(scenarioRow.style.display).toBe("none");
-    expect(profileRow.style.display).toBe("none");
-    expect(faultModesRow.style.display).toBe("none");
-    expect(parallelRow.style.display).toBe("none");
-    expect(suiteRow.style.display).toBe("");
-    expect(skipActivationRow.style.display).toBe("");
-  });
-
-  it.skip("renders QA artifacts overview with dual-device run, evidence and android mappings (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
-
-    const overview = createDomSinkElement();
-    elements.set("qa-artifact-overview", overview);
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    exports.setQaArtifactFiltersForTests({ scenarioFilter: "offline-online-resync", selectedRunId: "run-42" });
-    exports.setSuiteRunHistoryPayloadForTests([
-      {
-        runId: "run-42",
-        type: "dual-device",
-        status: "finished",
-        scenarioId: "offline-online-resync",
-        profileId: "dual-device-balanced",
-        timeline: [
-          { phase: "disconnect", message: "Netz getrennt", timestamp: "2026-04-07T10:00:00Z" },
-        ],
-        result: {
-          scenarioId: "offline-online-resync",
-          profileId: "dual-device-balanced",
-          faultModes: ["disconnect"],
-          overallStatus: "passed",
-        },
-      },
-    ]);
-    exports.setPythonCommissioningEvidenceHistoryForTests([
-      {
-        testId: "ios-xctest-parent",
-        testTitle: "iOS XCTest Parent",
-        status: "pass",
-        operator: "qa-operator",
-        evidenceRef: "EVID-123",
-      },
-    ]);
-    exports.setQaPlatformCatalogPayloadForTests({
-      dualDeviceScenarios: [
-        { scenarioId: "offline-online-resync", title: "Offline/Online Resync" },
-      ],
-      androidScenarioMappings: [
-        { scenarioId: "offline-online-resync", role: "child", testClass: "SyncSpec", testMethod: "resyncAfterReconnect" },
-      ],
-    });
-
-    exports.renderQaArtifactsOverview();
-
-    expect(overview.innerHTML).toContain("Letzter Dual-Device-Lauf");
-    expect(overview.innerHTML).toContain("offline-online-resync");
-    expect(overview.innerHTML).toContain("EVID-123");
-    expect(overview.innerHTML).toContain("SyncSpec");
-    expect(overview.innerHTML).toContain("qa-artifact-run-select");
-  });
-
-  it.skip("shows read-only artifact overview when python runtime is unavailable (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
-
-    const overview = createDomSinkElement();
-    elements.set("qa-artifact-overview", overview);
-
-    exports.setPythonOperatorRuntimeForTests(false);
-    exports.renderQaArtifactsOverview();
-
-    expect(overview.innerHTML).toContain("nur im Python-Operator verfügbar");
-  });
-
-  it.skip("shows empty artifact overview when no runs or evidence exist in operator mode (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
-
-    const overview = createDomSinkElement();
-    elements.set("qa-artifact-overview", overview);
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    exports.setSuiteRunHistoryPayloadForTests([]);
-    exports.setPythonCommissioningEvidenceHistoryForTests([]);
-    exports.setQaPlatformCatalogPayloadForTests({});
-    exports.setQaArtifactFiltersForTests();
-    exports.renderQaArtifactsOverview();
-
-    expect(overview.innerHTML).toContain("Noch keine Artefakte oder Laufspuren vorhanden");
-  });
 
   it("reports suite history as unavailable in read-only runtime", async () => {
     const { exports, elements, fetchMock } = loadAdminPanelTestExports();
@@ -904,50 +680,6 @@ describe("admin-panel helper functions", () => {
     expect(activeRunsEl.innerHTML).toBe("aktive Läufe bleiben unberührt");
   });
 
-  it.skip("renders populated suite history entries with status mapping (rerenderSuiteCatalogFromCache removed from app.js)", async () => {
-    const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
-
-    const historyEl = createDomSinkElement();
-    elements.set("suite-run-history", historyEl);
-    context.loadTestingRegister = jest.fn();
-    context.rerenderSuiteCatalogFromCache = jest.fn();
-    context.renderQaArtifactsOverview = jest.fn();
-
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue({
-        runs: [
-          {
-            runId: "run-pass-1",
-            suiteId: "daily-smoke",
-            status: "finished",
-            startedAt: "2026-04-07T11:00:00Z",
-            result: { status: "passed" },
-          },
-          {
-            runId: "run-skip-2",
-            suite_id: "device-sync",
-            status: "finished",
-            started_at: "2026-04-07T12:00:00Z",
-            result: { overall_status: "skipped" },
-          },
-        ],
-      }),
-    });
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    const result = await exports.loadSuiteRunHistory();
-
-    expect(result).toMatchObject({ ok: true, message: "2 Suite-Läufe geladen." });
-    expect(historyEl.innerHTML).toContain("badge pass\">passed</span>");
-    expect(historyEl.innerHTML).toContain("badge running\">skipped</span>");
-    expect(historyEl.innerHTML).toContain("daily-smoke");
-    expect(historyEl.innerHTML).toContain("device-sync");
-    expect(historyEl.innerHTML).toContain("run-pass-1");
-    expect(context.loadTestingRegister).toHaveBeenCalled();
-    expect(context.rerenderSuiteCatalogFromCache).toHaveBeenCalled();
-    expect(context.renderQaArtifactsOverview).toHaveBeenCalled();
-  });
 
   it("renders suite history load errors into the history container", async () => {
     const { exports, elements, fetchMock, context } = loadAdminPanelTestExports();
@@ -969,98 +701,10 @@ describe("admin-panel helper functions", () => {
     expect(historyEl.innerHTML).toContain("Backend nicht erreichbar");
   });
 
-  it.skip("renders suite catalog read-only, error and empty states via DOM helpers (function removed from app.js)", async () => {
-    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
 
-    const catalogEl = createDomSinkElement();
-    elements.set("suite-catalog", catalogEl);
-    elements.set("suite-group-filter", { value: "all", innerHTML: "" });
-    elements.set("suite-ready-only", { checked: false });
 
-    exports.setPythonOperatorRuntimeForTests(false);
-    await exports.loadSuiteCatalog();
-    expect(catalogEl.replaceChildren).toHaveBeenCalled();
-    expect(catalogEl.innerHTML).toContain("Suite-Katalog ist nur im Python-Operator verfuegbar");
 
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: jest.fn().mockResolvedValue({ error: "Katalogfehler" }),
-    });
-    exports.setPythonOperatorRuntimeForTests(true);
-    await exports.loadSuiteCatalog();
-    expect(catalogEl.innerHTML).toContain("Katalogfehler");
 
-    exports.renderSuiteCatalog([]);
-    expect(catalogEl.innerHTML).toContain("Keine Suiten gefunden");
-  });
-
-  it.skip("renders QA platform overview read-only and empty states via DOM helpers (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
-
-    const overviewEl = createDomSinkElement();
-    elements.set("qa-platform-overview", overviewEl);
-
-    exports.setPythonOperatorRuntimeForTests(false);
-    exports.renderQaPlatformOverview(null);
-    expect(overviewEl.replaceChildren).toHaveBeenCalled();
-    expect(overviewEl.innerHTML).toContain("QA-Plattformdaten sind nur im Python-Operator verfügbar");
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    exports.renderQaPlatformOverview(null);
-    expect(overviewEl.innerHTML).toContain("Noch kein QA-Katalog geladen");
-  });
-
-  it.skip("renders QA platform catalog load errors via DOM helpers (function removed from app.js)", async () => {
-    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
-
-    const overviewEl = createDomSinkElement();
-    elements.set("qa-platform-overview", overviewEl);
-
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: jest.fn().mockResolvedValue({ error: "QA-Katalog fehlt" }),
-    });
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    const result = await exports.loadQaPlatformCatalog();
-
-    expect(result).toMatchObject({ ok: false, message: "QA-Katalog fehlt" });
-    expect(overviewEl.innerHTML).toContain("QA-Katalog fehlt");
-  });
-
-  it.skip("renders emulator overview read-only and empty states via DOM helpers (function removed from app.js)", () => {
-    const { exports, elements } = loadAdminPanelTestExports();
-
-    const emulatorEl = createDomSinkElement();
-    elements.set("qa-emulator-lab", emulatorEl);
-
-    exports.setPythonOperatorRuntimeForTests(false);
-    exports.renderEmulatorLabOverview(null);
-    expect(emulatorEl.replaceChildren).toHaveBeenCalled();
-    expect(emulatorEl.innerHTML).toContain("Emulatorstatus ist nur im Python-Operator verfügbar");
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    exports.renderEmulatorLabOverview(null);
-    expect(emulatorEl.innerHTML).toContain("Noch kein Emulator-Labor geladen");
-  });
-
-  it.skip("renders emulator lab load errors via DOM helpers (function removed from app.js)", async () => {
-    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
-
-    const emulatorEl = createDomSinkElement();
-    elements.set("qa-emulator-lab", emulatorEl);
-
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: jest.fn().mockResolvedValue({ error: "Emulatordaten fehlen" }),
-    });
-
-    exports.setPythonOperatorRuntimeForTests(true);
-    const result = await exports.loadEmulatorLabOverview();
-
-    expect(result).toMatchObject({ ok: false, message: "Emulatordaten fehlen" });
-    expect(emulatorEl.innerHTML).toContain("Emulatordaten fehlen");
-  });
 
   it("renders testing register overview and storage empty states via DOM helpers", () => {
     const { exports, elements } = loadAdminPanelTestExports();
@@ -1149,32 +793,6 @@ describe("admin-panel helper functions", () => {
     expect(manualListEl.innerHTML).toContain("Testregister konnte nicht geladen werden: Registerfehler");
   });
 
-  it.skip("renders suite device status read-only, adb-missing and empty states via DOM helpers (function removed from app.js)", async () => {
-    const { exports, elements, fetchMock } = loadAdminPanelTestExports();
-
-    const deviceEl = createDomSinkElement();
-    elements.set("suite-device-status", deviceEl);
-
-    exports.setPythonOperatorRuntimeForTests(false);
-    await exports.loadSuiteDeviceStatus();
-    expect(deviceEl.replaceChildren).toHaveBeenCalled();
-    expect(deviceEl.innerHTML).toContain("Geraetestatus ist nur im Python-Operator verfuegbar");
-
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ adbAvailable: false }),
-    });
-    exports.setPythonOperatorRuntimeForTests(true);
-    await exports.loadSuiteDeviceStatus();
-    expect(deviceEl.innerHTML).toContain("ADB ist nicht verfuegbar");
-
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ adbAvailable: true, devices: [] }),
-    });
-    await exports.loadSuiteDeviceStatus();
-    expect(deviceEl.innerHTML).toContain("Keine Geraete angeschlossen");
-  });
 
   it("builds PowerShell deploy scripts with project scoping", () => {
     const { exports } = loadAdminPanelTestExports();

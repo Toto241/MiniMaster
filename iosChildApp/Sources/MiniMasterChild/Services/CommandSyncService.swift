@@ -116,7 +116,7 @@ final class CommandSyncService: ObservableObject {
                 )
                 let resolved = offlinePolicyCache.resolveConflict(serverPolicy: newState, serverVersion: policyVersion)
                 policyStore.apply(resolved)
-                appBlockingManager.applyPolicy(resolved)
+                blockingManager.applyPolicy(resolved)
             }
 
             // Also apply pending critical commands in snapshot

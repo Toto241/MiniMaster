@@ -83,6 +83,7 @@ struct ChildRootView: View {
     // MARK: - Dependency Container
 
     /// Creates and wires all app-level dependencies in the correct order.
+    @MainActor
     final class ChildAppEnvironment: ObservableObject {
         let policyStore = PolicyStore()
         let blockingManager = AppBlockingManager()

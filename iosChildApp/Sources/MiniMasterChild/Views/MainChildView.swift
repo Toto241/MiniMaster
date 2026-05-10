@@ -21,7 +21,7 @@ struct MainChildView: View {
                 if let blacklistNotice = blockingManager.appBlacklistNotice {
                     blacklistNoticeSection(blacklistNotice)
                 }
-                if !syncService.pendingCommandCount.isZero {
+                if syncService.pendingCommandCount > 0 {
                     syncSection
                 }
                 tasksSection
