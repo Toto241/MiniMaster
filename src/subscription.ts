@@ -10,11 +10,12 @@
  */
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
+import { createTraceContext, TracedLogger } from "./tracing";
 import * as admin from "firebase-admin";
 import { google } from "googleapis";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
+import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess, getTracedLogger } from "./shared";
 import { validateSku, validateString } from "./validation";
 import { withResilience, fetchWithTimeout } from "./resilience";
 import {
@@ -40,6 +41,7 @@ export { VALID_PRODUCT_IDS, getChildLimit, getParentAppLimit, getSubscriptionDur
  */
 export const verifyPurchase = functions.https.onCall(
   async (data: { purchaseToken: string; sku: string; platform?: "android" | "ios" }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "verifyPurchase");
     const startTime = Date.now();
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
@@ -69,7 +71,7 @@ export const verifyPurchase = functions.https.onCall(
           async () => verifyAppleTransaction(purchaseToken),
           { timeoutMs: 15000, retry: { maxAttempts: 3, baseDelayMs: 1000 } }
         ).catch((e) => {
-          functions.logger.error("Error verifying Apple purchase:", e);
+          logger.error("Error verifying Apple purchase:", e);
           return null;
         });
         isPurchaseValid = appleResult?.valid ?? false;
@@ -80,7 +82,7 @@ export const verifyPurchase = functions.https.onCall(
           async () => verifyPlaySubscription("com.minimaster.masterapp", sku, purchaseToken),
           { timeoutMs: 15000, retry: { maxAttempts: 3, baseDelayMs: 1000 } }
         ).catch((e) => {
-          functions.logger.error("Error verifying Google Play purchase:", e);
+          logger.error("Error verifying Google Play purchase:", e);
           return false;
         }) ?? false;
       }
@@ -124,9 +126,9 @@ export const verifyPurchase = functions.https.onCall(
               status: "pending",
               createdAt: now,
             });
-            functions.logger.info(`Affiliate conversion tracked for ${masterId} via ${masterData.affiliateCode}`);
+            logger.info(`Affiliate conversion tracked for ${masterId} via ${masterData.affiliateCode}`);
           } catch (affErr) {
-            functions.logger.warn("Affiliate tracking failed (non-critical):", affErr);
+            logger.warn("Affiliate tracking failed (non-critical):", { error: String(affErr) });
           }
         }
 
@@ -139,25 +141,26 @@ export const verifyPurchase = functions.https.onCall(
             parentAppLimit: getParentAppLimit(sku),
             childLimit: getChildLimit(sku),
             duration: Date.now() - startTime,
+            traceId,
           }
         );
 
-        functions.logger.info(`Subscription ${sku} activated for master ${masterId} (platform=${platform}).`);
+        logger.info(`Subscription ${sku} activated for master ${masterId} (platform=${platform}).`);
         return { success: true, subscriptionStatus: "active" };
       } else {
         await AuditLogger.logFailure(
           "subscription.verify_purchase", context, `masters/${masterId}`, "subscription",
-          new Error("Purchase verification failed"), { masterId, sku, platform }
+          new Error("Purchase verification failed"), { masterId, sku, platform, traceId }
         );
 
-        functions.logger.warn(`Invalid purchase token received for master ${masterId} (platform=${platform}).`);
+        logger.warn(`Invalid purchase token received for master ${masterId} (platform=${platform}).`);
         throw new functions.https.HttpsError("permission-denied", "Purchase verification failed.");
       }
     } catch (error) {
       if (!(error instanceof functions.https.HttpsError)) {
         await AuditLogger.logFailure(
           "subscription.verify_purchase", context, `masters/${masterId}`, "subscription",
-          error as Error, { masterId, sku, platform }
+          error as Error, { masterId, sku, platform, traceId }
         );
       }
       throw error;
@@ -170,6 +173,8 @@ export const verifyPurchase = functions.https.onCall(
  */
 export const getSubscriptionStatus = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "getSubscriptionStatus");
+    void logger; void traceId;
     const masterId = requireAuth(context);
     validateAppCheck(context, true);
     const masterDeviceRef = db().collection("masters").doc(masterId);
@@ -206,6 +211,8 @@ export const getSubscriptionStatus = functions.https.onCall(
  */
 export const revokeSubscription = functions.https.onCall(
   async (data: { subscriptionId?: string; masterId?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "revokeSubscription");
+    void logger;
     const startTime = Date.now();
 
     try {
@@ -258,14 +265,14 @@ export const revokeSubscription = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "admin.revoke_subscription", context, subscriptionId ? `subscriptions/${subscriptionId}` : `masters/${masterId}`, "subscription",
-        { subscriptionId, masterId, duration: Date.now() - startTime }
+        { subscriptionId, masterId, duration: Date.now() - startTime, traceId }
       );
 
       return { message: subscriptionId ? `Subscription ${subscriptionId} successfully revoked.` : `Subscription status for master ${masterId} successfully revoked.` };
     } catch (error) {
       await AuditLogger.logFailure(
         "admin.revoke_subscription", context, `subscriptions/${data.subscriptionId || "unknown"}`, "subscription",
-        error as Error, { subscriptionId: data.subscriptionId, masterId: data.masterId }
+        error as Error, { subscriptionId: data.subscriptionId, masterId: data.masterId, traceId }
       );
       console.error("Error revoking subscription:", error);
       if (error instanceof functions.https.HttpsError) throw error;
@@ -281,6 +288,7 @@ export const checkExpiredSubscriptions = functions.pubsub
   .schedule("0 0 * * *")
   .timeZone("Europe/Berlin")
   .onRun(async (_context) => {
+    const logger = new TracedLogger(createTraceContext("checkExpiredSubscriptions"));
     const now = admin.firestore.Timestamp.now();
 
     try {
@@ -321,12 +329,12 @@ export const checkExpiredSubscriptions = functions.pubsub
         await batch.commit();
       }
 
-      functions.logger.info(
+      logger.info(
         `Subscription Check: ${subCount} subscription(s) and ${trialCount} trial(s) marked as expired.`
       );
       return null;
     } catch (error) {
-      functions.logger.error("Failed to check expired subscriptions:", error);
+      logger.error("Failed to check expired subscriptions:", error);
       return null;
     }
   });
@@ -422,6 +430,7 @@ type AppleTransactionResponse = {
 export async function verifyAppleTransaction(
   originalTransactionId: string
 ): Promise<{ valid: boolean; expiresDateMs?: number }> {
+  const logger = new TracedLogger(createTraceContext("verifyAppleTransaction"));
   const jwt = signAppleJWT();
   const url = `${APPLE_API_BASE}/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`;
 
@@ -435,13 +444,13 @@ export async function verifyAppleTransaction(
   });
 
   if (response.status === 404) {
-    functions.logger.warn("Apple transaction not found", { originalTransactionId });
+    logger.warn("Apple transaction not found", { originalTransactionId });
     return { valid: false };
   }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    functions.logger.error("Apple API error", { status: response.status, body });
+    logger.error("Apple API error", { status: response.status, body });
     throw new Error(`Apple API returned ${response.status}: ${body}`);
   }
 
@@ -467,7 +476,7 @@ export async function verifyAppleTransaction(
   const expiresDateMs = latest.expiresDate;
   const isActive = expiresDateMs > nowMs;
 
-  functions.logger.info("Apple transaction verified", {
+  logger.info("Apple transaction verified", {
     originalTransactionId,
     productId: latest.productId,
     expiresDateMs,
@@ -518,12 +527,13 @@ type RtdnPayload = {
  */
 export function decodeRtdnPayload(data: string | undefined | null): RtdnPayload | null {
   if (!data) return null;
+  const logger = new TracedLogger(createTraceContext("decodeRtdnPayload"));
   try {
     const raw = Buffer.from(data, "base64").toString("utf8");
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed as RtdnPayload : null;
   } catch (err) {
-    functions.logger.warn("Failed to decode RTDN payload", err);
+    logger.warn("Failed to decode RTDN payload", { error: String(err) });
     return null;
   }
 }
@@ -537,8 +547,9 @@ export function decodeRtdnPayload(data: string | undefined | null): RtdnPayload 
 export async function applyRtdnNotification(
   payload: RtdnPayload
 ): Promise<{ handled: boolean; reason: string; masterId?: string; notificationType?: number }> {
+  const logger = new TracedLogger(createTraceContext("applyRtdnNotification"));
   if (payload.testNotification) {
-    functions.logger.info("RTDN test notification received", { version: payload.testNotification.version });
+    logger.info("RTDN test notification received", { version: payload.testNotification.version });
     return { handled: true, reason: "test_notification" };
   }
   const sub = payload.subscriptionNotification;
@@ -552,7 +563,7 @@ export async function applyRtdnNotification(
     .get();
 
   if (snapshot.empty) {
-    functions.logger.warn("RTDN received but no matching master found", {
+    logger.warn("RTDN received but no matching master found", {
       purchaseToken: sub.purchaseToken.slice(0, 6) + "…",
       notificationType: sub.notificationType,
     });
@@ -618,14 +629,14 @@ export async function applyRtdnNotification(
       break;
     }
     default: {
-      functions.logger.warn("RTDN unknown notificationType", { notificationType: sub.notificationType });
+      logger.warn("RTDN unknown notificationType", { notificationType: sub.notificationType });
       return { handled: false, reason: "unknown_notification_type", masterId, notificationType: sub.notificationType };
     }
   }
 
   await doc.ref.update(update);
 
-  functions.logger.info("RTDN processed", {
+  logger.info("RTDN processed", {
     masterId,
     notificationType: sub.notificationType,
     subscriptionId: sub.subscriptionId,
@@ -643,15 +654,16 @@ export async function applyRtdnNotification(
 export const onPlayBillingNotification = functions.pubsub
   .topic(process.env.PLAY_BILLING_PUBSUB_TOPIC || "play-billing-notifications")
   .onPublish(async (message) => {
+    const logger = new TracedLogger(createTraceContext("onPlayBillingNotification"));
     const payload = decodeRtdnPayload((message as any)?.data);
     if (!payload) {
-      functions.logger.warn("RTDN: empty or undecodable payload");
+      logger.warn("RTDN: empty or undecodable payload");
       return null;
     }
     try {
       await applyRtdnNotification(payload);
     } catch (err) {
-      functions.logger.error("RTDN processing failed", err);
+      logger.error("RTDN processing failed", err);
       // Swallow the error so Pub/Sub does not retry indefinitely on
       // permanent business-logic failures. Transient infra errors are
       // already retried by Firestore SDK internals.
@@ -746,6 +758,7 @@ export async function reverifyActiveSubscriptionsRun(
   packageName: string,
   maxBatch: number = REVERIFY_DEFAULT_BATCH
 ): Promise<{ scanned: number; updated: number; skipped: number; errors: number }> {
+  const logger = new TracedLogger(createTraceContext("reverifyActiveSubscriptionsRun"));
   const nowMs = Date.now();
   const candidates = await db().collection("masters")
     .where("subscription.status", "in", ["active", "grace_period"])
@@ -786,13 +799,13 @@ export async function reverifyActiveSubscriptionsRun(
       }
       await doc.ref.update(update);
       updated++;
-      functions.logger.info("Reverified subscription", {
+      logger.info("Reverified subscription", {
         masterId: doc.id,
         newStatus: update["subscription.status"],
       });
     } catch (err) {
       errors++;
-      functions.logger.warn("Reverify failed for master", {
+      logger.warn("Reverify failed for master", {
         masterId: doc.id,
         error: (err as Error)?.message,
       });
@@ -811,13 +824,14 @@ export const reverifyActiveSubscriptions = functions.pubsub
   .schedule("15 3 * * *")
   .timeZone("Europe/Berlin")
   .onRun(async () => {
+    const logger = new TracedLogger(createTraceContext("reverifyActiveSubscriptions"));
     const packageName = process.env.PLAY_PACKAGE_NAME || "com.minimaster.masterapp";
     const batchSize = Number(process.env.REVERIFY_BATCH || REVERIFY_DEFAULT_BATCH);
     try {
       const summary = await reverifyActiveSubscriptionsRun(packageName, batchSize);
-      functions.logger.info("Reverify run complete", summary);
+      logger.info("Reverify run complete", summary);
     } catch (err) {
-      functions.logger.error("Reverify run failed", err);
+      logger.error("Reverify run failed", err);
     }
     return null;
   });

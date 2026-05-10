@@ -12,7 +12,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
-import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
+import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, getTracedLogger } from "./shared";
 import { syncLegacyUsageRulesToCanonicalRules } from "./controllers/decisioning";
 import {
   validateDeviceId,
@@ -43,6 +43,7 @@ export const setDeviceLocked = functions.https.onCall(
   withErrorHandling(
     "setDeviceLocked",
     async (data: { childId: string; isLocked: boolean }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "setDeviceLocked");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -63,7 +64,7 @@ export const setDeviceLocked = functions.https.onCall(
         await AuditLogger.logDenied(
           isLocked ? "device.lock" : "device.unlock", context,
           `children/${childId}`, "device",
-          "Master not authorized for this child", { childId, isLocked }
+          "Master not authorized for this child", { childId, isLocked, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "This master device is not authorized to control the specified child device.");
       }
@@ -76,10 +77,10 @@ export const setDeviceLocked = functions.https.onCall(
       await AuditLogger.logSuccess(
         isLocked ? "device.lock" : "device.unlock", context,
         `children/${childId}`, "device",
-        { childId, isLocked, duration: Date.now() - startTime }
+        { childId, isLocked, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
+      logger.info(`Lock state for child ${childId} set to ${isLocked} by master ${masterId}.`);
       return { success: true, isLocked };
     }
   )
@@ -91,6 +92,7 @@ export const updateAppBlacklist = functions.https.onCall(
   withErrorHandling(
     "updateAppBlacklist",
     async (data: { childId: string; appBlacklist: string[] }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "updateAppBlacklist");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -109,7 +111,7 @@ export const updateAppBlacklist = functions.https.onCall(
       if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
         await AuditLogger.logDenied(
           "rules.update_blacklist", context, `children/${childId}`, "rule",
-          "Master not authorized for this child", { childId, appCount: appBlacklist.length }
+          "Master not authorized for this child", { childId, appCount: appBlacklist.length, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
       }
@@ -121,10 +123,10 @@ export const updateAppBlacklist = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "rules.update_blacklist", context, `children/${childId}`, "rule",
-        { childId, appCount: appBlacklist.length, duration: Date.now() - startTime }
+        { childId, appCount: appBlacklist.length, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
+      logger.info(`App blacklist for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     }
   )
@@ -136,6 +138,7 @@ export const setUsageRules = functions.https.onCall(
   withErrorHandling(
     "setUsageRules",
     async (data: { childId: string; usageRules: object }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "setUsageRules");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -154,7 +157,7 @@ export const setUsageRules = functions.https.onCall(
       if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
         await AuditLogger.logDenied(
           "rules.update_usage", context, `children/${childId}`, "rule",
-          "Master not authorized for this child", { childId }
+          "Master not authorized for this child", { childId, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Master device not authorized for this child.");
       }
@@ -168,10 +171,10 @@ export const setUsageRules = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "rules.update_usage", context, `children/${childId}`, "rule",
-        { childId, duration: Date.now() - startTime }
+        { childId, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
+      logger.info(`Usage rules for child ${childId} updated by master ${masterId}.`);
       return { success: true };
     }
   )
@@ -183,6 +186,8 @@ export const getRulesForChild = functions.https.onCall(
   withErrorHandling(
     "getRulesForChild",
     async (data: { childId: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "getRulesForChild");
+      void logger; void traceId;
       const requesterId = requireAuth(context);
       validateAppCheck(context, true);
 
@@ -216,6 +221,8 @@ export const recordHeartbeat = functions.https.onCall(
   withErrorHandling(
     "recordHeartbeat",
     async (_data: Record<string, never>, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "recordHeartbeat");
+      void logger;
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
@@ -232,7 +239,7 @@ export const recordHeartbeat = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "system.heartbeat", context, `children/${childId}`, "system",
-        { childId, duration: Date.now() - startTime }
+        { childId, duration: Date.now() - startTime, traceId }
       );
 
       return { success: true };
@@ -246,6 +253,7 @@ export const registerFcmToken = functions.https.onCall(
   withErrorHandling(
     "registerFcmToken",
     async (data: { token: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "registerFcmToken");
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
@@ -262,10 +270,10 @@ export const registerFcmToken = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "device.register", context, `children/${childId}`, "device",
-        { tokenType: "fcm", childId, duration: Date.now() - startTime }
+        { tokenType: "fcm", childId, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`FCM token for child ${childId} has been registered.`);
+      logger.info(`FCM token for child ${childId} has been registered.`);
       return { success: true };
     }
   )
@@ -277,6 +285,7 @@ export const updateFCMToken = functions.https.onCall(
   withErrorHandling(
     "updateFCMToken",
     async (data: { fcmToken: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "updateFCMToken");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -296,10 +305,10 @@ export const updateFCMToken = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "device.register", context, `masters/${masterId}`, "device",
-        { tokenType: "fcm", masterId, duration: Date.now() - startTime }
+        { tokenType: "fcm", masterId, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`FCM token updated for master ${masterId}.`);
+      logger.info(`FCM token updated for master ${masterId}.`);
       return { success: true };
     }
   )
@@ -311,6 +320,8 @@ export const reportDailyUsage = functions.https.onCall(
   withErrorHandling(
     "reportDailyUsage",
     async (data: { date: string; usageMillis: number }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "reportDailyUsage");
+      void logger;
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
@@ -336,7 +347,7 @@ export const reportDailyUsage = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "rules.update_screen_time", context, `children/${childId}/usageHistory/${date}`, "system",
-        { childId, date, usageMillis, duration: Date.now() - startTime }
+        { childId, date, usageMillis, duration: Date.now() - startTime, traceId }
       );
 
       return { success: true };
@@ -350,6 +361,8 @@ export const reportTamperEvent = functions.https.onCall(
   withErrorHandling(
     "reportTamperEvent",
     async (data: { childId: string; eventType: string; timestamp: number }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "reportTamperEvent");
+      void traceId;
       const callerId = requireAuth(context);
       validateAppCheck(context, true);
 
@@ -401,7 +414,7 @@ export const reportTamperEvent = functions.https.onCall(
         });
       }
 
-      functions.logger.warn(`Tamper event from child ${childId}: ${eventType}`);
+      logger.warn(`Tamper event from child ${childId}: ${eventType}`);
       return { success: true };
     }
   )

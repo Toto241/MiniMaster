@@ -9,7 +9,8 @@ import * as admin from "firebase-admin";
 import * as fs from "fs";
 import * as path from "path";
 import { db, auth, storage } from "../firebase";
-import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
+import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, getTracedLogger } from "./shared";
+import { TracedLogger } from "./tracing";
 
 const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
 
@@ -19,7 +20,7 @@ async function deleteQuerySnapshot(snapshot: FirebaseFirestore.QuerySnapshot): P
   return snapshot.size;
 }
 
-async function deleteMasterAccountById(masterId: string, context: CallableContext, startTime: number) {
+async function deleteMasterAccountById(masterId: string, context: CallableContext, startTime: number, traceId: string) {
   const masterDeviceRef = db().collection("masters").doc(masterId);
   const masterDoc = await masterDeviceRef.get();
   if (!masterDoc.exists) {
@@ -70,6 +71,7 @@ async function deleteMasterAccountById(masterId: string, context: CallableContex
       errorLogsDeleted,
       performanceMetricsDeleted,
       duration: Date.now() - startTime,
+      traceId,
     }
   );
 }
@@ -80,6 +82,7 @@ async function deleteMasterAccountById(masterId: string, context: CallableContex
 export const deleteUserAccount = functions.https.onCall(
   async (data: { masterId?: string }, context: CallableContext) => {
     const startTime = Date.now();
+    const { logger, traceId } = getTracedLogger(context, "deleteUserAccount");
     const callerId = requireAuth(context);
     const isAdmin = context.auth?.token?.role === "admin";
     validateAppCheck(context, true);
@@ -92,16 +95,16 @@ export const deleteUserAccount = functions.https.onCall(
     }
 
     try {
-      await deleteMasterAccountById(masterId, context, startTime);
+      await deleteMasterAccountById(masterId, context, startTime, traceId);
 
-      functions.logger.info(`User account and all associated data deleted for master ${masterId}.`);
+      logger.info(`User account and all associated data deleted for master ${masterId}.`);
       return { success: true };
     } catch (error) {
       await AuditLogger.logFailure(
         "device.delete", context, `masters/${masterId}`, "device",
-        error as Error, { masterId }
+        error as Error, { masterId, traceId }
       );
-      functions.logger.error(`Failed to delete user account for master ${masterId}:`, error);
+      logger.error(`Failed to delete user account for master ${masterId}:`, error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while deleting the user account.", error);
     }
   }
@@ -112,6 +115,8 @@ export const deleteUserAccount = functions.https.onCall(
  */
 export const adminHealthCheck = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "adminHealthCheck");
+    void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
@@ -242,6 +247,7 @@ ${sortedErrors.map(([msg, count]) => "║   - " + msg.substring(0, 60) + "...: "
 export const exportUserData = functions.https.onCall(
   async (data: { masterId?: string }, context: CallableContext) => {
     const startTime = Date.now();
+    const { logger, traceId } = getTracedLogger(context, "exportUserData");
     requireAdmin(context);
     const adminId = requireAuth(context);
     validateAppCheck(context, true);
@@ -304,14 +310,14 @@ export const exportUserData = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "device.delete", context, `masters/${masterId}`, "user",
-        { action: "data_export", duration: Date.now() - startTime }
+        { action: "data_export", duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Data export completed for master ${masterId} by admin ${adminId}.`);
+      logger.info(`Data export completed for master ${masterId} by admin ${adminId}.`);
       return { success: true, data: exportData };
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
-      functions.logger.error(`Failed to export data for master ${masterId}:`, error);
+      logger.error(`Failed to export data for master ${masterId}:`, error);
       throw new functions.https.HttpsError("internal", "An unexpected error occurred while exporting user data.", error);
     }
   }
@@ -323,6 +329,8 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 export const testGeminiConnection = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { prompt?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "testGeminiConnection");
+    void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
@@ -368,6 +376,8 @@ export const testGeminiConnection = functions.runWith({ secrets: ["GEMINI_API_KE
 
 export const getKnowledgeBase = functions.https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "getKnowledgeBase");
+    void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
@@ -389,6 +399,8 @@ export const getKnowledgeBase = functions.https.onCall(
 
 export const updateKnowledgeBase = functions.https.onCall(
   async (data: { content?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "updateKnowledgeBase");
+    void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
@@ -402,7 +414,7 @@ export const updateKnowledgeBase = functions.https.onCall(
       updatedBy: context.auth!.uid,
     });
 
-    functions.logger.info(`Knowledge base updated by admin ${context.auth!.uid} (${data.content.length} chars).`);
+    logger.info(`Knowledge base updated by admin ${context.auth!.uid} (${data.content.length} chars).`);
     return { success: true, length: data.content.length };
   }
 );
@@ -411,6 +423,8 @@ export const updateKnowledgeBase = functions.https.onCall(
 
 export const sendTestFcmMessage = functions.https.onCall(
   async (data: { token?: string; childId?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "sendTestFcmMessage");
+    void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
 
@@ -442,7 +456,7 @@ export const sendTestFcmMessage = functions.https.onCall(
         },
       });
 
-      functions.logger.info(`Test FCM sent by admin ${context.auth!.uid} to token ${fcmToken.substring(0, 20)}...`);
+      logger.info(`Test FCM sent by admin ${context.auth!.uid} to token ${fcmToken.substring(0, 20)}...`);
       return { success: true, messageId };
     } catch (error) {
       return { success: false, error: `FCM Fehler: ${(error as Error).message}` };
@@ -463,6 +477,8 @@ export const triggerScheduledJob = functions.https.onCall(
     }
 
     const startTime = Date.now();
+    const { logger, traceId } = getTracedLogger(context, "triggerScheduledJob");
+    void traceId;
 
     try {
       switch (jobName) {
@@ -508,7 +524,7 @@ export const triggerScheduledJob = functions.https.onCall(
       }
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
-      functions.logger.error(`Failed to trigger job ${jobName}:`, error);
+      logger.error(`Failed to trigger job ${jobName}:`, error);
       throw new functions.https.HttpsError("internal", `Job-Ausführung fehlgeschlagen: ${(error as Error).message}`);
     }
   }
@@ -528,6 +544,7 @@ try {
  */
 export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { hours?: number; functionFilter?: string; errorId?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "analyzeSystemErrors");
     requireAdmin(context);
     const adminId = requireAuth(context);
     validateAppCheck(context, true);
@@ -554,7 +571,7 @@ export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY
       }
       const errData = errDoc.data()!;
       const errors = [{ id: errDoc.id, ...errData }];
-      return await performAnalysis(apiKey, errors, adminId, context);
+      return await performAnalysis(apiKey, errors, adminId, context, logger, traceId);
     }
 
     const snapshot = await query.get();
@@ -590,7 +607,7 @@ export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY
       stack: g.stack,
       count: g.count,
       timestamp: g.timestamp,
-    })), adminId, context);
+    })), adminId, context, logger, traceId);
   }
 );
 
@@ -599,6 +616,8 @@ async function performAnalysis(
   errors: Array<{ id: string; functionName?: string; message?: string; stack?: string; count?: number; [key: string]: any }>,
   adminId: string,
   context: CallableContext,
+  logger: TracedLogger,
+  traceId: string,
 ) {
   const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
@@ -703,7 +722,7 @@ Antworte NUR mit dem JSON-Array, kein Markdown.`;
 
     await AuditLogger.logSuccess(
       "ai.error_analysis", context, `ai_error_analyses/${analysisDoc.id}`, "system",
-      { errorCount: errors.length, analysisCount: enriched.length, model }
+      { errorCount: errors.length, analysisCount: enriched.length, model, traceId }
     );
 
     return {
@@ -715,7 +734,7 @@ Antworte NUR mit dem JSON-Array, kein Markdown.`;
     };
   } catch (error) {
     clearTimeout(timeout);
-    functions.logger.error("AI error analysis failed:", error);
+    logger.error("AI error analysis failed:", error);
     throw new functions.https.HttpsError("internal", `KI-Fehleranalyse fehlgeschlagen: ${(error as Error).message}`);
   }
 }
@@ -726,6 +745,7 @@ Antworte NUR mit dem JSON-Array, kein Markdown.`;
  */
 export const executeAutoFix = functions.https.onCall(
   async (data: { analysisId: string; errorIndex: number; action: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "executeAutoFix");
     requireAdmin(context);
     const adminId = requireAuth(context);
     validateAppCheck(context, true);
@@ -836,15 +856,15 @@ export const executeAutoFix = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "ai.auto_fix", context, `ai_error_analyses/${analysisId}`, "system",
-        { action, errorIndex, ...fixResult.details }
+        { action, errorIndex, ...fixResult.details, traceId }
       );
 
-      functions.logger.info(`Auto-fix "${action}" executed by admin ${adminId}: ${fixResult.result}`);
+      logger.info(`Auto-fix "${action}" executed by admin ${adminId}: ${fixResult.result}`);
       return { success: true, ...fixResult };
     } catch (error) {
       await AuditLogger.logFailure(
         "ai.auto_fix", context, `ai_error_analyses/${analysisId}`, "system",
-        error as Error, { action, errorIndex }
+        error as Error, { action, errorIndex, traceId }
       );
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", `Auto-Fix fehlgeschlagen: ${(error as Error).message}`);

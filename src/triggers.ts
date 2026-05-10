@@ -9,6 +9,7 @@ import * as admin from "firebase-admin";
 import { db } from "../firebase";
 import { writeCommand, incrementPolicyVersion } from "./device-sync";
 import { withRetry } from "./resilience";
+import { createTraceContext, TracedLogger } from "./tracing";
 
 
 /**
@@ -34,20 +35,21 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   const childId = event.params.childId;
   const newData = event.data?.after.data();
   const oldData = event.data?.before.data();
+  const logger = new TracedLogger(createTraceContext("onChildDeviceUpdateV2"));
 
   if (!newData) {
-    functions.logger.info(`Child device ${childId} deleted, no action taken.`);
+    logger.info(`Child device ${childId} deleted, no action taken.`);
     return;
   }
 
   if (!oldData) {
-    functions.logger.info(`New child device ${childId} created, no action taken on update.`);
+    logger.info(`New child device ${childId} created, no action taken on update.`);
     return;
   }
 
   const fcmToken = newData.fcmToken;
   if (!fcmToken || typeof fcmToken !== "string") {
-    functions.logger.warn(`No valid FCM token for child ${childId}, cannot send notification.`);
+    logger.warn(`No valid FCM token for child ${childId}, cannot send notification.`);
     return;
   }
 
@@ -68,7 +70,7 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   }
 
   if (Object.keys(payload).length === 0) {
-    functions.logger.info(`No relevant changes detected for child ${childId}.`);
+    logger.info(`No relevant changes detected for child ${childId}.`);
     return;
   }
 
@@ -88,10 +90,10 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
     if (usageChanged) {
       await writeCommand(childId, "usage_rules", { usageRules: newData.usageRules || {} }, policyVersion);
     }
-    functions.logger.info(`Commands written for child ${childId}, policyVersion=${policyVersion}`);
+    logger.info(`Commands written for child ${childId}, policyVersion=${policyVersion}`);
   } catch (cmdError) {
     // Command-Erzeugung schlägt den FCM-Push nicht fehl; nur loggen
-    functions.logger.error(`Failed to write commands for child ${childId}:`, cmdError);
+    logger.error(`Failed to write commands for child ${childId}:`, cmdError);
   }
 
   // --- Legacy FCM-Diff-Push (Wake-up/Hint für verbundene Geräte) ---
@@ -106,9 +108,9 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
 
   try {
     await sendFcmWithRetry(message);
-    functions.logger.info(`Successfully sent FCM message to child ${childId} for data update.`);
+    logger.info(`Successfully sent FCM message to child ${childId} for data update.`);
   } catch (error) {
-    functions.logger.error(`Failed to send FCM message to child ${childId}:`, error);
+    logger.error(`Failed to send FCM message to child ${childId}:`, error);
   }
 });
 
@@ -121,6 +123,7 @@ export const analyzeTaskPhoto = onDocumentUpdated(
   async (event) => {
   const newData = event.data?.after.data();
   const oldData = event.data?.before.data();
+  const logger = new TracedLogger(createTraceContext("analyzeTaskPhoto"));
 
   if (!newData || !oldData) return;
 
@@ -128,12 +131,12 @@ export const analyzeTaskPhoto = onDocumentUpdated(
     const taskId = event.params.taskId;
     const childId = event.params.childId;
 
-    functions.logger.info(`Starting AI analysis for task ${taskId} (child: ${childId})`);
+    logger.info(`Starting AI analysis for task ${taskId} (child: ${childId})`);
 
     // Validate photoUrl is a Firebase Storage URL to prevent SSRF/injection
     const validStorageUrl = /^https:\/\/firebasestorage\.googleapis\.com\//;
     if (!validStorageUrl.test(newData.photoUrl)) {
-      functions.logger.error(`Invalid photoUrl for task ${taskId}: not a Firebase Storage URL`);
+      logger.error(`Invalid photoUrl for task ${taskId}: not a Firebase Storage URL`);
       return;
     }
 
@@ -144,11 +147,11 @@ export const analyzeTaskPhoto = onDocumentUpdated(
       try {
         analysis = await analyzeWithGemini(geminiKey, newData.photoUrl, newData.description || "");
       } catch (error) {
-        functions.logger.warn(`Gemini analysis failed for task ${taskId}, using fallback:`, error);
+        logger.warn(`Gemini analysis failed for task ${taskId}, using fallback:`, { error: String(error) });
         analysis = buildFallbackAnalysis();
       }
     } else {
-      functions.logger.info("GEMINI_API_KEY not set – using fallback analysis.");
+      logger.info("GEMINI_API_KEY not set – using fallback analysis.");
       analysis = buildFallbackAnalysis();
     }
 
@@ -156,9 +159,9 @@ export const analyzeTaskPhoto = onDocumentUpdated(
       await event.data?.after.ref.update({
         aiAnalysis: { ...analysis, analyzedAt: admin.firestore.FieldValue.serverTimestamp() },
       });
-      functions.logger.info(`AI analysis completed for task ${taskId}`);
+      logger.info(`AI analysis completed for task ${taskId}`);
     } catch (error) {
-      functions.logger.error("Failed to update task with AI analysis:", error);
+      logger.error("Failed to update task with AI analysis:", error);
     }
   }
 });
@@ -253,16 +256,17 @@ export const onTaskStatusChange = functions.firestore
   .onUpdate(async (change, context) => {
     const newValue = change.after.data();
     const previousValue = change.before.data();
+    const logger = new TracedLogger(createTraceContext("onTaskStatusChange"));
 
     if (!newValue || !previousValue) {
-      functions.logger.warn(`Task update ${context.params.taskId} has missing before/after data. Skipping notification.`);
+      logger.warn(`Task update ${context.params.taskId} has missing before/after data. Skipping notification.`);
       return;
     }
 
     if (newValue.status === "pending_approval" && previousValue.status !== "pending_approval") {
       const masterImei = newValue.masterImei;
       if (!masterImei) {
-        functions.logger.warn("No masterImei found for this task. Cannot send notification.");
+        logger.warn("No masterImei found for this task. Cannot send notification.");
         return;
       }
 
@@ -270,7 +274,7 @@ export const onTaskStatusChange = functions.firestore
       const fcmToken = masterDoc.data()?.fcmToken;
 
       if (!fcmToken) {
-        functions.logger.warn(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
+        logger.warn(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
         return;
       }
 
@@ -288,9 +292,9 @@ export const onTaskStatusChange = functions.firestore
 
       try {
         await sendFcmWithRetry(message);
-        functions.logger.info(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
+        logger.info(`Notification sent to master ${masterImei} for task ${context.params.taskId}`);
       } catch (error) {
-        functions.logger.error("Error sending notification:", error);
+        logger.error("Error sending notification:", error);
       }
 
       return;
@@ -303,7 +307,7 @@ export const onTaskStatusChange = functions.firestore
       const childFcmToken = childDoc.data()?.fcmToken;
 
       if (!childFcmToken) {
-        functions.logger.warn(`Child ${childId} does not have an FCM token. Cannot send review notification.`);
+        logger.warn(`Child ${childId} does not have an FCM token. Cannot send review notification.`);
         return;
       }
 
@@ -327,9 +331,9 @@ export const onTaskStatusChange = functions.firestore
 
       try {
         await sendFcmWithRetry(reviewMessage);
-        functions.logger.info(`Review notification sent to child ${childId} for task ${context.params.taskId}`);
+        logger.info(`Review notification sent to child ${childId} for task ${context.params.taskId}`);
       } catch (error) {
-        functions.logger.error("Error sending review notification:", error);
+        logger.error("Error sending review notification:", error);
       }
     }
   });
