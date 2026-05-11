@@ -32,30 +32,47 @@ jobs:
       - name: Materialize Android release matrix dry-run evidence
         run: python scripts/run_android_release_matrix.py --profile smoke
 
+      - name: Show Android matrix dry-run diagnostics
+        if: always()
+        run: |
+          echo "QA artifact tree:"
+          find build/qa-artifacts/android-release-matrix -maxdepth 3 -type f | sort || true
+          echo "Latest summary:"
+          cat build/qa-artifacts/android-release-matrix/latest-summary.json || true
+          echo "First manifest:"
+          find build/qa-artifacts/android-release-matrix -name manifest.json | sort | head -n 1 | xargs -r cat || true
+
       - name: Validate Android release matrix evidence
         run: python scripts/validate_android_release_matrix_evidence.py --allow-dry-run
+
+      - name: Show Android matrix validation summary
+        if: always()
+        run: cat build/qa-artifacts/android-release-matrix/validation-summary.json || true
 
       - name: Generate release evidence package
         run: python scripts/export_release_evidence.py
 
       - name: List generated artifacts
+        if: always()
         run: |
           echo "Generated release evidence files:"
           find build/qa-artifacts -maxdepth 4 -type f | sort || true
-          find build/release-evidence -maxdepth 4 -type f | sort
+          find build/release-evidence -maxdepth 4 -type f | sort || true
 
       - name: Upload Android matrix evidence artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-release-matrix-evidence
           path: build/qa-artifacts/android-release-matrix
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload release evidence artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: release-evidence
           path: build/release-evidence
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
