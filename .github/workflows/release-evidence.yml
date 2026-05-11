@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   export-release-evidence:
@@ -26,38 +25,21 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Build Android release matrix plan
-        run: python scripts/build_android_release_matrix_plan.py
-
-      - name: Materialize Android release matrix dry-run evidence
-        run: python scripts/run_android_release_matrix.py --profile smoke
-
-      - name: Show Android matrix dry-run diagnostics
-        if: always()
+      - name: Run release evidence pipeline
+        shell: bash
         run: |
-          echo "QA artifact tree:"
-          find build/qa-artifacts/android-release-matrix -maxdepth 3 -type f | sort || true
-          echo "Latest summary:"
-          cat build/qa-artifacts/android-release-matrix/latest-summary.json || true
-          echo "First manifest:"
-          find build/qa-artifacts/android-release-matrix -name manifest.json | sort | head -n 1 | xargs -r cat || true
-
-      - name: Validate Android release matrix evidence
-        run: python scripts/validate_android_release_matrix_evidence.py --allow-dry-run
-
-      - name: Show Android matrix validation summary
-        if: always()
-        run: cat build/qa-artifacts/android-release-matrix/validation-summary.json || true
-
-      - name: Generate release evidence package
-        run: python scripts/export_release_evidence.py
-
-      - name: List generated artifacts
-        if: always()
-        run: |
-          echo "Generated release evidence files:"
-          find build/qa-artifacts -maxdepth 4 -type f | sort || true
-          find build/release-evidence -maxdepth 4 -type f | sort || true
+          set -euxo pipefail
+          python --version
+          pwd
+          ls -la
+          test -f scripts/build_android_release_matrix_plan.py
+          test -f scripts/run_android_release_matrix.py
+          test -f scripts/validate_android_release_matrix_evidence.py
+          test -f scripts/export_release_evidence.py
+          python scripts/build_android_release_matrix_plan.py
+          python scripts/run_android_release_matrix.py --profile smoke
+          python scripts/validate_android_release_matrix_evidence.py --allow-dry-run
+          python scripts/export_release_evidence.py
 
       - name: Upload Android matrix evidence artifact
         if: always()
