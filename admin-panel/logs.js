@@ -267,11 +267,15 @@ function buildDetailsView(logData, revealPii) {
 /**
  * Show log details in modal
  */
+let currentLogData = null;
+
 function showDetails(logData) {
+    currentLogData = logData;
     const modal = document.getElementById('detailsModal');
     const detailsElement = document.getElementById('logDetails');
 
-    // Inject (or reuse) PII reveal toggle right above the <pre> element
+    // Inject the PII reveal toggle exactly once; subsequent calls just reset its state.
+    // Der Change-Handler liest currentLogData aus dem Modul-Scope, daher kein Rebind nötig.
     let toggleWrapper = document.getElementById('logPiiToggleWrapper');
     if (!toggleWrapper) {
         toggleWrapper = document.createElement('label');
@@ -286,23 +290,17 @@ function showDetails(logData) {
         toggleWrapper.appendChild(text);
         detailsElement.parentNode.insertBefore(toggleWrapper, detailsElement);
         cb.addEventListener('change', () => {
-            detailsElement.textContent = buildDetailsView(logData, cb.checked);
-            try {
-                if (cb.checked && firebase?.auth?.().currentUser) {
-                    console.info('audit-log: PII reveal toggled by', firebase.auth().currentUser.uid);
-                }
-            } catch (_) { /* noop */ }
+            detailsElement.textContent = buildDetailsView(currentLogData, cb.checked);
+            if (cb.checked) {
+                try {
+                    const uid = firebase?.auth?.().currentUser?.uid;
+                    if (uid) console.info('audit-log: PII reveal toggled by', uid);
+                } catch (_) { /* noop */ }
+            }
         });
     } else {
-        // Reset toggle when reopening modal for a different entry
         const cb = document.getElementById('logPiiToggle');
         if (cb) cb.checked = false;
-        // Re-bind change handler against new logData
-        const fresh = cb.cloneNode(true);
-        cb.parentNode.replaceChild(fresh, cb);
-        fresh.addEventListener('change', () => {
-            detailsElement.textContent = buildDetailsView(logData, fresh.checked);
-        });
     }
 
     detailsElement.textContent = buildDetailsView(logData, false);
