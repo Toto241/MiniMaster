@@ -5,10 +5,11 @@
 > [!NOTE]
 > Current status: actively maintained prototype with production-oriented backend hardening.
 > Core flows are usable; some enforcement capabilities are intentionally still in rollout.
+> Release readiness is tracked through explicit QA, CI, legal, Firebase/App Check and Android device-evidence gates.
 
 [![CI/CD Status](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml)
 
-Mini-Master is a comprehensive parental control solution for Android with a Firebase backend. It consists of two Android apps (`masterApp` for parents, `childApp` for children) plus a lightweight web control panel. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
+Mini-Master is a comprehensive parental control solution for Android with a Firebase backend. It consists of two Android apps (`masterApp` for parents, `childApp` for children), web/PWA panels, a lightweight operator/admin panel and a Python-powered local operator API. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
 
 ## Table of Contents
 
@@ -20,6 +21,7 @@ Mini-Master is a comprehensive parental control solution for Android with a Fire
 - [Usage](#usage)
 - [Documentation](#documentation)
 - [Testing](#testing)
+- [Release Readiness](#release-readiness)
 - [License](#license)
 
 ---
@@ -39,7 +41,8 @@ The Mini-Master suite is designed to give parents control over their children's 
 - **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
 - **First-Start Language Selection:** Both Android apps require language selection on first launch and persist the selected locale.
 - **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
-- **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, and view system statistics.
+- **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, review QA evidence and track release blockers.
+- **Python Operator API:** Local operator service for QA catalog, commissioning, emulator visibility and approved command execution.
 - **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
 - **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
 
@@ -47,18 +50,25 @@ The Mini-Master suite is designed to give parents control over their children's 
 
 The repository is organized as follows:
 
-- **`/` (Root):** Contains the TypeScript Firebase Functions backend (`index.ts`, `firebase.ts`) and project configuration.
-- **`/masterApp`:** The Android application for parents (Kotlin, Jetpack Compose, Hilt).
-- **`/childApp`:** The Android application for children (Kotlin, Jetpack Compose, Hilt). Includes the `MiniMasterAccessibilityService` for enforcement.
-- **`/web-control`:** A static web application for parental control.
-- **`/test`:** Backend unit and integration tests.
-- **`/docs`:** Additional documentation and architecture guides.
+- **`/` (Root):** TypeScript Firebase Functions backend (`index.ts`, `firebase.ts`), Firebase/Gradle configuration and project-level scripts.
+- **`/src`:** Cloud Functions implementation modules for auth, pairing, device control, tasks, subscriptions, support, legal, admin, decisioning, B2B, affiliate, resilience, validation, rate limiting and error handling.
+- **`/masterApp`:** Android application for parents (Kotlin, Jetpack Compose, Hilt).
+- **`/childApp`:** Android application for children (Kotlin, Jetpack Compose, Hilt). Includes enforcement via `MiniMasterAccessibilityService`.
+- **`/web-control`:** Static web application for parental control.
+- **`/admin-panel`:** Operator/admin dashboard including the lightweight `simple.html` operator console.
+- **`/python_admin`:** Local Python web application and operator API for admin-panel delivery, QA, commissioning and command orchestration.
+- **`/desktop`:** Electron launcher for local PC panels.
+- **`/scripts`:** Test, security, Android, QA, CI and release-gate automation.
+- **`/qa`:** Machine-readable QA catalogs and release-matrix definitions.
+- **`/test`:** Backend unit, integration and Firebase rules tests.
+- **`/docs`:** Architecture, legal, release, QA and implementation documentation.
 
 ## Technology Stack
 
-- **Backend:** TypeScript, Node.js, Firebase (Cloud Functions, Firestore, Authentication, Storage, Messaging).
+- **Backend:** TypeScript, Node.js 22, Firebase (Cloud Functions, Firestore, Authentication, Storage, Messaging).
 - **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager.
 - **Web Frontend:** HTML5, CSS3, Vanilla JavaScript.
+- **Operator Tooling:** Python local API, PowerShell/ADB/Gradle command orchestration, Electron desktop launcher.
 
 ---
 
@@ -70,6 +80,8 @@ The repository is organized as follows:
 - **Firebase Account:** A Google account to create a Firebase project.
 - **Firebase CLI:** Install globally via `npm install -g firebase-tools`.
 - **Android Studio:** Latest version with Android SDK and JDK 17.
+- **Python:** Python 3 for local operator tooling and QA orchestration.
+- **PowerShell:** Required for Windows release-gate and commissioning helper scripts.
 
 ### Firebase Setup
 
@@ -122,6 +134,32 @@ Notes:
 2.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration from the Firebase Console.
 3.  Serve the directory using a simple HTTP server (e.g., `python -m http.server 8000`).
 
+### Operator Panel Setup
+
+Static mode:
+
+```bash
+python -m http.server 8080
+```
+
+Then open:
+
+```text
+http://localhost:8080/admin-panel/simple.html
+```
+
+Python operator mode:
+
+```bash
+python3 python_admin/app.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8765/admin-panel/simple.html
+```
+
 ### Desktop Launcher Setup (PC)
 
 1.  Install dependencies in repository root: `npm install`
@@ -139,6 +177,7 @@ Notes:
 2.  **Setup Child Device:** Follow the onboarding flow on the child device and grant the crucial **Accessibility Service** permission for app blocking to work.
 3.  **Select App Language:** On first launch of each Android app, select the preferred app language before continuing.
 4.  **Management:** Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
+5.  **Operator Oversight:** Use the operator panel to review QA evidence, release blockers, support access, legal status and commissioning state.
 
 ### Supported Android App Languages
 
@@ -156,6 +195,7 @@ Comprehensive architecture and setup documentation is available in the `docs/` d
 - **[Legacy Auth Inventory](docs/LEGACY_AUTH_INVENTORY.md):** Vollständiges Inventar aller secretKey/IMEI-Endpunkte mit Freeze-Richtlinie.
 - **[Auth Migration Plan](docs/AUTH_MIGRATION_PLAN.md):** Phasenplan zur Migration von secretKey/IMEI auf Firebase Auth.
 - **[Quality Review 2026-03-17](docs/QUALITY_REVIEW_2026-03-17.md):** Consolidated status for code analysis, tests, GUI checks, and configuration validation.
+- **[Repository Folder Implementation Plan](docs/REPOSITORY_FOLDER_IMPLEMENTATION_PLAN_2026-05-11.md):** Current folder-by-folder implementation plan and release-readiness backlog.
 - **[Language Global Roadmap](docs/LANGUAGE_GLOBAL_ROADMAP.md):** Global language prioritization, rollout waves, and locale strategy.
 - **[First-Start Language Implementation](docs/LANGUAGE_FIRST_START_IMPLEMENTATION.md):** Technical details for mandatory language selection on first launch.
 - **[Language Validation Report 2026-03-18](docs/LANGUAGE_VALIDATION_REPORT_2026-03-18.md):** Deep integration analysis and current validation outcomes.
@@ -174,7 +214,7 @@ Each source file is also thoroughly documented.
 
 The project has a comprehensive test suite to ensure code quality and stability.
 
-- **Backend:** Run `npm test` to execute over 100 unit and integration tests for all Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
+- **Backend:** Run `npm test` to execute unit and integration tests for Cloud Functions and business logic. The command `npm run lint` checks for code style issues.
 - **Central Python test automation:** Run `python scripts/test_automation.py --group backend`, `python scripts/test_automation.py --group android`, or `python scripts/test_automation.py --group all` for a single inventory- and prerequisite-aware entry point. Results are written to `build/test-automation/latest-summary.json`.
 - **Android Lint (blocking for errors):** `./scripts/run-android-checks.sh lint`
 - **Android Unit Tests:** `./scripts/run-android-checks.sh :masterApp:testDebugUnitTest :childApp:testDebugUnitTest`
@@ -196,7 +236,7 @@ For repository validation after changes, run this sequence:
 
 ### Python Test Runner
 
-The repository now includes a Python-based orchestrator that inventories and runs the main automated suites across backend, Android, and connected-device scopes.
+The repository includes a Python-based orchestrator that inventories and runs the main automated suites across backend, Android, and connected-device scopes.
 
 - `python scripts/test_automation.py --list` lists all known suites.
 - `python scripts/test_automation.py --inventory` prints the current test inventory.
@@ -207,6 +247,25 @@ The repository now includes a Python-based orchestrator that inventories and run
 Optional: provide security CI inputs via `.security-test.env` or `scripts/security-test.env` (template: `scripts/security-test.env.template`) so `backend-security` can run without ad-hoc shell exports.
 
 Suites with missing external prerequisites are marked as skipped by default with a concrete reason. Use `--strict-skips` if skipped suites should fail the run.
+
+## Release Readiness
+
+Release readiness is intentionally evidence-based. A release is not considered ready only because scripts exist; each blocking area needs current evidence.
+
+Blocking categories:
+
+- GitHub Actions and CodeQL/Code Scanning availability
+- backend build, lint, Jest, Firebase rules and security tests
+- Android lint, unit tests and instrumentation builds
+- Android 10-16 two-device smoke/standard coverage
+- Firebase/App Check/secrets readiness
+- legacy-auth cutover status
+- legal, consent and store-readiness sign-off
+- release evidence manifest/export package
+
+Current known limitation:
+
+- Android matrix dry-run evidence is a planning/structure check and must not be treated as a real device pass until emulator/device execution is wired and captured.
 
 ## License
 
