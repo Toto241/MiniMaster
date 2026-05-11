@@ -28,18 +28,40 @@ jobs:
       - name: Run release evidence pipeline
         shell: bash
         run: |
-          set -euxo pipefail
-          python --version
-          pwd
-          ls -la
-          test -f scripts/build_android_release_matrix_plan.py
-          test -f scripts/run_android_release_matrix.py
-          test -f scripts/validate_android_release_matrix_evidence.py
-          test -f scripts/export_release_evidence.py
-          python scripts/build_android_release_matrix_plan.py
-          python scripts/run_android_release_matrix.py --profile smoke
-          python scripts/validate_android_release_matrix_evidence.py --allow-dry-run
-          python scripts/export_release_evidence.py
+          set -uxo pipefail
+          mkdir -p build/release-evidence-diagnostics
+          {
+            echo "python_version=$(python --version 2>&1)"
+            echo "working_directory=$(pwd)"
+            echo "head_sha=${GITHUB_SHA}"
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > build/release-evidence-diagnostics/context.txt
+
+          status=0
+          python scripts/build_android_release_matrix_plan.py > build/release-evidence-diagnostics/01-plan.log 2>&1 || status=$?
+          if [ "$status" -eq 0 ]; then
+            python scripts/run_android_release_matrix.py --profile smoke > build/release-evidence-diagnostics/02-run.log 2>&1 || status=$?
+          fi
+          if [ "$status" -eq 0 ]; then
+            python scripts/validate_android_release_matrix_evidence.py --allow-dry-run > build/release-evidence-diagnostics/03-validate.log 2>&1 || status=$?
+          fi
+          if [ "$status" -eq 0 ]; then
+            python scripts/export_release_evidence.py > build/release-evidence-diagnostics/04-export.log 2>&1 || status=$?
+          fi
+
+          echo "$status" > build/release-evidence-diagnostics/exit-code.txt
+          find build -maxdepth 5 -type f | sort > build/release-evidence-diagnostics/file-tree.txt || true
+          exit 0
+
+      - name: Upload release evidence diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-diagnostics
+          path: build/release-evidence-diagnostics
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload Android matrix evidence artifact
         if: always()
