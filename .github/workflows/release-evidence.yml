@@ -35,13 +35,28 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Build Android release matrix plan
+        run: npm run plan:android-release-matrix
+
+      - name: Materialize Android release matrix dry-run evidence
+        run: npm run run:android-release-matrix:smoke
+
       - name: Generate release evidence package
         run: npm run evidence:release
 
       - name: List generated artifacts
         run: |
           echo "Generated release evidence files:"
-          find build/release-evidence -maxdepth 3 -type f | sort
+          find build/qa-artifacts -maxdepth 4 -type f | sort || true
+          find build/release-evidence -maxdepth 4 -type f | sort
+
+      - name: Upload Android matrix evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-matrix-evidence
+          path: build/qa-artifacts/android-release-matrix
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload release evidence artifact
         uses: actions/upload-artifact@v4
