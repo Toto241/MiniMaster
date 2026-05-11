@@ -96,6 +96,9 @@ def validate_evidence(matrix_file: Path, evidence_root: Path, *, allow_dry_run: 
         checked_manifests += 1
         errors.extend(validate_manifest(manifest_path, required_fields, allow_dry_run=allow_dry_run))
 
+    if checked_manifests <= 0:
+        errors.append("no matrix manifest was found; run the matrix runner before validation")
+
     summary_path = evidence_root / "latest-summary.json"
     if not summary_path.exists():
         errors.append(f"missing latest summary: {summary_path}")
@@ -104,6 +107,8 @@ def validate_evidence(matrix_file: Path, evidence_root: Path, *, allow_dry_run: 
             summary = load_json(summary_path)
             if int(summary.get("totalRuns", 0)) <= 0:
                 errors.append(f"{summary_path}: totalRuns must be greater than zero")
+            if checked_manifests > 0 and int(summary.get("totalRuns", 0)) < checked_manifests:
+                errors.append(f"{summary_path}: totalRuns is lower than checked manifests")
         except (OSError, json.JSONDecodeError) as exc:
             errors.append(f"{summary_path}: cannot read summary: {exc}")
 
