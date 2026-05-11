@@ -41,6 +41,9 @@ jobs:
       - name: Materialize Android release matrix dry-run evidence
         run: npm run run:android-release-matrix:smoke
 
+      - name: Validate Android release matrix evidence
+        run: npm run validate:android-release-matrix
+
       - name: Generate release evidence package
         run: npm run evidence:release
 
