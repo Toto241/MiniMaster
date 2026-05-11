@@ -140,8 +140,12 @@ def execute_run(run: dict[str, Any], output_root: Path, *, dry_run: bool, requir
         ],
         "blockingFailures": blocking_failures,
     }
-    manifest_sha = write_text(run_dir / "manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+    manifest_body = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+    manifest_sha = write_text(run_dir / "manifest.json", manifest_body)
     manifest["manifestSha256"] = manifest_sha
+    manifest["artifacts"].append(
+        {"path": str((run_dir / "manifest.json").relative_to(REPO_ROOT)), "sha256": manifest_sha, "self": True}
+    )
     write_text(run_dir / "manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     return manifest
 
