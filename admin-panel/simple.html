@@ -3,32 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MiniMaster Admin Panel (Light)</title>
+  <title>MiniMaster Operator Panel</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="app-header">
-    <h1>MiniMaster Admin Panel</h1>
-    <nav class="app-nav">
+    <div>
+      <p class="eyebrow">MiniMaster Operator Console</p>
+      <h1>Admin-Panel & Start-Panel</h1>
+      <p class="header-subtitle">Aktuelle Lageübersicht für QA, Release, Commissioning, Support und Datenschutz.</p>
+    </div>
+    <nav class="app-nav" aria-label="Hauptnavigation">
       <ul>
-        <li><a href="#" data-page="overview">Übersicht</a></li>
-        <li><a href="#" data-page="users">Benutzer</a></li>
-        <li><a href="#" data-page="devices">Geräte</a></li>
-        <li><a href="#" data-page="subscriptions">Abos</a></li>
-        <li><a href="#" data-page="pairing">Kopplung</a></li>
-        <li><a href="#" data-page="support">Support</a></li>
-        <li><a href="#" data-page="errors">Fehler</a></li>
-        <li><a href="#" data-page="compliance">Compliance</a></li>
-        <li><a href="#" data-page="qa">QA</a></li>
-        <li><a href="#" data-page="admin">Administration</a></li>
-        <li><a href="#" data-page="ai">KI</a></li>
-        <li><a href="#" data-page="legal">Recht</a></li>
+        <li><a href="#" data-page="start">Start</a></li>
+        <li><a href="#" data-page="qa">Qualitätssicherung & Tests</a></li>
+        <li><a href="#" data-page="release">Release & Readiness</a></li>
+        <li><a href="#" data-page="commissioning">Einrichtung & Commissioning</a></li>
+        <li><a href="#" data-page="support">Betrieb & Support</a></li>
+        <li><a href="#" data-page="legal">Recht & Datenschutz</a></li>
+        <li><a href="#" data-page="commands">Befehlszentrale</a></li>
       </ul>
     </nav>
   </header>
-  <main id="content" class="app-content">
-    <p>Wähle einen Bereich im Menü aus, um zu starten.</p>
+  <main id="content" class="app-content" aria-live="polite">
+    <p>Start-Panel wird geladen …</p>
   </main>
   <script type="module" src="app-simple.js"></script>
 </body>
