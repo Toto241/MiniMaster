@@ -23,60 +23,15 @@ jobs:
       - name: Run release evidence pipeline
         shell: bash
         run: |
-          set -uxo pipefail
-          mkdir -p build/release-evidence-diagnostics
+          set -euo pipefail
           PYTHON_BIN="python3"
           if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
             PYTHON_BIN="python"
           fi
-          {
-            echo "python_bin=${PYTHON_BIN}"
-            echo "python_version=$($PYTHON_BIN --version 2>&1)"
-            echo "working_directory=$(pwd)"
-            echo "head_sha=${GITHUB_SHA}"
-            echo "event_name=${GITHUB_EVENT_NAME}"
-            echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > build/release-evidence-diagnostics/context.txt
-
-          status=0
-          "$PYTHON_BIN" scripts/build_android_release_matrix_plan.py > build/release-evidence-diagnostics/01-plan.log 2>&1 || status=$?
-          if [ "$status" -eq 0 ]; then
-            "$PYTHON_BIN" scripts/run_android_release_matrix.py --profile smoke > build/release-evidence-diagnostics/02-run.log 2>&1 || status=$?
-          fi
-          if [ "$status" -eq 0 ]; then
-            "$PYTHON_BIN" scripts/validate_android_release_matrix_evidence.py --allow-dry-run > build/release-evidence-diagnostics/03-validate.log 2>&1 || status=$?
-          fi
-          if [ "$status" -eq 0 ]; then
-            "$PYTHON_BIN" scripts/export_release_evidence.py > build/release-evidence-diagnostics/04-export.log 2>&1 || status=$?
-          fi
-
-          echo "$status" > build/release-evidence-diagnostics/exit-code.txt
-          find build -maxdepth 5 -type f | sort > build/release-evidence-diagnostics/file-tree.txt || true
-          exit 0
-
-      - name: Upload release evidence diagnostics artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-evidence-diagnostics
-          path: build/release-evidence-diagnostics
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload Android matrix evidence artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-matrix-evidence
-          path: build/qa-artifacts/android-release-matrix
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload release evidence artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-evidence
-          path: build/release-evidence
-          if-no-files-found: warn
-          retention-days: 14
+          "$PYTHON_BIN" --version
+          "$PYTHON_BIN" scripts/build_android_release_matrix_plan.py
+          "$PYTHON_BIN" scripts/run_android_release_matrix.py --profile smoke
+          "$PYTHON_BIN" scripts/validate_android_release_matrix_evidence.py --allow-dry-run
+          "$PYTHON_BIN" scripts/export_release_evidence.py
+          echo "Release evidence pipeline completed."
+          find build -maxdepth 5 -type f | sort || true
