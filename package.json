@@ -23,6 +23,7 @@
     "plan:admin-qa:gate": "python scripts/admin_panel_qa_plan.py --fail-on-p0-open",
     "guard:pr152": "python scripts/pr152_selective_guard.py",
     "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand && npm run analyze:admin-qa && npm run plan:admin-qa && npm run guard:pr152",
+    "evidence:release": "python scripts/export_release_evidence.py",
     "ci:revalidate": "pwsh ./scripts/revalidate-release-gates.ps1",
     "ci:revalidate:rerun": "pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed"
   },
