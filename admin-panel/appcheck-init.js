@@ -1,28 +1,18 @@
 /**
  * Firebase App Check Initialization for Admin Panel
  *
- * This file provides an example of how to initialize Firebase App Check
- * in the Admin Panel application.
+ * Aktiviert reCAPTCHA-v3-basiertes App Check, sobald app.js Firebase
+ * initialisiert hat. Da app.js den firebase.initializeApp()-Aufruf erst
+ * im DOMContentLoaded-Handler ausführt, wartet dieses Skript per Event +
+ * kurzer Polling-Phase auf den Default-App.
  *
- * To enable App Check:
- * 1. Add the App Check SDK to index.html:
- *    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
- *
- * 2. Include this file in index.html:
- *    <script src="appcheck-init.js"></script>
- *
- * 3. Enable reCAPTCHA v3 in Firebase Console:
- *    - Go to Build > App Check
- *    - Register your web app
- *    - Select reCAPTCHA v3 as the provider
- *    - Get your reCAPTCHA site key
- *
- * 4. Replace 'YOUR_RECAPTCHA_V3_SITE_KEY' below with your actual site key
- *
- * For more details, see docs/FIREBASE_APP_CHECK_SETUP.md
+ * Konfiguration:
+ * - window.MINIMASTER_APP_CHECK_SITE_KEY (Bootstrap-Dialog) oder
+ * - localStorage.minimasterAppCheckSiteKey
+ * Details: docs/FIREBASE_APP_CHECK_SETUP.md
  */
 
-(function() {
+(function () {
     const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
     let storageSiteKey = null;
     try {
@@ -44,24 +34,36 @@
         return;
     }
 
-    if (typeof firebase === "undefined") {
-        console.error("App Check: Firebase Compat-SDK nicht geladen – Skript-Reihenfolge in index.html prüfen.");
-        return;
+    let activated = false;
+
+    function tryActivate() {
+        if (activated) return true;
+        if (typeof firebase === "undefined" || typeof firebase.appCheck !== "function") return false;
+        if (!firebase.apps || firebase.apps.length === 0) return false;
+        try {
+            firebase.appCheck().activate(siteKey, true);
+            activated = true;
+            console.log("Firebase App Check aktiviert (admin-panel).");
+            return true;
+        } catch (error) {
+            console.error("App Check Aktivierung fehlgeschlagen:", error);
+            activated = true;
+            return true;
+        }
     }
 
-    if (typeof firebase.appCheck !== "function") {
-        console.error(
-            "App Check: firebase.appCheck() nicht verfügbar. " +
-            "firebase-app-check-compat.js fehlt im <head>."
-        );
-        return;
-    }
+    if (tryActivate()) return;
 
-    try {
-        const appCheck = firebase.appCheck();
-        appCheck.activate(siteKey, true);
-        console.log("Firebase App Check aktiviert (admin-panel).");
-    } catch (error) {
-        console.error("App Check Aktivierung fehlgeschlagen:", error);
-    }
+    const start = Date.now();
+    const intervalId = setInterval(() => {
+        if (tryActivate() || Date.now() - start > 15000) {
+            clearInterval(intervalId);
+            if (!activated) {
+                console.warn(
+                    "App Check: Firebase wurde innerhalb von 15 s nicht initialisiert. " +
+                    "Site-Key vorhanden, aber firebase.initializeApp() blieb aus."
+                );
+            }
+        }
+    }, 250);
 })();
