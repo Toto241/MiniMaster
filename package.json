@@ -24,6 +24,7 @@
     "plan:android-release-matrix": "python scripts/build_android_release_matrix_plan.py",
     "run:android-release-matrix": "python scripts/run_android_release_matrix.py",
     "run:android-release-matrix:smoke": "python scripts/run_android_release_matrix.py --profile smoke",
+    "validate:android-release-matrix": "python scripts/validate_android_release_matrix_evidence.py --allow-dry-run",
     "guard:pr152": "python scripts/pr152_selective_guard.py",
     "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand && npm run analyze:admin-qa && npm run plan:admin-qa && npm run guard:pr152",
     "evidence:release": "python scripts/export_release_evidence.py",
