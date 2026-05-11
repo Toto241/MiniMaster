@@ -21,31 +21,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Build Android release matrix plan
-        run: npm run plan:android-release-matrix
+        run: python scripts/build_android_release_matrix_plan.py
 
       - name: Materialize Android release matrix dry-run evidence
-        run: npm run run:android-release-matrix:smoke
+        run: python scripts/run_android_release_matrix.py --profile smoke
 
       - name: Validate Android release matrix evidence
-        run: npm run validate:android-release-matrix
+        run: python scripts/validate_android_release_matrix_evidence.py --allow-dry-run
 
       - name: Generate release evidence package
-        run: npm run evidence:release
+        run: python scripts/export_release_evidence.py
 
       - name: List generated artifacts
         run: |
