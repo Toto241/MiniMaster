@@ -221,7 +221,7 @@ export function withErrorHandling<T, R>(
       await logStructuredError(error, {
         functionName,
         callableContext: context,
-        metadata: { dataKeys: Object.keys(data as object) },
+        metadata: { dataKeys: data != null ? Object.keys(data as object) : [] },
       });
 
       // Re-throw HttpsErrors as-is, wrap others

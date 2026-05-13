@@ -117,7 +117,7 @@ function normalizeLocale(raw: unknown): string {
   if (!/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})*$/.test(value)) {
     throw new functions.https.HttpsError("invalid-argument", "locale must be a valid BCP-47 language tag.");
   }
-  return value.replace("_", "-");
+  return value.replace(/_/g, "-");
 }
 
 function normalizePolicyType(raw: unknown): PolicyType {
@@ -467,14 +467,19 @@ export const markLegalReconsentRequired = functions.https.onCall(
       .where("locale", "==", locale)
       .get();
 
-    const batch = db().batch();
-    snapshot.docs.forEach((doc) => {
-      batch.update(doc.ref, {
-        requiresReconsent: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const BATCH_SIZE = 499;
+    const docs = snapshot.docs;
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+      const batch = db().batch();
+      chunk.forEach((doc) => {
+        batch.update(doc.ref, {
+          requiresReconsent: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       });
-    });
-    await batch.commit();
+      await batch.commit();
+    }
 
     return { success: true, updatedCount: snapshot.size, scope: "country_locale" };
   }

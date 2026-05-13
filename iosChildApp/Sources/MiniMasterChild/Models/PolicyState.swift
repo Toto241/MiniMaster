@@ -67,6 +67,14 @@ struct AnyCodable: Codable {
         if let d = try? container.decode(Double.self) { value = d; return }
         if let b = try? container.decode(Bool.self)   { value = b; return }
         if let s = try? container.decode(String.self) { value = s; return }
+        if let arr = try? container.decode([AnyCodable].self) {
+            value = arr.map(\.value)
+            return
+        }
+        if let dict = try? container.decode([String: AnyCodable].self) {
+            value = dict.mapValues(\.value)
+            return
+        }
         value = NSNull()
     }
 

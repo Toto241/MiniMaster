@@ -69,6 +69,7 @@ export class DecisioningRepository {
     const snapshot = await this.database.collection(DECISIONING_COLLECTIONS.events)
       .where("userId", "==", userId)
       .where("deviceId", "==", deviceId)
+      .orderBy("timestamp", "desc")
       .limit(limit)
       .get();
     return snapshot.docs.map((doc) => doc.data() as DeviceEventRecord);

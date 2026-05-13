@@ -1,6 +1,5 @@
 import Foundation
 import FirebaseFunctions
-import FirebaseFirestore
 import FirebaseMessaging
 
 /// Bidirectional control-plane for the iOS child device.
@@ -13,8 +12,13 @@ final class CrossPlatformSyncService: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var lastError: Error?
 
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
     private let client = CloudFunctionsClient()
-    private let db = Firestore.firestore()
     private let childId: String
     private var syncTimer: Timer?
     private var fcmToken: String?
@@ -133,6 +137,17 @@ final class CrossPlatformSyncService: ObservableObject {
             break
         default:
             print("[CrossPlatformSyncService] Unknown command type: \(command.type)")
+            do {
+                try await client.acknowledgeCommand(
+                    childId: childId,
+                    commandId: command.commandId,
+                    status: "failed",
+                    appliedAt: Date()
+                )
+            } catch {
+                lastError = error
+            }
+            return
         }
 
         // Acknowledge
@@ -172,8 +187,7 @@ final class CrossPlatformSyncService: ObservableObject {
     func publishHeartbeat() async {
         do {
             let payload: [String: Any] = [
-                "eventType": "heartbeat",
-                "timestamp": ISO8601DateFormatter().string(from: Date()),
+                "timestamp": Self.iso8601Formatter.string(from: Date()),
                 "batteryLevel": await getBatteryLevel(),
                 "networkType": getNetworkType()
             ]
@@ -193,7 +207,7 @@ final class CrossPlatformSyncService: ObservableObject {
             _ = try await Functions.functions().httpsCallable("publishDeviceEvent").call([
                 "childId": childId,
                 "eventType": "tamper_event",
-                "payload": ["reason": reason, "timestamp": ISO8601DateFormatter().string(from: Date())]
+                "payload": ["reason": reason, "timestamp": Self.iso8601Formatter.string(from: Date())]
             ])
         } catch {
             lastError = error

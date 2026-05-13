@@ -309,7 +309,7 @@ export const exportUserData = functions.https.onCall(
       };
 
       await AuditLogger.logSuccess(
-        "device.delete", context, `masters/${masterId}`, "user",
+        "gdpr.dsar_export", context, `masters/${masterId}`, "user",
         { action: "data_export", duration: Date.now() - startTime, traceId }
       );
 
@@ -485,16 +485,21 @@ export const triggerScheduledJob = functions.https.onCall(
         case "checkExpiredSubscriptions": {
           const subsSnapshot = await db().collection("subscriptions")
             .where("status", "==", "active").get();
-          let expired = 0;
           const now = admin.firestore.Timestamp.now();
-          for (const doc of subsSnapshot.docs) {
+          const expiredDocs = subsSnapshot.docs.filter((doc) => {
             const expiresAt = doc.data().expiresAt;
-            if (expiresAt && expiresAt.toMillis() < now.toMillis()) {
-              await doc.ref.update({ status: "expired", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-              expired++;
+            return expiresAt && expiresAt.toMillis() < now.toMillis();
+          });
+          const BATCH_SIZE = 499;
+          for (let i = 0; i < expiredDocs.length; i += BATCH_SIZE) {
+            const chunk = expiredDocs.slice(i, i + BATCH_SIZE);
+            const batch = db().batch();
+            for (const doc of chunk) {
+              batch.update(doc.ref, { status: "expired", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
             }
+            await batch.commit();
           }
-          return { success: true, jobName, duration: Date.now() - startTime, result: { checked: subsSnapshot.size, expired } };
+          return { success: true, jobName, duration: Date.now() - startTime, result: { checked: subsSnapshot.size, expired: expiredDocs.length } };
         }
 
         case "cleanupExpiredGrants": {

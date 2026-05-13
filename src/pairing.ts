@@ -186,21 +186,24 @@ export const validatePairingCode = functions.https.onCall(
       }
 
       const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
-        );
-      }
-
       const childDeviceRef = db().collection("children").doc(childId);
-      await childDeviceRef.set({
-        childImei: childId,
-        masterImei: masterId,
-        pairedAt: now,
-      }, { merge: true });
+
+      await db().runTransaction(async (tx) => {
+        const existingChildren = await db().collection("children")
+          .where("masterImei", "==", masterId).get();
+        if (existingChildren.size >= childLimit) {
+          throw new functions.https.HttpsError(
+            "resource-exhausted",
+            `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
+          );
+        }
+        tx.set(childDeviceRef, {
+          childImei: childId,
+          masterImei: masterId,
+          pairedAt: now,
+        }, { merge: true });
+      });
+
       await activateTrialIfPending(masterId, masterData);
       logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
 
@@ -296,6 +299,7 @@ export const validatePairingToken = functions.https.onCall(
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
+      await checkRateLimitShared(childId, "pairing.validate_token", 10, 15 * 60 * 1000);
 
       const pairingToken = validateString(data.pairingToken, "pairingToken", {
         required: true,
@@ -349,21 +353,24 @@ export const validatePairingToken = functions.https.onCall(
         );
       }
       const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
-        );
-      }
-
       const childDeviceRef = db().collection("children").doc(childId);
-      await childDeviceRef.set({
-        childImei: childId,
-        masterImei: masterId,
-        pairedAt: now,
+
+      await db().runTransaction(async (tx) => {
+        const existingChildren = await db().collection("children")
+          .where("masterImei", "==", masterId).get();
+        if (existingChildren.size >= childLimit) {
+          throw new functions.https.HttpsError(
+            "resource-exhausted",
+            `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
+          );
+        }
+        tx.set(childDeviceRef, {
+          childImei: childId,
+          masterImei: masterId,
+          pairedAt: now,
+        });
       });
+
       await activateTrialIfPending(masterId, masterData);
 
       await tokenRef.delete();

@@ -269,7 +269,7 @@ const setupChecklistItems = [
     { key: "android-apps", label: "Android-Apps registriert (Master + Child)" },
     { key: "ios-apps", label: "iOS-Apps registriert (Master + Child)" },
     { key: "apple-app-store-api", label: "Apple App Store Server API konfiguriert (JWT, Bundle ID, Environment)" },
-    { key: "ai-config", label: "KI-Provider konfiguriert (Google Gemini 3.0)" },
+    { key: "ai-config", label: "KI-Provider konfiguriert (Google Gemini 2.0)" },
     { key: "support-workflow", label: "Support-Ticket-Workflow getestet" },
     { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" },
     { key: "deploy-verified", label: "Deploy erfolgreich und Functions live" }
@@ -761,7 +761,9 @@ function renderCommandBuilderConfig(config) {
 
 function saveCommandBuilderConfig(showMessage = true) {
     const values = getCommandBuilderFormValues();
-    localStorage.setItem(COMMAND_BUILDER_STORAGE_KEY, JSON.stringify(values));
+    const toSave = { ...values };
+    delete toSave.firstAdminPassword;
+    localStorage.setItem(COMMAND_BUILDER_STORAGE_KEY, JSON.stringify(toSave));
     if (showMessage) {
         showNotification("Befehlszentrale gespeichert.", "success");
     }
@@ -820,8 +822,11 @@ async function copyTextToClipboard(text) {
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
     textarea.select();
-    document.execCommand("copy");
+    const success = document.execCommand("copy");
     document.body.removeChild(textarea);
+    if (!success) {
+        throw new Error("Kopieren nicht möglich. Bitte manuell kopieren (Strg+C).");
+    }
 }
 
 async function copyRenderedCommand(payload, mode) {
@@ -1445,7 +1450,11 @@ function ensurePythonAutomationSelectedTest() {
 }
 
 function openPythonAutomationProtocol(encodedTestId) {
-    pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
+    try {
+        pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
+    } catch {
+        pythonCommissioningSelectedTestId = encodedTestId || "";
+    }
     renderPythonAutomationProtocolEditor();
     scrollQaSection("qa-protocol-card");
 }
@@ -2103,7 +2112,7 @@ function renderPythonAutomationResult(run) {
                         <strong>${escapeHtml(item.title || "Aktion")}</strong><br />
                         ${escapeHtml(item.detail || "")}
                         <div class='setup-actions' style='margin-block-start: 8px'>
-                            <button class='btn btn-secondary btn-sm' onclick="${item.action || ""}">${escapeHtml(item.buttonLabel || "Öffnen")}</button>
+                            <button class='btn btn-secondary btn-sm' data-action="${(item.action || '').replace(/"/g, '&quot;')}">${escapeHtml(item.buttonLabel || "Öffnen")}</button>
                         </div>
                     </div>
                 `).join("")}
@@ -2175,6 +2184,17 @@ function renderPythonAutomationResult(run) {
         </section>
 
     `;
+    if (!window._adminActionListenerAttached) {
+        window._adminActionListenerAttached = true;
+        document.addEventListener('click', e => {
+            if (e.target.matches('[data-action]')) {
+                const fn = e.target.dataset.action;
+                if (fn) {
+                    try { new Function(fn)(); } catch(ex) { console.error(ex); }
+                }
+            }
+        });
+    }
     renderQaTestWorkspace();
 }
 
@@ -12440,7 +12460,7 @@ async function runFullSetupValidation() {
             check: "AI Secret Configuration",
             status: ai.geminiConfigured ? "ok" : "warn",
             message: ai.geminiConfigured
-                ? `Backend-KI konfiguriert (Gemini 3.0: ${Boolean(ai.geminiConfigured)}).`
+                ? `Backend-KI konfiguriert (Gemini 2.0: ${Boolean(ai.geminiConfigured)}).`
                 : "Keine produktiven KI-Secrets im Backend erkannt (GEMINI_API_KEY fehlt)."
         });
     } catch (error) {

@@ -124,8 +124,8 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       setStatus("ticket-auth-status", "Authentifiziere über sicheren Web-Link...", "");
       const redeemFn = functions.httpsCallable("redeemMasterWebBootstrapToken");
       const tokenResult = await redeemFn({ bootstrapToken });
-      clearMasterWebBootstrapTokenFromLocation();
       await auth.signInWithCustomToken(tokenResult.data.customToken);
+      clearMasterWebBootstrapTokenFromLocation();
       return true;
     }
 
@@ -204,7 +204,7 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
         return;
       }
       db = firebase.firestore(app);
-      functions = firebase.app("parent-panel-app").functions();
+      functions = firebase.app("parent-panel-app").functions("europe-west1");
       auth = firebase.app("parent-panel-app").auth();
 
       auth.onAuthStateChanged(async (user) => {
