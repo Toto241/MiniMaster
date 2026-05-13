@@ -56,7 +56,9 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   const payload: { [key: string]: string } = {};
 
   const lockChanged = newData.isLocked !== oldData.isLocked;
-  const blacklistChanged = JSON.stringify(newData.appBlacklist) !== JSON.stringify(oldData.appBlacklist);
+  const newBlacklist: string[] = Array.isArray(newData.appBlacklist) ? [...newData.appBlacklist].sort() : [];
+  const oldBlacklist: string[] = Array.isArray(oldData.appBlacklist) ? [...oldData.appBlacklist].sort() : [];
+  const blacklistChanged = JSON.stringify(newBlacklist) !== JSON.stringify(oldBlacklist);
   const usageChanged = JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules);
 
   if (lockChanged) {
@@ -194,11 +196,20 @@ Respond ONLY with valid JSON (no markdown, no code fences):
   "summary": "one sentence"
 }`;
 
+  const imageResponse = await fetch(photoUrl);
+  if (!imageResponse.ok) {
+    throw new Error(`Failed to download photo for Gemini analysis: ${imageResponse.status}`);
+  }
+  const imageBuffer = await imageResponse.arrayBuffer();
+  const imageBase64 = Buffer.from(imageBuffer).toString("base64");
+  const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+  const mimeType = contentType.split(";")[0]!.trim();
+
   const body = {
     contents: [{
       parts: [
         { text: prompt },
-        { inlineData: { mimeType: "image/jpeg", fileUri: photoUrl } },
+        { inlineData: { mimeType, data: imageBase64 } },
       ],
     }],
     generationConfig: { temperature: 0.1, maxOutputTokens: 512 },

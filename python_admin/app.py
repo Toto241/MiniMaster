@@ -82,13 +82,10 @@ ANDROID_AUTOMATION_SWEEP_APPROVAL_TTL_SEC = int(os.environ.get("MINIMASTER_SWEEP
 
 ALLOWED_COMMANDS = {
     "adb",
-    "bash",
     "firebase",
     "node",
     "npm",
     "npx",
-    "powershell",
-    "pwsh",
     "python",
     "python3",
     "gradlew.bat",
@@ -3598,8 +3595,10 @@ def run_command(request: CommandRequest, timeout_sec: int | None = None) -> dict
 
             # Windows fallback: some tools (npm/firebase) may not resolve directly
             # in this runtime, but work through cmd.exe command resolution.
+            import shlex
+            parts = shlex.split(line, posix=False)
             process = subprocess.run(
-                ["cmd", "/c", line],
+                ["cmd", "/c"] + parts,
                 cwd=str(request.cwd),
                 capture_output=True,
                 text=True,
@@ -6708,11 +6707,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.OK, {"runningEmulators": running, "count": len(running)})
 
         if parsed.path == "/api/qa/emulators/reservations":
+            _reservations = load_emulator_reservations()
             return self._write_json(
                 HTTPStatus.OK,
                 {
-                    "reservations": load_emulator_reservations(),
-                    "count": len(load_emulator_reservations()),
+                    "reservations": _reservations,
+                    "count": len(_reservations),
                 },
             )
 
@@ -7514,7 +7514,11 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
     def _read_json_body(self) -> dict[str, object]:
+        MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
         content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length > MAX_REQUEST_BODY_BYTES:
+            self._write_json(413, {"error": "Request body too large"})
+            return None
         raw = self.rfile.read(content_length) if content_length > 0 else b"{}"
         try:
             return json.loads(raw.decode("utf-8"))

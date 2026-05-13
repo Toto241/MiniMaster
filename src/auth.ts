@@ -570,36 +570,47 @@ export const redeemOperatorAccessKey = functions.https.onCall(
 
     const keyRef = querySnapshot.docs[0]!.ref;
 
-    const grantedRole = await db().runTransaction(async (tx) => {
-      const keyDoc = await tx.get(keyRef);
-      if (!keyDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
-      }
+    let grantedRole: OperatorRole;
 
-      const payload = keyDoc.data() || {};
-      const role = typeof payload.role === "string" ? payload.role : "";
-      const usedAt = payload.usedAt || null;
-      const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
+    try {
+      grantedRole = await db().runTransaction(async (tx) => {
+        const keyDoc = await tx.get(keyRef);
+        if (!keyDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
+        }
 
-      if (!VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
-        throw new functions.https.HttpsError("internal", "Ungültige Rolleninformation im Schlüssel.");
-      }
-      if (usedAt) {
-        throw new functions.https.HttpsError("failed-precondition", "Dieser Zugangsschlüssel wurde bereits eingelöst.");
-      }
-      if (!expiresAt || expiresAt.toMillis() < Date.now()) {
-        throw new functions.https.HttpsError("deadline-exceeded", "Dieser Zugangsschlüssel ist abgelaufen.");
-      }
+        const payload = keyDoc.data() || {};
+        const role = typeof payload.role === "string" ? payload.role : "";
+        const usedAt = payload.usedAt || null;
+        const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
 
-      tx.update(keyRef, {
-        usedAt: admin.firestore.FieldValue.serverTimestamp(),
-        redeemedByUid: context.auth?.uid,
+        if (!VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
+          throw new functions.https.HttpsError("internal", "Ungültige Rolleninformation im Schlüssel.");
+        }
+        if (usedAt) {
+          throw new functions.https.HttpsError("failed-precondition", "Dieser Zugangsschlüssel wurde bereits eingelöst.");
+        }
+        if (!expiresAt || expiresAt.toMillis() < Date.now()) {
+          throw new functions.https.HttpsError("deadline-exceeded", "Dieser Zugangsschlüssel ist abgelaufen.");
+        }
+
+        tx.update(keyRef, {
+          usedAt: admin.firestore.FieldValue.serverTimestamp(),
+          redeemedByUid: context.auth?.uid,
+        });
+
+        return role as OperatorRole;
       });
+    } catch (txError) {
+      throw txError;
+    }
 
-      return role as OperatorRole;
-    });
-
-    await auth().setCustomUserClaims(context.auth.uid, { role: grantedRole });
+    try {
+      await auth().setCustomUserClaims(context.auth.uid, { role: grantedRole });
+    } catch (claimsError) {
+      await keyRef.update({ usedAt: admin.firestore.FieldValue.delete(), redeemedByUid: admin.firestore.FieldValue.delete() });
+      throw new functions.https.HttpsError("internal", "Rolle konnte nicht zugewiesen werden. Bitte erneut versuchen.");
+    }
 
     return {
       success: true,
@@ -671,7 +682,6 @@ export const resetOperatorAccounts = functions.https.onCall(
     const callerIsAdmin = callerRole === "admin";
 
     if (!resetEnabled) {
-      requireAdmin(context);
       throw new functions.https.HttpsError(
         "failed-precondition",
         "Operator account reset is disabled. Enable via FUNCTIONS_EMULATOR=true, ENABLE_OPERATOR_ACCOUNT_RESET=true, or MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET=true."

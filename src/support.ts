@@ -93,7 +93,7 @@ function shouldEscalateAfterAttempts(
   return !solved && nextRound >= MAX_CONVERSATION_ROUNDS && nextFailures >= MAX_CONVERSATION_ROUNDS;
 }
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -380,11 +380,15 @@ export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY
     if (!problemDescription || typeof problemDescription !== "string" || problemDescription.trim().length === 0) {
       throw new functions.https.HttpsError("invalid-argument", "Problem description is required.");
     }
+    if (problemDescription.trim().length > 4096) {
+      throw new functions.https.HttpsError("invalid-argument", "Problem description must not exceed 4096 characters.");
+    }
     if (typeof allowSupportAccess !== "boolean") {
       throw new functions.https.HttpsError("invalid-argument", "allowSupportAccess (boolean) is required.");
     }
 
     const masterImei = context.auth.uid;
+    checkRateLimit(masterImei, "createSupportTicket", 10, 3600000);
 
     try {
       const ticketRef = await db().collection("supportTickets").add({
@@ -553,17 +557,20 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
       return null;
     }
 
-    const batch = db().batch();
-
-    expiredGrantsSnapshot.docs.forEach((doc) => {
-      batch.update(doc.ref, { status: "expired" });
-      const ticketId = doc.data().ticketId;
-      if (ticketId) {
-        batch.update(db().collection("supportTickets").doc(ticketId), { accessGranted: false });
-      }
-    });
-
-    await batch.commit();
+    const BATCH_SIZE = 240;
+    const docs = expiredGrantsSnapshot.docs;
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+      const batch = db().batch();
+      chunk.forEach((doc) => {
+        batch.update(doc.ref, { status: "expired" });
+        const ticketId = doc.data().ticketId;
+        if (ticketId) {
+          batch.update(db().collection("supportTickets").doc(ticketId), { accessGranted: false });
+        }
+      });
+      await batch.commit();
+    }
 
     functions.logger.info(`Cleaned up ${expiredGrantsSnapshot.size} expired support grants.`);
     return null;

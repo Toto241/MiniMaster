@@ -4,6 +4,7 @@
  * injection prevention, and type safety.
  */
 import * as functions from "firebase-functions/v1";
+import { VALID_PRODUCT_IDS } from "./pricing-config";
 
 // ==================== CONSTANTS ====================
 
@@ -290,7 +291,7 @@ export function validateTimestamp(value: unknown, fieldName: string): number {
 export function validateISODate(value: unknown, fieldName = "deadlineISO"): string {
   const dateStr = validateString(value, fieldName, {
     required: true,
-    pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/,
+    pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})$/,
     sanitize: "none",
   });
 
@@ -564,23 +565,16 @@ export function validateEventType(value: unknown): string {
  * Validates subscription SKU.
  */
 export function validateSku(value: unknown): string {
-  const validSkus = [
-    "single_child_monthly",
-    "family_monthly",
-    "single_child_yearly",
-    "family_yearly",
-  ];
-
   const sku = validateString(value, "sku", {
     required: true,
     maxLength: 64,
     sanitize: "none",
   });
 
-  if (!validSkus.includes(sku)) {
+  if (!VALID_PRODUCT_IDS.includes(sku)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
-      `Invalid product ID: ${sku}. Allowed: ${validSkus.join(", ")}`
+      `Invalid product ID: ${sku}. Allowed: ${VALID_PRODUCT_IDS.join(", ")}`
     );
   }
 

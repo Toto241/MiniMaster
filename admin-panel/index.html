@@ -2,6 +2,7 @@
 <html lang="de">
     <head>
         <meta charset="UTF-8" />
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com; img-src 'self' data: https:; frame-ancestors 'none';">
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#0f172a" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -134,10 +135,11 @@
                             einzurichten und Zugang zu erhalten.
                         </p>
                         <p id="electron-operator-badge" class="mm-u013">
-                                aus dem QA-Register ableiten lassen. Bereits nach Qualitätssicherung migrierte Freigaben wie
-                                Play-Store-Readiness, Android-/Support-/Compliance-Commissioning und AI-Runtime werden nur noch
-                                im Bereich <strong>Qualitätssicherung</strong> gepflegt. Alles hier ist lokal persistiert, im Admin-Panel sichtbar und
-                            CLI-Befehle können direkt aus diesem Dashboard ausgeführt werden.
+                            Freigabe-Status und Commissioning-Nachweise können direkt aus dem QA-Register abgeleitet werden.
+                            Bereits abgeschlossene Qualitätssicherungsbereiche wie Play-Store-Readiness,
+                            Android-/Support-/Compliance-Commissioning und AI-Runtime werden ausschließlich im Bereich
+                            <strong>Qualitätssicherung</strong> gepflegt. Alle Daten sind lokal persistiert und im
+                            Admin-Panel einsehbar. CLI-Befehle können direkt aus diesem Dashboard ausgeführt werden.
                         </p>
                     </div>
 

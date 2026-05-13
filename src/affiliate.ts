@@ -81,10 +81,21 @@ export const registerAffiliate = functions.https.onCall(
         }
       }
 
-      // Generate unique affiliate code
+      // Generate unique affiliate code with collision check
       const codePrefix = AFFILIATE_CONFIG.affiliateCodesPrefix;
-      const codeNumber = Math.floor(1000 + Math.random() * 9000);
-      const code = `${codePrefix}${codeNumber}`;
+      let code: string | null = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const randomSuffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+        const candidate = `${codePrefix}${randomSuffix}`;
+        const existing = await db().collection("affiliates").where("code", "==", candidate).limit(1).get();
+        if (existing.empty) {
+          code = candidate;
+          break;
+        }
+      }
+      if (!code) {
+        throw new functions.https.HttpsError("internal", "Could not generate a unique affiliate code. Please try again.");
+      }
 
       const now = admin.firestore.Timestamp.now();
       const affiliateRef = db().collection("affiliates").doc();
