@@ -189,8 +189,8 @@ export const validatePairingCode = functions.https.onCall(
       const childDeviceRef = db().collection("children").doc(childId);
 
       await db().runTransaction(async (tx) => {
-        const existingChildren = await db().collection("children")
-          .where("masterImei", "==", masterId).get();
+        const childrenQuery = db().collection("children").where("masterImei", "==", masterId);
+        const existingChildren = await tx.get(childrenQuery);
         if (existingChildren.size >= childLimit) {
           throw new functions.https.HttpsError(
             "resource-exhausted",
@@ -356,8 +356,8 @@ export const validatePairingToken = functions.https.onCall(
       const childDeviceRef = db().collection("children").doc(childId);
 
       await db().runTransaction(async (tx) => {
-        const existingChildren = await db().collection("children")
-          .where("masterImei", "==", masterId).get();
+        const childrenQuery = db().collection("children").where("masterImei", "==", masterId);
+        const existingChildren = await tx.get(childrenQuery);
         if (existingChildren.size >= childLimit) {
           throw new functions.https.HttpsError(
             "resource-exhausted",
@@ -455,19 +455,23 @@ export const pairAuthenticatedChild = functions.https.onCall(
       }
 
       const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError("resource-exhausted", `Child limit reached (${childLimit}).`);
-      }
-
+      const childDeviceRef = db().collection("children").doc(childId);
       const now = admin.firestore.Timestamp.now();
-      await db().collection("children").doc(childId).set({
-        childId,
-        masterImei: masterId,
-        pairedAt: now,
-        modernFlow: true,
-      }, { merge: true });
+
+      await db().runTransaction(async (tx) => {
+        const childrenQuery = db().collection("children").where("masterImei", "==", masterId);
+        const existingChildren = await tx.get(childrenQuery);
+        if (existingChildren.size >= childLimit) {
+          throw new functions.https.HttpsError("resource-exhausted", `Child limit reached (${childLimit}).`);
+        }
+        tx.set(childDeviceRef, {
+          childId,
+          masterImei: masterId,
+          pairedAt: now,
+          modernFlow: true,
+        }, { merge: true });
+      });
+
       await activateTrialIfPending(masterId, masterData);
 
       await AuditLogger.logSuccess(
