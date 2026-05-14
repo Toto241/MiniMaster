@@ -12,6 +12,21 @@ import { withRetry } from "./resilience";
 import { createTraceContext, TracedLogger } from "./tracing";
 
 
+// Deterministic JSON serialization: object keys are sorted recursively so equal
+// payloads with differing key order compare equal.
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, v) => {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        sorted[k] = (v as Record<string, unknown>)[k];
+      }
+      return sorted;
+    }
+    return v;
+  });
+}
+
 /**
  * Sends an FCM message with centralized resilience retry (max 3 attempts).
  * Only retries on transient/server errors (5xx, UNAVAILABLE, INTERNAL).
@@ -59,7 +74,7 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   const newBlacklist: string[] = Array.isArray(newData.appBlacklist) ? [...newData.appBlacklist].sort() : [];
   const oldBlacklist: string[] = Array.isArray(oldData.appBlacklist) ? [...oldData.appBlacklist].sort() : [];
   const blacklistChanged = JSON.stringify(newBlacklist) !== JSON.stringify(oldBlacklist);
-  const usageChanged = JSON.stringify(newData.usageRules) !== JSON.stringify(oldData.usageRules);
+  const usageChanged = stableStringify(newData.usageRules) !== stableStringify(oldData.usageRules);
 
   if (lockChanged) {
     payload.isLocked = String(newData.isLocked);

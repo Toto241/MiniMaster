@@ -11,6 +11,7 @@
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import { randomBytes } from "crypto";
 import { db } from "../firebase";
 import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger } from "./shared";
 import { validateString } from "./validation";
@@ -81,11 +82,16 @@ export const registerAffiliate = functions.https.onCall(
         }
       }
 
-      // Generate unique affiliate code with collision check
+      // Generate unique affiliate code with collision check (CSPRNG: crypto.randomBytes)
       const codePrefix = AFFILIATE_CONFIG.affiliateCodesPrefix;
+      const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 chars, omit ambiguous I/O/0/1
       let code: string | null = null;
       for (let attempt = 0; attempt < 10; attempt++) {
-        const randomSuffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+        const bytes = randomBytes(6);
+        let randomSuffix = "";
+        for (let i = 0; i < 6; i++) {
+          randomSuffix += ALPHABET.charAt(bytes[i]! & 0x1f);
+        }
         const candidate = `${codePrefix}${randomSuffix}`;
         const existing = await db().collection("affiliates").where("code", "==", candidate).limit(1).get();
         if (existing.empty) {
