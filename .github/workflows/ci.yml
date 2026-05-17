@@ -5,6 +5,11 @@ on:
       - '**/*.ts'
       - '**/*.kt'
       - '**/*.xml'
+      - '**/*.html'
+      - 'admin-panel/**'
+      - 'web-control/**'
+      - 'parent-panel/**'
+      - 'child-panel/**'
       - '**/build.gradle'
       - '**/build.gradle.kts'
       - 'settings.gradle'
@@ -15,11 +20,17 @@ on:
       - 'package-lock.json'
       - 'jest.config.*'
       - 'tsconfig.json'
+      - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - '**/*.ts'
       - '**/*.kt'
       - '**/*.xml'
+      - '**/*.html'
+      - 'admin-panel/**'
+      - 'web-control/**'
+      - 'parent-panel/**'
+      - 'child-panel/**'
       - '**/build.gradle'
       - '**/build.gradle.kts'
       - 'settings.gradle'
@@ -30,6 +41,7 @@ on:
       - 'package-lock.json'
       - 'jest.config.*'
       - 'tsconfig.json'
+      - '.github/workflows/ci.yml'
 
 permissions:
   contents: read
