@@ -1,5 +1,18 @@
 # ==================== ACCEPTANCE RUNNER ====================
 
+import json
+import re
+import subprocess
+import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+REPO_ROOT = Path("/tmp/MiniMaster")
+LOG_DIR = REPO_ROOT / "python_admin" / "logs"
+ACCEPTANCE_RUNS_DIR = LOG_DIR / "acceptance_runs"
+ACCEPTANCE_RUNS_DIR.mkdir(parents=True, exist_ok=True)
+
 _acceptance_runs: dict[str, dict[str, object]] = {}
 _acceptance_lock = threading.Lock()
 
