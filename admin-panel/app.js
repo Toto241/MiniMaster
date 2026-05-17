@@ -11278,7 +11278,7 @@ function showDashboard(user) {
  */
 function applyRoleRestrictions(role) {
     const tabAccess = {
-        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup", "platforms", "qa", "admin", "firebase", "ai", "legal"],
+        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup", "platforms", "qa", "admin", "firebase", "ai", "automation", "legal"],
         support: ["overview", "support"],
         auditor: ["overview", "errorlogs", "compliance"]
     };
@@ -11327,6 +11327,7 @@ function _startTabAutoRefresh(tabName) {
         "devices": () => loadDevices(),
         "errorlogs": () => loadErrorLogs(),
         "compliance": () => loadComplianceRequests(),
+        "automation": () => loadAutomationDashboard(),
     };
     const fn = refreshMap[tabName];
     if (fn) {
@@ -11376,6 +11377,9 @@ function switchTab(tabName, evt) {
         } else {
             renderQaRefreshStatus();
         }
+    }
+    if (tabName === "automation") {
+        loadAutomationDashboard();
     }
 }
 
@@ -14351,7 +14355,7 @@ function searchErrorLogs() {
 }
 
 function renderErrorLogTable(container, docs) {
-    let html = "<table><tr><th>Zeitpunkt</th><th>Funktion</th><th>Fehlermeldung</th><th>User</th><th>Severity</th></tr>";
+    let html = "<table><tr><th>Zeitpunkt</th><th>Funktion</th><th>Fehlermeldung</th><th>User</th><th>Severity</th><th>Aktion</th></tr>";
     docs.forEach(doc => {
         const d = typeof doc.data === "function" ? doc.data() : doc;
         const ts = d.timestamp ? new Date(d.timestamp.seconds * 1000).toLocaleString() : "N/A";
@@ -14365,6 +14369,7 @@ function renderErrorLogTable(container, docs) {
             <td title="${escapeHtml(d.message || "")}">${escapeHtml(msg)}${(d.message || "").length > 80 ? "..." : ""}</td>
             <td>${escapeHtml(userId.substring(0, 12))}</td>
             <td><span class="status-expired">${escapeHtml(severity)}</span></td>
+            <td><button data-action="analyzeErrorWithGemini" data-error-ctx='${escapeHtml(JSON.stringify({ functionName: funcName, message: d.message || "", severity: severity, timestamp: d.timestamp }))}' class="btn btn-secondary btn-sm" title="Mit Gemini analysieren">🤖 Gemini</button></td>
         </tr>`;
     });
     html += "</table>";
@@ -16342,6 +16347,241 @@ function _mmInstallFacade() {
     } catch (error) {
         try { console.warn("[MM] Fassaden-Installation fehlgeschlagen:", error); } catch (_e) { /* noop */ }
     }
+}
+
+// ==================== AUTOMATION DASHBOARD ====================
+
+function loadAutomationDashboard() {
+    const healthCard = document.getElementById("automation-health-card");
+    const errorQueue = document.getElementById("automation-error-queue");
+    const MM = window.MM;
+    const auto = MM && MM.autoManagement ? MM.autoManagement : null;
+
+    if (!auto) {
+        if (healthCard) healthCard.innerHTML = "<div class='info'>Automatisierungs-Modul nicht geladen.</div>";
+        return;
+    }
+
+    try {
+        const health = auto.computeSystemHealth();
+        if (healthCard) {
+            const statusClass = health.status === "healthy" ? "status-active" : health.status === "degraded" ? "status-expired" : "status-expired";
+            healthCard.innerHTML = `
+                <div class="form-group">
+                    <div class="status-badge ${statusClass}">Status: ${escapeHtml(health.status.toUpperCase())}</div>
+                    <p class="muted">Aktive Automatisierungen: ${health.activeAutomations} | Ausstehende Genehmigungen: ${health.pendingApprovals}</p>
+                    <p class="muted">Kritisch: ${health.criticalPending} | Hoch: ${health.highPending} | Fehler (24h): ${health.failedExecutions24h}</p>
+                    <p class="muted">Letzte Aktualisierung: ${new Date(health.lastUpdated).toLocaleString("de-DE")}</p>
+                </div>
+            `;
+        }
+
+        const pending = auto.getPendingActions();
+        if (errorQueue) {
+            if (!pending || pending.length === 0) {
+                errorQueue.innerHTML = "<div class='info'>Keine Fehler in der Warteschlange.</div>";
+            } else {
+                let html = "<table><tr><th>Zeitpunkt</th><th>Typ</th><th>Schwere</th><th>Diagnose</th><th>Aktionen</th></tr>";
+                pending.forEach((action) => {
+                    html += `<tr>
+                        <td>${new Date(action.createdAt).toLocaleString("de-DE")}</td>
+                        <td>${escapeHtml(action.type)}</td>
+                        <td><span class="status-expired">${escapeHtml(action.severity)}</span></td>
+                        <td>${escapeHtml(action.diagnosis.substring(0, 60))}${action.diagnosis.length > 60 ? "..." : ""}</td>
+                        <td>
+                            <button data-action="automationApprove" data-action-id="${escapeHtml(action.id)}" class="btn btn-primary btn-sm">✅ Genehmigen</button>
+                            <button data-action="automationReject" data-action-id="${escapeHtml(action.id)}" class="btn btn-danger btn-sm">❌ Ablehnen</button>
+                        </td>
+                    </tr>`;
+                });
+                html += "</table>";
+                errorQueue.innerHTML = html;
+            }
+        }
+
+        const logsContainer = document.getElementById("automation-logs");
+        if (logsContainer) {
+            const logs = auto.getLogs({ since: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() });
+            if (!logs || logs.length === 0) {
+                logsContainer.innerHTML = "<div class='info'>Keine Logs in den letzten 24 Stunden.</div>";
+            } else {
+                let html = "<table><tr><th>Zeitpunkt</th><th>Typ</th><th>Nachricht</th></tr>";
+                logs.slice(0, 20).forEach((log) => {
+                    html += `<tr>
+                        <td>${new Date(log.timestamp).toLocaleString("de-DE")}</td>
+                        <td>${escapeHtml(log.type)}</td>
+                        <td>${escapeHtml(JSON.stringify(log).substring(0, 100))}...</td>
+                    </tr>`;
+                });
+                html += "</table>";
+                logsContainer.innerHTML = html;
+            }
+        }
+    } catch (err) {
+        if (healthCard) healthCard.innerHTML = `<div class='error'>Fehler beim Laden: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+// ==================== AUTOMATION ACTION HANDLER ====================
+
+async function handleAutomationAction(action, evt) {
+    const MM = window.MM;
+    const auto = MM && MM.autoManagement ? MM.autoManagement : null;
+    const resultEl = document.getElementById("automation-manual-result");
+
+    function showResult(msg, isError) {
+        if (resultEl) resultEl.innerHTML = `<div class="${isError ? "error" : "success-box"}">${escapeHtml(msg)}</div>`;
+    }
+
+    if (!auto) {
+        showResult("Automatisierungs-Modul nicht verfügbar.", true);
+        return;
+    }
+
+    try {
+        switch (action) {
+            case "automationHealthCheck": {
+                const health = auto.computeSystemHealth();
+                showResult(`System-Health: ${health.status.toUpperCase()} | Aktiv: ${health.activeAutomations} | Ausstehend: ${health.pendingApprovals}`);
+                break;
+            }
+            case "automationErrorAnalysis": {
+                const pending = auto.getPendingActions();
+                if (!pending || pending.length === 0) {
+                    showResult("Keine ausstehenden Fehler zur Analyse.");
+                } else {
+                    showResult(`${pending.length} Fehler in der Warteschlange. Wählen Sie einen aus, um Gemini-Analyse zu starten.`);
+                }
+                break;
+            }
+            case "automationProposeFixes": {
+                const pending = auto.getPendingActions();
+                if (!pending || pending.length === 0) {
+                    showResult("Keine ausstehenden Aktionen für Behebungsvorschläge.");
+                } else {
+                    const proposals = pending.map((a) => `- ${a.type}: ${a.diagnosis}`).join("\n");
+                    showResult(`Behebungsvorschläge:\n${proposals}`);
+                }
+                break;
+            }
+            case "automationClearPending": {
+                const pending = auto.getPendingActions();
+                pending.forEach((a) => auto.removePendingAction(a.id));
+                showResult(`${pending.length} ausstehende Aktionen gelöscht.`);
+                loadAutomationDashboard();
+                break;
+            }
+            case "automationSaveApiKey": {
+                const keyInput = document.getElementById("automation-api-key");
+                const passInput = document.getElementById("automation-passphrase");
+                const key = keyInput ? keyInput.value : "";
+                const passphrase = passInput ? passInput.value : "";
+                if (!key || !passphrase) {
+                    showResult("API-Key und Passphrase erforderlich.", true);
+                    return;
+                }
+                auto.storeApiKey(key, passphrase);
+                showResult("API-Key verschlüsselt gespeichert.");
+                if (keyInput) keyInput.value = "";
+                if (passInput) passInput.value = "";
+                break;
+            }
+            case "automationClearApiKey": {
+                auto.clearApiKey();
+                showResult("API-Key gelöscht.");
+                break;
+            }
+            case "automationRefreshLogs": {
+                loadAutomationDashboard();
+                showResult("Logs aktualisiert.");
+                break;
+            }
+            case "automationClearLogs": {
+                const logs = auto.getLogs();
+                logs.forEach((l) => { /* Logs werden durch appendLog verwaltet; kein direktes Löschen nötig */ });
+                showResult("Logs können nicht direkt gelöscht werden – werden automatisch auf 500 Einträge begrenzt.");
+                break;
+            }
+            case "automationApprove": {
+                const actionId = evt && evt.target ? evt.target.getAttribute("data-action-id") : null;
+                if (!actionId) {
+                    showResult("Keine Aktion-ID gefunden.", true);
+                    return;
+                }
+                const result = auto.approveAction(actionId);
+                showResult(result.success ? "Aktion genehmigt." : `Fehler: ${result.error}`, !result.success);
+                loadAutomationDashboard();
+                break;
+            }
+            case "automationReject": {
+                const rejectId = evt && evt.target ? evt.target.getAttribute("data-action-id") : null;
+                if (!rejectId) {
+                    showResult("Keine Aktion-ID gefunden.", true);
+                    return;
+                }
+                const result = auto.rejectAction(rejectId, "Manuell abgelehnt");
+                showResult(result.success ? "Aktion abgelehnt." : `Fehler: ${result.error}`, !result.success);
+                loadAutomationDashboard();
+                break;
+            }
+            case "analyzeErrorWithGemini": {
+                const errorCtx = evt && evt.target ? evt.target.getAttribute("data-error-ctx") : null;
+                if (!errorCtx) {
+                    showResult("Kein Fehler-Kontext gefunden.", true);
+                    return;
+                }
+                try {
+                    const ctx = JSON.parse(errorCtx);
+                    const sm = auto.createStateMachine({ error: ctx, source: "errorlogs" });
+                    const config = auto.getGeminiConfig();
+                    const diagnosis = await auto.diagnoseError(ctx, config);
+                    const planned = auto.planAction(diagnosis, ctx);
+                    planned._stateMachineId = sm.id;
+                    auto.queuePendingAction(planned);
+                    auto.transitionStateMachine(sm.id, "pending-approval");
+                    showResult(`Gemini-Analyse abgeschlossen. Status: ${diagnosis.severity} | Empfohlene Aktion: ${diagnosis.recommendedAction}`);
+                    loadAutomationDashboard();
+                } catch (err) {
+                    showResult(`Fehler bei Gemini-Analyse: ${err.message}`, true);
+                }
+                break;
+            }
+            default:
+                showResult(`Unbekannte Aktion: ${action}`, true);
+        }
+    } catch (err) {
+        showResult(`Fehler: ${err.message}`, true);
+    }
+}
+
+// ==================== GLOBAL AUTOMATION CLICK LISTENER ====================
+
+if (typeof document !== "undefined") {
+    document.addEventListener("click", function(e) {
+        const btn = e.target.closest("[data-action]");
+        if (!btn) return;
+        const action = btn.getAttribute("data-action");
+        if (!action) return;
+        // Nur Automation-Actions hier abfangen
+        const automationActions = [
+            "automationHealthCheck",
+            "automationErrorAnalysis",
+            "automationProposeFixes",
+            "automationClearPending",
+            "automationSaveApiKey",
+            "automationClearApiKey",
+            "automationRefreshLogs",
+            "automationClearLogs",
+            "automationApprove",
+            "automationReject",
+            "analyzeErrorWithGemini",
+        ];
+        if (automationActions.includes(action)) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAutomationAction(action, e);
+        }
+    });
 }
 
 if (typeof document !== "undefined") {
