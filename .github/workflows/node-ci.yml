@@ -1,9 +1,29 @@
 name: Node CI
 on:
   push:
-    paths: ['**/*.ts', 'package.json', 'jest.config.*', 'tsconfig.json']
+    paths:
+      - '**/*.ts'
+      - '**/*.html'
+      - 'admin-panel/**'
+      - 'web-control/**'
+      - 'parent-panel/**'
+      - 'child-panel/**'
+      - 'package.json'
+      - 'jest.config.*'
+      - 'tsconfig.json'
+      - '.github/workflows/node-ci.yml'
   pull_request:
-    paths: ['**/*.ts', 'package.json', 'jest.config.*', 'tsconfig.json']
+    paths:
+      - '**/*.ts'
+      - '**/*.html'
+      - 'admin-panel/**'
+      - 'web-control/**'
+      - 'parent-panel/**'
+      - 'child-panel/**'
+      - 'package.json'
+      - 'jest.config.*'
+      - 'tsconfig.json'
+      - '.github/workflows/node-ci.yml'
 
 permissions:
   contents: read
