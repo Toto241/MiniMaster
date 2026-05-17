@@ -58,6 +58,12 @@ from remote_mac_agent_contract import build_remote_mac_agent_run_entry  # noqa: 
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
 from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
+from acceptance_runner import (  # noqa: E402
+    _run_acceptance_task,
+    get_acceptance_run_status,
+    get_acceptance_run_report,
+    load_acceptance_history,
+)
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
@@ -65,6 +71,8 @@ REMOTE_MAC_AGENT_RUN_LOG_FILE = LOG_DIR / "remote_mac_agent_runs.jsonl"
 JOB_RUN_LOG_FILE = LOG_DIR / "job_runs.jsonl"
 ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE = LOG_DIR / "android_automation_sweep_approvals.jsonl"
 ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE = LOG_DIR / "android_compatibility_approvals.jsonl"
+ACCEPTANCE_RUNS_DIR = LOG_DIR / "acceptance_runs"
+ACCEPTANCE_RUNS_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_HOST = os.environ.get("MINIMASTER_ADMIN_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("MINIMASTER_ADMIN_PORT", "8765"))
 DEFAULT_HISTORY_LIMIT = 15
@@ -6807,6 +6815,24 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Job nicht gefunden."})
             return self._write_json(HTTPStatus.OK, job)
 
+        # ── Acceptance-API (GET) ────────────────────────────────────────
+        if parsed.path == "/api/acceptance/history":
+            return self._write_json(HTTPStatus.OK, load_acceptance_history())
+
+        if parsed.path.startswith("/api/acceptance/status/"):
+            run_id = parsed.path.split("/api/acceptance/status/", 1)[1].strip("/")
+            status = get_acceptance_run_status(run_id)
+            if status is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, status)
+
+        if parsed.path.startswith("/api/acceptance/report/"):
+            run_id = parsed.path.split("/api/acceptance/report/", 1)[1].strip("/")
+            report = get_acceptance_run_report(run_id)
+            if report is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, report)
+
         return super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
@@ -6857,6 +6883,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_stop_emulator()
         if parsed.path == "/api/qa/emulators/release":
             return self._handle_release_emulator_reservation()
+
+        # ── Acceptance-API (POST) ───────────────────────────────────────
+        if parsed.path == "/api/acceptance/start":
+            return self._handle_acceptance_start()
+        if parsed.path == "/api/acceptance/submit":
+            return self._handle_acceptance_submit()
 
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden."})
 
@@ -7512,6 +7544,45 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
+
+    def _handle_acceptance_start(self) -> None:
+        try:
+            payload = self._read_json_body()
+            mode = str(payload.get("mode") or "full").strip().lower()
+            if mode not in {"full", "quick", "lint-only"}:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "mode muss full, quick oder lint-only sein."})
+            with_coverage = bool(payload.get("coverage", False))
+            run_id = f"acc-{uuid4().hex[:12]}"
+            run_data = {
+                "runId": run_id,
+                "mode": mode,
+                "startedAt": datetime.now(timezone.utc).isoformat(),
+                "status": "running",
+                "results": {},
+                "logs": [f"[{datetime.now(timezone.utc).isoformat()}] Acceptance-Run gestartet (mode={mode}, coverage={with_coverage})"],
+            }
+            run_file = ACCEPTANCE_RUNS_DIR / f"{run_id}.json"
+            run_file.write_text(json.dumps(run_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            with _acceptance_lock:
+                _acceptance_runs[run_id] = run_data
+            thread = threading.Thread(target=_run_acceptance_task, args=(run_id, mode, with_coverage), daemon=True)
+            thread.start()
+            return self._write_json(HTTPStatus.OK, {"runId": run_id, "status": "running", "mode": mode})
+        except Exception as exc:
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_acceptance_submit(self) -> None:
+        try:
+            payload = self._read_json_body()
+            run_id = str(payload.get("runId") or "").strip()
+            if not run_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "runId ist erforderlich."})
+            report = get_acceptance_run_report(run_id)
+            if report is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, {"success": True, "runId": run_id, "message": "Run erfolgreich eingereicht."})
+        except Exception as exc:
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def _read_json_body(self) -> dict[str, object]:
         MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB

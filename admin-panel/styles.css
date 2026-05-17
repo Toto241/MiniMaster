@@ -5027,3 +5027,105 @@ input:focus, select:focus, textarea:focus {
     color: #888;
     margin-left: auto;
 }
+
+/* ── Acceptance Panel Styles ── */
+.acc-live-status {
+    margin: 12px 0;
+    padding: 12px;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+}
+.acc-progress-container {
+    width: 100%;
+    height: 8px;
+    background: #1e293b;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.acc-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+.acc-status-text {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+.acc-results {
+    margin: 12px 0;
+}
+.acc-results table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.acc-results th,
+.acc-results td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #1e293b;
+}
+.acc-results th {
+    color: #94a3b8;
+    font-weight: 500;
+}
+.acc-results .acc-pass {
+    color: #10b981;
+}
+.acc-results .acc-fail {
+    color: #ef4444;
+}
+.acc-results .acc-skip {
+    color: #64748b;
+}
+.acc-history {
+    margin: 12px 0;
+}
+.acc-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #1e293b;
+    font-size: 0.85rem;
+}
+.acc-history-item .acc-h-status {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.acc-history-item .acc-h-status.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+.acc-history-item .acc-h-status.failed {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+.acc-history-item .acc-h-status.running {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+.acc-log-viewer {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    color: #94a3b8;
+    margin-top: 8px;
+}
+
+/* Utility class for hiding elements (replaces inline style=display:none) */
+.hidden {
+    display: none !important;
+}

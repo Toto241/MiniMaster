@@ -140,6 +140,12 @@ export {
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
 
+export {
+  getAcceptanceStatus,
+  submitAcceptanceRun,
+  checkAcceptanceGates,
+} from "./src/acceptance";
+
 // ==================== EXTERNAL INTEGRATIONS COCKPIT ====================
 export {
   getExternalIntegrationsConfig,

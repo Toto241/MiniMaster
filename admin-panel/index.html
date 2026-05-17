@@ -1584,6 +1584,37 @@
                             </details>
                         </div>
 
+                        <div id="qa-acceptance-card" class="setup-card admin-only qa-workspace-card mm-u029">
+                            <div class="qa-workspace-header">
+                                <div>
+                                    <h3>🧪 Abnahme-Automation</h3>
+                                    <p>
+                                        Lokale Acceptance-Runs: Lint, Tests, Build und Coverage in einem Schritt.
+                                        Ergebnisse werden protokolliert und können an Firebase übermittelt werden.
+                                    </p>
+                                </div>
+                                <div class="setup-actions mm-u031">
+                                    <button id="acc-run-full-btn" type="button" class="btn btn-primary" title="Vollständiger Run (Lint + Test + Build)">Vollständiger Run</button>
+                                    <button id="acc-run-quick-btn" type="button" class="btn btn-secondary" title="Quick-Check (Lint + Core-Suites)">Quick Check</button>
+                                    <button id="acc-run-lint-btn" type="button" class="btn btn-secondary" title="Nur Lint">Lint Only</button>
+                                    <button id="acc-run-coverage-btn" type="button" class="btn btn-secondary" title="Full-Run mit Coverage">Coverage</button>
+                                </div>
+                            </div>
+                            <div id="acc-live-status" class="acc-live-status mm-u031 hidden">
+                                <div class="acc-progress-container">
+                                    <div class="acc-progress-bar" id="acc-progress-bar"></div>
+                                </div>
+                                <div class="acc-status-text" id="acc-status-text">Bereit</div>
+                            </div>
+                            <div id="acc-results" class="acc-results mm-u036">
+                                <div class="info">Noch kein Acceptance-Run ausgeführt.</div>
+                            </div>
+                            <div id="acc-history" class="acc-history mm-u036">
+                                <h4>Letzte Runs</h4>
+                                <div class="info">Historie wird geladen...</div>
+                            </div>
+                        </div>
+
                         <div id="qa-section-heading" class="qa-section-heading">
                             <h3>QA-Arbeitsfläche</h3>
                             <p>Eine fokussierte Sicht auf reale Läufe, offene Fehler, strukturierte Details und belastbare Folgeaktionen.</p>
@@ -2155,6 +2186,7 @@
         </div>
         <script type="module" src="modules/index.js?v=20260418"></script>
         <script src="app.js?v=20260326"></script>
+        <script src="acceptance-panel.js?v=20260326"></script>
         <script src="pwa-register.js"></script>
     </body>
 </html>

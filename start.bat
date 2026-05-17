@@ -71,6 +71,78 @@ if "!_READY!"=="0" (
     echo           Pruefen Sie das Konsolenfenster "MiniMaster-Admin" auf Fehlermeldungen.
 )
 
+rem ── Acceptance-Modi ───────────────────────────────────────────────
+if /I "%1"=="--acceptance" goto run_acceptance
+if /I "%1"=="--quick-check" goto run_quick_check
+if /I "%1"=="--coverage" goto run_coverage
+goto open_panel
+
+:run_acceptance
+echo.
+echo [ABNAHME] Starte vollstaendigen Acceptance-Run ...
+curl -sf -X POST -H "Content-Type: application/json" -d "{\"mode\":\"full\"}" "http://127.0.0.1:8765/api/acceptance/start" > "%TEMP%\mm_acceptance.json" 2>nul
+if errorlevel 1 (
+    echo [FEHLER] Acceptance-Start fehlgeschlagen.
+    goto open_panel
+)
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%TEMP%\mm_acceptance.json' | ConvertFrom-Json).runId"') do set "RUN_ID=%%a"
+echo Run-ID: %RUN_ID%
+:acc_wait_loop
+timeout /t 5 /nobreak >nul
+curl -sf "http://127.0.0.1:8765/api/acceptance/status/%RUN_ID%" > "%TEMP%\mm_status.json" 2>nul
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%TEMP%\mm_status.json' | ConvertFrom-Json).status"') do set "ACC_STATUS=%%a"
+if "%ACC_STATUS%"=="running" goto acc_wait_loop
+echo.
+echo [ABNAHME] Run abgeschlossen: %ACC_STATUS%
+curl -sf "http://127.0.0.1:8765/api/acceptance/report/%RUN_ID%" > "%TEMP%\mm_report.json" 2>nul
+type "%TEMP%\mm_report.json"
+start "" "http://127.0.0.1:8765/admin-panel/#acceptance-tab"
+endlocal
+exit /b 0
+
+:run_quick_check
+echo.
+echo [QUICK] Starte Quick-Check (Lint + Core-Suites) ...
+curl -sf -X POST -H "Content-Type: application/json" -d "{\"mode\":\"quick\"}" "http://127.0.0.1:8765/api/acceptance/start" > "%TEMP%\mm_quick.json" 2>nul
+if errorlevel 1 (
+    echo [FEHLER] Quick-Check Start fehlgeschlagen.
+    goto open_panel
+)
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%TEMP%\mm_quick.json' | ConvertFrom-Json).runId"') do set "RUN_ID=%%a"
+:quick_wait_loop
+timeout /t 3 /nobreak >nul
+curl -sf "http://127.0.0.1:8765/api/acceptance/status/%RUN_ID%" > "%TEMP%\mm_status.json" 2>nul
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%TEMP%\mm_status.json' | ConvertFrom-Json).status"') do set "ACC_STATUS=%%a"
+if "%ACC_STATUS%"=="running" goto quick_wait_loop
+echo.
+echo [QUICK] Abgeschlossen: %ACC_STATUS%
+curl -sf "http://127.0.0.1:8765/api/acceptance/report/%RUN_ID%" > "%TEMP%\mm_report.json" 2>nul
+powershell -NoProfile -Command "Get-Content '%TEMP%\mm_report.json' | ConvertFrom-Json | Select-Object -Property runId, status, results | Format-List"
+endlocal
+exit /b 0
+
+:run_coverage
+echo.
+echo [COVERAGE] Starte Full-Run mit Coverage ...
+curl -sf -X POST -H "Content-Type: application/json" -d "{\"mode\":\"full\",\"coverage\":true}" "http://127.0.0.1:8765/api/acceptance/start" > "%TEMP%\mm_cov.json" 2>nul
+if errorlevel 1 (
+    echo [FEHLER] Coverage-Run Start fehlgeschlagen.
+    goto open_panel
+)
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%TEMP%\mm_cov.json' | ConvertFrom-Json).runId"') do set "RUN_ID=%%a"
+:cov_wait_loop
+timeout /t 5 /nobreak >nul
+curl -sf "http://127.0.0.1:8765/api/acceptance/status/%RUN_ID%" > "%TEMP%\mm_status.json" 2>nul
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-Content '%TEMP%\mm_status.json' | ConvertFrom-Json).status"') do set "ACC_STATUS=%%a"
+if "%ACC_STATUS%"=="running" goto cov_wait_loop
+echo.
+echo [COVERAGE] Abgeschlossen: %ACC_STATUS%
+curl -sf "http://127.0.0.1:8765/api/acceptance/report/%RUN_ID%" > "%TEMP%\mm_report.json" 2>nul
+powershell -NoProfile -Command "Get-Content '%TEMP%\mm_report.json' | ConvertFrom-Json | Select-Object -Property runId, status, results | Format-List"
+start "" "http://127.0.0.1:8765/admin-panel/#acceptance-tab"
+endlocal
+exit /b 0
+
 :open_panel
 rem Admin-Panel ueber den Python-Server oeffnen
 echo Oeffne Admin-Panel unter http://127.0.0.1:8765/admin-panel/ ...
