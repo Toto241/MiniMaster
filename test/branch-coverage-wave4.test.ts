@@ -44,7 +44,15 @@ jest.mock("firebase-admin/auth", () => ({
 
 // ── State-backed Firestore mock (matches wave3 pattern) ────────────────────
 
-const mockDbObj = { collection: jest.fn() };
+const mockDbObj = { collection: jest.fn(), runTransaction: jest.fn(async (fn: any) => await fn({
+  get: jest.fn(async (refOrQuery: any) => {
+    if (refOrQuery.get) return await refOrQuery.get();
+    return await refOrQuery.get();
+  }),
+  set: jest.fn((ref: any, data: any, opts?: any) => ref.set(data, opts)),
+  update: jest.fn((ref: any, data: any) => ref.update(data)),
+  delete: jest.fn((ref: any) => ref.delete()),
+})) };
 
 jest.mock("../firebase", () => ({
   db: jest.fn(() => mockDbObj),
