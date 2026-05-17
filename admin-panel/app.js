@@ -184,6 +184,8 @@ function isPlaceholderFirebaseConfig(config) {
 }
 
 function loadFirebaseConfig() {
+    // 1) Lokaler Override (Bootstrap-Dialog -> localStorage) gewinnt, damit
+    //    Operatoren ohne Datei-Schreibrechte trotzdem konfigurieren koennen.
     try {
         const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
@@ -192,6 +194,16 @@ function loadFirebaseConfig() {
         }
     } catch (error) {
         console.warn("Failed to load Firebase config override:", error);
+    }
+    // 2) Vom Setup-Wizard generierte firebase-config.js (window.__MM_FIREBASE_CONFIG__).
+    //    Wird per <script src="firebase-config.js"> vor app.js geladen.
+    try {
+        const injected = typeof window !== "undefined" ? window.__MM_FIREBASE_CONFIG__ : null;
+        if (hasCompleteFirebaseConfig(injected) && !isPlaceholderFirebaseConfig(injected)) {
+            return injected;
+        }
+    } catch (error) {
+        console.warn("Failed to read injected Firebase config:", error);
     }
     return fallbackFirebaseConfig;
 }

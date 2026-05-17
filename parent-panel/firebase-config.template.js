@@ -1,5 +1,5 @@
 /*
- * Firebase configuration template for MiniMaster Web Control (Parent).
+ * Firebase configuration template for MiniMaster Parent Panel.
  *
  * Diese Datei dient als Vorlage. Sie wird vom Setup-Wizard
  * ('python -m scripts.config_transfer_cli' oder Admin-Panel-Button
