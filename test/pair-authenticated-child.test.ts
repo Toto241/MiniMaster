@@ -64,6 +64,42 @@ const mockDbObj = {
       return Promise.resolve({ id });
     }),
   })),
+  runTransaction: jest.fn().mockImplementation(async (fn: any) => {
+    const tx = {
+      get: jest.fn().mockImplementation((refOrQuery: any) => {
+        if (refOrQuery.get) {
+          return refOrQuery.get();
+        }
+        // DocumentReference path
+        return refOrQuery.get();
+      }),
+      set: jest.fn().mockImplementation((ref: any, data: any, opts?: any) => {
+        if (ref.set) {
+          return ref.set(data, opts);
+        }
+        // Fallback
+        const { name, id } = ref;
+        if (!colDocs[name]) colDocs[name] = {};
+        colDocs[name][id] = opts?.merge ? { ...colDocs[name][id], ...data } : { ...data };
+        docs[`${name}/${id}`] = colDocs[name][id];
+      }),
+      update: jest.fn().mockImplementation((ref: any, data: any) => {
+        if (ref.update) return ref.update(data);
+        const { name, id } = ref;
+        if (colDocs[name]) {
+          colDocs[name][id] = { ...colDocs[name][id], ...data };
+          docs[`${name}/${id}`] = colDocs[name][id];
+        }
+      }),
+      delete: jest.fn().mockImplementation((ref: any) => {
+        if (ref.delete) return ref.delete();
+        const { name, id } = ref;
+        delete docs[`${name}/${id}`];
+        if (colDocs[name]) delete colDocs[name][id];
+      }),
+    };
+    return await fn(tx);
+  }),
 };
 
 jest.mock("../firebase", () => ({

@@ -570,44 +570,38 @@ export const redeemOperatorAccessKey = functions.https.onCall(
 
     const keyRef = querySnapshot.docs[0]!.ref;
 
-    let grantedRole: OperatorRole;
+    const grantedRole: OperatorRole = await db().runTransaction(async (tx) => {
+      const keyDoc = await tx.get(keyRef);
+      if (!keyDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
+      }
 
-    try {
-      grantedRole = await db().runTransaction(async (tx) => {
-        const keyDoc = await tx.get(keyRef);
-        if (!keyDoc.exists) {
-          throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
-        }
+      const payload = keyDoc.data() || {};
+      const role = typeof payload.role === "string" ? payload.role : "";
+      const usedAt = payload.usedAt || null;
+      const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
 
-        const payload = keyDoc.data() || {};
-        const role = typeof payload.role === "string" ? payload.role : "";
-        const usedAt = payload.usedAt || null;
-        const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
+      if (!VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
+        throw new functions.https.HttpsError("internal", "Ungültige Rolleninformation im Schlüssel.");
+      }
+      if (usedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "Dieser Zugangsschlüssel wurde bereits eingelöst.");
+      }
+      if (!expiresAt || expiresAt.toMillis() < Date.now()) {
+        throw new functions.https.HttpsError("deadline-exceeded", "Dieser Zugangsschlüssel ist abgelaufen.");
+      }
 
-        if (!VALID_OPERATOR_ROLES.includes(role as OperatorRole)) {
-          throw new functions.https.HttpsError("internal", "Ungültige Rolleninformation im Schlüssel.");
-        }
-        if (usedAt) {
-          throw new functions.https.HttpsError("failed-precondition", "Dieser Zugangsschlüssel wurde bereits eingelöst.");
-        }
-        if (!expiresAt || expiresAt.toMillis() < Date.now()) {
-          throw new functions.https.HttpsError("deadline-exceeded", "Dieser Zugangsschlüssel ist abgelaufen.");
-        }
-
-        tx.update(keyRef, {
-          usedAt: admin.firestore.FieldValue.serverTimestamp(),
-          redeemedByUid: context.auth?.uid,
-        });
-
-        return role as OperatorRole;
+      tx.update(keyRef, {
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+        redeemedByUid: context.auth?.uid,
       });
-    } catch (txError) {
-      throw txError;
-    }
+
+      return role as OperatorRole;
+    });
 
     try {
       await auth().setCustomUserClaims(context.auth.uid, { role: grantedRole });
-    } catch (claimsError) {
+    } catch {
       await keyRef.update({ usedAt: admin.firestore.FieldValue.delete(), redeemedByUid: admin.firestore.FieldValue.delete() });
       throw new functions.https.HttpsError("internal", "Rolle konnte nicht zugewiesen werden. Bitte erneut versuchen.");
     }

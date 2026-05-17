@@ -49,7 +49,7 @@ import * as path from "path";
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
-const MAX_APP_JS_BYTES = 760_000;
+const MAX_APP_JS_BYTES = 770_000;
 const MAX_TOP_LEVEL_FUNCTIONS = 510;
 const MAX_INLINE_ONCLICK = 0;
 

@@ -234,7 +234,8 @@ Respond ONLY with valid JSON (no markdown, no code fences):
   };
 
   const controller = new AbortController();
-  const timerId = setTimeout(() => controller.abort(), 30_000);
+  const abortMs = process.env.GEMINI_TIMEOUT_MS ? parseInt(process.env.GEMINI_TIMEOUT_MS, 10) : 30_000;
+  const timerId = setTimeout(() => controller.abort(), abortMs);
 
   let response: Response;
   try {

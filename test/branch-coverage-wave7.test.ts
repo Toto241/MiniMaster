@@ -41,7 +41,15 @@ jest.mock("firebase-admin/auth", () => ({
   getAuth: jest.fn(() => mockAuth),
 }));
 
-const mockDbObj = { collection: jest.fn() };
+const mockDbObj = { collection: jest.fn(), runTransaction: jest.fn(async (fn: any) => await fn({
+  get: jest.fn(async (refOrQuery: any) => {
+    if (refOrQuery.get) return await refOrQuery.get();
+    return await refOrQuery.get();
+  }),
+  set: jest.fn((ref: any, data: any, opts?: any) => ref.set(data, opts)),
+  update: jest.fn((ref: any, data: any) => ref.update(data)),
+  delete: jest.fn((ref: any) => ref.delete()),
+})) };
 
 jest.mock("../firebase", () => ({
   db: jest.fn(() => mockDbObj),
@@ -811,6 +819,13 @@ describe("analyzeTaskPhoto edge cases", () => {
 
   it("Gemini analysis throws → uses fallback analysis", async () => {
     process.env.GEMINI_API_KEY = "test-key";
+    // Mock photo download (first fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+    // Mock Gemini API error (second fetch)
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
     const fn = fns.analyzeTaskPhoto;
     const mockUpdate = jest.fn().mockResolvedValue(undefined);
@@ -831,6 +846,13 @@ describe("analyzeTaskPhoto edge cases", () => {
 
   it("Gemini API returns non-ok status → throws and uses fallback", async () => {
     process.env.GEMINI_API_KEY = "test-key";
+    // Mock photo download (first fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+    // Mock Gemini API non-ok response (second fetch)
     mockFetch.mockResolvedValueOnce({ ok: false, status: 429, statusText: "Too Many Requests" });
     const fn = fns.analyzeTaskPhoto;
     const mockUpdate = jest.fn().mockResolvedValue(undefined);
@@ -851,9 +873,16 @@ describe("analyzeTaskPhoto edge cases", () => {
 
   it("Gemini returns unparseable JSON → uses raw response", async () => {
     process.env.GEMINI_API_KEY = "test-key";
+    // Mock photo download (first fetch)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+    // Mock Gemini API response with unparseable JSON (second fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
         candidates: [{ content: { parts: [{ text: "not json {{{" }] } }],
       }),
     });
@@ -878,9 +907,16 @@ describe("analyzeTaskPhoto edge cases", () => {
 
   it("Gemini returns empty candidates → uses raw (empty) response", async () => {
     process.env.GEMINI_API_KEY = "test-key";
+    // Mock photo download (first fetch)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ candidates: [] }),
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+    // Mock Gemini API response with empty candidates (second fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ candidates: [] }),
     });
     const fn = fns.analyzeTaskPhoto;
     const mockUpdate = jest.fn().mockResolvedValue(undefined);

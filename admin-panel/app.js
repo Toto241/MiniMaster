@@ -12680,7 +12680,7 @@ async function reloadConfigTransferState() {
         setConfigTransferStatus(
             data.envFileExists
                 ? `✓ Geladen aus ${data.envFile}. Geheime Werte sind maskiert.`
-                : "ℹ Keine .env vorhanden. Felder sind leer; nach „Übertragen" wird sie angelegt.",
+                : 'ℹ Keine .env vorhanden. Felder sind leer; nach „Übertragen" wird sie angelegt.',
             "success",
         );
     } catch (error) {
