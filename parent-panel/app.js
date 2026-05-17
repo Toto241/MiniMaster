@@ -67,12 +67,26 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
     }
 
     function loadFirebaseConfig() {
+      // 1) Lokaler Override (Bootstrap-Dialog -> localStorage) gewinnt.
       try {
         const raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
-        if (parsed && parsed.projectId && parsed.apiKey) return parsed;
+        if (parsed && parsed.projectId && parsed.apiKey
+            && !String(parsed.projectId).includes("your-")) {
+          return parsed;
+        }
       } catch (error) {
         console.warn("Firebase override konnte nicht geladen werden:", error);
+      }
+      // 2) Vom Setup-Wizard generierte firebase-config.js.
+      try {
+        const injected = typeof window !== "undefined" ? window.__MM_FIREBASE_CONFIG__ : null;
+        if (injected && injected.projectId && injected.apiKey
+            && !String(injected.projectId).includes("your-")) {
+          return injected;
+        }
+      } catch (error) {
+        console.warn("Injected Firebase-Konfiguration konnte nicht gelesen werden:", error);
       }
       return fallbackFirebaseConfig;
     }

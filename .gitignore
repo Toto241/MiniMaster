@@ -30,8 +30,18 @@ scripts/security-test.env
 # Firebase app configs (must never be committed)
 **/google-services.json
 **/GoogleService-Info.plist
+serviceAccountKey.json
 # Keep only safe templates in git
 !**/google-services.template.json
+!**/serviceAccountKey.template.json
+
+# Generated per-panel Firebase configuration (written by setup wizard,
+# contains real API keys). Templates remain checked in.
+admin-panel/firebase-config.js
+web-control/firebase-config.js
+parent-panel/firebase-config.js
+child-panel/firebase-config.js
+!**/firebase-config.template.js
 
 # OS-specific files
 .DS_Store
