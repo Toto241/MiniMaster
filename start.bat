@@ -18,6 +18,30 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem ── Pre-Flight ──────────────────────────────────────────────────
+rem Mit --skip-preflight kann uebersprungen werden. Pflichtfehler werden
+rem nur als Warnung ausgegeben, der Start wird nicht hart abgebrochen.
+if /I "%1"=="--preflight" (
+    "%PY%" "%~dp0scripts\preflight.py"
+    exit /b %ERRORLEVEL%
+)
+if /I "%1"=="--skip-preflight" goto skip_preflight
+echo --- Pre-Flight ---
+"%PY%" "%~dp0scripts\preflight.py"
+if errorlevel 1 (
+    echo.
+    echo [WARN] Pre-Flight meldet Pflicht-Fehler. Start trotzdem fortsetzen?
+    set "_CONT="
+    set /p _CONT=Fortfahren? [y/N]:
+    if /I not "!_CONT!"=="y" if /I not "!_CONT!"=="yes" if /I not "!_CONT!"=="j" if /I not "!_CONT!"=="ja" (
+        echo Abgebrochen.
+        endlocal
+        exit /b 1
+    )
+)
+echo.
+:skip_preflight
+
 rem Pruefen ob Port 8765 bereits belegt ist
 netstat -an 2>nul | findstr /C:":8765 " >nul
 if not errorlevel 1 (
