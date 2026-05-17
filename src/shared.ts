@@ -198,7 +198,8 @@ export type AuditAction =
   | "admin.b2b.add_device"
   | "admin.b2b.remove_device"
   | "admin.b2b.revoke"
-  | "gdpr.dsar_export";
+  | "gdpr.dsar_export"
+  | "acceptance.run_submitted";
 
 export interface AuditLog {
   timestamp: admin.firestore.Timestamp;
