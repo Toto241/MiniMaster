@@ -6332,10 +6332,21 @@ def _run_dual_device_background(run_id: str, kwargs: dict[str, object]) -> None:
     _persist_active_suite_run(run_id)
 
 
-# ─── Konfigurations-Transfer (.env + admin-panel/firebase-config.js) ───────────
+# ─── Konfigurations-Transfer (.env + */firebase-config.js) ───────────
 ENV_FILE = REPO_ROOT / ".env"
 ENV_EXAMPLE_FILE = REPO_ROOT / ".env.example"
 ADMIN_PANEL_FIREBASE_CONFIG_FILE = REPO_ROOT / "admin-panel" / "firebase-config.js"
+
+# Alle Panel-Verzeichnisse, in die der Wizard die generierte firebase-config.js
+# spiegelt. Damit erbt jedes Panel automatisch die Werte – frueher war der
+# Wizard auf das Admin-Panel beschraenkt und die anderen Panels mussten manuell
+# konfiguriert werden.
+PANEL_FIREBASE_CONFIG_FILES: tuple[Path, ...] = (
+    REPO_ROOT / "admin-panel" / "firebase-config.js",
+    REPO_ROOT / "web-control" / "firebase-config.js",
+    REPO_ROOT / "parent-panel" / "firebase-config.js",
+    REPO_ROOT / "child-panel" / "firebase-config.js",
+)
 
 # Felder der Firebase-Web-Konfiguration, die im Browser landen.
 FIREBASE_WEB_KEYS: tuple[str, ...] = (
@@ -6462,23 +6473,21 @@ def _merge_env_file(
     return _parse_env_file(path)
 
 
-def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
-    """Schreibt admin-panel/firebase-config.js mit Literal-Werten (Browser-tauglich)."""
+def _render_firebase_config_js(values: dict[str, str]) -> str:
+    """Rendert die generische firebase-config.js fuer alle Panels.
+
+    Klassisches Browser-Skript (kein ES-Module-Export, da die Datei per
+    ``<script src>`` ohne ``type="module"`` geladen wird). Sie setzt
+    ``window.__MM_FIREBASE_CONFIG__`` und ``window.MINIMASTER_APP_CHECK_SITE_KEY``
+    als globale Bootstrap-Quelle fuer alle vier Panels.
+    """
     def js_string(raw: object) -> str:
         text = "" if raw is None else str(raw)
         escaped = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
         return f"'{escaped}'"
 
-    rendered = (
-        "/*\n"
-        " * Firebase configuration for the Admin Panel.\n"
-        " *\n"
-        " * Diese Datei wird vom Admin-Panel-Button \"Übertragen\" generiert.\n"
-        " * Direkte Bearbeitung ist möglich, wird aber bei der nächsten Übertragung\n"
-        " * überschrieben.\n"
-        " */\n"
-        "\n"
-        "export const firebaseConfig = {\n"
+    body = (
+        "{\n"
         f"  apiKey: {js_string(values.get('apiKey'))},\n"
         f"  authDomain: {js_string(values.get('authDomain'))},\n"
         f"  projectId: {js_string(values.get('projectId'))},\n"
@@ -6490,10 +6499,34 @@ def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
         "    provider: 'reCaptchaV3',\n"
         f"    siteKey: {js_string(values.get(FIREBASE_APP_CHECK_KEY))},\n"
         "  },\n"
-        "};\n"
+        "}"
     )
-    ADMIN_PANEL_FIREBASE_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ADMIN_PANEL_FIREBASE_CONFIG_FILE.write_text(rendered, encoding="utf-8")
+
+    return (
+        "/*\n"
+        " * Firebase configuration for MiniMaster Panels.\n"
+        " *\n"
+        " * Diese Datei wird vom Admin-Panel-Button \"Übertragen\" bzw. von\n"
+        " * 'python -m scripts.config_transfer_cli' generiert. Direkte\n"
+        " * Bearbeitung ist möglich, wird aber bei der nächsten Übertragung\n"
+        " * überschrieben. Klassisches Browser-Skript ohne ES-Module-Export.\n"
+        " */\n"
+        "(function (root) {\n"
+        f"  var firebaseConfig = {body};\n"
+        "  root.__MM_FIREBASE_CONFIG__ = firebaseConfig;\n"
+        "  if (firebaseConfig && firebaseConfig.appCheck && firebaseConfig.appCheck.siteKey) {\n"
+        "    root.MINIMASTER_APP_CHECK_SITE_KEY = firebaseConfig.appCheck.siteKey;\n"
+        "  }\n"
+        "})(typeof window !== 'undefined' ? window : globalThis);\n"
+    )
+
+
+def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
+    """Schreibt firebase-config.js fuer ALLE Panels (Browser-tauglich)."""
+    rendered = _render_firebase_config_js(values)
+    for target in PANEL_FIREBASE_CONFIG_FILES:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(rendered, encoding="utf-8")
 
 
 def _read_admin_panel_firebase_config() -> dict[str, str]:
@@ -6618,6 +6651,7 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         "envKeyCount": len(written_env),
         "adminPanelFirebaseConfigWritten": panel_written,
         "adminPanelFirebaseConfigFile": str(ADMIN_PANEL_FIREBASE_CONFIG_FILE),
+        "panelFirebaseConfigFiles": [str(p) for p in PANEL_FIREBASE_CONFIG_FILES],
     }
 
 

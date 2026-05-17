@@ -24,7 +24,10 @@
     "guard:pr152": "python scripts/pr152_selective_guard.py",
     "validate:readiness": "npm run build && npm run lint && npm run test:ci && npm run test:rules:structural && npm run analyze:fertigungsstand && npm run analyze:admin-qa && npm run plan:admin-qa && npm run guard:pr152",
     "ci:revalidate": "pwsh ./scripts/revalidate-release-gates.ps1",
-    "ci:revalidate:rerun": "pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed"
+    "ci:revalidate:rerun": "pwsh ./scripts/revalidate-release-gates.ps1 -RerunLatestFailed",
+    "preflight": "python scripts/preflight.py",
+    "preflight:json": "python scripts/preflight.py --json",
+    "setup": "python scripts/setup_init.py"
   },
   "keywords": [],
   "author": "",
