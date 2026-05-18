@@ -538,8 +538,12 @@
                                 <button type="button" class="btn btn-outline btn-full" id="connectivity-test-btn" data-action="runConnectivityTest" title="Testet, ob Browser + Server die Firebase-Endpoints erreichen (Diagnose bei auth/network-request-failed)">
                                     🔍 Verbindung testen (Browser + Server)
                                 </button>
+                                <button type="button" class="btn btn-outline btn-full" id="auth-probe-btn" data-action="runAuthDiagnostics" title="Probiert via Backend einen Identity-Toolkit-Aufruf und entschluesselt den echten Auth-Fehlercode (OPERATION_NOT_ALLOWED, INVALID_LOGIN_CREDENTIALS, API_KEY_*, ...). Wenn Email+Passwort eingetragen sind, wird auch ein echter Login-Versuch gemacht.">
+                                    🩺 Erweiterte Login-Diagnose (Identity Toolkit Probe)
+                                </button>
                                 <div id="login-status" class="phase-status"></div>
                                 <div id="connectivity-test-result" class="phase-status" hidden></div>
+                                <div id="auth-probe-result" class="phase-status" hidden></div>
                             </form>
                         </div>
                     </div>

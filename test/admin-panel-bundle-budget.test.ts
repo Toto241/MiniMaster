@@ -54,13 +54,24 @@ import * as path from "path";
  *     _mmScheduleDomInit, setConfigSnapshotStatus, _escapeHtml,
  *     renderConfigSnapshotsList, reloadConfigSnapshots, createConfigSnapshot,
  *     restoreConfigSnapshot. Limits angepasst mit kleinem Headroom.
+ *
+ * Stand Login-Diagnose-Tools (Connectivity-Self-Test + erweiterte Auth-Probe):
+ *   - app.js: 821_155 Bytes (+1_155 ueber dem Limit von 820_000).
+ *   - Top-Level-Funktionen: 529 (+4 ueber dem Limit von 525).
+ *   - Begruendung: Backend+Browser-Konnektivitaetstest und Identity-Toolkit-
+ *     Probe-Diagnose, die `auth/network-request-failed` in konkrete Fehler-
+ *     Codes decodieren (OPERATION_NOT_ALLOWED, INVALID_LOGIN_CREDENTIALS,
+ *     API_KEY_*). Neue Funktionen: runConnectivityTest, _probeBrowserEndpoint,
+ *     _renderConnectivityResult, runAuthDiagnostics, _renderAuthDiagnostics,
+ *     _boolBadge, _tristateBadge plus _escapeHtml (zuvor schon vorhanden).
+ *     Limits angepasst mit kleinem Headroom.
  */
 
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
-const MAX_APP_JS_BYTES = 820_000;
-const MAX_TOP_LEVEL_FUNCTIONS = 525;
+const MAX_APP_JS_BYTES = 835_000;
+const MAX_TOP_LEVEL_FUNCTIONS = 535;
 const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
