@@ -112,11 +112,16 @@ function initializeAuthBindings() {
 // Endpoint und parallel direkte fetch()-Probes – die Differenz zwischen
 // beiden zeigt direkt, ob das Problem im Browser-TLS-Stack liegt.
 const _CONNECTIVITY_BROWSER_ENDPOINTS = [
-    { id: "identitytoolkit", name: "Firebase Auth", url: "https://identitytoolkit.googleapis.com/" },
-    { id: "securetoken",     name: "Token Refresh", url: "https://securetoken.googleapis.com/" },
-    { id: "firestore",       name: "Firestore",     url: "https://firestore.googleapis.com/" },
-    { id: "storage",         name: "Storage",       url: "https://firebasestorage.googleapis.com/" },
-    { id: "ocsp_google",     name: "OCSP (Cert-Sperre)", url: "https://ocsp.pki.goog/" },
+    { id: "identitytoolkit", name: "Firebase Auth",     url: "https://identitytoolkit.googleapis.com/", critical: true },
+    { id: "securetoken",     name: "Token Refresh",     url: "https://securetoken.googleapis.com/",     critical: true },
+    { id: "firestore",       name: "Firestore",         url: "https://firestore.googleapis.com/",       critical: true },
+    { id: "storage",         name: "Storage",           url: "https://firebasestorage.googleapis.com/", critical: true },
+    // OCSP wird vom Browser-TLS-Handshake INTERN genutzt, nicht via fetch().
+    // Direkter no-cors-fetch dorthin scheitert in Chrome/Edge fast immer mit
+    // "Failed to fetch" – das ist KEIN Indiz fuer ein TLS-Stack-Problem.
+    // Wir lassen den Probe drin als informativen Indikator, werten ihn aber
+    // nicht mehr als Diagnose-Kriterium.
+    { id: "ocsp_google",     name: "OCSP (informativ, scheitert oft)", url: "https://ocsp.pki.goog/", critical: false },
 ];
 
 async function _probeBrowserEndpoint(endpoint) {
@@ -161,35 +166,82 @@ function _renderConnectivityResult(backend, browser) {
 
     rows.push("<hr>");
     rows.push("<strong>Browser (dein TLS-Stack, inkl. Antivirus/Extensions):</strong>");
-    const browserFails = (browser || []).filter(b => !b.result.ok);
     if (browser && browser.length > 0) {
         for (const entry of browser) {
             const r = entry.result;
             const mark = r.ok ? "✓" : "✗";
             const detail = r.ok ? `OK (${r.ms}ms)` : `Fehler: ${r.error || "unbekannt"}`;
-            rows.push(`<div style="font-family:monospace">${mark} ${_escapeHtml(entry.endpoint.name)} — ${_escapeHtml(detail)}</div>`);
+            const tag = entry.endpoint.critical ? "" : " <em>(nicht kritisch)</em>";
+            rows.push(`<div style="font-family:monospace">${mark} ${_escapeHtml(entry.endpoint.name)} — ${_escapeHtml(detail)}${tag}</div>`);
         }
     }
 
-    // Cross-Diagnose: Backend OK, Browser fail = TLS-Stack-Problem (Antivirus)
+    // KRITISCHE Endpoints (Firebase selbst) entscheiden ueber die Diagnose,
+    // nicht informative wie OCSP – ein OCSP-fetch scheitert in Chrome/Edge
+    // fast immer mit "Failed to fetch", obwohl der TLS-Handshake intern
+    // funktioniert.
+    const criticalFails = (browser || []).filter(b => b.endpoint.critical && !b.result.ok);
+    const allCriticalOk = criticalFails.length === 0;
     const backendOk = backend && backend.diagnosis && backend.diagnosis.level === "ok";
+
     rows.push("<hr>");
-    if (backendOk && browserFails.length > 0) {
+    if (backendOk && allCriticalOk) {
+        // Konnektivitaet ist nachweislich OK. auth/network-request-failed
+        // hat hier eine Konfig-Ursache.
         rows.push(
-            `<div style="background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
-                <strong>⚠ Diagnose: Browser-TLS-Stack ist das Problem.</strong><br>
-                Server kommt durch, Browser nicht. Hauptverdaechtige:
+            `<div style="background:#d1fae5;padding:10px;border-left:4px solid #16a34a">
+                <strong>✓ Diagnose: Konnektivitaet ist OK.</strong> Alle Firebase-Endpoints
+                sind aus Server- und Browser-Sicht erreichbar.<br><br>
+                Wenn der Login trotzdem mit <code>auth/network-request-failed</code> scheitert,
+                ist es <strong>kein</strong> Netzwerk-/TLS-Problem. Pruefe in dieser Reihenfolge:
                 <ol>
-                    <li><strong>Browser-Erweiterung</strong> (uBlock, Privacy Badger, AdBlock) blockt Google-API-Aufrufe.
-                        Test: im Inkognito-Modus oeffnen, oder Erweiterungen fuer 127.0.0.1:8765 deaktivieren.</li>
-                    <li><strong>Antivirus mit SSL-Inspection</strong> (Kaspersky, Avast, Norton, Sophos, Bitdefender).
-                        Test: SSL-Scanning testweise deaktivieren oder Ausnahme fuer *.googleapis.com einrichten.</li>
-                    <li><strong>Anderen Browser probieren</strong>: Firefox nutzt einen eigenen TLS-Stack und ist nicht
-                        anfaellig fuer die gleichen Probleme wie Chrome/Edge auf Windows.</li>
+                    <li>
+                        <strong>Email/Password als Provider aktivieren</strong> (haeufigste Ursache):<br>
+                        Firebase-Console → <em>Authentication → Sign-in method</em> → Eintrag
+                        „Email/Password" → <em>Enable</em>.
+                    </li>
+                    <li>
+                        <strong>Authorized Domains pruefen</strong>: Firebase-Console →
+                        <em>Authentication → Settings → Authorized domains</em> →
+                        muss enthalten: <code>localhost</code>, <code>127.0.0.1</code>,
+                        <code>&lt;projectId&gt;.firebaseapp.com</code>.
+                    </li>
+                    <li>
+                        <strong>App Check pruefen</strong>: Firebase-Console → <em>App Check</em>
+                        → wenn fuer „Authentication" auf <em>Enforced</em>, aber kein reCAPTCHA-
+                        Provider konfiguriert ist → entweder Provider hinterlegen oder
+                        Enforcement zurueck auf <em>Unenforced</em>.
+                    </li>
+                    <li>
+                        <strong>F12 → Tab „Netzwerk" → Login erneut probieren</strong>: such die
+                        rote Zeile zu <code>identitytoolkit.googleapis.com</code> → der Response-
+                        Body verraet die echte Ursache (z.B. <code>OPERATION_NOT_ALLOWED</code>,
+                        <code>API_KEY_HTTP_REFERRER_BLOCKED</code>, …).
+                    </li>
                 </ol>
             </div>`
         );
-    } else if (!backendOk && browserFails.length === 0) {
+    } else if (backendOk && !allCriticalOk) {
+        // Backend kommt durch, kritische Browser-Endpoints scheitern.
+        rows.push(
+            `<div style="background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
+                <strong>⚠ Diagnose: Browser-TLS-Stack ist das Problem.</strong> Server kommt
+                durch (${(browser || []).filter(b => b.endpoint.critical && b.result.ok).length}
+                von ${(browser || []).filter(b => b.endpoint.critical).length} kritischen
+                Browser-Tests fehlgeschlagen).
+                <ol>
+                    <li><strong>Browser-Erweiterung</strong> (uBlock, Privacy Badger, AdBlock)
+                        blockt Google-API-Aufrufe. Test: Inkognito-Modus, oder Erweiterungen
+                        fuer 127.0.0.1:8765 deaktivieren.</li>
+                    <li><strong>Antivirus mit SSL-Inspection</strong> (Kaspersky, Avast, Norton,
+                        Sophos, Bitdefender). Test: SSL-Scanning testweise deaktivieren oder
+                        Ausnahme fuer *.googleapis.com einrichten.</li>
+                    <li><strong>Anderen Browser probieren</strong>: Firefox nutzt einen eigenen
+                        TLS-Stack (NSS) und ist meist nicht betroffen.</li>
+                </ol>
+            </div>`
+        );
+    } else if (!backendOk && allCriticalOk) {
         rows.push(
             `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
                 <strong>⚠ Diagnose: Server-Routing-Problem.</strong><br>
@@ -197,21 +249,12 @@ function _renderConnectivityResult(backend, browser) {
                 fuer Python (HTTPS_PROXY-Umgebungsvariable).
             </div>`
         );
-    } else if (!backendOk && browserFails.length > 0) {
+    } else {
         rows.push(
             `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
                 <strong>✗ Diagnose: Komplettes Netzwerkproblem.</strong><br>
-                Weder Browser noch Server erreichen die Firebase-Endpoints. Pruefe Internetverbindung,
-                Router/Firewall und DNS-Aufloesung.
-            </div>`
-        );
-    } else {
-        rows.push(
-            `<div style="background:#d1fae5;padding:10px;border-left:4px solid #16a34a">
-                <strong>✓ Diagnose: Konnektivitaet OK.</strong><br>
-                Wenn der Login trotzdem mit auth/network-request-failed scheitert, liegt es nicht am Netzwerk.
-                Pruefe: (1) Email/Password als Provider in Firebase Auth aktiviert,
-                (2) 127.0.0.1 in Authorized Domains, (3) App Check nicht ohne Site Key enforced.
+                Weder Browser noch Server erreichen alle kritischen Firebase-Endpoints. Pruefe
+                Internetverbindung, Router/Firewall und DNS-Aufloesung.
             </div>`
         );
     }
