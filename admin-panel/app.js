@@ -12779,6 +12779,19 @@ async function reloadConfigTransferState() {
     }
 }
 
+// Hilfs-Scheduler: ruft initFn nach DOMContentLoaded auf (oder direkt, wenn
+// das DOM bereits steht). Macht in DOM-losen Umgebungen (Test-Harness ohne
+// jsdom) einen No-Op, statt mit `querySelector is not a function` zu sterben.
+function _mmScheduleDomInit(initFn) {
+    if (typeof document === "undefined") return;
+    if (typeof document.querySelector !== "function") return;
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initFn, { once: true });
+    } else {
+        initFn();
+    }
+}
+
 if (typeof window !== "undefined") {
     window.transferBootstrapConfig = transferBootstrapConfig;
     window.reloadConfigTransferState = reloadConfigTransferState;
@@ -12787,18 +12800,13 @@ if (typeof window !== "undefined") {
     // Benutzer ohne Klick sofort sieht, welche der drei Pflicht-Dateien
     // bereits vorhanden sind. Schlaegt im rein statischen Modus (ohne
     // Python-Admin-Server) leise fehl.
-    const _initArtifactStatus = () => {
+    _mmScheduleDomInit(() => {
         if (!document.querySelector("[data-artifact-key]")) return;
         fetch("/api/config/transfer")
             .then(r => (r.ok ? r.json() : null))
             .then(data => { if (data) renderArtifactStatus(data.artifacts || {}); })
             .catch(() => { /* ohne Server: Status bleibt "unbekannt" */ });
-    };
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", _initArtifactStatus, { once: true });
-    } else {
-        _initArtifactStatus();
-    }
+    });
 }
 
 // ─── Konfigurations-Snapshots (Baustein A) ──────────────────────────
@@ -12939,15 +12947,10 @@ if (typeof window !== "undefined") {
     window.reloadConfigSnapshots = reloadConfigSnapshots;
     window.restoreConfigSnapshot = restoreConfigSnapshot;
 
-    const _initSnapshotsList = () => {
+    _mmScheduleDomInit(() => {
         if (!document.getElementById("config-snapshots-list")) return;
         reloadConfigSnapshots().catch(() => { /* still */ });
-    };
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", _initSnapshotsList, { once: true });
-    } else {
-        _initSnapshotsList();
-    }
+    });
 }
 
 function initializeFirebaseAfterConfigSave() {

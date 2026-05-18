@@ -44,13 +44,23 @@ import * as path from "path";
  *     renderExternalIntegrations, renderOemMatrix, onExternalIntegrationFieldChange,
  *     readOemMatrixFromDom, onOemAction, saveOemMatrix). Limits leicht angehoben,
  *     um Headroom fuer den naechsten Iterationsschritt zu lassen.
+ *
+ * Stand Konfig-Transfer + Snapshots (Bausteine A/B/C – Datei-Upload fuer
+ * google-services.json / serviceAccountKey.json + Snapshot-Verwaltung):
+ *   - app.js: 804_643 Bytes (+19_643 ueber dem Limit von 785_000).
+ *   - Top-Level-Funktionen: 521 (+6 ueber dem Limit von 515).
+ *   - Begruendung: Neue Funktionen fuer Datei-Upload und Snapshot-Verwaltung:
+ *     _readFileAsText, collectArtifactUploads, renderArtifactStatus,
+ *     _mmScheduleDomInit, setConfigSnapshotStatus, _escapeHtml,
+ *     renderConfigSnapshotsList, reloadConfigSnapshots, createConfigSnapshot,
+ *     restoreConfigSnapshot. Limits angepasst mit kleinem Headroom.
  */
 
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
-const MAX_APP_JS_BYTES = 785_000;
-const MAX_TOP_LEVEL_FUNCTIONS = 515;
+const MAX_APP_JS_BYTES = 820_000;
+const MAX_TOP_LEVEL_FUNCTIONS = 525;
 const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
