@@ -53,8 +53,17 @@ if not errorlevel 1 (
 rem Optional: Firebase-/Secret-Konfiguration vor dem Start eintragen
 echo.
 echo Moechten Sie Firebase- und Secret-Konfiguration jetzt per Eingabeaufforderung
-echo eintragen und in .env / admin-panel/firebase-config.js uebertragen?
-echo (Druecken Sie ENTER ohne Eingabe, um direkt das Admin-Panel zu oeffnen.)
+echo eintragen?
+echo.
+echo   - Firebase-Web-Konfig (API-Key, Project-ID, ...)  -^> .env + firebase-config.js
+echo   - Optionale Secrets (GEMINI_API_KEY, OPENAI_API_KEY, ...) -^> .env
+echo   - Pflicht-Dateien (google-services.json, serviceAccountKey.json)
+echo       Tipp: Datei aus dem Explorer in dieses Fenster ziehen, um den
+echo       vollstaendigen Pfad einzufuegen. Vorschlaege aus Downloads/ werden
+echo       automatisch angeboten.
+echo.
+echo (Druecken Sie ENTER ohne Eingabe, um direkt das Admin-Panel zu oeffnen.
+echo  Das Admin-Panel hat dieselben Felder + Datei-Upload unter "Uebertragen".)
 set "_RUN_CONFIG_CLI="
 set /p _RUN_CONFIG_CLI=Konfiguration jetzt eintragen? [j/N]:
 if /I "%_RUN_CONFIG_CLI%"=="j" goto run_config_cli

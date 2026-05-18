@@ -265,6 +265,35 @@
                                 <button type="button" data-action="reloadConfigTransferState" class="btn btn-secondary" title="Aktuelle Werte aus .env / firebase-config.js neu laden">Aus Dateien laden</button>
                             </div>
 
+                            <details class="phase-help" id="config-transfer-artifacts" open>
+                                <summary>Firebase-Pflicht-Artefakte (JSON-Dateien aus der Firebase-Console)</summary>
+                                <div class="phase-help-content">
+                                    <p class="text-muted">
+                                        Die drei JSON-Dateien sind fuer den Produktivbetrieb erforderlich. Datei auswaehlen oder per
+                                        Drag&amp;Drop ins Feld ziehen – beim Klick auf <strong>Übertragen</strong> werden sie an die
+                                        richtigen Stellen kopiert. Eine bereits gefuellte Datei wird unten als <em>vorhanden</em>
+                                        markiert; Auswaehlen ueberschreibt sie.
+                                    </p>
+                                    <div class="firebase-config-form">
+                                        <div class="config-field">
+                                            <label for="artifact-googleServicesMaster">masterApp/google-services.json</label>
+                                            <input type="file" id="artifact-googleServicesMaster" data-artifact-key="googleServicesMaster" accept=".json,application/json" />
+                                            <small class="text-muted" id="artifact-status-googleServicesMaster">Status: unbekannt</small>
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="artifact-googleServicesChild">childApp/google-services.json</label>
+                                            <input type="file" id="artifact-googleServicesChild" data-artifact-key="googleServicesChild" accept=".json,application/json" />
+                                            <small class="text-muted" id="artifact-status-googleServicesChild">Status: unbekannt</small>
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="artifact-serviceAccountKey">serviceAccountKey.json (Repo-Stamm)</label>
+                                            <input type="file" id="artifact-serviceAccountKey" data-artifact-key="serviceAccountKey" accept=".json,application/json" />
+                                            <small class="text-muted" id="artifact-status-serviceAccountKey">Status: unbekannt</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
                             <details class="phase-help" id="config-transfer-secrets">
                                 <summary>Weitere Konfiguration / Secrets (werden bei „Übertragen" in <code>.env</code> geschrieben)</summary>
                                 <div class="phase-help-content">

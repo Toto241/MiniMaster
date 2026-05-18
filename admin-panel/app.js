@@ -12619,23 +12619,87 @@ function collectEnvFormUpdates() {
     return updates;
 }
 
+function _readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Datei nicht lesbar"));
+        reader.readAsText(file);
+    });
+}
+
+async function collectArtifactUploads() {
+    const inputs = document.querySelectorAll("[data-artifact-key]");
+    const artifacts = {};
+    const errors = [];
+    for (const input of inputs) {
+        const key = input.getAttribute("data-artifact-key");
+        const file = input.files && input.files[0];
+        if (!key || !file) continue;
+        try {
+            const text = await _readFileAsText(file);
+            try {
+                JSON.parse(text);
+            } catch (err) {
+                errors.push(`${key}: kein gueltiges JSON (${err.message})`);
+                continue;
+            }
+            artifacts[key] = { content: text };
+        } catch (err) {
+            errors.push(`${key}: ${err.message}`);
+        }
+    }
+    if (errors.length) {
+        throw new Error(errors.join("; "));
+    }
+    return artifacts;
+}
+
+function renderArtifactStatus(artifacts) {
+    if (!artifacts || typeof artifacts !== "object") return;
+    Object.entries(artifacts).forEach(([key, info]) => {
+        const node = document.getElementById(`artifact-status-${key}`);
+        if (!node || !info) return;
+        if (info.valid) {
+            const detail = info.projectId ? ` (project_id=${info.projectId}` + (info.packageName ? `, package=${info.packageName})` : ")") : "";
+            node.textContent = `✓ vorhanden${detail}`;
+            node.className = "text-muted phase-status-success";
+        } else if (info.exists) {
+            node.textContent = `⚠ ${info.error || "ungueltig"}`;
+            node.className = "text-muted phase-status-error";
+        } else {
+            node.textContent = "✗ fehlt";
+            node.className = "text-muted phase-status-error";
+        }
+    });
+}
+
 async function transferBootstrapConfig() {
     const firebase = getBootstrapFirebaseFormValues();
     const env = collectEnvFormUpdates();
+    let artifacts = {};
+    try {
+        artifacts = await collectArtifactUploads();
+    } catch (error) {
+        setConfigTransferStatus("Datei-Auswahl fehlerhaft: " + error.message, "error");
+        showNotification("Übertragen abgebrochen: " + error.message, "error");
+        return;
+    }
 
     const hasFirebaseValue = Object.values(firebase).some(v => v && v.toString().trim() !== "");
-    if (!hasFirebaseValue && Object.keys(env).length === 0) {
-        setConfigTransferStatus("Keine Werte zum Übertragen – bitte mindestens ein Feld ausfüllen.", "error");
+    const hasArtifacts = Object.keys(artifacts).length > 0;
+    if (!hasFirebaseValue && Object.keys(env).length === 0 && !hasArtifacts) {
+        setConfigTransferStatus("Keine Werte zum Übertragen – bitte mindestens ein Feld ausfüllen oder eine Datei waehlen.", "error");
         showNotification("Übertragen abgebrochen: keine Werte angegeben.", "warning");
         return;
     }
 
-    setConfigTransferStatus("Übertrage Konfiguration in .env und admin-panel/firebase-config.js …", "info");
+    setConfigTransferStatus("Übertrage Konfiguration in .env, admin-panel/firebase-config.js und Pflicht-Artefakte …", "info");
     try {
         const response = await fetch("/api/config/transfer", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ firebase, env }),
+            body: JSON.stringify({ firebase, env, artifacts }),
         });
         if (!response.ok) {
             const errPayload = await response.json().catch(() => ({}));
@@ -12643,14 +12707,22 @@ async function transferBootstrapConfig() {
         }
         const result = await response.json();
         const wrote = result.envWritten || [];
+        const artifactsWritten = result.artifactsWritten || [];
         const summary = [
             result.adminPanelFirebaseConfigWritten ? "firebase-config.js geschrieben" : null,
             wrote.length ? `${wrote.length} Werte in .env geschrieben` : null,
+            artifactsWritten.length ? `${artifactsWritten.length} Pflicht-Datei(en) geschrieben` : null,
         ].filter(Boolean).join(" – ") || "Keine Änderung erforderlich.";
+
+        renderArtifactStatus(result.artifacts || {});
 
         // Lokale Bootstrap-Konfiguration aus dem Formular ebenfalls persistieren,
         // damit der Browser dieselben Werte nutzt wie die Festplatte.
         try { persistBootstrapFirebaseConfig(false); } catch (_err) { /* nicht kritisch */ }
+
+        // Datei-Inputs zuruecksetzen, damit beim naechsten Klick nicht erneut
+        // dieselbe Datei hochgeladen wird.
+        document.querySelectorAll("[data-artifact-key]").forEach(input => { input.value = ""; });
 
         setConfigTransferStatus(`✓ ${summary}`, "success");
         showNotification("Konfiguration übertragen. " + summary, "success");
@@ -12693,6 +12765,7 @@ async function reloadConfigTransferState() {
                 input.value = value;
             }
         });
+        renderArtifactStatus(data.artifacts || {});
         setConfigTransferStatus(
             data.envFileExists
                 ? `✓ Geladen aus ${data.envFile}. Geheime Werte sind maskiert.`
@@ -12709,6 +12782,23 @@ async function reloadConfigTransferState() {
 if (typeof window !== "undefined") {
     window.transferBootstrapConfig = transferBootstrapConfig;
     window.reloadConfigTransferState = reloadConfigTransferState;
+
+    // Beim Laden des Panels den Artefakt-Status leise abfragen, damit der
+    // Benutzer ohne Klick sofort sieht, welche der drei Pflicht-Dateien
+    // bereits vorhanden sind. Schlaegt im rein statischen Modus (ohne
+    // Python-Admin-Server) leise fehl.
+    const _initArtifactStatus = () => {
+        if (!document.querySelector("[data-artifact-key]")) return;
+        fetch("/api/config/transfer")
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => { if (data) renderArtifactStatus(data.artifacts || {}); })
+            .catch(() => { /* ohne Server: Status bleibt "unbekannt" */ });
+    };
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", _initArtifactStatus, { once: true });
+    } else {
+        _initArtifactStatus();
+    }
 }
 
 function initializeFirebaseAfterConfigSave() {
