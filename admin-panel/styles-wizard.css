@@ -118,6 +118,7 @@ body {
 .wiz-field input[type="password"],
 .wiz-field input[type="email"],
 .wiz-field input[type="file"],
+.wiz-field select,
 .wiz-field textarea {
     width: 100%;
     padding: 8px 10px;
@@ -126,6 +127,34 @@ body {
     font-size: 0.95rem;
     font-family: inherit;
     background: white;
+}
+
+.wiz-field select:disabled {
+    background: #f3f4f6;
+    color: var(--wiz-muted);
+}
+
+.wiz-firebase-import {
+    margin: 16px 0;
+    padding: 12px 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+}
+
+.wiz-firebase-import summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--wiz-accent);
+}
+
+.wiz-firebase-import p {
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
+
+.wiz-firebase-import .wiz-actions {
+    margin-top: 8px;
 }
 
 .wiz-field textarea {

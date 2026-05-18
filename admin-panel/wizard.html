@@ -89,6 +89,37 @@
                 er sprechen soll. Ohne diese Werte kann sich kein Operator anmelden,
                 kein Gerät pairen und keine Telemetrie geschrieben werden.
             </div>
+
+            <details class="wiz-firebase-import">
+                <summary>📥 Aus bestehendem Firebase-Projekt importieren (Firebase CLI)</summary>
+                <p>
+                    Wenn du dich lokal bereits mit <code>firebase login</code> authentifiziert
+                    hast, kann der Wizard die Werte aus einem bestehenden Projekt automatisch
+                    abholen – inkl. der beiden <code>google-services.json</code>-Dateien.
+                    Nur der <code>serviceAccountKey.json</code> muss weiterhin manuell aus der
+                    Console heruntergeladen werden (Sicherheitsgrund: Firebase CLI darf keine
+                    privaten Schluessel erzeugen).
+                </p>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="loadFirebaseProjects">
+                        Projekte laden
+                    </button>
+                </div>
+                <div class="wiz-field">
+                    <label for="wiz-firebase-project-select">Verfuegbare Projekte</label>
+                    <select id="wiz-firebase-project-select" disabled>
+                        <option value="">(noch nicht geladen)</option>
+                    </select>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="importFirebaseProject" disabled id="wiz-firebase-import-btn">
+                        Werte aus diesem Projekt uebernehmen
+                    </button>
+                </div>
+                <div class="wiz-status" id="wiz-firebase-import-status">
+                    Status: noch nichts geladen.
+                </div>
+            </details>
             <p><strong>So findest du sie:</strong></p>
             <ol>
                 <li>Firebase-Console → <em>Projekteinstellungen</em> (Zahnrad oben links)</li>
