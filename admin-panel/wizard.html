@@ -271,6 +271,52 @@
                 Ohne diese Dateien laufen die mobilen Apps nicht und die Pre-Flight-Pruefung bleibt rot.
             </div>
 
+            <details class="wiz-firebase-import">
+                <summary>🔧 Tool-Helfer: SHA-1 / SHA-256 aus Android-Keystore berechnen</summary>
+                <p>
+                    <strong>Wofuer?</strong> Google Sign-In, Firebase App Check (Play Integrity)
+                    und Dynamic Links setzen voraus, dass der <strong>SHA-1-Fingerprint</strong>
+                    deines Signierungs-Zertifikats in der Firebase-Console hinterlegt ist –
+                    zusaetzlich zur <code>google-services.json</code>. Der Wert steht nicht
+                    in der heruntergeladenen JSON; er muss separat aus dem Keystore
+                    gelesen werden (Tool: <code>keytool</code>, Teil von JDK 17).
+                </p>
+                <p>
+                    <strong>Workflow:</strong> Knopf druecken → SHA-1 + SHA-256 erscheinen unten →
+                    in der Firebase-Console unter <em>Project Settings → Android-App →
+                    „Fingerprint hinzufuegen"</em> einfuegen.
+                </p>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="loadDebugKeystoreSha">
+                        📋 Debug-Keystore lesen (Default-Werte)
+                    </button>
+                </div>
+                <details class="wiz-help-block">
+                    <summary>Eigenen Release-Keystore lesen (Pfad + Passwort)</summary>
+                    <div class="wiz-field">
+                        <label for="wiz-keystore-path">Pfad zur .jks/.keystore-Datei</label>
+                        <input type="text" id="wiz-keystore-path" placeholder="C:\path\to\release.keystore" />
+                    </div>
+                    <div class="wiz-field">
+                        <label for="wiz-keystore-alias">Alias</label>
+                        <input type="text" id="wiz-keystore-alias" placeholder="z. B. release oder upload" />
+                    </div>
+                    <div class="wiz-field">
+                        <label for="wiz-keystore-storepass">Store-Passwort</label>
+                        <input type="password" id="wiz-keystore-storepass" autocomplete="off" />
+                    </div>
+                    <div class="wiz-actions">
+                        <button type="button" class="wiz-btn" data-wiz-action="loadCustomKeystoreSha">
+                            📋 Custom-Keystore lesen
+                        </button>
+                    </div>
+                </details>
+                <div class="wiz-status" id="wiz-keystore-status">
+                    Status: noch nichts gelesen.
+                </div>
+                <div id="wiz-keystore-result" class="wiz-help-block" hidden></div>
+            </details>
+
             <div class="wiz-field">
                 <label for="wiz-art-master">masterApp / google-services.json</label>
                 <p class="wiz-hint">
