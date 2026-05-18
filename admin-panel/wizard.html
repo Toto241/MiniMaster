@@ -124,6 +124,23 @@
                         <li>Authorized redirect URIs: <em>(leer lassen – wir nutzen den GIS-Token-Flow)</em></li>
                         <li>„Create" → Client ID kopieren</li>
                         <li>Zusaetzlich pruefen: <a href="https://console.cloud.google.com/apis/library/firebase.googleapis.com" target="_blank" rel="noopener">Firebase Management API</a> muss im Projekt aktiviert sein</li>
+                        <li>
+                            <strong>WICHTIG – sonst „Fehler 403: access_denied" beim Login:</strong>
+                            <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener">OAuth consent screen</a>
+                            oeffnen → Status sollte „Testing" sein (Default) →
+                            unter <em>„Test users"</em> auf „+ Add users" → die eigene
+                            Google-Mail-Adresse eintragen. Solange der Consent-Screen
+                            unverifiziert ist, duerfen nur die hier gelisteten Konten
+                            den Login durchlaufen (Google-Standard fuer
+                            nicht-Workspace-Apps; bis zu 100 Tester moeglich).
+                            <br />
+                            <strong>Falls Google meldet „not associated with a Google Account":</strong>
+                            Du hast vermutlich eine <code>@googlemail.com</code>-Adresse eingetragen.
+                            Google's Validator akzeptiert nur die kanonische
+                            <code>@gmail.com</code>-Form – beide gehoeren demselben Konto.
+                            Trage stattdessen <code>name@gmail.com</code> ein (Punkte in
+                            Gmail-Adressen werden ohnehin ignoriert).
+                        </li>
                     </ol>
                 </details>
                 <div class="wiz-field">

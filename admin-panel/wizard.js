@@ -67,6 +67,32 @@
         node.className = "wiz-status" + (level ? ` is-${level}` : "");
     }
 
+    function describeOAuthError(code) {
+        const c = String(code || "").toLowerCase();
+        // Bekannte Google-Fehler-Codes → konkrete Handlungsanweisung statt
+        // generische Botschaft. Der Wizard ist Erstkontakt mit Google OAuth
+        // fuer viele Nutzer – die Default-Meldungen reichen nicht.
+        if (c === "access_denied" || c === "popup_closed_by_user") {
+            return "✗ Zugriff von Google verweigert. Wahrscheinlichste Ursache: dein Konto ist " +
+                "noch nicht als Test-User im OAuth-consent-screen eingetragen. " +
+                "Loesung: console.cloud.google.com/apis/credentials/consent → " +
+                "'Test users' → '+ Add users' → eigene Mail eintragen → erneut versuchen.";
+        }
+        if (c === "popup_blocked" || c === "popup_failed_to_open") {
+            return "✗ Popup blockiert. Bitte Popups fuer 127.0.0.1:8765 im Browser zulassen und erneut klicken.";
+        }
+        if (c === "invalid_client" || c === "unauthorized_client") {
+            return "✗ Client-ID ungueltig oder Origin nicht autorisiert. Pruefe in der Cloud-Console, " +
+                "dass 'http://127.0.0.1:8765' bzw. 'http://localhost:8765' als 'Authorized JavaScript origin' " +
+                "im OAuth-Client eingetragen ist.";
+        }
+        if (c === "invalid_scope") {
+            return "✗ Scope abgelehnt. Pruefe, dass die Firebase Management API im Cloud-Projekt aktiviert ist " +
+                "(console.cloud.google.com/apis/library/firebase.googleapis.com).";
+        }
+        return `✗ Login fehlgeschlagen: ${code || "unbekannt"}`;
+    }
+
     function getOAuthClientId() {
         const input = document.getElementById("wiz-oauth-client-id");
         return ((input && input.value) || "").trim();
@@ -128,11 +154,12 @@
                         _oauthAccessToken = tokenResponse.access_token;
                         onOAuthLoggedIn();
                     } else if (tokenResponse && tokenResponse.error) {
-                        setOAuthStatus(`✗ Login fehlgeschlagen: ${tokenResponse.error}`, "err");
+                        setOAuthStatus(describeOAuthError(tokenResponse.error), "err");
                     }
                 },
                 error_callback: (err) => {
-                    setOAuthStatus(`✗ Login abgebrochen oder fehlgeschlagen: ${(err && err.type) || "unbekannt"}`, "err");
+                    const code = (err && (err.type || err.error)) || "unbekannt";
+                    setOAuthStatus(describeOAuthError(code), "err");
                 },
             });
             setOAuthStatus("Oeffne Google-Anmeldung …", "");
