@@ -327,16 +327,34 @@ function _renderAuthDiagnostics(result, opts) {
 
     // Zielgerichtete Empfehlungen aus dem 3-Wege-Vergleich
     if (backendLoginOk && browserDirectAttempted && browserDirectOk) {
+        const appCheck = probeAppCheckStatus();
+        const appCheckLine = appCheck.siteKeyPresent
+            ? `<div style="font-family:monospace;font-size:0.85em;color:#6b7280">App Check: Site-Key gesetzt (${_escapeHtml(appCheck.siteKeyValue)}), Provider ${_escapeHtml(appCheck.provider)}.</div>`
+            : `<div style="font-family:monospace;font-size:0.85em;color:#dc2626">App Check: kein Site-Key in firebase-config.js. ${_escapeHtml(appCheck.hint)}</div>`;
         rows.push(`<div style="margin-top:10px;background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
             <strong>🩺 Diagnose-Fokus: Das Firebase-SDK selbst.</strong> Backend + Browser-Direct funktionieren –
-            der Auth-Aufruf kommt am Server an. Der SDK-Layer dazwischen scheitert. Probier in dieser Reihenfolge:
-            <ol>
-                <li><strong>Browser-Cache leeren</strong> fuer 127.0.0.1:8765 (Strg+Shift+Entf → Cookies + Site-Daten → 1 Stunde).</li>
-                <li><strong>IndexedDB pruefen</strong>: DevTools (F12) → Application → IndexedDB → 'firebaseLocalStorageDb' loeschen.</li>
-                <li><strong>Service Worker entregistrieren</strong>: DevTools → Application → Service Workers → Unregister.</li>
-                <li><strong>App Check pruefen</strong>: Firebase-Console → App Check → wenn fuer Authentication 'Enforced', aber kein Provider konfiguriert ist → entweder Provider hinterlegen oder zurueck auf 'Unenforced'.</li>
-                <li><strong>Inkognito-Modus testen</strong>: schliesst alle Extensions UND alle State-Probleme aus. Wenn Login dort funktioniert, ist eine Extension oder lokaler Cache der Uebeltaeter.</li>
-            </ol>
+            der Auth-Aufruf kommt am Server an. Der SDK-Layer dazwischen scheitert.<br><br>
+            ${appCheckLine}<br>
+            <strong>Automatische Reparatur (empfohlene Reihenfolge):</strong>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-primary" id="auto-reset-state-btn">🧹 Browser-State zuruecksetzen (1 Klick)</button>
+                <button type="button" class="btn btn-secondary" id="auto-reload-btn">🔄 Mit Cache-Bypass neu laden</button>
+                <button type="button" class="btn btn-secondary" id="open-app-check-console-btn">🔗 App Check in Firebase-Console oeffnen</button>
+            </div>
+            <div id="auto-reset-result" style="margin-top:8px"></div>
+            <details style="margin-top:8px">
+                <summary>Was macht 'Browser-State zuruecksetzen'?</summary>
+                <p style="font-size:0.9em">Loescht fuer 127.0.0.1:8765: <em>localStorage</em>, <em>sessionStorage</em>,
+                alle <em>IndexedDB</em>-Datenbanken (insb. <code>firebaseLocalStorageDb</code>, App-Check-DB, Heartbeat-DB),
+                <em>CacheStorage</em>, alle <em>Service-Worker</em>-Registrierungen und Cookies. Andere Sites bleiben unberuehrt.</p>
+            </details>
+            <details style="margin-top:8px">
+                <summary>Wenn das nicht hilft: Inkognito-Modus probieren</summary>
+                <p style="font-size:0.9em">Tastenkuerzel: <strong>Strg+Shift+N</strong> (Chrome/Edge) bzw.
+                <strong>Strg+Shift+P</strong> (Firefox). Dort die Login-Seite oeffnen
+                <code>http://127.0.0.1:8765/admin-panel/</code>. Wenn der Login dort funktioniert, ist eine Extension
+                der Uebeltaeter – im normalen Profil eine nach der anderen deaktivieren bis der Login klappt.</p>
+            </details>
         </div>`);
     } else if (backendLoginOk && browserDirectAttempted && !browserDirectOk) {
         rows.push(`<div style="margin-top:10px;background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
@@ -361,6 +379,67 @@ function _renderAuthDiagnostics(result, opts) {
     }
 
     node.innerHTML = rows.join("\n");
+
+    // Buttons in der Fall-A-Box verdrahten (dynamisch injiziertes DOM).
+    const resetBtn = document.getElementById("auto-reset-state-btn");
+    if (resetBtn && !resetBtn.__bound) {
+        resetBtn.__bound = true;
+        resetBtn.addEventListener("click", _handleAutoResetClick);
+    }
+    const reloadBtn = document.getElementById("auto-reload-btn");
+    if (reloadBtn && !reloadBtn.__bound) {
+        reloadBtn.__bound = true;
+        reloadBtn.addEventListener("click", () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("_mmReset", String(Date.now()));
+            window.location.replace(url.toString());
+        });
+    }
+    const consoleBtn = document.getElementById("open-app-check-console-btn");
+    if (consoleBtn && !consoleBtn.__bound) {
+        consoleBtn.__bound = true;
+        consoleBtn.addEventListener("click", () => {
+            const pid = (result && result.projectId) || "_";
+            window.open(
+                `https://console.firebase.google.com/project/${encodeURIComponent(pid)}/appcheck/products`,
+                "_blank", "noopener",
+            );
+        });
+    }
+}
+
+async function _handleAutoResetClick() {
+    const btn = document.getElementById("auto-reset-state-btn");
+    const target = document.getElementById("auto-reset-result");
+    if (!target) return;
+    const ok = window.confirm(
+        "Das loescht localStorage, IndexedDB, Caches, Service Worker und Cookies "
+        + "fuer 127.0.0.1:8765 / localhost:8765 (keine anderen Sites).\n\n"
+        + "Danach wird die Seite mit Cache-Bypass neu geladen. Fortfahren?"
+    );
+    if (!ok) return;
+    if (btn) btn.disabled = true;
+    target.innerHTML = "<em>Loesche Browser-State …</em>";
+    let report;
+    try {
+        report = await autoResetFirebaseBrowserState();
+    } catch (err) {
+        target.innerHTML = `<div style="background:#fee2e2;padding:8px;border-left:4px solid #dc2626">
+            ✗ Reset fehlgeschlagen: ${_escapeHtml(err.message || String(err))}</div>`;
+        if (btn) btn.disabled = false;
+        return;
+    }
+    const rows = report.map(r => {
+        const mark = r.ok ? "✓" : "✗";
+        const color = r.ok ? "#16a34a" : "#dc2626";
+        return `<div style="font-family:monospace;font-size:0.9em;color:${color}">${mark} ${_escapeHtml(r.step)} – ${_escapeHtml(r.detail)}</div>`;
+    });
+    rows.push(`<div style="margin-top:8px;padding:8px;background:#d1fae5;border-left:4px solid #16a34a">
+        <strong>✓ Reset abgeschlossen.</strong>
+        <div id="reset-reload-zone" style="margin-top:6px"></div>
+    </div>`);
+    target.innerHTML = rows.join("\n");
+    _hardReloadWithCountdown(document.getElementById("reset-reload-zone"), 5);
 }
 
 function _boolBadge(value) {
@@ -374,6 +453,199 @@ function _tristateBadge(value) {
         return "<span style=\"color:#6b7280\">? nicht ermittelbar (vorgelagerter Fehler)</span>";
     }
     return _boolBadge(value);
+}
+
+// ── Auto-Reset: alle Browser-Stores, die das Firebase-SDK nutzt ──────
+//
+// Loescht localStorage, sessionStorage, alle IndexedDB-Datenbanken,
+// CacheStorage-Eintraege, Service-Worker-Registrierungen und Cookies
+// fuer die aktuelle Origin. Wird ueber den "Browser-State zuruecksetzen"-
+// Button in der Diagnose-Box ausgeloest.
+//
+// Sicherheit: betrifft NUR die aktuelle Origin (127.0.0.1:8765 /
+// localhost:8765) – andere Sites bleiben unberuehrt.
+async function autoResetFirebaseBrowserState() {
+    const report = [];
+
+    // 1) localStorage
+    try {
+        const count = (typeof localStorage !== "undefined") ? localStorage.length : 0;
+        if (typeof localStorage !== "undefined") localStorage.clear();
+        report.push({ step: "localStorage", ok: true, detail: `${count} Eintrag(e) geloescht` });
+    } catch (err) {
+        report.push({ step: "localStorage", ok: false, detail: err.message || String(err) });
+    }
+
+    // 2) sessionStorage
+    try {
+        const count = (typeof sessionStorage !== "undefined") ? sessionStorage.length : 0;
+        if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+        report.push({ step: "sessionStorage", ok: true, detail: `${count} Eintrag(e) geloescht` });
+    } catch (err) {
+        report.push({ step: "sessionStorage", ok: false, detail: err.message || String(err) });
+    }
+
+    // 3) IndexedDB – primaer ueber databases() (Chromium/Firefox), sonst
+    //    Fallback auf bekannte Firebase-DB-Namen.
+    const _FIREBASE_DB_NAMES = [
+        "firebaseLocalStorageDb",
+        "firebase-installations-database",
+        "firebase-heartbeat-database",
+        "firebase-messaging-database",
+        "firebase-app-check-database",
+        "firebase-analytics-database",
+    ];
+    try {
+        const dbs = [];
+        if (typeof indexedDB !== "undefined" && typeof indexedDB.databases === "function") {
+            const listed = await indexedDB.databases();
+            for (const entry of listed) {
+                if (entry && entry.name) dbs.push(entry.name);
+            }
+        } else {
+            // Browser ohne databases()-API (Safari teilweise): fallback
+            for (const name of _FIREBASE_DB_NAMES) dbs.push(name);
+        }
+        let deleted = 0;
+        const failed = [];
+        for (const name of dbs) {
+            const ok = await new Promise((resolve) => {
+                try {
+                    const req = indexedDB.deleteDatabase(name);
+                    req.onsuccess = () => resolve(true);
+                    req.onerror = () => resolve(false);
+                    req.onblocked = () => resolve(false);
+                    // Timeout-Safety: nach 2s aufgeben
+                    setTimeout(() => resolve(false), 2000);
+                } catch (_e) {
+                    resolve(false);
+                }
+            });
+            if (ok) deleted += 1;
+            else failed.push(name);
+        }
+        const detailParts = [`${deleted}/${dbs.length} DB(s) geloescht`];
+        if (failed.length) detailParts.push(`blockiert: ${failed.join(", ")}`);
+        report.push({
+            step: "IndexedDB",
+            ok: failed.length === 0,
+            detail: detailParts.join(" – "),
+        });
+    } catch (err) {
+        report.push({ step: "IndexedDB", ok: false, detail: err.message || String(err) });
+    }
+
+    // 4) CacheStorage (Service-Worker-Caches)
+    try {
+        if (typeof caches !== "undefined" && typeof caches.keys === "function") {
+            const names = await caches.keys();
+            await Promise.all(names.map(n => caches.delete(n)));
+            report.push({
+                step: "CacheStorage",
+                ok: true,
+                detail: `${names.length} Cache(s) geloescht${names.length ? `: ${names.join(", ")}` : ""}`,
+            });
+        } else {
+            report.push({ step: "CacheStorage", ok: true, detail: "API nicht verfuegbar" });
+        }
+    } catch (err) {
+        report.push({ step: "CacheStorage", ok: false, detail: err.message || String(err) });
+    }
+
+    // 5) Service-Worker-Registrierungen
+    try {
+        if (typeof navigator !== "undefined"
+            && navigator.serviceWorker
+            && typeof navigator.serviceWorker.getRegistrations === "function") {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister().catch(() => false)));
+            report.push({
+                step: "Service Workers",
+                ok: true,
+                detail: `${regs.length} Worker entregistriert`,
+            });
+        } else {
+            report.push({ step: "Service Workers", ok: true, detail: "API nicht verfuegbar" });
+        }
+    } catch (err) {
+        report.push({ step: "Service Workers", ok: false, detail: err.message || String(err) });
+    }
+
+    // 6) Cookies fuer aktuelle Origin
+    try {
+        const rawCookies = (document.cookie || "").split(";");
+        let cleared = 0;
+        for (const raw of rawCookies) {
+            const trimmed = raw.trim();
+            if (!trimmed) continue;
+            const name = trimmed.split("=")[0].trim();
+            if (!name) continue;
+            // Mit / ohne Pfad ablaufen lassen – manche Cookies sind auf
+            // konkrete Pfade gesetzt.
+            document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            document.cookie = `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            cleared += 1;
+        }
+        report.push({ step: "Cookies", ok: true, detail: `${cleared} Cookie(s) entfernt` });
+    } catch (err) {
+        report.push({ step: "Cookies", ok: false, detail: err.message || String(err) });
+    }
+
+    return report;
+}
+
+// ── App-Check-Probe (clientseitig) ──────────────────────────────────
+//
+// Schaut, ob die aktuelle firebase-config.js einen Site Key fuer App
+// Check setzt und ob App Check beim SDK-Init eine Instanz angelegt hat.
+// Erkennt typische Fehl-Konfigurationen: enforced ohne Provider.
+function probeAppCheckStatus() {
+    const cfg = (typeof window !== "undefined" && window.__MM_FIREBASE_CONFIG__) || null;
+    const siteKey = cfg && cfg.appCheck && cfg.appCheck.siteKey ? cfg.appCheck.siteKey : "";
+    const globalSiteKey = (typeof window !== "undefined" && window.MINIMASTER_APP_CHECK_SITE_KEY) || "";
+    const effective = siteKey || globalSiteKey;
+    return {
+        siteKeyPresent: !!effective,
+        siteKeyValue: effective ? `${String(effective).slice(0, 6)}…(${String(effective).length} chars)` : "",
+        provider: cfg && cfg.appCheck ? (cfg.appCheck.provider || "?") : "(nicht konfiguriert)",
+        hint: effective
+            ? "App Check ist clientseitig konfiguriert. Falls trotzdem Login-Probleme: "
+              + "in der Firebase-Console pruefen, ob der reCAPTCHA-Site-Key in App Check "
+              + "fuer die Web-App registriert ist (gleicher Schluessel wie hier)."
+            : "Kein Site Key gesetzt. Wenn App Check fuer Authentication in der Firebase-"
+              + "Console auf 'Enforced' steht, wird der Login geblockt – Site Key in der "
+              + "firebase-config.js eintragen ODER Enforcement zurueck auf 'Unenforced'.",
+    };
+}
+
+// ── Auto-Reload mit Countdown ───────────────────────────────────────
+function _hardReloadWithCountdown(targetNode, seconds = 5) {
+    let remaining = seconds;
+    const tick = () => {
+        if (targetNode) {
+            targetNode.innerHTML = `<strong>Seite wird in ${remaining}s neu geladen …</strong>
+                <button type="button" class="btn btn-secondary" id="reset-cancel-reload-btn">Abbrechen</button>`;
+            const cancelBtn = document.getElementById("reset-cancel-reload-btn");
+            if (cancelBtn) {
+                cancelBtn.addEventListener("click", () => {
+                    clearInterval(handle);
+                    targetNode.innerHTML = "<em>Reload abgebrochen. Klick 'Anmelden' um es zu probieren.</em>";
+                }, { once: true });
+            }
+        }
+        if (remaining <= 0) {
+            clearInterval(handle);
+            // Cache-Bypass-Reload: location.reload(true) ist deprecated;
+            // Trick: ein Query-Parameter zwingt einen frischen Server-Request.
+            const url = new URL(window.location.href);
+            url.searchParams.set("_mmReset", String(Date.now()));
+            window.location.replace(url.toString());
+            return;
+        }
+        remaining -= 1;
+    };
+    tick();
+    const handle = setInterval(tick, 1000);
 }
 
 // ── Connectivity-Self-Test (Backend + Browser-Stack parallel) ───────
