@@ -46,6 +46,157 @@
         return true;
     }
 
+    // ── Firebase-Import (lesend, ueber Firebase CLI) ───────────────────
+    //
+    // Hier zwischengespeicherte Inhalte fuer die Pflicht-Dateien. Werden
+    // beim Submit als artifacts[<key>].content gesendet, sofern der User
+    // nicht zusaetzlich manuell eine andere Datei hochgeladen hat (die
+    // gewinnt dann).
+    const _firebaseImportedArtifacts = Object.create(null);
+
+    function setFirebaseImportStatus(message, level) {
+        const node = document.getElementById("wiz-firebase-import-status");
+        if (!node) return;
+        node.textContent = message || "";
+        node.className = "wiz-status" + (level ? ` is-${level}` : "");
+    }
+
+    async function loadFirebaseProjects() {
+        const select = document.getElementById("wiz-firebase-project-select");
+        const importBtn = document.getElementById("wiz-firebase-import-btn");
+        setFirebaseImportStatus("Lade Projekte aus 'firebase projects:list' …", "");
+        try {
+            const response = await fetch("/api/firebase/projects");
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            const projects = data.projects || [];
+            if (!select) return;
+            select.innerHTML = "";
+            if (projects.length === 0) {
+                select.appendChild(buildOption("", "(keine Projekte gefunden)"));
+                select.disabled = true;
+                if (importBtn) importBtn.disabled = true;
+                setFirebaseImportStatus("Keine Projekte mit dem aktuellen Login zugreifbar.", "warn");
+                return;
+            }
+            select.appendChild(buildOption("", "— bitte waehlen —"));
+            projects.forEach(p => {
+                const label = p.displayName ? `${p.displayName} (${p.projectId})` : p.projectId;
+                select.appendChild(buildOption(p.projectId, label));
+            });
+            select.disabled = false;
+            if (importBtn) importBtn.disabled = false;
+            setFirebaseImportStatus(`✓ ${projects.length} Projekt(e) geladen. Eines auswaehlen und uebernehmen.`, "ok");
+        } catch (err) {
+            setFirebaseImportStatus(`✗ Laden fehlgeschlagen: ${err.message}`, "err");
+            if (select) {
+                select.innerHTML = "";
+                select.appendChild(buildOption("", "(Fehler – siehe Status)"));
+                select.disabled = true;
+            }
+            if (importBtn) importBtn.disabled = true;
+        }
+    }
+
+    function buildOption(value, label) {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        return opt;
+    }
+
+    async function importFirebaseProject() {
+        const select = document.getElementById("wiz-firebase-project-select");
+        if (!select || !select.value) {
+            setFirebaseImportStatus("Bitte zuerst ein Projekt auswaehlen.", "warn");
+            return;
+        }
+        const projectId = select.value;
+        setFirebaseImportStatus(`Hole Konfiguration fuer '${projectId}' aus der Firebase CLI …`, "");
+        try {
+            const response = await fetch(`/api/firebase/import?projectId=${encodeURIComponent(projectId)}`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            const summary = applyFirebaseImport(data);
+            setFirebaseImportStatus(`✓ ${summary}`, "ok");
+        } catch (err) {
+            setFirebaseImportStatus(`✗ Import fehlgeschlagen: ${err.message}`, "err");
+        }
+    }
+
+    function applyFirebaseImport(data) {
+        const parts = [];
+
+        // Web-Konfiguration in die Eingabefelder uebernehmen.
+        const web = data && data.webConfig;
+        if (web && typeof web === "object") {
+            const keys = ["projectId", "apiKey", "authDomain", "storageBucket", "messagingSenderId", "appId", "measurementId"];
+            let written = 0;
+            keys.forEach(key => {
+                const value = web[key];
+                if (typeof value !== "string" || !value) return;
+                const input = document.querySelector(`[data-firebase-key="${key}"]`);
+                if (input) {
+                    input.value = value;
+                    written += 1;
+                }
+            });
+            if (written > 0) parts.push(`Web-Konfig (${written} Felder)`);
+        } else {
+            parts.push("keine Web-App im Projekt");
+        }
+
+        // Android-Configs → Pflicht-Dateien-Inhalte vorhalten.
+        const androidApps = (data && data.androidApps) || [];
+        let masterAssigned = false;
+        let childAssigned = false;
+        androidApps.forEach(app => {
+            if (!app || !app.fileContents) return;
+            const pkg = app.packageName || "";
+            if (pkg === "com.minimaster.masterapp" && !masterAssigned) {
+                _firebaseImportedArtifacts.googleServicesMaster = app.fileContents;
+                markArtifactImported("googleServicesMaster", pkg);
+                masterAssigned = true;
+            } else if (pkg === "com.google.pairing" && !childAssigned) {
+                _firebaseImportedArtifacts.googleServicesChild = app.fileContents;
+                markArtifactImported("googleServicesChild", pkg);
+                childAssigned = true;
+            }
+        });
+        if (masterAssigned) parts.push("masterApp/google-services.json");
+        if (childAssigned) parts.push("childApp/google-services.json");
+
+        // Service Account: kann CLI nicht erzeugen → Hinweis durchreichen.
+        if (data && data.serviceAccount && data.serviceAccount.consoleUrl) {
+            const link = document.getElementById("wiz-link-service-account");
+            if (link) link.setAttribute("href", data.serviceAccount.consoleUrl);
+        }
+
+        // Deep-Links erneut auflösen, falls die Project-ID gerade gesetzt wurde.
+        updateDeepLinks();
+
+        // CLI hat Teil-Warnungen geliefert?
+        const warnings = (data && data.warnings) || [];
+        if (warnings.length) {
+            parts.push(`(${warnings.length} Teil-Warnung(en))`);
+        }
+
+        return parts.length ? `Uebernommen: ${parts.join(", ")}. Service-Account-Key bitte manuell hochladen.` : "Keine uebernehmbaren Werte gefunden.";
+    }
+
+    function markArtifactImported(key, pkg) {
+        const status = document.getElementById(`wiz-art-${shortFileKey(key)}-status`);
+        if (!status) return;
+        status.textContent = `✓ Aus Firebase CLI uebernommen (package=${pkg}). Datei-Upload ueberschreibt diese Quelle.`;
+        status.className = "wiz-status is-ok";
+    }
+
     // ── Field-Sammler ──────────────────────────────────────────────────
     function collectFirebase() {
         const out = {};
@@ -79,6 +230,9 @@
     async function collectArtifacts() {
         const out = {};
         const fileInputs = $$("[data-artifact-key]");
+
+        // Manuelle Uploads haben Vorrang.
+        const uploadedKeys = new Set();
         for (const input of fileInputs) {
             const key = input.getAttribute("data-artifact-key");
             const file = input.files && input.files[0];
@@ -95,7 +249,17 @@
                 throw new Error(`${key}: kein gueltiges JSON (${err.message})`);
             }
             out[key] = { content: text };
+            uploadedKeys.add(key);
         }
+
+        // Aus Firebase CLI importierte Inhalte nachreichen, sofern der User
+        // nicht manuell eine Datei hochgeladen hat.
+        Object.entries(_firebaseImportedArtifacts).forEach(([key, content]) => {
+            if (!uploadedKeys.has(key) && typeof content === "string" && content) {
+                out[key] = { content };
+            }
+        });
+
         return out;
     }
 
@@ -175,7 +339,13 @@
         const files = $$("[data-artifact-key]").reduce((acc, input) => {
             const key = input.getAttribute("data-artifact-key");
             const file = input.files && input.files[0];
-            acc[key] = file ? file.name : null;
+            if (file) {
+                acc[key] = `Upload: ${file.name}`;
+            } else if (_firebaseImportedArtifacts[key]) {
+                acc[key] = "aus Firebase CLI uebernommen";
+            } else {
+                acc[key] = null;
+            }
             return acc;
         }, {});
 
@@ -201,8 +371,7 @@
             serviceAccountKey: "serviceAccountKey.json",
         };
         Object.entries(fileLabels).forEach(([key, label]) => {
-            const name = files[key];
-            rows.push(summaryRow(label, name ? `Datei: ${name}` : null, false));
+            rows.push(summaryRow(label, files[key], false));
         });
 
         const envLabels = {
@@ -331,6 +500,8 @@
                 if (action === "next") next();
                 else if (action === "prev") prev();
                 else if (action === "submit") submitWizard();
+                else if (action === "loadFirebaseProjects") loadFirebaseProjects();
+                else if (action === "importFirebaseProject") importFirebaseProject();
             });
         });
         // Project-ID-Aenderung -> Deep-Links aktualisieren

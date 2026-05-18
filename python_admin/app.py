@@ -7,6 +7,7 @@ import mimetypes
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -6583,6 +6584,174 @@ def _artifact_has_placeholder(text: str) -> bool:
     return any(token in text for token in ARTIFACT_PLACEHOLDER_TOKENS)
 
 
+# ─── Firebase CLI Wrapper (nur lesende Operationen) ──────────────────
+
+def _run_firebase_cli(args: list[str], *, timeout: int = 60) -> tuple[int, str, str]:
+    """Fuehrt 'firebase <args>' aus. Loest .cmd-Wrapper auf Windows ueber
+    shutil.which auf. Liefert (returncode, stdout, stderr).
+    """
+    fb = shutil.which("firebase")
+    if not fb:
+        return (127, "", "firebase CLI nicht im PATH. Bitte installieren: npm install -g firebase-tools")
+    try:
+        proc = subprocess.run(
+            [fb, *args], capture_output=True, text=True, timeout=timeout, encoding="utf-8",
+        )
+        return (proc.returncode, proc.stdout or "", proc.stderr or "")
+    except Exception as exc:
+        return (1, "", str(exc))
+
+
+def _parse_firebase_json_response(
+    out: str, err: str, op_label: str,
+) -> dict[str, object]:
+    """Wertet die '--json'-Antwort der Firebase CLI aus.
+
+    Konvention: Ein Top-Level-Objekt {"status": "success"|"error", "result": ...,
+    "error": "...optional"}. Wir koennen uns auf den ``status``-Feld nicht auf
+    den Exit-Code verlassen, weil die CLI selbst bei Auth-Fehlern manchmal 0
+    zurueckgibt. Wirft RuntimeError mit lesbarer Botschaft bei Fehlern.
+    """
+    raw = (out or "").strip()
+    if not raw:
+        message = (err or "").strip() or "(keine Ausgabe)"
+        raise RuntimeError(
+            f"{op_label}: keine JSON-Antwort. CLI-Ausgabe: {message[:300]}. "
+            "Pruefe 'firebase login' und Netzwerkzugriff."
+        )
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        raise RuntimeError(
+            f"{op_label}: Antwort ist kein JSON ({exc}). Raw: {raw[:200]}"
+        )
+    if not isinstance(parsed, dict):
+        raise RuntimeError(f"{op_label}: unerwarteter Antwort-Typ ({type(parsed).__name__}).")
+    if parsed.get("status") == "error":
+        msg = parsed.get("error") or "unbekannter CLI-Fehler"
+        raise RuntimeError(
+            f"{op_label}: {msg}. Pruefe 'firebase login' und ob das Projekt "
+            f"erreichbar ist – oder fuelle den Wizard manuell aus."
+        )
+    return parsed
+
+
+def list_firebase_projects() -> list[dict[str, str]]:
+    """Liefert die Liste aller Firebase-Projekte, auf die der aktuelle CLI-Login Zugriff hat."""
+    _, out, err = _run_firebase_cli(["projects:list", "--json"])
+    parsed = _parse_firebase_json_response(out, err, "firebase projects:list")
+    result = parsed.get("result") or []
+    projects: list[dict[str, str]] = []
+    for entry in result if isinstance(result, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        projects.append({
+            "projectId": str(entry.get("projectId") or ""),
+            "displayName": str(entry.get("displayName") or ""),
+            "projectNumber": str(entry.get("projectNumber") or ""),
+            "state": str(entry.get("state") or ""),
+        })
+    return projects
+
+
+def import_firebase_project(project_id: str) -> dict[str, object]:
+    """Holt Web-Konfig und google-services.json-Inhalte aller registrierten Apps.
+
+    Loest sowohl die Web-App-Config (apiKey, projectId, ...) als auch die
+    google-services.json fuer alle Android-Apps via 'firebase apps:sdkconfig'.
+    Wirft RuntimeError mit lesbarer Botschaft bei fehlenden Credentials.
+    """
+    if not project_id or not re.match(r"^[a-z][a-z0-9-]{4,29}$", project_id):
+        raise ValueError("Ungueltige projectId.")
+
+    # 1) Apps des Projekts auflisten (harter Fehler bei Misslingen).
+    _, out, err = _run_firebase_cli(["apps:list", "--project", project_id, "--json"])
+    apps_payload = _parse_firebase_json_response(out, err, "firebase apps:list")
+    apps = apps_payload.get("result") or []
+
+    web_config: dict[str, object] | None = None
+    android_apps: list[dict[str, object]] = []
+    app_errors: list[str] = []
+
+    for app in apps if isinstance(apps, list) else []:
+        if not isinstance(app, dict):
+            continue
+        platform = str(app.get("platform") or "").upper()
+        app_id = str(app.get("appId") or "")
+        if not app_id:
+            continue
+
+        if platform == "WEB" and web_config is None:
+            _, out2, err2 = _run_firebase_cli(
+                ["apps:sdkconfig", "WEB", app_id, "--project", project_id, "--json"],
+            )
+            try:
+                cfg_payload = _parse_firebase_json_response(out2, err2, f"sdkconfig WEB {app_id}")
+            except RuntimeError as exc:
+                app_errors.append(str(exc))
+                continue
+            sdk = ((cfg_payload.get("result") or {}).get("sdkConfig") or {})
+            if isinstance(sdk, dict):
+                web_config = {
+                    "apiKey": str(sdk.get("apiKey") or ""),
+                    "authDomain": str(sdk.get("authDomain") or ""),
+                    "projectId": str(sdk.get("projectId") or project_id),
+                    "storageBucket": str(sdk.get("storageBucket") or ""),
+                    "messagingSenderId": str(sdk.get("messagingSenderId") or ""),
+                    "appId": str(sdk.get("appId") or ""),
+                    "measurementId": str(sdk.get("measurementId") or ""),
+                }
+
+        elif platform == "ANDROID":
+            _, out2, err2 = _run_firebase_cli(
+                ["apps:sdkconfig", "ANDROID", app_id, "--project", project_id, "--json"],
+            )
+            try:
+                cfg_payload = _parse_firebase_json_response(out2, err2, f"sdkconfig ANDROID {app_id}")
+            except RuntimeError as exc:
+                app_errors.append(str(exc))
+                continue
+            file_contents = ((cfg_payload.get("result") or {}).get("fileContents") or "")
+            if not isinstance(file_contents, str) or not file_contents.strip():
+                continue
+            pkg = ""
+            try:
+                parsed = json.loads(file_contents)
+                clients = parsed.get("client") or []
+                if isinstance(clients, list) and clients:
+                    first = clients[0]
+                    if isinstance(first, dict):
+                        info = (first.get("client_info") or {})
+                        if isinstance(info, dict):
+                            pkg = str(((info.get("android_client_info") or {}).get("package_name") or ""))
+            except Exception:
+                pkg = ""
+            android_apps.append({
+                "appId": app_id,
+                "displayName": str(app.get("displayName") or ""),
+                "packageName": pkg,
+                "fileContents": file_contents,
+            })
+
+    # Service-Account-Schluessel kann die Firebase-CLI NICHT erzeugen (das geht
+    # nur ueber gcloud / Console). Wir liefern einen Link-Hinweis mit zurueck.
+    service_account_hint = {
+        "available": False,
+        "reason": "Firebase CLI kann keine Service-Account-Keys generieren. "
+                  "Bitte ueber Firebase-Console -> Projekteinstellungen -> Dienstkonten -> "
+                  "'Neuen privaten Schluessel generieren' anlegen und in den Wizard hochladen.",
+        "consoleUrl": f"https://console.firebase.google.com/project/{project_id}/settings/serviceaccounts/adminsdk",
+    }
+
+    return {
+        "projectId": project_id,
+        "webConfig": web_config,
+        "androidApps": android_apps,
+        "serviceAccount": service_account_hint,
+        "warnings": app_errors,
+    }
+
+
 def _summarize_artifact(target: Path) -> dict[str, object]:
     """Liest eine vorhandene JSON-Pflicht-Datei und gibt Status-Infos zurueck."""
     info: dict[str, object] = {
@@ -6888,6 +7057,32 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                     "snapshotRoot": str(SNAPSHOT_ROOT),
                     "snapshots": list_snapshots(),
                 })
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/firebase/projects":
+            try:
+                projects = list_firebase_projects()
+                return self._write_json(HTTPStatus.OK, {
+                    "projects": projects,
+                    "count": len(projects),
+                })
+            except RuntimeError as exc:
+                return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/firebase/import":
+            query = parse_qs(parsed.query)
+            project_id = (query.get("projectId") or [""])[0].strip()
+            if not project_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "projectId fehlt."})
+            try:
+                return self._write_json(HTTPStatus.OK, import_firebase_project(project_id))
+            except ValueError as exc:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            except RuntimeError as exc:
+                return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
             except Exception as exc:  # pragma: no cover
                 return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
