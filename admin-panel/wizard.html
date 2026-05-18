@@ -493,6 +493,52 @@
                 <input type="text" id="wiz-env-APPLE_BUNDLE_ID" data-env-key="APPLE_BUNDLE_ID" placeholder="com.minimaster.masterapp" />
             </div>
 
+            <details class="wiz-help-block">
+                <summary>🍎 Weitere Apple-Subscription-Felder (App Store Server API v2)</summary>
+                <p class="wiz-hint">
+                    Diese Felder sind nur noetig, wenn du iOS-Abos verifizieren willst
+                    (App Store Server Notifications, Subscription Status). Werte
+                    kommen aus App Store Connect → Users and Access → Keys.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" href="https://appstoreconnect.apple.com/access/api" target="_blank" rel="noopener">
+                        🔗 App Store Connect – Keys
+                    </a>
+                </div>
+                <div class="wiz-field">
+                    <label for="wiz-env-APPLE_ISSUER_ID">APPLE_ISSUER_ID</label>
+                    <p class="wiz-hint">Issuer ID (UUID) deines App-Store-Connect-Teams.</p>
+                    <input type="password" id="wiz-env-APPLE_ISSUER_ID" data-env-key="APPLE_ISSUER_ID" autocomplete="off" placeholder="z. B. 12345678-1234-1234-1234-123456789abc" />
+                </div>
+                <div class="wiz-field">
+                    <label for="wiz-env-APPLE_KEY_ID">APPLE_KEY_ID</label>
+                    <p class="wiz-hint">Key ID (10-Zeichen-Code) des privaten Schluessels.</p>
+                    <input type="password" id="wiz-env-APPLE_KEY_ID" data-env-key="APPLE_KEY_ID" autocomplete="off" placeholder="z. B. ABC1234XYZ" />
+                </div>
+                <div class="wiz-field">
+                    <label for="wiz-env-APPLE_PRIVATE_KEY">APPLE_PRIVATE_KEY (PKCS8)</label>
+                    <p class="wiz-hint">
+                        Inhalt der <code>.p8</code>-Datei – inklusive der Zeilen
+                        <code>-----BEGIN PRIVATE KEY-----</code> und
+                        <code>-----END PRIVATE KEY-----</code>. Wird beim Verlassen des
+                        Feldes automatisch mit <code>openssl</code> validiert (siehe
+                        Status unten).
+                    </p>
+                    <textarea id="wiz-env-APPLE_PRIVATE_KEY" data-env-key="APPLE_PRIVATE_KEY" rows="6" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----&#10;MIGTAg...&#10;-----END PRIVATE KEY-----"></textarea>
+                    <div class="wiz-status" id="wiz-apple-key-status">
+                        Status: noch nicht geprueft. Tippen + Tab/Klick ausserhalb startet die Pruefung.
+                    </div>
+                </div>
+                <div class="wiz-field">
+                    <label for="wiz-env-APPLE_ENVIRONMENT">APPLE_ENVIRONMENT</label>
+                    <p class="wiz-hint">
+                        <code>production</code> fuer Live-Betrieb, <code>sandbox</code>
+                        fuer Test-Accounts aus App Store Connect.
+                    </p>
+                    <input type="text" id="wiz-env-APPLE_ENVIRONMENT" data-env-key="APPLE_ENVIRONMENT" placeholder="production" />
+                </div>
+            </details>
+
             <div class="wiz-field">
                 <label for="wiz-env-PLAY_PACKAGE_NAME">Android Package Name <em>(Pflicht fuer Android-Subscriptions)</em></label>
                 <p class="wiz-hint">
@@ -564,6 +610,17 @@
                     </a>
                 </div>
                 <input type="text" id="wiz-env-PLAY_BILLING_PUBSUB_TOPIC" data-env-key="PLAY_BILLING_PUBSUB_TOPIC" placeholder="projects/my-gcp-project/topics/play-billing-notifications" />
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="checkPubsubTopic" id="wiz-pubsub-check-btn">
+                        🔍 Existenz pruefen (via gcloud)
+                    </button>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="createPubsubTopic" id="wiz-pubsub-create-btn">
+                        ➕ Topic jetzt anlegen (via gcloud)
+                    </button>
+                </div>
+                <div class="wiz-status" id="wiz-pubsub-status">
+                    Status: gcloud noch nicht geprueft. Klick auf einen der Buttons startet die Pruefung.
+                </div>
             </div>
         </div>
         <div class="wiz-actions">

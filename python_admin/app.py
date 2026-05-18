@@ -7102,6 +7102,13 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             except Exception as exc:  # pragma: no cover
                 return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
+        if parsed.path == "/api/tools/gcloud-status":
+            try:
+                from gcloud_tools import gcloud_status  # type: ignore
+                return self._write_json(HTTPStatus.OK, gcloud_status())
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
         if parsed.path == "/api/commissioning/history":
             query = parse_qs(parsed.query)
             limit = parse_int(
@@ -7294,6 +7301,14 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_snapshot_restore()
         if parsed.path == "/api/tools/keystore-sha":
             return self._handle_keystore_sha()
+        if parsed.path == "/api/tools/apple-key-validate":
+            return self._handle_apple_key_validate()
+        if parsed.path == "/api/tools/pubsub-create-topic":
+            return self._handle_pubsub_create_topic()
+        if parsed.path == "/api/tools/pubsub-check-topic":
+            return self._handle_pubsub_check_topic()
+        if parsed.path == "/api/tools/apk-verify":
+            return self._handle_apk_verify()
         if parsed.path == "/api/commands/run":
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
@@ -7420,6 +7435,69 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_apple_key_validate(self) -> None:
+        try:
+            payload = self._read_json_body()
+            key_text = str(payload.get("key") or "")
+            if not key_text:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "key fehlt im Body."})
+            from openssl_tools import validate_apple_private_key  # type: ignore
+            result = validate_apple_private_key(key_text)
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        # Status-Code: 200 immer (Validierungsfehler ist kein API-Fehler)
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_pubsub_create_topic(self) -> None:
+        try:
+            payload = self._read_json_body()
+            project_id = str(payload.get("projectId") or "").strip()
+            topic = str(payload.get("topic") or "").strip()
+            if not project_id or not topic:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "projectId und topic muessen gesetzt sein."})
+            from gcloud_tools import create_pubsub_topic  # type: ignore
+            result = create_pubsub_topic(project_id, topic)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except RuntimeError as exc:
+            return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_pubsub_check_topic(self) -> None:
+        try:
+            payload = self._read_json_body()
+            project_id = str(payload.get("projectId") or "").strip()
+            topic = str(payload.get("topic") or "").strip()
+            if not project_id or not topic:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "projectId und topic muessen gesetzt sein."})
+            from gcloud_tools import check_pubsub_topic  # type: ignore
+            result = check_pubsub_topic(project_id, topic)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except RuntimeError as exc:
+            return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_apk_verify(self) -> None:
+        try:
+            payload = self._read_json_body()
+            apk_path = str(payload.get("path") or "").strip()
+            if not apk_path:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "path fehlt im Body."})
+            from apksigner_tools import verify_apk  # type: ignore
+            result = verify_apk(Path(apk_path).expanduser())
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        # Status-Code: 200, weil "nicht verifiziert" kein API-Fehler ist.
         return self._write_json(HTTPStatus.OK, result)
 
     def _handle_run_commissioning(self) -> None:
