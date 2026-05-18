@@ -46,6 +46,133 @@
         return true;
     }
 
+    // ── Pub/Sub-Topic via gcloud (Play Billing RTDN) ───────────────────
+
+    function setPubsubStatus(message, level) {
+        const node = document.getElementById("wiz-pubsub-status");
+        if (!node) return;
+        node.textContent = message || "";
+        node.className = "wiz-status" + (level ? ` is-${level}` : "");
+    }
+
+    function _readPubsubInputs() {
+        const topicInput = document.getElementById("wiz-env-PLAY_BILLING_PUBSUB_TOPIC");
+        const projInput = document.getElementById("wiz-projectId");
+        const topic = (topicInput && topicInput.value || "").trim();
+        const projectId = (projInput && projInput.value || "").trim();
+        return { topic, projectId };
+    }
+
+    async function checkPubsubTopic() {
+        const { topic, projectId } = _readPubsubInputs();
+        if (!projectId) {
+            setPubsubStatus("Bitte zuerst die Project ID in Step 2 eintragen.", "warn");
+            return;
+        }
+        if (!topic) {
+            setPubsubStatus("Bitte zuerst einen Topic-Namen eintragen (Default-Vorschlag aus Project ID).", "warn");
+            return;
+        }
+        setPubsubStatus("Pruefe Topic via gcloud …", "");
+        try {
+            const response = await fetch("/api/tools/pubsub-check-topic", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ projectId, topic }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.exists) {
+                setPubsubStatus(`✓ ${data.hint}`, "ok");
+            } else {
+                setPubsubStatus(`⚠ ${data.hint} – auf „Topic jetzt anlegen" klicken.`, "warn");
+            }
+        } catch (err) {
+            setPubsubStatus(`✗ ${err.message}`, "err");
+        }
+    }
+
+    async function createPubsubTopic() {
+        const { topic, projectId } = _readPubsubInputs();
+        if (!projectId) {
+            setPubsubStatus("Bitte zuerst die Project ID in Step 2 eintragen.", "warn");
+            return;
+        }
+        if (!topic) {
+            setPubsubStatus("Bitte zuerst einen Topic-Namen eintragen.", "warn");
+            return;
+        }
+        if (!confirm(`Pub/Sub-Topic '${topic}' im Projekt '${projectId}' anlegen?`)) return;
+        setPubsubStatus("Erstelle Topic via gcloud …", "");
+        try {
+            const response = await fetch("/api/tools/pubsub-create-topic", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ projectId, topic }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.created) {
+                setPubsubStatus(`✓ ${data.hint}`, "ok");
+            } else if (data.alreadyExisted) {
+                setPubsubStatus(`ℹ ${data.hint}`, "ok");
+            } else {
+                setPubsubStatus(`✓ ${data.hint || "Topic verfuegbar."}`, "ok");
+            }
+        } catch (err) {
+            setPubsubStatus(`✗ ${err.message}`, "err");
+        }
+    }
+
+    // ── Apple Private Key Inline-Validator (openssl) ───────────────────
+
+    function setApplePrivateKeyStatus(message, level) {
+        const node = document.getElementById("wiz-apple-key-status");
+        if (!node) return;
+        node.textContent = message || "";
+        node.className = "wiz-status" + (level ? ` is-${level}` : "");
+    }
+
+    async function validateApplePrivateKey() {
+        const ta = document.getElementById("wiz-env-APPLE_PRIVATE_KEY");
+        if (!ta) return;
+        const key = (ta.value || "").trim();
+        if (!key) {
+            setApplePrivateKeyStatus("Status: leer (kann uebersprungen werden, falls keine iOS-Abos).", "");
+            return;
+        }
+        setApplePrivateKeyStatus("Pruefe Schluessel via openssl …", "");
+        try {
+            const response = await fetch("/api/tools/apple-key-validate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.valid) {
+                const parts = [];
+                if (data.pemType) parts.push(`Typ ${data.pemType}`);
+                if (data.curve) parts.push(`Kurve ${data.curve}`);
+                if (data.bits) parts.push(`${data.bits} Bit`);
+                setApplePrivateKeyStatus(`✓ Gueltig – ${parts.join(", ")}.`, "ok");
+            } else {
+                setApplePrivateKeyStatus(`✗ ${data.hint || "ungueltig"}`, "err");
+            }
+        } catch (err) {
+            setApplePrivateKeyStatus(`✗ Pruefung fehlgeschlagen: ${err.message}`, "err");
+        }
+    }
+
     // ── Keystore-Helfer (SHA-1 / SHA-256 via keytool) ──────────────────
 
     function setKeystoreStatus(message, level) {
@@ -960,10 +1087,15 @@
                 else if (action === "importViaOAuth") importViaOAuth();
                 else if (action === "loadDebugKeystoreSha") loadDebugKeystoreSha();
                 else if (action === "loadCustomKeystoreSha") loadCustomKeystoreSha();
+                else if (action === "checkPubsubTopic") checkPubsubTopic();
+                else if (action === "createPubsubTopic") createPubsubTopic();
             });
         });
         // Gespeicherte Client-ID aus localStorage vorbefuellen
         loadStoredClientId();
+        // Apple-Private-Key auto-validieren beim Verlassen des Feldes
+        const appleKeyTa = document.getElementById("wiz-env-APPLE_PRIVATE_KEY");
+        if (appleKeyTa) appleKeyTa.addEventListener("blur", validateApplePrivateKey);
         // Project-ID-Aenderung -> Deep-Links aktualisieren + Folge-Felder vorausfuellen
         const pidInput = document.getElementById("wiz-projectId");
         if (pidInput) {
