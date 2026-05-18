@@ -7091,6 +7091,17 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             except Exception as exc:  # pragma: no cover
                 return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
+        if parsed.path == "/api/tools/android-debug-sha":
+            try:
+                from keystore_tools import read_debug_keystore_fingerprints  # type: ignore
+                return self._write_json(HTTPStatus.OK, read_debug_keystore_fingerprints())
+            except FileNotFoundError as exc:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            except RuntimeError as exc:
+                return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
         if parsed.path == "/api/commissioning/history":
             query = parse_qs(parsed.query)
             limit = parse_int(
@@ -7281,6 +7292,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_snapshot_create()
         if parsed.path == "/api/config/snapshots/restore":
             return self._handle_snapshot_restore()
+        if parsed.path == "/api/tools/keystore-sha":
+            return self._handle_keystore_sha()
         if parsed.path == "/api/commands/run":
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
@@ -7381,6 +7394,30 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             result = restore_snapshot(snapshot_id)
         except FileNotFoundError as exc:
             return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_keystore_sha(self) -> None:
+        try:
+            payload = self._read_json_body()
+            path = str(payload.get("path") or "").strip()
+            if not path:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "path fehlt im Body."})
+            alias = str(payload.get("alias") or "androiddebugkey").strip()
+            storepass = str(payload.get("storepass") or "android")
+            keypass = payload.get("keypass")
+            from keystore_tools import read_keystore_fingerprints  # type: ignore
+            result = read_keystore_fingerprints(
+                Path(path).expanduser(),
+                alias=alias,
+                storepass=storepass,
+                keypass=str(keypass) if keypass is not None else None,
+            )
+        except FileNotFoundError as exc:
+            return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except RuntimeError as exc:
+            return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         return self._write_json(HTTPStatus.OK, result)

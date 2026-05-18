@@ -46,6 +46,106 @@
         return true;
     }
 
+    // ── Keystore-Helfer (SHA-1 / SHA-256 via keytool) ──────────────────
+
+    function setKeystoreStatus(message, level) {
+        const node = document.getElementById("wiz-keystore-status");
+        if (!node) return;
+        node.textContent = message || "";
+        node.className = "wiz-status" + (level ? ` is-${level}` : "");
+    }
+
+    function renderKeystoreResult(data) {
+        const node = document.getElementById("wiz-keystore-result");
+        if (!node) return;
+        if (!data || !data.fingerprints) {
+            node.hidden = true;
+            return;
+        }
+        const fp = data.fingerprints;
+        const rows = [];
+        rows.push(`<p><strong>Keystore:</strong> <code>${escapeHtml(data.keystorePath)}</code></p>`);
+        rows.push(`<p><strong>Alias:</strong> <code>${escapeHtml(data.alias)}</code></p>`);
+        if (fp.sha1) {
+            rows.push(`<p><strong>SHA-1:</strong> <code id="wiz-keystore-sha1">${escapeHtml(fp.sha1)}</code>
+                <button type="button" class="wiz-btn" data-wiz-action="copyKeystoreSha1">In Zwischenablage kopieren</button></p>`);
+        }
+        if (fp.sha256) {
+            rows.push(`<p><strong>SHA-256:</strong> <code id="wiz-keystore-sha256">${escapeHtml(fp.sha256)}</code>
+                <button type="button" class="wiz-btn" data-wiz-action="copyKeystoreSha256">In Zwischenablage kopieren</button></p>`);
+        }
+        rows.push(`<p class="wiz-hint">
+            → Firebase-Console → <em>Project Settings → Allgemein → Deine Apps → Android-App → Fingerprint hinzufuegen</em>
+            (SHA-1 ist Pflicht fuer Google Sign-In, SHA-256 zusaetzlich fuer Play App Signing).
+        </p>`);
+        node.innerHTML = rows.join("\n");
+        node.hidden = false;
+        // Kopier-Buttons neu binden
+        node.querySelectorAll("[data-wiz-action]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const a = btn.getAttribute("data-wiz-action");
+                if (a === "copyKeystoreSha1") copyToClipboard(fp.sha1, "SHA-1");
+                else if (a === "copyKeystoreSha256") copyToClipboard(fp.sha256, "SHA-256");
+            });
+        });
+    }
+
+    async function copyToClipboard(text, label) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setKeystoreStatus(`✓ ${label} in Zwischenablage kopiert.`, "ok");
+        } catch (err) {
+            setKeystoreStatus(`✗ Konnte nicht kopieren: ${err.message}`, "err");
+        }
+    }
+
+    async function loadDebugKeystoreSha() {
+        setKeystoreStatus("Lese Debug-Keystore via keytool …", "");
+        try {
+            const response = await fetch("/api/tools/android-debug-sha");
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            renderKeystoreResult(data);
+            setKeystoreStatus("✓ Debug-Keystore erfolgreich gelesen.", "ok");
+        } catch (err) {
+            setKeystoreStatus(`✗ ${err.message}`, "err");
+        }
+    }
+
+    async function loadCustomKeystoreSha() {
+        const path = (document.getElementById("wiz-keystore-path") || {}).value || "";
+        const alias = (document.getElementById("wiz-keystore-alias") || {}).value || "";
+        const storepass = (document.getElementById("wiz-keystore-storepass") || {}).value || "";
+        if (!path.trim()) {
+            setKeystoreStatus("Bitte Pfad zur Keystore-Datei eintragen.", "warn");
+            return;
+        }
+        setKeystoreStatus("Lese Keystore via keytool …", "");
+        try {
+            const response = await fetch("/api/tools/keystore-sha", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    path: path.trim(),
+                    alias: alias.trim() || "androiddebugkey",
+                    storepass,
+                }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            renderKeystoreResult(data);
+            setKeystoreStatus("✓ Keystore erfolgreich gelesen.", "ok");
+        } catch (err) {
+            setKeystoreStatus(`✗ ${err.message}`, "err");
+        }
+    }
+
     // ── Firebase-Direktimport ueber Google OAuth + Management REST API ─
     //
     // Token-Flow ueber Google Identity Services (GIS). Der Token bleibt
@@ -858,6 +958,8 @@
                 else if (action === "loginGoogleOAuth") loginGoogleOAuth();
                 else if (action === "logoutGoogleOAuth") logoutGoogleOAuth();
                 else if (action === "importViaOAuth") importViaOAuth();
+                else if (action === "loadDebugKeystoreSha") loadDebugKeystoreSha();
+                else if (action === "loadCustomKeystoreSha") loadCustomKeystoreSha();
             });
         });
         // Gespeicherte Client-ID aus localStorage vorbefuellen
