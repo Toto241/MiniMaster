@@ -40,6 +40,89 @@ class CheckResult:
     fix_hint: str = ""
 
 
+# Zentrale "Wofuer ist das wichtig?"-Texte pro check_id. Wird beim Rendern
+# unterhalb der Fix-Zeile ausgegeben, sofern der Check nicht OK ist – damit
+# weiss der Operator nicht nur _was_ zu tun ist, sondern auch _warum_ und
+# _was passiert, wenn es bleibt wie es ist_.
+PURPOSE_TEXTS: dict[str, str] = {
+    "tool-node": (
+        "Cloud-Functions-Build und alle npm-Scripts laufen auf Node.js. "
+        "Ohne v22+ schlagen Build und Deploy fehl."
+    ),
+    "tool-npm": (
+        "npm orchestriert Builds, Tests und das Firebase CLI selbst. "
+        "Ohne npm kein Backend-Setup."
+    ),
+    "tool-python": (
+        "Der Admin-Server, Pre-Flight und Setup-Wizard laufen in Python. "
+        "Ohne Python 3.8+ startet die Betriebszentrale nicht."
+    ),
+    "tool-firebase-cli": (
+        "Wird fuer 'firebase deploy', Emulator-Suites und Wizard-Imports "
+        "verwendet. Ohne CLI bleiben Functions und Hosting undeployed."
+    ),
+    "firebase-login": (
+        "Ohne aktive Authentifizierung kann das CLI keine Projekte sehen "
+        "und der Wizard-CLI-Import liefert leere Listen."
+    ),
+    "tool-jdk": (
+        "Android-Builds (Master-/Child-App) brauchen JDK 17. Reine "
+        "Backend-Arbeit funktioniert auch ohne."
+    ),
+    "repo-node-modules": (
+        "Cloud-Functions-Build und TypeScript-Checks brauchen die "
+        "installierten Dependencies. Ohne node_modules schlagen Tests fehl."
+    ),
+    "repo-build": (
+        "Firebase-Hosting-Deploys und 'firebase emulators:start' lesen "
+        "lib/index.js. Ohne Build laufen Functions im Emulator nicht."
+    ),
+    "config-env": (
+        "Cloud Functions, Gemini-Aufrufe und Support-Mails lesen ihre "
+        "Werte aus .env. Pflicht-Variablen wie GEMINI_API_KEY ohne Wert "
+        "deaktivieren ganze Feature-Bereiche."
+    ),
+    "schema-env-drift": (
+        "Wenn .env.example neue Pflicht-Variablen bekommt (z.B. nach "
+        "git pull), bleibt das Backend ohne diese Werte still kaputt. "
+        "Drift-Hinweis erinnert daran, sie nachzutragen."
+    ),
+    "config-gs-master": (
+        "Die Master-App (Eltern, Android) braucht google-services.json "
+        "zur Laufzeit, um sich beim Firebase-Backend zu authentifizieren. "
+        "Ohne Datei laesst sich die App nicht bauen."
+    ),
+    "config-gs-child": (
+        "Gleicher Mechanismus fuer die Child-App (Kindgerät, Android). "
+        "Ohne Datei kein Pairing, kein Telemetrie-Upload."
+    ),
+    "config-service-account": (
+        "Setup-Admin-CLI, Firestore-Migrationen, Tests gegen die echte "
+        "Firebase und der Wizard-Auto-Snapshot brauchen Server-Credentials. "
+        "Ohne serviceAccountKey.json laufen alle Admin-Operationen ins Leere."
+    ),
+    "config-firebase-panels": (
+        "Die Browser-Panels (Admin/Web-Control/Eltern/Kind) lesen "
+        "Firebase-Konfig zur Laufzeit. Ohne diese Dateien zeigt jedes "
+        "Panel beim Login einen weissen Bildschirm."
+    ),
+    "schema-firebase-drift": (
+        "Wenn das Template neue Felder bekommt, fehlen sie in den "
+        "Panel-Configs und einzelne Firebase-Features (z.B. App Check, "
+        "Analytics) sind stumm deaktiviert."
+    ),
+    "config-appcheck": (
+        "FIREBASE_APP_CHECK_SITE_KEY = reCAPTCHA-v3-Site-Key. Schuetzt "
+        "Browser-Aufrufe vor Bot-Traffic. Fuer Production empfohlen, "
+        "im lokalen Setup nicht zwingend."
+    ),
+    "config-firebaserc": (
+        "Definiert das Default-Firebase-Projekt fuer 'firebase deploy'. "
+        "Ohne .firebaserc muss bei jedem CLI-Aufruf '--project' mitgegeben werden."
+    ),
+}
+
+
 def _which(*candidates: str) -> str | None:
     for name in candidates:
         path = shutil.which(name)
@@ -442,6 +525,31 @@ CHECKS: tuple[Callable[[], CheckResult], ...] = (
 STATUS_SYMBOL = {"ok": "[OK] ", "warn": "[WARN]", "fail": "[FAIL]"}
 
 
+def _wrap_purpose(text: str, *, prefix: str, max_width: int = 78) -> list[str]:
+    """Bricht den Purpose-Text auf Terminal-Breite um, eingerueckt unter Prefix."""
+    indent = " " * len(prefix)
+    available = max(20, max_width - len(prefix))
+    words = text.split()
+    out: list[str] = []
+    current = ""
+    for word in words:
+        if not current:
+            current = word
+        elif len(current) + 1 + len(word) <= available:
+            current = f"{current} {word}"
+        else:
+            out.append(current)
+            current = word
+    if current:
+        out.append(current)
+    if not out:
+        return []
+    rendered = [f"{prefix}{out[0]}"]
+    for line in out[1:]:
+        rendered.append(f"{indent}{line}")
+    return rendered
+
+
 def render_human(results: list[CheckResult], strict: bool) -> str:
     lines: list[str] = []
     lines.append("=" * 72)
@@ -453,7 +561,13 @@ def render_human(results: list[CheckResult], strict: bool) -> str:
         lines.append(f"{marker}{req} {r.title}")
         lines.append(f"        -> {r.details}")
         if r.fix_hint and r.status != "ok":
-            lines.append(f"        Fix: {r.fix_hint}")
+            lines.append(f"        Fix:    {r.fix_hint}")
+            purpose = PURPOSE_TEXTS.get(r.check_id)
+            if purpose:
+                # Lange Purpose-Texte umbrechen, damit sie nicht aus dem
+                # Terminal laufen.
+                wrapped = _wrap_purpose(purpose, prefix="        Wofuer: ")
+                lines.extend(wrapped)
     lines.append("-" * 72)
     fails = [r for r in results if r.status == "fail"]
     warns = [r for r in results if r.status == "warn"]

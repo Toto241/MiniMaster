@@ -449,6 +449,21 @@
 
         // Deep-Links erneut auflösen, falls die Project-ID gerade gesetzt wurde.
         updateDeepLinks();
+        // Aus der jetzt bekannten Project-ID weitere Folge-Felder vorausfuellen.
+        deriveFromProjectId();
+        // PLAY_PACKAGE_NAME aus master-google-services.json-Inhalt extrahieren
+        const importedMaster = _firebaseImportedArtifacts.googleServicesMaster;
+        if (importedMaster) {
+            try {
+                const parsed = JSON.parse(importedMaster);
+                const pkg = parsed && parsed.client && parsed.client[0]
+                    && parsed.client[0].client_info && parsed.client[0].client_info.android_client_info
+                    && parsed.client[0].client_info.android_client_info.package_name;
+                if (pkg) setAutoIfEmpty("wiz-env-PLAY_PACKAGE_NAME", pkg, "aus Firebase-Import");
+                const senderId = parsed && parsed.project_info && parsed.project_info.project_number;
+                if (senderId) setAutoIfEmpty("wiz-messagingSenderId", String(senderId), "aus Firebase-Import");
+            } catch (_e) { /* ignore parse errors */ }
+        }
 
         // CLI hat Teil-Warnungen geliefert?
         const warnings = (data && data.warnings) || [];
@@ -572,8 +587,22 @@
                     // koennen wir es automatisch nachtragen.
                     if (projectId) {
                         const pidInput = document.getElementById("wiz-projectId");
-                        if (pidInput && !pidInput.value.trim()) pidInput.value = projectId;
+                        if (pidInput && !pidInput.value.trim()) {
+                            pidInput.value = projectId;
+                            _autoFilled.add("wiz-projectId");
+                            showAutoBadge(pidInput, `aus ${shortFileKey(key)}-Upload`);
+                        }
                         updateDeepLinks();
+                        deriveFromProjectId();
+                    }
+                    // messagingSenderId aus project_info.project_number ableiten
+                    const senderId = data && data.project_info && data.project_info.project_number;
+                    if (senderId) {
+                        setAutoIfEmpty("wiz-messagingSenderId", String(senderId), `aus ${shortFileKey(key)}-Upload`);
+                    }
+                    // PLAY_PACKAGE_NAME aus master-google-services.json
+                    if (key === "googleServicesMaster" && pkg) {
+                        setAutoIfEmpty("wiz-env-PLAY_PACKAGE_NAME", pkg, "aus masterApp google-services.json");
                     }
                 } catch (err) {
                     setFileStatus(key, "err", `✗ ${err.message}`);
@@ -592,6 +621,57 @@
         setHref("wiz-link-child-gs", `${base}/settings/general/android:com.google.pairing`);
         setHref("wiz-link-service-account", `${base}/settings/serviceaccounts/adminsdk`);
         setHref("wiz-link-appcheck", `${base}/appcheck/products`);
+    }
+
+    // ── Auto-Berechnung aus Project ID ─────────────────────────────────
+    //
+    // Sobald die Project-ID bekannt ist, koennen mehrere andere Felder per
+    // Firebase-Konvention abgeleitet werden. Wir befuellen NUR Felder, die
+    // (a) leer sind oder (b) ein zuvor von uns berechneter Wert sind – damit
+    // ueberschreiben wir niemals etwas, was der User selbst eingegeben hat.
+    const _autoFilled = new Set();
+
+    function setAutoIfEmpty(inputId, value, hintNode) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const current = (input.value || "").trim();
+        const wasAutoFilled = _autoFilled.has(inputId);
+        if (current && !wasAutoFilled) return; // User hat eigenen Wert
+        input.value = value;
+        _autoFilled.add(inputId);
+        if (hintNode) showAutoBadge(input, hintNode);
+    }
+
+    function showAutoBadge(input, label) {
+        // Visuell markieren, dass der Wert berechnet wurde. Wird beim ersten
+        // User-Edit wieder entfernt.
+        if (input.dataset.autoBadge === "1") return;
+        input.dataset.autoBadge = "1";
+        input.title = `Vorgeschlagen: ${label}. Du kannst den Wert ueberschreiben.`;
+        const handler = () => {
+            _autoFilled.delete(input.id);
+            input.dataset.autoBadge = "";
+            input.removeAttribute("title");
+            input.removeEventListener("input", handler);
+        };
+        input.addEventListener("input", handler);
+    }
+
+    function deriveFromProjectId() {
+        const pidInput = document.getElementById("wiz-projectId");
+        const projectId = ((pidInput && pidInput.value) || "").trim();
+        if (!projectId) return;
+        // Firebase-Web-Konvention
+        setAutoIfEmpty("wiz-authDomain", `${projectId}.firebaseapp.com`,
+            "aus Project ID");
+        // Storage-Bucket: 2024+ default ist firebasestorage.app; aeltere
+        // Projekte nutzen appspot.com. User kann das problemlos korrigieren.
+        setAutoIfEmpty("wiz-storageBucket", `${projectId}.firebasestorage.app`,
+            "aus Project ID (alt: <projectId>.appspot.com)");
+        // Play Billing RTDN-Topic-Vorschlag
+        setAutoIfEmpty("wiz-env-PLAY_BILLING_PUBSUB_TOPIC",
+            `projects/${projectId}/topics/play-billing-notifications`,
+            "Konvention: projects/<gcp-project>/topics/play-billing-notifications");
     }
 
     function setHref(id, href) {
@@ -782,9 +862,14 @@
         });
         // Gespeicherte Client-ID aus localStorage vorbefuellen
         loadStoredClientId();
-        // Project-ID-Aenderung -> Deep-Links aktualisieren
+        // Project-ID-Aenderung -> Deep-Links aktualisieren + Folge-Felder vorausfuellen
         const pidInput = document.getElementById("wiz-projectId");
-        if (pidInput) pidInput.addEventListener("input", updateDeepLinks);
+        if (pidInput) {
+            pidInput.addEventListener("input", () => {
+                updateDeepLinks();
+                deriveFromProjectId();
+            });
+        }
         attachFileValidators();
         updateDeepLinks();
         showStep(1);

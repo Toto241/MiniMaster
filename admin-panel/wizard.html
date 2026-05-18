@@ -348,18 +348,50 @@
             </div>
 
             <div class="wiz-field">
-                <label for="wiz-firebase-appCheckSiteKey">App Check Site Key <em>(empfohlen fuer Production)</em></label>
+                <label for="wiz-firebase-appCheckSiteKey">App Check Site Key <em>(optional – kannst du leer lassen)</em></label>
                 <p class="wiz-hint">
-                    reCAPTCHA-v3-Site-Key, der die Browser-Panels vor missbraeuchlichem
-                    Traffic schuetzt. Ohne diesen Key sind App-Check-Enforcement-Pruefungen
-                    deaktiviert – nicht empfohlen ausserhalb der lokalen Entwicklung.
+                    <strong>Kurz:</strong> Wenn du nicht sicher bist, was das ist, lass das
+                    Feld leer – fuer lokale Entwicklung und Beta-Tests brauchst du es nicht.
                 </p>
+                <p class="wiz-hint">
+                    <strong>Lang:</strong> Firebase App Check ist eine Bot-Bremse fuer dein
+                    Backend (Firestore/Functions/Storage). Es laesst nur Aufrufe von deinen
+                    echten Browser-Panels durch, keine selbstgebauten Skripte mit deinem
+                    <code>apiKey</code>. Fuer Browser nutzt App Check
+                    <strong>reCAPTCHA v3</strong> – der hier eingetragene Wert ist der
+                    <em>oeffentliche</em> Site Key dieser reCAPTCHA-Site (beginnt mit
+                    <code>6L</code>). Ohne diesen Key bleibt App Check im
+                    permissive-Mode – alles funktioniert, aber Bot-Traffic wird nicht
+                    geblockt. Wird typischerweise erst vor dem Production-Go-Live aktiviert.
+                </p>
+                <details class="wiz-help-block">
+                    <summary>So bekommst du den Site Key (3 Schritte – nur fuer Production)</summary>
+                    <ol>
+                        <li>
+                            <a href="https://www.google.com/recaptcha/admin/create" target="_blank" rel="noopener">reCAPTCHA-Admin-Console</a>
+                            oeffnen → „reCAPTCHA v3" waehlen → Domains hinzufuegen
+                            (<code>127.0.0.1</code>, <code>localhost</code>, deine
+                            Produktiv-Domain) → <strong>Site Key</strong> kopieren.
+                        </li>
+                        <li>
+                            Firebase-Console → <strong>App Check</strong> → Web-App auswaehlen
+                            → „reCAPTCHA v3" als Provider hinzufuegen → Site Key dort einfuegen.
+                        </li>
+                        <li>
+                            <em>Denselben</em> Site Key unten in dieses Feld einfuegen –
+                            die Browser-Panels nutzen ihn dann als Attestation-Provider.
+                        </li>
+                    </ol>
+                </details>
                 <div class="wiz-link-row">
-                    <a class="wiz-link-btn" id="wiz-link-appcheck" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
-                        🔗 App Check (Firebase-Console)
+                    <a class="wiz-link-btn" href="https://www.google.com/recaptcha/admin/create" target="_blank" rel="noopener">
+                        🔗 reCAPTCHA v3 – Site anlegen
+                    </a>
+                    <a class="wiz-link-btn is-secondary" id="wiz-link-appcheck" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                        🔗 Firebase App Check – Provider registrieren
                     </a>
                 </div>
-                <input type="text" id="wiz-firebase-appCheckSiteKey" data-firebase-key="appCheckSiteKey" placeholder="6L…" />
+                <input type="text" id="wiz-firebase-appCheckSiteKey" data-firebase-key="appCheckSiteKey" placeholder="6L… (oder leer lassen)" />
             </div>
 
             <div class="wiz-field">
