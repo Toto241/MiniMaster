@@ -157,6 +157,24 @@ body {
     margin-top: 8px;
 }
 
+.wiz-help-block {
+    background: white;
+    border: 1px solid var(--wiz-border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+}
+
+.wiz-help-block summary {
+    cursor: pointer;
+    color: var(--wiz-accent);
+    font-weight: 500;
+}
+
+.wiz-help-block ol { margin: 8px 0; padding-left: 24px; }
+.wiz-help-block li { margin: 4px 0; }
+
 .wiz-field textarea {
     min-height: 80px;
     resize: vertical;

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MiniMaster – Setup-Wizard</title>
     <link rel="stylesheet" href="styles-wizard.css" />
+    <!-- Google Identity Services (OAuth Token Flow im Browser, Popup-basiert).
+         Wird nur fuer den direkten Firebase-Internet-Import benoetigt. -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <main class="wiz-shell" id="wiz-shell">
@@ -90,15 +93,77 @@
                 kein Gerät pairen und keine Telemetrie geschrieben werden.
             </div>
 
+            <details class="wiz-firebase-import" open>
+                <summary>🌐 Direkt aus Firebase importieren (Google-Login, ohne CLI)</summary>
+                <p>
+                    <strong>Was passiert hier?</strong> Du meldest dich mit deinem Google-Konto
+                    an, danach holt der Wizard die Web-Konfig und beide
+                    <code>google-services.json</code>-Dateien direkt von der
+                    <a href="https://firebase.google.com/docs/projects/api/reference/rest" target="_blank" rel="noopener">Firebase Management REST API</a>
+                    aus dem Internet. Es muss keine Firebase CLI installiert sein. Der
+                    Access Token bleibt nur im Browser-Speicher und wird nicht persistiert.
+                </p>
+                <details class="wiz-help-block">
+                    <summary>Einmal-Setup: OAuth-Client-ID anlegen (warum &amp; wie)</summary>
+                    <p>
+                        Google erlaubt API-Zugriff nur ueber registrierte OAuth-Clients. Da
+                        MiniMaster nicht mit einer eigenen, geteilten Client-ID ausgeliefert
+                        wird (das wuerde alle Nutzer auf dieselbe Quote setzen und ist gegen
+                        die Google-Richtlinien), muss <em>du</em> eine eigene Client-ID anlegen
+                        – einmalig:
+                    </p>
+                    <ol>
+                        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console → APIs &amp; Services → Credentials</a> oeffnen</li>
+                        <li>„Create Credentials" → „OAuth client ID"</li>
+                        <li>Application type: <strong>Web application</strong></li>
+                        <li>
+                            Authorized JavaScript origins:
+                            <code>http://127.0.0.1:8765</code> und
+                            <code>http://localhost:8765</code>
+                        </li>
+                        <li>Authorized redirect URIs: <em>(leer lassen – wir nutzen den GIS-Token-Flow)</em></li>
+                        <li>„Create" → Client ID kopieren</li>
+                        <li>Zusaetzlich pruefen: <a href="https://console.cloud.google.com/apis/library/firebase.googleapis.com" target="_blank" rel="noopener">Firebase Management API</a> muss im Projekt aktiviert sein</li>
+                    </ol>
+                </details>
+                <div class="wiz-field">
+                    <label for="wiz-oauth-client-id">OAuth Client ID</label>
+                    <p class="wiz-hint">
+                        Wird im Browser-Speicher (<code>localStorage</code>) gemerkt, sodass
+                        du sie bei der naechsten Sitzung nicht erneut eingeben musst.
+                    </p>
+                    <input type="text" id="wiz-oauth-client-id" placeholder="z. B. 1234567890-abc...apps.googleusercontent.com" />
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="loginGoogleOAuth" id="wiz-oauth-login-btn">
+                        🔐 Mit Google anmelden
+                    </button>
+                    <button type="button" class="wiz-btn" data-wiz-action="logoutGoogleOAuth" id="wiz-oauth-logout-btn" hidden>
+                        Abmelden
+                    </button>
+                </div>
+                <div class="wiz-field" id="wiz-oauth-project-block" hidden>
+                    <label for="wiz-oauth-project-select">Firebase-Projekte (eingeloggter Account)</label>
+                    <select id="wiz-oauth-project-select" disabled>
+                        <option value="">(lade Projekte …)</option>
+                    </select>
+                </div>
+                <div class="wiz-actions" id="wiz-oauth-import-actions" hidden>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="importViaOAuth" id="wiz-oauth-import-btn" disabled>
+                        Werte aus diesem Projekt uebernehmen
+                    </button>
+                </div>
+                <div class="wiz-status" id="wiz-oauth-status">
+                    Status: noch nicht angemeldet.
+                </div>
+            </details>
+
             <details class="wiz-firebase-import">
-                <summary>📥 Aus bestehendem Firebase-Projekt importieren (Firebase CLI)</summary>
+                <summary>📥 Alternativ: Aus lokaler Firebase CLI importieren</summary>
                 <p>
                     Wenn du dich lokal bereits mit <code>firebase login</code> authentifiziert
-                    hast, kann der Wizard die Werte aus einem bestehenden Projekt automatisch
-                    abholen – inkl. der beiden <code>google-services.json</code>-Dateien.
-                    Nur der <code>serviceAccountKey.json</code> muss weiterhin manuell aus der
-                    Console heruntergeladen werden (Sicherheitsgrund: Firebase CLI darf keine
-                    privaten Schluessel erzeugen).
+                    hast, kann der Wizard die Werte ohne Browser-Login uebernehmen. Funktion
+                    identisch zum Direktimport oben.
                 </p>
                 <div class="wiz-actions">
                     <button type="button" class="wiz-btn" data-wiz-action="loadFirebaseProjects">

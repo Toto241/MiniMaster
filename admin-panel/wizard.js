@@ -46,6 +46,248 @@
         return true;
     }
 
+    // ── Firebase-Direktimport ueber Google OAuth + Management REST API ─
+    //
+    // Token-Flow ueber Google Identity Services (GIS). Der Token bleibt
+    // nur im Browser (sessionStorage waere noch persistenter; wir nutzen
+    // in-memory, damit er nach Tab-Close weg ist). Die Firebase Management
+    // REST API liefert Web-Konfig und google-services.json-Inhalte direkt
+    // aus dem Internet – ganz ohne lokal installierte Firebase CLI.
+    const OAUTH_CLIENT_ID_LS_KEY = "mm.wizard.oauthClientId";
+    const OAUTH_SCOPE = "https://www.googleapis.com/auth/firebase.readonly";
+    const FIREBASE_MGMT_BASE = "https://firebase.googleapis.com/v1beta1";
+
+    let _oauthAccessToken = null;
+    let _oauthTokenClient = null;
+
+    function setOAuthStatus(message, level) {
+        const node = document.getElementById("wiz-oauth-status");
+        if (!node) return;
+        node.textContent = message || "";
+        node.className = "wiz-status" + (level ? ` is-${level}` : "");
+    }
+
+    function getOAuthClientId() {
+        const input = document.getElementById("wiz-oauth-client-id");
+        return ((input && input.value) || "").trim();
+    }
+
+    function loadStoredClientId() {
+        try {
+            const stored = localStorage.getItem(OAUTH_CLIENT_ID_LS_KEY);
+            const input = document.getElementById("wiz-oauth-client-id");
+            if (stored && input && !input.value) input.value = stored;
+        } catch (_err) { /* localStorage may be disabled */ }
+    }
+
+    function persistClientId(value) {
+        try { localStorage.setItem(OAUTH_CLIENT_ID_LS_KEY, value); }
+        catch (_err) { /* ignore */ }
+    }
+
+    function ensureGisLoaded() {
+        return new Promise((resolve, reject) => {
+            const w = window;
+            const start = Date.now();
+            const tick = () => {
+                if (w.google && w.google.accounts && w.google.accounts.oauth2) {
+                    resolve(w.google.accounts.oauth2);
+                    return;
+                }
+                if (Date.now() - start > 8000) {
+                    reject(new Error("Google Identity Services konnte nicht geladen werden (Netzwerk?)."));
+                    return;
+                }
+                setTimeout(tick, 100);
+            };
+            tick();
+        });
+    }
+
+    async function loginGoogleOAuth() {
+        const clientId = getOAuthClientId();
+        if (!clientId) {
+            setOAuthStatus("Bitte zuerst die OAuth Client ID eintragen.", "warn");
+            return;
+        }
+        persistClientId(clientId);
+        setOAuthStatus("Lade Google Identity Services …", "");
+        let oauth2;
+        try {
+            oauth2 = await ensureGisLoaded();
+        } catch (err) {
+            setOAuthStatus(`✗ ${err.message}`, "err");
+            return;
+        }
+        try {
+            _oauthTokenClient = oauth2.initTokenClient({
+                client_id: clientId,
+                scope: OAUTH_SCOPE,
+                callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        _oauthAccessToken = tokenResponse.access_token;
+                        onOAuthLoggedIn();
+                    } else if (tokenResponse && tokenResponse.error) {
+                        setOAuthStatus(`✗ Login fehlgeschlagen: ${tokenResponse.error}`, "err");
+                    }
+                },
+                error_callback: (err) => {
+                    setOAuthStatus(`✗ Login abgebrochen oder fehlgeschlagen: ${(err && err.type) || "unbekannt"}`, "err");
+                },
+            });
+            setOAuthStatus("Oeffne Google-Anmeldung …", "");
+            _oauthTokenClient.requestAccessToken({ prompt: "consent" });
+        } catch (err) {
+            setOAuthStatus(`✗ Auth-Setup fehlgeschlagen: ${err.message}`, "err");
+        }
+    }
+
+    function logoutGoogleOAuth() {
+        _oauthAccessToken = null;
+        const projectBlock = document.getElementById("wiz-oauth-project-block");
+        const importActions = document.getElementById("wiz-oauth-import-actions");
+        const logoutBtn = document.getElementById("wiz-oauth-logout-btn");
+        if (projectBlock) projectBlock.hidden = true;
+        if (importActions) importActions.hidden = true;
+        if (logoutBtn) logoutBtn.hidden = true;
+        setOAuthStatus("Abgemeldet.", "");
+    }
+
+    async function onOAuthLoggedIn() {
+        const logoutBtn = document.getElementById("wiz-oauth-logout-btn");
+        if (logoutBtn) logoutBtn.hidden = false;
+        setOAuthStatus("✓ Angemeldet. Lade Projektliste …", "ok");
+        try {
+            const projects = await fetchFirebaseProjectsOAuth();
+            const select = document.getElementById("wiz-oauth-project-select");
+            const block = document.getElementById("wiz-oauth-project-block");
+            const importActions = document.getElementById("wiz-oauth-import-actions");
+            const importBtn = document.getElementById("wiz-oauth-import-btn");
+            if (block) block.hidden = false;
+            if (importActions) importActions.hidden = false;
+            if (!select) return;
+            select.innerHTML = "";
+            if (projects.length === 0) {
+                select.appendChild(buildOption("", "(keine Firebase-Projekte zugreifbar)"));
+                select.disabled = true;
+                if (importBtn) importBtn.disabled = true;
+                setOAuthStatus("⚠ Keine Firebase-Projekte in diesem Konto sichtbar.", "warn");
+                return;
+            }
+            select.appendChild(buildOption("", "— bitte waehlen —"));
+            projects.forEach(p => {
+                const label = p.displayName ? `${p.displayName} (${p.projectId})` : p.projectId;
+                select.appendChild(buildOption(p.projectId, label));
+            });
+            select.disabled = false;
+            if (importBtn) importBtn.disabled = false;
+            setOAuthStatus(`✓ ${projects.length} Projekt(e) geladen. Eines auswaehlen und uebernehmen.`, "ok");
+        } catch (err) {
+            setOAuthStatus(`✗ Projekt-Liste fehlgeschlagen: ${err.message}`, "err");
+        }
+    }
+
+    async function fetchOAuthJson(path) {
+        const response = await fetch(`${FIREBASE_MGMT_BASE}${path}`, {
+            headers: { Authorization: `Bearer ${_oauthAccessToken}` },
+        });
+        if (!response.ok) {
+            let detail = "";
+            try {
+                const errData = await response.json();
+                detail = (errData && errData.error && errData.error.message) || "";
+            } catch (_e) { /* ignore */ }
+            throw new Error(`HTTP ${response.status} ${response.statusText}${detail ? ` – ${detail}` : ""}`);
+        }
+        return response.json();
+    }
+
+    async function fetchFirebaseProjectsOAuth() {
+        // Paginierte Liste; fuer Setup-Wizard reicht die erste Seite (default ~25).
+        const data = await fetchOAuthJson("/projects?pageSize=200");
+        const results = (data && data.results) || [];
+        return results.map(p => ({
+            projectId: p.projectId || "",
+            displayName: p.displayName || "",
+        })).filter(p => p.projectId);
+    }
+
+    function base64ToText(b64) {
+        // Browser-Atob plus UTF-8 Korrektur.
+        const binary = atob(b64);
+        try {
+            return decodeURIComponent(escape(binary));
+        } catch (_err) {
+            return binary;
+        }
+    }
+
+    async function importViaOAuth() {
+        const select = document.getElementById("wiz-oauth-project-select");
+        if (!select || !select.value) {
+            setOAuthStatus("Bitte ein Projekt auswaehlen.", "warn");
+            return;
+        }
+        const projectId = select.value;
+        setOAuthStatus(`Hole Konfiguration von firebase.googleapis.com fuer '${projectId}' …`, "");
+        try {
+            // Web-Apps -> erste passende -> Web-Config
+            const webApps = await fetchOAuthJson(`/projects/${encodeURIComponent(projectId)}/webApps?pageSize=100`);
+            const firstWeb = (webApps.apps || [])[0];
+            let webConfig = null;
+            if (firstWeb && firstWeb.appId) {
+                const cfg = await fetchOAuthJson(`/projects/${encodeURIComponent(projectId)}/webApps/${encodeURIComponent(firstWeb.appId)}/config`);
+                webConfig = {
+                    apiKey: cfg.apiKey || "",
+                    authDomain: cfg.authDomain || "",
+                    projectId: cfg.projectId || projectId,
+                    storageBucket: cfg.storageBucket || "",
+                    messagingSenderId: cfg.messagingSenderId || "",
+                    appId: cfg.appId || firstWeb.appId,
+                    measurementId: cfg.measurementId || "",
+                };
+            }
+
+            // Android-Apps -> nach package_name filtern
+            const androidList = await fetchOAuthJson(`/projects/${encodeURIComponent(projectId)}/androidApps?pageSize=100`);
+            const androidApps = [];
+            for (const app of (androidList.apps || [])) {
+                const pkg = app.packageName || "";
+                if (pkg !== "com.minimaster.masterapp" && pkg !== "com.google.pairing") continue;
+                if (!app.appId) continue;
+                const cfg = await fetchOAuthJson(`/projects/${encodeURIComponent(projectId)}/androidApps/${encodeURIComponent(app.appId)}/config`);
+                const b64 = cfg.configFileContents || "";
+                const fileContents = b64 ? base64ToText(b64) : "";
+                androidApps.push({
+                    appId: app.appId,
+                    packageName: pkg,
+                    displayName: app.displayName || "",
+                    fileContents,
+                });
+            }
+
+            // Service-Account: REST-API erlaubt Generierung waere ueber IAM API moeglich,
+            // wir wollen hier aber bewusst KEINE Schluessel erzeugen (Security + Quoten).
+            const serviceAccount = {
+                available: false,
+                reason: "Aus Sicherheitsgruenden generiert der Wizard keine Service-Account-Keys. "
+                      + "Bitte den Schluessel manuell in der Firebase-Console erzeugen und im naechsten Schritt hochladen.",
+                consoleUrl: `https://console.firebase.google.com/project/${encodeURIComponent(projectId)}/settings/serviceaccounts/adminsdk`,
+            };
+
+            const summary = applyFirebaseImport({
+                projectId,
+                webConfig,
+                androidApps,
+                serviceAccount,
+                warnings: [],
+            });
+            setOAuthStatus(`✓ ${summary}`, "ok");
+        } catch (err) {
+            setOAuthStatus(`✗ Import fehlgeschlagen: ${err.message}`, "err");
+        }
+    }
+
     // ── Firebase-Import (lesend, ueber Firebase CLI) ───────────────────
     //
     // Hier zwischengespeicherte Inhalte fuer die Pflicht-Dateien. Werden
@@ -502,8 +744,13 @@
                 else if (action === "submit") submitWizard();
                 else if (action === "loadFirebaseProjects") loadFirebaseProjects();
                 else if (action === "importFirebaseProject") importFirebaseProject();
+                else if (action === "loginGoogleOAuth") loginGoogleOAuth();
+                else if (action === "logoutGoogleOAuth") logoutGoogleOAuth();
+                else if (action === "importViaOAuth") importViaOAuth();
             });
         });
+        // Gespeicherte Client-ID aus localStorage vorbefuellen
+        loadStoredClientId();
         // Project-ID-Aenderung -> Deep-Links aktualisieren
         const pidInput = document.getElementById("wiz-projectId");
         if (pidInput) pidInput.addEventListener("input", updateDeepLinks);
