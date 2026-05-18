@@ -100,7 +100,129 @@ function initializeAuthBindings() {
         connectivityBtn.__authClickBound = true;
     }
 
+    const authProbeBtn = document.getElementById("auth-probe-btn");
+    if (authProbeBtn && !authProbeBtn.__authClickBound) {
+        authProbeBtn.addEventListener("click", runAuthDiagnostics);
+        authProbeBtn.__authClickBound = true;
+    }
+
     authBindingsInitialized = true;
+}
+
+// ── Erweiterte Login-Diagnose via Backend-Probe ─────────────────────
+//
+// Macht via Backend einen Identity-Toolkit-Aufruf und decodiert den echten
+// Server-Error-Code (OPERATION_NOT_ALLOWED, INVALID_LOGIN_CREDENTIALS,
+// API_KEY_HTTP_REFERRER_BLOCKED, ...). Das Browser-SDK uebersetzt diese
+// alle pauschal zu "auth/network-request-failed" – wir wollen aber genau
+// wissen, welche Konfig-/Account-Ursache dahinter steckt.
+async function runAuthDiagnostics() {
+    const btn = document.getElementById("auth-probe-btn");
+    const node = document.getElementById("auth-probe-result");
+    const emailField = document.getElementById("login-email");
+    const passwordField = document.getElementById("login-password");
+    if (btn) btn.disabled = true;
+    if (node) {
+        node.hidden = false;
+        node.innerHTML = "<em>Backend ruft Identity Toolkit auf …</em>";
+    }
+    const email = ((emailField && emailField.value) || "").trim();
+    const password = (passwordField && passwordField.value) || "";
+    let result = null;
+    try {
+        const response = await fetch("/api/diagnostics/auth-probe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        result = await response.json();
+    } catch (err) {
+        if (node) {
+            node.innerHTML = `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>✗ Backend-Probe fehlgeschlagen:</strong> ${_escapeHtml(err.message)}
+            </div>`;
+        }
+        if (btn) btn.disabled = false;
+        return;
+    }
+    _renderAuthDiagnostics(result, { hadCredentials: !!(email && password) });
+    if (btn) btn.disabled = false;
+}
+
+function _renderAuthDiagnostics(result, opts) {
+    const node = document.getElementById("auth-probe-result");
+    if (!node || !result) return;
+    if (result.ok === false) {
+        node.innerHTML = `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+            <strong>✗ ${_escapeHtml(result.headline || "Diagnose nicht moeglich")}</strong>
+            ${result.fix ? `<div style="margin-top:6px">Fix: ${_escapeHtml(result.fix)}</div>` : ""}
+        </div>`;
+        return;
+    }
+
+    const level = result.level || "warn";
+    const palette = level === "error"
+        ? { bg: "#fee2e2", border: "#dc2626" }
+        : level === "ok"
+            ? { bg: "#d1fae5", border: "#16a34a" }
+            : { bg: "#fef3c7", border: "#f59e0b" };
+
+    const rows = [];
+    rows.push(`<div style="background:${palette.bg};padding:12px;border-left:4px solid ${palette.border}">`);
+    rows.push(`<strong>${_escapeHtml(result.headline || "")}</strong>`);
+    rows.push("</div>");
+
+    // Strukturierter Block: API-Key + Provider + Login-Versuch
+    rows.push("<div style=\"margin-top:10px;font-family:monospace;font-size:0.9em\">");
+    rows.push(`<div>Project ID: <strong>${_escapeHtml(result.projectId || "(unbekannt)")}</strong></div>`);
+    rows.push(`<div>API-Key gueltig: ${_boolBadge(result.apiKeyValid)}</div>`);
+    rows.push(`<div>Email/Password-Provider aktiv: ${_tristateBadge(result.emailPasswordProviderEnabled)}</div>`);
+
+    const probe = (result.probe && result.probe.diagnosis) || {};
+    rows.push(`<div style="margin-top:6px"><strong>Probe</strong> (Identity Toolkit, Dummy-Email):</div>`);
+    rows.push(`<div>&nbsp;&nbsp;Kategorie: ${_escapeHtml(probe.category || "?")}${probe.code ? " (" + _escapeHtml(probe.code) + ")" : ""}</div>`);
+    if (probe.explanation) rows.push(`<div>&nbsp;&nbsp;${_escapeHtml(probe.explanation)}</div>`);
+
+    if (result.loginAttempt && result.loginAttempt.diagnosis) {
+        const ldiag = result.loginAttempt.diagnosis;
+        rows.push(`<div style="margin-top:6px"><strong>Echter Login-Versuch</strong> (mit eingegebenen Credentials):</div>`);
+        rows.push(`<div>&nbsp;&nbsp;Kategorie: ${_escapeHtml(ldiag.category || "?")}${ldiag.code ? " (" + _escapeHtml(ldiag.code) + ")" : ""}</div>`);
+        if (ldiag.explanation) rows.push(`<div>&nbsp;&nbsp;${_escapeHtml(ldiag.explanation)}</div>`);
+    } else if (opts && opts.hadCredentials) {
+        rows.push(`<div style="margin-top:6px"><em>Echter Login wurde uebersprungen (API-Key oder Provider haben Probleme).</em></div>`);
+    } else {
+        rows.push(`<div style="margin-top:6px"><em>Tipp: Email + Passwort eingeben und Diagnose nochmal starten – Backend versucht dann auch einen echten Login.</em></div>`);
+    }
+    rows.push("</div>");
+
+    // Konkrete Aktionen
+    const actions = result.recommendedActions || [];
+    if (actions.length > 0) {
+        rows.push("<div style=\"margin-top:10px\"><strong>Konkrete naechste Schritte:</strong><ul>");
+        for (const a of actions) {
+            rows.push(`<li>${_escapeHtml(a)}</li>`);
+        }
+        rows.push("</ul></div>");
+    }
+
+    node.innerHTML = rows.join("\n");
+}
+
+function _boolBadge(value) {
+    if (value === true) return "<span style=\"color:#16a34a\">✓ ja</span>";
+    if (value === false) return "<span style=\"color:#dc2626\">✗ nein</span>";
+    return "<span style=\"color:#6b7280\">? unbekannt</span>";
+}
+
+function _tristateBadge(value) {
+    if (value === null || value === undefined) {
+        return "<span style=\"color:#6b7280\">? nicht ermittelbar (vorgelagerter Fehler)</span>";
+    }
+    return _boolBadge(value);
 }
 
 // ── Connectivity-Self-Test (Backend + Browser-Stack parallel) ───────

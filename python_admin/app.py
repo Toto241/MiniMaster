@@ -7316,6 +7316,8 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._handle_pubsub_check_topic()
         if parsed.path == "/api/tools/apk-verify":
             return self._handle_apk_verify()
+        if parsed.path == "/api/diagnostics/auth-probe":
+            return self._handle_auth_probe()
         if parsed.path == "/api/commands/run":
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
@@ -7505,6 +7507,25 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         # Status-Code: 200, weil "nicht verifiziert" kein API-Fehler ist.
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_auth_probe(self) -> None:
+        """POST /api/diagnostics/auth-probe – Backend-Probe gegen Identity Toolkit.
+
+        Body (alles optional): {email, password, apiKey}.
+        Wenn email+password leer sind, laeuft nur die Dummy-Probe; sonst
+        zusaetzlich ein echter Login-Versuch. Credentials werden nicht geloggt.
+        """
+        try:
+            payload = self._read_json_body()
+            email = str(payload.get("email") or "").strip()
+            password = str(payload.get("password") or "")
+            api_key = str(payload.get("apiKey") or "").strip()
+            from auth_diagnostics import diagnose_login_failure  # type: ignore
+            result = diagnose_login_failure(api_key=api_key, email=email, password=password)
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        # 200 immer – Auth-Misserfolg ist Diagnose-Information, kein HTTP-Fehler.
         return self._write_json(HTTPStatus.OK, result)
 
     def _handle_run_commissioning(self) -> None:
