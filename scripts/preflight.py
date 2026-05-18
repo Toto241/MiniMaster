@@ -325,6 +325,76 @@ def check_appcheck_site_key() -> CheckResult:
                        "FIREBASE_APP_CHECK_SITE_KEY gesetzt.")
 
 
+def _env_keys(text: str) -> set[str]:
+    keys: set[str] = set()
+    for raw in text.splitlines():
+        match = re.match(r"^\s*([A-Z][A-Z0-9_]*)\s*=", raw)
+        if match:
+            keys.add(match.group(1))
+    return keys
+
+
+def check_env_schema_drift() -> CheckResult:
+    """Meldet, wenn .env.example neue Schluessel hat, die in .env fehlen."""
+    env = REPO_ROOT / ".env"
+    example = REPO_ROOT / ".env.example"
+    if not example.exists():
+        return CheckResult("schema-env-drift", ".env Schema aktuell", "ok", False,
+                           ".env.example fehlt – keine Drift-Pruefung moeglich.")
+    if not env.exists():
+        return CheckResult("schema-env-drift", ".env Schema aktuell", "ok", False,
+                           ".env fehlt – wird beim Setup neu angelegt.")
+    try:
+        example_keys = _env_keys(example.read_text(encoding="utf-8"))
+        env_keys = _env_keys(env.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return CheckResult("schema-env-drift", ".env Schema aktuell", "warn", False,
+                           f".env/.env.example nicht lesbar: {exc}", "")
+    new_keys = sorted(example_keys - env_keys)
+    if new_keys:
+        # WICHTIG: Diese Liste hier nur als Hinweis, kein Pflichtfehler – der
+        # eigentliche Wert-Check passiert in check_env_file().
+        return CheckResult("schema-env-drift", ".env Schema aktuell", "warn", False,
+                           f"Neue Variablen in .env.example seit Setup: {', '.join(new_keys)}",
+                           "Im Admin-Panel/Wizard ergaenzen ODER manuell aus .env.example uebernehmen.")
+    removed_keys = sorted(env_keys - example_keys)
+    if removed_keys:
+        return CheckResult("schema-env-drift", ".env Schema aktuell", "ok", False,
+                           f"In .env vorhandene, aber nicht in .env.example beschriebene Keys: "
+                           f"{', '.join(removed_keys)}")
+    return CheckResult("schema-env-drift", ".env Schema aktuell", "ok", False,
+                       f"{len(env_keys)} Schluessel synchron mit .env.example.")
+
+
+def check_firebase_config_drift() -> CheckResult:
+    """Vergleicht Panel-firebase-config.js gegen das Template auf Strukturebene."""
+    template = REPO_ROOT / "admin-panel" / "firebase-config.template.js"
+    if not template.exists():
+        return CheckResult("schema-firebase-drift", "Firebase-Config Schema aktuell", "ok", False,
+                           "Template fehlt – kein Vergleich moeglich.")
+    template_fields = set(re.findall(r"\b([a-zA-Z]+)\s*:", template.read_text(encoding="utf-8")))
+    panels = ("admin-panel", "web-control", "parent-panel", "child-panel")
+    missing_fields: dict[str, list[str]] = {}
+    for panel in panels:
+        p = REPO_ROOT / panel / "firebase-config.js"
+        if not p.exists():
+            continue
+        try:
+            fields = set(re.findall(r"\b([a-zA-Z]+)\s*:", p.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+        diff = sorted(template_fields - fields)
+        if diff:
+            missing_fields[panel] = diff
+    if not missing_fields:
+        return CheckResult("schema-firebase-drift", "Firebase-Config Schema aktuell", "ok", False,
+                           "Alle Panel-Configs decken die Template-Felder ab.")
+    summary = "; ".join(f"{panel}: {', '.join(fields)}" for panel, fields in missing_fields.items())
+    return CheckResult("schema-firebase-drift", "Firebase-Config Schema aktuell", "warn", False,
+                       f"Template-Felder fehlen: {summary}",
+                       "Im Admin-Panel 'Uebertragen' erneut ausfuehren (rendert aus aktuellem Template).")
+
+
 def check_firebaserc() -> CheckResult:
     rc_file = REPO_ROOT / ".firebaserc"
     if not rc_file.exists():
@@ -354,10 +424,12 @@ CHECKS: tuple[Callable[[], CheckResult], ...] = (
     check_node_modules,
     check_built_functions,
     check_env_file,
+    check_env_schema_drift,
     check_google_services_master,
     check_google_services_child,
     check_service_account,
     check_firebase_config_files,
+    check_firebase_config_drift,
     check_appcheck_site_key,
     check_firebaserc,
 )

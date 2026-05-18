@@ -362,6 +362,29 @@
 
                             <div id="config-transfer-status" class="phase-status"></div>
 
+                            <details class="phase-help" id="config-snapshots-section">
+                                <summary>Konfigurations-Snapshots (Schutz vor Datenverlust)</summary>
+                                <div class="phase-help-content">
+                                    <p class="text-muted">
+                                        Vor jeder Uebertragung und vor Git-Operationen
+                                        (checkout/merge/rebase) wird automatisch ein Snapshot der
+                                        Konfig-Pflicht-Dateien ausserhalb des Repos abgelegt. Per
+                                        <strong>Wiederherstellen</strong> kann ein frueherer Stand
+                                        zurueckgeholt werden – der aktuelle Stand wird vorher
+                                        automatisch als <em>pre-restore</em>-Snapshot gesichert.
+                                    </p>
+                                    <div class="phase-actions mm-u034">
+                                        <button type="button" data-action="createConfigSnapshot" class="btn btn-secondary" title="Sofort einen manuellen Snapshot anlegen">📸 Snapshot jetzt anlegen</button>
+                                        <button type="button" data-action="reloadConfigSnapshots" class="btn btn-secondary" title="Snapshot-Liste neu laden">Liste aktualisieren</button>
+                                    </div>
+                                    <p class="text-muted" id="config-snapshots-root"></p>
+                                    <div id="config-snapshots-list" class="phase-help-content">
+                                        <p class="text-muted">Snapshots werden beim Laden angezeigt …</p>
+                                    </div>
+                                    <div id="config-snapshots-status" class="phase-status"></div>
+                                </div>
+                            </details>
+
                             <div class="firebase-import-box mm-u040">
                                 <h4>Notfall-Neueinrichtung nach Cloud-Löschung</h4>
                                 <p>

@@ -27,6 +27,11 @@ if /I "%1"=="--preflight" (
 )
 if /I "%1"=="--skip-preflight" goto skip_preflight
 
+rem Git-Hooks fuer Konfig-Snapshots installieren (idempotent, still).
+rem Bei jedem 'git checkout/merge/rebase' wird automatisch ein Snapshot
+rem der Konfig-Pflicht-Dateien angelegt – siehe scripts/config_snapshot.py.
+"%PY%" -m scripts.install_git_hooks --quiet >nul 2>nul
+
 echo --- Pre-Flight ---
 "%PY%" "%~dp0scripts\preflight.py"
 if not errorlevel 1 goto preflight_done

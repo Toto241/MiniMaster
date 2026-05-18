@@ -6822,6 +6822,18 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         for key, path in FIREBASE_ARTIFACT_TARGETS.items()
     }
 
+    # Auto-Snapshot: nur, wenn auch tatsaechlich etwas geschrieben wurde.
+    # Schlaegt der Snapshot fehl (z.B. weil HOME nicht beschreibbar ist),
+    # wird das geloggt, aber nicht propagiert – der Transfer selbst war
+    # bereits erfolgreich.
+    snapshot_info: dict[str, object] | None = None
+    if env_updates or panel_written or artifact_results:
+        try:
+            from config_snapshot import create_snapshot as _create_snapshot  # type: ignore
+            snapshot_info = _create_snapshot(reason="after-transfer")
+        except Exception as exc:  # pragma: no cover - defensive
+            snapshot_info = {"error": f"Snapshot fehlgeschlagen: {exc}"}
+
     return {
         "ok": True,
         "envWritten": sorted(env_updates.keys()),
@@ -6833,6 +6845,7 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         "panelFirebaseConfigFiles": [str(p) for p in PANEL_FIREBASE_CONFIG_FILES],
         "artifactsWritten": sorted(artifact_results.keys()),
         "artifacts": artifact_status,
+        "snapshot": snapshot_info,
     }
 
 
@@ -6866,6 +6879,16 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             try:
                 return self._write_json(HTTPStatus.OK, load_config_transfer_state())
             except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/config/snapshots":
+            try:
+                from config_snapshot import list_snapshots, SNAPSHOT_ROOT  # type: ignore
+                return self._write_json(HTTPStatus.OK, {
+                    "snapshotRoot": str(SNAPSHOT_ROOT),
+                    "snapshots": list_snapshots(),
+                })
+            except Exception as exc:  # pragma: no cover
                 return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
         if parsed.path == "/api/commissioning/history":
@@ -7054,6 +7077,10 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/config/transfer":
             return self._handle_config_transfer()
+        if parsed.path == "/api/config/snapshots/create":
+            return self._handle_snapshot_create()
+        if parsed.path == "/api/config/snapshots/restore":
+            return self._handle_snapshot_restore()
         if parsed.path == "/api/commands/run":
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
@@ -7129,6 +7156,32 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_snapshot_create(self) -> None:
+        try:
+            payload = self._read_json_body()
+            reason = str(payload.get("reason") or "manual").strip()
+            from config_snapshot import create_snapshot, prune_snapshots  # type: ignore
+            info = create_snapshot(reason=reason)
+            prune_snapshots()
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, info)
+
+    def _handle_snapshot_restore(self) -> None:
+        try:
+            payload = self._read_json_body()
+            snapshot_id = str(payload.get("snapshotId") or "").strip()
+            if not snapshot_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "snapshotId fehlt im Body."})
+            from config_snapshot import restore_snapshot  # type: ignore
+            result = restore_snapshot(snapshot_id)
+        except FileNotFoundError as exc:
+            return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         return self._write_json(HTTPStatus.OK, result)
 
