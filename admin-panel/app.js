@@ -124,11 +124,38 @@ async function runAuthDiagnostics() {
     if (btn) btn.disabled = true;
     if (node) {
         node.hidden = false;
-        node.innerHTML = "<em>Backend ruft Identity Toolkit auf …</em>";
+        node.innerHTML = "<em>Backend ruft Identity Toolkit auf, Browser macht parallel Direct-Probe …</em>";
     }
     const email = ((emailField && emailField.value) || "").trim();
     const password = (passwordField && passwordField.value) || "";
-    let result = null;
+
+    // Parallel: Backend-Probe + Browser-Direct-Probe.
+    // Browser-Direct = das gleiche, was das Firebase-SDK auch macht, aber
+    // direkt per fetch() ohne das SDK. Trennt SDK-Init-Probleme von
+    // tatsaechlichen Browser-Layer-Blockaden (AV/Extension).
+    const apiKey = _firebaseApiKeyForDiagnostics();
+    const [backendResult, browserDirect] = await Promise.all([
+        _runBackendAuthProbe(email, password),
+        (email && password && apiKey) ? _runBrowserDirectAuthProbe(apiKey, email, password) : Promise.resolve(null),
+    ]);
+
+    if (backendResult && backendResult.__fetchError) {
+        if (node) {
+            node.innerHTML = `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>✗ Backend-Probe fehlgeschlagen:</strong> ${_escapeHtml(backendResult.__fetchError)}
+            </div>`;
+        }
+        if (btn) btn.disabled = false;
+        return;
+    }
+    _renderAuthDiagnostics(backendResult, {
+        hadCredentials: !!(email && password),
+        browserDirect,
+    });
+    if (btn) btn.disabled = false;
+}
+
+async function _runBackendAuthProbe(email, password) {
     try {
         const response = await fetch("/api/diagnostics/auth-probe", {
             method: "POST",
@@ -137,20 +164,53 @@ async function runAuthDiagnostics() {
         });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(data.error || `HTTP ${response.status}`);
+            return { __fetchError: data.error || `HTTP ${response.status}` };
         }
-        result = await response.json();
+        return await response.json();
     } catch (err) {
-        if (node) {
-            node.innerHTML = `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
-                <strong>✗ Backend-Probe fehlgeschlagen:</strong> ${_escapeHtml(err.message)}
-            </div>`;
-        }
-        if (btn) btn.disabled = false;
-        return;
+        return { __fetchError: err.message };
     }
-    _renderAuthDiagnostics(result, { hadCredentials: !!(email && password) });
-    if (btn) btn.disabled = false;
+}
+
+function _firebaseApiKeyForDiagnostics() {
+    // Eingeloggte firebase-config.js exportiert den Key auf window.
+    const cfg = (typeof window !== "undefined" && window.__MM_FIREBASE_CONFIG__) || null;
+    return (cfg && cfg.apiKey) || "";
+}
+
+async function _runBrowserDirectAuthProbe(apiKey, email, password) {
+    // Exakt derselbe Aufruf, den das Firebase Auth Web-SDK intern macht – aber
+    // ohne das SDK. Damit trennen wir Browser-Layer-Blockaden (Extension/AV,
+    // die Google-API-POSTs blocken) von SDK-State-/Init-Problemen.
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`;
+    const start = performance.now();
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, returnSecureToken: true }),
+        });
+        const ms = Math.round(performance.now() - start);
+        const text = await response.text();
+        let body = null;
+        try { body = JSON.parse(text); } catch (_e) { /* keep raw */ }
+        if (response.ok) {
+            return { ok: true, ms, status: response.status };
+        }
+        const errCode = body && body.error && body.error.message
+            ? String(body.error.message).split(":")[0].trim()
+            : "";
+        return {
+            ok: false,
+            ms,
+            status: response.status,
+            errorCode: errCode,
+            errorMessage: (body && body.error && body.error.message) || text.slice(0, 200),
+        };
+    } catch (err) {
+        const ms = Math.round(performance.now() - start);
+        return { ok: false, ms, fetchError: err.message || String(err) };
+    }
 }
 
 function _renderAuthDiagnostics(result, opts) {
@@ -164,7 +224,58 @@ function _renderAuthDiagnostics(result, opts) {
         return;
     }
 
-    const level = result.level || "warn";
+    // Drei-Wege-Vergleich: Backend-Login vs Browser-Direct vs SDK
+    const backendLoginOk = !!(result.loginAttempt
+        && result.loginAttempt.diagnosis
+        && result.loginAttempt.diagnosis.category === "login_succeeded");
+    const browserDirect = opts && opts.browserDirect;
+    const browserDirectOk = !!(browserDirect && browserDirect.ok);
+    const browserDirectAttempted = !!browserDirect;
+    // Falls Diagnose laeuft, ist der SDK-Login bereits gescheitert (deshalb
+    // hat der User den Diagnose-Button geklickt). Daher SDK = scheitert.
+
+    // Headline neu bestimmen mit dem Drei-Wege-Wissen
+    let headline = result.headline || "";
+    let level = result.level || "warn";
+    if (backendLoginOk && browserDirectAttempted) {
+        if (browserDirectOk) {
+            // Browser kann den Auth-Endpoint direkt erreichen → SDK selbst ist das Problem
+            headline = (
+                "✓ Backend UND Browser-Direct-Fetch funktionieren. "
+                + "Das Problem liegt im Firebase-SDK selbst – nicht im Netzwerk und nicht "
+                + "in Antivirus/Extension. Wahrscheinliche Ursachen: App Check-Token "
+                + "kann nicht beschafft werden, IndexedDB-Quote voll, Service Worker mit "
+                + "veraltetem Cache, oder SDK-Initialisierungs-Race."
+            );
+            level = "warn";
+        } else if (browserDirect.fetchError) {
+            // Browser kann den POST gar nicht erst absetzen → Browser-Layer blockt
+            headline = (
+                "✗ Browser-Direct-Fetch zu identitytoolkit scheitert mit '"
+                + (browserDirect.fetchError || "Failed to fetch")
+                + "', obwohl Backend OK ist. Das ist definitiv ein Browser-Layer-"
+                + "Problem: Extension (uBlock/Privacy Badger) oder Antivirus mit "
+                + "SSL-Inspection blockt POST-Requests mit Credentials-Body."
+            );
+            level = "error";
+        } else if (browserDirect.status === 0) {
+            headline = (
+                "⚠ Browser-Direct-Fetch hat keinen Status zurueckgegeben (status=0). "
+                + "Typisch fuer: CORS-Block durch eine Extension/AV oder DNS-Hijacking."
+            );
+            level = "error";
+        } else {
+            // Browser bekam echte HTTP-Antwort vom Identity Toolkit – aber nicht OK
+            headline = (
+                `✗ Browser-Direct-Fetch antwortet mit HTTP ${browserDirect.status} `
+                + `(Code: ${browserDirect.errorCode || "unbekannt"}). `
+                + `Backend kommt durch, Browser nicht – Antivirus/Extension manipuliert `
+                + `den Request-Body oder Origin-Header.`
+            );
+            level = "error";
+        }
+    }
+
     const palette = level === "error"
         ? { bg: "#fee2e2", border: "#dc2626" }
         : level === "ok"
@@ -173,10 +284,10 @@ function _renderAuthDiagnostics(result, opts) {
 
     const rows = [];
     rows.push(`<div style="background:${palette.bg};padding:12px;border-left:4px solid ${palette.border}">`);
-    rows.push(`<strong>${_escapeHtml(result.headline || "")}</strong>`);
+    rows.push(`<strong>${_escapeHtml(headline)}</strong>`);
     rows.push("</div>");
 
-    // Strukturierter Block: API-Key + Provider + Login-Versuch
+    // Strukturierter Block: API-Key + Provider + 3-Wege-Login-Vergleich
     rows.push("<div style=\"margin-top:10px;font-family:monospace;font-size:0.9em\">");
     rows.push(`<div>Project ID: <strong>${_escapeHtml(result.projectId || "(unbekannt)")}</strong></div>`);
     rows.push(`<div>API-Key gueltig: ${_boolBadge(result.apiKeyValid)}</div>`);
@@ -189,20 +300,60 @@ function _renderAuthDiagnostics(result, opts) {
 
     if (result.loginAttempt && result.loginAttempt.diagnosis) {
         const ldiag = result.loginAttempt.diagnosis;
-        rows.push(`<div style="margin-top:6px"><strong>Echter Login-Versuch</strong> (mit eingegebenen Credentials):</div>`);
+        rows.push(`<div style="margin-top:6px"><strong>Backend-Login</strong> (Python OpenSSL, mit eingegebenen Credentials):</div>`);
         rows.push(`<div>&nbsp;&nbsp;Kategorie: ${_escapeHtml(ldiag.category || "?")}${ldiag.code ? " (" + _escapeHtml(ldiag.code) + ")" : ""}</div>`);
         if (ldiag.explanation) rows.push(`<div>&nbsp;&nbsp;${_escapeHtml(ldiag.explanation)}</div>`);
     } else if (opts && opts.hadCredentials) {
-        rows.push(`<div style="margin-top:6px"><em>Echter Login wurde uebersprungen (API-Key oder Provider haben Probleme).</em></div>`);
+        rows.push(`<div style="margin-top:6px"><em>Backend-Login wurde uebersprungen (API-Key oder Provider haben Probleme).</em></div>`);
     } else {
-        rows.push(`<div style="margin-top:6px"><em>Tipp: Email + Passwort eingeben und Diagnose nochmal starten – Backend versucht dann auch einen echten Login.</em></div>`);
+        rows.push(`<div style="margin-top:6px"><em>Tipp: Email + Passwort eingeben und Diagnose nochmal starten – fuer den vollen 3-Wege-Vergleich.</em></div>`);
+    }
+
+    // Browser-Direct-Probe (NEU)
+    if (browserDirectAttempted) {
+        rows.push(`<div style="margin-top:6px"><strong>Browser-Direct-Fetch</strong> (Browser, gleicher POST wie Firebase-SDK, aber ohne SDK):</div>`);
+        if (browserDirectOk) {
+            rows.push(`<div>&nbsp;&nbsp;<span style="color:#16a34a">✓ HTTP ${browserDirect.status}</span> in ${browserDirect.ms}ms – Browser kann den Auth-Endpoint direkt erreichen.</div>`);
+        } else if (browserDirect.fetchError) {
+            rows.push(`<div>&nbsp;&nbsp;<span style="color:#dc2626">✗ fetch fehlgeschlagen</span> nach ${browserDirect.ms}ms: ${_escapeHtml(browserDirect.fetchError)}</div>`);
+        } else {
+            rows.push(`<div>&nbsp;&nbsp;<span style="color:#dc2626">✗ HTTP ${browserDirect.status}</span> in ${browserDirect.ms}ms – Code: ${_escapeHtml(browserDirect.errorCode || "?")}</div>`);
+            if (browserDirect.errorMessage) rows.push(`<div>&nbsp;&nbsp;Nachricht: ${_escapeHtml(browserDirect.errorMessage)}</div>`);
+        }
+    } else if (opts && opts.hadCredentials) {
+        rows.push(`<div style="margin-top:6px"><em>Browser-Direct-Probe uebersprungen (kein apiKey in window.__MM_FIREBASE_CONFIG__ gefunden).</em></div>`);
     }
     rows.push("</div>");
 
-    // Konkrete Aktionen
+    // Zielgerichtete Empfehlungen aus dem 3-Wege-Vergleich
+    if (backendLoginOk && browserDirectAttempted && browserDirectOk) {
+        rows.push(`<div style="margin-top:10px;background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
+            <strong>🩺 Diagnose-Fokus: Das Firebase-SDK selbst.</strong> Backend + Browser-Direct funktionieren –
+            der Auth-Aufruf kommt am Server an. Der SDK-Layer dazwischen scheitert. Probier in dieser Reihenfolge:
+            <ol>
+                <li><strong>Browser-Cache leeren</strong> fuer 127.0.0.1:8765 (Strg+Shift+Entf → Cookies + Site-Daten → 1 Stunde).</li>
+                <li><strong>IndexedDB pruefen</strong>: DevTools (F12) → Application → IndexedDB → 'firebaseLocalStorageDb' loeschen.</li>
+                <li><strong>Service Worker entregistrieren</strong>: DevTools → Application → Service Workers → Unregister.</li>
+                <li><strong>App Check pruefen</strong>: Firebase-Console → App Check → wenn fuer Authentication 'Enforced', aber kein Provider konfiguriert ist → entweder Provider hinterlegen oder zurueck auf 'Unenforced'.</li>
+                <li><strong>Inkognito-Modus testen</strong>: schliesst alle Extensions UND alle State-Probleme aus. Wenn Login dort funktioniert, ist eine Extension oder lokaler Cache der Uebeltaeter.</li>
+            </ol>
+        </div>`);
+    } else if (backendLoginOk && browserDirectAttempted && !browserDirectOk) {
+        rows.push(`<div style="margin-top:10px;background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+            <strong>🩺 Diagnose-Fokus: Browser-Layer (Extension oder Antivirus).</strong>
+            Server kommt durch, Browser-fetch dorthin nicht.
+            <ol>
+                <li><strong>Browser-Erweiterungen deaktivieren</strong> (uBlock Origin, Privacy Badger, AdBlock Plus, Ghostery, Brave Shields). Im Inkognito-Modus laufen Extensions standardmaessig nicht.</li>
+                <li><strong>Antivirus mit SSL-/HTTPS-Scanning</strong>: Kaspersky, Avast, Norton, Sophos, Bitdefender. SSL-Inspection testweise deaktivieren ODER eine Ausnahme fuer <code>*.googleapis.com</code> einrichten.</li>
+                <li><strong>Anderen Browser probieren</strong>: Firefox nutzt einen eigenen TLS-Stack und Extensions-Set – schliesst beide Verdaechtige auf einen Schlag aus.</li>
+            </ol>
+        </div>`);
+    }
+
+    // Backend-Aktionen, falls Backend selbst Probleme meldet
     const actions = result.recommendedActions || [];
-    if (actions.length > 0) {
-        rows.push("<div style=\"margin-top:10px\"><strong>Konkrete naechste Schritte:</strong><ul>");
+    if (actions.length > 0 && !backendLoginOk) {
+        rows.push("<div style=\"margin-top:10px\"><strong>Konkrete naechste Schritte (Backend-Befund):</strong><ul>");
         for (const a of actions) {
             rows.push(`<li>${_escapeHtml(a)}</li>`);
         }
