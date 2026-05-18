@@ -94,7 +94,158 @@ function initializeAuthBindings() {
         checkProviderBtn.__authClickBound = true;
     }
 
+    const connectivityBtn = document.getElementById("connectivity-test-btn");
+    if (connectivityBtn && !connectivityBtn.__authClickBound) {
+        connectivityBtn.addEventListener("click", runConnectivityTest);
+        connectivityBtn.__authClickBound = true;
+    }
+
     authBindingsInitialized = true;
+}
+
+// ── Connectivity-Self-Test (Backend + Browser-Stack parallel) ───────
+//
+// Bei "auth/network-request-failed" ist die haeufigste Ursache nicht ein
+// echtes Netzwerkproblem, sondern: (a) Browser-Erweiterung blockt Google-
+// APIs, (b) Antivirus mit SSL-Inspection scheitert bei der OCSP-/CRL-
+// Pruefung, (c) Authorized Domain fehlt. Dieser Test ruft den Backend-
+// Endpoint und parallel direkte fetch()-Probes – die Differenz zwischen
+// beiden zeigt direkt, ob das Problem im Browser-TLS-Stack liegt.
+const _CONNECTIVITY_BROWSER_ENDPOINTS = [
+    { id: "identitytoolkit", name: "Firebase Auth", url: "https://identitytoolkit.googleapis.com/" },
+    { id: "securetoken",     name: "Token Refresh", url: "https://securetoken.googleapis.com/" },
+    { id: "firestore",       name: "Firestore",     url: "https://firestore.googleapis.com/" },
+    { id: "storage",         name: "Storage",       url: "https://firebasestorage.googleapis.com/" },
+    { id: "ocsp_google",     name: "OCSP (Cert-Sperre)", url: "https://ocsp.pki.goog/" },
+];
+
+async function _probeBrowserEndpoint(endpoint) {
+    const start = performance.now();
+    try {
+        // 'no-cors' erlaubt uns nur 'opaque'-Responses, aber: Bei TLS-/Netzwerk-
+        // Fehlern wirft fetch() trotzdem – genau das ist die Information die wir
+        // brauchen. Status-Codes lesen geht nicht, ist hier aber nicht das Ziel.
+        await fetch(endpoint.url, { mode: "no-cors", cache: "no-store" });
+        return { ok: true, ms: Math.round(performance.now() - start) };
+    } catch (err) {
+        return {
+            ok: false,
+            ms: Math.round(performance.now() - start),
+            error: (err && err.message) || String(err),
+        };
+    }
+}
+
+function _renderConnectivityResult(backend, browser) {
+    const node = document.getElementById("connectivity-test-result");
+    if (!node) return "";
+    const rows = [];
+
+    rows.push("<strong>Backend (Python urllib, OpenSSL-TLS):</strong>");
+    if (backend && backend.diagnosis) {
+        rows.push(`<div>${_escapeHtml(backend.diagnosis.headline || "")}</div>`);
+        for (const ep of (backend.endpoints || [])) {
+            const strict = ep.strict || {};
+            const mark = strict.ok ? "✓" : "✗";
+            const detail = strict.ok
+                ? `${strict.statusCode || "?"} (${strict.elapsedMs}ms)`
+                : `${strict.category || "fail"}: ${(strict.errorReason || "").slice(0, 80)}`;
+            rows.push(`<div style="font-family:monospace">${mark} ${_escapeHtml(ep.name)} — ${_escapeHtml(detail)}</div>`);
+        }
+        for (const hint of (backend.diagnosis.hints || [])) {
+            rows.push(`<div style="margin-top:6px"><em>Hinweis:</em> ${_escapeHtml(hint)}</div>`);
+        }
+    } else {
+        rows.push(`<div>Backend-Test fehlgeschlagen oder nicht verfuegbar.</div>`);
+    }
+
+    rows.push("<hr>");
+    rows.push("<strong>Browser (dein TLS-Stack, inkl. Antivirus/Extensions):</strong>");
+    const browserFails = (browser || []).filter(b => !b.result.ok);
+    if (browser && browser.length > 0) {
+        for (const entry of browser) {
+            const r = entry.result;
+            const mark = r.ok ? "✓" : "✗";
+            const detail = r.ok ? `OK (${r.ms}ms)` : `Fehler: ${r.error || "unbekannt"}`;
+            rows.push(`<div style="font-family:monospace">${mark} ${_escapeHtml(entry.endpoint.name)} — ${_escapeHtml(detail)}</div>`);
+        }
+    }
+
+    // Cross-Diagnose: Backend OK, Browser fail = TLS-Stack-Problem (Antivirus)
+    const backendOk = backend && backend.diagnosis && backend.diagnosis.level === "ok";
+    rows.push("<hr>");
+    if (backendOk && browserFails.length > 0) {
+        rows.push(
+            `<div style="background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
+                <strong>⚠ Diagnose: Browser-TLS-Stack ist das Problem.</strong><br>
+                Server kommt durch, Browser nicht. Hauptverdaechtige:
+                <ol>
+                    <li><strong>Browser-Erweiterung</strong> (uBlock, Privacy Badger, AdBlock) blockt Google-API-Aufrufe.
+                        Test: im Inkognito-Modus oeffnen, oder Erweiterungen fuer 127.0.0.1:8765 deaktivieren.</li>
+                    <li><strong>Antivirus mit SSL-Inspection</strong> (Kaspersky, Avast, Norton, Sophos, Bitdefender).
+                        Test: SSL-Scanning testweise deaktivieren oder Ausnahme fuer *.googleapis.com einrichten.</li>
+                    <li><strong>Anderen Browser probieren</strong>: Firefox nutzt einen eigenen TLS-Stack und ist nicht
+                        anfaellig fuer die gleichen Probleme wie Chrome/Edge auf Windows.</li>
+                </ol>
+            </div>`
+        );
+    } else if (!backendOk && browserFails.length === 0) {
+        rows.push(
+            `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>⚠ Diagnose: Server-Routing-Problem.</strong><br>
+                Browser kommt durch, der Python-Server nicht. Pruefe ggf. eine Proxy-Konfiguration
+                fuer Python (HTTPS_PROXY-Umgebungsvariable).
+            </div>`
+        );
+    } else if (!backendOk && browserFails.length > 0) {
+        rows.push(
+            `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>✗ Diagnose: Komplettes Netzwerkproblem.</strong><br>
+                Weder Browser noch Server erreichen die Firebase-Endpoints. Pruefe Internetverbindung,
+                Router/Firewall und DNS-Aufloesung.
+            </div>`
+        );
+    } else {
+        rows.push(
+            `<div style="background:#d1fae5;padding:10px;border-left:4px solid #16a34a">
+                <strong>✓ Diagnose: Konnektivitaet OK.</strong><br>
+                Wenn der Login trotzdem mit auth/network-request-failed scheitert, liegt es nicht am Netzwerk.
+                Pruefe: (1) Email/Password als Provider in Firebase Auth aktiviert,
+                (2) 127.0.0.1 in Authorized Domains, (3) App Check nicht ohne Site Key enforced.
+            </div>`
+        );
+    }
+    node.hidden = false;
+    node.innerHTML = rows.join("\n");
+}
+
+function _escapeHtml(text) {
+    return String(text == null ? "" : text)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+async function runConnectivityTest() {
+    const btn = document.getElementById("connectivity-test-btn");
+    const node = document.getElementById("connectivity-test-result");
+    if (btn) btn.disabled = true;
+    if (node) {
+        node.hidden = false;
+        node.innerHTML = "<em>Teste Konnektivitaet aus Browser- und Backend-Sicht parallel …</em>";
+    }
+    let backendResult = null;
+    const browserResults = [];
+    try {
+        const [backend, ...probes] = await Promise.all([
+            fetch("/api/tools/firebase-connectivity").then(r => r.ok ? r.json() : null).catch(() => null),
+            ..._CONNECTIVITY_BROWSER_ENDPOINTS.map(ep => _probeBrowserEndpoint(ep).then(result => ({ endpoint: ep, result }))),
+        ]);
+        backendResult = backend;
+        browserResults.push(...probes);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+    _renderConnectivityResult(backendResult, browserResults);
 }
 
 function initializeAuthStateObserver() {

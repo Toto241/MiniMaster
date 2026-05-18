@@ -7109,6 +7109,13 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             except Exception as exc:  # pragma: no cover
                 return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
+        if parsed.path == "/api/tools/firebase-connectivity":
+            try:
+                from firebase_connectivity import run_connectivity_check  # type: ignore
+                return self._write_json(HTTPStatus.OK, run_connectivity_check(timeout=6.0))
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
         if parsed.path == "/api/commissioning/history":
             query = parse_qs(parsed.query)
             limit = parse_int(

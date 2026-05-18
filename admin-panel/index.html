@@ -535,7 +535,11 @@
                                 <button type="button" class="btn btn-outline btn-full" id="check-provider-btn" title="Prüft, welche Anmeldemethode für diese E-Mail-Adresse konfiguriert ist">
                                     Anmeldeart für E-Mail prüfen
                                 </button>
+                                <button type="button" class="btn btn-outline btn-full" id="connectivity-test-btn" data-action="runConnectivityTest" title="Testet, ob Browser + Server die Firebase-Endpoints erreichen (Diagnose bei auth/network-request-failed)">
+                                    🔍 Verbindung testen (Browser + Server)
+                                </button>
                                 <div id="login-status" class="phase-status"></div>
+                                <div id="connectivity-test-result" class="phase-status" hidden></div>
                             </form>
                         </div>
                     </div>
