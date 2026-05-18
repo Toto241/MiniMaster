@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "716142639488",
+    "project_id": "minimaster-28fbd",
+    "storage_bucket": "minimaster-28fbd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:716142639488:android:0a726bec83e7a5ff71a965",
+        "android_client_info": {
+          "package_name": "com.google.pairing"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "716142639488-pkgvo1elghfctutspjv3gsul3asht1nt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDeDL5QEyuwiwBFnkaAv07BnmRtmvD6q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "716142639488-pkgvo1elghfctutspjv3gsul3asht1nt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:716142639488:android:3c924442cd68837e71a965",
+        "android_client_info": {
+          "package_name": "com.minimaster.masterapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "716142639488-pkgvo1elghfctutspjv3gsul3asht1nt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDeDL5QEyuwiwBFnkaAv07BnmRtmvD6q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "716142639488-pkgvo1elghfctutspjv3gsul3asht1nt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
