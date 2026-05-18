@@ -65,13 +65,25 @@ import * as path from "path";
  *     _renderConnectivityResult, runAuthDiagnostics, _renderAuthDiagnostics,
  *     _boolBadge, _tristateBadge plus _escapeHtml (zuvor schon vorhanden).
  *     Limits angepasst mit kleinem Headroom.
+ *
+ * Stand Browser-State-Auto-Reset (Fall-A-Diagnose automatisiert):
+ *   - app.js: 843_347 Bytes (+8_347 ueber dem Limit von 835_000).
+ *   - Top-Level-Funktionen: 536 (+1 ueber dem Limit von 535).
+ *   - Begruendung: 1-Klick-Reset von localStorage, sessionStorage, IndexedDB,
+ *     CacheStorage, Service Workers, Cookies plus Auto-Reload mit Countdown,
+ *     ausserdem App-Check-Status-Probe und 3-Wege-Browser-Direct-Vergleich.
+ *     Neue Funktionen: autoResetFirebaseBrowserState, probeAppCheckStatus,
+ *     _hardReloadWithCountdown, _handleAutoResetClick, _runBackendAuthProbe,
+ *     _firebaseApiKeyForDiagnostics, _runBrowserDirectAuthProbe (sieben
+ *     neue, davon eine "double-counted" wegen Inkrement-Differenz).
+ *     Limits angepasst mit kleinem Headroom.
  */
 
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
-const MAX_APP_JS_BYTES = 835_000;
-const MAX_TOP_LEVEL_FUNCTIONS = 535;
+const MAX_APP_JS_BYTES = 855_000;
+const MAX_TOP_LEVEL_FUNCTIONS = 545;
 const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
