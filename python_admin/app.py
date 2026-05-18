@@ -6337,6 +6337,25 @@ ENV_FILE = REPO_ROOT / ".env"
 ENV_EXAMPLE_FILE = REPO_ROOT / ".env.example"
 ADMIN_PANEL_FIREBASE_CONFIG_FILE = REPO_ROOT / "admin-panel" / "firebase-config.js"
 
+# Zielpfade fuer die Firebase-Pflicht-Artefakte. Werden ueber den Uebertragen-
+# Wizard (start.bat / Admin-Panel) per Pfad-Angabe oder Inline-Inhalt befuellt.
+GOOGLE_SERVICES_MASTER_FILE = REPO_ROOT / "masterApp" / "google-services.json"
+GOOGLE_SERVICES_CHILD_FILE = REPO_ROOT / "childApp" / "google-services.json"
+SERVICE_ACCOUNT_KEY_FILE = REPO_ROOT / "serviceAccountKey.json"
+
+FIREBASE_ARTIFACT_TARGETS: dict[str, Path] = {
+    "googleServicesMaster": GOOGLE_SERVICES_MASTER_FILE,
+    "googleServicesChild": GOOGLE_SERVICES_CHILD_FILE,
+    "serviceAccountKey": SERVICE_ACCOUNT_KEY_FILE,
+}
+
+ARTIFACT_PLACEHOLDER_TOKENS: tuple[str, ...] = (
+    "your-",
+    "your_project",
+    "<your",
+    "REPLACE_ME",
+)
+
 # Alle Panel-Verzeichnisse, in die der Wizard die generierte firebase-config.js
 # spiegelt. Damit erbt jedes Panel automatisch die Werte – frueher war der
 # Wizard auf das Admin-Panel beschraenkt und die anderen Panels mussten manuell
@@ -6560,6 +6579,134 @@ def _mask_secret(value: str) -> str:
     return value[:3] + "…" + value[-3:]
 
 
+def _artifact_has_placeholder(text: str) -> bool:
+    return any(token in text for token in ARTIFACT_PLACEHOLDER_TOKENS)
+
+
+def _summarize_artifact(target: Path) -> dict[str, object]:
+    """Liest eine vorhandene JSON-Pflicht-Datei und gibt Status-Infos zurueck."""
+    info: dict[str, object] = {
+        "path": str(target),
+        "exists": target.exists(),
+        "valid": False,
+    }
+    if not target.exists():
+        return info
+    try:
+        raw = target.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except Exception as exc:
+        info["error"] = f"JSON nicht parsbar: {exc}"
+        return info
+    if _artifact_has_placeholder(raw):
+        info["error"] = "Enthaelt Platzhalter (your-...)"
+        info["valid"] = False
+    else:
+        info["valid"] = True
+    if isinstance(data, dict):
+        project_info = data.get("project_info")
+        if isinstance(project_info, dict):
+            info["projectId"] = project_info.get("project_id", "")
+            info["projectNumber"] = project_info.get("project_number", "")
+        if "project_id" in data:
+            info["projectId"] = data.get("project_id", "")
+        if "client_email" in data:
+            info["clientEmail"] = data.get("client_email", "")
+        clients = data.get("client")
+        if isinstance(clients, list) and clients:
+            first = clients[0]
+            if isinstance(first, dict):
+                client_info = first.get("client_info")
+                if isinstance(client_info, dict):
+                    info["packageName"] = client_info.get(
+                        "android_client_info", {}
+                    ).get("package_name", "")
+    return info
+
+
+def _normalize_artifact_input(raw: object) -> tuple[str, object]:
+    """Entpackt das vom Wizard gelieferte Artefakt zu (kind, payload).
+
+    Akzeptiert:
+      - String mit Dateipfad (`/path/to/google-services.json`)
+      - Dict {"path": "..."}
+      - Dict {"content": "<json-text>"} oder {"content": {<dict>}}
+      - Dict mit JSON-Feldern direkt (z.B. {"project_info": {...}})
+    """
+    if raw is None:
+        return ("empty", None)
+    if isinstance(raw, str):
+        trimmed = raw.strip()
+        if not trimmed:
+            return ("empty", None)
+        return ("path", trimmed)
+    if isinstance(raw, dict):
+        if "path" in raw and raw.get("path"):
+            return ("path", str(raw["path"]).strip())
+        if "content" in raw:
+            return ("content", raw["content"])
+        return ("content", raw)
+    return ("invalid", None)
+
+
+def _apply_artifact(key: str, raw: object) -> dict[str, object]:
+    """Schreibt ein Pflicht-Artefakt (JSON-Datei) an seine Zieladresse.
+
+    Wirft ValueError bei Ungueltigkeit; liefert ansonsten ein Status-Dict.
+    """
+    target = FIREBASE_ARTIFACT_TARGETS[key]
+    kind, value = _normalize_artifact_input(raw)
+    if kind == "empty":
+        return {"key": key, "skipped": True, "path": str(target)}
+    if kind == "invalid":
+        raise ValueError(f"{key}: unbekanntes Eingabeformat.")
+
+    if kind == "path":
+        assert isinstance(value, str)
+        source = Path(value).expanduser()
+        if not source.is_absolute():
+            source = (REPO_ROOT / value).resolve()
+        if not source.exists() or not source.is_file():
+            raise ValueError(f"{key}: Quelldatei nicht gefunden: {source}")
+        try:
+            text = source.read_text(encoding="utf-8")
+        except Exception as exc:
+            raise ValueError(f"{key}: Quelldatei nicht lesbar: {exc}") from exc
+        try:
+            json.loads(text)
+        except Exception as exc:
+            raise ValueError(f"{key}: Quelldatei ist kein valides JSON: {exc}") from exc
+        if _artifact_has_placeholder(text):
+            raise ValueError(
+                f"{key}: Quelldatei enthaelt Platzhalter (your-...). "
+                "Bitte die echte Datei aus der Firebase-Console verwenden."
+            )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        return {"key": key, "written": True, "path": str(target), "source": str(source)}
+
+    # kind == "content"
+    if isinstance(value, str):
+        text = value
+        try:
+            json.loads(text)
+        except Exception as exc:
+            raise ValueError(f"{key}: Inline-Inhalt ist kein valides JSON: {exc}") from exc
+    else:
+        try:
+            text = json.dumps(value, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            raise ValueError(f"{key}: Inline-Inhalt nicht serialisierbar: {exc}") from exc
+    if _artifact_has_placeholder(text):
+        raise ValueError(
+            f"{key}: Inline-Inhalt enthaelt Platzhalter (your-...). "
+            "Bitte die echte Datei aus der Firebase-Console verwenden."
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return {"key": key, "written": True, "path": str(target), "source": "inline"}
+
+
 def load_config_transfer_state() -> dict[str, object]:
     env_values = _parse_env_file(ENV_FILE)
     panel_values = _read_admin_panel_firebase_config()
@@ -6581,6 +6728,11 @@ def load_config_transfer_state() -> dict[str, object]:
         else:
             env_view[key] = raw_value
 
+    artifacts_view: dict[str, dict[str, object]] = {
+        key: _summarize_artifact(path)
+        for key, path in FIREBASE_ARTIFACT_TARGETS.items()
+    }
+
     return {
         "envFileExists": ENV_FILE.exists(),
         "envFile": str(ENV_FILE),
@@ -6589,13 +6741,22 @@ def load_config_transfer_state() -> dict[str, object]:
         "env": env_view,
         "secretKeys": sorted(SECRET_ENV_KEYS),
         "allowedEnvKeys": list(ALLOWED_ENV_KEYS),
+        "artifacts": artifacts_view,
+        "artifactKeys": list(FIREBASE_ARTIFACT_TARGETS.keys()),
     }
 
 
 def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
-    """Schreibt die übergebenen Werte in .env und admin-panel/firebase-config.js."""
+    """Schreibt die übergebenen Werte in .env und admin-panel/firebase-config.js.
+
+    Optional koennen unter ``payload['artifacts']`` die drei Pflicht-JSON-Dateien
+    (``googleServicesMaster``, ``googleServicesChild``, ``serviceAccountKey``)
+    mitgeliefert werden – entweder als Pfad (String), als Dict ``{"path": ...}``
+    oder als Dict ``{"content": <json-text-oder-dict>}``.
+    """
     firebase_payload = as_dict(payload.get("firebase"))
     env_payload = as_dict(payload.get("env"))
+    artifacts_payload = as_dict(payload.get("artifacts"))
 
     firebase_normalized: dict[str, str] = {}
     for key in FIREBASE_WEB_KEYS:
@@ -6643,6 +6804,24 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         _write_admin_panel_firebase_config(merged_panel_values)
         panel_written = True
 
+    artifact_results: dict[str, dict[str, object]] = {}
+    artifact_errors: dict[str, str] = {}
+    for art_key in FIREBASE_ARTIFACT_TARGETS:
+        if art_key not in artifacts_payload:
+            continue
+        try:
+            artifact_results[art_key] = _apply_artifact(art_key, artifacts_payload[art_key])
+        except ValueError as exc:
+            artifact_errors[art_key] = str(exc)
+
+    if artifact_errors:
+        raise ValueError("; ".join(f"{k}: {v}" for k, v in artifact_errors.items()))
+
+    artifact_status: dict[str, dict[str, object]] = {
+        key: _summarize_artifact(path)
+        for key, path in FIREBASE_ARTIFACT_TARGETS.items()
+    }
+
     return {
         "ok": True,
         "envWritten": sorted(env_updates.keys()),
@@ -6652,6 +6831,8 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         "adminPanelFirebaseConfigWritten": panel_written,
         "adminPanelFirebaseConfigFile": str(ADMIN_PANEL_FIREBASE_CONFIG_FILE),
         "panelFirebaseConfigFiles": [str(p) for p in PANEL_FIREBASE_CONFIG_FILES],
+        "artifactsWritten": sorted(artifact_results.keys()),
+        "artifacts": artifact_status,
     }
 
 
