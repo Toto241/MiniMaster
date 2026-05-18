@@ -360,6 +360,35 @@
             </div>
 
             <div class="wiz-field">
+                <label for="wiz-env-RESEND_API_KEY">Resend API Key <em>(Pflicht fuer Support-Automatik)</em></label>
+                <p class="wiz-hint">
+                    Resend ist der Email-Provider, der die von Gemini erzeugten
+                    Support-Ticket-Antworten an die Eltern versendet. Ohne Key werden
+                    Antworten nur in der Cloud-Function geloggt, aber nicht zugestellt –
+                    der Support-Workflow funktioniert dann nicht.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" href="https://resend.com/api-keys" target="_blank" rel="noopener">
+                        🔗 Resend – API Keys
+                    </a>
+                    <a class="wiz-link-btn is-secondary" href="https://resend.com/domains" target="_blank" rel="noopener">
+                        📖 Absender-Domain verifizieren
+                    </a>
+                </div>
+                <input type="password" id="wiz-env-RESEND_API_KEY" data-env-key="RESEND_API_KEY" autocomplete="off" placeholder="re_…" />
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-env-SUPPORT_FROM_EMAIL">Support-Absender-Adresse <em>(Pflicht zusammen mit Resend Key)</em></label>
+                <p class="wiz-hint">
+                    Die Adresse, von der Support-Antworten verschickt werden. Muss in
+                    Resend als verifizierte Domain registriert sein, sonst werden Mails
+                    abgelehnt.
+                </p>
+                <input type="email" id="wiz-env-SUPPORT_FROM_EMAIL" data-env-key="SUPPORT_FROM_EMAIL" autocomplete="off" placeholder="support@minimaster.app" />
+            </div>
+
+            <div class="wiz-field">
                 <label for="wiz-env-APPLE_BUNDLE_ID">Apple Bundle ID <em>(nur fuer iOS-Subscriptions)</em></label>
                 <p class="wiz-hint">
                     Bundle-Identifier deiner iOS-App im App Store, z. B.
@@ -367,6 +396,79 @@
                     benoetigt; lokales Setup laeuft ohne.
                 </p>
                 <input type="text" id="wiz-env-APPLE_BUNDLE_ID" data-env-key="APPLE_BUNDLE_ID" placeholder="com.minimaster.masterapp" />
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-env-PLAY_PACKAGE_NAME">Android Package Name <em>(Pflicht fuer Android-Subscriptions)</em></label>
+                <p class="wiz-hint">
+                    Vollqualifizierter Paketname der Master-App, wie er in der Play
+                    Console registriert ist. Wird fuer das Auflösen von Subscriptions
+                    ueber die Google Play Developer API (androidpublisher v3) verwendet.
+                </p>
+                <input type="text" id="wiz-env-PLAY_PACKAGE_NAME" data-env-key="PLAY_PACKAGE_NAME" placeholder="com.minimaster.masterapp" />
+            </div>
+
+            <details class="wiz-help-block">
+                <summary>📱 Werte, die NACH dem Setup im Admin-Panel konfiguriert werden (Play Integrity, Device Check, VAPID, reCAPTCHA, FCM)</summary>
+                <p>
+                    Die folgenden Werte werden nicht in <code>.env</code> abgelegt, sondern
+                    im Firestore-Dokument <code>operatorConfig/externalIntegrations</code>
+                    – sichtbar im Admin-Panel unter
+                    <a href="/admin-panel/#external-integrations-card" target="_blank" rel="noopener">
+                        Setup → Externe Integrationen
+                    </a>.
+                </p>
+                <ul>
+                    <li>
+                        <strong>Play Integrity Key</strong> (Pfad zu Secret Manager). Erforderlich,
+                        damit der Backend den von der Master-App gesendeten Play-Integrity-Token
+                        validieren kann (Schutz vor manipulierten Android-Installationen).
+                        <a href="https://console.cloud.google.com/security/integrity-api" target="_blank" rel="noopener">
+                            Play Integrity in Cloud-Console aktivieren ↗
+                        </a>
+                    </li>
+                    <li>
+                        <strong>Apple DeviceCheck Key</strong> (Pfad zu Secret Manager). Optional,
+                        wird fuer das iOS-Pendant verwendet (App Attest / DeviceCheck).
+                    </li>
+                    <li>
+                        <strong>FCM Server Key</strong> (Pfad zu Secret Manager). Wird vom Backend
+                        zum Senden von Push-Nachrichten an die Master-/Child-Apps gebraucht.
+                        Wenn Firebase Admin SDK ueber den Service Account laeuft (typisch), ist
+                        dieser Eintrag optional.
+                    </li>
+                    <li>
+                        <strong>reCAPTCHA v3 Site Key</strong> (oeffentlich, kein Secret). Wird
+                        auch in das <code>FIREBASE_APP_CHECK_SITE_KEY</code>-Feld weiter oben
+                        eingetragen – beide Stellen muessen denselben Wert haben, falls Web-App-
+                        Check ueber reCAPTCHA aktiviert ist.
+                    </li>
+                </ul>
+                <p>
+                    Diese Werte sind <em>nicht zwingend</em> fuer den ersten Start. Erst beim
+                    Production-Go-Live im Admin-Panel ergaenzen.
+                </p>
+            </details>
+
+            <div class="wiz-field">
+                <label for="wiz-env-PLAY_BILLING_PUBSUB_TOPIC">Play Billing Pub/Sub Topic <em>(Pflicht fuer RTDN)</em></label>
+                <p class="wiz-hint">
+                    Vollqualifizierter Name des Cloud-Pub/Sub-Topics, das Real-Time
+                    Developer Notifications (RTDN) von Play empfaengt – z. B.
+                    Abo-Verlaengerungen, Kuendigungen, Reaktivierungen. Ohne Topic
+                    laeuft der Subscription-Webhook leer und Abo-Statusse bleiben
+                    veraltet. Format:
+                    <code>projects/&lt;gcp-projekt&gt;/topics/&lt;topic-name&gt;</code>.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" href="https://console.cloud.google.com/cloudpubsub/topic/list" target="_blank" rel="noopener">
+                        🔗 Cloud Pub/Sub – Topic anlegen
+                    </a>
+                    <a class="wiz-link-btn is-secondary" href="https://play.google.com/console" target="_blank" rel="noopener">
+                        📖 Play Console – Monetisation → Subscriptions → RTDN
+                    </a>
+                </div>
+                <input type="text" id="wiz-env-PLAY_BILLING_PUBSUB_TOPIC" data-env-key="PLAY_BILLING_PUBSUB_TOPIC" placeholder="projects/my-gcp-project/topics/play-billing-notifications" />
             </div>
         </div>
         <div class="wiz-actions">

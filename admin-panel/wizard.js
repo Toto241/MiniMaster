@@ -619,7 +619,11 @@
         const envLabels = {
             GEMINI_API_KEY: "GEMINI_API_KEY",
             OPENAI_API_KEY: "OPENAI_API_KEY",
+            RESEND_API_KEY: "RESEND_API_KEY",
+            SUPPORT_FROM_EMAIL: "SUPPORT_FROM_EMAIL",
             APPLE_BUNDLE_ID: "APPLE_BUNDLE_ID",
+            PLAY_PACKAGE_NAME: "PLAY_PACKAGE_NAME",
+            PLAY_BILLING_PUBSUB_TOPIC: "PLAY_BILLING_PUBSUB_TOPIC",
         };
         Object.entries(envLabels).forEach(([key, label]) => {
             const value = env[key];
