@@ -42,6 +42,10 @@ def _ask(prompt: str, default: bool = True, assume_yes: bool = False) -> bool:
 def _run(cmd: list[str], cwd: Path | None = None) -> int:
     print(f"\n>>> {' '.join(cmd)}")
     try:
+        if cmd:
+            resolved = shutil.which(cmd[0])
+            if resolved:
+                cmd = [resolved, *cmd[1:]]
         return subprocess.call(cmd, cwd=str(cwd) if cwd else None)
     except FileNotFoundError as exc:
         print(f"[FEHLER] Befehl nicht gefunden: {exc}")
@@ -95,12 +99,13 @@ def step_firebase_cli(assume_yes: bool) -> bool:
 
 def step_firebase_login(assume_yes: bool) -> bool:
     print("\n--- Schritt 4: Firebase Login ---")
-    if not shutil.which("firebase"):
+    firebase_path = shutil.which("firebase")
+    if not firebase_path:
         print("[WARN] firebase CLI fehlt – Login uebersprungen.")
         return False
     rc, out = 0, ""
     try:
-        proc = subprocess.run(["firebase", "login:list"], capture_output=True,
+        proc = subprocess.run([firebase_path, "login:list"], capture_output=True,
                               text=True, timeout=15)
         rc = proc.returncode
         out = proc.stdout + proc.stderr

@@ -50,6 +50,10 @@ def _which(*candidates: str) -> str | None:
 
 def _run(cmd: list[str], timeout: int = 10) -> tuple[int, str]:
     try:
+        if cmd:
+            resolved = shutil.which(cmd[0])
+            if resolved:
+                cmd = [resolved, *cmd[1:]]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return proc.returncode, (proc.stdout + proc.stderr).strip()
     except Exception as exc:
