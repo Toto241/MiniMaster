@@ -26,19 +26,50 @@ if /I "%1"=="--preflight" (
     exit /b %ERRORLEVEL%
 )
 if /I "%1"=="--skip-preflight" goto skip_preflight
+
 echo --- Pre-Flight ---
 "%PY%" "%~dp0scripts\preflight.py"
-if errorlevel 1 (
-    echo.
-    echo [WARN] Pre-Flight meldet Pflicht-Fehler. Start trotzdem fortsetzen?
-    set "_CONT="
-    set /p _CONT=Fortfahren? [y/N]:
-    if /I not "!_CONT!"=="y" if /I not "!_CONT!"=="yes" if /I not "!_CONT!"=="j" if /I not "!_CONT!"=="ja" (
-        echo Abgebrochen.
-        endlocal
-        exit /b 1
-    )
-)
+if not errorlevel 1 goto preflight_done
+
+rem ── Pflicht-Fehler: Wizard direkt anbieten (Default JA) ──────────
+echo.
+echo [WARN] Pre-Flight meldet Pflicht-Fehler. Der Konfigurations-Wizard
+echo        kann fehlende Werte direkt eintragen:
+echo          - Firebase-Web-Konfig (API-Key, Project-ID, ...)
+echo          - Pflicht-Dateien (google-services.json, serviceAccountKey.json)
+echo          - Optionale Secrets (GEMINI_API_KEY, OPENAI_API_KEY, ...)
+echo        Tipp: JSON-Dateien per Drag^&Drop ins Fenster ziehen –
+echo              Vorschlaege aus Downloads/ werden automatisch angeboten.
+echo.
+set "_RUN_WIZARD="
+set /p _RUN_WIZARD=Konfigurations-Wizard jetzt starten? [J/n]:
+if /I "!_RUN_WIZARD!"=="n" goto preflight_offer_skip
+if /I "!_RUN_WIZARD!"=="no" goto preflight_offer_skip
+if /I "!_RUN_WIZARD!"=="nein" goto preflight_offer_skip
+
+rem User hat ENTER oder explizit Ja gewaehlt → Wizard starten.
+echo.
+echo Starte Konfigurations-Wizard ...
+"%PY%" -m scripts.config_transfer_cli
+echo.
+echo --- Pre-Flight (erneut nach Wizard) ---
+"%PY%" "%~dp0scripts\preflight.py"
+if not errorlevel 1 goto preflight_done
+
+:preflight_offer_skip
+echo.
+echo [WARN] Es bestehen weiterhin Pflicht-Fehler.
+set "_CONT="
+set /p _CONT=Trotzdem starten (z.B. um das Admin-Panel zu nutzen)? [y/N]:
+if /I "!_CONT!"=="y" goto preflight_done
+if /I "!_CONT!"=="yes" goto preflight_done
+if /I "!_CONT!"=="j" goto preflight_done
+if /I "!_CONT!"=="ja" goto preflight_done
+echo Abgebrochen.
+endlocal
+exit /b 1
+
+:preflight_done
 echo.
 :skip_preflight
 
@@ -49,36 +80,6 @@ if not errorlevel 1 (
     echo        Das Admin-Panel wird direkt geoeffnet.
     goto open_panel
 )
-
-rem Optional: Firebase-/Secret-Konfiguration vor dem Start eintragen
-echo.
-echo Moechten Sie Firebase- und Secret-Konfiguration jetzt per Eingabeaufforderung
-echo eintragen?
-echo.
-echo   - Firebase-Web-Konfig (API-Key, Project-ID, ...)  -^> .env + firebase-config.js
-echo   - Optionale Secrets (GEMINI_API_KEY, OPENAI_API_KEY, ...) -^> .env
-echo   - Pflicht-Dateien (google-services.json, serviceAccountKey.json)
-echo       Tipp: Datei aus dem Explorer in dieses Fenster ziehen, um den
-echo       vollstaendigen Pfad einzufuegen. Vorschlaege aus Downloads/ werden
-echo       automatisch angeboten.
-echo.
-echo (Druecken Sie ENTER ohne Eingabe, um direkt das Admin-Panel zu oeffnen.
-echo  Das Admin-Panel hat dieselben Felder + Datei-Upload unter "Uebertragen".)
-set "_RUN_CONFIG_CLI="
-set /p _RUN_CONFIG_CLI=Konfiguration jetzt eintragen? [j/N]:
-if /I "%_RUN_CONFIG_CLI%"=="j" goto run_config_cli
-if /I "%_RUN_CONFIG_CLI%"=="ja" goto run_config_cli
-if /I "%_RUN_CONFIG_CLI%"=="y" goto run_config_cli
-if /I "%_RUN_CONFIG_CLI%"=="yes" goto run_config_cli
-goto skip_config_cli
-
-:run_config_cli
-echo.
-echo Starte Konfigurations-Assistent...
-"%PY%" -m scripts.config_transfer_cli
-echo.
-
-:skip_config_cli
 
 rem Python-Admin-Server im Hintergrund starten (minimiertes Fenster)
 echo Starte Python-Admin-Server auf http://127.0.0.1:8765 ...
