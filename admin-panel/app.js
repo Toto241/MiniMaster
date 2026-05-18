@@ -12801,6 +12801,155 @@ if (typeof window !== "undefined") {
     }
 }
 
+// ─── Konfigurations-Snapshots (Baustein A) ──────────────────────────
+
+function setConfigSnapshotStatus(message, level = "info") {
+    const node = document.getElementById("config-snapshots-status");
+    if (!node) return;
+    node.textContent = message || "";
+    node.className = `phase-status phase-status-${level}`;
+}
+
+function _escapeHtml(text) {
+    return String(text == null ? "" : text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function renderConfigSnapshotsList(snapshots, snapshotRoot) {
+    const list = document.getElementById("config-snapshots-list");
+    const rootNode = document.getElementById("config-snapshots-root");
+    if (rootNode && snapshotRoot) {
+        rootNode.textContent = `Ablage: ${snapshotRoot}`;
+    }
+    if (!list) return;
+    if (!Array.isArray(snapshots) || snapshots.length === 0) {
+        list.innerHTML = '<p class="text-muted">Noch keine Snapshots vorhanden.</p>';
+        return;
+    }
+    const rows = snapshots.slice(0, 30).map(entry => {
+        const id = _escapeHtml(entry.snapshotId);
+        const created = _escapeHtml(entry.createdAt || "?");
+        const reason = _escapeHtml(entry.reason || "-");
+        const files = Array.isArray(entry.filesIncluded) ? entry.filesIncluded : [];
+        const commit = entry.gitCommit ? _escapeHtml(String(entry.gitCommit).slice(0, 8)) : "—";
+        return `
+            <div class="config-field" style="border-top:1px solid var(--border, #ccc); padding-top:6px;">
+                <div><strong>${id}</strong></div>
+                <small class="text-muted">
+                    ${created} · reason=${reason} · git=${commit} · ${files.length} Datei(en)
+                </small>
+                <div class="phase-actions mm-u034" style="margin-top:6px;">
+                    <button type="button" class="btn btn-secondary" data-snapshot-action="restore" data-snapshot-id="${id}" title="Diesen Snapshot wiederherstellen (mit Pre-Restore-Sicherung)">↺ Wiederherstellen</button>
+                </div>
+            </div>
+        `;
+    }).join("");
+    list.innerHTML = rows;
+
+    list.querySelectorAll('[data-snapshot-action="restore"]').forEach(btn => {
+        btn.addEventListener("click", () => restoreConfigSnapshot(btn.getAttribute("data-snapshot-id")));
+    });
+}
+
+async function reloadConfigSnapshots() {
+    setConfigSnapshotStatus("Lade Snapshot-Liste …", "info");
+    try {
+        const response = await fetch("/api/config/snapshots");
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        renderConfigSnapshotsList(data.snapshots || [], data.snapshotRoot || "");
+        setConfigSnapshotStatus(
+            `✓ ${(data.snapshots || []).length} Snapshot(s).`, "success",
+        );
+    } catch (error) {
+        console.error("[reloadConfigSnapshots]", error);
+        setConfigSnapshotStatus(
+            "Laden fehlgeschlagen: " + error.message + " (nur im Python-Admin-Modus verfuegbar).",
+            "error",
+        );
+    }
+}
+
+async function createConfigSnapshot() {
+    setConfigSnapshotStatus("Lege Snapshot an …", "info");
+    try {
+        const response = await fetch("/api/config/snapshots/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: "manual-admin-panel" }),
+        });
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const info = await response.json();
+        const files = (info.filesIncluded || []).length;
+        setConfigSnapshotStatus(`✓ Snapshot ${info.snapshotId} angelegt (${files} Datei(en)).`, "success");
+        showNotification("Konfigurations-Snapshot angelegt.", "success");
+        await reloadConfigSnapshots();
+    } catch (error) {
+        console.error("[createConfigSnapshot]", error);
+        setConfigSnapshotStatus("Anlegen fehlgeschlagen: " + error.message, "error");
+        showNotification("Snapshot anlegen fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+async function restoreConfigSnapshot(snapshotId) {
+    if (!snapshotId) return;
+    if (!confirm(`Snapshot ${snapshotId} wiederherstellen?\n\nDer aktuelle Stand wird vorher automatisch als pre-restore-Snapshot gesichert.`)) {
+        return;
+    }
+    setConfigSnapshotStatus(`Stelle Snapshot ${snapshotId} wieder her …`, "info");
+    try {
+        const response = await fetch("/api/config/snapshots/restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ snapshotId }),
+        });
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        const restored = (result.restored || []).length;
+        setConfigSnapshotStatus(
+            `✓ ${restored} Datei(en) wiederhergestellt. Pre-Restore-Backup: ${result.preRestoreSnapshot || "—"}.`,
+            "success",
+        );
+        showNotification("Snapshot wiederhergestellt.", "success");
+        await reloadConfigSnapshots();
+        // Status der Pflicht-Artefakte erneut laden (kann sich geaendert haben).
+        try { await reloadConfigTransferState(); } catch (_err) { /* nicht kritisch */ }
+    } catch (error) {
+        console.error("[restoreConfigSnapshot]", error);
+        setConfigSnapshotStatus("Wiederherstellen fehlgeschlagen: " + error.message, "error");
+        showNotification("Wiederherstellen fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+if (typeof window !== "undefined") {
+    window.createConfigSnapshot = createConfigSnapshot;
+    window.reloadConfigSnapshots = reloadConfigSnapshots;
+    window.restoreConfigSnapshot = restoreConfigSnapshot;
+
+    const _initSnapshotsList = () => {
+        if (!document.getElementById("config-snapshots-list")) return;
+        reloadConfigSnapshots().catch(() => { /* still */ });
+    };
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", _initSnapshotsList, { once: true });
+    } else {
+        _initSnapshotsList();
+    }
+}
+
 function initializeFirebaseAfterConfigSave() {
     // If Firebase already initialized, just reload
     if (app) {
