@@ -32,40 +32,40 @@ rem Bei jedem 'git checkout/merge/rebase' wird automatisch ein Snapshot
 rem der Konfig-Pflicht-Dateien angelegt – siehe scripts/config_snapshot.py.
 "%PY%" -m scripts.install_git_hooks --quiet >nul 2>nul
 
+rem Flag steuert, ob nach Server-Start der Browser-Wizard statt des
+rem Admin-Panels geoeffnet wird.
+set "_OPEN_WIZARD=0"
+
 echo --- Pre-Flight ---
 "%PY%" "%~dp0scripts\preflight.py"
 if not errorlevel 1 goto preflight_done
 
-rem ── Pflicht-Fehler: Wizard direkt anbieten (Default JA) ──────────
+rem ── Pflicht-Fehler: Browser-Wizard ankuendigen ──────────────────────
 echo.
-echo [WARN] Pre-Flight meldet Pflicht-Fehler. Der Konfigurations-Wizard
-echo        kann fehlende Werte direkt eintragen:
+echo [WARN] Pre-Flight meldet Pflicht-Fehler. Der Setup-Wizard oeffnet
+echo        sich gleich automatisch im Browser. Er fuehrt durch:
 echo          - Firebase-Web-Konfig (API-Key, Project-ID, ...)
 echo          - Pflicht-Dateien (google-services.json, serviceAccountKey.json)
 echo          - Optionale Secrets (GEMINI_API_KEY, OPENAI_API_KEY, ...)
-echo        Tipp: JSON-Dateien per Drag^&Drop ins Fenster ziehen –
-echo              Vorschlaege aus Downloads/ werden automatisch angeboten.
+echo        Pro Eingabefeld findest du eine Erklaerung und einen Link
+echo        zur richtigen Stelle in der Firebase-Console.
+echo.
+echo        Falls du lieber die Konsolen-Variante haben moechtest, brich
+echo        ab und starte:   python -m scripts.config_transfer_cli
 echo.
 set "_RUN_WIZARD="
-set /p _RUN_WIZARD=Konfigurations-Wizard jetzt starten? [J/n]:
+set /p _RUN_WIZARD=Browser-Setup-Wizard jetzt starten? [J/n]:
 if /I "!_RUN_WIZARD!"=="n" goto preflight_offer_skip
 if /I "!_RUN_WIZARD!"=="no" goto preflight_offer_skip
 if /I "!_RUN_WIZARD!"=="nein" goto preflight_offer_skip
-
-rem User hat ENTER oder explizit Ja gewaehlt → Wizard starten.
-echo.
-echo Starte Konfigurations-Wizard ...
-"%PY%" -m scripts.config_transfer_cli
-echo.
-echo --- Pre-Flight (erneut nach Wizard) ---
-"%PY%" "%~dp0scripts\preflight.py"
-if not errorlevel 1 goto preflight_done
+set "_OPEN_WIZARD=1"
+goto preflight_done
 
 :preflight_offer_skip
 echo.
-echo [WARN] Es bestehen weiterhin Pflicht-Fehler.
+echo [WARN] Wizard uebersprungen. Pflicht-Fehler bleiben bestehen.
 set "_CONT="
-set /p _CONT=Trotzdem starten (z.B. um das Admin-Panel zu nutzen)? [y/N]:
+set /p _CONT=Server trotzdem starten und Admin-Panel oeffnen? [y/N]:
 if /I "!_CONT!"=="y" goto preflight_done
 if /I "!_CONT!"=="yes" goto preflight_done
 if /I "!_CONT!"=="j" goto preflight_done
@@ -183,8 +183,15 @@ endlocal
 exit /b 0
 
 :open_panel
-rem Admin-Panel ueber den Python-Server oeffnen
-echo Oeffne Admin-Panel unter http://127.0.0.1:8765/admin-panel/ ...
-start "" "http://127.0.0.1:8765/admin-panel/"
+rem Wenn Pflicht-Fehler vorlagen und der User den Browser-Wizard wollte,
+rem oeffnen wir wizard.html statt index.html. Nach Submit leitet der
+rem Wizard automatisch zum Admin-Panel weiter.
+if "!_OPEN_WIZARD!"=="1" (
+    echo Oeffne Setup-Wizard unter http://127.0.0.1:8765/admin-panel/wizard.html ...
+    start "" "http://127.0.0.1:8765/admin-panel/wizard.html"
+) else (
+    echo Oeffne Admin-Panel unter http://127.0.0.1:8765/admin-panel/ ...
+    start "" "http://127.0.0.1:8765/admin-panel/"
+)
 
 endlocal

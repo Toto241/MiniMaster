@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MiniMaster – Setup-Wizard</title>
+    <link rel="stylesheet" href="styles-wizard.css" />
+</head>
+<body>
+<main class="wiz-shell" id="wiz-shell">
+    <header class="wiz-header">
+        <h1>MiniMaster Setup-Wizard</h1>
+        <p>
+            Diese kurze Einrichtung verbindet die Admin-Zentrale mit deinem Firebase-Projekt.
+            Jeder Schritt erklaert, wofuer die Eingabe gebraucht wird, und bietet einen
+            Direkt-Link zu der Stelle in der Firebase-Console, an der der Wert zu finden ist.
+            Alle Werte werden lokal in <code>.env</code> und den Panel-Konfig-Dateien gespeichert.
+        </p>
+    </header>
+
+    <div class="wiz-progress" id="wiz-progress" aria-label="Fortschritt">
+        <div class="wiz-progress-step" data-step="1">1 · Willkommen</div>
+        <div class="wiz-progress-step" data-step="2">2 · Firebase-Projekt</div>
+        <div class="wiz-progress-step" data-step="3">3 · Pflicht-Dateien</div>
+        <div class="wiz-progress-step" data-step="4">4 · Secrets</div>
+        <div class="wiz-progress-step" data-step="5">5 · Speichern</div>
+    </div>
+
+    <!-- ── Step 1: Willkommen ────────────────────────────────────────── -->
+    <section class="wiz-step" data-step="1">
+        <div class="wiz-card">
+            <h2>Was wird hier eingerichtet?</h2>
+            <p>
+                MiniMaster braucht ein eigenes Firebase-Projekt. Wir sammeln in den naechsten
+                Schritten <strong>drei Gruppen</strong> von Informationen:
+            </p>
+            <ol>
+                <li>
+                    <strong>Firebase-Web-Konfiguration</strong> (API-Key, Project-ID, …) –
+                    damit die Browser-Panels (Admin, Web-Control, Eltern, Kind) sich beim
+                    Backend authentifizieren koennen.
+                </li>
+                <li>
+                    <strong>Pflicht-Dateien</strong> (zwei <code>google-services.json</code>
+                    plus <code>serviceAccountKey.json</code>) – fuer die Android-Apps und
+                    Server-seitige Admin-Operationen.
+                </li>
+                <li>
+                    <strong>Optionale Secrets</strong> (Gemini-/OpenAI-Key, App-Check
+                    Site-Key, Apple-Subscription-Felder) – fuer KI-Funktionen und externe
+                    Anbindungen.
+                </li>
+            </ol>
+            <div class="wiz-purpose">
+                <strong>Bevor du startest:</strong>
+                Lege in der Firebase-Console <em>einmalig</em> ein Projekt an
+                und registriere darin eine Web-App, eine Android-App
+                <code>com.minimaster.masterapp</code> und eine Android-App
+                <code>com.google.pairing</code>. Den Link findest du unten.
+            </div>
+            <div class="wiz-link-row">
+                <a class="wiz-link-btn" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                    🔗 Firebase-Console oeffnen
+                </a>
+                <a class="wiz-link-btn is-secondary" href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noopener">
+                    📖 Firebase Web-Setup Anleitung
+                </a>
+            </div>
+            <p>
+                Werte koennen jederzeit nachtraeglich im Admin-Panel oder durch erneutes
+                Ausfuehren von <code>start.bat</code> geaendert werden. Der Wizard hat einen
+                Snapshot-Mechanismus, der dich vor versehentlichem Datenverlust schuetzt.
+            </p>
+        </div>
+        <div class="wiz-actions">
+            <span></span>
+            <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+        </div>
+    </section>
+
+    <!-- ── Step 2: Firebase-Web-Konfig ────────────────────────────────── -->
+    <section class="wiz-step" data-step="2">
+        <div class="wiz-card">
+            <h2>Firebase-Web-Konfiguration</h2>
+            <div class="wiz-purpose">
+                <strong>Wofuer ist das wichtig?</strong>
+                Diese Werte stehen in <code>admin-panel/firebase-config.js</code> (und in den
+                drei anderen Panels). Sie sagen dem Browser, mit welchem Firebase-Projekt
+                er sprechen soll. Ohne diese Werte kann sich kein Operator anmelden,
+                kein Gerät pairen und keine Telemetrie geschrieben werden.
+            </div>
+            <p><strong>So findest du sie:</strong></p>
+            <ol>
+                <li>Firebase-Console → <em>Projekteinstellungen</em> (Zahnrad oben links)</li>
+                <li>Tab „Allgemein" → ganz unten „Deine Apps" → Web-App auswaehlen</li>
+                <li>Im Block „SDK-Setup und -Konfiguration" auf „Konfiguration" klicken</li>
+            </ol>
+            <div class="wiz-link-row">
+                <a class="wiz-link-btn" id="wiz-link-firebase-general" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                    🔗 Direkt zur Web-Konfiguration
+                </a>
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-projectId">Project ID</label>
+                <p class="wiz-hint">Der eindeutige Bezeichner deines Firebase-Projekts (z. B. <code>minimaster-prod</code>).</p>
+                <input type="text" id="wiz-projectId" data-firebase-key="projectId" placeholder="z. B. minimaster-prod" />
+            </div>
+            <div class="wiz-field">
+                <label for="wiz-apiKey">Web API Key</label>
+                <p class="wiz-hint">Der oeffentliche Web-API-Key – fuer Browser-Auth, nicht geheim, aber spezifisch fuer dein Projekt.</p>
+                <input type="text" id="wiz-apiKey" data-firebase-key="apiKey" placeholder="AIzaSy…" />
+            </div>
+            <div class="wiz-field">
+                <label for="wiz-authDomain">Auth Domain</label>
+                <p class="wiz-hint">Typischerweise <code>&lt;projectId&gt;.firebaseapp.com</code>.</p>
+                <input type="text" id="wiz-authDomain" data-firebase-key="authDomain" placeholder="z. B. minimaster-prod.firebaseapp.com" />
+            </div>
+            <div class="wiz-field">
+                <label for="wiz-storageBucket">Storage Bucket</label>
+                <p class="wiz-hint">Adresse des Cloud-Storage-Buckets fuer Uploads und Snapshot-Dateien.</p>
+                <input type="text" id="wiz-storageBucket" data-firebase-key="storageBucket" placeholder="z. B. minimaster-prod.firebasestorage.app" />
+            </div>
+            <div class="wiz-field">
+                <label for="wiz-messagingSenderId">Messaging Sender ID</label>
+                <p class="wiz-hint">Sender-ID fuer FCM-Push-Nachrichten (numerisch).</p>
+                <input type="text" id="wiz-messagingSenderId" data-firebase-key="messagingSenderId" placeholder="z. B. 1234567890" />
+            </div>
+            <div class="wiz-field">
+                <label for="wiz-appId">App ID</label>
+                <p class="wiz-hint">Identifiziert die Web-App innerhalb des Projekts, Format <code>1:&lt;number&gt;:web:&lt;hash&gt;</code>.</p>
+                <input type="text" id="wiz-appId" data-firebase-key="appId" placeholder="z. B. 1:1234567890:web:abc..." />
+            </div>
+            <div class="wiz-field">
+                <label for="wiz-measurementId">Measurement ID <em>(optional)</em></label>
+                <p class="wiz-hint">Fuer Google Analytics 4 – kann leer bleiben.</p>
+                <input type="text" id="wiz-measurementId" data-firebase-key="measurementId" placeholder="z. B. G-XXXXXXXXXX" />
+            </div>
+        </div>
+        <div class="wiz-actions">
+            <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+            <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+        </div>
+    </section>
+
+    <!-- ── Step 3: Pflicht-Dateien ────────────────────────────────────── -->
+    <section class="wiz-step" data-step="3">
+        <div class="wiz-card">
+            <h2>Pflicht-Dateien aus der Firebase-Console</h2>
+            <div class="wiz-purpose">
+                <strong>Wofuer ist das wichtig?</strong>
+                Diese drei JSON-Dateien werden NICHT ueber die Web-Konfiguration abgedeckt
+                und muessen separat aus der Firebase-Console heruntergeladen werden:
+                <ul>
+                    <li><code>google-services.json</code> der Android-Apps – binden die mobilen Apps an dein Projekt.</li>
+                    <li><code>serviceAccountKey.json</code> – erlaubt server-seitige Admin-Operationen (Setup-Admin-Befehle, Migrationen, Tests).</li>
+                </ul>
+                Ohne diese Dateien laufen die mobilen Apps nicht und die Pre-Flight-Pruefung bleibt rot.
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-art-master">masterApp / google-services.json</label>
+                <p class="wiz-hint">
+                    Android-App mit Package-Name <code>com.minimaster.masterapp</code> (das ist die Eltern-App).
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" id="wiz-link-master-gs" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                        🔗 Datei aus Firebase-Console holen
+                    </a>
+                </div>
+                <input type="file" id="wiz-art-master" data-artifact-key="googleServicesMaster" accept=".json,application/json" />
+                <div class="wiz-status" id="wiz-art-master-status">Status: noch nicht geprueft</div>
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-art-child">childApp / google-services.json</label>
+                <p class="wiz-hint">
+                    Android-App mit Package-Name <code>com.google.pairing</code> (das ist die Kind-App).
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" id="wiz-link-child-gs" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                        🔗 Datei aus Firebase-Console holen
+                    </a>
+                </div>
+                <input type="file" id="wiz-art-child" data-artifact-key="googleServicesChild" accept=".json,application/json" />
+                <div class="wiz-status" id="wiz-art-child-status">Status: noch nicht geprueft</div>
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-art-sa">serviceAccountKey.json</label>
+                <p class="wiz-hint">
+                    Privater Schluessel fuer das Default-Dienstkonto. Wird vom Setup-Admin-CLI
+                    und Cloud-Functions-Deploys aus dem lokalen Filesystem gelesen.
+                    <strong>Diese Datei ist hochsensibel</strong> – behandle sie wie ein Passwort.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" id="wiz-link-service-account" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                        🔗 Neuen privaten Schluessel generieren
+                    </a>
+                </div>
+                <input type="file" id="wiz-art-sa" data-artifact-key="serviceAccountKey" accept=".json,application/json" />
+                <div class="wiz-status" id="wiz-art-sa-status">Status: noch nicht geprueft</div>
+            </div>
+        </div>
+        <div class="wiz-actions">
+            <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+            <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+        </div>
+    </section>
+
+    <!-- ── Step 4: Secrets ────────────────────────────────────────────── -->
+    <section class="wiz-step" data-step="4">
+        <div class="wiz-card">
+            <h2>Optionale Secrets &amp; externe Anbindungen</h2>
+            <div class="wiz-purpose">
+                <strong>Wofuer ist das wichtig?</strong>
+                Diese Werte sind <em>nicht</em> pflicht fuer den Start, schalten aber konkrete
+                Features frei. Jedes Feld kann uebersprungen und spaeter im Admin-Panel
+                nachgereicht werden.
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-env-GEMINI_API_KEY">Gemini API Key <em>(empfohlen)</em></label>
+                <p class="wiz-hint">
+                    Schaltet den KI-Assistenten im Admin-Panel frei und automatisiert
+                    Support-Ticket-Antworten plus FCM-Analyse. Ohne diesen Key sind alle
+                    Gemini-Funktionen deaktiviert.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">
+                        🔗 Google AI Studio – Key erzeugen
+                    </a>
+                </div>
+                <input type="password" id="wiz-env-GEMINI_API_KEY" data-env-key="GEMINI_API_KEY" autocomplete="off" placeholder="AIzaSy…" />
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-firebase-appCheckSiteKey">App Check Site Key <em>(empfohlen fuer Production)</em></label>
+                <p class="wiz-hint">
+                    reCAPTCHA-v3-Site-Key, der die Browser-Panels vor missbraeuchlichem
+                    Traffic schuetzt. Ohne diesen Key sind App-Check-Enforcement-Pruefungen
+                    deaktiviert – nicht empfohlen ausserhalb der lokalen Entwicklung.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" id="wiz-link-appcheck" href="https://console.firebase.google.com/" target="_blank" rel="noopener">
+                        🔗 App Check (Firebase-Console)
+                    </a>
+                </div>
+                <input type="text" id="wiz-firebase-appCheckSiteKey" data-firebase-key="appCheckSiteKey" placeholder="6L…" />
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-env-OPENAI_API_KEY">OpenAI API Key <em>(optionaler Fallback)</em></label>
+                <p class="wiz-hint">
+                    Aktiv nur, wenn auch <code>OPENAI_FALLBACK_ENABLED=true</code>. Springt
+                    ein, wenn Gemini nicht antwortet. Kann leer bleiben.
+                </p>
+                <div class="wiz-link-row">
+                    <a class="wiz-link-btn" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">
+                        🔗 OpenAI Platform – API Keys
+                    </a>
+                </div>
+                <input type="password" id="wiz-env-OPENAI_API_KEY" data-env-key="OPENAI_API_KEY" autocomplete="off" placeholder="sk-…" />
+            </div>
+
+            <div class="wiz-field">
+                <label for="wiz-env-APPLE_BUNDLE_ID">Apple Bundle ID <em>(nur fuer iOS-Subscriptions)</em></label>
+                <p class="wiz-hint">
+                    Bundle-Identifier deiner iOS-App im App Store, z. B.
+                    <code>com.minimaster.masterapp</code>. Wird nur fuer die App-Store-Server-API
+                    benoetigt; lokales Setup laeuft ohne.
+                </p>
+                <input type="text" id="wiz-env-APPLE_BUNDLE_ID" data-env-key="APPLE_BUNDLE_ID" placeholder="com.minimaster.masterapp" />
+            </div>
+        </div>
+        <div class="wiz-actions">
+            <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+            <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+        </div>
+    </section>
+
+    <!-- ── Step 5: Zusammenfassung & Speichern ────────────────────────── -->
+    <section class="wiz-step" data-step="5">
+        <div class="wiz-card">
+            <h2>Zusammenfassung &amp; Speichern</h2>
+            <p>
+                Hier siehst du, was beim Klick auf <strong>Speichern</strong> in
+                <code>.env</code>, <code>admin-panel/firebase-config.js</code> (und den drei
+                anderen Panel-Configs) sowie an den Zielpfaden der Pflicht-Dateien geschrieben
+                wird. Bestehende Werte werden ersetzt, leere Felder lassen den bestehenden
+                Wert unveraendert.
+            </p>
+            <ul class="wiz-summary-list" id="wiz-summary-list"></ul>
+            <div class="wiz-result" id="wiz-result" hidden></div>
+        </div>
+        <div class="wiz-actions">
+            <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+            <button type="button" class="wiz-btn is-primary" id="wiz-submit-btn" data-wiz-action="submit">Speichern &amp; Admin-Panel oeffnen</button>
+        </div>
+    </section>
+</main>
+
+<script src="wizard.js"></script>
+</body>
+</html>
