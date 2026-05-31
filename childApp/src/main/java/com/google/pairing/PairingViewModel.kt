@@ -18,30 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 /**
- * Represents the different states of the device pairing process.
- * This sealed class is used to drive the UI in [PairingScreen].
- */
-sealed class PairingState {
-    /** The initial state before any pairing attempt has been made. */
-    object Idle : PairingState()
-    /** The state when the pairing token is currently being validated with the backend. */
-    object Loading : PairingState()
-    /** The state when the device has been successfully paired. */
-    object Success : PairingState()
-    /** The state when an error has occurred during pairing. */
-    data class Error(val message: String) : PairingState()
-}
-
-/**
  * A [ViewModel] responsible for the business logic of pairing the child device
  * with a master account.
- *
- * It communicates with the Firebase backend to validate a pairing token and, upon
- * success, saves the returned child ID using the [ChildIdRepository].
- *
- * @property childIdRepository The repository for persisting the child ID.
- * @property functions The Firebase Functions instance for making backend calls.
- * @property ioDispatcher The coroutine dispatcher for background operations.
  */
 @HiltViewModel
 class PairingViewModel @Inject constructor(
@@ -50,35 +28,29 @@ class PairingViewModel @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
+    private var firebaseAuth: FirebaseAuth? = null
+    private fun auth(): FirebaseAuth = firebaseAuth ?: FirebaseAuth.getInstance().also { firebaseAuth = it }
+
     private val _pairingState = MutableStateFlow<PairingState>(PairingState.Idle)
-    /**
-     * A [StateFlow] representing the current state of the pairing process.
-     * The UI observes this flow to show loading indicators, success messages, or error alerts.
-     */
     val pairingState: StateFlow<PairingState> = _pairingState.asStateFlow()
 
-    private val _childImeiForDebug = MutableStateFlow<String?>(null)
-    /** A [StateFlow] that holds the child's IMEI, primarily for debugging purposes. */
-    val childImeiForDebug: StateFlow<String?> = _childImeiForDebug.asStateFlow()
+    private val _stableDeviceIdForDebug = MutableStateFlow<String?>(null)
+    val stableDeviceIdForDebug: StateFlow<String?> = _stableDeviceIdForDebug.asStateFlow()
 
     /**
-     * Initiates the token validation process using the modern authenticated flow.
+     * Validates a pairing token using the authenticated child flow.
      *
-     * Ensures the device is anonymously signed in to Firebase, then calls
-     * `pairAuthenticatedChild` so the Firebase UID becomes the canonical childId.
-     *
-     * @param token The pairing token received from the deep link.
-     * @param childImei The unique identifier (e.g., IMEI) of the child device (stored for reference).
+     * @param token The pairing token received from the deep link or manual entry.
+     * @param stableDeviceId Optional app-scoped device identifier for debug display only.
      */
-    fun validateToken(token: String, childImei: String) {
-        _childImeiForDebug.value = childImei
+    fun validateToken(token: String, stableDeviceId: String? = null) {
+        _stableDeviceIdForDebug.value = stableDeviceId?.takeIf { it.isNotBlank() }
 
         viewModelScope.launch(ioDispatcher) {
             _pairingState.value = PairingState.Loading
 
             try {
-                // Modern flow: anonymous auth first
-                val auth = FirebaseAuth.getInstance()
+                val auth = auth()
                 val firebaseUser = auth.currentUser ?: auth.signInAnonymously().await().user
                 if (firebaseUser == null) {
                     _pairingState.value = PairingState.Error("Firebase authentication failed.")
@@ -109,5 +81,9 @@ class PairingViewModel @Inject constructor(
                 _pairingState.value = PairingState.Error(errorMessage)
             }
         }
+    }
+
+    internal fun setFirebaseAuthForTesting(auth: FirebaseAuth) {
+        this.firebaseAuth = auth
     }
 }

@@ -1,0 +1,40 @@
+# Play Console Submission Packet (DE Pilot)
+
+**Status:** Repo-ready submission bundle — external Play Console clicks still required  
+**Generated:** 2026-05-30  
+**Apps:** `com.minimaster.masterapp` (Parent), `com.google.pairing` (Child)
+
+## Submission checklist
+
+| Item | Repo artifact | Console action | Status |
+| --- | --- | --- | --- |
+| Data Safety form | [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md) | Copy answers into Play Console → App content → Data safety | Ready to submit |
+| IARC questionnaire | [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md) Part B | Complete IARC in Play Console | Ready to submit |
+| Store listing DE | [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md) Part A | Paste title/short/full description + assets | Ready to submit |
+| Permissions declaration | [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md) | Submit Accessibility/Location/Phone declarations | Ready to submit |
+| App access guide | [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md) | Attach reviewer login path in Play Console | Ready to submit |
+| Privacy policy URL | [PRIVACY_POLICY_DE.md](PRIVACY_POLICY_DE.md) | Link `https://minimaster.app/privacy` (or hosted URL) | Ready |
+| Support email | Admin panel default `privacy@minimaster.app` | Enter in Store listing contact details | Ready |
+
+## Pre-filled operator values
+
+Use these values consistently across Data Safety and Store listing:
+
+- **Privacy policy URL:** `https://minimaster.app/privacy`
+- **Support / privacy email:** `privacy@minimaster.app`
+- **Category:** Parenting / Tools
+- **Target audience:** Parents with children under 13 (child app on child device)
+- **Ads:** No
+- **In-app purchases:** Yes (subscription via Google Play Billing)
+
+## Evidence links (repo-side)
+
+- Security evidence: `npm run security:evidence:collect` → `build/security-evidence/latest-report.md`
+- Commissioning evidence: `npm run commissioning:evidence:collect` → `build/commissioning-evidence/latest-report.md`
+- Release register: [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
+
+## Remaining external steps
+
+1. Upload final screenshots and feature graphic to Play Console.
+2. Submit both apps for review after physical commissioning evidence is attached.
+3. Record submission timestamps in [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md).

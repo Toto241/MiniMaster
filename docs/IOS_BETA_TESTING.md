@@ -59,6 +59,21 @@ xcrun altool --upload-app --type ios --file "build/Export/MiniMasterChild.ipa" -
 
 ## FamilyControls-Testing auf Device
 
+### Automatisierte UI-Contract-Tests (Repo)
+
+Vor dem manuellen Beta-Lauf können folgende Swift-Package-Tests ausgeführt werden:
+
+```bash
+cd iosMasterApp
+swift test
+```
+
+Abgedeckt durch `MiniMasterParentUIContractTests`:
+- LoginView Accessibility-IDs (`login.imeiField`, `login.deviceNameField`, `login.registerButton`)
+- PairingView Accessibility-IDs (`pairing.generateCodeButton`, `pairing.generateLinkButton`)
+
+Diese Tests ersetzen keinen XCUITest auf Gerät, sichern aber die UI-Hooks für künftige UI-Automation.
+
 ### Erst-Setup
 1. App installieren (TestFlight oder Xcode-Direct)
 2. App starten → Child-Registrierung durchlaufen

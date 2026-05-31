@@ -18,14 +18,22 @@
    - Storage: enforce `childId` ownership and admin override.
 
 ## Phase 2 — Client Auth & Device Identity
+
+**Status (2026-05-30):** Completed in repository.
+
 1. **Firebase Auth**
-   - Master app: sign in via Firebase Auth before calling backend (anonymous or full account).
-   - Child app: sign in via Firebase Auth before pairing.
+   - Master app: anonymous Firebase Auth before backend calls (`registerAuthenticatedMaster`).
+   - Child app: anonymous Firebase Auth before pairing (`pairAuthenticatedChild`).
+   - Web-control: bootstrap/custom-token only; direct secretKey login removed.
+   - iOS parent: `registerAuthenticatedMaster` + custom token; no local secretKey storage.
 2. **Device ID**
-   - Replace IMEI usage with Android ID (or Firebase Installation ID).
+   - Master app: stable app-scoped ID via ANDROID_ID fallback (`getStableMasterId`).
+   - Child app: stable app-scoped ID via `ChildIdentityStorage.getOrCreateStableChildId`.
 3. **Secrets Removal**
-   - Remove `secretKey` from all UI and storage.
-   - Remove IMEI/secretKey fields in web panel.
+   - Master credentials repository stores `masterId` only; legacy `secretKey` purged on read.
+   - Web panels and iOS parent no longer persist secretKey locally.
+
+Regression guard: `test/auth-migration-phase2-completion.test.ts`.
 
 ## Phase 3 — Cleanup & Enforcement
 1. **Data Migration**

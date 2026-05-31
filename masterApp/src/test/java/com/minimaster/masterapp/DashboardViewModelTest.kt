@@ -51,7 +51,7 @@ class DashboardViewModelTest {
 
     @Test
     fun setDeviceLocked_without_credentials_sets_error() = runTest {
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        whenever(credentialsRepository.getMasterId).thenReturn(flowOf(null))
 
         val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
         advanceUntilIdle()
@@ -64,7 +64,7 @@ class DashboardViewModelTest {
 
     @Test
     fun errorShown_resets_error_state() = runTest {
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        whenever(credentialsRepository.getMasterId).thenReturn(flowOf(null))
 
         val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
         advanceUntilIdle()
@@ -80,11 +80,10 @@ class DashboardViewModelTest {
 
     @Test
     fun createTask_with_credentials_calls_backend() = runTest {
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        whenever(credentialsRepository.getMasterId).thenReturn(flowOf("master-1"))
         val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
         advanceUntilIdle()
 
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-1" to "secret-1"))
         whenever(functions.getHttpsCallable(eq("createTask"))).thenReturn(callable)
         whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
 
@@ -102,11 +101,10 @@ class DashboardViewModelTest {
 
     @Test
     fun setDeviceLocked_with_credentials_calls_backend_with_expected_payload() = runTest {
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        whenever(credentialsRepository.getMasterId).thenReturn(flowOf("master-9"))
         val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
         advanceUntilIdle()
 
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-9" to "secret-9"))
         whenever(functions.getHttpsCallable(eq("setDeviceLocked"))).thenReturn(callable)
         whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
 
@@ -123,11 +121,10 @@ class DashboardViewModelTest {
 
     @Test
     fun rejectTask_with_credentials_calls_backend_with_expected_payload() = runTest {
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf(null to null))
+        whenever(credentialsRepository.getMasterId).thenReturn(flowOf("master-3"))
         val viewModel = DashboardViewModel(firestore, functions, credentialsRepository)
         advanceUntilIdle()
 
-        whenever(credentialsRepository.getCredentials).thenReturn(flowOf("imei-3" to "secret-3"))
         whenever(functions.getHttpsCallable(eq("rejectTask"))).thenReturn(callable)
         whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
 

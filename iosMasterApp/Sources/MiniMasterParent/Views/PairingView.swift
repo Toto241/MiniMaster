@@ -29,6 +29,7 @@ struct PairingView: View {
                         }
                     }
                     .disabled(isLoading)
+                    .accessibilityIdentifier("pairing.generateCodeButton")
 
                     Button(action: generatePairingLink) {
                         HStack {
@@ -37,6 +38,7 @@ struct PairingView: View {
                         }
                     }
                     .disabled(isLoading)
+                    .accessibilityIdentifier("pairing.generateLinkButton")
                 }
 
                 if isLoading {

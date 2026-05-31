@@ -1,6 +1,9 @@
 package com.google.pairing
 
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
@@ -31,6 +34,8 @@ class PairingViewModelTest {
     private lateinit var childIdRepository: ChildIdRepository
     private lateinit var functions: FirebaseFunctions
     private lateinit var callable: HttpsCallableReference
+    private lateinit var firebaseAuth: FirebaseAuth
+    private lateinit var firebaseUser: FirebaseUser
 
     @Before
     fun setUp() {
@@ -38,7 +43,14 @@ class PairingViewModelTest {
         childIdRepository = mock()
         functions = mock()
         callable = mock()
-        whenever(functions.getHttpsCallable(eq("validatePairingToken"))).thenReturn(callable)
+        firebaseAuth = mock()
+        firebaseUser = mock()
+        whenever(functions.getHttpsCallable(eq("pairAuthenticatedChild"))).thenReturn(callable)
+
+        val authResult = mock<AuthResult>()
+        whenever(authResult.user).thenReturn(firebaseUser)
+        whenever(firebaseAuth.currentUser).thenReturn(null)
+        whenever(firebaseAuth.signInAnonymously()).thenReturn(Tasks.forResult(authResult))
     }
 
     @After
@@ -53,8 +65,9 @@ class PairingViewModelTest {
         whenever(callable.call(any())).thenReturn(Tasks.forResult(callableResult))
 
         val viewModel = PairingViewModel(childIdRepository, functions, dispatcher)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
 
-        viewModel.validateToken("token-1", "imei-1")
+        viewModel.validateToken("token-1", "android-device-1")
         advanceUntilIdle()
 
         val payloadCaptor = argumentCaptor<Any>()
@@ -62,10 +75,10 @@ class PairingViewModelTest {
         val payload = payloadCaptor.firstValue as Map<*, *>
 
         assertEquals("token-1", payload["pairingToken"])
-        assertEquals("imei-1", payload["childImei"])
+        assertEquals(null, payload["childImei"])
         verify(childIdRepository).saveChildId("child-123")
         assertTrue(viewModel.pairingState.value is PairingState.Success)
-        assertEquals("imei-1", viewModel.childImeiForDebug.value)
+        assertEquals("android-device-1", viewModel.stableDeviceIdForDebug.value)
     }
 
     @Test
@@ -75,8 +88,9 @@ class PairingViewModelTest {
         whenever(callable.call(any())).thenReturn(Tasks.forResult(callableResult))
 
         val viewModel = PairingViewModel(childIdRepository, functions, dispatcher)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
 
-        viewModel.validateToken("token-2", "imei-2")
+        viewModel.validateToken("token-2")
         advanceUntilIdle()
 
         val state = viewModel.pairingState.value
@@ -89,8 +103,9 @@ class PairingViewModelTest {
         whenever(callable.call(any())).thenReturn(Tasks.forException(RuntimeException("network down")))
 
         val viewModel = PairingViewModel(childIdRepository, functions, dispatcher)
+        viewModel.setFirebaseAuthForTesting(firebaseAuth)
 
-        viewModel.validateToken("token-3", "imei-3")
+        viewModel.validateToken("token-3")
         advanceUntilIdle()
 
         val state = viewModel.pairingState.value

@@ -8,7 +8,100 @@ const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations
 const P0_BLOCKER_COCKPIT_STORAGE_KEY = "operatorP0BlockerCockpit";
 
 // ==================== SESSION TIMEOUT ====================
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
+function getSessionManager() {
+    return window.MM && window.MM.sessionManager ? window.MM.sessionManager : null;
+}
+
+async function ensureOperatorTier(minTier) {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.ensureTier === "function") {
+        return sessionManager.ensureTier(minTier);
+    }
+    return true;
+}
+
+function resetSessionTimeout() {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.recordActivity === "function") {
+        sessionManager.recordActivity();
+        return;
+    }
+
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    if (!auth || !auth.currentUser) return;
+
+    sessionWarningTimer = setTimeout(() => {
+        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "warning");
+    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
+
+    sessionTimeoutTimer = setTimeout(() => {
+        if (auth && auth.currentUser) {
+            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
+            auth.signOut();
+        }
+    }, SESSION_TIMEOUT_MS);
+}
+
+function startSessionMonitoring() {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.start === "function") {
+        sessionManager.configure({
+            onLogout: () => {
+                if (auth) auth.signOut();
+            },
+            onNotify: (message, type) => showNotification(message, type || "info"),
+            isAdminPinConfigured: async () => {
+                if (!functions) return false;
+                const statusFn = functions.httpsCallable("getOperatorAdminPinStatus");
+                const response = await statusFn({});
+                return Boolean(response?.data?.configured);
+            },
+            hasFreshAdminVerification: async () => {
+                if (!auth || !auth.currentUser) return false;
+                const token = await auth.currentUser.getIdTokenResult();
+                const verifiedAt = token?.claims?.admin_verified_at;
+                if (typeof verifiedAt !== "number") return false;
+                return (Date.now() / 1000 - verifiedAt) / 60 <= 30;
+            },
+            verifyAdminPin: async (pin) => {
+                if (!functions) throw new Error("Firebase Functions nicht initialisiert.");
+                const verifyFn = functions.httpsCallable("verifyAdminPin");
+                await verifyFn({ pin });
+                if (auth && auth.currentUser) {
+                    await auth.currentUser.getIdToken(true);
+                }
+            },
+        });
+        sessionManager.markLoggedIn();
+        sessionManager.start();
+        return;
+    }
+
+    if (!sessionMonitoringActive) {
+        SESSION_MONITORING_EVENTS.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
+        sessionMonitoringActive = true;
+    }
+    resetSessionTimeout();
+}
+
+function stopSessionMonitoring() {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.stop === "function") {
+        sessionManager.stop();
+    }
+
+    if (sessionMonitoringActive) {
+        SESSION_MONITORING_EVENTS.forEach(evt => document.removeEventListener(evt, resetSessionTimeout));
+        sessionMonitoringActive = false;
+    }
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    sessionTimeoutTimer = null;
+    sessionWarningTimer = null;
+}
+
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // Legacy fallback
 let sessionTimeoutTimer = null;
 let sessionWarningTimer = null;
 const SESSION_MONITORING_EVENTS = ["mousedown", "keydown", "scroll", "touchstart"];
@@ -22,44 +115,6 @@ const QA_RUNTIME_OPERATOR_SECTION_IDS = [
     "qa-python-run-card",
     "qa-suite-card",
 ];
-
-function resetSessionTimeout() {
-    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
-    if (!auth || !auth.currentUser) return;
-
-    // Warnung 5 Minuten vor Ablauf
-    sessionWarningTimer = setTimeout(() => {
-        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "warning");
-    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
-
-    // Auto-Logout nach Timeout
-    sessionTimeoutTimer = setTimeout(() => {
-        if (auth && auth.currentUser) {
-            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
-            auth.signOut();
-        }
-    }, SESSION_TIMEOUT_MS);
-}
-
-function startSessionMonitoring() {
-    if (!sessionMonitoringActive) {
-        SESSION_MONITORING_EVENTS.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
-        sessionMonitoringActive = true;
-    }
-    resetSessionTimeout();
-}
-
-function stopSessionMonitoring() {
-    if (sessionMonitoringActive) {
-        SESSION_MONITORING_EVENTS.forEach(evt => document.removeEventListener(evt, resetSessionTimeout));
-        sessionMonitoringActive = false;
-    }
-    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
-    sessionTimeoutTimer = null;
-    sessionWarningTimer = null;
-}
 
 function initializeAuthBindings() {
     if (authBindingsInitialized) return;
@@ -8445,9 +8500,9 @@ const platformReadinessItems = {
     masterApp: {
         label: "MasterApp (Eltern-Android)",
         items: [
-            { key: "ma-registration-flow", label: "Geräteregistrierung & SecretKey-Persistierung funktionsfähig", severity: "critical" },
-            { key: "ma-credentials-encrypted", label: "IMEI/SecretKey verschlüsselt gespeichert (EncryptedSharedPreferences)", severity: "critical" },
-            { key: "ma-imei-fallback", label: "IMEI-Fallback für Android 10+ implementiert (kein READ_PHONE_STATE)", severity: "critical" },
+            { key: "ma-registration-flow", label: "Geräteregistrierung via registerAuthenticatedMaster + Firebase Auth funktionsfähig", severity: "critical" },
+            { key: "ma-credentials-encrypted", label: "Master-ID verschlüsselt gespeichert (EncryptedSharedPreferences, ohne secretKey)", severity: "critical" },
+            { key: "ma-imei-fallback", label: "Stabile Geräte-ID via ANDROID_ID/UUID-Fallback (kein READ_PHONE_STATE)", severity: "critical" },
             { key: "ma-proguard-enabled", label: "ProGuard/R8 in Release-Build aktiviert (minifyEnabled=true)", severity: "critical" },
             { key: "ma-pairing-works", label: "Pairing-Link-Generierung und Kopplung mit ChildApp getestet", severity: "critical" },
             { key: "ma-lock-unlock", label: "Lock/Unlock Toggle für Kindergeräte funktionsfähig", severity: "critical" },
@@ -8457,9 +8512,9 @@ const platformReadinessItems = {
             { key: "ma-usage-rules-nav", label: "UsageRulesScreen über Navigation erreichbar und datengebunden", severity: "high" },
             { key: "ma-date-picker", label: "DatePicker statt Freitext-Timestamp für Task-Deadline", severity: "medium" },
             { key: "ma-subscription-check", label: "Abo-Status wird beim Start geprüft (queryPurchases)", severity: "high" },
-            { key: "ma-subscription-enforce", label: "Free-Tier-Limit (1 Kind) wird vor Aktionen erzwungen", severity: "high" },
+            { key: "ma-subscription-enforce", label: "Trial-/Abo-Zugang wird vor Kopplung und Aktionen erzwungen (hasActiveAccess)", severity: "high" },
             { key: "ma-fcm-working", label: "FCM Push-Empfang (task_pending_approval, device_status) getestet", severity: "high" },
-            { key: "ma-debug-hidden", label: "Debug-Infos (IMEI/SecretKey) in Release-Builds ausgeblendet", severity: "critical" },
+            { key: "ma-debug-hidden", label: "Debug-Infos (Master-ID) in Release-Builds ausgeblendet", severity: "critical" },
             { key: "ma-firebase-appcheck", label: "Firebase App Check aktiviert", severity: "high" },
             { key: "ma-offline-handling", label: "Offline-Hinweis oder -Caching implementiert", severity: "medium" },
             { key: "ma-qr-pairing", label: "QR-Code-Anzeige für Pairing (nicht nur Link)", severity: "medium" },
@@ -9009,8 +9064,8 @@ const setupWizards = {
             },
             {
                 title: "2. Geräteregistrierung",
-                instruction: "Öffnen Sie die App. Sie werden automatisch zur Registrierung geleitet. Die App fordert <strong>READ_PHONE_STATE</strong> an und registriert das Gerät über <code>registerMasterDevice</code>.",
-                detail: "Nach Registrierung erhalten Sie einen <strong>SecretKey</strong>, der im DataStore gespeichert wird. <em>Wichtig:</em> Auf Android 10+ kann die IMEI nicht direkt gelesen werden – hier wird eine alternative Geräte-ID benötigt.",
+                instruction: "Öffnen Sie die App. Sie werden zur Registrierung geleitet. Die App meldet sich per <strong>Firebase Anonymous Auth</strong> an und registriert das Gerät über <code>registerAuthenticatedMaster</code>.",
+                detail: "Es wird nur die kanonische <strong>masterId</strong> lokal gespeichert — kein <code>secretKey</code>. Die Geräte-ID basiert auf ANDROID_ID oder einem persistenten UUID-Fallback.",
             },
             {
                 title: "3. Kind-Gerät koppeln",
@@ -9055,7 +9110,7 @@ const setupWizards = {
             {
                 title: "2. Kopplung durchführen",
                 instruction: "Öffnen Sie die ChildApp und geben Sie den <strong>6-stelligen Code</strong> ein oder öffnen Sie den <strong>Pairing-Link</strong> auf dem Kind-Gerät.",
-                detail: "Die App ruft <code>validatePairingCode</code> oder <code>validatePairingToken</code> auf. Nach Erfolg wird ein Child-Dokument in Firestore erstellt und die App wechselt in den überwachten Modus.",
+                detail: "Die App meldet sich per Firebase Anonymous Auth an und ruft <code>pairAuthenticatedChild</code> auf. Nach Erfolg wird ein Child-Dokument in Firestore erstellt und die App wechselt in den überwachten Modus.",
             },
             {
                 title: "3. Berechtigungen erteilen",
@@ -10990,6 +11045,10 @@ function renderAdminActivationContent(user) {
                 können Sie sich direkt als Admin aktivieren:
             </p>
             <div class="phase-actions" style="margin-block-start: 12px">
+                <label for="bootstrap-admin-pin" class="muted" style="display:block;margin-block-end:6px">
+                    Admin-PIN (6–8 Ziffern, empfohlen für T4-Aktionen):
+                </label>
+                <input type="password" id="bootstrap-admin-pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" class="form-input" style="max-width:220px;margin-block-end:8px" placeholder="z. B. 123456" />
                 <button onclick="bootstrapFirstAdminAction()" class="btn btn-primary" id="btn-bootstrap-admin">
                     🔑 Als ersten Admin aktivieren
                 </button>
@@ -11381,8 +11440,12 @@ async function bootstrapFirstAdminAction() {
     }
 
     try {
+        const adminPin = (document.getElementById("bootstrap-admin-pin")?.value || "").trim();
+        const payload = {};
+        if (adminPin) payload.adminPin = adminPin;
+
         const bootstrapFunc = functions.httpsCallable("bootstrapFirstAdmin");
-        const result = await bootstrapFunc({});
+        const result = await bootstrapFunc(payload);
 
         if (statusEl) {
             statusEl.innerHTML = `<div class="admin-success-box">
@@ -11463,6 +11526,12 @@ async function resetAllUsersFromOnboarding() {
     if ((secondConfirm || "").trim() !== "RESET_ALL_AUTH_USERS") {
         dbg("❌ ABBRUCH: Text stimmt nicht überein.");
         if (statusEl) statusEl.innerHTML = `<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein. Eingabe war: <code>${escapeHtml(String(secondConfirm || "(leer)"))}</code></div>`;
+        window._resetBlocksPhaseChange = false;
+        return;
+    }
+
+    if (!(await ensureOperatorTier("T4"))) {
+        if (statusEl) statusEl.innerHTML = "<div class='info'>Reset abgebrochen — Admin-PIN/Re-Auth erforderlich.</div>";
         window._resetBlocksPhaseChange = false;
         return;
     }
@@ -12151,6 +12220,7 @@ function initializeSetupAssistant() {
     renderPrioritizedActionPlan();
     initOperatorReadinessCard();
     initExternalIntegrationsCard();
+    initAdminPinCard();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
@@ -12184,6 +12254,77 @@ function initOperatorReadinessCard() {
     if (exportEvidenceBtn) exportEvidenceBtn.addEventListener("click", exportReleaseEvidenceBundle);
     const exportArtefactBtn = document.querySelector("[data-action='exportReleaseArtefact']");
     if (exportArtefactBtn) exportArtefactBtn.addEventListener("click", exportReleaseArtefact);
+}
+
+function initAdminPinCard() {
+    const saveBtn = document.getElementById("btn-save-admin-pin");
+    const verifyBtn = document.getElementById("btn-verify-admin-pin");
+    if (saveBtn) saveBtn.addEventListener("click", () => saveOperatorAdminPinFromPanel());
+    if (verifyBtn) verifyBtn.addEventListener("click", () => verifyOperatorAdminPinFromPanel());
+    loadOperatorAdminPinStatus();
+}
+
+async function loadOperatorAdminPinStatus() {
+    const statusEl = document.getElementById("admin-pin-status");
+    if (!statusEl || !functions) return;
+
+    try {
+        const statusFn = functions.httpsCallable("getOperatorAdminPinStatus");
+        const response = await statusFn({});
+        const data = response?.data || {};
+        const configured = Boolean(data.configured);
+        const fresh = Boolean(data.verificationFresh);
+        statusEl.innerHTML = configured
+            ? `PIN konfiguriert${fresh ? " · T4-Bestätigung aktiv (≤30 Min)" : " · T4-Bestätigung ausstehend"}`
+            : "Noch keine Admin-PIN gesetzt — T4-Aktionen sind ohne PIN-Schutz möglich.";
+    } catch (error) {
+        statusEl.textContent = "PIN-Status konnte nicht geladen werden.";
+    }
+}
+
+async function saveOperatorAdminPinFromPanel() {
+    const resultEl = document.getElementById("admin-pin-result");
+    const currentPin = (document.getElementById("admin-pin-current")?.value || "").trim();
+    const newPin = (document.getElementById("admin-pin-new")?.value || "").trim();
+    const confirmPin = (document.getElementById("admin-pin-confirm")?.value || "").trim();
+
+    if (!newPin || newPin !== confirmPin) {
+        showNotification("Neue PIN und Bestätigung müssen übereinstimmen.", "error");
+        return;
+    }
+    if (!/^\d{6,8}$/.test(newPin)) {
+        showNotification("Admin-PIN muss 6–8 Ziffern enthalten.", "error");
+        return;
+    }
+    if (!(await ensureOperatorTier("T3"))) return;
+
+    if (resultEl) resultEl.innerHTML = "<div class='loading'>Speichere Admin-PIN...</div>";
+    try {
+        const payload = { pin: newPin };
+        if (currentPin) payload.currentPin = currentPin;
+        await functions.httpsCallable("setOperatorAdminPin")(payload);
+        if (resultEl) resultEl.innerHTML = "<div class='success-box'>Admin-PIN gespeichert.</div>";
+        document.getElementById("admin-pin-current").value = "";
+        document.getElementById("admin-pin-new").value = "";
+        document.getElementById("admin-pin-confirm").value = "";
+        showNotification("Admin-PIN gespeichert.", "success");
+        loadOperatorAdminPinStatus();
+    } catch (error) {
+        if (resultEl) resultEl.innerHTML = `<div class='error'>${escapeHtml(error.message || "Speichern fehlgeschlagen")}</div>`;
+        showNotification("Admin-PIN konnte nicht gespeichert werden: " + error.message, "error");
+    }
+}
+
+async function verifyOperatorAdminPinFromPanel() {
+    const resultEl = document.getElementById("admin-pin-result");
+    if (!(await ensureOperatorTier("T4"))) {
+        if (resultEl) resultEl.innerHTML = "<div class='info'>T4-Bestätigung abgebrochen.</div>";
+        return;
+    }
+
+    if (resultEl) resultEl.innerHTML = "<div class='success-box'>Admin-PIN bestätigt — T4-Aktionen für 30 Minuten freigegeben.</div>";
+    showNotification("Admin-PIN bestätigt.", "success");
+    loadOperatorAdminPinStatus();
 }
 
 async function loadOperatorReadiness() {
@@ -13069,6 +13210,7 @@ async function loadOperatorConfig() {
 
 async function saveOperatorConfig() {
     const status = document.getElementById("operator-config-status");
+    if (!(await ensureOperatorTier("T3"))) return;
     if (status) status.innerHTML = "<div class='loading'>Speichere Konfiguration...</div>";
 
     try {
@@ -14223,6 +14365,7 @@ function getOnlineStatus(lastSeen) {
 
 async function revokeUserTokens(uid) {
     if (!confirm(`Alle Tokens für User ${uid} widerrufen? Der User muss sich neu einloggen.`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
     try {
         const revokeFunc = functions.httpsCallable("revokeUserTokens");
         await revokeFunc({ uid: uid });
@@ -14321,6 +14464,7 @@ async function loadSubscriptions(direction) {
 
 async function revokeUserSubscription(masterId) {
     if (!confirm(`Are you sure you want to revoke the subscription for ${masterId}?`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
 
     try {
         const revokeFunc = functions.httpsCallable("revokeSubscription");
@@ -14674,6 +14818,8 @@ async function triggerAccountDeletion() {
     if (!confirm(`LETZTE BESTÄTIGUNG: Sind Sie absolut sicher, dass Sie User ${masterId} löschen möchten?`)) {
         return;
     }
+
+    if (!(await ensureOperatorTier("T4"))) return;
 
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Lösche Account...</div>";
 
@@ -15091,6 +15237,11 @@ function closeDeviceDetailsModal() {
 }
 
 async function toggleDeviceLock(childId, currentState) {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.ensureTier === "function") {
+        const allowed = await sessionManager.ensureTier("T3");
+        if (!allowed) return;
+    }
     if (!confirm(`Gerät ${childId} ${currentState ? "entsperren" : "sperren"}?`)) return;
     try {
         const result = await functions.httpsCallable("setDeviceLocked")({ childId, isLocked: !currentState });
@@ -15497,6 +15648,7 @@ async function grantAdminClaim() {
     }
 
     if (!confirm(`Admin-Claim für UID "${uid}" setzen?`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
 
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Admin-Claim...</div>";
 
@@ -15591,6 +15743,7 @@ async function assignUserRole() {
     }
 
     if (!confirm(`Rolle '${role}' für User ${uid} setzen?`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
 
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Rolle...</div>";
 
@@ -15631,6 +15784,8 @@ async function resetOperatorAccountsFromAdminPanel() {
         }
         return;
     }
+
+    if (!(await ensureOperatorTier("T4"))) return;
 
     if (resultEl) {
         resultEl.innerHTML = "<div class='loading'>Betreiberkonten werden zurückgesetzt...</div>";
@@ -15765,6 +15920,8 @@ async function saveKnowledgeBase() {
         showNotification("Knowledge Base darf nicht leer sein.", "info");
         return;
     }
+
+    if (!(await ensureOperatorTier("T3"))) return;
 
     resultEl.innerHTML = "<div class='loading'>Speichere...</div>";
 
@@ -16309,6 +16466,14 @@ async function executeAiFix(errorIndex, action) {
     if (!confirmed) return;
 
     const btn = document.getElementById("btn-fix-" + errorIndex);
+    if (!(await ensureOperatorTier("T3"))) {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "⚡ Auto-Fix ausführen";
+        }
+        return;
+    }
+
     if (btn) {
         btn.disabled = true;
         btn.textContent = "⏳ Wird ausgeführt...";
