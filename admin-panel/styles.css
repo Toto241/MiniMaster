@@ -5129,3 +5129,68 @@ input:focus, select:focus, textarea:focus {
 .hidden {
     display: none !important;
 }
+
+/* Operator session manager (AP-N3 Phase 1) */
+.session-expiry-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10050;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.session-expiry-banner--warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-bottom: 1px solid #fcd34d;
+}
+.session-expiry-banner--error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-bottom: 1px solid #fca5a5;
+}
+.session-reauth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+.session-reauth-modal {
+    background: var(--card-bg, #fff);
+    color: var(--text-primary, #0f172a);
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 320px;
+    max-width: 420px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+.session-reauth-modal h3 {
+    margin: 0 0 8px;
+    font-size: 1.1rem;
+}
+.session-reauth-modal p {
+    margin: 0 0 16px;
+    color: var(--text-muted, #64748b);
+    font-size: 0.875rem;
+}
+.session-reauth-modal input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color, #cbd5e1);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 0.95rem;
+}
+.session-reauth-modal .session-reauth-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}

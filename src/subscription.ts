@@ -15,7 +15,7 @@ import * as admin from "firebase-admin";
 import { google } from "googleapis";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess, getTracedLogger } from "./shared";
+import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess, getTracedLogger, requireTier } from "./shared";
 import { validateSku, validateString } from "./validation";
 import { withResilience, fetchWithTimeout } from "./resilience";
 import {
@@ -217,6 +217,7 @@ export const revokeSubscription = functions.https.onCall(
 
     try {
       requireAdmin(context);
+      requireTier(context, "T3", "revokeSubscription");
       validateAppCheck(context, true);
       const adminUid = context.auth?.uid;
 

@@ -1058,6 +1058,27 @@
                             </div>
                         </div>
 
+                        <!-- ==================== Admin-PIN (T4) ==================== -->
+                        <div class="setup-card mm-u043 admin-only" id="admin-pin-card">
+                            <h3>🔐 Operator Admin-PIN</h3>
+                            <p>
+                                Schützt kritische T4-Aktionen (Account-Löschung, Auth-Reset). Die PIN wird gehasht in
+                                <code>operatorConfig/adminPin</code> gespeichert. Nach erfolgreicher Eingabe gilt
+                                <code>admin_verified_at</code> für 30 Minuten.
+                            </p>
+                            <div id="admin-pin-status" class="muted">Status wird geladen…</div>
+                            <div class="mm-u011" style="margin-block-start: 12px">
+                                <input type="password" id="admin-pin-current" class="form-input mm-u015" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Aktuelle PIN (bei Änderung)" title="Aktuelle Admin-PIN" />
+                                <input type="password" id="admin-pin-new" class="form-input mm-u015" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Neue PIN (6–8 Ziffern)" title="Neue Admin-PIN" />
+                                <input type="password" id="admin-pin-confirm" class="form-input mm-u015" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Neue PIN bestätigen" title="Neue Admin-PIN bestätigen" />
+                            </div>
+                            <div class="mm-u011">
+                                <button id="btn-save-admin-pin" class="primary-btn" type="button">PIN speichern</button>
+                                <button id="btn-verify-admin-pin" class="secondary-btn" type="button">PIN jetzt bestätigen (T4)</button>
+                            </div>
+                            <div id="admin-pin-result" class="mm-u048"></div>
+                        </div>
+
                         <!-- ==================== Externe Integrationen ==================== -->
                         <div class="setup-card mm-u043" id="external-integrations-card">
                             <h3>🌐 Externe Integrationen (Apple, Play, Secrets, OEM, Release)</h3>

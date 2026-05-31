@@ -2,7 +2,7 @@
 
 **Status:** Consolidated evidence register for release candidate approval.
 
-Current synthesis note (2026-04-24): Repo-side remediation remains substantially complete, and contradictions around Admin-Panel security/automation documentation have been resolved. The repository now contains an automated manufacturing-status analysis (`scripts/analyze_fertigungsstand.py`) exposed through `npm run analyze:fertigungsstand` and `npm run analyze:fertigungsstand:gate`. Security hardening config for Electron 36→41 and firebase-admin transitive dependency overrides has been applied (pending `npm install` due to Windows file lock on `default_app.asar`). PR152 selective guard, lint (0 errors) and all local test suites pass. External go-live blockers remain: Code Scanning not enabled (Issue #158), fresh Android CI evidence, final deploy evidence, Firebase key rotation, Play Console submission evidence, physical/emulator commissioning evidence, on-call roster and final Go/No-Go decision.
+Current synthesis note (2026-05-30): Auth migration Phase 2 client work is complete in-repo (`test/auth-migration-phase2-completion.test.ts`). Local security evidence is automated via `npm run security:evidence:collect` (`build/security-evidence/`). Automated backend commissioning evidence is available via `npm run commissioning:evidence:collect` (`build/commissioning-evidence/`). Play Console submission packet consolidated in `docs/PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md`. iOS beta UI contract tests added (`MiniMasterParentUIContractTests`). External go-live blockers remain: GitHub Code Scanning enablement (Issue #158), physical Android commissioning, Play Console submission clicks, Firebase key rotation, on-call roster, final Go/No-Go decision.
 
 ## 1. Purpose
 
@@ -33,7 +33,12 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Admin-Panel documentation consistency | [ADMIN_PANEL_ARCHITECTURE.md](ADMIN_PANEL_ARCHITECTURE.md) now declares automation-first status and resolves stale SRI/CSP/inline-handler contradictions | ✅ | Documented + Automated gate | 2026-04-24 |
 | PR152 selective integration guard | `npm run guard:pr152` — all P0/P1/P2 checks pass (security files, ESLint rules, Firestore rules/indexes, monetisation tabs present) | ✅ | Automated | 2026-04-24 |
 | Desktop security hardening | Electron 36→41 and electron-builder 24→26 config applied; overrides for `@tootallnate/once` and `uuid` transitive vulns added | 🔄 Config applied; pending `npm install` | Automated + Engineering | 2026-04-24 |
-| CodeQL security scan (0 high/critical) | ⛔ Blocked by repository setting (Code Scanning not enabled — Issue #158); local security suites pass but are not a substitute for fresh CodeQL evidence | ⛔ | Engineering | 2026-04-24 |
+| Local security evidence bundle | `npm run security:evidence:collect` → `build/security-evidence/latest-summary.json` | ✅ Repo-side pass (2026-05-30) | Automated | 2026-05-30 |
+| Automated commissioning evidence (backend) | `npm run commissioning:evidence:collect` → `build/commissioning-evidence/latest-summary.json` | 🔄 Partial — backend pass, physical device pending | Automated | 2026-05-30 |
+| Play Console submission packet | [PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md](PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md) | ✅ Repo-ready; external Play Console clicks pending | Product/Ops | 2026-05-30 |
+| Auth migration Phase 2 (clients) | [AUTH_MIGRATION_PLAN.md](AUTH_MIGRATION_PLAN.md) + `test/auth-migration-phase2-completion.test.ts` | ✅ | Engineering | 2026-05-30 |
+| iOS beta UI contract tests | `iosMasterApp/Tests/MiniMasterParentTests/MiniMasterParentUIContractTests.swift` | ✅ Repo-side | Engineering | 2026-05-30 |
+| CodeQL security scan (0 high/critical) | ⛔ Blocked by repository setting (Code Scanning not enabled — Issue #158); local security evidence pass is not a substitute for SARIF upload | ⛔ | Engineering | 2026-05-30 |
 | Android build / Android CI | ⚠️ Workflow now includes network health check (`dl.google.com` probe) and skips gracefully when Google Maven is unreachable; fresh green CI run still pending | ⚠️ | Engineering | 2026-04-24 |
 | Deployment result | Final production deploy evidence is pending because production runtime secrets/config and deploy sign-off are external to the repository | ⛔ | Engineering | offen |
 
@@ -41,7 +46,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 
 | Checklist Key | Result | Evidence Link | Tester | Date |
 | --------------- | -------- | --------------- | -------- | ------ |
-| android-apps (pairing + sync) | ⬜ | Android device suites / emulator commissioning still require a real device or complete AVD environment; this remains a hard go-live gate | Automated + QA/Operations pending | offen |
+| android-apps (pairing + sync) | 🔄 | Backend automated evidence in `build/commissioning-evidence/`; physical USB/emulator commissioning still required via `scripts/run-dual-device-commissioning.ps1` | Automated + QA/Operations pending | 2026-05-30 |
 | `ai-config` (AI setup + generation) | ⬜ | Productive provider/fallback evidence is still required | Engineering + Product/Ops | offen |
 | `support-workflow` (ticket lifecycle) | ✅ | `backend-jest` incl. e2e-ticket-lifecycle evidence | Automated | 2026-03-29 |
 | `compliance-flow` (DSAR + audit) | ✅ | `test/enforcement-automation.test.ts` | Automated | 2026-03-19 |

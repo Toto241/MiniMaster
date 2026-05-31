@@ -9,7 +9,7 @@ import * as admin from "firebase-admin";
 import * as fs from "fs";
 import * as path from "path";
 import { db, auth, storage } from "../firebase";
-import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, getTracedLogger } from "./shared";
+import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, getTracedLogger, requireTier, requireAdminPinVerification } from "./shared";
 import { TracedLogger } from "./tracing";
 
 const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
@@ -85,6 +85,10 @@ export const deleteUserAccount = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "deleteUserAccount");
     const callerId = requireAuth(context);
     const isAdmin = context.auth?.token?.role === "admin";
+    if (isAdmin) {
+      requireTier(context, "T4", "deleteUserAccount");
+      await requireAdminPinVerification(context, "deleteUserAccount");
+    }
     validateAppCheck(context, true);
 
     let masterId = callerId;
@@ -402,6 +406,7 @@ export const updateKnowledgeBase = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "updateKnowledgeBase");
     void traceId;
     requireAdmin(context);
+    requireTier(context, "T3", "updateKnowledgeBase");
     validateAppCheck(context, true);
 
     if (typeof data?.content !== "string") {
@@ -752,6 +757,7 @@ export const executeAutoFix = functions.https.onCall(
   async (data: { analysisId: string; errorIndex: number; action: string }, context: CallableContext) => {
     const { logger, traceId } = getTracedLogger(context, "executeAutoFix");
     requireAdmin(context);
+    requireTier(context, "T3", "executeAutoFix");
     const adminId = requireAuth(context);
     validateAppCheck(context, true);
 

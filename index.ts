@@ -27,6 +27,9 @@ export {
   resetAllAuthUsersHealth,
   getLegacyAuthUsageStats,
   migrateToFamiliesSchema,
+  getOperatorAdminPinStatus,
+  setOperatorAdminPin,
+  verifyAdminPin,
 } from "./src/auth";
 
 // ==================== PAIRING ====================

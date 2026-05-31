@@ -265,8 +265,7 @@ fun RegistrationScreen(viewModel: MasterViewModel, onRegistrationSuccess: () -> 
 fun DebugInfoView(debugState: DebugState, linkState: LinkGenerationState) {
     Column(modifier = Modifier.padding(top = 16.dp)) {
         Text(stringResource(R.string.debug_info), style = MaterialTheme.typography.caption)
-        Text(stringResource(R.string.debug_imei, debugState.imei ?: "Not set"), style = MaterialTheme.typography.caption)
-        Text(stringResource(R.string.debug_secret_key, debugState.secretKey ?: "Not set"), style = MaterialTheme.typography.caption)
+        Text(stringResource(R.string.debug_imei, debugState.masterId ?: "Not set"), style = MaterialTheme.typography.caption)
         val linkStatus = when(linkState) {
             is LinkGenerationState.Idle -> "Idle"
             is LinkGenerationState.Loading -> "Loading..."

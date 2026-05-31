@@ -8,8 +8,18 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db, auth } from "../firebase";
-import { requireAdmin, requireAuth, AuditLogger, checkRateLimitShared, validateAppCheck, getTracedLogger } from "./shared";
+import { requireAdmin, requireAuth, AuditLogger, checkRateLimitShared, validateAppCheck, getTracedLogger, requireTier } from "./shared";
 import type { OperatorRole } from "./shared";
+import {
+  hashAdminPin,
+  verifyAdminPinHash,
+  getStoredAdminPinHash,
+  persistAdminPinHash,
+  isAdminVerificationFresh,
+  mergeOperatorCustomClaims,
+  requireAdminPinVerification,
+  ADMIN_PIN_VERIFICATION_MINUTES,
+} from "./admin-pin";
 import { isLegacyAuthCutoverEnabled } from "./cutover-monitor";
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
 
@@ -179,6 +189,7 @@ export const setAdminClaim = functions.https.onCall(async (data: { uid: string }
 
   try {
     requireAdmin(context);
+    requireTier(context, "T3", "setAdminClaim");
     validateAppCheck(context, true);
 
     const uid = data.uid;
@@ -626,6 +637,7 @@ export const setUserRole = functions.https.onCall(
 
     try {
       requireAdmin(context);
+      requireTier(context, "T3", "setUserRole");
       validateAppCheck(context, true);
 
       const { uid, role } = data;
@@ -694,6 +706,9 @@ export const resetOperatorAccounts = functions.https.onCall(
         "Admin privileges required for operator account reset."
       );
     }
+
+    requireTier(context, "T4", "resetOperatorAccounts");
+    await requireAdminPinVerification(context, "resetOperatorAccounts");
 
     validateAppCheck(context, true);
 
@@ -828,6 +843,11 @@ export const resetAllAuthUsers = functions.https.onCall(
         "permission-denied",
         "Admin privileges or a valid recovery token are required for all-user reset."
       );
+    }
+
+    if (context.auth && !recoveryTokenAllowed) {
+      requireTier(context, "T4", "resetAllAuthUsers");
+      await requireAdminPinVerification(context, "resetAllAuthUsers");
     }
 
     validateAppCheck(context, true);
@@ -1059,7 +1079,7 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
  * Security: iterates all users to verify no admin claim exists.
  */
 export const bootstrapFirstAdmin = functions.https.onCall(
-  async (_data: unknown, context: CallableContext) => {
+  async (data: { adminPin?: string }, context: CallableContext) => {
     const { logger, traceId } = getTracedLogger(context, "bootstrapFirstAdmin");
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sie müssen angemeldet sein.");
@@ -1067,6 +1087,7 @@ export const bootstrapFirstAdmin = functions.https.onCall(
     validateAppCheck(context, true);
 
     const callerUid = context.auth.uid;
+    const adminPin = typeof data?.adminPin === "string" ? data.adminPin.trim() : "";
 
     try {
       const adminExists = await hasAnyAdminUser();
@@ -1081,13 +1102,22 @@ export const bootstrapFirstAdmin = functions.https.onCall(
       // No admin exists → promote caller to admin
       await auth().setCustomUserClaims(callerUid, { role: "admin" });
 
+      if (adminPin) {
+        const pinHash = await hashAdminPin(adminPin);
+        await persistAdminPinHash(pinHash, callerUid);
+      }
+
       await AuditLogger.logSuccess(
         "admin.set_admin_claim", context, `users/${callerUid}`, "user",
-        { targetUserId: callerUid, bootstrapFirstAdmin: true, traceId }
+        { targetUserId: callerUid, bootstrapFirstAdmin: true, adminPinConfigured: Boolean(adminPin), traceId }
       );
 
       logger.info(`Bootstrap: First admin set for UID ${callerUid}`);
-      return { success: true, message: "Sie sind jetzt Admin! Die Seite wird neu geladen." };
+      return {
+        success: true,
+        message: "Sie sind jetzt Admin! Die Seite wird neu geladen.",
+        adminPinConfigured: Boolean(adminPin),
+      };
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
       logger.error("Bootstrap admin error:", error);
@@ -1398,6 +1428,7 @@ export const revokeUserTokens = functions.https.onCall(
     const startTime = Date.now();
     try {
       requireAdmin(context);
+      requireTier(context, "T3", "revokeUserTokens");
       validateAppCheck(context, true);
       const targetUid = data.uid;
       if (!targetUid || typeof targetUid !== "string") {
@@ -1424,6 +1455,107 @@ export const revokeUserTokens = functions.https.onCall(
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to revoke tokens.");
     }
+  }
+);
+
+export const getOperatorAdminPinStatus = functions.https.onCall(
+  async (_data: unknown, context: CallableContext) => {
+    requireAdmin(context);
+    validateAppCheck(context, true);
+
+    const doc = await db().collection("operatorConfig").doc("adminPin").get();
+    const payload = doc.data() || {};
+
+    return {
+      configured: Boolean(payload.pinHash),
+      updatedAtMs: payload.updatedAt && typeof payload.updatedAt.toMillis === "function"
+        ? payload.updatedAt.toMillis()
+        : null,
+      verificationFresh: isAdminVerificationFresh(context),
+      verificationExpiresInMinutes: ADMIN_PIN_VERIFICATION_MINUTES,
+    };
+  }
+);
+
+export const setOperatorAdminPin = functions.https.onCall(
+  async (data: { pin?: string; currentPin?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "setOperatorAdminPin");
+    void logger;
+    requireAdmin(context);
+    requireTier(context, "T3", "setOperatorAdminPin");
+    validateAppCheck(context, true);
+
+    const pin = typeof data?.pin === "string" ? data.pin.trim() : "";
+    const currentPin = typeof data?.currentPin === "string" ? data.currentPin.trim() : "";
+    if (!pin) {
+      throw new functions.https.HttpsError("invalid-argument", "pin ist erforderlich.");
+    }
+
+    const existingHash = await getStoredAdminPinHash();
+    if (existingHash) {
+      if (!currentPin) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "currentPin ist erforderlich, um eine bestehende Admin-PIN zu ändern."
+        );
+      }
+      const currentValid = await verifyAdminPinHash(currentPin, existingHash);
+      if (!currentValid) {
+        throw new functions.https.HttpsError("permission-denied", "Aktuelle Admin-PIN ist falsch.");
+      }
+    }
+
+    const pinHash = await hashAdminPin(pin);
+    await persistAdminPinHash(pinHash, context.auth!.uid);
+
+    await AuditLogger.logSuccess(
+      "admin.set_admin_pin", context, "operatorConfig/adminPin", "config",
+      { replacedExisting: Boolean(existingHash), traceId }
+    );
+
+    return { success: true, configured: true };
+  }
+);
+
+export const verifyAdminPin = functions.https.onCall(
+  async (data: { pin?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "verifyAdminPin");
+    void logger;
+    requireAdmin(context);
+    validateAppCheck(context, true);
+    await checkRateLimitShared(context.auth!.uid, "auth.verify_admin_pin", 5, 15 * 60 * 1000);
+
+    const pin = typeof data?.pin === "string" ? data.pin.trim() : "";
+    const pinHash = await getStoredAdminPinHash();
+    if (!pinHash) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Es ist noch keine Admin-PIN konfiguriert."
+      );
+    }
+
+    const valid = await verifyAdminPinHash(pin, pinHash);
+    if (!valid) {
+      await AuditLogger.logFailure(
+        "admin.verify_admin_pin", context, "operatorConfig/adminPin", "config",
+        new Error("Invalid admin PIN"), { traceId }
+      );
+      throw new functions.https.HttpsError("permission-denied", "Admin-PIN ist falsch.");
+    }
+
+    const verifiedAt = Math.floor(Date.now() / 1000);
+    await mergeOperatorCustomClaims(context.auth!.uid, { admin_verified_at: verifiedAt });
+
+    await AuditLogger.logSuccess(
+      "admin.verify_admin_pin", context, "operatorConfig/adminPin", "config",
+      { verifiedAt, traceId }
+    );
+
+    return {
+      success: true,
+      verifiedAt,
+      expiresInMinutes: ADMIN_PIN_VERIFICATION_MINUTES,
+    };
   }
 );
 /**

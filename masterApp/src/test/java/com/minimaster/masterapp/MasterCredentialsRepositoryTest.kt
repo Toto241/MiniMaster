@@ -23,9 +23,9 @@ class MasterCredentialsRepositoryTest {
     }
 
     @Test
-    fun `saveCredentials persists values to secure store and datastore`() = runTest {
+    fun `saveMasterId persists master id to secure store`() = runTest {
         val secureStore = FakeSecureStore()
-        val dataStore = createDataStore("saveCredentials")
+        val dataStore = createDataStore("saveMasterId")
         MasterCredentialSecureStoreFactory.create = { secureStore }
 
         val repository = MasterCredentialsRepository(
@@ -33,42 +33,39 @@ class MasterCredentialsRepositoryTest {
             context = mock<Context>(),
         )
 
-        repository.saveCredentials("imei-123", "secret-456")
+        repository.saveMasterId("master-123")
 
-        assertEquals("imei-123", secureStore.values["master_imei"])
-        assertEquals("secret-456", secureStore.values["secret_key"])
-        assertEquals("imei-123" to "secret-456", repository.getCredentials.first())
+        assertEquals("master-123", secureStore.values["master_imei"])
+        assertNull(secureStore.values["secret_key"])
+        assertEquals("master-123", repository.getMasterId.first())
         assertNull(readPlaintextValue(dataStore, "master_imei"))
-        assertNull(readPlaintextValue(dataStore, "secret_key"))
     }
 
     @Test
-    fun `getCredentials falls back to secure store when datastore is empty`() = runTest {
+    fun `getMasterId falls back to secure store when datastore is empty`() = runTest {
         val secureStore = FakeSecureStore(
             mutableMapOf(
-                "master_imei" to "imei-fallback",
-                "secret_key" to "secret-fallback",
+                "master_imei" to "master-fallback",
             )
         )
         MasterCredentialSecureStoreFactory.create = { secureStore }
 
         val repository = MasterCredentialsRepository(
-            dataStore = createDataStore("fallbackCredentials"),
+            dataStore = createDataStore("fallbackMasterId"),
             context = mock<Context>(),
         )
 
-        assertEquals("imei-fallback" to "secret-fallback", repository.getCredentials.first())
+        assertEquals("master-fallback", repository.getMasterId.first())
     }
 
     @Test
-    fun `getCredentials migrates legacy plaintext credentials into secure store and clears datastore`() = runTest {
+    fun `getMasterId reads legacy plaintext master id until save migrates it`() = runTest {
         val secureStore = FakeSecureStore()
-        val dataStore = createDataStore("migrateLegacyCredentials")
+        val dataStore = createDataStore("legacyMasterId")
         MasterCredentialSecureStoreFactory.create = { secureStore }
 
         dataStore.edit { preferences ->
-            preferences[stringPreferencesKey("master_imei")] = "imei-legacy"
-            preferences[stringPreferencesKey("secret_key")] = "secret-legacy"
+            preferences[stringPreferencesKey("master_imei")] = "master-legacy"
         }
 
         val repository = MasterCredentialsRepository(
@@ -76,51 +73,38 @@ class MasterCredentialsRepositoryTest {
             context = mock<Context>(),
         )
 
-        assertEquals("imei-legacy" to "secret-legacy", repository.getCredentials.first())
-        assertEquals("imei-legacy", secureStore.values["master_imei"])
-        assertEquals("secret-legacy", secureStore.values["secret_key"])
-        assertNull(readPlaintextValue(dataStore, "master_imei"))
-        assertNull(readPlaintextValue(dataStore, "secret_key"))
+        assertEquals("master-legacy", repository.getMasterId.first())
     }
 
     @Test
-    fun `getCredentials prefers secure store over legacy plaintext and still clears plaintext`() = runTest {
+    fun `getMasterId purges legacy secret key from secure store`() = runTest {
         val secureStore = FakeSecureStore(
             mutableMapOf(
-                "master_imei" to "imei-secure",
-                "secret_key" to "secret-secure",
+                "master_imei" to "master-secure",
+                "secret_key" to "legacy-secret",
             )
         )
-        val dataStore = createDataStore("preferSecureStore")
         MasterCredentialSecureStoreFactory.create = { secureStore }
 
-        dataStore.edit { preferences ->
-            preferences[stringPreferencesKey("master_imei")] = "imei-legacy"
-            preferences[stringPreferencesKey("secret_key")] = "secret-legacy"
-        }
-
         val repository = MasterCredentialsRepository(
-            dataStore = dataStore,
+            dataStore = createDataStore("purgeSecretKey"),
             context = mock<Context>(),
         )
 
-        assertEquals("imei-secure" to "secret-secure", repository.getCredentials.first())
-        assertNull(readPlaintextValue(dataStore, "master_imei"))
-        assertNull(readPlaintextValue(dataStore, "secret_key"))
+        assertEquals("master-secure", repository.getMasterId.first())
+        assertNull(secureStore.values["secret_key"])
     }
 
     @Test
-    fun `getCredentials returns nulls when neither datastore nor secure store has values`() = runTest {
+    fun `getMasterId returns null when neither datastore nor secure store has values`() = runTest {
         MasterCredentialSecureStoreFactory.create = { FakeSecureStore() }
 
         val repository = MasterCredentialsRepository(
-            dataStore = createDataStore("emptyCredentials"),
+            dataStore = createDataStore("emptyMasterId"),
             context = mock<Context>(),
         )
 
-        val credentials = repository.getCredentials.first()
-        assertNull(credentials.first)
-        assertNull(credentials.second)
+        assertNull(repository.getMasterId.first())
     }
 
     private fun createDataStore(name: String) = PreferenceDataStoreFactory.create(
@@ -140,9 +124,12 @@ class MasterCredentialsRepositoryTest {
     ) : MasterCredentialSecureStore {
         override fun getString(key: String): String? = values[key]
 
-        override fun putCredentials(imei: String, secretKey: String) {
-            values["master_imei"] = imei
-            values["secret_key"] = secretKey
+        override fun putMasterId(masterId: String) {
+            values["master_imei"] = masterId
+        }
+
+        override fun purgeLegacySecretKey() {
+            values.remove("secret_key")
         }
     }
 }

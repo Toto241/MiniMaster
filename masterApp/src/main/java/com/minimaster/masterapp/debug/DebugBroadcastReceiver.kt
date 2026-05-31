@@ -62,16 +62,16 @@ class DebugBroadcastReceiver : BroadcastReceiver() {
                     return
                 }
                 val secureStore = defaultMasterCredentialSecureStore(context)
-                val imei = secureStore.getString("master_imei") ?: ""
-                val secretKey = secureStore.getString("secret_key") ?: ""
+                val masterId = secureStore.getString("master_imei") ?: ""
+                secureStore.purgeLegacySecretKey()
                 val legalConsent = false
                 val fcmToken = ""
-                val registrationState = if (imei.isBlank()) "UNREGISTERED" else "REGISTERED"
+                val registrationState = if (masterId.isBlank()) "UNREGISTERED" else "REGISTERED"
 
                 val json = DebugSessionManager.dumpStateJson(
                     registrationState = registrationState,
-                    imeiLast4 = imei.takeLast(4).ifEmpty { "----" },
-                    secretKeyLast4 = secretKey.takeLast(4).ifEmpty { "----" },
+                    imeiLast4 = masterId.takeLast(4).ifEmpty { "----" },
+                    secretKeyLast4 = "----",
                     legalConsentAccepted = legalConsent,
                     fcmTokenLast8 = fcmToken.takeLast(8).ifEmpty { "--------" }
                 )

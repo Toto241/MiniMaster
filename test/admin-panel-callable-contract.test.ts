@@ -77,6 +77,7 @@ describe("admin-panel callable contract", () => {
     const known = [
       "aiExplainProblem", "setUserRole", "createOperatorAccessKey", "redeemOperatorAccessKey",
       "bootstrapFirstAdmin", "resetAllAuthUsers", "resetAllAuthUsersHealth",
+      "getOperatorAdminPinStatus", "setOperatorAdminPin", "verifyAdminPin",
       "getOperatorSetupStatus", "setOperatorSetupChecklistItem", "adminHealthCheck",
       "revokeUserTokens", "revokeSubscription", "analyzeWithDebugData", "getTicketUserData",
       "exportUserData", "deleteUserAccount", "setAdminClaim", "resetOperatorAccounts",
