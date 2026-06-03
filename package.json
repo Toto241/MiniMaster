@@ -28,6 +28,7 @@
     "security:evidence:collect": "pwsh ./scripts/collect-security-evidence.ps1",
     "commissioning:evidence:collect": "pwsh ./scripts/collect-commissioning-evidence.ps1",
     "code-scanning:enable": "pwsh ./scripts/enable-code-scanning.ps1",
+    "pages:privacy:setup": "pwsh ./scripts/setup-github-pages.ps1",
     "preflight": "python scripts/preflight.py",
     "preflight:json": "python scripts/preflight.py --json",
     "setup": "python scripts/setup_init.py"
