@@ -13,14 +13,14 @@
 | Store listing DE | [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md) Part A | Paste title/short/full description + assets | Ready to submit |
 | Permissions declaration | [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md) | Submit Accessibility/Location/Phone declarations | Ready to submit |
 | App access guide | [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md) | Attach reviewer login path in Play Console | Ready to submit |
-| Privacy policy URL | [PRIVACY_POLICY_DE.md](PRIVACY_POLICY_DE.md) | Link `https://minimaster.app/privacy` (or hosted URL) | Ready |
+| Privacy policy URL | [PRIVACY_POLICY_DE.md](PRIVACY_POLICY_DE.md) | `https://toto241.github.io/MiniMaster/privacy/` (interim; spaeter `https://minimaster.app/privacy`) — Setup: [ENABLE_GITHUB_PAGES.md](ENABLE_GITHUB_PAGES.md) | Ready |
 | Support email | Admin panel default `privacy@minimaster.app` | Enter in Store listing contact details | Ready |
 
 ## Pre-filled operator values
 
 Use these values consistently across Data Safety and Store listing:
 
-- **Privacy policy URL:** `https://minimaster.app/privacy`
+- **Privacy policy URL (interim):** `https://toto241.github.io/MiniMaster/privacy/` — siehe `npm run pages:privacy:setup`
 - **Support / privacy email:** `privacy@minimaster.app`
 - **Category:** Parenting / Tools
 - **Target audience:** Parents with children under 13 (child app on child device)

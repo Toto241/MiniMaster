@@ -79,3 +79,9 @@ DerivedData/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# GitHub Pages (lokal generiert; Deploy via Actions)
+site/
+
+# Lokale Publisher-Daten fuer setup-github-pages.ps1
+config/legal-publisher.json
