@@ -9,7 +9,6 @@ import "./core/format.js";
 import "./core/automation-meta.js";
 import "./core/encoding.js";
 import "./core/error-codes.js";
-import "./core/error-codes.js";
 import "./core/security.js";
 import "./core/firebase-config.js";
 import "./core/dates.js";
