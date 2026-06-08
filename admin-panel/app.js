@@ -1175,6 +1175,83 @@ function buildEffectivePlayStoreReadinessState(state = getPlayStoreReadinessStat
     };
 }
 
+const playStoreReadinessCheckLabels = {
+    dataSafety: "Data-Safety-Formular vollständig und geprüft",
+    iarc: "IARC-Altersfreigabe abgeschlossen",
+    listing: "Store Listing vollständig",
+    privacyUrlLinked: "Privacy-Policy-URL in Store und App verlinkt",
+    permissionsDeclaration: "Permissions Declaration eingereicht",
+    appAccessGuide: "App-Access-Anleitung für Reviewer hinterlegt",
+    securityRotationDone: "Schlüsselrotation/-restriktion durchgeführt",
+    goNoGoSignedOff: "Interne Go/No-Go-Freigabe dokumentiert",
+};
+
+const playStoreRequiredConsoleEvidence = [
+    "Play Console Data-Safety final submitted/reviewed Screenshot",
+    "Sensitive permissions declaration submitted/reviewed Screenshots",
+    "IARC certificate oder Play Console Age-Rating Screenshot",
+    "Store listing preview Screenshot inklusive Privacy-URL und Support-Kontakt",
+    "Reviewer App Access instructions in der Play Console hinterlegt",
+];
+
+function getPlayStoreReadinessCheckKeys() {
+    return Object.keys(playStoreReadinessCheckLabels);
+}
+
+function validatePlayStoreReadinessState(state) {
+    if (!state) return { ok: false, code: "missing-state", message: "Kein State zum Speichern übergeben." };
+    const privacyUrl = String(state.privacyUrl || "").trim();
+    if (!privacyUrl || !/^https:\/\//i.test(privacyUrl)) {
+        return { ok: false, code: "invalid-privacy-url", message: "Bitte eine gültige Privacy-Policy-URL mit https:// eintragen." };
+    }
+    const supportEmail = String(state.supportEmail || "").trim();
+    if (!supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) {
+        return { ok: false, code: "invalid-email", message: "Bitte eine gültige Support-/Privacy-E-Mail eintragen." };
+    }
+    return { ok: true };
+}
+
+function computePlayStoreReadinessSummary(state) {
+    const checks = state?.checks || {};
+    const keys = getPlayStoreReadinessCheckKeys();
+    const total = keys.length;
+    const completed = keys.reduce((sum, key) => sum + (checks[key] ? 1 : 0), 0);
+    const ready = completed === total
+        && Boolean(String(state?.privacyUrl || "").trim())
+        && Boolean(String(state?.supportEmail || "").trim());
+    return { total, completed, ready };
+}
+
+function buildPlayStoreComplianceProtocol(state = getPlayStoreReadinessState(), options = {}) {
+    const effective = buildEffectivePlayStoreReadinessState(state);
+    const summary = computePlayStoreReadinessSummary(effective);
+    const openChecks = getPlayStoreReadinessCheckKeys()
+        .filter(key => !effective.checks?.[key])
+        .map(key => ({ key, label: playStoreReadinessCheckLabels[key] || key }));
+    const validation = validatePlayStoreReadinessState(effective);
+    const blockers = [
+        ...openChecks.map(item => ({ id: "check-" + item.key, type: "check", label: item.label })),
+        ...(validation.ok ? [] : [{ id: validation.code, type: "metadata", label: validation.message }]),
+    ];
+
+    return {
+        generatedAt: options.generatedAt || new Date().toISOString(),
+        type: "google-playstore-compliance-protocol",
+        ready: summary.ready && blockers.length === 0,
+        summary,
+        checks: getPlayStoreReadinessCheckKeys().map(key => ({
+            key,
+            label: playStoreReadinessCheckLabels[key] || key,
+            passed: Boolean(effective.checks?.[key]),
+        })),
+        blockers,
+        privacyUrl: effective.privacyUrl,
+        supportEmail: effective.supportEmail,
+        listingUrl: effective.listingUrl || "",
+        manualConsoleEvidenceRequired: [...playStoreRequiredConsoleEvidence],
+    };
+}
+
 const defaultCommandBuilderConfig = {
     workspacePath: "D:\\Tools\\MiniMaster",
     firstAdminEmail: "",
@@ -16933,8 +17010,9 @@ function exportP0BlockerCockpit() {
     setP0BlockerCockpitState(state);
     renderP0BlockerCockpit();
 
+    const exportedAt = new Date().toISOString();
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         type: "p0-blocker-cockpit",
         ...state,
@@ -17075,12 +17153,9 @@ function savePlayStoreReadiness() {
     const resultEl = document.getElementById("playstore-readiness-result");
     const state = collectPlayStoreReadinessFromUi();
 
-    if (!state.privacyUrl || !/^https:\/\//i.test(state.privacyUrl)) {
-        if (resultEl) resultEl.innerHTML = "<div class='error'>Bitte eine gültige Privacy-Policy-URL mit https:// eintragen.</div>";
-        return;
-    }
-    if (!state.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.supportEmail)) {
-        if (resultEl) resultEl.innerHTML = "<div class='error'>Bitte eine gültige Support-/Privacy-E-Mail eintragen.</div>";
+    const validation = validatePlayStoreReadinessState(state);
+    if (!validation.ok) {
+        if (resultEl) resultEl.innerHTML = "<div class='error'>" + escapeHtml(validation.message) + "</div>";
         return;
     }
 
@@ -17106,11 +17181,13 @@ function resetPlayStoreReadiness() {
 
 function exportPlayStoreReadiness() {
     const state = getPlayStoreReadinessState();
+    const exportedAt = new Date().toISOString();
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         type: "play-store-readiness",
         ...state,
+        complianceProtocol: buildPlayStoreComplianceProtocol(state, { generatedAt: exportedAt }),
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -17234,9 +17311,10 @@ function exportReleaseArtefact() {
     const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
     const attestations = getCommissioningAttestations();
     const status = computeGoLiveStatus();
+    const exportedAt = new Date().toISOString();
 
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         version: "1.0",
         type: "release-artefact",
@@ -17252,6 +17330,7 @@ function exportReleaseArtefact() {
         commissioningSummary: commissioningSummary || null,
         p0BlockerCockpit: p0BlockerState,
         playStoreReadiness: playStoreState,
+        playStoreComplianceProtocol: buildPlayStoreComplianceProtocol(playStoreState, { generatedAt: exportedAt }),
         platformChecksSummary: status.platformStatus,
         platformChecksDetail: platformState,
         attestations,
@@ -17363,8 +17442,9 @@ function exportReleaseEvidenceBundle() {
         })),
     };
 
+    const exportedAt = new Date().toISOString();
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         version: "1.0",
         type: "release-evidence-bundle",
@@ -17381,6 +17461,7 @@ function exportReleaseEvidenceBundle() {
         commissioningHistory: commissioningHistorySummary,
         p0BlockerCockpit: p0BlockerState,
         playStoreReadiness: playStoreState,
+        playStoreComplianceProtocol: buildPlayStoreComplianceProtocol(playStoreState, { generatedAt: exportedAt }),
         platformChecksSummary: status.platformStatus,
         platformChecksDetail: platformState,
         attestations,
