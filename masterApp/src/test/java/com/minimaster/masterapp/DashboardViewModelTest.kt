@@ -1,7 +1,10 @@
 package com.minimaster.masterapp
 
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.HttpsCallableReference
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +37,10 @@ class DashboardViewModelTest {
     private lateinit var functions: FirebaseFunctions
     private lateinit var credentialsRepository: MasterCredentialsRepository
     private lateinit var callable: HttpsCallableReference
+    private lateinit var childrenCollection: CollectionReference
+    private lateinit var childrenQuery: Query
+    private lateinit var tasksQuery: Query
+    private lateinit var listenerRegistration: ListenerRegistration
 
     @Before
     fun setUp() {
@@ -42,6 +49,18 @@ class DashboardViewModelTest {
         functions = mock()
         credentialsRepository = mock()
         callable = mock()
+        childrenCollection = mock()
+        childrenQuery = mock()
+        tasksQuery = mock()
+        listenerRegistration = mock()
+
+        whenever(firestore.collection(eq("children"))).thenReturn(childrenCollection)
+        whenever(childrenCollection.whereEqualTo(eq("masterImei"), any())).thenReturn(childrenQuery)
+        whenever(childrenQuery.addSnapshotListener(any())).thenReturn(listenerRegistration)
+        whenever(firestore.collectionGroup(eq("tasks"))).thenReturn(tasksQuery)
+        whenever(tasksQuery.whereEqualTo(eq("masterImei"), any())).thenReturn(tasksQuery)
+        whenever(tasksQuery.whereEqualTo(eq("status"), eq("pending_approval"))).thenReturn(tasksQuery)
+        whenever(tasksQuery.addSnapshotListener(any())).thenReturn(listenerRegistration)
     }
 
     @After

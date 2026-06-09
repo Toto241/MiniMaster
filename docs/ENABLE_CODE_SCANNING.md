@@ -2,6 +2,8 @@
 
 **Status:** Workflow existiert (`.github/workflows/codeql-analysis.yml`), aber GitHub Code Scanning ist im Repository noch **nicht aktiviert**. Die API liefert HTTP 403, bis die einmalige UI-Aktivierung erfolgt ist.
 
+**2026-06-09 check:** `gh api --method PATCH repos/Toto241/MiniMaster/code-scanning/default-setup -f state=configured -f query_suite=security-extended` wurde getestet und von GitHub mit HTTP 403 abgelehnt. Der aktuelle Token kann diese Repo-Setting-Aktivierung nicht ersetzen.
+
 ## Schritte (Repo Owner, ~5 Minuten)
 
 1. Öffne https://github.com/Toto241/MiniMaster/settings/security_analysis
