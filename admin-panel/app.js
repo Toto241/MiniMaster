@@ -12898,6 +12898,10 @@ async function onExternalIntegrationFieldChange(input) {
     const field = input.getAttribute("data-ext-field");
     const type = input.getAttribute("data-ext-type");
     if (!category || !field) return;
+    if (!(await ensureOperatorTier("T3"))) {
+        if (type === "bool") input.checked = !input.checked;
+        return;
+    }
     const value = type === "bool" ? !!input.checked : input.value;
     input.disabled = true;
     try {
@@ -12961,6 +12965,7 @@ function onOemAction(target) {
 }
 
 async function saveOemMatrix() {
+    if (!(await ensureOperatorTier("T3"))) return;
     const rows = readOemMatrixFromDom();
     try {
         if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
@@ -14804,6 +14809,7 @@ async function saveAdminResponse(ticketId) {
         showNotification("Bitte geben Sie eine Antwort ein.", "info");
         return;
     }
+    if (!(await ensureOperatorTier("T3"))) return;
 
     try {
         await db.collection("supportTickets").doc(ticketId).update({
@@ -14820,6 +14826,7 @@ async function saveAdminResponse(ticketId) {
 }
 
 async function updateTicketStatus(ticketId, newStatus) {
+    if (!(await ensureOperatorTier("T3"))) return;
     try {
         await db.collection("supportTickets").doc(ticketId).update({
             status: newStatus,
