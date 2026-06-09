@@ -32,7 +32,8 @@ jobs:
       MINIMASTER_RELEASE_STORE_PASSWORD: ${{ secrets.MINIMASTER_RELEASE_STORE_PASSWORD }}
       MINIMASTER_RELEASE_KEY_ALIAS: ${{ secrets.MINIMASTER_RELEASE_KEY_ALIAS }}
       MINIMASTER_RELEASE_KEY_PASSWORD: ${{ secrets.MINIMASTER_RELEASE_KEY_PASSWORD }}
-      MINIMASTER_UPLOAD_CRASHLYTICS_MAPPING: ${{ inputs.play_ready && 'true' || 'false' }}
+      MINIMASTER_UPLOAD_CRASHLYTICS_MAPPING: 'false'
+      PLAY_READY_INPUT: ${{ github.event.inputs.play_ready || 'false' }}
 
     steps:
       - uses: actions/checkout@v6
@@ -112,8 +113,16 @@ jobs:
         if: env.MINIMASTER_RELEASE_KEYSTORE_BASE64 != ''
         run: printf '%s' "${MINIMASTER_RELEASE_KEYSTORE_BASE64}" | base64 --decode > "${MINIMASTER_RELEASE_STORE_FILE}"
 
+      - name: Configure Crashlytics mapping upload
+        run: |
+          if [ "${PLAY_READY_INPUT}" = "true" ]; then
+            echo "MINIMASTER_UPLOAD_CRASHLYTICS_MAPPING=true" >> "$GITHUB_ENV"
+          else
+            echo "MINIMASTER_UPLOAD_CRASHLYTICS_MAPPING=false" >> "$GITHUB_ENV"
+          fi
+
       - name: Enforce Play-ready secrets
-        if: inputs.play_ready
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.play_ready == 'true'
         run: |
           set -euo pipefail
           test -n "${MASTER_GOOGLE_SERVICES_JSON}"
