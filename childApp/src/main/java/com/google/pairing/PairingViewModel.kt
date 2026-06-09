@@ -17,6 +17,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+sealed class PairingState {
+    data object Idle : PairingState()
+    data object Loading : PairingState()
+    data object Success : PairingState()
+    data class Error(val message: String) : PairingState()
+}
+
 /**
  * A [ViewModel] responsible for the business logic of pairing the child device
  * with a master account.

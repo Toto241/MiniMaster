@@ -32,6 +32,7 @@ jobs:
       MINIMASTER_RELEASE_STORE_PASSWORD: ${{ secrets.MINIMASTER_RELEASE_STORE_PASSWORD }}
       MINIMASTER_RELEASE_KEY_ALIAS: ${{ secrets.MINIMASTER_RELEASE_KEY_ALIAS }}
       MINIMASTER_RELEASE_KEY_PASSWORD: ${{ secrets.MINIMASTER_RELEASE_KEY_PASSWORD }}
+      MINIMASTER_UPLOAD_CRASHLYTICS_MAPPING: ${{ inputs.play_ready && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@v6

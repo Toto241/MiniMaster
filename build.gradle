@@ -59,12 +59,13 @@ allprojects {
             force 'io.netty:netty-buffer:4.1.135.Final'
             force 'io.netty:netty-transport:4.1.135.Final'
             force 'io.netty:netty-resolver:4.1.135.Final'
+            force 'io.netty:netty-handler-proxy:4.1.135.Final'
 
             // ============================================================
             // LOGBACK - CVE-2023-6378, CVE-2024-12798 (Serialization & Code Execution)
             // ============================================================
-            force 'ch.qos.logback:logback-core:1.5.19'
-            force 'ch.qos.logback:logback-classic:1.5.19'
+            force 'ch.qos.logback:logback-core:1.5.25'
+            force 'ch.qos.logback:logback-classic:1.5.25'
 
             // ============================================================
             // APACHE COMMONS COMPRESS - CVE-2024-25710, CVE-2024-26308
