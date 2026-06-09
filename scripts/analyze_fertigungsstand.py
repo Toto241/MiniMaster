@@ -68,16 +68,23 @@ def collect_findings() -> list[Finding]:
     findings: list[Finding] = []
 
     billing_blocker = contains(ci, "Billing blocker detected: yes") or contains(ci, "spending limit")
+    code_scanning_blocker = contains(ci, "Code Scanning not enabled") or contains(release, "Code Scanning not enabled")
     codeql_success = contains(ci, "CodeQL Security Analysis", "Latest status: completed / success")
     android_success = contains(ci, "Android CI", "Latest status: completed / success")
 
     findings.append(Finding(
         area="CI / Security Gate",
-        status=status_from_bool(codeql_success, billing_blocker),
+        status=status_from_bool(codeql_success, billing_blocker or code_scanning_blocker),
         severity="P0",
         title="Current CodeQL evidence is required before release",
-        evidence="CI_REVALIDATION_LATEST.md reports a billing/spending-limit blocker" if billing_blocker else "CI_REVALIDATION_LATEST.md inspected",
-        next_action="Resolve GitHub Actions billing/spending limit, rerun CodeQL, and update release evidence with a green run.",
+        evidence=(
+            "GitHub Code Scanning is not enabled in repository settings"
+            if code_scanning_blocker
+            else "CI_REVALIDATION_LATEST.md reports a billing/spending-limit blocker"
+            if billing_blocker
+            else "CI_REVALIDATION_LATEST.md inspected"
+        ),
+        next_action="Enable GitHub Code Scanning in repository settings, rerun CodeQL, and update release evidence with a green run.",
     ))
 
     findings.append(Finding(
@@ -86,7 +93,7 @@ def collect_findings() -> list[Finding]:
         severity="P0",
         title="Current Android CI evidence is required before release",
         evidence="CI_REVALIDATION_LATEST.md reports Android CI did not start because of billing/spending-limit" if billing_blocker else "CI_REVALIDATION_LATEST.md inspected",
-        next_action="Rerun Android CI after billing is fixed and archive the run URL in RELEASE_EVIDENCE_REGISTER.md.",
+        next_action="Rerun Android CI after the branch is pushed and archive the run URL in RELEASE_EVIDENCE_REGISTER.md.",
     ))
 
     deploy_done = not contains(release, "Deployment Reference | _(pending final deploy)_") and not contains(release, "Deployment result", "⛔")

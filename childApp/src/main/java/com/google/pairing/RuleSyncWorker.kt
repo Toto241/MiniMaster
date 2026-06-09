@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 /**
@@ -53,7 +54,7 @@ class RuleSyncWorker(
                 .call(hashMapOf("childId" to childId, "maxItems" to 20))
                 .await()
 
-            val data = result.data as? Map<String, Any>
+            val data = result.getData() as? Map<String, Any>
             val commands = data?.get("commands") as? List<Map<String, Any>> ?: emptyList()
 
             if (commands.isNotEmpty()) {
