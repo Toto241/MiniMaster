@@ -17,8 +17,8 @@ describe("verifyAdminPin cloud function wiring", () => {
   });
 
   it("requires admin PIN verification on T4 callables", () => {
-    expect(authSource).toContain('requireAdminPinVerification(context, "resetOperatorAccounts")');
-    expect(authSource).toContain('requireAdminPinVerification(context, "resetAllAuthUsers")');
+    expect(authSource).toContain("requireAdminPinVerification(context, \"resetOperatorAccounts\")");
+    expect(authSource).toContain("requireAdminPinVerification(context, \"resetAllAuthUsers\")");
   });
 
   it("session manager prompts for admin PIN on T4 promotion", () => {
@@ -28,8 +28,8 @@ describe("verifyAdminPin cloud function wiring", () => {
 
   it("dashboard gates privileged actions with ensureOperatorTier", () => {
     expect(appSource).toContain("async function ensureOperatorTier");
-    expect(appSource).toContain('ensureOperatorTier("T3")');
-    expect(appSource).toContain('ensureOperatorTier("T4")');
+    expect(appSource).toContain("ensureOperatorTier(\"T3\")");
+    expect(appSource).toContain("ensureOperatorTier(\"T4\")");
     expect(appSource).toContain("initAdminPinCard");
     expect(appSource).toContain("getOperatorAdminPinStatus");
   });

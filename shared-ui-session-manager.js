@@ -39,9 +39,8 @@
       this.recordActivity();
       return;
     }
-    var self = this;
-    ACTIVITY_EVENTS.forEach(function (evt) {
-      document.addEventListener(evt, self._activityHandler, { passive: true });
+    ACTIVITY_EVENTS.forEach((evt) => {
+      document.addEventListener(evt, this._activityHandler, { passive: true });
     });
     this.monitoringActive = true;
     this.idleCheckInterval = global.setInterval(this.checkIdle.bind(this), 60000);
@@ -50,9 +49,8 @@
 
   MasterSessionManager.prototype.stop = function () {
     if (this.monitoringActive) {
-      var self = this;
-      ACTIVITY_EVENTS.forEach(function (evt) {
-        document.removeEventListener(evt, self._activityHandler);
+      ACTIVITY_EVENTS.forEach((evt) => {
+        document.removeEventListener(evt, this._activityHandler);
       });
       this.monitoringActive = false;
     }

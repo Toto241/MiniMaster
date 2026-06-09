@@ -10,8 +10,8 @@ describe("Auth migration phase 2 — client completion", () => {
     const masterVm = read("masterApp/src/main/java/com/minimaster/masterapp/MasterViewModel.kt");
     const credentials = read("masterApp/src/main/java/com/minimaster/masterapp/MasterCredentialsRepository.kt");
 
-    expect(masterVm).toContain('getHttpsCallable("registerAuthenticatedMaster")');
-    expect(masterVm).not.toContain('getHttpsCallable("registerMasterDevice")');
+    expect(masterVm).toContain("getHttpsCallable(\"registerAuthenticatedMaster\")");
+    expect(masterVm).not.toContain("getHttpsCallable(\"registerMasterDevice\")");
     expect(masterVm).toContain("signInAnonymously()");
     expect(credentials).toContain("getMasterId");
     expect(credentials).toContain("saveMasterId");
@@ -24,7 +24,7 @@ describe("Auth migration phase 2 — client completion", () => {
     const pairingVm = read("childApp/src/main/java/com/google/pairing/PairingViewModel.kt");
     const pairingScreen = read("childApp/src/main/java/com/google/pairing/PairingScreen.kt");
 
-    expect(pairingVm).toContain('getHttpsCallable("pairAuthenticatedChild")');
+    expect(pairingVm).toContain("getHttpsCallable(\"pairAuthenticatedChild\")");
     expect(pairingVm).toContain("signInAnonymously()");
     expect(pairingVm).not.toMatch(/validateToken\s*\(\s*token:\s*String,\s*childImei:\s*String\s*\)/);
     expect(pairingScreen).not.toContain("Child IMEI");
