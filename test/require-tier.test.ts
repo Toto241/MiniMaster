@@ -1,4 +1,4 @@
-const shared = require("../src/shared");
+import * as shared from "../src/shared";
 
 function authContext(authTimeSecondsAgo: number, extras: Record<string, unknown> = {}) {
   const authTime = Math.floor(Date.now() / 1000) - authTimeSecondsAgo;

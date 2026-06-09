@@ -1194,9 +1194,7 @@ const playStoreRequiredConsoleEvidence = [
     "Reviewer App Access instructions in der Play Console hinterlegt",
 ];
 
-function getPlayStoreReadinessCheckKeys() {
-    return Object.keys(playStoreReadinessCheckLabels);
-}
+const playStoreReadinessCheckKeys = Object.keys(playStoreReadinessCheckLabels);
 
 function validatePlayStoreReadinessState(state) {
     if (!state) return { ok: false, code: "missing-state", message: "Kein State zum Speichern übergeben." };
@@ -1213,7 +1211,7 @@ function validatePlayStoreReadinessState(state) {
 
 function computePlayStoreReadinessSummary(state) {
     const checks = state?.checks || {};
-    const keys = getPlayStoreReadinessCheckKeys();
+    const keys = playStoreReadinessCheckKeys;
     const total = keys.length;
     const completed = keys.reduce((sum, key) => sum + (checks[key] ? 1 : 0), 0);
     const ready = completed === total
@@ -1225,7 +1223,7 @@ function computePlayStoreReadinessSummary(state) {
 function buildPlayStoreComplianceProtocol(state = getPlayStoreReadinessState(), options = {}) {
     const effective = buildEffectivePlayStoreReadinessState(state);
     const summary = computePlayStoreReadinessSummary(effective);
-    const openChecks = getPlayStoreReadinessCheckKeys()
+    const openChecks = playStoreReadinessCheckKeys
         .filter(key => !effective.checks?.[key])
         .map(key => ({ key, label: playStoreReadinessCheckLabels[key] || key }));
     const validation = validatePlayStoreReadinessState(effective);
@@ -1239,7 +1237,7 @@ function buildPlayStoreComplianceProtocol(state = getPlayStoreReadinessState(), 
         type: "google-playstore-compliance-protocol",
         ready: summary.ready && blockers.length === 0,
         summary,
-        checks: getPlayStoreReadinessCheckKeys().map(key => ({
+        checks: playStoreReadinessCheckKeys.map(key => ({
             key,
             label: playStoreReadinessCheckLabels[key] || key,
             passed: Boolean(effective.checks?.[key]),
