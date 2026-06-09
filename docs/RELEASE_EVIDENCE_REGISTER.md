@@ -40,8 +40,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Play Console submission packet | [PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md](PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md) | ✅ Repo-ready; external Play Console clicks pending | Product/Ops | 2026-05-30 |
 | Auth migration Phase 2 (clients) | [AUTH_MIGRATION_PLAN.md](AUTH_MIGRATION_PLAN.md) + `test/auth-migration-phase2-completion.test.ts` | ✅ | Engineering | 2026-05-30 |
 | iOS beta UI contract tests | `iosMasterApp/Tests/MiniMasterParentTests/MiniMasterParentUIContractTests.swift` | ✅ Repo-side | Engineering | 2026-05-30 |
-| CodeQL security scan (0 high/critical) | ⛔ Blocked by repository setting (Code Scanning not enabled — Issue #158). API activation attempt on 2026-06-09 returned HTTP 403; enable in GitHub Settings before rerun. | ⛔ | Engineering | 2026-06-09 |
-| Android build / Android CI | Release AAB workflow added and validated with `actionlint`; modules moved to `compileSdk 36`/`targetSdk 35`; local `:masterApp:bundleRelease` and `:childApp:bundleRelease` pass with system CA and a temporary child Firebase config for `com.minimaster.childapp`; Android CI no longer fails on a missing `jacocoTestReport` task. Real Firebase config and fresh green GitHub run links still pending. | ⚠️ | Engineering | 2026-06-09 |
+| CodeQL security scan (0 high/critical) | CodeQL workflow is green for JavaScript and Java/Kotlin ([run 27229989798](https://github.com/Toto241/MiniMaster/actions/runs/27229989798)), but Code Scanning is still not enabled in repository settings (Issue #158). API activation attempt on 2026-06-09 returned HTTP 403; enable in GitHub Settings before treating this as final Security-tab evidence. | ⛔ | Engineering | 2026-06-09 |
+| Android build / Android CI | Release AAB workflow added and validated with `actionlint`; modules moved to `compileSdk 36`/`targetSdk 35`; local `:masterApp:bundleRelease` and `:childApp:bundleRelease` pass with system CA and a temporary child Firebase config for `com.minimaster.childapp`; Android CI is green ([run 27229989412](https://github.com/Toto241/MiniMaster/actions/runs/27229989412)). Real Firebase config and Play-ready release-bundle run still pending. | ⚠️ | Engineering | 2026-06-09 |
 | Deployment result | Final production deploy evidence is pending because production runtime secrets/config and deploy sign-off are external to the repository | ⛔ | Engineering | offen |
 
 ### 3.2 Functional Commissioning Gate
@@ -101,8 +101,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Aktion | Zielnachweis | Status | Owner | Zieltermin |
 | ------ | ------ | ------ | ------ | ------ |
 | GitHub Code Scanning aktivieren | Security tab akzeptiert CodeQL SARIF und `gh api repos/Toto241/MiniMaster/code-scanning/alerts` liefert 200 statt 403 | ⬜ | Repo Owner | offen |
-| CodeQL-Ergebnis verlinken | Frischer erfolgreicher CodeQL-Run | ⬜ | Engineering Owner | nach Repo-Settings-Fix |
-| Android CI Build-Nachweis verlinken | Frischer erfolgreicher Android-CI-Run und Android Release Bundles Run | ⬜ | Engineering Owner | nach Push/CI |
+| CodeQL-Ergebnis verlinken | Frischer erfolgreicher CodeQL-Run vorhanden; Code-Scanning-API muss noch 200 statt 403 liefern | 🔄 | Engineering Owner + Repo Owner | nach Repo-Settings-Fix |
+| Android CI Build-Nachweis verlinken | Android CI gruen; Android Release Bundles Play-ready Run mit echten Secrets fehlt noch | 🔄 | Engineering Owner | nach Firebase/Signing-Secrets |
 | Fertigungsstandsanalyse lokal/CI ausfuehren | `build/fertigungsstand/latest-summary.json` und `latest-report.md` archiviert | ⬜ | Engineering Owner | naechster Checkout/CI-Lauf |
 | Finalen Deploy-Nachweis erfassen | Deployment-Referenz in diesem Register | ⬜ | Engineering Owner | nach CI-Fix |
 | Firebase-Key-Rotation + Restriktionen abschliessen | Screenshot/Export aus Firebase Console + Runbook-Eintrag; alte getrackte Admin-SDK/App-Config-Werte revoked | ⬜ | Security Owner | offen |
@@ -119,7 +119,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | # | Task | Owner | Abhaengigkeit | Nachweis fuer Done | Status |
 | --- | --- | --- | --- | --- | --- |
 | 1 | GitHub Code Scanning in Repository Settings aktivieren | Repo Owner | GitHub Admin Settings | Code scanning API liefert 200 und Security tab zeigt CodeQL | ⬜ |
-| 2 | CodeQL, Android CI und Android Release Bundles neu ausfuehren | Engineering | 1 + Push | completed/success Runs | ⬜ |
+| 2 | CodeQL, Android CI und Android Release Bundles neu ausfuehren | Engineering | 1 + Push | CodeQL und Android CI completed/success; Android Release Bundles play-ready noch offen | 🔄 |
 | 3 | `npm run analyze:fertigungsstand:gate` ausfuehren und archivieren | Engineering | Checkout/CI | latest-summary.json + latest-report.md | ⬜ |
 | 4 | Release-Evidence mit aktuellen Run-Links aktualisieren | Engineering | 2, 3 | dieses Register aktualisiert | ⬜ |
 | 5 | Finalen Deploy-Nachweis erfassen | Engineering | 2 | Deployment-Referenz | ⬜ |

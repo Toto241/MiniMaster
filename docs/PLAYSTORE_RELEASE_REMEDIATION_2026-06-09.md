@@ -13,7 +13,7 @@ This note records the remediation pass for the nine release-readiness areas and 
 | 5 | Sensitive permissions documentation | Updated repo-side | Play permissions checklist and reviewer guide now reflect Accessibility, Usage Access, Overlay, Device Admin, FGS special use, and Camera without claiming Location. |
 | 6 | Data Safety / Privacy mismatch | Updated repo-side | Data Safety template no longer declares Location for the current Android release and marks CodeQL/Deletion URL as release gates. |
 | 7 | Tracked credentials | Fixed current tree | Removed tracked Firebase Admin SDK/app config JSON files and hardened `.gitignore`; history and real keys still require external rotation. |
-| 8 | Git/GitHub blocker | Diagnosed/fixed where repo-side | Local Git is clean and `main` is pushed. The empty Android Release Bundles failure was a workflow validation error (`runner.temp` in job-level `env`) and is fixed. GitHub Code Scanning is still disabled and API activation returns HTTP 403. Dependabot still reports remaining Gradle alerts from `settings.gradle` after dependency submission. |
+| 8 | Git/GitHub blocker | Diagnosed/fixed where repo-side | Local Git is clean and `main` is pushed. The empty Android Release Bundles failure was a workflow validation error (`runner.temp` in job-level `env`) and is fixed. CI, Android CI, Node CI, CodeQL, and Dependency Submission are green on `e391dab`. GitHub Code Scanning is still disabled and API activation returns HTTP 403. Dependabot still reports remaining Gradle alerts from `settings.gradle` after dependency submission. |
 | 9 | Release evidence | Updated repo-side | Release evidence register and security baseline document the 2026-06-09 state and remaining external gates. |
 
 ## External Gates Still Required
