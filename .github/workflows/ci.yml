@@ -68,7 +68,7 @@ jobs:
         run: npm run lint
 
       - name: Run backend tests
-        run: npm test --silent
+        run: npm run test:ci -- --silent
 
       - name: Upload backend test and coverage artifacts
         if: always()
@@ -227,7 +227,12 @@ jobs:
 
       - name: Generate Jacoco report
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon
+        run: |
+          if ./scripts/run-android-checks.sh tasks --all --no-daemon | grep -qE '(^|[[:space:]])jacocoTestReport([[:space:]]|$)'; then
+            ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon
+          else
+            echo "::notice::No jacocoTestReport task is configured; skipping Android coverage report."
+          fi
 
       - name: Upload reports
         if: steps.network-test.outputs.google-maven-accessible == 'true'

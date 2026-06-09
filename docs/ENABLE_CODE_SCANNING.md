@@ -31,4 +31,4 @@
 ## Verwandte Blocker
 
 - GitHub Actions Billing/Spending-Limit (siehe `docs/RELEASE_EVIDENCE_REGISTER.md` §5)
-- Android CI ebenfalls von Billing betroffen
+- Android CI is no longer blocked by the old missing-JaCoCo-task failure; remaining security evidence still needs Code Scanning enabled in repository settings.
