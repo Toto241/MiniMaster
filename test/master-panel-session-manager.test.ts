@@ -34,6 +34,14 @@ describe("master panel session timeout alignment", () => {
     expect(parentSource).toContain("ensureMasterSession");
   });
 
+  it("child-panel uses shared session manager", () => {
+    const childIndex = fs.readFileSync(path.join(__dirname, "..", "child-panel", "index.html"), "utf8");
+    const childSource = fs.readFileSync(path.join(__dirname, "..", "child-panel", "app.js"), "utf8");
+    expect(childIndex).toContain("shared-ui-session-manager.js");
+    expect(childSource).toContain("MiniMasterSessionManager");
+    expect(childSource).toContain("ensureMasterSession");
+  });
+
   it("MasterSessionManager logs out after idle timeout", () => {
     let loggedOut = false;
     const notified: string[] = [];

@@ -14,6 +14,47 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
     let auth = null;
     let currentMasterImei = null;
     let appCheckConfigured = false;
+    let masterSessionManager = null;
+
+    function getMasterSessionManager() {
+      if (!masterSessionManager && typeof MiniMasterSessionManager === "function") {
+        masterSessionManager = new MiniMasterSessionManager({
+          isActive: function () { return Boolean(currentMasterImei); },
+          onLogout: function () { logoutMasterSession(); },
+          onNotify: function (message, type) {
+            setStatus("ticket-auth-status", message, type === "error" ? "error" : "success");
+          },
+        });
+      }
+      return masterSessionManager;
+    }
+
+    function ensureMasterSession() {
+      var manager = getMasterSessionManager();
+      if (!manager) return true;
+      return manager.ensureActiveSession();
+    }
+
+    function startMasterSessionMonitoring() {
+      var manager = getMasterSessionManager();
+      if (!manager) return;
+      manager.markLoggedIn();
+      manager.start();
+    }
+
+    function stopMasterSessionMonitoring() {
+      var manager = getMasterSessionManager();
+      if (manager) manager.stop();
+    }
+
+    function logoutMasterSession() {
+      stopMasterSessionMonitoring();
+      currentMasterImei = null;
+      if (auth) {
+        auth.signOut().catch(function () { /* noop */ });
+      }
+      setStatus("ticket-auth-status", "Session abgelaufen — bitte erneut anmelden.", "error");
+    }
 
     function getAppCheckSiteKey() {
       const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
@@ -146,6 +187,7 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       auth.onAuthStateChanged(async (user) => {
         if (user) {
           currentMasterImei = user.uid;
+          startMasterSessionMonitoring();
           let platformLabel = "";
           try {
             const childDoc = await db.collection("children").doc(user.uid).get();
@@ -156,7 +198,11 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
           } catch { /* ignore */ }
           setStatus("ticket-auth-status", "Authentifiziert als " + user.uid + (platformLabel ? " · " + platformLabel : ""), "success");
           loadOwnTickets();
+          return;
         }
+
+        currentMasterImei = null;
+        stopMasterSessionMonitoring();
       });
 
       tryBootstrapTicketAuthFromUrl().catch((error) => {
@@ -175,6 +221,9 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
           return;
         }
         if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {
+          return;
+        }
+        if (!ensureMasterSession()) {
           return;
         }
         const senderName = document.getElementById("ticket-sender-name").value.trim();
@@ -234,6 +283,9 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
         if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {
           return;
         }
+        if (!ensureMasterSession()) {
+          return;
+        }
         setStatus("ticket-submit-status", "Verarbeite Debug-Entscheidung...", "");
         const callable = functions.httpsCallable(allowDebug ? "grantDebugAccess" : "skipDebugMode");
         await callable({ ticketId });
@@ -257,6 +309,9 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
           return;
         }
         if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {
+          return;
+        }
+        if (!ensureMasterSession()) {
           return;
         }
         const textarea = document.getElementById("reply-" + ticketId);

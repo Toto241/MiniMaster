@@ -199,7 +199,7 @@ window.sessionManager = new SessionManager();
 - [x] T3-Aktionen zeigen Re-Auth-Modal vor Ausführung *(Dashboard-Gates + Server-Tier)*
 - [x] T4-Aktionen zeigen Re-Auth-Modal + PIN-Eingabe *(Phase 3 — `verifyAdminPin`, Session-Manager)*
 - [x] Admin-PIN kann im Operator-Setup-Tab gesetzt/geändert werden
-- [x] Session-Timeout-Verhalten ist überall konsistent (admin-panel, web-control, parent-panel) *(Master-Panels: 15 Min Idle + 8h Limit via `shared-ui-session-manager.js`)*
+- [x] Session-Timeout-Verhalten ist überall konsistent (admin-panel, web-control, parent-panel, child-panel) *(Master-Panels via `shared-ui-session-manager.js`)*
 - [x] Server-seitiges Action-Gating via `requireTier()` für kritische Cloud Functions *(Phase 2)*
 - [x] Tests decken Timeout-Pfade und Re-Auth-Flows ab *(Unit-Tests Phase 1/2)*
 

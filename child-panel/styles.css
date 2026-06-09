@@ -149,3 +149,26 @@
     .reply-input {
       min-block-size: 80px;
     }
+
+    .session-expiry-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10050;
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    .session-expiry-banner--warning {
+      background: #fef3c7;
+      color: #92400e;
+      border-bottom: 1px solid #fcd34d;
+    }
+    .session-expiry-banner--error {
+      background: #fee2e2;
+      color: #991b1b;
+      border-bottom: 1px solid #fca5a5;
+    }
