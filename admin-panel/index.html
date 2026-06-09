@@ -1703,6 +1703,41 @@
                             </div>
                         </div>
 
+                        <div id="qa-release-doctor-card" class="setup-card admin-only qa-workspace-card mm-u029">
+                            <div class="qa-workspace-header">
+                                <div>
+                                    <h3>Release Doctor</h3>
+                                    <p>Gebündelter Status aus Preflight, PlayStore-Protokoll, Fertigungsstand, Admin-QA, GitHub Security und Workflow-Runs.</p>
+                                </div>
+                                <div class="setup-actions mm-u031">
+                                    <button data-action="loadReleaseDoctor" class="btn btn-primary" title="Release Doctor jetzt ausführen">Jetzt pruefen</button>
+                                    <button data-action="exportReleaseDoctor" class="btn btn-secondary" title="Letzten Release-Doctor-Report als JSON herunterladen">JSON exportieren</button>
+                                </div>
+                            </div>
+                            <div id="release-doctor-summary" class="data-list qa-test-workspace-status mm-u031">
+                                <div class="info">Noch kein Release-Doctor-Report geladen.</div>
+                            </div>
+                            <div id="release-doctor-sections" class="qa-test-metrics mm-u031">
+                                <div class="info">Die Einzelergebnisse erscheinen nach dem ersten Lauf.</div>
+                            </div>
+                            <div class="python-automation-separation-hint">
+                                <strong>Externe Gates bleiben manuell/external:</strong>
+                                <ul>
+                                    <li>GitHub Code Scanning repository setting</li>
+                                    <li>CodeQL green run evidence</li>
+                                    <li>Android CI green run evidence</li>
+                                    <li>Firebase key rotation</li>
+                                    <li>Play Console Data Safety / IARC / Permissions / App Access</li>
+                                    <li>physical commissioning sign-off</li>
+                                    <li>on-call roster and reachability</li>
+                                    <li>final production deploy evidence</li>
+                                </ul>
+                            </div>
+                            <div id="release-doctor-blockers" class="data-list mm-u036">
+                                <div class="info">Blocker werden nach dem ersten Lauf angezeigt.</div>
+                            </div>
+                        </div>
+
                         <div id="qa-section-heading" class="qa-section-heading">
                             <h3>QA-Arbeitsfläche</h3>
                             <p>Eine fokussierte Sicht auf reale Läufe, offene Fehler, strukturierte Details und belastbare Folgeaktionen.</p>

@@ -7156,6 +7156,19 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/qa/release-workspace":
             return self._write_json(HTTPStatus.OK, build_qa_release_workspace())
 
+        if parsed.path == "/api/release-doctor":
+            try:
+                from release_doctor import DEFAULT_JSON_OUT, DEFAULT_MARKDOWN_OUT, build_release_doctor, write_outputs  # type: ignore
+                payload = build_release_doctor()
+                write_outputs(payload, DEFAULT_JSON_OUT, DEFAULT_MARKDOWN_OUT)
+                payload["files"] = {
+                    "json": str(DEFAULT_JSON_OUT),
+                    "markdown": str(DEFAULT_MARKDOWN_OUT),
+                }
+                return self._write_json(HTTPStatus.OK, payload)
+            except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
         if parsed.path == "/api/jobs":
             query = parse_qs(parsed.query)
             limit = parse_int(query.get("limit", [25])[0], 25, min_value=1, max_value=200)

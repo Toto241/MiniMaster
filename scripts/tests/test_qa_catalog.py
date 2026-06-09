@@ -22,6 +22,7 @@ class TestQaCatalog:
         assert "suiteEntries" in result
         assert "inventoryEntries" in result
         assert "automationBacklog" in result
+        assert "classificationTypes" in result
 
     def test_execution_profiles_cover_minimal_standard_full(self):
         result = build_qa_catalog()
@@ -51,6 +52,30 @@ class TestQaCatalog:
         assert suite_entries["android-e2e-shell-script"]["testLevel"] == "system"
         assert suite_entries["android-unit-master"]["appRole"] == "parent"
         assert "full" in suite_entries["android-e2e-shell-script"]["executionProfiles"]
+
+    def test_suite_entries_include_release_automation_metadata(self):
+        result = build_qa_catalog()
+        suite_entries = {entry["id"]: entry for entry in result["suiteEntries"]}
+
+        backend = suite_entries["backend-jest"]
+        assert backend["automationType"] == "automated"
+        assert backend["environmentRequirement"] == "lokaler Host/CI"
+        assert backend["evidenceTarget"] == "build/test-automation/latest-summary.json"
+        assert backend["migrationPriority"] == backend["priority"]
+
+        e2e = suite_entries["android-e2e-shell-script"]
+        assert e2e["automationType"] == "automated-with-device-prereqs"
+        assert e2e["environmentRequirement"] == "zwei ADB-Targets oder Dual-AVD-Konfiguration"
+        assert e2e["evidenceTarget"] == "build/test-automation/latest-summary.json"
+        assert e2e["migrationPriority"] == e2e["priority"]
+
+    def test_classification_types_cover_automation_manual_and_external(self):
+        result = build_qa_catalog()
+        classifications = {entry["classification"] for entry in result["classificationTypes"]}
+        automation_types = {entry["automationType"] for entry in result["classificationTypes"]}
+
+        assert {"automation", "manual", "external"}.issubset(classifications)
+        assert {"automated", "manual", "external"}.issubset(automation_types)
 
     def test_android_scenario_mappings_reference_known_scenarios(self):
         result = build_qa_catalog()
