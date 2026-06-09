@@ -80,7 +80,7 @@ MANUAL_TO_AUTOMATION_CANDIDATES = (
 )
 
 EXTERNAL_GATES = (
-    "GitHub Actions Billing/Spending-Limit",
+    "GitHub Code Scanning repository setting",
     "CodeQL green run evidence",
     "Android CI green run evidence",
     "Firebase key rotation",
@@ -254,7 +254,7 @@ def evaluate() -> dict[str, object]:
         area="Release Gates",
         title="External release gates must be separated from automated tests",
         evidence=f"visible_external_gates={external_gate_visibility}",
-        recommendation="Do not mark Billing, Play Console, Firebase Console or physical sign-off as automatically passed.",
+        recommendation="Do not mark GitHub settings, Play Console, Firebase Console or physical sign-off as automatically passed.",
     ))
 
     qa_catalog_has_automation_status = "automation" in qa_catalog.lower() and "manual" in qa_catalog.lower()
