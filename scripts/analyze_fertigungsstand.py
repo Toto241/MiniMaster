@@ -71,14 +71,21 @@ def collect_findings() -> list[Finding]:
     code_scanning_blocker = contains(ci, "Code Scanning not enabled") or contains(release, "Code Scanning not enabled")
     codeql_success = contains(ci, "CodeQL Security Analysis", "Latest status: completed / success")
     android_success = contains(ci, "Android CI", "Latest status: completed / success")
+    codeql_status = (
+        "blocked_external"
+        if code_scanning_blocker
+        else status_from_bool(codeql_success, billing_blocker)
+    )
 
     findings.append(Finding(
         area="CI / Security Gate",
-        status=status_from_bool(codeql_success, billing_blocker or code_scanning_blocker),
+        status=codeql_status,
         severity="P0",
         title="Current CodeQL evidence is required before release",
         evidence=(
-            "GitHub Code Scanning is not enabled in repository settings"
+            "CodeQL workflow is green, but GitHub Code Scanning API is still disabled in repository settings"
+            if codeql_success and code_scanning_blocker
+            else "GitHub Code Scanning is not enabled in repository settings"
             if code_scanning_blocker
             else "CI_REVALIDATION_LATEST.md reports a billing/spending-limit blocker"
             if billing_blocker
@@ -106,7 +113,11 @@ def collect_findings() -> list[Finding]:
         next_action="Run an authenticated deploy with production runtime config, capture the deployment reference, and update the evidence register.",
     ))
 
-    commissioning_done = contains(release, "android-apps", "✅") and not contains(release, "No connected Android device or emulator")
+    commissioning_done = bool(re.search(
+        r"^\|\s*android-apps\b[^|]*\|\s*✅\s*\|",
+        release,
+        flags=re.IGNORECASE | re.MULTILINE,
+    ))
     findings.append(Finding(
         area="Android Commissioning",
         status=status_from_bool(commissioning_done),
