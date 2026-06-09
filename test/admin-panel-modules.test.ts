@@ -125,6 +125,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "operatorConfig",
       "operatorEffective",
       "platformQaReadiness",
+      "pricingLookup",
       "pythonAutomationActions",
       "qaTestingRegister",
       "sanitize",
@@ -1817,14 +1818,14 @@ describe("admin-panel module wiring", () => {
     }
   });
 
-  it("Fassade swappt 28 Funktionen in simulierter Browser-Reihenfolge", async () => {
+  it("Fassade swappt 29 Funktionen in simulierter Browser-Reihenfolge", async () => {
     // Simuliere: 1. app.js parst & deklariert Originale, 2. Module registrieren MM,
     // 3. DOMContentLoaded -> _mmInstallFacade ersetzt globale Funktionsbindings.
     const sandboxGlobal: any = {};
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(28);
+    expect(sandboxGlobal.MM.list().length).toBe(29);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der geswappten Funktionen taucht im app.js

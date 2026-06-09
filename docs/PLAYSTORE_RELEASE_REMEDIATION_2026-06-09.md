@@ -6,14 +6,14 @@ This note records the remediation pass for the nine release-readiness areas and 
 
 | # | Area | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | Android release build path | Fixed repo-side | Added `.github/workflows/android-release.yml`, moved Android modules to `compileSdk 36`, kept `targetSdk 35`, added optional upload-key signing via `MINIMASTER_RELEASE_*` properties/secrets. |
-| 2 | Dependency/security alerts | Fixed repo-side | Refreshed Gradle security pins and npm/Yarn lockfiles; `npm audit` is clean when run with the local system CA. App-level `protobuf-javalite` force was removed because it caused duplicate classes with Firebase protolite in release bundles; Netty/Logback/BouncyCastle/Commons/Jose pins are set for the remaining Gradle alerts pending dependency-submission refresh. |
+| 1 | Android release build path | Fixed repo-side | Added `.github/workflows/android-release.yml`, moved Android modules to `compileSdk 36`, kept `targetSdk 35`, added optional upload-key signing via `MINIMASTER_RELEASE_*` properties/secrets, and fixed GitHub workflow validation (`actionlint` clean). |
+| 2 | Dependency/security alerts | Fixed repo-side | Refreshed Gradle security pins and npm/Yarn lockfiles; `npm audit` is clean when run with the local system CA. App-level `protobuf-javalite` force was removed because it caused duplicate classes with Firebase protolite in release bundles; Netty/Logback/BouncyCastle/Commons/Jose pins are set. GitHub Dependency Submission now succeeds, but Dependabot still shows remaining Gradle alerts from `settings.gradle`. |
 | 3 | Child Play package ID | Fixed repo-side | Child app `applicationId` changed from `com.google.pairing` to `com.minimaster.childapp`; Kotlin namespace remains `com.google.pairing` until a low-risk package refactor is scheduled. |
 | 4 | Billing acknowledgement | Fixed repo-side | Upgraded to Play Billing Library 8, added pending-purchase params, automatic service reconnection, active subscription query, and acknowledgement after backend verification. |
 | 5 | Sensitive permissions documentation | Updated repo-side | Play permissions checklist and reviewer guide now reflect Accessibility, Usage Access, Overlay, Device Admin, FGS special use, and Camera without claiming Location. |
 | 6 | Data Safety / Privacy mismatch | Updated repo-side | Data Safety template no longer declares Location for the current Android release and marks CodeQL/Deletion URL as release gates. |
 | 7 | Tracked credentials | Fixed current tree | Removed tracked Firebase Admin SDK/app config JSON files and hardened `.gitignore`; history and real keys still require external rotation. |
-| 8 | Git/GitHub blocker | Diagnosed | Local Git is clean; GitHub Code Scanning is disabled and API activation returns HTTP 403. Dependabot showed 47 open alerts before this branch is pushed and dependency graph refreshes. |
+| 8 | Git/GitHub blocker | Diagnosed/fixed where repo-side | Local Git is clean and `main` is pushed. The empty Android Release Bundles failure was a workflow validation error (`runner.temp` in job-level `env`) and is fixed. GitHub Code Scanning is still disabled and API activation returns HTTP 403. Dependabot still reports remaining Gradle alerts from `settings.gradle` after dependency submission. |
 | 9 | Release evidence | Updated repo-side | Release evidence register and security baseline document the 2026-06-09 state and remaining external gates. |
 
 ## External Gates Still Required

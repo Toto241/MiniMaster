@@ -119,7 +119,12 @@ jobs:
         run: echo "Instrumentation tests are typically run on emulator; configure matrix if needed."
       - name: Jacoco report
         if: steps.network-check.outputs.available == 'true'
-        run: ./scripts/run-android-checks.sh jacocoTestReport
+        run: |
+          if ./scripts/run-android-checks.sh tasks --all --no-daemon | grep -qE '(^|[[:space:]])jacocoTestReport([[:space:]]|$)'; then
+            ./scripts/run-android-checks.sh jacocoTestReport
+          else
+            echo "::notice::No jacocoTestReport task is configured; skipping Android coverage report."
+          fi
       - name: Upload reports
         if: steps.network-check.outputs.available == 'true'
         uses: actions/upload-artifact@v4
