@@ -48,7 +48,15 @@ module.exports = {
       },
     },
     {
-      files: ["shared-ui-tooltips.js", "start.js", "parent-panel/app.js", "child-panel/app.js", "web-control/app.js", "admin-panel/app.js"],
+      files: [
+        "shared-ui-session-manager.js",
+        "shared-ui-tooltips.js",
+        "start.js",
+        "parent-panel/app.js",
+        "child-panel/app.js",
+        "web-control/app.js",
+        "admin-panel/app.js",
+      ],
       env: {
         browser: true,
       },

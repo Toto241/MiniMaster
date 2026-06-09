@@ -31,7 +31,9 @@
     "pages:privacy:setup": "pwsh ./scripts/setup-github-pages.ps1",
     "preflight": "python scripts/preflight.py",
     "preflight:json": "python scripts/preflight.py --json",
-    "setup": "python scripts/setup_init.py"
+    "setup": "python scripts/setup_init.py",
+    "playstore:protocol": "python scripts/playstore_compliance_protocol.py",
+    "playstore:protocol:gate": "python scripts/playstore_compliance_protocol.py --fail-on-open"
   },
   "keywords": [],
   "author": "",

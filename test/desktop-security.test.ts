@@ -25,7 +25,7 @@ jest.mock("electron", () => ({
   BrowserWindow: Object.assign(jest.fn(), { getAllWindows: jest.fn(() => []) }),
   shell: { openExternal: jest.fn() },
   ipcMain: { handle: jest.fn() },
-}));
+}), { virtual: true });
 
 describe("Desktop CLI security helpers", () => {
   const loadModule = () => loadDesktopModule("../desktop/main.js") as Record<string, any>;
