@@ -55,7 +55,7 @@ ARTIFACT_PROMPTS: list[tuple[str, str, tuple[str, ...]]] = [
     ),
     (
         "googleServicesChild",
-        "Pfad zu childApp google-services.json (Package com.google.pairing)",
+        "Pfad zu childApp google-services.json (Package com.minimaster.childapp)",
         ("google-services.json", "childApp-google-services.json"),
     ),
     (

@@ -1048,6 +1048,7 @@ let androidCompatibilityFormDraft = {
     timeoutSec: "3600",
 };
 let suiteRunHistoryPayload = [];
+let releaseDoctorPayload = null;
 let qaDashboardLoadPromise = null;
 let qaTestWorkspaceSelection = { kind: "", id: "" };
 let qaRefreshState = {
@@ -1088,7 +1089,7 @@ const commissioningQaRegisterDefinitions = [
     { key: "functions-enabled", label: "Cloud Functions aktiviert", automationType: "automatic" },
     { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt", automationType: "manual" },
     { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert", automationType: "manual" },
-    { key: "android-child-registered", label: "Android-App com.google.pairing registriert", automationType: "manual" },
+    { key: "android-child-registered", label: "Android-App com.minimaster.childapp registriert", automationType: "manual" },
     { key: "ios-master-registered", label: "iOS-App MiniMasterParent registriert (App Store Connect)", automationType: "manual" },
     { key: "ios-child-registered", label: "iOS-App MiniMasterChild registriert (App Store Connect + Family Controls)", automationType: "manual" },
     { key: "firebase-project-bound", label: "firebase use --add lokal durchgeführt", automationType: "automatic" },
@@ -1546,6 +1547,125 @@ function updateQaRefreshSummary(reason, sectionResults = []) {
         ? `${successCount}/${sectionResults.length} QA-Bereiche geladen, ${errorCount} mit Fehler.`
         : `${successCount}/${sectionResults.length} QA-Bereiche erfolgreich synchronisiert.`;
     renderQaRefreshStatus();
+}
+
+function getReleaseDoctorStatusClass(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "pass") return "success-box";
+    if (normalized === "warn" || normalized === "unknown") return "info";
+    return "error";
+}
+
+function formatReleaseDoctorStatus(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "pass") return "OK";
+    if (normalized === "warn") return "Warnung";
+    if (normalized === "blocked_external") return "Extern blockiert";
+    if (normalized === "unknown") return "Unbekannt";
+    if (normalized === "fail") return "Blockiert";
+    return status || "-";
+}
+
+function renderReleaseDoctor(payload) {
+    const summaryEl = document.getElementById("release-doctor-summary");
+    const sectionsEl = document.getElementById("release-doctor-sections");
+    const blockersEl = document.getElementById("release-doctor-blockers");
+    if (!summaryEl || !sectionsEl || !blockersEl) return;
+
+    const data = payload && typeof payload === "object" ? payload : {};
+    const summary = data.summary || {};
+    const sections = Array.isArray(data.sections) ? data.sections : [];
+    const git = data.git || {};
+    const ready = Boolean(summary.releaseReady);
+    const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString("de-DE") : "-";
+
+    summaryEl.innerHTML =
+        `<div class='${ready ? "success-box" : "error"}'>` +
+        `<p><strong>Status:</strong> ${ready ? "Release Doctor gruen" : "Release Doctor blockiert"}</p>` +
+        `<p><strong>Checks:</strong> ${escapeHtml(String(summary.passedCount || 0))}/${escapeHtml(String(summary.totalCount || sections.length))} bestanden; ` +
+        `Blocker: ${escapeHtml(String(summary.hardBlockerCount || 0))}; Warnungen: ${escapeHtml(String(summary.warningCount || 0))}</p>` +
+        `<p><strong>Commit:</strong> <code>${escapeHtml(String(git.shortHead || ""))}</code> ${git.dirty ? "(lokale Aenderungen vorhanden)" : ""}</p>` +
+        `<p><strong>Aktualisiert:</strong> ${escapeHtml(generated)}</p>` +
+        `</div>`;
+
+    sectionsEl.innerHTML = sections.map(section => {
+        const status = String(section.status || "");
+        const boxClass = getReleaseDoctorStatusClass(status);
+        return (
+            `<div class='python-automation-metric ${boxClass}'>` +
+            `<span>${escapeHtml(String(section.title || section.id || "-"))}</span>` +
+            `<strong>${escapeHtml(formatReleaseDoctorStatus(status))}</strong>` +
+            `<small>${escapeHtml(String(section.summary || ""))}</small>` +
+            `</div>`
+        );
+    }).join("") || "<div class='info'>Keine Release-Doctor-Sektionen vorhanden.</div>";
+
+    const blockerRows = [];
+    sections.forEach(section => {
+        const blockers = Array.isArray(section.blockers) ? section.blockers : [];
+        blockers.forEach(blocker => {
+            blockerRows.push({
+                section: String(section.title || section.id || "-"),
+                title: String(blocker.title || blocker.id || blocker.name || blocker.package || "-"),
+                detail: String(blocker.nextAction || blocker.recommendation || blocker.details || blocker.fixHint || blocker.url || ""),
+            });
+        });
+    });
+
+    if (blockerRows.length === 0) {
+        blockersEl.innerHTML = "<div class='success-box'>Keine Release-Doctor-Blocker gemeldet.</div>";
+        return;
+    }
+
+    blockersEl.innerHTML =
+        "<table><tr><th>Bereich</th><th>Blocker</th><th>Naechste Aktion</th></tr>" +
+        blockerRows.map(row => (
+            `<tr>` +
+            `<td>${escapeHtml(row.section)}</td>` +
+            `<td>${escapeHtml(row.title)}</td>` +
+            `<td>${escapeHtml(row.detail || "-")}</td>` +
+            `</tr>`
+        )).join("") +
+        "</table>";
+}
+
+async function loadReleaseDoctor() {
+    const summaryEl = document.getElementById("release-doctor-summary");
+    if (summaryEl) summaryEl.innerHTML = "<div class='loading'>Release Doctor laeuft...</div>";
+
+    try {
+        const response = await fetch("/api/release-doctor", { cache: "no-store" });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `HTTP ${response.status}`);
+        }
+        releaseDoctorPayload = await response.json();
+        renderReleaseDoctor(releaseDoctorPayload);
+        showNotification("Release Doctor aktualisiert.", "success");
+    } catch (error) {
+        console.error("Release Doctor failed:", error);
+        if (summaryEl) {
+            summaryEl.innerHTML = `<div class='error'>Release Doctor fehlgeschlagen: ${escapeHtml(error.message || String(error))}</div>`;
+        }
+        showNotification("Release Doctor fehlgeschlagen.", "error");
+    }
+}
+
+function exportReleaseDoctor() {
+    if (!releaseDoctorPayload) {
+        showNotification("Bitte zuerst den Release Doctor ausfuehren.", "warning");
+        return;
+    }
+    const blob = new Blob([JSON.stringify(releaseDoctorPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "release-doctor-" + safeDate + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 function getQaDashboardSectionLoaders() {
@@ -9179,7 +9299,7 @@ const setupWizards = {
         steps: [
             {
                 title: "1. App installieren",
-                instruction: "Installieren Sie die ChildApp auf dem Kind-Smartphone. Paketname: <strong>com.google.pairing</strong> (Legacy-Paketname).",
+                instruction: "Installieren Sie die ChildApp auf dem Kind-Smartphone. Paketname: <strong>com.minimaster.childapp</strong>.",
                 detail: "Für Tests: <code>gradlew.bat :childApp:assembleDebug</code>. Per ADB installieren: <code>adb install childApp/build/outputs/apk/debug/childApp-debug.apk</code>.",
             },
             {
@@ -9551,7 +9671,7 @@ function extractFirebaseConfigFromGoogleServices(rawConfig, metaOut = null) {
 
     const preferredClient = clients.find(client => {
         const packageName = client?.client_info?.android_client_info?.package_name;
-        return packageName === "com.google.pairing";
+        return packageName === "com.minimaster.childapp";
     }) || clients[0];
 
     const selectedPackageName = String(preferredClient?.client_info?.android_client_info?.package_name || "").trim();
@@ -17628,6 +17748,7 @@ function loadAutomationDashboard() {
     }
 
     try {
+        syncAutomationConfigForm(auto);
         const health = auto.computeSystemHealth();
         if (healthCard) {
             const statusClass = health.status === "healthy" ? "status-active" : health.status === "degraded" ? "status-expired" : "status-expired";
@@ -17689,6 +17810,100 @@ function loadAutomationDashboard() {
 
 // ==================== AUTOMATION ACTION HANDLER ====================
 
+function showAutomationConfigStatus(message, isError = false) {
+    const statusEl = document.getElementById("automation-config-status");
+    if (!statusEl) return;
+    statusEl.innerHTML = `<div class="${isError ? "error" : "success-box"}">${escapeHtml(message)}</div>`;
+}
+
+function getAutomationConfigDefaults(auto) {
+    return {
+        model: auto && auto.DEFAULT_MODEL ? auto.DEFAULT_MODEL : "gemini-3.0-flash",
+        promptTemplate: auto && auto.DEFAULT_PROMPT_TEMPLATE ? auto.DEFAULT_PROMPT_TEMPLATE : "",
+        autoMode: false,
+    };
+}
+
+function getAutomationConfigFormValues(auto) {
+    const defaults = getAutomationConfigDefaults(auto);
+    const modelEl = document.getElementById("automation-model");
+    const promptEl = document.getElementById("automation-prompt-template");
+    const autoModeEl = document.getElementById("automation-auto-mode");
+    const model = String(modelEl && modelEl.value ? modelEl.value : defaults.model).trim() || defaults.model;
+    const promptTemplate = promptEl && promptEl.value ? promptEl.value : defaults.promptTemplate;
+    return {
+        model,
+        promptTemplate,
+        autoMode: Boolean(autoModeEl && autoModeEl.checked),
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+function setAutomationConfigFormValues(config, auto) {
+    const defaults = getAutomationConfigDefaults(auto);
+    const value = { ...defaults, ...(config || {}) };
+    const modelEl = document.getElementById("automation-model");
+    const promptEl = document.getElementById("automation-prompt-template");
+    const autoModeEl = document.getElementById("automation-auto-mode");
+    if (modelEl) modelEl.value = value.model || defaults.model;
+    if (promptEl) promptEl.value = value.promptTemplate || defaults.promptTemplate;
+    if (autoModeEl) autoModeEl.checked = Boolean(value.autoMode);
+}
+
+function syncAutomationConfigForm(auto) {
+    const fields = [
+        document.getElementById("automation-model"),
+        document.getElementById("automation-prompt-template"),
+        document.getElementById("automation-auto-mode"),
+    ].filter(Boolean);
+    if (fields.includes(document.activeElement)) return;
+    const config = auto && typeof auto.getGeminiConfig === "function" ? auto.getGeminiConfig() : {};
+    setAutomationConfigFormValues(config, auto);
+}
+
+function saveAutomationConfigFromUi(auto) {
+    if (!auto || typeof auto.setGeminiConfig !== "function") {
+        throw new Error("Automatisierungs-Konfiguration kann nicht gespeichert werden.");
+    }
+    const values = getAutomationConfigFormValues(auto);
+    const saved = auto.setGeminiConfig(values);
+    if (typeof auto.appendLog === "function") {
+        auto.appendLog({
+            type: "config-updated",
+            model: saved.model,
+            autoMode: Boolean(saved.autoMode),
+        });
+    }
+    setAutomationConfigFormValues(saved, auto);
+    showAutomationConfigStatus(`Konfiguration gespeichert. Modell: ${saved.model}; Auto-Modus: ${saved.autoMode ? "aktiv" : "inaktiv"}.`);
+    return saved;
+}
+
+function resetAutomationConfigUi(auto) {
+    if (!auto || typeof auto.setGeminiConfig !== "function") {
+        throw new Error("Automatisierungs-Konfiguration kann nicht zurueckgesetzt werden.");
+    }
+    const defaults = {
+        ...getAutomationConfigDefaults(auto),
+        updatedAt: new Date().toISOString(),
+    };
+    const saved = auto.setGeminiConfig(defaults);
+    if (typeof auto.appendLog === "function") {
+        auto.appendLog({ type: "config-reset", model: saved.model, autoMode: Boolean(saved.autoMode) });
+    }
+    setAutomationConfigFormValues(saved, auto);
+    showAutomationConfigStatus("Konfiguration auf Standardwerte zurueckgesetzt.");
+    return saved;
+}
+
+function toggleAutomationAutoMode(auto) {
+    const autoModeEl = document.getElementById("automation-auto-mode");
+    if (autoModeEl) autoModeEl.checked = !autoModeEl.checked;
+    const saved = saveAutomationConfigFromUi(auto);
+    showAutomationConfigStatus(`Auto-Modus ${saved.autoMode ? "aktiviert" : "deaktiviert"}.`);
+    return saved;
+}
+
 async function handleAutomationAction(action, evt) {
     const MM = window.MM;
     const auto = MM && MM.autoManagement ? MM.autoManagement : null;
@@ -17734,6 +17949,21 @@ async function handleAutomationAction(action, evt) {
                 pending.forEach((a) => auto.removePendingAction(a.id));
                 showResult(`${pending.length} ausstehende Aktionen gelöscht.`);
                 loadAutomationDashboard();
+                break;
+            }
+            case "automationSaveConfig": {
+                const saved = saveAutomationConfigFromUi(auto);
+                showResult(`Konfiguration gespeichert. Modell: ${saved.model}; Auto-Modus: ${saved.autoMode ? "aktiv" : "inaktiv"}.`);
+                break;
+            }
+            case "automationResetConfig": {
+                const saved = resetAutomationConfigUi(auto);
+                showResult(`Standardwerte wiederhergestellt. Modell: ${saved.model}; Auto-Modus: ${saved.autoMode ? "aktiv" : "inaktiv"}.`);
+                break;
+            }
+            case "automationToggleAutoMode": {
+                const saved = toggleAutomationAutoMode(auto);
+                showResult(`Auto-Modus ${saved.autoMode ? "aktiviert" : "deaktiviert"}.`);
                 break;
             }
             case "automationSaveApiKey": {
@@ -17833,6 +18063,9 @@ if (typeof document !== "undefined") {
             "automationErrorAnalysis",
             "automationProposeFixes",
             "automationClearPending",
+            "automationSaveConfig",
+            "automationResetConfig",
+            "automationToggleAutoMode",
             "automationSaveApiKey",
             "automationClearApiKey",
             "automationRefreshLogs",

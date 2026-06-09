@@ -507,7 +507,7 @@
             const androidApps = [];
             for (const app of (androidList.apps || [])) {
                 const pkg = app.packageName || "";
-                if (pkg !== "com.minimaster.masterapp" && pkg !== "com.google.pairing") continue;
+                if (pkg !== "com.minimaster.masterapp" && pkg !== "com.minimaster.childapp") continue;
                 if (!app.appId) continue;
                 const cfg = await fetchOAuthJson(`/projects/${encodeURIComponent(projectId)}/androidApps/${encodeURIComponent(app.appId)}/config`);
                 const b64 = cfg.configFileContents || "";
@@ -659,7 +659,7 @@
                 _firebaseImportedArtifacts.googleServicesMaster = app.fileContents;
                 markArtifactImported("googleServicesMaster", pkg);
                 masterAssigned = true;
-            } else if (pkg === "com.google.pairing" && !childAssigned) {
+            } else if (pkg === "com.minimaster.childapp" && !childAssigned) {
                 _firebaseImportedArtifacts.googleServicesChild = app.fileContents;
                 markArtifactImported("googleServicesChild", pkg);
                 childAssigned = true;
@@ -845,7 +845,7 @@
         const base = `https://console.firebase.google.com/project/${encodeURIComponent(pid)}`;
         setHref("wiz-link-firebase-general", `${base}/settings/general/`);
         setHref("wiz-link-master-gs", `${base}/settings/general/android:com.minimaster.masterapp`);
-        setHref("wiz-link-child-gs", `${base}/settings/general/android:com.google.pairing`);
+        setHref("wiz-link-child-gs", `${base}/settings/general/android:com.minimaster.childapp`);
         setHref("wiz-link-service-account", `${base}/settings/serviceaccounts/adminsdk`);
         setHref("wiz-link-appcheck", `${base}/appcheck/products`);
     }

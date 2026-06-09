@@ -90,11 +90,13 @@ PURPOSE_TEXTS: dict[str, str] = {
     "config-gs-master": (
         "Die Master-App (Eltern, Android) braucht google-services.json "
         "zur Laufzeit, um sich beim Firebase-Backend zu authentifizieren. "
-        "Ohne Datei laesst sich die App nicht bauen."
+        "Ohne Datei oder mit falscher Package-ID laesst sich die App nicht "
+        "zuverlaessig bauen."
     ),
     "config-gs-child": (
         "Gleicher Mechanismus fuer die Child-App (Kindgerät, Android). "
-        "Ohne Datei kein Pairing, kein Telemetrie-Upload."
+        "Ohne Datei oder mit falscher Package-ID kein Play-faehiger Build "
+        "fuer com.minimaster.childapp."
     ),
     "config-service-account": (
         "Setup-Admin-CLI, Firestore-Migrationen, Tests gegen die echte "
@@ -307,32 +309,60 @@ def _has_placeholder(path: Path) -> bool:
     return any(token in text for token in PLACEHOLDER_TOKENS)
 
 
-def check_google_services_master() -> CheckResult:
-    p = REPO_ROOT / "masterApp" / "google-services.json"
+def _google_services_package_names(path: Path) -> list[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    packages: list[str] = []
+    clients = data.get("client") if isinstance(data, dict) else None
+    if not isinstance(clients, list):
+        return packages
+    for client in clients:
+        info = client.get("client_info") if isinstance(client, dict) else None
+        android_info = info.get("android_client_info") if isinstance(info, dict) else None
+        package_name = android_info.get("package_name") if isinstance(android_info, dict) else None
+        if isinstance(package_name, str) and package_name.strip():
+            packages.append(package_name.strip())
+    return sorted(set(packages))
+
+
+def _check_google_services_file(check_id: str, title: str, relative_path: str, expected_package: str) -> CheckResult:
+    p = REPO_ROOT / relative_path
     if not p.exists():
-        return CheckResult("config-gs-master", "masterApp/google-services.json", "fail", True,
+        return CheckResult(check_id, title, "fail", True,
                            "Datei fehlt (nur Template vorhanden).",
-                           "Aus Firebase-Console fuer Package com.minimaster.masterapp herunterladen.")
+                           f"Aus Firebase-Console fuer Package {expected_package} herunterladen.")
     if _has_placeholder(p):
-        return CheckResult("config-gs-master", "masterApp/google-services.json", "fail", True,
+        return CheckResult(check_id, title, "fail", True,
                            "Enthaelt Platzhalter-Werte.",
                            "Echte google-services.json aus Firebase-Console verwenden.")
-    return CheckResult("config-gs-master", "masterApp/google-services.json", "ok", True,
-                       "Datei vorhanden.")
+    package_names = _google_services_package_names(p)
+    if expected_package not in package_names:
+        found = ", ".join(package_names) if package_names else "keine Package-ID gefunden"
+        return CheckResult(check_id, title, "fail", True,
+                           f"Package-ID {expected_package} fehlt; gefunden: {found}.",
+                           f"In Firebase eine Android-App fuer {expected_package} anlegen und google-services.json neu herunterladen.")
+    return CheckResult(check_id, title, "ok", True,
+                       f"Datei vorhanden; Package-ID {expected_package} gefunden.")
+
+
+def check_google_services_master() -> CheckResult:
+    return _check_google_services_file(
+        "config-gs-master",
+        "masterApp/google-services.json",
+        "masterApp/google-services.json",
+        "com.minimaster.masterapp",
+    )
 
 
 def check_google_services_child() -> CheckResult:
-    p = REPO_ROOT / "childApp" / "google-services.json"
-    if not p.exists():
-        return CheckResult("config-gs-child", "childApp/google-services.json", "fail", True,
-                           "Datei fehlt (nur Template vorhanden).",
-                           "Aus Firebase-Console fuer Package com.google.pairing herunterladen.")
-    if _has_placeholder(p):
-        return CheckResult("config-gs-child", "childApp/google-services.json", "fail", True,
-                           "Enthaelt Platzhalter-Werte.",
-                           "Echte google-services.json aus Firebase-Console verwenden.")
-    return CheckResult("config-gs-child", "childApp/google-services.json", "ok", True,
-                       "Datei vorhanden.")
+    return _check_google_services_file(
+        "config-gs-child",
+        "childApp/google-services.json",
+        "childApp/google-services.json",
+        "com.minimaster.childapp",
+    )
 
 
 def check_service_account() -> CheckResult:
