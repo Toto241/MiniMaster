@@ -17,6 +17,7 @@ import "./core/nav-bootstrap.js";
 import "./core/global-action-bootstrap.js";
 import "./core/crypto-debug.js";
 import "./core/session-manager.js";
+import "./shared/pricing-lookup.js";
 import "./tabs/legal-playstore.js";
 import "./tabs/qa-testing-register.js";
 import "./tabs/firebase-deployment.js";

@@ -28,12 +28,30 @@ def resolveDebugSecret = { String propertyName ->
     return normalized.replace('\\', '\\\\').replace('"', '\\"')
 }
 
+def resolveReleaseSigningValue = { String propertyName, String envName ->
+    def value = project.findProperty(propertyName) ?: localProperties.getProperty(propertyName) ?: System.getenv(envName)
+    def normalized = value?.toString()?.trim()
+    return normalized ? normalized : null
+}
+
+def releaseStoreFilePath = resolveReleaseSigningValue('release.store.file', 'MINIMASTER_RELEASE_STORE_FILE')
+def releaseStorePassword = resolveReleaseSigningValue('release.store.password', 'MINIMASTER_RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = resolveReleaseSigningValue('release.key.alias', 'MINIMASTER_RELEASE_KEY_ALIAS')
+def releaseKeyPassword = resolveReleaseSigningValue('release.key.password', 'MINIMASTER_RELEASE_KEY_PASSWORD')
+def releaseSigningValues = [releaseStoreFilePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+def hasAnyReleaseSigningValue = releaseSigningValues.any { it != null }
+def hasReleaseSigningConfig = releaseSigningValues.every { it != null }
+
+if (hasAnyReleaseSigningValue && !hasReleaseSigningConfig) {
+    throw new GradleException("Incomplete release signing configuration for childApp. Provide release.store.file, release.store.password, release.key.alias, and release.key.password or the MINIMASTER_RELEASE_* environment variables.")
+}
+
 android {
-    compileSdk 35
+    compileSdk 36
     namespace "com.google.pairing"
 
     defaultConfig {
-        applicationId "com.google.pairing"
+        applicationId "com.minimaster.childapp"
         minSdk 24
         targetSdk 35
         versionCode 2
@@ -47,9 +65,23 @@ android {
         buildConfigField("String", "DEBUG_SESSION_SECRET_CHILD", "\"${debugSecretChild}\"")
     }
 
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            release {
+                storeFile rootProject.file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
+            if (hasReleaseSigningConfig) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -86,19 +118,20 @@ dependencies {
     // These override versions pulled in by Firebase/BoM transitive chains.
     constraints {
         // Netty — decompression bomb, HTTP/2 frame flood, request smuggling, desync (GHSA-2025)
-        implementation('io.netty:netty-codec-http2:4.1.118.Final')
-        implementation('io.netty:netty-codec-http:4.1.118.Final')
-        implementation('io.netty:netty-codec:4.1.118.Final')
-        implementation('io.netty:netty-common:4.1.118.Final')
-        implementation('io.netty:netty-buffer:4.1.118.Final')
-        implementation('io.netty:netty-transport:4.1.118.Final')
-        implementation('io.netty:netty-handler:4.1.118.Final')
+        implementation('io.netty:netty-codec-http2:4.1.135.Final')
+        implementation('io.netty:netty-codec-http:4.1.135.Final')
+        implementation('io.netty:netty-codec:4.1.135.Final')
+        implementation('io.netty:netty-common:4.1.135.Final')
+        implementation('io.netty:netty-buffer:4.1.135.Final')
+        implementation('io.netty:netty-transport:4.1.135.Final')
+        implementation('io.netty:netty-handler:4.1.135.Final')
 
         // Protobuf — uncontrolled resource consumption (CVE-2024-7254)
         implementation('com.google.protobuf:protobuf-javalite:4.30.2')
 
         // BouncyCastle — timing channel (CVE-2024-29857)
-        implementation('org.bouncycastle:bcprov-jdk18on:1.80')
+        implementation('org.bouncycastle:bcprov-jdk18on:1.84')
+        implementation('org.bouncycastle:bcpkix-jdk18on:1.84')
 
         // jose4j — DoS via compressed JWE (CVE-2024-21907)
         implementation('org.bitbucket.b_c:jose4j:0.9.6')

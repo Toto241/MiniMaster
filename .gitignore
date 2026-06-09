@@ -29,8 +29,11 @@ scripts/security-test.env
 
 # Firebase app configs (must never be committed)
 **/google-services.json
+*_google-services.json
 **/GoogleService-Info.plist
 serviceAccountKey.json
+serviceAccountKey*.json
+*firebase-adminsdk*.json
 # Keep only safe templates in git
 !**/google-services.template.json
 !**/serviceAccountKey.template.json
