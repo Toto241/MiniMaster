@@ -9170,7 +9170,7 @@ const setupWizards = {
             {
                 title: "8. Abonnement prüfen",
                 instruction: "Öffnen Sie den <strong>Subscription-Screen</strong>. Prüfen Sie, ob Produkte angezeigt werden und ein Testkauf möglich ist.",
-                detail: "SKUs: single_child_monthly (€1,99), family_monthly (€4,99), single_child_yearly (€19,99), family_yearly (€49,99). Testmodus über Google Play Console aktivieren.",
+                detail: "SKUs (netto, zzgl. MwSt.): single_child_monthly (€4,99/Monat), family_monthly (€9,99/Monat), single_child_yearly (€39,99/Jahr), family_yearly (€79,99/Jahr), family_yearly_premium (€99,99/Jahr). Testmodus über Google Play Console aktivieren.",
             },
         ],
     },
@@ -13966,6 +13966,11 @@ function appendAssistantMessage(text, role) {
 }
 
 function generateOperatorAssistantAnswer(question) {
+    const moduleGenerate = window.MM?.operatorAssistant?.generate;
+    if (typeof moduleGenerate === "function") {
+        return moduleGenerate(question);
+    }
+
     const q = question.toLowerCase();
 
     if (q.includes("admin") || q.includes("claim") || q.includes("rolle")) {
@@ -14017,7 +14022,9 @@ function generateOperatorAssistantAnswer(question) {
     }
 
     if (q.includes("subscription") || q.includes("abo") || q.includes("ablauf") || q.includes("trial")) {
-        return "Subscriptions: In der Übersicht werden Warnungen für ablaufende Trials (<7 Tage) und Abos angezeigt. Im User-Detail sind alle Abo-Infos sichtbar: Typ, Start, Ablauf, Kinderlimit, Purchase-Token. SKUs: single_child_monthly (€1.99), family_monthly (€4.99), single_child_yearly (€19.99), family_yearly (€49.99).";
+        const moduleAnswer = window.MM?.pricingLookup?.buildOperatorSubscriptionAnswerDe?.();
+        if (moduleAnswer) return moduleAnswer;
+        return "Subscriptions: In der Übersicht werden Warnungen für ablaufende Trials (<7 Tage) und Abos angezeigt. Im User-Detail sind alle Abo-Infos sichtbar: Typ, Start, Ablauf, Kinderlimit, Purchase-Token. SKUs (netto): single_child_monthly (€4,99/Monat), family_monthly (€9,99/Monat), single_child_yearly (€39,99/Jahr), family_yearly (€79,99/Jahr), family_yearly_premium (€99,99/Jahr).";
     }
 
     return "Empfohlener Ablauf: 1) Full Validation starten, 2) Fehler zuerst in Firebase-Config/Claims beheben, 3) Firestore/Functions erneut prüfen, 4) Support- und Compliance-Workflow testweise durchlaufen, 5) Setup-Report exportieren.";
@@ -14074,11 +14081,7 @@ function loadStats() {
         let monthlyRevenue = 0;
         snapshot.forEach(doc => {
             const subscriptionType = doc.data().subscription?.type || "";
-
-            if (subscriptionType === "single_child_monthly") monthlyRevenue += 1.99;
-            else if (subscriptionType === "family_monthly") monthlyRevenue += 4.99;
-            else if (subscriptionType === "single_child_yearly") monthlyRevenue += 19.99 / 12;
-            else if (subscriptionType === "family_yearly") monthlyRevenue += 49.99 / 12;
+            monthlyRevenue += getSubscriptionMonthlyRevenueEur(subscriptionType);
         });
 
         document.getElementById("stat-current-revenue").textContent = `€${monthlyRevenue.toFixed(2)}`;
@@ -14460,6 +14463,24 @@ function closeUserDetailsModal() {
 }
 
 // ==================== SUBSCRIPTION MANAGEMENT ====================
+
+function getSubscriptionMonthlyRevenueEur(subscriptionType) {
+    const lookup = window.MM?.pricingLookup;
+    if (lookup?.monthlyRevenueEur) {
+        return lookup.monthlyRevenueEur(subscriptionType);
+    }
+    const fallbackNetCents = {
+        single_child_monthly: 499,
+        family_monthly: 999,
+        single_child_yearly: 3999,
+        family_yearly: 7999,
+        family_yearly_premium: 9999,
+    };
+    const cents = fallbackNetCents[subscriptionType];
+    if (!cents) return 0;
+    const yearly = subscriptionType.includes("yearly");
+    return (yearly ? Math.round(cents / 12) : cents) / 100;
+}
 
 function filterSubscriptions(status) {
     currentSubFilter = status;

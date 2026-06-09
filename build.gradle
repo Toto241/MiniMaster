@@ -27,7 +27,7 @@ allprojects {
     configurations.all {
         resolutionStrategy {
             // Force specific versions of transitive dependencies to mitigate CVEs
-            // Updated December 2025 to address all known vulnerabilities
+            // Updated June 2026 to keep GitHub dependency alerts below release-blocker level.
             // Reference: https://github.com/Toto241/MiniMaster/security/dependabot
 
             // ============================================================
@@ -51,25 +51,30 @@ allprojects {
             // ============================================================
             // NETTY - Multiple CVEs (HTTP/2 DDoS, SslHandler crash, etc.)
             // ============================================================
-            force 'io.netty:netty-handler:4.1.116.Final'
-            force 'io.netty:netty-codec:4.1.116.Final'
-            force 'io.netty:netty-codec-http:4.1.116.Final'
-            force 'io.netty:netty-codec-http2:4.1.116.Final'
-            force 'io.netty:netty-common:4.1.116.Final'
-            force 'io.netty:netty-buffer:4.1.116.Final'
-            force 'io.netty:netty-transport:4.1.116.Final'
-            force 'io.netty:netty-resolver:4.1.116.Final'
+            force 'io.netty:netty-handler:4.1.135.Final'
+            force 'io.netty:netty-codec:4.1.135.Final'
+            force 'io.netty:netty-codec-http:4.1.135.Final'
+            force 'io.netty:netty-codec-http2:4.1.135.Final'
+            force 'io.netty:netty-common:4.1.135.Final'
+            force 'io.netty:netty-buffer:4.1.135.Final'
+            force 'io.netty:netty-transport:4.1.135.Final'
+            force 'io.netty:netty-resolver:4.1.135.Final'
 
             // ============================================================
             // LOGBACK - CVE-2023-6378, CVE-2024-12798 (Serialization & Code Execution)
             // ============================================================
-            force 'ch.qos.logback:logback-core:1.5.15'
-            force 'ch.qos.logback:logback-classic:1.5.15'
+            force 'ch.qos.logback:logback-core:1.5.19'
+            force 'ch.qos.logback:logback-classic:1.5.19'
 
             // ============================================================
             // APACHE COMMONS COMPRESS - CVE-2024-25710, CVE-2024-26308
             // ============================================================
             force 'org.apache.commons:commons-compress:1.27.1'
+
+            // ============================================================
+            // APACHE COMMONS IO - XML parsing denial-of-service advisories
+            // ============================================================
+            force 'commons-io:commons-io:2.18.0'
 
             // ============================================================
             // GUAVA - CVE-2023-2976, CVE-2020-8908 (Temp directory & info disclosure)
@@ -113,6 +118,11 @@ allprojects {
             force 'com.nimbusds:nimbus-jose-jwt:9.47'
 
             // ============================================================
+            // JOSE4J - compressed JWE denial-of-service advisory
+            // ============================================================
+            force 'org.bitbucket.b_c:jose4j:0.9.6'
+
+            // ============================================================
             // REACTOR NETTY - CVE-2023-34062
             // ============================================================
             force 'io.projectreactor.netty:reactor-netty-http:1.2.1'
@@ -130,8 +140,8 @@ allprojects {
             // ============================================================
             // BOUNCYCASTLE - Cryptography security updates
             // ============================================================
-            force 'org.bouncycastle:bcprov-jdk18on:1.79'
-            force 'org.bouncycastle:bcpkix-jdk18on:1.79'
+            force 'org.bouncycastle:bcprov-jdk18on:1.84'
+            force 'org.bouncycastle:bcpkix-jdk18on:1.84'
         }
     }
 }

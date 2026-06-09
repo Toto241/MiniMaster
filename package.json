@@ -44,7 +44,21 @@
     "google-gax": "^5.0.6",
     "gaxios": "^7.0.0",
     "teeny-request": "^10.0.0",
-    "retry-request": "^8.0.0"
+    "retry-request": "^8.0.0",
+    "protobufjs": "^7.5.6",
+    "qs": "^6.15.2",
+    "@google-cloud/storage": "^7.21.0",
+    "uuid": "^11.1.1"
+  },
+  "resolutions": {
+    "google-gax": "^5.0.6",
+    "gaxios": "^7.0.0",
+    "teeny-request": "^10.0.0",
+    "retry-request": "^8.0.0",
+    "protobufjs": "^7.5.6",
+    "qs": "^6.15.2",
+    "@google-cloud/storage": "^7.21.0",
+    "uuid": "^11.1.1"
   },
   "engines": {
     "node": ">=22"
@@ -53,7 +67,7 @@
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^7.2.3",
     "googleapis": "^155.0.1",
-    "uuid": "^9.0.1"
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

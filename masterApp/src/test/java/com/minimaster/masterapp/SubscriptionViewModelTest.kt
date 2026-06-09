@@ -88,6 +88,7 @@ class SubscriptionViewModelTest {
 
         assertEquals("token-1", payload["purchaseToken"])
         assertEquals("single_child_monthly", payload["sku"])
+        verify(billingClientWrapper).acknowledgePurchase(purchase)
     }
 
     @Test
@@ -102,5 +103,23 @@ class SubscriptionViewModelTest {
         advanceUntilIdle()
 
         verify(callable, never()).call(any())
+        verify(billingClientWrapper, never()).acknowledgePurchase(purchase)
+    }
+
+    @Test
+    fun verifyPurchase_alreadyAcknowledged_doesNotAcknowledgeAgain() = runTest {
+        val viewModel = SubscriptionViewModel(billingClientWrapper, functions)
+        val purchase: Purchase = mock()
+
+        whenever(purchase.purchaseToken).thenReturn("token-3")
+        whenever(purchase.products).thenReturn(listOf("family_monthly"))
+        whenever(purchase.isAcknowledged).thenReturn(true)
+        whenever(callable.call(any())).thenReturn(Tasks.forResult(mock()))
+
+        viewModel.verifyPurchase(purchase)
+        advanceUntilIdle()
+
+        verify(callable).call(any())
+        verify(billingClientWrapper, never()).acknowledgePurchase(purchase)
     }
 }
