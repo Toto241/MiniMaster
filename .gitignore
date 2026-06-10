@@ -67,6 +67,15 @@ test/wave*-errors.txt
 test/wave*-failures.txt
 test/wave*-json.txt
 
+# Regenerierbare Tool-Ausgaben / Artefakte (Repo-Cleanup)
+lint_output*.txt
+lint-output.txt
+test-ci-output.txt
+build-output.txt
+audit_report.txt
+*.exe
+admin-panel.zip
+
 # Python local environments and bytecode
 .venv/
 **/__pycache__/
