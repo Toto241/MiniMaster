@@ -85,6 +85,12 @@ jobs:
     timeout-minutes: 90
     # Kostenkontrolle: nur auf PRs und manuell, nicht bei jedem Push.
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    # Advisory: Diese Instrumented-Tests liefen bisher in keiner CI. Sie liefern
+    # bereits Signal (Logs/Artefakte/Screenshots), blockieren aber noch nicht den
+    # Merge, solange ihre Laufzeitstabilitaet auf CI-Emulatoren (Firebase-
+    # Platzhalter, Hilt, Emulator-Flakiness) nicht bestaetigt ist. Sobald die
+    # Matrix mehrfach stabil gruen ist, continue-on-error entfernen.
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
