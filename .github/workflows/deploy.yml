@@ -281,7 +281,7 @@ jobs:
               "client_info": {
                 "mobilesdk_app_id": "1:000000000000:android:placeholderchild",
                 "android_client_info": {
-                  "package_name": "com.google.pairing"
+                  "package_name": "com.minimaster.childapp"
                 }
               },
               "oauth_client": [],

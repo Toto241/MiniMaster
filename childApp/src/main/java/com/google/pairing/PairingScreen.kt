@@ -5,6 +5,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -24,7 +25,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
     val pairingState by viewModel.pairingState.collectAsState()
-    val childImei by viewModel.childImeiForDebug.collectAsState()
+    val stableDeviceId by viewModel.stableDeviceIdForDebug.collectAsState()
+    val context = LocalContext.current
     var pairingCode by remember { mutableStateOf("") }
     var showDebugInfo by remember { mutableStateOf(false) }
 
@@ -55,10 +57,10 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
 
         Button(
             onClick = {
-                // The IMEI is retrieved and passed for validation.
-                // In a real app, this might be handled differently for privacy.
-                val imei = childImei ?: ""
-                viewModel.validateToken(pairingCode, imei)
+                viewModel.validateToken(
+                    pairingCode,
+                    ChildIdentityStorage.getOrCreateStableChildId(context)
+                )
             },
             enabled = pairingCode.isNotBlank() && pairingState !is PairingState.Loading,
             modifier = Modifier
@@ -107,7 +109,7 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
             Text(if (showDebugInfo) "Hide Debug Info" else "Show Debug Info")
         }
         if (showDebugInfo) {
-            DebugInfoView(pairingState = pairingState, childImei = childImei)
+            DebugInfoView(pairingState = pairingState, stableDeviceId = stableDeviceId)
         }
     }
 }
@@ -119,10 +121,10 @@ fun PairingScreen(viewModel: PairingViewModel = hiltViewModel()) {
  * @param childImei The child's IMEI, if available.
  */
 @Composable
-fun DebugInfoView(pairingState: PairingState, childImei: String?) {
+fun DebugInfoView(pairingState: PairingState, stableDeviceId: String?) {
     Column(modifier = Modifier.padding(top = 16.dp), horizontalAlignment = Alignment.Start) {
         Text("---- DEBUG INFO ----", style = MaterialTheme.typography.caption)
-        Text("Child IMEI: ${childImei ?: "Not set"}", style = MaterialTheme.typography.caption)
+        Text("Stable device ID: ${stableDeviceId ?: "Not set"}", style = MaterialTheme.typography.caption)
         val statusText = when(pairingState) {
             is PairingState.Idle -> "Idle"
             is PairingState.Loading -> "Loading"

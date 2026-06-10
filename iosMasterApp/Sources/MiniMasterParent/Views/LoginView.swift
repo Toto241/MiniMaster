@@ -15,7 +15,9 @@ struct LoginView: View {
                     TextField("login.field.imei", text: $imei)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .accessibilityIdentifier("login.imeiField")
                     TextField("login.field.deviceName", text: $deviceName)
+                        .accessibilityIdentifier("login.deviceNameField")
                 }
                 Section {
                     Button {
@@ -38,6 +40,7 @@ struct LoginView: View {
                         }
                     }
                     .disabled(imei.isEmpty || isRegistering)
+                    .accessibilityIdentifier("login.registerButton")
                 }
                 if let error = authService.error {
                     Section {

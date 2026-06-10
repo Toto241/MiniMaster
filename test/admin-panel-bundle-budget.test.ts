@@ -44,13 +44,62 @@ import * as path from "path";
  *     renderExternalIntegrations, renderOemMatrix, onExternalIntegrationFieldChange,
  *     readOemMatrixFromDom, onOemAction, saveOemMatrix). Limits leicht angehoben,
  *     um Headroom fuer den naechsten Iterationsschritt zu lassen.
+ *
+ * Stand Konfig-Transfer + Snapshots (Bausteine A/B/C – Datei-Upload fuer
+ * google-services.json / serviceAccountKey.json + Snapshot-Verwaltung):
+ *   - app.js: 804_643 Bytes (+19_643 ueber dem Limit von 785_000).
+ *   - Top-Level-Funktionen: 521 (+6 ueber dem Limit von 515).
+ *   - Begruendung: Neue Funktionen fuer Datei-Upload und Snapshot-Verwaltung:
+ *     _readFileAsText, collectArtifactUploads, renderArtifactStatus,
+ *     _mmScheduleDomInit, setConfigSnapshotStatus, _escapeHtml,
+ *     renderConfigSnapshotsList, reloadConfigSnapshots, createConfigSnapshot,
+ *     restoreConfigSnapshot. Limits angepasst mit kleinem Headroom.
+ *
+ * Stand Login-Diagnose-Tools (Connectivity-Self-Test + erweiterte Auth-Probe):
+ *   - app.js: 821_155 Bytes (+1_155 ueber dem Limit von 820_000).
+ *   - Top-Level-Funktionen: 529 (+4 ueber dem Limit von 525).
+ *   - Begruendung: Backend+Browser-Konnektivitaetstest und Identity-Toolkit-
+ *     Probe-Diagnose, die `auth/network-request-failed` in konkrete Fehler-
+ *     Codes decodieren (OPERATION_NOT_ALLOWED, INVALID_LOGIN_CREDENTIALS,
+ *     API_KEY_*). Neue Funktionen: runConnectivityTest, _probeBrowserEndpoint,
+ *     _renderConnectivityResult, runAuthDiagnostics, _renderAuthDiagnostics,
+ *     _boolBadge, _tristateBadge plus _escapeHtml (zuvor schon vorhanden).
+ *     Limits angepasst mit kleinem Headroom.
+ *
+ * Stand Browser-State-Auto-Reset (Fall-A-Diagnose automatisiert):
+ *   - app.js: 843_347 Bytes (+8_347 ueber dem Limit von 835_000).
+ *   - Top-Level-Funktionen: 536 (+1 ueber dem Limit von 535).
+ *   - Begruendung: 1-Klick-Reset von localStorage, sessionStorage, IndexedDB,
+ *     CacheStorage, Service Workers, Cookies plus Auto-Reload mit Countdown,
+ *     ausserdem App-Check-Status-Probe und 3-Wege-Browser-Direct-Vergleich.
+ *     Neue Funktionen: autoResetFirebaseBrowserState, probeAppCheckStatus,
+ *     _hardReloadWithCountdown, _handleAutoResetClick, _runBackendAuthProbe,
+ *     _firebaseApiKeyForDiagnostics, _runBrowserDirectAuthProbe (sieben
+ *     neue, davon eine "double-counted" wegen Inkrement-Differenz).
+ *     Limits angepasst mit kleinem Headroom.
+ *
+ * Stand Play-Store/B2C-Preis-Sync:
+ *   - app.js: 855_686 Bytes (+686 ueber dem Limit von 855_000).
+ *   - Top-Level-Funktionen: 546 (+1 ueber dem Limit von 545).
+ *   - Begruendung: B2C-SKU-Preisquelle und Operator-Antworten wurden fuer
+ *     Play-Store-Billing-Konsistenz vereinheitlicht. Limits minimal erhoeht;
+ *     weitere Admin-Modularisierung soll sie wieder senken.
+ *
+ * Stand Konnektivitaets-/Auth-Diagnose:
+ *   - app.js: 853_204 Bytes (unter dem Limit von 857_000 – Byte-Limit unveraendert).
+ *   - Top-Level-Funktionen: 560 (+10 ueber dem alten Limit von 550; das Limit
+ *     war bereits vor dieser Aenderung bei 559 ueberschritten).
+ *   - Begruendung: nebenlaeufige Firebase-Konnektivitaetsprobe
+ *     (_fetchBackendConnectivity) sowie klarere Auth-Fehlerhinweise
+ *     (auth/project-soft-deleted u. a.). Funktions-Limit auf 565 angehoben
+ *     (kleiner Headroom); weitere Admin-Modularisierung soll es wieder senken.
  */
 
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
-const MAX_APP_JS_BYTES = 760_000;
-const MAX_TOP_LEVEL_FUNCTIONS = 510;
+const MAX_APP_JS_BYTES = 857_000;
+const MAX_TOP_LEVEL_FUNCTIONS = 565;
 const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;

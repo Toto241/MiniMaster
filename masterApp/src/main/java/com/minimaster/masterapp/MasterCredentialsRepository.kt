@@ -15,76 +15,44 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository for managing the persistence of the master device's credentials (IMEI and secret key).
+ * Repository for persisting the registered master device identifier.
  *
- * This class uses Jetpack DataStore to securely and asynchronously store and retrieve the credentials.
- * It provides a Flow to observe credential changes and a suspend function to save them.
- *
- * @property dataStore The [DataStore] instance for accessing preferences, injected by Hilt.
+ * Phase 2 auth migration: only the canonical masterId is stored locally.
+ * Legacy secretKey values are purged on read.
  */
 @Singleton
 class MasterCredentialsRepository @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     @ApplicationContext private val context: Context
 ) {
-
-    /**
-     * A private object to hold the keys for the values stored in DataStore.
-     */
     private object PreferencesKeys {
         val MASTER_IMEI = stringPreferencesKey("master_imei")
-        val SECRET_KEY = stringPreferencesKey("secret_key")
     }
 
     private val secureStore by lazy { MasterCredentialSecureStoreFactory.create(context) }
 
-    /**
-     * A [Flow] that emits a [Pair] of the master IMEI and secret key.
-     * It emits a new pair whenever the credentials change in the DataStore.
-     * The values in the pair will be null if they have not been set.
-     */
-    val getCredentials: Flow<Pair<String?, String?>> = dataStore.data
+    val getMasterId: Flow<String?> = dataStore.data
         .map { preferences ->
-            val legacyImei = preferences[PreferencesKeys.MASTER_IMEI]
-            val legacySecret = preferences[PreferencesKeys.SECRET_KEY]
-            val secureImei = secureStore.getString("master_imei")
-            val secureSecret = secureStore.getString("secret_key")
-
-            val imei = secureImei ?: legacyImei
-            val secret = secureSecret ?: legacySecret
-
-            if (legacyImei != null || legacySecret != null) {
-                if (imei != null || secret != null) {
-                    secureStore.putCredentials(imei.orEmpty(), secret.orEmpty())
-                }
-                dataStore.edit { mutablePreferences ->
-                    mutablePreferences.remove(PreferencesKeys.MASTER_IMEI)
-                    mutablePreferences.remove(PreferencesKeys.SECRET_KEY)
-                }
-            }
-
-            imei to secret
+            secureStore.purgeLegacySecretKey()
+            val secureMasterId = secureStore.getString("master_imei")
+            val legacyMasterId = preferences[PreferencesKeys.MASTER_IMEI]
+            (secureMasterId ?: legacyMasterId)?.takeIf { it.isNotBlank() }
         }
 
-    /**
-     * Saves the master device's IMEI and secret key to DataStore.
-     *
-     * @param imei The unique identifier of the master device.
-     * @param secretKey The secret key associated with the master device.
-     */
-    suspend fun saveCredentials(imei: String, secretKey: String) {
-        secureStore.putCredentials(imei, secretKey)
+    suspend fun saveMasterId(masterId: String) {
+        secureStore.putMasterId(masterId)
+        secureStore.purgeLegacySecretKey()
 
         dataStore.edit { preferences ->
             preferences.remove(PreferencesKeys.MASTER_IMEI)
-            preferences.remove(PreferencesKeys.SECRET_KEY)
         }
     }
 }
 
 internal interface MasterCredentialSecureStore {
     fun getString(key: String): String?
-    fun putCredentials(imei: String, secretKey: String)
+    fun putMasterId(masterId: String)
+    fun purgeLegacySecretKey()
 }
 
 internal object MasterCredentialSecureStoreFactory {
@@ -114,10 +82,15 @@ private class EncryptedSharedPreferencesSecureStore(context: Context) : MasterCr
 
     override fun getString(key: String): String? = encryptedPrefs.getString(key, null)
 
-    override fun putCredentials(imei: String, secretKey: String) {
+    override fun putMasterId(masterId: String) {
         encryptedPrefs.edit()
-            .putString("master_imei", imei)
-            .putString("secret_key", secretKey)
+            .putString("master_imei", masterId)
             .apply()
+    }
+
+    override fun purgeLegacySecretKey() {
+        if (encryptedPrefs.contains("secret_key")) {
+            encryptedPrefs.edit().remove("secret_key").apply()
+        }
     }
 }

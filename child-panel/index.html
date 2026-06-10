@@ -10,6 +10,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
   <script src="../shared-ui-tooltips.js"></script>
+  <script src="../shared-ui-session-manager.js"></script>
     <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -106,6 +107,9 @@
     </section>
   </main>
 
+  <!-- Vom Setup-Wizard generierte Firebase-Werte (optional; 404 ohne Wizard
+       ist erwartet und wird vom Browser stillschweigend ignoriert). -->
+  <script src="./firebase-config.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

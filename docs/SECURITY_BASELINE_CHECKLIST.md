@@ -121,7 +121,8 @@ Same as web-control — ✅ all headers applied via firebase.json.
 | R-02 | Desktop | `shell: true` in spawn | Medium | Accepted | Command whitelist + argument sanitization applied; no direct user input to shell |
 | R-03 | web-control | Legacy IMEI/secretKey login form | Medium | Mitigating | Feature flag `DISABLE_LEGACY_SECRETKEY_AUTH` available; cutover plan active; web panels now use bootstrapToken only |
 | R-04 | Desktop | Electron 36.9.5 has high-severity CVE (AppleScript injection) | High | Mitigating | Config upgraded to Electron 41.3.0 + electron-builder 26.8.1; pending `npm install` due to Windows file lock. See `docs/SECURITY_HARDENING_P3.md` |
-| R-05 | Root dependencies | firebase-admin@13.8.0 transitive chain contains moderate/low vulns (`uuid`, `@tootallnate/once`) | Low | Mitigating | npm `overrides` applied forcing `uuid@11.1.0` and `@tootallnate/once@3.0.1`; pending `npm install` |
+| R-05 | Root dependencies | firebase-admin/google client transitive chain had moderate alerts (`protobufjs`, `uuid`, `qs`, `@google-cloud/storage`) | Low | **Closed repo-side** | npm `overrides`/Yarn `resolutions` refreshed; `npm audit` returns 0 vulnerabilities with the local system CA (2026-06-09) |
+| R-06 | Git history secrets | Firebase Admin SDK and app config JSON files were tracked before the current cleanup | High | Mitigating | Files removed from current tree and `.gitignore` hardened; Firebase keys/configs must be rotated/revoked before release |
 
 ---
 
@@ -138,7 +139,10 @@ Same as web-control — ✅ all headers applied via firebase.json.
 | `electron` (root) | 36.9.5 | 41.3.0 | High | Config applied; install pending |
 | `electron` (desktop) | 31.x | 41.3.0 | High | Config applied; install pending |
 | `electron-builder` | 24.13.3 | 26.8.1 | — | Config applied; install pending |
-| `uuid` (transitive) | 9.0.1 / 8.3.2 | 11.1.0 | Moderate | Override applied; install pending |
+| `uuid` (direct/transitive) | 11.1.1 | 11.1.1 | Moderate | ✅ Installed |
+| `protobufjs` (transitive) | 7.6.2 | >=7.5.6 | High | ✅ Installed |
+| `qs` (transitive) | 6.15.2 | >=6.15.2 | Moderate | ✅ Installed |
+| `@google-cloud/storage` (transitive) | 7.21.0 | >=7.21.0 | Moderate | ✅ Installed |
 | `@tootallnate/once` | 2.0.0 | 3.0.1 | Low | Override applied; install pending |
 
 **Reference:** `docs/SECURITY_HARDENING_P3.md`

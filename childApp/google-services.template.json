@@ -1,3 +1,3 @@
 {
-  "_comment": "Template only. DO NOT commit real google-services.json. Download the real file from Firebase Console and place it as childApp/google-services.json (local only)."
+  "_comment": "Template only. DO NOT commit real google-services.json. Download the real file for package com.minimaster.childapp from Firebase Console and place it as childApp/google-services.json (local only)."
 }

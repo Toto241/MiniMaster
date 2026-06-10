@@ -30,7 +30,7 @@ class PairingScreenUITest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         val dataStore = com.google.pairing.di.AppModule.provideDataStore(context)
-        val childIdRepository = ChildIdRepository(dataStore)
+        val childIdRepository = ChildIdRepository(dataStore, context)
         viewModel = PairingViewModel(childIdRepository, FirebaseFunctions.getInstance(), Dispatchers.Main)
     }
 

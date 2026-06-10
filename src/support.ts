@@ -9,7 +9,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
-import { AuditLogger, checkRateLimit, requireSupportOrAdmin, validateAppCheck } from "./shared";
+import { AuditLogger, checkRateLimit, requireSupportOrAdmin, validateAppCheck, getTracedLogger } from "./shared";
 
 // ==================== AI CLIENT ====================
 
@@ -93,7 +93,7 @@ function shouldEscalateAfterAttempts(
   return !solved && nextRound >= MAX_CONVERSATION_ROUNDS && nextFailures >= MAX_CONVERSATION_ROUNDS;
 }
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 async function generateWithGemini(prompt: string): Promise<AiGenerationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -369,6 +369,8 @@ if (!knowledgeBase) {
 
 export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { problemDescription: string; allowSupportAccess: boolean; consentSource?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "createSupportTicket");
+    void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -378,11 +380,15 @@ export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY
     if (!problemDescription || typeof problemDescription !== "string" || problemDescription.trim().length === 0) {
       throw new functions.https.HttpsError("invalid-argument", "Problem description is required.");
     }
+    if (problemDescription.trim().length > 4096) {
+      throw new functions.https.HttpsError("invalid-argument", "Problem description must not exceed 4096 characters.");
+    }
     if (typeof allowSupportAccess !== "boolean") {
       throw new functions.https.HttpsError("invalid-argument", "allowSupportAccess (boolean) is required.");
     }
 
     const masterImei = context.auth.uid;
+    checkRateLimit(masterImei, "createSupportTicket", 10, 3600000);
 
     try {
       const ticketRef = await db().collection("supportTickets").add({
@@ -415,10 +421,10 @@ export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY
         });
       }
 
-      functions.logger.info(`Support ticket created: ${ticketRef.id} for master ${masterImei}`);
+      logger.info(`Support ticket created: ${ticketRef.id} for master ${masterImei}`);
       return { success: true, ticketId: ticketRef.id };
     } catch (error) {
-      functions.logger.error(`Failed to create support ticket for master ${masterImei}:`, error);
+      logger.error(`Failed to create support ticket for master ${masterImei}:`, error);
       throw new functions.https.HttpsError("internal", "Failed to create support ticket.", error);
     }
   }
@@ -426,6 +432,7 @@ export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY
 
 export const grantSupportAccess = functions.https.onCall(
   async (data: { ticketId: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "grantSupportAccess");
     const startTime = Date.now();
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
@@ -444,7 +451,7 @@ export const grantSupportAccess = functions.https.onCall(
       if (!ticketDoc.exists || ticketDoc.data()?.masterImei !== masterImei) {
         await AuditLogger.logDenied(
           "admin.grant_support_access", context, `supportTickets/${ticketId}`, "system",
-          "Ticket not found or access denied", { ticketId }
+          "Ticket not found or access denied", { ticketId, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Ticket not found or access denied.");
       }
@@ -467,17 +474,17 @@ export const grantSupportAccess = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "admin.grant_support_access", context, `supportAccessGrants/${grantRef.id}`, "system",
-        { ticketId, grantId: grantRef.id, expiresAt: expiresAt.toISOString(), duration: Date.now() - startTime }
+        { ticketId, grantId: grantRef.id, expiresAt: expiresAt.toISOString(), duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Support access granted: ${grantRef.id} for ticket ${ticketId}`);
+      logger.info(`Support access granted: ${grantRef.id} for ticket ${ticketId}`);
       return { success: true, grantId: grantRef.id, expiresAt: expiresAt.toISOString() };
     } catch (error) {
       await AuditLogger.logFailure(
         "admin.grant_support_access", context, `supportTickets/${ticketId}`, "system",
-        error as Error, { ticketId }
+        error as Error, { ticketId, traceId }
       );
-      functions.logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
+      logger.error(`Failed to grant support access for ticket ${ticketId}:`, error);
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to grant support access.", error);
     }
@@ -486,6 +493,7 @@ export const grantSupportAccess = functions.https.onCall(
 
 export const revokeSupportAccess = functions.https.onCall(
   async (data: { grantId: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "revokeSupportAccess");
     const startTime = Date.now();
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
@@ -504,7 +512,7 @@ export const revokeSupportAccess = functions.https.onCall(
       if (!grantDoc.exists || grantDoc.data()?.masterImei !== masterImei) {
         await AuditLogger.logDenied(
           "admin.revoke_support_access", context, `supportAccessGrants/${grantId}`, "system",
-          "Grant not found or access denied", { grantId }
+          "Grant not found or access denied", { grantId, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Grant not found or access denied.");
       }
@@ -518,17 +526,17 @@ export const revokeSupportAccess = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "admin.revoke_support_access", context, `supportAccessGrants/${grantId}`, "system",
-        { grantId, ticketId, duration: Date.now() - startTime }
+        { grantId, ticketId, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Support access revoked: ${grantId}`);
+      logger.info(`Support access revoked: ${grantId}`);
       return { success: true };
     } catch (error) {
       await AuditLogger.logFailure(
         "admin.revoke_support_access", context, `supportAccessGrants/${grantId}`, "system",
-        error as Error, { grantId }
+        error as Error, { grantId, traceId }
       );
-      functions.logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
+      logger.error(`Failed to revoke support access for grant ${grantId}:`, error);
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to revoke support access.", error);
     }
@@ -549,17 +557,20 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
       return null;
     }
 
-    const batch = db().batch();
-
-    expiredGrantsSnapshot.docs.forEach((doc) => {
-      batch.update(doc.ref, { status: "expired" });
-      const ticketId = doc.data().ticketId;
-      if (ticketId) {
-        batch.update(db().collection("supportTickets").doc(ticketId), { accessGranted: false });
-      }
-    });
-
-    await batch.commit();
+    const BATCH_SIZE = 240;
+    const docs = expiredGrantsSnapshot.docs;
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+      const batch = db().batch();
+      chunk.forEach((doc) => {
+        batch.update(doc.ref, { status: "expired" });
+        const ticketId = doc.data().ticketId;
+        if (ticketId) {
+          batch.update(db().collection("supportTickets").doc(ticketId), { accessGranted: false });
+        }
+      });
+      await batch.commit();
+    }
 
     functions.logger.info(`Cleaned up ${expiredGrantsSnapshot.size} expired support grants.`);
     return null;
@@ -942,6 +953,8 @@ export const onSupportTicketUpdated = functions.firestore
 
 export const analyzeWithDebugData = functions.https.onCall(
   async (data: { ticketId: string; userMessage?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "analyzeWithDebugData");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -994,6 +1007,8 @@ export const analyzeWithDebugData = functions.https.onCall(
 
 export const grantDebugAccess = functions.https.onCall(
   async (data: { ticketId: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "grantDebugAccess");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1080,6 +1095,8 @@ export const grantDebugAccess = functions.https.onCall(
 
 export const skipDebugMode = functions.https.onCall(
   async (data: { ticketId: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "skipDebugMode");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1143,6 +1160,8 @@ export const skipDebugMode = functions.https.onCall(
 
 export const processUserReplyMessage = functions.https.onCall(
   async (data: { ticketId: string; message: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "processUserReplyMessage");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1219,6 +1238,8 @@ export const processUserReplyMessage = functions.https.onCall(
 
 export const getDebugInfo = functions.https.onCall(
   async (data: { ticketId: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "getDebugInfo");
+    void logger; void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1280,6 +1301,8 @@ export const getDebugInfo = functions.https.onCall(
 
 export const provideSolutionFeedback = functions.https.onCall(
   async (data: { ticketId: string; feedback: string; comment?: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "provideSolutionFeedback");
+    void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1321,10 +1344,10 @@ export const provideSolutionFeedback = functions.https.onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Ticket ${ticketId} feedback: ${feedback}, new status: ${newStatus}`);
+      logger.info(`Ticket ${ticketId} feedback: ${feedback}, new status: ${newStatus}`);
       return { success: true, message: `Ticket ${newStatus}.` };
     } catch (error) {
-      functions.logger.error("Error in provideSolutionFeedback:", error);
+      logger.error("Error in provideSolutionFeedback:", error);
       if (error instanceof functions.https.HttpsError) throw error;
       throw new functions.https.HttpsError("internal", "Failed to update ticket feedback.");
     }
@@ -1337,6 +1360,8 @@ export const provideSolutionFeedback = functions.https.onCall(
  */
 export const getTicketUserData = functions.https.onCall(
   async (data: { ticketId: string }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "getTicketUserData");
+    void logger; void traceId;
     requireSupportOrAdmin(context);
     const callerId = context.auth!.uid;
     validateAppCheck(context, true);
@@ -1413,6 +1438,8 @@ export const getTicketUserData = functions.https.onCall(
  */
 export const aiExplainProblem = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
   async (data: { problemContext: string; consentGiven: boolean }, context: CallableContext) => {
+    const { logger, traceId } = getTracedLogger(context, "aiExplainProblem");
+    void traceId;
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     }
@@ -1486,7 +1513,7 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
         model: aiResult.provider === "gemini" ? GEMINI_MODEL : "gpt-4o",
       };
     } catch (error) {
-      functions.logger.error("Error in aiExplainProblem:", error);
+      logger.error("Error in aiExplainProblem:", error);
       throw new functions.https.HttpsError(
         "internal",
         "KI-Analyse fehlgeschlagen. Bitte prüfen Sie die KI-Konfiguration (GEMINI_API_KEY)."

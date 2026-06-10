@@ -88,21 +88,18 @@ final class PhotoProofService: ObservableObject {
         metadata.contentType = "image/jpeg"
 
         _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let uploadTask = ref.putData(jpegData, metadata: metadata) { [weak self] progress in
-                guard let self, let progress else { return }
-                let fraction = Double(progress.completedUnitCount) / Double(progress.totalUnitCount)
-                Task { @MainActor in self.uploadProgress = fraction }
-            }
-
-            uploadTask.observe(.success) { _ in
-                continuation.resume()
-            }
-            uploadTask.observe(.failure) { snapshot in
-                if let error = snapshot.error {
+            let uploadTask = ref.putData(jpegData, metadata: metadata) { _, error in
+                if let error {
                     continuation.resume(throwing: error)
                 } else {
-                    continuation.resume(throwing: PhotoProofError.uploadFailed)
+                    continuation.resume()
                 }
+            }
+
+            uploadTask.observe(.progress) { [weak self] snapshot in
+                guard let self, let progress = snapshot.progress else { return }
+                let fraction = Double(progress.completedUnitCount) / Double(max(progress.totalUnitCount, 1))
+                Task { @MainActor in self.uploadProgress = fraction }
             }
         }
 

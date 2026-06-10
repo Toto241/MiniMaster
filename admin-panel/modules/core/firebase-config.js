@@ -78,7 +78,7 @@ function _extractFromGoogleServices(rawConfig, metaOut = null) {
   const preferredClient =
     clients.find((client) => {
       const packageName = client?.client_info?.android_client_info?.package_name;
-      return packageName === "com.google.pairing";
+      return packageName === "com.minimaster.childapp";
     }) || clients[0];
 
   const selectedPackageName = String(

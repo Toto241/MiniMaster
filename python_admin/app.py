@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import json
 import hashlib
 import mimetypes
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -58,6 +60,12 @@ from remote_mac_agent_contract import build_remote_mac_agent_run_entry  # noqa: 
 from usb_test_runner import run_usb_test  # noqa: E402
 from dual_device_runner import run_dual_device  # noqa: E402
 from static_readiness_checks import run_checks_as_dicts as run_static_readiness_checks, summary as static_readiness_summary  # noqa: E402
+from acceptance_runner import (  # noqa: E402
+    _run_acceptance_task,
+    get_acceptance_run_status,
+    get_acceptance_run_report,
+    load_acceptance_history,
+)
 LOG_DIR = REPO_ROOT / "python_admin" / "logs"
 COMMISSIONING_LOG_FILE = LOG_DIR / "commissioning_runs.jsonl"
 COMMISSIONING_EVIDENCE_LOG_FILE = LOG_DIR / "commissioning_evidence.jsonl"
@@ -65,6 +73,8 @@ REMOTE_MAC_AGENT_RUN_LOG_FILE = LOG_DIR / "remote_mac_agent_runs.jsonl"
 JOB_RUN_LOG_FILE = LOG_DIR / "job_runs.jsonl"
 ANDROID_AUTOMATION_SWEEP_APPROVAL_LOG_FILE = LOG_DIR / "android_automation_sweep_approvals.jsonl"
 ANDROID_COMPATIBILITY_APPROVAL_LOG_FILE = LOG_DIR / "android_compatibility_approvals.jsonl"
+ACCEPTANCE_RUNS_DIR = LOG_DIR / "acceptance_runs"
+ACCEPTANCE_RUNS_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_HOST = os.environ.get("MINIMASTER_ADMIN_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("MINIMASTER_ADMIN_PORT", "8765"))
 DEFAULT_HISTORY_LIMIT = 15
@@ -82,13 +92,10 @@ ANDROID_AUTOMATION_SWEEP_APPROVAL_TTL_SEC = int(os.environ.get("MINIMASTER_SWEEP
 
 ALLOWED_COMMANDS = {
     "adb",
-    "bash",
     "firebase",
     "node",
     "npm",
     "npx",
-    "powershell",
-    "pwsh",
     "python",
     "python3",
     "gradlew.bat",
@@ -3269,7 +3276,73 @@ def build_repo_test_inventory_entries(
     return items
 
 
-def build_testing_register() -> dict[str, object]:
+# Das Testing-Register wird live aus Repo-Inventar, statischer Analyse, Docs-
+# Validierung und Suite-/Commissioning-Historie berechnet (~4 s pro Lauf). Das
+# Admin-Panel pollt mehrere Endpunkte, die alle build_testing_register()
+# aufrufen – ein Dashboard-Refresh wuerde die Berechnung sonst mehrfach
+# ausloesen. Eine kurze TTL-Memoization bedient schnelle Wiederholungen aus dem
+# Cache; die Frische bleibt durch die TTL begrenzt. Tests setzen den Cache vor
+# jedem Lauf zurueck (conftest-Fixture), sodass das Verhalten unveraendert ist.
+TESTING_REGISTER_CACHE_TTL_SECONDS = 5.0
+_testing_register_cache: dict[str, object] = {"value": None, "expires_at": 0.0}
+# Kurzlebiger Lock fuer das Lesen/Schreiben der Cache-Felder.
+_testing_register_cache_lock = threading.Lock()
+# Serialisiert die ~4s teure Neuberechnung: nur ein Thread rechnet, parallele
+# Anfragen warten und erhalten danach den frisch gecachten Wert (kein
+# Cache-Stampede / Thundering Herd beim Polling des Admin-Panels).
+_testing_register_compute_lock = threading.Lock()
+
+
+def clear_testing_register_cache() -> None:
+    """Verwirft den memoisierten Testing-Register-Snapshot (z. B. fuer Tests)."""
+    with _testing_register_cache_lock:
+        _testing_register_cache["value"] = None
+        _testing_register_cache["expires_at"] = 0.0
+
+
+def _read_fresh_testing_register_cache() -> dict[str, object] | None:
+    """Gibt eine Kopie des Cache zurueck, falls er noch gueltig ist, sonst None."""
+    now = time.monotonic()
+    with _testing_register_cache_lock:
+        cached = _testing_register_cache["value"]
+        if cached is not None and now < cast(float, _testing_register_cache["expires_at"]):
+            return copy.deepcopy(cast(dict[str, object], cached))
+    return None
+
+
+def build_testing_register(*, use_cache: bool = True) -> dict[str, object]:
+    """Liefert das Testing-Register, optional aus einem kurzlebigen TTL-Cache.
+
+    use_cache=False erzwingt eine frische Berechnung (umgeht und aktualisiert den
+    Cache nicht). Rueckgaben sind tiefe Kopien, damit Aufrufer den Snapshot
+    gefahrlos mutieren koennen, ohne den Cache zu beschaedigen.
+
+    Double-Checked Locking verhindert, dass parallele Anfragen die teure
+    Berechnung gleichzeitig ausloesen.
+    """
+    if not use_cache:
+        return _compute_testing_register()
+
+    # 1. Schneller Pfad ohne Compute-Lock.
+    cached = _read_fresh_testing_register_cache()
+    if cached is not None:
+        return cached
+
+    # 2. Nur ein Thread berechnet; die uebrigen blockieren hier und sehen nach
+    #    Freigabe den frischen Cache (zweite Pruefung).
+    with _testing_register_compute_lock:
+        cached = _read_fresh_testing_register_cache()
+        if cached is not None:
+            return cached
+
+        fresh = _compute_testing_register()
+        with _testing_register_cache_lock:
+            _testing_register_cache["value"] = copy.deepcopy(fresh)
+            _testing_register_cache["expires_at"] = time.monotonic() + TESTING_REGISTER_CACHE_TTL_SECONDS
+        return fresh
+
+
+def _compute_testing_register() -> dict[str, object]:
     commissioning_catalog = get_commissioning_test_catalog()
     latest_commissioning_run = load_commissioning_history(1)
     latest_commissioning = latest_commissioning_run[0] if latest_commissioning_run else None
@@ -3598,8 +3671,13 @@ def run_command(request: CommandRequest, timeout_sec: int | None = None) -> dict
 
             # Windows fallback: some tools (npm/firebase) may not resolve directly
             # in this runtime, but work through cmd.exe command resolution.
+            # NB: shlex ist modulweit importiert – ein lokales `import shlex`
+            # hier wuerde shlex fuer die ganze Funktion zur lokalen Variable
+            # machen und die Nutzung oben (Zeile ~3580) mit UnboundLocalError
+            # brechen.
+            parts = shlex.split(line, posix=False)
             process = subprocess.run(
-                ["cmd", "/c", line],
+                ["cmd", "/c"] + parts,
                 cwd=str(request.cwd),
                 capture_output=True,
                 text=True,
@@ -6325,10 +6403,40 @@ def _run_dual_device_background(run_id: str, kwargs: dict[str, object]) -> None:
     _persist_active_suite_run(run_id)
 
 
-# ─── Konfigurations-Transfer (.env + admin-panel/firebase-config.js) ───────────
+# ─── Konfigurations-Transfer (.env + */firebase-config.js) ───────────
 ENV_FILE = REPO_ROOT / ".env"
 ENV_EXAMPLE_FILE = REPO_ROOT / ".env.example"
 ADMIN_PANEL_FIREBASE_CONFIG_FILE = REPO_ROOT / "admin-panel" / "firebase-config.js"
+
+# Zielpfade fuer die Firebase-Pflicht-Artefakte. Werden ueber den Uebertragen-
+# Wizard (start.bat / Admin-Panel) per Pfad-Angabe oder Inline-Inhalt befuellt.
+GOOGLE_SERVICES_MASTER_FILE = REPO_ROOT / "masterApp" / "google-services.json"
+GOOGLE_SERVICES_CHILD_FILE = REPO_ROOT / "childApp" / "google-services.json"
+SERVICE_ACCOUNT_KEY_FILE = REPO_ROOT / "serviceAccountKey.json"
+
+FIREBASE_ARTIFACT_TARGETS: dict[str, Path] = {
+    "googleServicesMaster": GOOGLE_SERVICES_MASTER_FILE,
+    "googleServicesChild": GOOGLE_SERVICES_CHILD_FILE,
+    "serviceAccountKey": SERVICE_ACCOUNT_KEY_FILE,
+}
+
+ARTIFACT_PLACEHOLDER_TOKENS: tuple[str, ...] = (
+    "your-",
+    "your_project",
+    "<your",
+    "REPLACE_ME",
+)
+
+# Alle Panel-Verzeichnisse, in die der Wizard die generierte firebase-config.js
+# spiegelt. Damit erbt jedes Panel automatisch die Werte – frueher war der
+# Wizard auf das Admin-Panel beschraenkt und die anderen Panels mussten manuell
+# konfiguriert werden.
+PANEL_FIREBASE_CONFIG_FILES: tuple[Path, ...] = (
+    REPO_ROOT / "admin-panel" / "firebase-config.js",
+    REPO_ROOT / "web-control" / "firebase-config.js",
+    REPO_ROOT / "parent-panel" / "firebase-config.js",
+    REPO_ROOT / "child-panel" / "firebase-config.js",
+)
 
 # Felder der Firebase-Web-Konfiguration, die im Browser landen.
 FIREBASE_WEB_KEYS: tuple[str, ...] = (
@@ -6356,6 +6464,10 @@ ALLOWED_ENV_KEYS: tuple[str, ...] = (
     "GEMINI_MODEL",
     "OPENAI_API_KEY",
     "OPENAI_FALLBACK_ENABLED",
+    "RESEND_API_KEY",
+    "SUPPORT_FROM_EMAIL",
+    "PLAY_BILLING_PUBSUB_TOPIC",
+    "PLAY_PACKAGE_NAME",
     "LEGAL_POLICY_BASE_URL",
     "PAIRING_LINK_BASE_URL",
     "DISABLE_LEGACY_SECRETKEY_AUTH",
@@ -6370,6 +6482,7 @@ ALLOWED_ENV_KEYS: tuple[str, ...] = (
 SECRET_ENV_KEYS: frozenset[str] = frozenset({
     "GEMINI_API_KEY",
     "OPENAI_API_KEY",
+    "RESEND_API_KEY",
     "APPLE_PRIVATE_KEY",
     "APPLE_KEY_ID",
     "APPLE_ISSUER_ID",
@@ -6455,23 +6568,21 @@ def _merge_env_file(
     return _parse_env_file(path)
 
 
-def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
-    """Schreibt admin-panel/firebase-config.js mit Literal-Werten (Browser-tauglich)."""
+def _render_firebase_config_js(values: dict[str, str]) -> str:
+    """Rendert die generische firebase-config.js fuer alle Panels.
+
+    Klassisches Browser-Skript (kein ES-Module-Export, da die Datei per
+    ``<script src>`` ohne ``type="module"`` geladen wird). Sie setzt
+    ``window.__MM_FIREBASE_CONFIG__`` und ``window.MINIMASTER_APP_CHECK_SITE_KEY``
+    als globale Bootstrap-Quelle fuer alle vier Panels.
+    """
     def js_string(raw: object) -> str:
         text = "" if raw is None else str(raw)
         escaped = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
         return f"'{escaped}'"
 
-    rendered = (
-        "/*\n"
-        " * Firebase configuration for the Admin Panel.\n"
-        " *\n"
-        " * Diese Datei wird vom Admin-Panel-Button \"Übertragen\" generiert.\n"
-        " * Direkte Bearbeitung ist möglich, wird aber bei der nächsten Übertragung\n"
-        " * überschrieben.\n"
-        " */\n"
-        "\n"
-        "export const firebaseConfig = {\n"
+    body = (
+        "{\n"
         f"  apiKey: {js_string(values.get('apiKey'))},\n"
         f"  authDomain: {js_string(values.get('authDomain'))},\n"
         f"  projectId: {js_string(values.get('projectId'))},\n"
@@ -6483,10 +6594,34 @@ def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
         "    provider: 'reCaptchaV3',\n"
         f"    siteKey: {js_string(values.get(FIREBASE_APP_CHECK_KEY))},\n"
         "  },\n"
-        "};\n"
+        "}"
     )
-    ADMIN_PANEL_FIREBASE_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ADMIN_PANEL_FIREBASE_CONFIG_FILE.write_text(rendered, encoding="utf-8")
+
+    return (
+        "/*\n"
+        " * Firebase configuration for MiniMaster Panels.\n"
+        " *\n"
+        " * Diese Datei wird vom Admin-Panel-Button \"Übertragen\" bzw. von\n"
+        " * 'python -m scripts.config_transfer_cli' generiert. Direkte\n"
+        " * Bearbeitung ist möglich, wird aber bei der nächsten Übertragung\n"
+        " * überschrieben. Klassisches Browser-Skript ohne ES-Module-Export.\n"
+        " */\n"
+        "(function (root) {\n"
+        f"  var firebaseConfig = {body};\n"
+        "  root.__MM_FIREBASE_CONFIG__ = firebaseConfig;\n"
+        "  if (firebaseConfig && firebaseConfig.appCheck && firebaseConfig.appCheck.siteKey) {\n"
+        "    root.MINIMASTER_APP_CHECK_SITE_KEY = firebaseConfig.appCheck.siteKey;\n"
+        "  }\n"
+        "})(typeof window !== 'undefined' ? window : globalThis);\n"
+    )
+
+
+def _write_admin_panel_firebase_config(values: dict[str, str]) -> None:
+    """Schreibt firebase-config.js fuer ALLE Panels (Browser-tauglich)."""
+    rendered = _render_firebase_config_js(values)
+    for target in PANEL_FIREBASE_CONFIG_FILES:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(rendered, encoding="utf-8")
 
 
 def _read_admin_panel_firebase_config() -> dict[str, str]:
@@ -6520,6 +6655,302 @@ def _mask_secret(value: str) -> str:
     return value[:3] + "…" + value[-3:]
 
 
+def _artifact_has_placeholder(text: str) -> bool:
+    return any(token in text for token in ARTIFACT_PLACEHOLDER_TOKENS)
+
+
+# ─── Firebase CLI Wrapper (nur lesende Operationen) ──────────────────
+
+def _run_firebase_cli(args: list[str], *, timeout: int = 60) -> tuple[int, str, str]:
+    """Fuehrt 'firebase <args>' aus. Loest .cmd-Wrapper auf Windows ueber
+    shutil.which auf. Liefert (returncode, stdout, stderr).
+    """
+    fb = shutil.which("firebase")
+    if not fb:
+        return (127, "", "firebase CLI nicht im PATH. Bitte installieren: npm install -g firebase-tools")
+    try:
+        proc = subprocess.run(
+            [fb, *args], capture_output=True, text=True, timeout=timeout, encoding="utf-8",
+        )
+        return (proc.returncode, proc.stdout or "", proc.stderr or "")
+    except Exception as exc:
+        return (1, "", str(exc))
+
+
+def _parse_firebase_json_response(
+    out: str, err: str, op_label: str,
+) -> dict[str, object]:
+    """Wertet die '--json'-Antwort der Firebase CLI aus.
+
+    Konvention: Ein Top-Level-Objekt {"status": "success"|"error", "result": ...,
+    "error": "...optional"}. Wir koennen uns auf den ``status``-Feld nicht auf
+    den Exit-Code verlassen, weil die CLI selbst bei Auth-Fehlern manchmal 0
+    zurueckgibt. Wirft RuntimeError mit lesbarer Botschaft bei Fehlern.
+    """
+    raw = (out or "").strip()
+    if not raw:
+        message = (err or "").strip() or "(keine Ausgabe)"
+        raise RuntimeError(
+            f"{op_label}: keine JSON-Antwort. CLI-Ausgabe: {message[:300]}. "
+            "Pruefe 'firebase login' und Netzwerkzugriff."
+        )
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        raise RuntimeError(
+            f"{op_label}: Antwort ist kein JSON ({exc}). Raw: {raw[:200]}"
+        )
+    if not isinstance(parsed, dict):
+        raise RuntimeError(f"{op_label}: unerwarteter Antwort-Typ ({type(parsed).__name__}).")
+    if parsed.get("status") == "error":
+        msg = parsed.get("error") or "unbekannter CLI-Fehler"
+        raise RuntimeError(
+            f"{op_label}: {msg}. Pruefe 'firebase login' und ob das Projekt "
+            f"erreichbar ist – oder fuelle den Wizard manuell aus."
+        )
+    return parsed
+
+
+def list_firebase_projects() -> list[dict[str, str]]:
+    """Liefert die Liste aller Firebase-Projekte, auf die der aktuelle CLI-Login Zugriff hat."""
+    _, out, err = _run_firebase_cli(["projects:list", "--json"])
+    parsed = _parse_firebase_json_response(out, err, "firebase projects:list")
+    result = parsed.get("result") or []
+    projects: list[dict[str, str]] = []
+    for entry in result if isinstance(result, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        projects.append({
+            "projectId": str(entry.get("projectId") or ""),
+            "displayName": str(entry.get("displayName") or ""),
+            "projectNumber": str(entry.get("projectNumber") or ""),
+            "state": str(entry.get("state") or ""),
+        })
+    return projects
+
+
+def import_firebase_project(project_id: str) -> dict[str, object]:
+    """Holt Web-Konfig und google-services.json-Inhalte aller registrierten Apps.
+
+    Loest sowohl die Web-App-Config (apiKey, projectId, ...) als auch die
+    google-services.json fuer alle Android-Apps via 'firebase apps:sdkconfig'.
+    Wirft RuntimeError mit lesbarer Botschaft bei fehlenden Credentials.
+    """
+    if not project_id or not re.match(r"^[a-z][a-z0-9-]{4,29}$", project_id):
+        raise ValueError("Ungueltige projectId.")
+
+    # 1) Apps des Projekts auflisten (harter Fehler bei Misslingen).
+    _, out, err = _run_firebase_cli(["apps:list", "--project", project_id, "--json"])
+    apps_payload = _parse_firebase_json_response(out, err, "firebase apps:list")
+    apps = apps_payload.get("result") or []
+
+    web_config: dict[str, object] | None = None
+    android_apps: list[dict[str, object]] = []
+    app_errors: list[str] = []
+
+    for app in apps if isinstance(apps, list) else []:
+        if not isinstance(app, dict):
+            continue
+        platform = str(app.get("platform") or "").upper()
+        app_id = str(app.get("appId") or "")
+        if not app_id:
+            continue
+
+        if platform == "WEB" and web_config is None:
+            _, out2, err2 = _run_firebase_cli(
+                ["apps:sdkconfig", "WEB", app_id, "--project", project_id, "--json"],
+            )
+            try:
+                cfg_payload = _parse_firebase_json_response(out2, err2, f"sdkconfig WEB {app_id}")
+            except RuntimeError as exc:
+                app_errors.append(str(exc))
+                continue
+            sdk = ((cfg_payload.get("result") or {}).get("sdkConfig") or {})
+            if isinstance(sdk, dict):
+                web_config = {
+                    "apiKey": str(sdk.get("apiKey") or ""),
+                    "authDomain": str(sdk.get("authDomain") or ""),
+                    "projectId": str(sdk.get("projectId") or project_id),
+                    "storageBucket": str(sdk.get("storageBucket") or ""),
+                    "messagingSenderId": str(sdk.get("messagingSenderId") or ""),
+                    "appId": str(sdk.get("appId") or ""),
+                    "measurementId": str(sdk.get("measurementId") or ""),
+                }
+
+        elif platform == "ANDROID":
+            _, out2, err2 = _run_firebase_cli(
+                ["apps:sdkconfig", "ANDROID", app_id, "--project", project_id, "--json"],
+            )
+            try:
+                cfg_payload = _parse_firebase_json_response(out2, err2, f"sdkconfig ANDROID {app_id}")
+            except RuntimeError as exc:
+                app_errors.append(str(exc))
+                continue
+            file_contents = ((cfg_payload.get("result") or {}).get("fileContents") or "")
+            if not isinstance(file_contents, str) or not file_contents.strip():
+                continue
+            pkg = ""
+            try:
+                parsed = json.loads(file_contents)
+                clients = parsed.get("client") or []
+                if isinstance(clients, list) and clients:
+                    first = clients[0]
+                    if isinstance(first, dict):
+                        info = (first.get("client_info") or {})
+                        if isinstance(info, dict):
+                            pkg = str(((info.get("android_client_info") or {}).get("package_name") or ""))
+            except Exception:
+                pkg = ""
+            android_apps.append({
+                "appId": app_id,
+                "displayName": str(app.get("displayName") or ""),
+                "packageName": pkg,
+                "fileContents": file_contents,
+            })
+
+    # Service-Account-Schluessel kann die Firebase-CLI NICHT erzeugen (das geht
+    # nur ueber gcloud / Console). Wir liefern einen Link-Hinweis mit zurueck.
+    service_account_hint = {
+        "available": False,
+        "reason": "Firebase CLI kann keine Service-Account-Keys generieren. "
+                  "Bitte ueber Firebase-Console -> Projekteinstellungen -> Dienstkonten -> "
+                  "'Neuen privaten Schluessel generieren' anlegen und in den Wizard hochladen.",
+        "consoleUrl": f"https://console.firebase.google.com/project/{project_id}/settings/serviceaccounts/adminsdk",
+    }
+
+    return {
+        "projectId": project_id,
+        "webConfig": web_config,
+        "androidApps": android_apps,
+        "serviceAccount": service_account_hint,
+        "warnings": app_errors,
+    }
+
+
+def _summarize_artifact(target: Path) -> dict[str, object]:
+    """Liest eine vorhandene JSON-Pflicht-Datei und gibt Status-Infos zurueck."""
+    info: dict[str, object] = {
+        "path": str(target),
+        "exists": target.exists(),
+        "valid": False,
+    }
+    if not target.exists():
+        return info
+    try:
+        raw = target.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except Exception as exc:
+        info["error"] = f"JSON nicht parsbar: {exc}"
+        return info
+    if _artifact_has_placeholder(raw):
+        info["error"] = "Enthaelt Platzhalter (your-...)"
+        info["valid"] = False
+    else:
+        info["valid"] = True
+    if isinstance(data, dict):
+        project_info = data.get("project_info")
+        if isinstance(project_info, dict):
+            info["projectId"] = project_info.get("project_id", "")
+            info["projectNumber"] = project_info.get("project_number", "")
+        if "project_id" in data:
+            info["projectId"] = data.get("project_id", "")
+        if "client_email" in data:
+            info["clientEmail"] = data.get("client_email", "")
+        clients = data.get("client")
+        if isinstance(clients, list) and clients:
+            first = clients[0]
+            if isinstance(first, dict):
+                client_info = first.get("client_info")
+                if isinstance(client_info, dict):
+                    info["packageName"] = client_info.get(
+                        "android_client_info", {}
+                    ).get("package_name", "")
+    return info
+
+
+def _normalize_artifact_input(raw: object) -> tuple[str, object]:
+    """Entpackt das vom Wizard gelieferte Artefakt zu (kind, payload).
+
+    Akzeptiert:
+      - String mit Dateipfad (`/path/to/google-services.json`)
+      - Dict {"path": "..."}
+      - Dict {"content": "<json-text>"} oder {"content": {<dict>}}
+      - Dict mit JSON-Feldern direkt (z.B. {"project_info": {...}})
+    """
+    if raw is None:
+        return ("empty", None)
+    if isinstance(raw, str):
+        trimmed = raw.strip()
+        if not trimmed:
+            return ("empty", None)
+        return ("path", trimmed)
+    if isinstance(raw, dict):
+        if "path" in raw and raw.get("path"):
+            return ("path", str(raw["path"]).strip())
+        if "content" in raw:
+            return ("content", raw["content"])
+        return ("content", raw)
+    return ("invalid", None)
+
+
+def _apply_artifact(key: str, raw: object) -> dict[str, object]:
+    """Schreibt ein Pflicht-Artefakt (JSON-Datei) an seine Zieladresse.
+
+    Wirft ValueError bei Ungueltigkeit; liefert ansonsten ein Status-Dict.
+    """
+    target = FIREBASE_ARTIFACT_TARGETS[key]
+    kind, value = _normalize_artifact_input(raw)
+    if kind == "empty":
+        return {"key": key, "skipped": True, "path": str(target)}
+    if kind == "invalid":
+        raise ValueError(f"{key}: unbekanntes Eingabeformat.")
+
+    if kind == "path":
+        assert isinstance(value, str)
+        source = Path(value).expanduser()
+        if not source.is_absolute():
+            source = (REPO_ROOT / value).resolve()
+        if not source.exists() or not source.is_file():
+            raise ValueError(f"{key}: Quelldatei nicht gefunden: {source}")
+        try:
+            text = source.read_text(encoding="utf-8")
+        except Exception as exc:
+            raise ValueError(f"{key}: Quelldatei nicht lesbar: {exc}") from exc
+        try:
+            json.loads(text)
+        except Exception as exc:
+            raise ValueError(f"{key}: Quelldatei ist kein valides JSON: {exc}") from exc
+        if _artifact_has_placeholder(text):
+            raise ValueError(
+                f"{key}: Quelldatei enthaelt Platzhalter (your-...). "
+                "Bitte die echte Datei aus der Firebase-Console verwenden."
+            )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        return {"key": key, "written": True, "path": str(target), "source": str(source)}
+
+    # kind == "content"
+    if isinstance(value, str):
+        text = value
+        try:
+            json.loads(text)
+        except Exception as exc:
+            raise ValueError(f"{key}: Inline-Inhalt ist kein valides JSON: {exc}") from exc
+    else:
+        try:
+            text = json.dumps(value, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            raise ValueError(f"{key}: Inline-Inhalt nicht serialisierbar: {exc}") from exc
+    if _artifact_has_placeholder(text):
+        raise ValueError(
+            f"{key}: Inline-Inhalt enthaelt Platzhalter (your-...). "
+            "Bitte die echte Datei aus der Firebase-Console verwenden."
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return {"key": key, "written": True, "path": str(target), "source": "inline"}
+
+
 def load_config_transfer_state() -> dict[str, object]:
     env_values = _parse_env_file(ENV_FILE)
     panel_values = _read_admin_panel_firebase_config()
@@ -6541,6 +6972,11 @@ def load_config_transfer_state() -> dict[str, object]:
         else:
             env_view[key] = raw_value
 
+    artifacts_view: dict[str, dict[str, object]] = {
+        key: _summarize_artifact(path)
+        for key, path in FIREBASE_ARTIFACT_TARGETS.items()
+    }
+
     return {
         "envFileExists": ENV_FILE.exists(),
         "envFile": str(ENV_FILE),
@@ -6549,13 +6985,22 @@ def load_config_transfer_state() -> dict[str, object]:
         "env": env_view,
         "secretKeys": sorted(SECRET_ENV_KEYS),
         "allowedEnvKeys": list(ALLOWED_ENV_KEYS),
+        "artifacts": artifacts_view,
+        "artifactKeys": list(FIREBASE_ARTIFACT_TARGETS.keys()),
     }
 
 
 def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
-    """Schreibt die übergebenen Werte in .env und admin-panel/firebase-config.js."""
+    """Schreibt die übergebenen Werte in .env und admin-panel/firebase-config.js.
+
+    Optional koennen unter ``payload['artifacts']`` die drei Pflicht-JSON-Dateien
+    (``googleServicesMaster``, ``googleServicesChild``, ``serviceAccountKey``)
+    mitgeliefert werden – entweder als Pfad (String), als Dict ``{"path": ...}``
+    oder als Dict ``{"content": <json-text-oder-dict>}``.
+    """
     firebase_payload = as_dict(payload.get("firebase"))
     env_payload = as_dict(payload.get("env"))
+    artifacts_payload = as_dict(payload.get("artifacts"))
 
     firebase_normalized: dict[str, str] = {}
     for key in FIREBASE_WEB_KEYS:
@@ -6603,6 +7048,36 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         _write_admin_panel_firebase_config(merged_panel_values)
         panel_written = True
 
+    artifact_results: dict[str, dict[str, object]] = {}
+    artifact_errors: dict[str, str] = {}
+    for art_key in FIREBASE_ARTIFACT_TARGETS:
+        if art_key not in artifacts_payload:
+            continue
+        try:
+            artifact_results[art_key] = _apply_artifact(art_key, artifacts_payload[art_key])
+        except ValueError as exc:
+            artifact_errors[art_key] = str(exc)
+
+    if artifact_errors:
+        raise ValueError("; ".join(f"{k}: {v}" for k, v in artifact_errors.items()))
+
+    artifact_status: dict[str, dict[str, object]] = {
+        key: _summarize_artifact(path)
+        for key, path in FIREBASE_ARTIFACT_TARGETS.items()
+    }
+
+    # Auto-Snapshot: nur, wenn auch tatsaechlich etwas geschrieben wurde.
+    # Schlaegt der Snapshot fehl (z.B. weil HOME nicht beschreibbar ist),
+    # wird das geloggt, aber nicht propagiert – der Transfer selbst war
+    # bereits erfolgreich.
+    snapshot_info: dict[str, object] | None = None
+    if env_updates or panel_written or artifact_results:
+        try:
+            from config_snapshot import create_snapshot as _create_snapshot  # type: ignore
+            snapshot_info = _create_snapshot(reason="after-transfer")
+        except Exception as exc:  # pragma: no cover - defensive
+            snapshot_info = {"error": f"Snapshot fehlgeschlagen: {exc}"}
+
     return {
         "ok": True,
         "envWritten": sorted(env_updates.keys()),
@@ -6611,6 +7086,10 @@ def apply_config_transfer(payload: dict[str, object]) -> dict[str, object]:
         "envKeyCount": len(written_env),
         "adminPanelFirebaseConfigWritten": panel_written,
         "adminPanelFirebaseConfigFile": str(ADMIN_PANEL_FIREBASE_CONFIG_FILE),
+        "panelFirebaseConfigFiles": [str(p) for p in PANEL_FIREBASE_CONFIG_FILES],
+        "artifactsWritten": sorted(artifact_results.keys()),
+        "artifacts": artifact_status,
+        "snapshot": snapshot_info,
     }
 
 
@@ -6644,6 +7123,67 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             try:
                 return self._write_json(HTTPStatus.OK, load_config_transfer_state())
             except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/config/snapshots":
+            try:
+                from config_snapshot import list_snapshots, SNAPSHOT_ROOT  # type: ignore
+                return self._write_json(HTTPStatus.OK, {
+                    "snapshotRoot": str(SNAPSHOT_ROOT),
+                    "snapshots": list_snapshots(),
+                })
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/firebase/projects":
+            try:
+                projects = list_firebase_projects()
+                return self._write_json(HTTPStatus.OK, {
+                    "projects": projects,
+                    "count": len(projects),
+                })
+            except RuntimeError as exc:
+                return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/firebase/import":
+            query = parse_qs(parsed.query)
+            project_id = (query.get("projectId") or [""])[0].strip()
+            if not project_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "projectId fehlt."})
+            try:
+                return self._write_json(HTTPStatus.OK, import_firebase_project(project_id))
+            except ValueError as exc:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            except RuntimeError as exc:
+                return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/tools/android-debug-sha":
+            try:
+                from keystore_tools import read_debug_keystore_fingerprints  # type: ignore
+                return self._write_json(HTTPStatus.OK, read_debug_keystore_fingerprints())
+            except FileNotFoundError as exc:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            except RuntimeError as exc:
+                return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/tools/gcloud-status":
+            try:
+                from gcloud_tools import gcloud_status  # type: ignore
+                return self._write_json(HTTPStatus.OK, gcloud_status())
+            except Exception as exc:  # pragma: no cover
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+        if parsed.path == "/api/tools/firebase-connectivity":
+            try:
+                from firebase_connectivity import run_connectivity_check  # type: ignore
+                return self._write_json(HTTPStatus.OK, run_connectivity_check(timeout=6.0))
+            except Exception as exc:  # pragma: no cover
                 return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
         if parsed.path == "/api/commissioning/history":
@@ -6686,6 +7226,19 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/qa/release-workspace":
             return self._write_json(HTTPStatus.OK, build_qa_release_workspace())
 
+        if parsed.path == "/api/release-doctor":
+            try:
+                from release_doctor import DEFAULT_JSON_OUT, DEFAULT_MARKDOWN_OUT, build_release_doctor, write_outputs  # type: ignore
+                payload = build_release_doctor()
+                write_outputs(payload, DEFAULT_JSON_OUT, DEFAULT_MARKDOWN_OUT)
+                payload["files"] = {
+                    "json": str(DEFAULT_JSON_OUT),
+                    "markdown": str(DEFAULT_MARKDOWN_OUT),
+                }
+                return self._write_json(HTTPStatus.OK, payload)
+            except Exception as exc:  # pragma: no cover - defensive HTTP boundary
+                return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
         if parsed.path == "/api/jobs":
             query = parse_qs(parsed.query)
             limit = parse_int(query.get("limit", [25])[0], 25, min_value=1, max_value=200)
@@ -6708,11 +7261,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.OK, {"runningEmulators": running, "count": len(running)})
 
         if parsed.path == "/api/qa/emulators/reservations":
+            _reservations = load_emulator_reservations()
             return self._write_json(
                 HTTPStatus.OK,
                 {
-                    "reservations": load_emulator_reservations(),
-                    "count": len(load_emulator_reservations()),
+                    "reservations": _reservations,
+                    "count": len(_reservations),
                 },
             )
 
@@ -6807,12 +7361,46 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
                 return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Job nicht gefunden."})
             return self._write_json(HTTPStatus.OK, job)
 
+        # ── Acceptance-API (GET) ────────────────────────────────────────
+        if parsed.path == "/api/acceptance/history":
+            return self._write_json(HTTPStatus.OK, load_acceptance_history())
+
+        if parsed.path.startswith("/api/acceptance/status/"):
+            run_id = parsed.path.split("/api/acceptance/status/", 1)[1].strip("/")
+            status = get_acceptance_run_status(run_id)
+            if status is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, status)
+
+        if parsed.path.startswith("/api/acceptance/report/"):
+            run_id = parsed.path.split("/api/acceptance/report/", 1)[1].strip("/")
+            report = get_acceptance_run_report(run_id)
+            if report is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, report)
+
         return super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         if parsed.path == "/api/config/transfer":
             return self._handle_config_transfer()
+        if parsed.path == "/api/config/snapshots/create":
+            return self._handle_snapshot_create()
+        if parsed.path == "/api/config/snapshots/restore":
+            return self._handle_snapshot_restore()
+        if parsed.path == "/api/tools/keystore-sha":
+            return self._handle_keystore_sha()
+        if parsed.path == "/api/tools/apple-key-validate":
+            return self._handle_apple_key_validate()
+        if parsed.path == "/api/tools/pubsub-create-topic":
+            return self._handle_pubsub_create_topic()
+        if parsed.path == "/api/tools/pubsub-check-topic":
+            return self._handle_pubsub_check_topic()
+        if parsed.path == "/api/tools/apk-verify":
+            return self._handle_apk_verify()
+        if parsed.path == "/api/diagnostics/auth-probe":
+            return self._handle_auth_probe()
         if parsed.path == "/api/commands/run":
             return self._handle_run_command()
         if parsed.path == "/api/commissioning/run":
@@ -6858,6 +7446,12 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/qa/emulators/release":
             return self._handle_release_emulator_reservation()
 
+        # ── Acceptance-API (POST) ───────────────────────────────────────
+        if parsed.path == "/api/acceptance/start":
+            return self._handle_acceptance_start()
+        if parsed.path == "/api/acceptance/submit":
+            return self._handle_acceptance_submit()
+
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden."})
 
     def _handle_run_command(self) -> None:
@@ -6883,6 +7477,138 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # pragma: no cover - defensive HTTP boundary
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_snapshot_create(self) -> None:
+        try:
+            payload = self._read_json_body()
+            reason = str(payload.get("reason") or "manual").strip()
+            from config_snapshot import create_snapshot, prune_snapshots  # type: ignore
+            info = create_snapshot(reason=reason)
+            prune_snapshots()
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, info)
+
+    def _handle_snapshot_restore(self) -> None:
+        try:
+            payload = self._read_json_body()
+            snapshot_id = str(payload.get("snapshotId") or "").strip()
+            if not snapshot_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "snapshotId fehlt im Body."})
+            from config_snapshot import restore_snapshot  # type: ignore
+            result = restore_snapshot(snapshot_id)
+        except FileNotFoundError as exc:
+            return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_keystore_sha(self) -> None:
+        try:
+            payload = self._read_json_body()
+            path = str(payload.get("path") or "").strip()
+            if not path:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "path fehlt im Body."})
+            alias = str(payload.get("alias") or "androiddebugkey").strip()
+            storepass = str(payload.get("storepass") or "android")
+            keypass = payload.get("keypass")
+            from keystore_tools import read_keystore_fingerprints  # type: ignore
+            result = read_keystore_fingerprints(
+                Path(path).expanduser(),
+                alias=alias,
+                storepass=storepass,
+                keypass=str(keypass) if keypass is not None else None,
+            )
+        except FileNotFoundError as exc:
+            return self._write_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except RuntimeError as exc:
+            return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_apple_key_validate(self) -> None:
+        try:
+            payload = self._read_json_body()
+            key_text = str(payload.get("key") or "")
+            if not key_text:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "key fehlt im Body."})
+            from openssl_tools import validate_apple_private_key  # type: ignore
+            result = validate_apple_private_key(key_text)
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        # Status-Code: 200 immer (Validierungsfehler ist kein API-Fehler)
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_pubsub_create_topic(self) -> None:
+        try:
+            payload = self._read_json_body()
+            project_id = str(payload.get("projectId") or "").strip()
+            topic = str(payload.get("topic") or "").strip()
+            if not project_id or not topic:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "projectId und topic muessen gesetzt sein."})
+            from gcloud_tools import create_pubsub_topic  # type: ignore
+            result = create_pubsub_topic(project_id, topic)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except RuntimeError as exc:
+            return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_pubsub_check_topic(self) -> None:
+        try:
+            payload = self._read_json_body()
+            project_id = str(payload.get("projectId") or "").strip()
+            topic = str(payload.get("topic") or "").strip()
+            if not project_id or not topic:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "projectId und topic muessen gesetzt sein."})
+            from gcloud_tools import check_pubsub_topic  # type: ignore
+            result = check_pubsub_topic(project_id, topic)
+        except ValueError as exc:
+            return self._write_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except RuntimeError as exc:
+            return self._write_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_apk_verify(self) -> None:
+        try:
+            payload = self._read_json_body()
+            apk_path = str(payload.get("path") or "").strip()
+            if not apk_path:
+                return self._write_json(HTTPStatus.BAD_REQUEST,
+                                        {"error": "path fehlt im Body."})
+            from apksigner_tools import verify_apk  # type: ignore
+            result = verify_apk(Path(apk_path).expanduser())
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        # Status-Code: 200, weil "nicht verifiziert" kein API-Fehler ist.
+        return self._write_json(HTTPStatus.OK, result)
+
+    def _handle_auth_probe(self) -> None:
+        """POST /api/diagnostics/auth-probe – Backend-Probe gegen Identity Toolkit.
+
+        Body (alles optional): {email, password, apiKey}.
+        Wenn email+password leer sind, laeuft nur die Dummy-Probe; sonst
+        zusaetzlich ein echter Login-Versuch. Credentials werden nicht geloggt.
+        """
+        try:
+            payload = self._read_json_body()
+            email = str(payload.get("email") or "").strip()
+            password = str(payload.get("password") or "")
+            api_key = str(payload.get("apiKey") or "").strip()
+            from auth_diagnostics import diagnose_login_failure  # type: ignore
+            result = diagnose_login_failure(api_key=api_key, email=email, password=password)
+        except Exception as exc:  # pragma: no cover
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        # 200 immer – Auth-Misserfolg ist Diagnose-Information, kein HTTP-Fehler.
         return self._write_json(HTTPStatus.OK, result)
 
     def _handle_run_commissioning(self) -> None:
@@ -7513,8 +8239,51 @@ class MiniMasterAdminHandler(SimpleHTTPRequestHandler):
             return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         return self._write_json(HTTPStatus.OK, {"jobId": job["jobId"], "status": "queued"})
 
+    def _handle_acceptance_start(self) -> None:
+        try:
+            payload = self._read_json_body()
+            mode = str(payload.get("mode") or "full").strip().lower()
+            if mode not in {"full", "quick", "lint-only"}:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "mode muss full, quick oder lint-only sein."})
+            with_coverage = bool(payload.get("coverage", False))
+            run_id = f"acc-{uuid4().hex[:12]}"
+            run_data = {
+                "runId": run_id,
+                "mode": mode,
+                "startedAt": datetime.now(timezone.utc).isoformat(),
+                "status": "running",
+                "results": {},
+                "logs": [f"[{datetime.now(timezone.utc).isoformat()}] Acceptance-Run gestartet (mode={mode}, coverage={with_coverage})"],
+            }
+            run_file = ACCEPTANCE_RUNS_DIR / f"{run_id}.json"
+            run_file.write_text(json.dumps(run_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            with _acceptance_lock:
+                _acceptance_runs[run_id] = run_data
+            thread = threading.Thread(target=_run_acceptance_task, args=(run_id, mode, with_coverage), daemon=True)
+            thread.start()
+            return self._write_json(HTTPStatus.OK, {"runId": run_id, "status": "running", "mode": mode})
+        except Exception as exc:
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_acceptance_submit(self) -> None:
+        try:
+            payload = self._read_json_body()
+            run_id = str(payload.get("runId") or "").strip()
+            if not run_id:
+                return self._write_json(HTTPStatus.BAD_REQUEST, {"error": "runId ist erforderlich."})
+            report = get_acceptance_run_report(run_id)
+            if report is None:
+                return self._write_json(HTTPStatus.NOT_FOUND, {"error": "Run nicht gefunden."})
+            return self._write_json(HTTPStatus.OK, {"success": True, "runId": run_id, "message": "Run erfolgreich eingereicht."})
+        except Exception as exc:
+            return self._write_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
     def _read_json_body(self) -> dict[str, object]:
+        MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
         content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length > MAX_REQUEST_BODY_BYTES:
+            self._write_json(413, {"error": "Request body too large"})
+            return None
         raw = self.rfile.read(content_length) if content_length > 0 else b"{}"
         try:
             return json.loads(raw.decode("utf-8"))

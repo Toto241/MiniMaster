@@ -34,7 +34,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet("status","set-secret","rotate-token","create-topic","apply-targets","deploy-rules","upload-config","mark")]
+  [ValidateSet("status","set-secret","rotate-token","create-topic","apply-targets","deploy-rules","upload-config","mark","run-tests","acceptance-gate","upload-coverage")]
   [string]$Action,
 
   [string]$ProjectId,
@@ -194,6 +194,58 @@ switch ($Action) {
     if ($ConfigKind -eq "service-account") {
       Write-Host "Hinweis: $rel ist gitignored. Für Functions-Runtime separat als Secret hochladen." -ForegroundColor Yellow
     }
+  }
+
+  "run-tests" {
+    Require-Tool "npm" "npm install -g npm"
+    Push-Location $repoRoot
+    try {
+      Write-Host "→ npm test" -ForegroundColor Cyan
+      & npm test
+    } finally { Pop-Location }
+  }
+
+  "acceptance-gate" {
+    $result = Invoke-CallableFunction -fnName "checkAcceptanceGates" -payload @{}  
+    Write-Host ""
+    Write-Host "── ACCEPTANCE GATES ──" -ForegroundColor Green
+    if (-not $result.gatesAvailable) {
+      Write-Host $result.message -ForegroundColor Yellow
+    } else {
+      Write-Host "Lint Clean     : $($result.gates.lintClean)" -ForegroundColor $(if ($result.gates.lintClean) { "Green" } else { "Red" })
+      Write-Host "Build Passed   : $($result.gates.buildPassed)" -ForegroundColor $(if ($result.gates.buildPassed) { "Green" } else { "Red" })
+      Write-Host "All Tests OK   : $($result.gates.allTestsPassed)" -ForegroundColor $(if ($result.gates.allTestsPassed) { "Green" } else { "Red" })
+      Write-Host "Coverage Branches  : $($result.gates.coverageBranches)" -ForegroundColor $(if ($result.gates.coverageBranches) { "Green" } else { "Red" })
+      Write-Host "Coverage Functions : $($result.gates.coverageFunctions)" -ForegroundColor $(if ($result.gates.coverageFunctions) { "Green" } else { "Red" })
+      Write-Host "Coverage Lines     : $($result.gates.coverageLines)" -ForegroundColor $(if ($result.gates.coverageLines) { "Green" } else { "Red" })
+      Write-Host "Coverage Statements: $($result.gates.coverageStatements)" -ForegroundColor $(if ($result.gates.coverageStatements) { "Green" } else { "Red" })
+      Write-Host ""
+      if ($result.allGatesPassed) {
+        Write-Host "✔ ALLE GATES BESTANDEN" -ForegroundColor Green
+      } else {
+        Write-Host "✘ EINIGE GATES FEHLGESCHLAGEN" -ForegroundColor Red
+      }
+    }
+  }
+
+  "upload-coverage" {
+    $covFile = Join-Path $repoRoot "coverage" "lcov-report" "index.html"
+    if (-not (Test-Path $covFile)) {
+      Write-Host "Coverage-Report nicht gefunden: $covFile" -ForegroundColor Yellow
+      Write-Host "Führe zuerst 'npm test -- --coverage' aus." -ForegroundColor Cyan
+      return
+    }
+    $html = Get-Content $covFile -Raw
+    # Extrahiere Coverage-Werte aus dem HTML
+    $lines = 0; $functions = 0; $branches = 0
+    if ($html -match 'Lines[^\d]*(\d+(?:\.\d+)?)%') { $lines = [math]::Round($matches[1]) }
+    if ($html -match 'Functions[^\d]*(\d+(?:\.\d+)?)%') { $functions = [math]::Round($matches[1]) }
+    if ($html -match 'Branches[^\d]*(\d+(?:\.\d+)?)%') { $branches = [math]::Round($matches[1]) }
+    Write-Host ""
+    Write-Host "── COVERAGE SUMMARY ──" -ForegroundColor Green
+    Write-Host "Lines    : $lines%"
+    Write-Host "Functions: $functions%"
+    Write-Host "Branches : $branches%"
   }
 
   default { throw "Unbekannte Action: $Action" }

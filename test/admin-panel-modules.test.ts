@@ -26,7 +26,9 @@ function rewriteAsCommonJS(source: string, _baseDir: string): string {
     .replace(/^\s*export\s+function\s+([A-Za-z_$][\w$]*)/gm,
       (_m, name) => `module.exports.${name} = function ${name}`)
     .replace(/^\s*export\s+const\s+([A-Za-z_$][\w$]*)\s*=/gm,
-      (_m, name) => `module.exports.${name} =`);
+      (_m, name) => `module.exports.${name} =`)
+    .replace(/^\s*export\s+default\s+([A-Za-z_$][\w$]*);?\s*$/gm,
+      (_m, name) => `module.exports.default = ${name};`);
 }
 
 function makeLoader(globalScope: any) {
@@ -123,10 +125,12 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "operatorConfig",
       "operatorEffective",
       "platformQaReadiness",
+      "pricingLookup",
       "pythonAutomationActions",
       "qaTestingRegister",
       "sanitize",
       "security",
+      "sessionManager",
       "testingRegisterInsights",
       "testingRegisterPriorities",
     ]);
@@ -1814,14 +1818,14 @@ describe("admin-panel module wiring", () => {
     }
   });
 
-  it("Fassade swappt 28 Funktionen in simulierter Browser-Reihenfolge", async () => {
+  it("Fassade swappt 29 Funktionen in simulierter Browser-Reihenfolge", async () => {
     // Simuliere: 1. app.js parst & deklariert Originale, 2. Module registrieren MM,
     // 3. DOMContentLoaded -> _mmInstallFacade ersetzt globale Funktionsbindings.
     const sandboxGlobal: any = {};
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(27);
+    expect(sandboxGlobal.MM.list().length).toBe(29);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der geswappten Funktionen taucht im app.js

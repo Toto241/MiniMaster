@@ -12,7 +12,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db, storage } from "../firebase";
-import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess } from "./shared";
+import { requireAuth, checkRateLimit, validateAppCheck, AuditLogger, hasActiveAccess, getTracedLogger } from "./shared";
 import {
   validateDeviceId,
   validateTaskDescription,
@@ -169,6 +169,7 @@ export const createTask = functions.https.onCall(
   withErrorHandling(
     "createTask",
     async (data: { childId: string; description: string; deadlineISO: string; unlockDuration?: number }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "createTask");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -201,7 +202,7 @@ export const createTask = functions.https.onCall(
       if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
         await AuditLogger.logDenied(
           "task.create", context, `children/${childId}/tasks`, "task",
-          "Master not authorized for this child", { childId, description }
+          "Master not authorized for this child", { childId, description, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
       }
@@ -221,10 +222,10 @@ export const createTask = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "task.create", context, `children/${childId}/tasks/${taskRef.id}`, "task",
-        { childId, taskId: taskRef.id, description, deadline: deadlineISO, duration: Date.now() - startTime }
+        { childId, taskId: taskRef.id, description, deadline: deadlineISO, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Task ${taskRef.id} created for child ${childId}`);
+      logger.info(`Task ${taskRef.id} created for child ${childId}`);
       return { success: true, taskId: taskRef.id };
     }
   )
@@ -236,9 +237,11 @@ export const completeTask = functions.https.onCall(
   withErrorHandling(
     "completeTask",
     async (data: { taskId: string; photoUrl: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "completeTask");
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
+      checkRateLimit(childId, "completeTask", 10, 60 * 60 * 1000);
 
       const taskId = validateDeviceId(data.taskId, "taskId");
       const photoUrl = validateFirebaseStorageUrl(data.photoUrl);
@@ -288,10 +291,10 @@ export const completeTask = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "task.complete", context, `children/${childId}/tasks/${taskId}`, "task",
-        { childId, taskId, duration: Date.now() - startTime }
+        { childId, taskId, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
+      logger.info(`TASK_COMPLETED taskId=${taskId} child=${childId}`);
       return { success: true };
     }
   )
@@ -303,6 +306,7 @@ export const approveTask = functions.https.onCall(
   withErrorHandling(
     "approveTask",
     async (data: { childId: string; taskId: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "approveTask");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -320,7 +324,7 @@ export const approveTask = functions.https.onCall(
       if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
         await AuditLogger.logDenied(
           "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",
-          "Master not authorized for this child", { childId, taskId }
+          "Master not authorized for this child", { childId, taskId, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
       }
@@ -335,21 +339,23 @@ export const approveTask = functions.https.onCall(
         throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
       }
 
-      await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-
+      const updatePayload: Record<string, unknown> = {
+        status: "approved",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
       if (typeof taskData?.unlockDuration === "number" && taskData.unlockDuration > 0) {
-        const unlockUntil = admin.firestore.Timestamp.fromMillis(
+        updatePayload.unlockUntil = admin.firestore.Timestamp.fromMillis(
           Date.now() + taskData.unlockDuration * 60 * 1000
         );
-        await taskRef.update({ unlockUntil });
       }
+      await taskRef.update(updatePayload);
 
       await AuditLogger.logSuccess(
         "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",
-        { childId, taskId, duration: Date.now() - startTime }
+        { childId, taskId, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
+      logger.info(`TASK_APPROVED taskId=${taskId} child=${childId} master=${masterId}`);
       return { success: true };
     }
   )
@@ -361,6 +367,7 @@ export const rejectTask = functions.https.onCall(
   withErrorHandling(
     "rejectTask",
     async (data: { childId: string; taskId: string; reason?: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "rejectTask");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -379,7 +386,7 @@ export const rejectTask = functions.https.onCall(
       if (!childDoc.exists || childDoc.data()?.masterImei !== masterId) {
         await AuditLogger.logDenied(
           "task.reject", context, `children/${childId}/tasks/${taskId}`, "task",
-          "Master not authorized for this child", { childId, taskId }
+          "Master not authorized for this child", { childId, taskId, traceId }
         );
         throw new functions.https.HttpsError("permission-denied", "Master not authorized for this child.");
       }
@@ -406,10 +413,10 @@ export const rejectTask = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "task.reject", context, `children/${childId}/tasks/${taskId}`, "task",
-        { childId, taskId, reason: reason || "none", duration: Date.now() - startTime }
+        { childId, taskId, reason: reason || "none", duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`TASK_REJECTED taskId=${taskId} child=${childId} master=${masterId} reason=${reason || "none"}`);
+      logger.info(`TASK_REJECTED taskId=${taskId} child=${childId} master=${masterId} reason=${reason || "none"}`);
       return { success: true };
     }
   )
