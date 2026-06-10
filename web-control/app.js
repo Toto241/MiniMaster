@@ -94,39 +94,43 @@ const LEGAL_COUNTRY_OPTIONS = [
     { code: "SA", label: "Saudi Arabia" },
 ];
 
-// ==================== SESSION TIMEOUT ====================
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
-let sessionTimeoutTimer = null;
-let sessionWarningTimer = null;
+// ==================== SESSION TIMEOUT (AP-N3 — shared master panel policy) ====================
+let masterSessionManager = null;
+
+function getMasterSessionManager() {
+    if (!masterSessionManager && typeof MiniMasterSessionManager === "function") {
+        masterSessionManager = new MiniMasterSessionManager({
+            isActive: () => Boolean(currentMasterImei),
+            onLogout: () => logout(),
+            onNotify: (message, type) => showNotification(message, type || "info"),
+        });
+    }
+    return masterSessionManager;
+}
+
+function ensureMasterSession() {
+    const manager = getMasterSessionManager();
+    if (!manager) return true;
+    return manager.ensureActiveSession();
+}
 
 function resetSessionTimeout() {
-    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
-    if (!currentMasterImei) return;
-
-    sessionWarningTimer = setTimeout(() => {
-        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "error");
-    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
-
-    sessionTimeoutTimer = setTimeout(() => {
-        if (currentMasterImei) {
-            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
-            logout();
-        }
-    }, SESSION_TIMEOUT_MS);
+    const manager = getMasterSessionManager();
+    if (manager) {
+        manager.recordActivity();
+    }
 }
 
 function startSessionMonitoring() {
-    const events = ["mousedown", "keydown", "scroll", "touchstart"];
-    events.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
-    resetSessionTimeout();
+    const manager = getMasterSessionManager();
+    if (!manager) return;
+    manager.markLoggedIn();
+    manager.start();
 }
 
 function stopSessionMonitoring() {
-    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
-    sessionTimeoutTimer = null;
-    sessionWarningTimer = null;
+    const manager = getMasterSessionManager();
+    if (manager) manager.stop();
 }
 
 // Firebase configuration — configure via Operator-Dashboard (localStorage) or replace placeholders
@@ -228,6 +232,7 @@ function isPlaceholderFirebaseConfig(config) {
 }
 
 function loadFirebaseConfig() {
+    // 1) Lokaler Override (Bootstrap-Dialog -> localStorage) gewinnt.
     try {
         const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
@@ -236,6 +241,15 @@ function loadFirebaseConfig() {
         }
     } catch (error) {
         console.warn('Failed to load Firebase config override:', error);
+    }
+    // 2) Vom Setup-Wizard generierte firebase-config.js (window.__MM_FIREBASE_CONFIG__).
+    try {
+        const injected = typeof window !== 'undefined' ? window.__MM_FIREBASE_CONFIG__ : null;
+        if (hasCompleteFirebaseConfig(injected) && !isPlaceholderFirebaseConfig(injected)) {
+            return injected;
+        }
+    } catch (error) {
+        console.warn('Failed to read injected Firebase config:', error);
     }
     return fallbackFirebaseConfig;
 }
@@ -794,6 +808,7 @@ function renderDevices(devices) {
  * @param {boolean} isLocked - The desired new lock state.
  */
 function toggleDeviceLock(childImei, isLocked) {
+    if (!ensureMasterSession()) return;
     const setDeviceLocked = functions.httpsCallable('setDeviceLocked');
 
     setDeviceLocked({
@@ -892,6 +907,7 @@ function closeTaskModal() {
  */
 function createTask(event) {
     event.preventDefault();
+    if (!ensureMasterSession()) return;
     const selectorGroup = document.getElementById('task-child-selector-group');
     const selectedChildId = document.getElementById('task-child-select')?.value;
     const childId = selectorGroup && selectorGroup.style.display !== 'none' && selectedChildId
@@ -1014,6 +1030,7 @@ function loadUsageHistory(childId) {
  */
 function saveRules(event) {
     event.preventDefault();
+    if (!ensureMasterSession()) return;
 
     const childImei = document.getElementById('rules-child-id').value;
     const dailyLimitMinutes = parseInt(document.getElementById('daily-limit').value);
@@ -1158,6 +1175,7 @@ function renderTasksToReview(tasks) {
  * @param {string} childImei - The ID of the child device.
  */
 function approveTaskReview(taskId, childImei) {
+    if (!ensureMasterSession()) return;
     const approveTask = functions.httpsCallable('approveTask');
 
     approveTask({
@@ -1286,6 +1304,7 @@ function showSupport() {
 
 async function createSupportTicket(event) {
     event.preventDefault();
+    if (!ensureMasterSession()) return;
 
     const problemDescription = document.getElementById('problem-description').value;
     const consentValue = document.querySelector('input[name="support-access-consent"]:checked')?.value;
@@ -1420,6 +1439,7 @@ async function grantAccess(ticketId) {
     if (!confirm('This will grant the support team temporary access to your account data for 48 hours. Continue?')) {
         return;
     }
+    if (!ensureMasterSession()) return;
 
     try {
         const grantAccess = functions.httpsCallable('grantSupportAccess');
@@ -1439,6 +1459,7 @@ async function revokeAccess(grantId) {
     if (!confirm('This will revoke support access to your account. Continue?')) {
         return;
     }
+    if (!ensureMasterSession()) return;
 
     try {
         const revokeAccess = functions.httpsCallable('revokeSupportAccess');

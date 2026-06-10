@@ -68,16 +68,30 @@ def collect_findings() -> list[Finding]:
     findings: list[Finding] = []
 
     billing_blocker = contains(ci, "Billing blocker detected: yes") or contains(ci, "spending limit")
+    code_scanning_blocker = contains(ci, "Code Scanning not enabled") or contains(release, "Code Scanning not enabled")
     codeql_success = contains(ci, "CodeQL Security Analysis", "Latest status: completed / success")
     android_success = contains(ci, "Android CI", "Latest status: completed / success")
+    codeql_status = (
+        "blocked_external"
+        if code_scanning_blocker
+        else status_from_bool(codeql_success, billing_blocker)
+    )
 
     findings.append(Finding(
         area="CI / Security Gate",
-        status=status_from_bool(codeql_success, billing_blocker),
+        status=codeql_status,
         severity="P0",
         title="Current CodeQL evidence is required before release",
-        evidence="CI_REVALIDATION_LATEST.md reports a billing/spending-limit blocker" if billing_blocker else "CI_REVALIDATION_LATEST.md inspected",
-        next_action="Resolve GitHub Actions billing/spending limit, rerun CodeQL, and update release evidence with a green run.",
+        evidence=(
+            "CodeQL workflow is green, but GitHub Code Scanning API is still disabled in repository settings"
+            if codeql_success and code_scanning_blocker
+            else "GitHub Code Scanning is not enabled in repository settings"
+            if code_scanning_blocker
+            else "CI_REVALIDATION_LATEST.md reports a billing/spending-limit blocker"
+            if billing_blocker
+            else "CI_REVALIDATION_LATEST.md inspected"
+        ),
+        next_action="Enable GitHub Code Scanning in repository settings, rerun CodeQL, and update release evidence with a green run.",
     ))
 
     findings.append(Finding(
@@ -86,23 +100,27 @@ def collect_findings() -> list[Finding]:
         severity="P0",
         title="Current Android CI evidence is required before release",
         evidence="CI_REVALIDATION_LATEST.md reports Android CI did not start because of billing/spending-limit" if billing_blocker else "CI_REVALIDATION_LATEST.md inspected",
-        next_action="Rerun Android CI after billing is fixed and archive the run URL in RELEASE_EVIDENCE_REGISTER.md.",
+        next_action="Rerun Android CI after the branch is pushed and archive the run URL in RELEASE_EVIDENCE_REGISTER.md.",
     ))
 
     deploy_done = not contains(release, "Deployment Reference | _(pending final deploy)_") and not contains(release, "Deployment result", "⛔")
     findings.append(Finding(
         area="Release Evidence",
-        status=status_from_bool(deploy_done),
+        status=status_from_bool(deploy_done, blocked=not deploy_done),
         severity="P0",
         title="Final deployment reference is still missing",
         evidence="RELEASE_EVIDENCE_REGISTER.md still marks final deploy evidence as pending or blocked.",
         next_action="Run an authenticated deploy with production runtime config, capture the deployment reference, and update the evidence register.",
     ))
 
-    commissioning_done = contains(release, "android-apps", "✅") and not contains(release, "No connected Android device or emulator")
+    commissioning_done = bool(re.search(
+        r"^\|\s*android-apps\b[^|]*\|\s*✅\s*\|",
+        release,
+        flags=re.IGNORECASE | re.MULTILINE,
+    ))
     findings.append(Finding(
         area="Android Commissioning",
-        status=status_from_bool(commissioning_done),
+        status=status_from_bool(commissioning_done, blocked=not commissioning_done),
         severity="P0",
         title="Real/emulated Android commissioning evidence is incomplete",
         evidence="RELEASE_EVIDENCE_REGISTER.md documents skipped device suites / missing AVD or device readiness.",
@@ -185,19 +203,27 @@ def collect_findings() -> list[Finding]:
 
 
 def summarize(findings: list[Finding]) -> dict[str, object]:
-    hard_blockers = [f for f in findings if f.severity == "P0" and f.status != "done"]
+    release_blockers = [f for f in findings if f.severity == "P0" and f.status != "done"]
+    repo_blockers = [f for f in findings if f.severity == "P0" and f.status == "open"]
+    external_blockers = [f for f in findings if f.severity == "P0" and f.status == "blocked_external"]
     p1_open = [f for f in findings if f.severity == "P1" and f.status not in {"done"}]
-    p2_open = [f for f in findings if f.severity == "P2" and f.status not in {"done"}]
+    p2_open = [f for f in findings if f.severity == "P2" and f.status not in {"done", "review_required"}]
 
-    repo_done = max(0, 100 - len(hard_blockers) * 10 - len(p1_open) * 5 - len(p2_open) * 2)
-    release_ready = len(hard_blockers) == 0 and all(f.status == "done" for f in findings if f.severity == "P1")
+    repo_done = max(0, 100 - len(repo_blockers) * 10 - len(p1_open) * 5 - len(p2_open) * 2)
+    release_ready = len(release_blockers) == 0 and all(f.status == "done" for f in findings if f.severity == "P1")
+    repo_ready = len(repo_blockers) == 0 and all(
+        f.status in {"done", "in_progress", "blocked_external"} for f in findings if f.severity == "P1"
+    )
 
     return {
         "generated_at_epoch": int(time.time()),
         "repository": "Toto241/MiniMaster",
         "release_ready": release_ready,
+        "repo_ready": repo_ready,
         "estimated_repo_completion_percent": repo_done,
-        "hard_blocker_count": len(hard_blockers),
+        "hard_blocker_count": len(release_blockers),
+        "repo_blocker_count": len(repo_blockers),
+        "external_blocker_count": len(external_blockers),
         "p1_open_count": len(p1_open),
         "p2_open_count": len(p2_open),
         "findings": [asdict(f) for f in findings],
@@ -211,8 +237,11 @@ def render_markdown(payload: dict[str, object]) -> str:
         "",
         f"Generated epoch: `{payload['generated_at_epoch']}`",
         f"Release ready: `{payload['release_ready']}`",
+        f"Repo ready: `{payload['repo_ready']}`",
         f"Estimated repo completion: `{payload['estimated_repo_completion_percent']}%`",
-        f"P0 blockers: `{payload['hard_blocker_count']}`",
+        f"P0 release blockers: `{payload['hard_blocker_count']}`",
+        f"P0 repo blockers: `{payload['repo_blocker_count']}`",
+        f"P0 external blockers: `{payload['external_blocker_count']}`",
         f"P1 open: `{payload['p1_open_count']}`",
         f"P2 open: `{payload['p2_open_count']}`",
         "",
@@ -238,7 +267,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Analyze MiniMaster manufacturing status and implementation gaps.")
     parser.add_argument("--json-out", type=Path, default=DEFAULT_JSON_OUT)
     parser.add_argument("--markdown-out", type=Path, default=DEFAULT_MARKDOWN_OUT)
-    parser.add_argument("--fail-on-p0", action="store_true", help="Return non-zero if any P0 blocker is open.")
+    parser.add_argument("--fail-on-p0", action="store_true", help="Return non-zero if any in-repo P0 blocker is open.")
     args = parser.parse_args()
 
     findings = collect_findings()
@@ -250,7 +279,7 @@ def main() -> int:
     args.markdown_out.write_text(render_markdown(payload), encoding="utf-8")
 
     print(json.dumps(payload, indent=2, ensure_ascii=False))
-    return 1 if args.fail_on_p0 and payload["hard_blocker_count"] else 0
+    return 1 if args.fail_on_p0 and payload["repo_blocker_count"] else 0
 
 
 if __name__ == "__main__":

@@ -25,4 +25,10 @@ describe("child-panel security regressions", () => {
     expect(indexSource).not.toContain(" style=\"");
     expect(indexSource).toContain("<link rel=\"stylesheet\" href=\"./styles.css\" />");
   });
+
+  it("loads shared master session manager", () => {
+    expect(indexSource).toContain("shared-ui-session-manager.js");
+    expect(appSource).toContain("MiniMasterSessionManager");
+    expect(appSource).toContain("ensureMasterSession");
+  });
 });

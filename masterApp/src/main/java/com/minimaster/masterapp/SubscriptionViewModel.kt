@@ -77,6 +77,9 @@ class SubscriptionViewModel @Inject constructor(
             )
             try {
                 functions.getHttpsCallable("verifyPurchase").call(data).await()
+                if (!purchase.isAcknowledged) {
+                    billingClientWrapper.acknowledgePurchase(purchase)
+                }
                 Log.d(TAG, "Purchase verification successful for $sku.")
             } catch (e: Exception) {
                 Log.e(TAG, "Purchase verification failed for $sku.", e)

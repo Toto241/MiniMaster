@@ -291,6 +291,7 @@ export async function getRateLimitMetrics(): Promise<{
   try {
     const snapshot = await db().collection(RATE_LIMIT_COLLECTION)
       .where("blockedUntil", ">", admin.firestore.Timestamp.now())
+      .limit(500)
       .get();
 
     const blockedUsers = snapshot.size;

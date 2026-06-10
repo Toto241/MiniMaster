@@ -64,6 +64,10 @@ final class CommandSyncService: ObservableObject {
         networkMonitor.start(queue: networkQueue)
     }
 
+    deinit {
+        networkMonitor.cancel()
+    }
+
     /// Store the childId after successful pairing.
     func configure(childId: String) {
         self.childId = childId
@@ -144,18 +148,22 @@ final class CommandSyncService: ObservableObject {
 
     // MARK: - Fetch & Apply Commands
 
-    func fetchAndApplyAllCommands(childId: String, cursor: String? = nil) async {
+    func fetchAndApplyAllCommands(childId: String, cursor initialCursor: String? = nil) async {
+        var cursor: String? = initialCursor
+        var iterations = 0
+        let maxIterations = 100
         do {
-            let (commands, nextCursor, _) = try await client.fetchPendingCommands(
-                childId: childId,
-                cursor: cursor
-            )
-            for command in commands {
-                await applyAndAck(command: command, childId: childId)
-            }
-            if let next = nextCursor {
-                await fetchAndApplyAllCommands(childId: childId, cursor: next)
-            }
+            repeat {
+                let (commands, nextCursor, _) = try await client.fetchPendingCommands(
+                    childId: childId,
+                    cursor: cursor
+                )
+                for command in commands {
+                    await applyAndAck(command: command, childId: childId)
+                }
+                cursor = nextCursor
+                iterations += 1
+            } while cursor != nil && iterations < maxIterations
             pendingCommandCount = 0
             lastSyncDate = Date()
         } catch {

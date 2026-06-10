@@ -69,7 +69,8 @@ class CommissioningMasterUiFlowTest {
                     description = "Upload proof",
                     photoUrl = "https://example.com/proof.jpg"
                 ),
-                onApproveClick = { approveClicked = true }
+                onApproveClick = { approveClicked = true },
+                onRejectClick = {}
             )
         }
 

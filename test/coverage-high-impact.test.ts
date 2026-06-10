@@ -178,6 +178,32 @@ const mockFirestore: any = {
       },
     }),
   }),
+  runTransaction: async (updateFn: any) => {
+    const tx = {
+      get: async (refOrQuery: any) => {
+        if (typeof refOrQuery.get === "function") {
+          return refOrQuery.get();
+        }
+        return refOrQuery.get();
+      },
+      set: async (ref: any, data: DocData, opts?: { merge?: boolean }) => {
+        if (typeof ref.set === "function") {
+          await ref.set(data, opts);
+        }
+      },
+      update: async (ref: any, data: DocData) => {
+        if (typeof ref.update === "function") {
+          await ref.update(data);
+        }
+      },
+      delete: async (ref: any) => {
+        if (typeof ref.delete === "function") {
+          await ref.delete();
+        }
+      },
+    };
+    return await updateFn(tx);
+  },
   batch: () => {
     const updates: Array<() => Promise<void>> = [];
     return {

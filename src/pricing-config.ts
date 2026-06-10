@@ -206,7 +206,7 @@ export function calculatePrice(priceCents: number, countryCode: string, vatId?: 
   reverseCharge: boolean;
 } {
   const vatConfig = VAT_RATES[countryCode.toUpperCase()];
-  const vatRate = vatConfig?.rate || 0.19; // Default to German VAT
+  const vatRate = vatConfig?.rate ?? 0;
 
   // B2B reverse charge for EU businesses with valid VAT ID
   const reverseCharge = Boolean(vatId && vatId.length > 5 && countryCode.toUpperCase() !== "CH");

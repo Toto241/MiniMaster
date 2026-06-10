@@ -241,6 +241,7 @@ export const completeTask = functions.https.onCall(
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
+      checkRateLimit(childId, "completeTask", 10, 60 * 60 * 1000);
 
       const taskId = validateDeviceId(data.taskId, "taskId");
       const photoUrl = validateFirebaseStorageUrl(data.photoUrl);
@@ -338,14 +339,16 @@ export const approveTask = functions.https.onCall(
         throw new functions.https.HttpsError("failed-precondition", "Task not in pending_approval state.");
       }
 
-      await taskRef.update({ status: "approved", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-
+      const updatePayload: Record<string, unknown> = {
+        status: "approved",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
       if (typeof taskData?.unlockDuration === "number" && taskData.unlockDuration > 0) {
-        const unlockUntil = admin.firestore.Timestamp.fromMillis(
+        updatePayload.unlockUntil = admin.firestore.Timestamp.fromMillis(
           Date.now() + taskData.unlockDuration * 60 * 1000
         );
-        await taskRef.update({ unlockUntil });
       }
+      await taskRef.update(updatePayload);
 
       await AuditLogger.logSuccess(
         "task.approve", context, `children/${childId}/tasks/${taskId}`, "task",

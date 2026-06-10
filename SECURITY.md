@@ -69,7 +69,14 @@ The environment variable `DISABLE_LEGACY_SECRETKEY_AUTH=true` can be set to reje
 
 ### Session Timeout
 
-Both web panels (admin-panel and web-control) enforce a **30-minute inactivity timeout**. The session timer resets on user interaction. On expiry, the user is logged out and redirected to the login screen. Implementation: client-side `setTimeout` + `firebase.auth().signOut()`.
+All operator and master web panels enforce aligned session policies (AP-N3):
+
+| Panel | Idle timeout | Max session | Re-auth |
+|-------|-------------|-------------|---------|
+| `admin-panel` | 15 min | 8 h (+ T3/T4 tiers) | Password + Admin-PIN for critical ops |
+| `web-control`, `parent-panel`, `child-panel` | 15 min | 8 h | Auto-logout (custom-token sessions) |
+
+Master panels use `shared-ui-session-manager.js`; the operator dashboard uses `admin-panel/modules/core/session-manager.js`. On expiry, users are signed out via `firebase.auth().signOut()`.
 
 ### Content Security Policy (CSP)
 

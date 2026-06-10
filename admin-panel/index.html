@@ -2,6 +2,7 @@
 <html lang="de">
     <head>
         <meta charset="UTF-8" />
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com; img-src 'self' data: https:; frame-ancestors 'none';">
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#0f172a" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -18,6 +19,10 @@
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
         <script src="../shared-ui-tooltips.js"></script>
+        <!-- Vom Setup-Wizard generierte Firebase-Werte (optional; ein 404 ist
+             erwartet, solange der Wizard nicht gelaufen ist – wird stillschweigend
+             ignoriert und window.__MM_FIREBASE_CONFIG__ bleibt undefined). -->
+        <script src="firebase-config.js"></script>
         <script src="appcheck-init.js"></script>
     </head>
     <body>
@@ -103,6 +108,9 @@
                 <button class="nav-tab" type="button" data-tab="ai" title="KI-Assistent für Fragen, Operator-Hilfe und Fehlerüberwachung">
                     🤖 KI-Assistent
                 </button>
+                <button class="nav-tab" type="button" data-tab="automation" title="Automatisches Management, Fehlerbehebung und Gemini-Steuerung">
+                    🤖 Automatisierung
+                </button>
                 <button class="nav-tab" type="button" data-tab="legal" title="Richtlinien, Einwilligungen, Reconsent und Play Store Readiness">
                     📜 Recht &amp; Datenschutz
                 </button>
@@ -134,10 +142,11 @@
                             einzurichten und Zugang zu erhalten.
                         </p>
                         <p id="electron-operator-badge" class="mm-u013">
-                                aus dem QA-Register ableiten lassen. Bereits nach Qualitätssicherung migrierte Freigaben wie
-                                Play-Store-Readiness, Android-/Support-/Compliance-Commissioning und AI-Runtime werden nur noch
-                                im Bereich <strong>Qualitätssicherung</strong> gepflegt. Alles hier ist lokal persistiert, im Admin-Panel sichtbar und
-                            CLI-Befehle können direkt aus diesem Dashboard ausgeführt werden.
+                            Freigabe-Status und Commissioning-Nachweise können direkt aus dem QA-Register abgeleitet werden.
+                            Bereits abgeschlossene Qualitätssicherungsbereiche wie Play-Store-Readiness,
+                            Android-/Support-/Compliance-Commissioning und AI-Runtime werden ausschließlich im Bereich
+                            <strong>Qualitätssicherung</strong> gepflegt. Alle Daten sind lokal persistiert und im
+                            Admin-Panel einsehbar. CLI-Befehle können direkt aus diesem Dashboard ausgeführt werden.
                         </p>
                     </div>
 
@@ -256,6 +265,35 @@
                                 <button type="button" data-action="reloadConfigTransferState" class="btn btn-secondary" title="Aktuelle Werte aus .env / firebase-config.js neu laden">Aus Dateien laden</button>
                             </div>
 
+                            <details class="phase-help" id="config-transfer-artifacts" open>
+                                <summary>Firebase-Pflicht-Artefakte (JSON-Dateien aus der Firebase-Console)</summary>
+                                <div class="phase-help-content">
+                                    <p class="text-muted">
+                                        Die drei JSON-Dateien sind fuer den Produktivbetrieb erforderlich. Datei auswaehlen oder per
+                                        Drag&amp;Drop ins Feld ziehen – beim Klick auf <strong>Übertragen</strong> werden sie an die
+                                        richtigen Stellen kopiert. Eine bereits gefuellte Datei wird unten als <em>vorhanden</em>
+                                        markiert; Auswaehlen ueberschreibt sie.
+                                    </p>
+                                    <div class="firebase-config-form">
+                                        <div class="config-field">
+                                            <label for="artifact-googleServicesMaster">masterApp/google-services.json</label>
+                                            <input type="file" id="artifact-googleServicesMaster" data-artifact-key="googleServicesMaster" accept=".json,application/json" />
+                                            <small class="text-muted" id="artifact-status-googleServicesMaster">Status: unbekannt</small>
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="artifact-googleServicesChild">childApp/google-services.json</label>
+                                            <input type="file" id="artifact-googleServicesChild" data-artifact-key="googleServicesChild" accept=".json,application/json" />
+                                            <small class="text-muted" id="artifact-status-googleServicesChild">Status: unbekannt</small>
+                                        </div>
+                                        <div class="config-field">
+                                            <label for="artifact-serviceAccountKey">serviceAccountKey.json (Repo-Stamm)</label>
+                                            <input type="file" id="artifact-serviceAccountKey" data-artifact-key="serviceAccountKey" accept=".json,application/json" />
+                                            <small class="text-muted" id="artifact-status-serviceAccountKey">Status: unbekannt</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
                             <details class="phase-help" id="config-transfer-secrets">
                                 <summary>Weitere Konfiguration / Secrets (werden bei „Übertragen" in <code>.env</code> geschrieben)</summary>
                                 <div class="phase-help-content">
@@ -323,6 +361,29 @@
                             </details>
 
                             <div id="config-transfer-status" class="phase-status"></div>
+
+                            <details class="phase-help" id="config-snapshots-section">
+                                <summary>Konfigurations-Snapshots (Schutz vor Datenverlust)</summary>
+                                <div class="phase-help-content">
+                                    <p class="text-muted">
+                                        Vor jeder Uebertragung und vor Git-Operationen
+                                        (checkout/merge/rebase) wird automatisch ein Snapshot der
+                                        Konfig-Pflicht-Dateien ausserhalb des Repos abgelegt. Per
+                                        <strong>Wiederherstellen</strong> kann ein frueherer Stand
+                                        zurueckgeholt werden – der aktuelle Stand wird vorher
+                                        automatisch als <em>pre-restore</em>-Snapshot gesichert.
+                                    </p>
+                                    <div class="phase-actions mm-u034">
+                                        <button type="button" data-action="createConfigSnapshot" class="btn btn-secondary" title="Sofort einen manuellen Snapshot anlegen">📸 Snapshot jetzt anlegen</button>
+                                        <button type="button" data-action="reloadConfigSnapshots" class="btn btn-secondary" title="Snapshot-Liste neu laden">Liste aktualisieren</button>
+                                    </div>
+                                    <p class="text-muted" id="config-snapshots-root"></p>
+                                    <div id="config-snapshots-list" class="phase-help-content">
+                                        <p class="text-muted">Snapshots werden beim Laden angezeigt …</p>
+                                    </div>
+                                    <div id="config-snapshots-status" class="phase-status"></div>
+                                </div>
+                            </details>
 
                             <div class="firebase-import-box mm-u040">
                                 <h4>Notfall-Neueinrichtung nach Cloud-Löschung</h4>
@@ -474,7 +535,15 @@
                                 <button type="button" class="btn btn-outline btn-full" id="check-provider-btn" title="Prüft, welche Anmeldemethode für diese E-Mail-Adresse konfiguriert ist">
                                     Anmeldeart für E-Mail prüfen
                                 </button>
+                                <button type="button" class="btn btn-outline btn-full" id="connectivity-test-btn" data-action="runConnectivityTest" title="Testet, ob Browser + Server die Firebase-Endpoints erreichen (Diagnose bei auth/network-request-failed)">
+                                    🔍 Verbindung testen (Browser + Server)
+                                </button>
+                                <button type="button" class="btn btn-outline btn-full" id="auth-probe-btn" data-action="runAuthDiagnostics" title="Probiert via Backend einen Identity-Toolkit-Aufruf und entschluesselt den echten Auth-Fehlercode (OPERATION_NOT_ALLOWED, INVALID_LOGIN_CREDENTIALS, API_KEY_*, ...). Wenn Email+Passwort eingetragen sind, wird auch ein echter Login-Versuch gemacht.">
+                                    🩺 Erweiterte Login-Diagnose (Identity Toolkit Probe)
+                                </button>
                                 <div id="login-status" class="phase-status"></div>
+                                <div id="connectivity-test-result" class="phase-status" hidden></div>
+                                <div id="auth-probe-result" class="phase-status" hidden></div>
                             </form>
                         </div>
                     </div>
@@ -817,6 +886,22 @@
                                 Geschlossen
                             </button>
                         </div>
+                        <section id="support-automation-panel" class="support-automation-panel admin-info-box mm-u010">
+                            <h3>Support-Automation</h3>
+                            <p>
+                                Master-initiierte Freigaben laufen über <code>grantSupportAccess</code>,
+                                <code>revokeSupportAccess</code> und <code>grantDebugAccess</code> im Parent-/Web-Control-Panel.
+                                Operatoren nutzen <code>analyzeWithDebugData</code> im Ticket-Detail für KI-Reanalysen.
+                            </p>
+                            <button
+                                type="button"
+                                data-action="showSupportAutomationGuide"
+                                class="btn btn-secondary"
+                                title="Callable-Workflow und Rollen für Support-Automation anzeigen"
+                            >
+                                Callable-Workflow anzeigen
+                            </button>
+                        </section>
                         <div id="support-tickets-list" class="data-list">
                             <!-- Support tickets will be rendered here -->
                         </div>
@@ -987,6 +1072,27 @@
                             <div id="operator-readiness-content" class="mm-u048">
                                 <p class="muted">Klicken Sie auf „Status aktualisieren", um den aktuellen Inbetriebnahme-Status abzurufen.</p>
                             </div>
+                        </div>
+
+                        <!-- ==================== Admin-PIN (T4) ==================== -->
+                        <div class="setup-card mm-u043 admin-only" id="admin-pin-card">
+                            <h3>🔐 Operator Admin-PIN</h3>
+                            <p>
+                                Schützt kritische T4-Aktionen (Account-Löschung, Auth-Reset). Die PIN wird gehasht in
+                                <code>operatorConfig/adminPin</code> gespeichert. Nach erfolgreicher Eingabe gilt
+                                <code>admin_verified_at</code> für 30 Minuten.
+                            </p>
+                            <div id="admin-pin-status" class="muted">Status wird geladen…</div>
+                            <div class="mm-u011 mm-u036">
+                                <input type="password" id="admin-pin-current" class="form-input mm-u015" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Aktuelle PIN (bei Änderung)" title="Aktuelle Admin-PIN" />
+                                <input type="password" id="admin-pin-new" class="form-input mm-u015" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Neue PIN (6–8 Ziffern)" title="Neue Admin-PIN" />
+                                <input type="password" id="admin-pin-confirm" class="form-input mm-u015" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Neue PIN bestätigen" title="Neue Admin-PIN bestätigen" />
+                            </div>
+                            <div class="mm-u011">
+                                <button id="btn-save-admin-pin" class="primary-btn" type="button">PIN speichern</button>
+                                <button id="btn-verify-admin-pin" class="secondary-btn" type="button">PIN jetzt bestätigen (T4)</button>
+                            </div>
+                            <div id="admin-pin-result" class="mm-u048"></div>
                         </div>
 
                         <!-- ==================== Externe Integrationen ==================== -->
@@ -1582,6 +1688,72 @@
                             </details>
                         </div>
 
+                        <div id="qa-acceptance-card" class="setup-card admin-only qa-workspace-card mm-u029">
+                            <div class="qa-workspace-header">
+                                <div>
+                                    <h3>🧪 Abnahme-Automation</h3>
+                                    <p>
+                                        Lokale Acceptance-Runs: Lint, Tests, Build und Coverage in einem Schritt.
+                                        Ergebnisse werden protokolliert und können an Firebase übermittelt werden.
+                                    </p>
+                                </div>
+                                <div class="setup-actions mm-u031">
+                                    <button id="acc-run-full-btn" type="button" class="btn btn-primary" title="Vollständiger Run (Lint + Test + Build)">Vollständiger Run</button>
+                                    <button id="acc-run-quick-btn" type="button" class="btn btn-secondary" title="Quick-Check (Lint + Core-Suites)">Quick Check</button>
+                                    <button id="acc-run-lint-btn" type="button" class="btn btn-secondary" title="Nur Lint">Lint Only</button>
+                                    <button id="acc-run-coverage-btn" type="button" class="btn btn-secondary" title="Full-Run mit Coverage">Coverage</button>
+                                </div>
+                            </div>
+                            <div id="acc-live-status" class="acc-live-status mm-u031 hidden">
+                                <div class="acc-progress-container">
+                                    <div class="acc-progress-bar" id="acc-progress-bar"></div>
+                                </div>
+                                <div class="acc-status-text" id="acc-status-text">Bereit</div>
+                            </div>
+                            <div id="acc-results" class="acc-results mm-u036">
+                                <div class="info">Noch kein Acceptance-Run ausgeführt.</div>
+                            </div>
+                            <div id="acc-history" class="acc-history mm-u036">
+                                <h4>Letzte Runs</h4>
+                                <div class="info">Historie wird geladen...</div>
+                            </div>
+                        </div>
+
+                        <div id="qa-release-doctor-card" class="setup-card admin-only qa-workspace-card mm-u029">
+                            <div class="qa-workspace-header">
+                                <div>
+                                    <h3>Release Doctor</h3>
+                                    <p>Gebündelter Status aus Preflight, PlayStore-Protokoll, Fertigungsstand, Admin-QA, GitHub Security und Workflow-Runs.</p>
+                                </div>
+                                <div class="setup-actions mm-u031">
+                                    <button data-action="loadReleaseDoctor" class="btn btn-primary" title="Release Doctor jetzt ausführen">Jetzt pruefen</button>
+                                    <button data-action="exportReleaseDoctor" class="btn btn-secondary" title="Letzten Release-Doctor-Report als JSON herunterladen">JSON exportieren</button>
+                                </div>
+                            </div>
+                            <div id="release-doctor-summary" class="data-list qa-test-workspace-status mm-u031">
+                                <div class="info">Noch kein Release-Doctor-Report geladen.</div>
+                            </div>
+                            <div id="release-doctor-sections" class="qa-test-metrics mm-u031">
+                                <div class="info">Die Einzelergebnisse erscheinen nach dem ersten Lauf.</div>
+                            </div>
+                            <div class="python-automation-separation-hint">
+                                <strong>Externe Gates bleiben manuell/external:</strong>
+                                <ul>
+                                    <li>GitHub Code Scanning repository setting</li>
+                                    <li>CodeQL green run evidence</li>
+                                    <li>Android CI green run evidence</li>
+                                    <li>Firebase key rotation</li>
+                                    <li>Play Console Data Safety / IARC / Permissions / App Access</li>
+                                    <li>physical commissioning sign-off</li>
+                                    <li>on-call roster and reachability</li>
+                                    <li>final production deploy evidence</li>
+                                </ul>
+                            </div>
+                            <div id="release-doctor-blockers" class="data-list mm-u036">
+                                <div class="info">Blocker werden nach dem ersten Lauf angezeigt.</div>
+                            </div>
+                        </div>
+
                         <div id="qa-section-heading" class="qa-section-heading">
                             <h3>QA-Arbeitsfläche</h3>
                             <p>Eine fokussierte Sicht auf reale Läufe, offene Fehler, strukturierte Details und belastbare Folgeaktionen.</p>
@@ -2051,6 +2223,109 @@
                 </div>
             </div>
 
+            <!-- ==================== AUTOMATION TAB ==================== -->
+            <div id="tab-automation" class="tab-content mm-u010">
+                <h2>🤖 Automatisierung & Auto-Management</h2>
+
+                <!-- Section 1: Status-Dashboard -->
+                <div class="compliance-section mm-u030">
+                    <h3>📊 System-Status</h3>
+                    <p>Übersicht über aktive Automatisierungen, letzte Aktionen und System-Health.</p>
+                    <div id="automation-health-card" class="data-list">
+                        <div class="info">Lade System-Status...</div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Fehler-Warteschlange -->
+                <div class="compliance-section mm-u030">
+                    <h3>⚠️ Fehler-Warteschlange</h3>
+                    <p>Erkannte Fehler mit Gemini-Diagnose und Bestätigungs-Buttons.</p>
+                    <div id="automation-error-queue" class="data-list">
+                        <div class="info">Keine Fehler in der Warteschlange.</div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Manuelle Steuerung -->
+                <div class="compliance-section mm-u030">
+                    <h3>🎮 Manuelle Steuerung</h3>
+                    <p>Alle automatisierten Bedingungen können hier manuell ausgelöst werden.</p>
+                    <div class="form-group mm-u015">
+                        <button data-action="automationHealthCheck" class="btn btn-primary" title="System-Health-Check manuell starten">
+                            🔍 System-Health-Check
+                        </button>
+                        <button data-action="automationErrorAnalysis" class="btn btn-primary" title="Fehler-Analyse mit Gemini starten">
+                            🤖 Fehler-Analyse starten
+                        </button>
+                        <button data-action="automationProposeFixes" class="btn btn-secondary" title="Automatische Behebung vorschlagen">
+                            🔧 Automatische Behebung vorschlagen
+                        </button>
+                        <button data-action="automationClearPending" class="btn btn-danger" title="Genehmigungs-Warteschlange leeren">
+                            🗑️ Genehmigungs-Warteschlange leeren
+                        </button>
+                    </div>
+                    <div id="automation-manual-result" class="data-list mm-u041"></div>
+                </div>
+
+                <!-- Section 4: Gemini-Konfiguration -->
+                <div class="compliance-section mm-u030">
+                    <h3>⚙️ Gemini-Konfiguration</h3>
+                    <p>API-Key (verschlüsselt gespeichert), Prompt-Templates und Model-Auswahl.</p>
+                    <div class="form-group mm-u015">
+                        <label class="field-label" for="automation-api-key">API-Key (optional – Callable-Proxy bevorzugt)</label>
+                        <input type="password" id="automation-api-key" placeholder="Gemini API-Key eingeben..." title="Wird verschlüsselt im LocalStorage gespeichert" />
+                        <label class="field-label" for="automation-passphrase">Passphrase zur Verschlüsselung</label>
+                        <input type="password" id="automation-passphrase" placeholder="Passphrase..." title="Wird NICHT gespeichert – nur zum Ent-/Verschlüsseln" />
+                        <button data-action="automationSaveApiKey" class="btn btn-secondary" title="API-Key verschlüsselt speichern">
+                            🔐 API-Key speichern
+                        </button>
+                        <button data-action="automationClearApiKey" class="btn btn-danger" title="Gespeicherten API-Key löschen">
+                            🗑️ API-Key löschen
+                        </button>
+                    </div>
+                    <div class="form-group mm-u015">
+                        <label class="field-label" for="automation-model">Modell</label>
+                        <input type="text" id="automation-model" placeholder="gemini-3.0-flash" title="Gemini-Modell für Diagnosen" />
+                        <label class="field-label" for="automation-prompt-template">Prompt-Template</label>
+                        <textarea id="automation-prompt-template" rows="12" placeholder="{{ERROR_CONTEXT}} wird durch den Fehler ersetzt..."
+                            title="Prompt-Template für Gemini-Diagnosen"></textarea>
+                        <button data-action="automationSaveConfig" class="btn btn-secondary" title="Konfiguration speichern">
+                            💾 Konfiguration speichern
+                        </button>
+                        <button data-action="automationResetConfig" class="btn btn-secondary" title="Auf Standardwerte zurücksetzen">
+                            ↩️ Standardwerte
+                        </button>
+                    </div>
+                    <div class="form-group mm-u015">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="automation-auto-mode" />
+                            <span>Auto-Modus aktivieren (Fehler automatisch analysieren und in Warteschlange stellen)</span>
+                        </label>
+                        <button data-action="automationToggleAutoMode" class="btn btn-secondary" title="Auto-Modus umschalten">
+                            🔄 Auto-Modus umschalten
+                        </button>
+                    </div>
+                    <div id="automation-config-status" class="data-list mm-u033"></div>
+                </div>
+
+                <!-- Section 5: Logs -->
+                <div class="compliance-section mm-u030">
+                    <h3>📝 Automatisierungs-Logs</h3>
+                    <p>Chronologische Liste aller automatischen und manuellen Aktionen.</p>
+                    <div class="user-search">
+                        <input type="text" id="automation-log-filter" placeholder="Logs filtern..." title="Nach Aktionstyp oder Status filtern" />
+                        <button data-action="automationRefreshLogs" class="btn btn-secondary" title="Logs aktualisieren">
+                            🔄 Aktualisieren
+                        </button>
+                        <button data-action="automationClearLogs" class="btn btn-danger" title="Alle Logs löschen">
+                            🗑️ Logs leeren
+                        </button>
+                    </div>
+                    <div id="automation-logs-list" class="data-list">
+                        <div class="info">Keine Logs vorhanden.</div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Global Notification (outside dashboard-section so it's visible during onboarding) -->
@@ -2153,6 +2428,7 @@
         </div>
         <script type="module" src="modules/index.js?v=20260418"></script>
         <script src="app.js?v=20260326"></script>
+        <script src="acceptance-panel.js?v=20260326"></script>
         <script src="pwa-register.js"></script>
     </body>
 </html>
