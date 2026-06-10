@@ -40,6 +40,13 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test:ci
+      - name: Manufacturing status gate
+        run: npm run analyze:fertigungsstand:gate
+      - name: Upload manufacturing status report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fertigungsstand-report
+          path: build/fertigungsstand/
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:

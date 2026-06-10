@@ -14915,12 +14915,25 @@ async function viewTicketDetails(ticketId) {
             }
         }
 
+        html += `<h4>Support-Automation</h4>`;
+        html += `<div class="support-automation-actions">`;
+        if (!ticket.accessGranted) {
+            html += `<button data-action="invokeGrantSupportAccessGuide" data-args='["${encodedTicketId}"]' class="btn btn-secondary" title="grantSupportAccess – Master muss im Parent-/Web-Control-Panel freigeben">Master-Freigabe anfordern</button>`;
+        } else if (ticket.accessGrantId) {
+            const encodedGrantId = encodeInlineArgument(String(ticket.accessGrantId));
+            html += `<button data-action="invokeRevokeSupportAccess" data-args='["${encodedGrantId}"]' class="btn btn-secondary" title="revokeSupportAccess – Master kann aktive Freigabe entziehen">Freigabe widerrufen (Master)</button>`;
+        }
+        if (String(ticket.conversationStatus || "") === "awaiting_debug_consent") {
+            html += `<button data-action="invokeGrantDebugAccessGuide" data-args='["${encodedTicketId}"]' class="btn btn-secondary" title="grantDebugAccess – Master aktiviert Debug-Modus nach Einwilligung">Debug-Einwilligung anfordern</button>`;
+        }
         if (currentUserRole === "admin" || currentUserRole === "support") {
             const debugLabel = ticket.accessGranted && ticket.debugAccessGrantId
                 ? "🤖 KI-Reanalyse mit Debug-Daten"
                 : "🤖 KI-Reanalyse anstoßen";
             html += `<button onclick="reanalyzeTicketWithAi(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-secondary" title="Ruft analyzeWithDebugData auf. Nutzt Debug-Snapshot, sofern Master Debug-Modus freigegeben hat.">${debugLabel}</button>`;
         }
+        html += `</div>`;
+
         html += `</div>`;
         html += `<div id="ticket-ai-reanalyze-status" class="info" style="margin-block-start:10px;display:none"></div>`;
 
@@ -14956,6 +14969,52 @@ async function reanalyzeTicketWithAi(ticketId) {
             statusEl.innerHTML = `<div class='error'>KI-Reanalyse fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
         }
         showNotification("KI-Reanalyse fehlgeschlagen: " + (error?.message || ""), "error");
+    }
+}
+
+function showSupportAutomationGuide() {
+    const html = "<div class='success-box'><h4>Support-Automation</h4><ul>"
+        + "<li><strong>grantSupportAccess</strong> (Master)</li>"
+        + "<li><strong>revokeSupportAccess</strong> (Master)</li>"
+        + "<li><strong>grantDebugAccess</strong> (Master)</li>"
+        + "<li><strong>analyzeWithDebugData</strong> (Operator)</li></ul></div>";
+    showNotification("Support-Automation-Workflow angezeigt.", "info");
+    const listEl = document.getElementById("support-tickets-list");
+    if (!listEl) return;
+    let guideEl = document.getElementById("support-automation-guide");
+    if (!guideEl) {
+        guideEl = document.createElement("div");
+        guideEl.id = "support-automation-guide";
+        listEl.parentNode.insertBefore(guideEl, listEl);
+    }
+    guideEl.innerHTML = html;
+}
+
+function invokeGrantSupportAccessGuide(encodedTicketId) {
+    showSupportAutomationGuide();
+    showNotification("grantSupportAccess: Master-Freigabe im Parent-/Web-Control-Panel für Ticket "
+        + decodeInlineArgument(encodedTicketId), "info");
+}
+
+function invokeGrantDebugAccessGuide(encodedTicketId) {
+    showSupportAutomationGuide();
+    showNotification("grantDebugAccess: Debug-Einwilligung im Parent-Panel für Ticket "
+        + decodeInlineArgument(encodedTicketId), "info");
+}
+
+async function invokeRevokeSupportAccess(encodedGrantId) {
+    const grantId = decodeInlineArgument(encodedGrantId);
+    if (!grantId || !functions?.httpsCallable) {
+        showNotification("revokeSupportAccess: Firebase nicht bereit oder keine Grant-ID.", "error");
+        return;
+    }
+    if (!confirm("revokeSupportAccess für Grant " + grantId + "?")) return;
+    try {
+        const result = await functions.httpsCallable("revokeSupportAccess")({ grantId });
+        showNotification(result?.data?.success ? "revokeSupportAccess erfolgreich." : "revokeSupportAccess abgeschlossen.", "success");
+        loadSupportTickets();
+    } catch (error) {
+        showNotification("revokeSupportAccess (master-initiiert): " + (error?.message || ""), "warning");
     }
 }
 
