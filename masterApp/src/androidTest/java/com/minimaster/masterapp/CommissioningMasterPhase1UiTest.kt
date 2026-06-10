@@ -48,7 +48,11 @@ class CommissioningMasterPhase1UiTest {
 
         composeTestRule.setContent {
             LinkGenerationSection(
-                linkState = LinkGenerationState.Success("PAIR-TOKEN-123"),
+                linkState = LinkGenerationState.Success(
+                    pairingToken = "PAIR-TOKEN-123",
+                    pairingLink = "https://minimaster.app/pair/PAIR-TOKEN-123",
+                    qrCodeValue = "PAIR-TOKEN-123",
+                ),
                 onGenerateClick = {}
             )
         }
