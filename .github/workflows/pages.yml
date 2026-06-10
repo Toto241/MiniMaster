@@ -1,0 +1,46 @@
+name: Privacy-Policy Pages
+
+# Nur manuell: vermeidet rote Runs, solange Pages noch nicht aktiviert ist.
+# Vor dem ersten Lauf: scripts/setup-github-pages.ps1 oder Settings -> Pages -> GitHub Actions.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Privacy-Policy rendern
+        run: |
+          python scripts/render_privacy_policy.py --build --out site/privacy/index.html
+          python scripts/render_privacy_policy.py --check
+
+      - name: Pages-Konfiguration
+        uses: actions/configure-pages@v5
+
+      - name: Artefakt hochladen (site/)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

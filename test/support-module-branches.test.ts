@@ -59,6 +59,11 @@ describe("support module load branches", () => {
       checkRateLimit: jest.fn(),
       requireSupportOrAdmin: jest.fn(),
       validateAppCheck: jest.fn(),
+      getTracedLogger: jest.fn().mockReturnValue({
+        logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), elapsed: jest.fn().mockReturnValue(0), startSpan: jest.fn().mockReturnValue(jest.fn()) },
+        traceId: "test-trace-id",
+        spanId: "test-span-id",
+      }),
     }));
 
     let wrapped: any;

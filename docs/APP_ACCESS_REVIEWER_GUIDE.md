@@ -30,7 +30,7 @@ This document is intended for Google Play reviewers to validate app behavior tha
 Apps:
 
 - Parent app: com.minimaster.masterapp
-- Child app: com.google.pairing
+- Child app: com.minimaster.childapp
 
 ## 2. Test Credentials
 
@@ -115,16 +115,6 @@ Where used:
 
 - Child task submission when parent requires photo.
 
-### 5.4 Location (optional)
-
-Why needed:
-
-- Optional location-based rules configured by parent.
-
-Where used:
-
-- Child rule evaluation only if location rule is enabled.
-
 ## 6. Minimal Reviewer Test Scenario
 
 1. Parent creates one child pairing session.
@@ -143,7 +133,7 @@ Expected outcome:
 
 - Child app is not standalone and requires parent pairing.
 - Enforcement behavior requires granted Device Admin + Accessibility permissions.
-- Optional features (camera, location) are inactive unless parent enables them.
+- Optional camera proof is inactive unless parent enables it.
 
 ## 8. Contact for Review Team
 

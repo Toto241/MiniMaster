@@ -12,7 +12,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { db } from "../firebase";
-import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess, checkRateLimitShared } from "./shared";
+import { requireAuth, validateAppCheck, AuditLogger, hasActiveAccess, checkRateLimitShared, getTracedLogger } from "./shared";
 import { validateString } from "./validation";
 import { withErrorHandling } from "./error-handler";
 
@@ -50,6 +50,7 @@ export const createPairingCode = functions.https.onCall(
   withErrorHandling(
     "createPairingCode",
     async (_data: Record<string, never>, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "createPairingCode");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -87,10 +88,10 @@ export const createPairingCode = functions.https.onCall(
 
           await AuditLogger.logSuccess(
             "device.pair", context, `pairingCodes/${pairingCode}`, "device",
-            { codeType: "6digit", expiresIn: "24h", duration: Date.now() - startTime }
+            { codeType: "6digit", expiresIn: "24h", duration: Date.now() - startTime, traceId }
           );
 
-          functions.logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
+          logger.info(`Pairing code ${pairingCode} created for masterId ${masterId}`);
           return { pairingCode: pairingCode };
         }
       }
@@ -98,7 +99,7 @@ export const createPairingCode = functions.https.onCall(
       await AuditLogger.logFailure(
         "device.pair", context, `masters/${masterId}`, "device",
         new Error("Could not create unique pairing code after max attempts"),
-        { codeType: "6digit", maxAttempts }
+        { codeType: "6digit", maxAttempts, traceId }
       );
 
       throw new functions.https.HttpsError(
@@ -116,6 +117,7 @@ export const validatePairingCode = functions.https.onCall(
   withErrorHandling(
     "validatePairingCode",
     async (data: { pairingCode: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "validatePairingCode");
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
@@ -132,13 +134,13 @@ export const validatePairingCode = functions.https.onCall(
       const doc = await pairingCodeRef.get();
 
       if (!doc.exists) {
-        functions.logger.warn(`Pairing code ${pairingCode} not found.`);
+        logger.warn(`Pairing code ${pairingCode} not found.`);
         throw new functions.https.HttpsError("not-found", "Invalid pairing code.");
       }
 
       const codeData = doc.data();
       if (!codeData) {
-        functions.logger.error(`Pairing code ${pairingCode} exists but data is undefined.`);
+        logger.error(`Pairing code ${pairingCode} exists but data is undefined.`);
         throw new functions.https.HttpsError("internal", "Pairing code data is missing.");
       }
 
@@ -146,13 +148,13 @@ export const validatePairingCode = functions.https.onCall(
       const masterId = (codeData.masterId || codeData.masterImei) as string | undefined;
 
       if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
-        functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
+        logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'expiresAt' field.`);
         await pairingCodeRef.delete();
         throw new functions.https.HttpsError("internal", "Invalid pairing code data structure.");
       }
 
       if (!masterId || typeof masterId !== "string") {
-        functions.logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'masterId' field.`);
+        logger.error(`DATA_CORRUPTION Pairing code ${pairingCode} has invalid 'masterId' field.`);
         await pairingCodeRef.delete();
         throw new functions.https.HttpsError("internal", "Invalid pairing code data structure (masterId).");
       }
@@ -160,7 +162,7 @@ export const validatePairingCode = functions.https.onCall(
       const now = admin.firestore.Timestamp.now();
 
       if (now.seconds > expiresAt.seconds) {
-        functions.logger.info(`Pairing code ${pairingCode} has expired.`);
+        logger.info(`Pairing code ${pairingCode} has expired.`);
         await pairingCodeRef.delete();
         throw new functions.https.HttpsError("deadline-exceeded", "Pairing code has expired.");
       }
@@ -175,7 +177,7 @@ export const validatePairingCode = functions.https.onCall(
         await AuditLogger.logDenied(
           "device.pair", context, `children/${childId}`, "device",
           "No active subscription or trial. Please subscribe to continue.",
-          { masterId, subscriptionStatus: masterData?.subscription?.status || "none" }
+          { masterId, subscriptionStatus: masterData?.subscription?.status || "none", traceId }
         );
         throw new functions.https.HttpsError(
           "resource-exhausted",
@@ -184,30 +186,33 @@ export const validatePairingCode = functions.https.onCall(
       }
 
       const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
-        );
-      }
-
       const childDeviceRef = db().collection("children").doc(childId);
-      await childDeviceRef.set({
-        childImei: childId,
-        masterImei: masterId,
-        pairedAt: now,
-      }, { merge: true });
+
+      await db().runTransaction(async (tx) => {
+        const childrenQuery = db().collection("children").where("masterImei", "==", masterId);
+        const existingChildren = await tx.get(childrenQuery);
+        if (existingChildren.size >= childLimit) {
+          throw new functions.https.HttpsError(
+            "resource-exhausted",
+            `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
+          );
+        }
+        tx.set(childDeviceRef, {
+          childImei: childId,
+          masterImei: masterId,
+          pairedAt: now,
+        }, { merge: true });
+      });
+
       await activateTrialIfPending(masterId, masterData);
-      functions.logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
+      logger.info(`Child device ${childId} successfully paired with master ${masterId} via pairing code.`);
 
       await pairingCodeRef.delete();
-      functions.logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
+      logger.info(`Valid pairing code ${pairingCode} used and deleted for childId ${childId}.`);
 
       await AuditLogger.logSuccess(
         "device.pair", context, `children/${childId}`, "device",
-        { masterId, pairingMethod: "code", duration: Date.now() - startTime }
+        { masterId, pairingMethod: "code", duration: Date.now() - startTime, traceId }
       );
 
       return { childId: childId };
@@ -222,6 +227,7 @@ export const generatePairingLink = functions.https.onCall(
   withErrorHandling(
     "generatePairingLink",
     async (_data: Record<string, never>, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "generatePairingLink");
       const startTime = Date.now();
       const masterId = requireAuth(context);
       validateAppCheck(context, true);
@@ -238,7 +244,7 @@ export const generatePairingLink = functions.https.onCall(
         await AuditLogger.logDenied(
           "device.pair", context, `masters/${masterId}`, "device",
           "No active subscription or trial. Please subscribe to continue.",
-          { subscriptionStatus: masterData?.subscription?.status || "none" }
+          { subscriptionStatus: masterData?.subscription?.status || "none", traceId }
         );
         throw new functions.https.HttpsError(
           "resource-exhausted",
@@ -263,10 +269,10 @@ export const generatePairingLink = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "device.pair", context, `pairingTokens/${pairingToken}`, "device",
-        { tokenType: "link", expiresIn: "5min", duration: Date.now() - startTime }
+        { tokenType: "link", expiresIn: "5min", duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Pairing token created for masterId: ${masterId}`);
+      logger.info(`Pairing token created for masterId: ${masterId}`);
       return {
         pairingToken: pairingToken,
         pairingLink,
@@ -289,9 +295,11 @@ export const validatePairingToken = functions.https.onCall(
   withErrorHandling(
     "validatePairingToken",
     async (data: { pairingToken: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "validatePairingToken");
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
+      await checkRateLimitShared(childId, "pairing.validate_token", 10, 15 * 60 * 1000);
 
       const pairingToken = validateString(data.pairingToken, "pairingToken", {
         required: true,
@@ -317,7 +325,7 @@ export const validatePairingToken = functions.https.onCall(
       const masterId = (tokenData.masterId || tokenData.masterImei) as string | undefined;
 
       if (!expiresAt || !(expiresAt instanceof admin.firestore.Timestamp)) {
-        functions.logger.error(`DATA_CORRUPTION Pairing token ${pairingToken} has invalid 'expiresAt' field.`);
+        logger.error(`DATA_CORRUPTION Pairing token ${pairingToken} has invalid 'expiresAt' field.`);
         await tokenRef.delete();
         throw new functions.https.HttpsError("internal", "Invalid pairing token data structure.");
       }
@@ -345,31 +353,34 @@ export const validatePairingToken = functions.https.onCall(
         );
       }
       const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
-        );
-      }
-
       const childDeviceRef = db().collection("children").doc(childId);
-      await childDeviceRef.set({
-        childImei: childId,
-        masterImei: masterId,
-        pairedAt: now,
+
+      await db().runTransaction(async (tx) => {
+        const childrenQuery = db().collection("children").where("masterImei", "==", masterId);
+        const existingChildren = await tx.get(childrenQuery);
+        if (existingChildren.size >= childLimit) {
+          throw new functions.https.HttpsError(
+            "resource-exhausted",
+            `Child limit reached (${childLimit}). Upgrade your subscription for more devices.`
+          );
+        }
+        tx.set(childDeviceRef, {
+          childImei: childId,
+          masterImei: masterId,
+          pairedAt: now,
+        });
       });
+
       await activateTrialIfPending(masterId, masterData);
 
       await tokenRef.delete();
 
       await AuditLogger.logSuccess(
         "device.pair", context, `children/${childId}`, "device",
-        { masterId, pairingMethod: "token", duration: Date.now() - startTime }
+        { masterId, pairingMethod: "token", duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Child device ${childId} successfully paired with master ${masterId}.`);
+      logger.info(`Child device ${childId} successfully paired with master ${masterId}.`);
       return { childId: childId, masterId: masterId };
     }
   )
@@ -387,6 +398,7 @@ export const pairAuthenticatedChild = functions.https.onCall(
   withErrorHandling(
     "pairAuthenticatedChild",
     async (data: { pairingCode?: string; pairingToken?: string }, context: CallableContext) => {
+      const { logger, traceId } = getTracedLogger(context, "pairAuthenticatedChild");
       const startTime = Date.now();
       const childId = requireAuth(context);
       validateAppCheck(context, true);
@@ -443,27 +455,31 @@ export const pairAuthenticatedChild = functions.https.onCall(
       }
 
       const childLimit = masterData?.subscription?.childLimit || DEFAULT_CHILD_APP_LIMIT;
-      const existingChildren = await db().collection("children")
-        .where("masterImei", "==", masterId).get();
-      if (existingChildren.size >= childLimit) {
-        throw new functions.https.HttpsError("resource-exhausted", `Child limit reached (${childLimit}).`);
-      }
-
+      const childDeviceRef = db().collection("children").doc(childId);
       const now = admin.firestore.Timestamp.now();
-      await db().collection("children").doc(childId).set({
-        childId,
-        masterImei: masterId,
-        pairedAt: now,
-        modernFlow: true,
-      }, { merge: true });
+
+      await db().runTransaction(async (tx) => {
+        const childrenQuery = db().collection("children").where("masterImei", "==", masterId);
+        const existingChildren = await tx.get(childrenQuery);
+        if (existingChildren.size >= childLimit) {
+          throw new functions.https.HttpsError("resource-exhausted", `Child limit reached (${childLimit}).`);
+        }
+        tx.set(childDeviceRef, {
+          childId,
+          masterImei: masterId,
+          pairedAt: now,
+          modernFlow: true,
+        }, { merge: true });
+      });
+
       await activateTrialIfPending(masterId, masterData);
 
       await AuditLogger.logSuccess(
         "device.pair", context, `children/${childId}`, "device",
-        { masterId, pairingMethod: data.pairingCode ? "code" : "token", modernFlow: true, duration: Date.now() - startTime }
+        { masterId, pairingMethod: data.pairingCode ? "code" : "token", modernFlow: true, duration: Date.now() - startTime, traceId }
       );
 
-      functions.logger.info(`Authenticated child ${childId} paired with master ${masterId}.`);
+      logger.info(`Authenticated child ${childId} paired with master ${masterId}.`);
       return { childId, masterId };
     }
   )

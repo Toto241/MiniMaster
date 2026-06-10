@@ -6,6 +6,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
+import { extractTraceContext, TracedLogger } from "./tracing";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const AUDIT_LOG_RETENTION_DAYS = 90;
@@ -45,6 +46,53 @@ export function requireAuditorOrAbove(context: CallableContext): void {
     throw new functions.https.HttpsError("permission-denied", "Operator privileges required.");
   }
 }
+
+export type SessionTier = "T1" | "T2" | "T3" | "T4";
+
+const SESSION_TIER_MAX_MINUTES: Record<SessionTier, number> = {
+  T1: 15,
+  T2: 8 * 60,
+  T3: 2 * 60,
+  T4: 30,
+};
+
+export function getSessionAgeMinutes(context: CallableContext): number {
+  const authTime = context.auth?.token?.auth_time;
+  if (typeof authTime !== "number") return 0;
+  return (Date.now() / 1000 - authTime) / 60;
+}
+
+/**
+ * Enforces maximum session age for privileged operator actions (AP-N3 Phase 2).
+ * T4 additionally requires a fresh admin_verified_at custom claim when present.
+ */
+export function requireTier(context: CallableContext, minTier: SessionTier, actionName: string): void {
+  requireAuth(context);
+  const sessionAgeMinutes = getSessionAgeMinutes(context);
+  const maxMinutes = SESSION_TIER_MAX_MINUTES[minTier];
+  if (sessionAgeMinutes > maxMinutes) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Session tier ${minTier} required for ${actionName}. Re-authenticate and retry.`
+    );
+  }
+
+  if (minTier === "T4") {
+    const verifiedAt = context.auth?.token?.admin_verified_at;
+    if (typeof verifiedAt === "number") {
+      const verifiedAgeMinutes = (Date.now() / 1000 - verifiedAt) / 60;
+      if (verifiedAgeMinutes > SESSION_TIER_MAX_MINUTES.T4) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          `Admin verification expired for ${actionName}. Confirm admin PIN and retry.`
+        );
+      }
+    }
+  }
+}
+
+/** Re-export for T4 callables that also require configured admin PIN verification. */
+export { requireAdminPinVerification } from "./admin-pin";
 
 /**
  * Verifies that the authenticated user (master) owns the specified child document.
@@ -175,6 +223,8 @@ export type AuditAction =
   | "admin.grant_support_access"
   | "admin.revoke_support_access"
   | "admin.set_admin_claim"
+  | "admin.set_admin_pin"
+  | "admin.verify_admin_pin"
   | "admin.reset_operator_accounts"
   | "admin.user_impersonation"
   | "admin.revoke_subscription"
@@ -196,7 +246,9 @@ export type AuditAction =
   | "admin.b2b.activate"
   | "admin.b2b.add_device"
   | "admin.b2b.remove_device"
-  | "admin.b2b.revoke";
+  | "admin.b2b.revoke"
+  | "gdpr.dsar_export"
+  | "acceptance.run_submitted";
 
 export interface AuditLog {
   timestamp: admin.firestore.Timestamp;
@@ -243,10 +295,11 @@ export class AuditLogger {
 
       await this.collection().add(logEntry);
 
+      const logPayload = { action, userId, status, traceId: metadata?.traceId };
       if (status === "failure" || status === "denied") {
-        functions.logger.error("Audit Event", { action, userId, status, error: error?.message });
+        functions.logger.error("Audit Event", { ...logPayload, error: error?.message });
       } else {
-        functions.logger.info("Audit Event", { action, userId, status });
+        functions.logger.info("Audit Event", logPayload);
       }
     } catch (loggingError) {
       functions.logger.error("Failed to write audit log", { error: loggingError });
@@ -339,6 +392,25 @@ export async function handleError(
 }
 
 // ==================== SUBSCRIPTION / TRIAL ACCESS ====================
+
+/**
+ * Result of getTracedLogger containing both the logger and the raw trace context.
+ */
+export interface TracedLoggerResult {
+  logger: TracedLogger;
+  traceId: string;
+  spanId: string;
+}
+
+/**
+ * Creates a TracedLogger for a callable function invocation.
+ * Extracts trace context from the callable context (including GCP Cloud Trace header
+ * when available) and returns a logger that injects traceId/spanId into every log entry.
+ */
+export function getTracedLogger(context: CallableContext, functionName: string): TracedLoggerResult {
+  const trace = extractTraceContext(context, functionName);
+  return { logger: new TracedLogger(trace), traceId: trace.traceId, spanId: trace.spanId };
+}
 
 export function hasActiveAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
   if (!masterData) return false;

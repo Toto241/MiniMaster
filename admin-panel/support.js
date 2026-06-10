@@ -1,96 +1,56 @@
 /**
  * Displays the support panel UI and wires up event handlers.
+ * Callable names align with Firebase Functions: grantSupportAccess,
+ * revokeSupportAccess, grantDebugAccess, analyzeWithDebugData.
  * @param {HTMLElement} container
  */
 export function showSupportPanel(container) {
   container.innerHTML = `
     <h2>Support & Debugging</h2>
     <div class="support-actions">
-      <button id="btn-grant-support">Support-Zugriff gewähren</button>
-      <button id="btn-revoke-support">Support-Zugriff entziehen</button>
-      <button id="btn-grant-debug">Debug-Zugriff gewähren</button>
-      <button id="btn-analyze-debug">Analyse mit Debug-Daten</button>
+      <button id="btn-grant-support" title="grantSupportAccess">Support-Zugriff gewähren</button>
+      <button id="btn-revoke-support" title="revokeSupportAccess">Support-Zugriff entziehen</button>
+      <button id="btn-grant-debug" title="grantDebugAccess">Debug-Zugriff gewähren</button>
+      <button id="btn-analyze-debug" title="analyzeWithDebugData">Analyse mit Debug-Daten</button>
     </div>
     <div id="support-result" class="support-result"></div>
   `;
 
-  document.getElementById('btn-grant-support').addEventListener('click', async () => {
-    await grantSupportAccess();
-  });
-  document.getElementById('btn-revoke-support').addEventListener('click', async () => {
-    await revokeSupportAccess();
-  });
-  document.getElementById('btn-grant-debug').addEventListener('click', async () => {
-    await grantDebugAccess();
-  });
-  document.getElementById('btn-analyze-debug').addEventListener('click', async () => {
-    await analyzeWithDebugData();
-  });
-}
+  const actions = [
+    { id: "btn-grant-support", callable: "grantSupportAccess", pending: "grantSupportAccess wird angefordert...", success: "grantSupportAccess abgeschlossen." },
+    { id: "btn-revoke-support", callable: "revokeSupportAccess", pending: "revokeSupportAccess wird ausgeführt...", success: "revokeSupportAccess abgeschlossen." },
+    { id: "btn-grant-debug", callable: "grantDebugAccess", pending: "grantDebugAccess wird angefordert...", success: "grantDebugAccess abgeschlossen." },
+    { id: "btn-analyze-debug", callable: "analyzeWithDebugData", pending: "analyzeWithDebugData läuft...", parseJson: true },
+  ];
 
-/**
- * Grants support access via backend API.
- */
-async function grantSupportAccess() {
-  updateResult('Support-Zugriff wird angefordert...');
-  try {
-    const response = await fetch('/api/support/grant', { method: 'POST' });
-    if (!response.ok) throw new Error('Fehler beim Gewähren');
-    updateResult('Support-Zugriff gewährt.');
-  } catch (error) {
-    updateResult('Fehler: ' + error.message);
+  for (const action of actions) {
+    const btn = document.getElementById(action.id);
+    if (!btn) continue;
+    btn.addEventListener("click", () => callSupportCallable(action));
   }
 }
 
-/**
- * Revokes support access via backend API.
- */
-async function revokeSupportAccess() {
-  updateResult('Support-Zugriff wird entzogen...');
+async function callSupportCallable({ callable, pending, success, parseJson }) {
+  updateResult(pending);
   try {
-    const response = await fetch('/api/support/revoke', { method: 'POST' });
-    if (!response.ok) throw new Error('Fehler beim Entziehen');
-    updateResult('Support-Zugriff entzogen.');
+    const functionsApi = window.firebase?.functions?.();
+    if (!functionsApi || typeof functionsApi.httpsCallable !== "function") {
+      throw new Error("Firebase Functions nicht initialisiert.");
+    }
+    const fn = functionsApi.httpsCallable(callable);
+    const response = await fn({});
+    if (parseJson) {
+      updateResult(`${callable} abgeschlossen: ` + JSON.stringify(response?.data || {}));
+    } else {
+      updateResult(success);
+    }
   } catch (error) {
-    updateResult('Fehler: ' + error.message);
+    updateResult(`${callable} Fehler: ` + error.message);
   }
 }
 
-/**
- * Grants debug access via backend API.
- */
-async function grantDebugAccess() {
-  updateResult('Debug-Zugriff wird angefordert...');
-  try {
-    const response = await fetch('/api/debug/grant', { method: 'POST' });
-    if (!response.ok) throw new Error('Fehler beim Gewähren');
-    updateResult('Debug-Zugriff gewährt.');
-  } catch (error) {
-    updateResult('Fehler: ' + error.message);
-  }
-}
-
-/**
- * Sends debug data for analysis via backend API.
- */
-async function analyzeWithDebugData() {
-  updateResult('Debug-Analyse wird gestartet...');
-  try {
-    const response = await fetch('/api/debug/analyze', { method: 'POST' });
-    if (!response.ok) throw new Error('Fehler bei Analyse');
-    const data = await response.json();
-    updateResult('Analyse abgeschlossen: ' + JSON.stringify(data));
-  } catch (error) {
-    updateResult('Fehler: ' + error.message);
-  }
-}
-
-/**
- * Updates the result area with a message.
- * @param {string} message
- */
 function updateResult(message) {
-  const resultElement = document.getElementById('support-result');
+  const resultElement = document.getElementById("support-result");
   if (resultElement) {
     resultElement.textContent = message;
   }

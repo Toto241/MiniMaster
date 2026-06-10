@@ -287,15 +287,7 @@ export const addB2BDevice = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Organization not found.");
       }
 
-      const orgData = orgDoc.data() as B2BOrganization;
-
-      // Check device limit
-      if (orgData.maxDevices > 0 && orgData.currentDevices >= orgData.maxDevices) {
-        throw new functions.https.HttpsError("resource-exhausted",
-          `Device limit reached (${orgData.currentDevices}/${orgData.maxDevices}). Upgrade license tier.`);
-      }
-
-      // Check if device already in org
+      // Check if device already in org (before transaction to avoid unnecessary transaction)
       const existing = await db().collection("b2b_devices")
         .where("orgId", "==", orgId)
         .where("childId", "==", childId)
@@ -307,20 +299,35 @@ export const addB2BDevice = functions.https.onCall(
       }
 
       const now = admin.firestore.Timestamp.now();
+      let newDeviceCount: number;
 
-      // Add device
-      await db().collection("b2b_devices").add({
-        orgId,
-        childId,
-        label: data.label || "",
-        addedAt: now,
-        addedBy: userId,
-      });
+      await db().runTransaction(async (tx) => {
+        const freshOrgDoc = await tx.get(orgRef);
+        if (!freshOrgDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "Organization not found.");
+        }
+        const freshOrgData = freshOrgDoc.data() as B2BOrganization;
 
-      // Increment counter
-      await orgRef.update({
-        currentDevices: admin.firestore.FieldValue.increment(1),
-        updatedAt: now,
+        if (freshOrgData.maxDevices > 0 && freshOrgData.currentDevices >= freshOrgData.maxDevices) {
+          throw new functions.https.HttpsError("resource-exhausted",
+            `Device limit reached (${freshOrgData.currentDevices}/${freshOrgData.maxDevices}). Upgrade license tier.`);
+        }
+
+        const newDeviceRef = db().collection("b2b_devices").doc();
+        tx.set(newDeviceRef, {
+          orgId,
+          childId,
+          label: data.label || "",
+          addedAt: now,
+          addedBy: userId,
+        });
+
+        tx.update(orgRef, {
+          currentDevices: admin.firestore.FieldValue.increment(1),
+          updatedAt: now,
+        });
+
+        newDeviceCount = freshOrgData.currentDevices + 1;
       });
 
       await AuditLogger.logSuccess(
@@ -328,7 +335,7 @@ export const addB2BDevice = functions.https.onCall(
         { orgId, childId, duration: Date.now() - startTime }
       );
 
-      return { success: true, orgId, childId, currentDevices: orgData.currentDevices + 1 };
+      return { success: true, orgId, childId, currentDevices: newDeviceCount! };
     }
   )
 );

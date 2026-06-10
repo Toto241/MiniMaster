@@ -5,6 +5,11 @@ on:
       - '**/*.ts'
       - '**/*.kt'
       - '**/*.xml'
+      - '**/*.html'
+      - 'admin-panel/**'
+      - 'web-control/**'
+      - 'parent-panel/**'
+      - 'child-panel/**'
       - '**/build.gradle'
       - '**/build.gradle.kts'
       - 'settings.gradle'
@@ -15,11 +20,17 @@ on:
       - 'package-lock.json'
       - 'jest.config.*'
       - 'tsconfig.json'
+      - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - '**/*.ts'
       - '**/*.kt'
       - '**/*.xml'
+      - '**/*.html'
+      - 'admin-panel/**'
+      - 'web-control/**'
+      - 'parent-panel/**'
+      - 'child-panel/**'
       - '**/build.gradle'
       - '**/build.gradle.kts'
       - 'settings.gradle'
@@ -30,6 +41,7 @@ on:
       - 'package-lock.json'
       - 'jest.config.*'
       - 'tsconfig.json'
+      - '.github/workflows/ci.yml'
 
 permissions:
   contents: read
@@ -56,7 +68,7 @@ jobs:
         run: npm run lint
 
       - name: Run backend tests
-        run: npm test --silent
+        run: npm run test:ci -- --silent
 
       - name: Upload backend test and coverage artifacts
         if: always()
@@ -136,7 +148,7 @@ jobs:
                 "client_info": {
                   "mobilesdk_app_id": "1:000000000000:android:placeholderchild",
                   "android_client_info": {
-                    "package_name": "com.google.pairing"
+                    "package_name": "com.minimaster.childapp"
                   }
                 },
                 "oauth_client": [],
@@ -215,7 +227,12 @@ jobs:
 
       - name: Generate Jacoco report
         if: steps.network-test.outputs.google-maven-accessible == 'true'
-        run: ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon
+        run: |
+          if ./scripts/run-android-checks.sh tasks --all --no-daemon | grep -qE '(^|[[:space:]])jacocoTestReport([[:space:]]|$)'; then
+            ./scripts/run-android-checks.sh jacocoTestReport --continue --no-daemon
+          else
+            echo "::notice::No jacocoTestReport task is configured; skipping Android coverage report."
+          fi
 
       - name: Upload reports
         if: steps.network-test.outputs.google-maven-accessible == 'true'
@@ -287,7 +304,7 @@ jobs:
                 "client_info": {
                   "mobilesdk_app_id": "1:000000000000:android:placeholderchild",
                   "android_client_info": {
-                    "package_name": "com.google.pairing"
+                    "package_name": "com.minimaster.childapp"
                   }
                 },
                 "oauth_client": [],

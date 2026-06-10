@@ -1,29 +1,29 @@
-// Firebase Configuration Template
-// Copy this file to firebase-config.js and fill in your actual Firebase project details
-
-const firebaseConfig = {
-    apiKey: "your-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.firebasestorage.app",
-    messagingSenderId: "your-messaging-sender-id",
-    appId: "your-app-id"
-};
-
-// How to get these values:
-// 1. Go to Firebase Console (https://console.firebase.google.com/)
-// 2. Select your project
-// 3. Click on the gear icon (Project Settings)
-// 4. Scroll down to "Your apps" section
-// 5. Click on the web app icon or "Add app" to create a web app
-// 6. Copy the configuration object
-
-// Alternative: You can also replace the firebaseConfig object directly in app.js
-// if you prefer not to use a separate configuration file.
-
-// Security Note:
-// These values are safe to include in client-side code as they are public identifiers.
-// The actual security is handled by Firebase Security Rules and Functions.
-
-// Export the configuration (if using as a module)
-// window.firebaseConfig = firebaseConfig;
+/*
+ * Firebase configuration template for MiniMaster Web Control (Parent).
+ *
+ * Diese Datei dient als Vorlage. Sie wird vom Setup-Wizard
+ * ('python -m scripts.config_transfer_cli' oder Admin-Panel-Button
+ * "Übertragen") als firebase-config.js mit echten Werten überschrieben.
+ *
+ * firebase-config.js ist in .gitignore – echte API-Keys gelangen nicht
+ * versehentlich ins Repository. Die Template-Datei bleibt versioniert.
+ */
+(function (root) {
+  var firebaseConfig = {
+    apiKey: 'your-api-key',
+    authDomain: 'your-project.firebaseapp.com',
+    projectId: 'your-project-id',
+    storageBucket: 'your-project.firebasestorage.app',
+    messagingSenderId: 'your-messaging-sender-id',
+    appId: 'your-app-id',
+    measurementId: '',
+    appCheck: {
+      provider: 'reCaptchaV3',
+      siteKey: ''
+    }
+  };
+  root.__MM_FIREBASE_CONFIG__ = firebaseConfig;
+  if (firebaseConfig.appCheck && firebaseConfig.appCheck.siteKey) {
+    root.MINIMASTER_APP_CHECK_SITE_KEY = firebaseConfig.appCheck.siteKey;
+  }
+})(typeof window !== 'undefined' ? window : globalThis);

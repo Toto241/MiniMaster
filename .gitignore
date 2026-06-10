@@ -29,9 +29,22 @@ scripts/security-test.env
 
 # Firebase app configs (must never be committed)
 **/google-services.json
+*_google-services.json
 **/GoogleService-Info.plist
+serviceAccountKey.json
+serviceAccountKey*.json
+*firebase-adminsdk*.json
 # Keep only safe templates in git
 !**/google-services.template.json
+!**/serviceAccountKey.template.json
+
+# Generated per-panel Firebase configuration (written by setup wizard,
+# contains real API keys). Templates remain checked in.
+admin-panel/firebase-config.js
+web-control/firebase-config.js
+parent-panel/firebase-config.js
+child-panel/firebase-config.js
+!**/firebase-config.template.js
 
 # OS-specific files
 .DS_Store
@@ -54,6 +67,15 @@ test/wave*-errors.txt
 test/wave*-failures.txt
 test/wave*-json.txt
 
+# Regenerierbare Tool-Ausgaben / Artefakte (Repo-Cleanup)
+lint_output*.txt
+lint-output.txt
+test-ci-output.txt
+build-output.txt
+audit_report.txt
+*.exe
+admin-panel.zip
+
 # Python local environments and bytecode
 .venv/
 **/__pycache__/
@@ -69,3 +91,9 @@ DerivedData/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# GitHub Pages (lokal generiert; Deploy via Actions)
+site/
+
+# Lokale Publisher-Daten fuer setup-github-pages.ps1
+config/legal-publisher.json

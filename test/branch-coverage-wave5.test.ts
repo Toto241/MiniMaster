@@ -54,7 +54,15 @@ jest.mock("firebase-admin/auth", () => ({
 
 // ── State‐backed Firestore mock ───────────────────────────────────────────
 
-const mockDbObj = { collection: jest.fn() };
+const mockDbObj = { collection: jest.fn(), runTransaction: jest.fn(async (fn: any) => await fn({
+  get: jest.fn(async (refOrQuery: any) => {
+    if (refOrQuery.get) return await refOrQuery.get();
+    return await refOrQuery.get();
+  }),
+  set: jest.fn((ref: any, data: any, opts?: any) => ref.set(data, opts)),
+  update: jest.fn((ref: any, data: any) => ref.update(data)),
+  delete: jest.fn((ref: any) => ref.delete()),
+})) };
 
 jest.mock("../firebase", () => ({
   db: jest.fn(() => mockDbObj),
@@ -1675,9 +1683,16 @@ describe("analyzeTaskPhoto", () => {
 
   it("Gemini returns unparseable JSON", async () => {
     process.env.GEMINI_API_KEY = "test-gemini-key";
+    // Mock photo download (first fetch)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+    // Mock Gemini API response with unparseable JSON (second fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
         candidates: [{ content: { parts: [{ text: "not valid json {{{" }] } }],
       }),
     });
@@ -1702,6 +1717,13 @@ describe("analyzeTaskPhoto", () => {
 
   it("Gemini API error (non-ok response)", async () => {
     process.env.GEMINI_API_KEY = "test-gemini-key";
+    // Mock photo download (first fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+    // Mock Gemini API non-ok response (second fetch)
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 500,

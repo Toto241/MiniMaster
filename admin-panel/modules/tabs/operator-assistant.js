@@ -5,6 +5,7 @@
 // Stichworte (z.B. "config" und "cloud-dienst") deterministisch dieselbe
 // Antwort liefern.
 import { register } from "../core/registry.js";
+import { buildOperatorSubscriptionAnswerDe } from "../shared/pricing-lookup.js";
 
 const TOPICS = [
   {
@@ -70,7 +71,7 @@ const TOPICS = [
   {
     id: "subscription",
     keywords: ["subscription", "abo", "ablauf", "trial"],
-    answer: "Subscriptions: In der \u00dcbersicht werden Warnungen f\u00fcr ablaufende Trials (<7 Tage) und Abos angezeigt. Im User-Detail sind alle Abo-Infos sichtbar: Typ, Start, Ablauf, Kinderlimit, Purchase-Token. SKUs: single_child_monthly (\u20ac1.99), family_monthly (\u20ac4.99), single_child_yearly (\u20ac19.99), family_yearly (\u20ac49.99).",
+    answer: buildOperatorSubscriptionAnswerDe(),
   },
 ];
 

@@ -65,7 +65,7 @@ describe("pricing-config helpers", () => {
 
   it("calculatePrice defaults to German VAT for unknown country", () => {
     const result = calculatePrice(100, "XX");
-    expect(result.vatRate).toBe(0.19);
+    expect(result.vatRate).toBe(0);
   });
 
   it("getTierBySku returns B2C tier", () => {

@@ -1,0 +1,297 @@
+/* MiniMaster Setup-Wizard – CSP-konform (keine inline styles).
+ * Geladen ausschliesslich von admin-panel/wizard.html.
+ */
+
+:root {
+    --wiz-bg: #f5f7fa;
+    --wiz-fg: #1f2937;
+    --wiz-muted: #6b7280;
+    --wiz-border: #d1d5db;
+    --wiz-accent: #1d4ed8;
+    --wiz-accent-fg: #ffffff;
+    --wiz-ok: #16a34a;
+    --wiz-warn: #d97706;
+    --wiz-err: #dc2626;
+    --wiz-card: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--wiz-bg);
+    color: var(--wiz-fg);
+    line-height: 1.5;
+}
+
+.wiz-shell {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.wiz-header h1 {
+    margin: 0 0 8px;
+    font-size: 1.6rem;
+}
+
+.wiz-header p {
+    margin: 0 0 24px;
+    color: var(--wiz-muted);
+}
+
+.wiz-progress {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 24px;
+}
+
+.wiz-progress-step {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--wiz-card);
+    border: 1px solid var(--wiz-border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--wiz-muted);
+    text-align: center;
+}
+
+.wiz-progress-step.is-active {
+    border-color: var(--wiz-accent);
+    color: var(--wiz-accent);
+    font-weight: 600;
+}
+
+.wiz-progress-step.is-done {
+    background: var(--wiz-ok);
+    border-color: var(--wiz-ok);
+    color: white;
+}
+
+.wiz-card {
+    background: var(--wiz-card);
+    border: 1px solid var(--wiz-border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 16px;
+}
+
+.wiz-card h2 {
+    margin: 0 0 8px;
+    font-size: 1.25rem;
+}
+
+.wiz-card .wiz-purpose {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin: 0 0 16px;
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.wiz-card .wiz-purpose strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.wiz-field {
+    margin-bottom: 20px;
+}
+
+.wiz-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.wiz-field .wiz-hint {
+    font-size: 0.85rem;
+    color: var(--wiz-muted);
+    margin: 2px 0 6px;
+}
+
+.wiz-field input[type="text"],
+.wiz-field input[type="url"],
+.wiz-field input[type="password"],
+.wiz-field input[type="email"],
+.wiz-field input[type="file"],
+.wiz-field select,
+.wiz-field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--wiz-border);
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: white;
+}
+
+.wiz-field select:disabled {
+    background: #f3f4f6;
+    color: var(--wiz-muted);
+}
+
+.wiz-firebase-import {
+    margin: 16px 0;
+    padding: 12px 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+}
+
+.wiz-firebase-import summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--wiz-accent);
+}
+
+.wiz-firebase-import p {
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
+
+.wiz-firebase-import .wiz-actions {
+    margin-top: 8px;
+}
+
+.wiz-help-block {
+    background: white;
+    border: 1px solid var(--wiz-border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+}
+
+.wiz-help-block summary {
+    cursor: pointer;
+    color: var(--wiz-accent);
+    font-weight: 500;
+}
+
+.wiz-help-block ol { margin: 8px 0; padding-left: 24px; }
+.wiz-help-block li { margin: 4px 0; }
+
+.wiz-field textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.wiz-field input:focus,
+.wiz-field textarea:focus {
+    outline: none;
+    border-color: var(--wiz-accent);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15);
+}
+
+.wiz-link-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 6px 0 10px;
+    flex-wrap: wrap;
+}
+
+.wiz-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--wiz-accent);
+    color: var(--wiz-accent-fg);
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.wiz-link-btn:hover {
+    opacity: 0.92;
+}
+
+.wiz-link-btn.is-secondary {
+    background: white;
+    color: var(--wiz-accent);
+    border: 1px solid var(--wiz-accent);
+}
+
+.wiz-status {
+    font-size: 0.85rem;
+    margin-top: 6px;
+    color: var(--wiz-muted);
+}
+
+.wiz-status.is-ok { color: var(--wiz-ok); font-weight: 500; }
+.wiz-status.is-warn { color: var(--wiz-warn); }
+.wiz-status.is-err { color: var(--wiz-err); }
+
+.wiz-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.wiz-btn {
+    padding: 10px 20px;
+    border: 1px solid var(--wiz-border);
+    background: white;
+    color: var(--wiz-fg);
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.wiz-btn:hover { background: #f3f4f6; }
+
+.wiz-btn.is-primary {
+    background: var(--wiz-accent);
+    color: var(--wiz-accent-fg);
+    border-color: var(--wiz-accent);
+}
+
+.wiz-btn.is-primary:hover { opacity: 0.92; background: var(--wiz-accent); }
+
+.wiz-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.wiz-step { display: none; }
+.wiz-step.is-active { display: block; }
+
+.wiz-summary-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.wiz-summary-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--wiz-border);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.95rem;
+}
+
+.wiz-summary-list li:last-child { border-bottom: none; }
+
+.wiz-summary-list .wiz-summary-key { color: var(--wiz-muted); }
+.wiz-summary-list .wiz-summary-val { font-weight: 500; }
+.wiz-summary-list .wiz-summary-val.is-missing { color: var(--wiz-err); }
+.wiz-summary-list .wiz-summary-val.is-ok { color: var(--wiz-ok); }
+
+.wiz-result {
+    background: #d1fae5;
+    border-left: 4px solid var(--wiz-ok);
+    padding: 16px;
+    border-radius: 4px;
+    margin-top: 16px;
+}
+
+.wiz-result.is-error {
+    background: #fee2e2;
+    border-left-color: var(--wiz-err);
+}
