@@ -20,6 +20,10 @@ EVIDENCE_CANDIDATES = (
     "docs/SECURITY_HARDENING_P3.md",
     "build/test-automation/latest-summary.json",
     "build/qa-artifacts/latest-summary.json",
+    "build/qa-artifacts/android-release-matrix/latest-summary.json",
+    "build/qa-artifacts/android-release-matrix/validation-summary.json",
+    "build/fertigungsstand/latest-summary.json",
+    "docs/REPO_FINAL_STATUS.md",
     "build/reports/tests/test/index.html",
     "build/reports/jacoco/test/html/index.html",
     "masterApp/build/reports/lint-results-debug.html",
@@ -117,7 +121,10 @@ def load_json_if_exists(path: Path) -> dict[str, object] | None:
 def derive_gate_status(files: list[EvidenceFile]) -> list[dict[str, object]]:
     existing = {item.path for item in files if item.exists}
     latest_summary = load_json_if_exists(REPO_ROOT / "build/test-automation/latest-summary.json")
-    qa_summary = load_json_if_exists(REPO_ROOT / "build/qa-artifacts/latest-summary.json")
+    qa_summary = (
+        load_json_if_exists(REPO_ROOT / "build/qa-artifacts/latest-summary.json")
+        or load_json_if_exists(REPO_ROOT / "build/qa-artifacts/android-release-matrix/latest-summary.json")
+    )
 
     gate_rows: list[dict[str, object]] = []
     for gate in RELEASE_GATES:
