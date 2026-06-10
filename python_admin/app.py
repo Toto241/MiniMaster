@@ -3604,7 +3604,10 @@ def run_command(request: CommandRequest, timeout_sec: int | None = None) -> dict
 
             # Windows fallback: some tools (npm/firebase) may not resolve directly
             # in this runtime, but work through cmd.exe command resolution.
-            import shlex
+            # NB: shlex ist modulweit importiert – ein lokales `import shlex`
+            # hier wuerde shlex fuer die ganze Funktion zur lokalen Variable
+            # machen und die Nutzung oben (Zeile ~3580) mit UnboundLocalError
+            # brechen.
             parts = shlex.split(line, posix=False)
             process = subprocess.run(
                 ["cmd", "/c"] + parts,
