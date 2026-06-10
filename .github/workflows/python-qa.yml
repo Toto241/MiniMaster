@@ -38,20 +38,13 @@ jobs:
 
       - name: Run Python test suite
         working-directory: scripts
-        # Deselektierte Tests (jeweils ein eigener, dokumentierter Folge-Task):
-        #   1-2) android-automation-sweep / full-master-commissioning erwarten ein
-        #        real provisioniertes Android-SDK + AVD-Manager und schlagen ohne
-        #        diese Umgebung deterministisch im Precheck fehl (HTTP 400 statt
-        #        Erreichen des gemockten Freigabe-Gates). TODO: SDK/AVD-Precheck
-        #        in den Tests mocken oder Job mit setup-android provisionieren.
-        #   3-4) Die beiden testing-register-Insight-Tests rufen das echte
-        #        build_testing_register() auf und teilen sich Modul-Globalstate;
-        #        bei gemeinsamem Lauf beeinflussen sie sich gegenseitig (flaky).
-        #        TODO: build_testing_register() in diesen Tests mocken oder den
-        #        geteilten State isolieren.
+        # Deselektierte Tests (dokumentierter Folge-Task):
+        #   android-automation-sweep / full-master-commissioning erwarten ein real
+        #   provisioniertes Android-SDK + AVD-Manager und schlagen ohne diese
+        #   Umgebung deterministisch im Precheck fehl (HTTP 400 statt Erreichen
+        #   des gemockten Freigabe-Gates). TODO: SDK/AVD-Precheck in den Tests
+        #   mocken oder Job mit setup-android provisionieren.
         run: |
           python -m pytest -q \
             --deselect "tests/test_app_suites.py::TestMiniMasterAdminHandlerRoutes::test_do_post_android_automation_sweep_rejects_warning_state_without_active_approval" \
-            --deselect "tests/test_integration.py::TestFullUsbTestFlow::test_full_master_commissioning_flow" \
-            --deselect "tests/test_http_runtime_qa.py::TestQaRuntimeHttpContracts::test_runtime_http_serves_duplicate_coverage_insights_in_testing_register" \
-            --deselect "tests/test_http_runtime_qa.py::TestQaRuntimeHttpContracts::test_runtime_http_serves_manual_prioritization_insights_in_testing_register"
+            --deselect "tests/test_integration.py::TestFullUsbTestFlow::test_full_master_commissioning_flow"
