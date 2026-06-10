@@ -635,6 +635,13 @@ body {
     margin: 8px 0;
 }
 
+.support-automation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-block-end: 10px;
+}
+
 .admin-waiting-hint {
     background: #fefce8;
     border: 1px solid #fde68a;
@@ -5026,4 +5033,171 @@ input:focus, select:focus, textarea:focus {
     font-size: 0.75rem;
     color: #888;
     margin-left: auto;
+}
+
+/* ── Acceptance Panel Styles ── */
+.acc-live-status {
+    margin: 12px 0;
+    padding: 12px;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+}
+.acc-progress-container {
+    width: 100%;
+    height: 8px;
+    background: #1e293b;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.acc-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+.acc-status-text {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+.acc-results {
+    margin: 12px 0;
+}
+.acc-results table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.acc-results th,
+.acc-results td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #1e293b;
+}
+.acc-results th {
+    color: #94a3b8;
+    font-weight: 500;
+}
+.acc-results .acc-pass {
+    color: #10b981;
+}
+.acc-results .acc-fail {
+    color: #ef4444;
+}
+.acc-results .acc-skip {
+    color: #64748b;
+}
+.acc-history {
+    margin: 12px 0;
+}
+.acc-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #1e293b;
+    font-size: 0.85rem;
+}
+.acc-history-item .acc-h-status {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.acc-history-item .acc-h-status.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+.acc-history-item .acc-h-status.failed {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+.acc-history-item .acc-h-status.running {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+.acc-log-viewer {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    color: #94a3b8;
+    margin-top: 8px;
+}
+
+/* Utility class for hiding elements (replaces inline style=display:none) */
+.hidden {
+    display: none !important;
+}
+
+/* Operator session manager (AP-N3 Phase 1) */
+.session-expiry-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10050;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.session-expiry-banner--warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-bottom: 1px solid #fcd34d;
+}
+.session-expiry-banner--error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-bottom: 1px solid #fca5a5;
+}
+.session-reauth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+.session-reauth-modal {
+    background: var(--card-bg, #fff);
+    color: var(--text-primary, #0f172a);
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 320px;
+    max-width: 420px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+.session-reauth-modal h3 {
+    margin: 0 0 8px;
+    font-size: 1.1rem;
+}
+.session-reauth-modal p {
+    margin: 0 0 16px;
+    color: var(--text-muted, #64748b);
+    font-size: 0.875rem;
+}
+.session-reauth-modal input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color, #cbd5e1);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 0.95rem;
+}
+.session-reauth-modal .session-reauth-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
 }

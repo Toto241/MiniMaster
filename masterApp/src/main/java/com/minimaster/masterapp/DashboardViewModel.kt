@@ -86,10 +86,10 @@ class DashboardViewModel @Inject constructor(
         // When the ViewModel is created, start observing the master credentials.
         // Once available, load the associated children and tasks.
         viewModelScope.launch {
-            credentialsRepository.getCredentials.collect { (imei, _) ->
-                if (imei != null) {
-                    loadChildren(imei)
-                    loadTasksForReview(imei)
+            credentialsRepository.getMasterId.collect { masterId ->
+                if (masterId != null) {
+                    loadChildren(masterId)
+                    loadTasksForReview(masterId)
                     // Register FCM token on startup to ensure notifications work
                     registerFcmToken()
                 }
@@ -169,7 +169,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun setDeviceLocked(childImei: String, isLocked: Boolean) {
         viewModelScope.launch {
-            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            val hasCredentials = credentialsRepository.getMasterId.first() != null
             if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
@@ -194,7 +194,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun createTask(childImei: String, description: String, deadline: Long) {
         viewModelScope.launch {
-            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            val hasCredentials = credentialsRepository.getMasterId.first() != null
             if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
@@ -223,7 +223,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun approveTask(childImei: String, taskId: String) {
         viewModelScope.launch {
-            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            val hasCredentials = credentialsRepository.getMasterId.first() != null
             if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch
@@ -249,7 +249,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun rejectTask(childImei: String, taskId: String, reason: String? = null) {
         viewModelScope.launch {
-            val hasCredentials = credentialsRepository.getCredentials.first().first != null
+            val hasCredentials = credentialsRepository.getMasterId.first() != null
             if (!hasCredentials) {
                 _error.value = "Credentials not found. Cannot perform action."
                 return@launch

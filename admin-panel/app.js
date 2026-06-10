@@ -8,7 +8,100 @@ const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations
 const P0_BLOCKER_COCKPIT_STORAGE_KEY = "operatorP0BlockerCockpit";
 
 // ==================== SESSION TIMEOUT ====================
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minuten Inaktivität
+function getSessionManager() {
+    return window.MM && window.MM.sessionManager ? window.MM.sessionManager : null;
+}
+
+async function ensureOperatorTier(minTier) {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.ensureTier === "function") {
+        return sessionManager.ensureTier(minTier);
+    }
+    return true;
+}
+
+function resetSessionTimeout() {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.recordActivity === "function") {
+        sessionManager.recordActivity();
+        return;
+    }
+
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    if (!auth || !auth.currentUser) return;
+
+    sessionWarningTimer = setTimeout(() => {
+        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "warning");
+    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
+
+    sessionTimeoutTimer = setTimeout(() => {
+        if (auth && auth.currentUser) {
+            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
+            auth.signOut();
+        }
+    }, SESSION_TIMEOUT_MS);
+}
+
+function startSessionMonitoring() {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.start === "function") {
+        sessionManager.configure({
+            onLogout: () => {
+                if (auth) auth.signOut();
+            },
+            onNotify: (message, type) => showNotification(message, type || "info"),
+            isAdminPinConfigured: async () => {
+                if (!functions) return false;
+                const statusFn = functions.httpsCallable("getOperatorAdminPinStatus");
+                const response = await statusFn({});
+                return Boolean(response?.data?.configured);
+            },
+            hasFreshAdminVerification: async () => {
+                if (!auth || !auth.currentUser) return false;
+                const token = await auth.currentUser.getIdTokenResult();
+                const verifiedAt = token?.claims?.admin_verified_at;
+                if (typeof verifiedAt !== "number") return false;
+                return (Date.now() / 1000 - verifiedAt) / 60 <= 30;
+            },
+            verifyAdminPin: async (pin) => {
+                if (!functions) throw new Error("Firebase Functions nicht initialisiert.");
+                const verifyFn = functions.httpsCallable("verifyAdminPin");
+                await verifyFn({ pin });
+                if (auth && auth.currentUser) {
+                    await auth.currentUser.getIdToken(true);
+                }
+            },
+        });
+        sessionManager.markLoggedIn();
+        sessionManager.start();
+        return;
+    }
+
+    if (!sessionMonitoringActive) {
+        SESSION_MONITORING_EVENTS.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
+        sessionMonitoringActive = true;
+    }
+    resetSessionTimeout();
+}
+
+function stopSessionMonitoring() {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.stop === "function") {
+        sessionManager.stop();
+    }
+
+    if (sessionMonitoringActive) {
+        SESSION_MONITORING_EVENTS.forEach(evt => document.removeEventListener(evt, resetSessionTimeout));
+        sessionMonitoringActive = false;
+    }
+    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+    sessionTimeoutTimer = null;
+    sessionWarningTimer = null;
+}
+
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // Legacy fallback
 let sessionTimeoutTimer = null;
 let sessionWarningTimer = null;
 const SESSION_MONITORING_EVENTS = ["mousedown", "keydown", "scroll", "touchstart"];
@@ -22,44 +115,6 @@ const QA_RUNTIME_OPERATOR_SECTION_IDS = [
     "qa-python-run-card",
     "qa-suite-card",
 ];
-
-function resetSessionTimeout() {
-    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
-    if (!auth || !auth.currentUser) return;
-
-    // Warnung 5 Minuten vor Ablauf
-    sessionWarningTimer = setTimeout(() => {
-        showNotification("Ihre Sitzung läuft in 5 Minuten ab. Bewegen Sie die Maus, um eingeloggt zu bleiben.", "warning");
-    }, SESSION_TIMEOUT_MS - 5 * 60 * 1000);
-
-    // Auto-Logout nach Timeout
-    sessionTimeoutTimer = setTimeout(() => {
-        if (auth && auth.currentUser) {
-            showNotification("Sitzung abgelaufen – automatisch abgemeldet.", "error");
-            auth.signOut();
-        }
-    }, SESSION_TIMEOUT_MS);
-}
-
-function startSessionMonitoring() {
-    if (!sessionMonitoringActive) {
-        SESSION_MONITORING_EVENTS.forEach(evt => document.addEventListener(evt, resetSessionTimeout, { passive: true }));
-        sessionMonitoringActive = true;
-    }
-    resetSessionTimeout();
-}
-
-function stopSessionMonitoring() {
-    if (sessionMonitoringActive) {
-        SESSION_MONITORING_EVENTS.forEach(evt => document.removeEventListener(evt, resetSessionTimeout));
-        sessionMonitoringActive = false;
-    }
-    if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
-    sessionTimeoutTimer = null;
-    sessionWarningTimer = null;
-}
 
 function initializeAuthBindings() {
     if (authBindingsInitialized) return;
@@ -94,7 +149,796 @@ function initializeAuthBindings() {
         checkProviderBtn.__authClickBound = true;
     }
 
+    const connectivityBtn = document.getElementById("connectivity-test-btn");
+    if (connectivityBtn && !connectivityBtn.__authClickBound) {
+        connectivityBtn.addEventListener("click", runConnectivityTest);
+        connectivityBtn.__authClickBound = true;
+    }
+
+    const authProbeBtn = document.getElementById("auth-probe-btn");
+    if (authProbeBtn && !authProbeBtn.__authClickBound) {
+        authProbeBtn.addEventListener("click", runAuthDiagnostics);
+        authProbeBtn.__authClickBound = true;
+    }
+
     authBindingsInitialized = true;
+}
+
+// ── Erweiterte Login-Diagnose via Backend-Probe ─────────────────────
+//
+// Macht via Backend einen Identity-Toolkit-Aufruf und decodiert den echten
+// Server-Error-Code (OPERATION_NOT_ALLOWED, INVALID_LOGIN_CREDENTIALS,
+// API_KEY_HTTP_REFERRER_BLOCKED, ...). Das Browser-SDK uebersetzt diese
+// alle pauschal zu "auth/network-request-failed" – wir wollen aber genau
+// wissen, welche Konfig-/Account-Ursache dahinter steckt.
+async function runAuthDiagnostics() {
+    const btn = document.getElementById("auth-probe-btn");
+    const node = document.getElementById("auth-probe-result");
+    const emailField = document.getElementById("login-email");
+    const passwordField = document.getElementById("login-password");
+    if (btn) btn.disabled = true;
+    if (node) {
+        node.hidden = false;
+        node.innerHTML = "<em>Backend ruft Identity Toolkit auf, Browser macht parallel Direct-Probe …</em>";
+    }
+    const email = ((emailField && emailField.value) || "").trim();
+    const password = (passwordField && passwordField.value) || "";
+
+    // Parallel: Backend-Probe + Browser-Direct-Probe.
+    // Browser-Direct = das gleiche, was das Firebase-SDK auch macht, aber
+    // direkt per fetch() ohne das SDK. Trennt SDK-Init-Probleme von
+    // tatsaechlichen Browser-Layer-Blockaden (AV/Extension).
+    const apiKey = _firebaseApiKeyForDiagnostics();
+    const [backendResult, browserDirect] = await Promise.all([
+        _runBackendAuthProbe(email, password),
+        (email && password && apiKey) ? _runBrowserDirectAuthProbe(apiKey, email, password) : Promise.resolve(null),
+    ]);
+
+    if (backendResult && backendResult.__fetchError) {
+        if (node) {
+            node.innerHTML = `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>✗ Backend-Probe fehlgeschlagen:</strong> ${_escapeHtml(backendResult.__fetchError)}
+            </div>`;
+        }
+        if (btn) btn.disabled = false;
+        return;
+    }
+    _renderAuthDiagnostics(backendResult, {
+        hadCredentials: !!(email && password),
+        browserDirect,
+    });
+    if (btn) btn.disabled = false;
+}
+
+async function _runBackendAuthProbe(email, password) {
+    try {
+        const response = await fetch("/api/diagnostics/auth-probe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            return { __fetchError: data.error || `HTTP ${response.status}` };
+        }
+        return await response.json();
+    } catch (err) {
+        return { __fetchError: err.message };
+    }
+}
+
+function _firebaseApiKeyForDiagnostics() {
+    // Eingeloggte firebase-config.js exportiert den Key auf window.
+    const cfg = (typeof window !== "undefined" && window.__MM_FIREBASE_CONFIG__) || null;
+    return (cfg && cfg.apiKey) || "";
+}
+
+async function _runBrowserDirectAuthProbe(apiKey, email, password) {
+    // Exakt derselbe Aufruf, den das Firebase Auth Web-SDK intern macht – aber
+    // ohne das SDK. Damit trennen wir Browser-Layer-Blockaden (Extension/AV,
+    // die Google-API-POSTs blocken) von SDK-State-/Init-Problemen.
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`;
+    const start = performance.now();
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, returnSecureToken: true }),
+        });
+        const ms = Math.round(performance.now() - start);
+        const text = await response.text();
+        let body = null;
+        try { body = JSON.parse(text); } catch (_e) { /* keep raw */ }
+        if (response.ok) {
+            return { ok: true, ms, status: response.status };
+        }
+        const errCode = body && body.error && body.error.message
+            ? String(body.error.message).split(":")[0].trim()
+            : "";
+        return {
+            ok: false,
+            ms,
+            status: response.status,
+            errorCode: errCode,
+            errorMessage: (body && body.error && body.error.message) || text.slice(0, 200),
+        };
+    } catch (err) {
+        const ms = Math.round(performance.now() - start);
+        return { ok: false, ms, fetchError: err.message || String(err) };
+    }
+}
+
+function _renderAuthDiagnostics(result, opts) {
+    const node = document.getElementById("auth-probe-result");
+    if (!node || !result) return;
+    if (result.ok === false) {
+        node.innerHTML = `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+            <strong>✗ ${_escapeHtml(result.headline || "Diagnose nicht moeglich")}</strong>
+            ${result.fix ? `<div style="margin-top:6px">Fix: ${_escapeHtml(result.fix)}</div>` : ""}
+        </div>`;
+        return;
+    }
+
+    // Drei-Wege-Vergleich: Backend-Login vs Browser-Direct vs SDK
+    const backendLoginOk = !!(result.loginAttempt
+        && result.loginAttempt.diagnosis
+        && result.loginAttempt.diagnosis.category === "login_succeeded");
+    const browserDirect = opts && opts.browserDirect;
+    const browserDirectOk = !!(browserDirect && browserDirect.ok);
+    const browserDirectAttempted = !!browserDirect;
+    // Falls Diagnose laeuft, ist der SDK-Login bereits gescheitert (deshalb
+    // hat der User den Diagnose-Button geklickt). Daher SDK = scheitert.
+
+    // Headline neu bestimmen mit dem Drei-Wege-Wissen
+    let headline = result.headline || "";
+    let level = result.level || "warn";
+    if (backendLoginOk && browserDirectAttempted) {
+        if (browserDirectOk) {
+            // Browser kann den Auth-Endpoint direkt erreichen → SDK selbst ist das Problem
+            headline = (
+                "✓ Backend UND Browser-Direct-Fetch funktionieren. "
+                + "Das Problem liegt im Firebase-SDK selbst – nicht im Netzwerk und nicht "
+                + "in Antivirus/Extension. Wahrscheinliche Ursachen: App Check-Token "
+                + "kann nicht beschafft werden, IndexedDB-Quote voll, Service Worker mit "
+                + "veraltetem Cache, oder SDK-Initialisierungs-Race."
+            );
+            level = "warn";
+        } else if (browserDirect.fetchError) {
+            // Browser kann den POST gar nicht erst absetzen → Browser-Layer blockt
+            headline = (
+                "✗ Browser-Direct-Fetch zu identitytoolkit scheitert mit '"
+                + (browserDirect.fetchError || "Failed to fetch")
+                + "', obwohl Backend OK ist. Das ist definitiv ein Browser-Layer-"
+                + "Problem: Extension (uBlock/Privacy Badger) oder Antivirus mit "
+                + "SSL-Inspection blockt POST-Requests mit Credentials-Body."
+            );
+            level = "error";
+        } else if (browserDirect.status === 0) {
+            headline = (
+                "⚠ Browser-Direct-Fetch hat keinen Status zurueckgegeben (status=0). "
+                + "Typisch fuer: CORS-Block durch eine Extension/AV oder DNS-Hijacking."
+            );
+            level = "error";
+        } else {
+            // Browser bekam echte HTTP-Antwort vom Identity Toolkit – aber nicht OK
+            headline = (
+                `✗ Browser-Direct-Fetch antwortet mit HTTP ${browserDirect.status} `
+                + `(Code: ${browserDirect.errorCode || "unbekannt"}). `
+                + `Backend kommt durch, Browser nicht – Antivirus/Extension manipuliert `
+                + `den Request-Body oder Origin-Header.`
+            );
+            level = "error";
+        }
+    }
+
+    const palette = level === "error"
+        ? { bg: "#fee2e2", border: "#dc2626" }
+        : level === "ok"
+            ? { bg: "#d1fae5", border: "#16a34a" }
+            : { bg: "#fef3c7", border: "#f59e0b" };
+
+    const rows = [];
+    rows.push(`<div style="background:${palette.bg};padding:12px;border-left:4px solid ${palette.border}">`);
+    rows.push(`<strong>${_escapeHtml(headline)}</strong>`);
+    rows.push("</div>");
+
+    // Strukturierter Block: API-Key + Provider + 3-Wege-Login-Vergleich
+    rows.push("<div style=\"margin-top:10px;font-family:monospace;font-size:0.9em\">");
+    rows.push(`<div>Project ID: <strong>${_escapeHtml(result.projectId || "(unbekannt)")}</strong></div>`);
+    rows.push(`<div>API-Key gueltig: ${_boolBadge(result.apiKeyValid)}</div>`);
+    rows.push(`<div>Email/Password-Provider aktiv: ${_tristateBadge(result.emailPasswordProviderEnabled)}</div>`);
+
+    const probe = (result.probe && result.probe.diagnosis) || {};
+    rows.push(`<div style="margin-top:6px"><strong>Probe</strong> (Identity Toolkit, Dummy-Email):</div>`);
+    rows.push(`<div>&nbsp;&nbsp;Kategorie: ${_escapeHtml(probe.category || "?")}${probe.code ? " (" + _escapeHtml(probe.code) + ")" : ""}</div>`);
+    if (probe.explanation) rows.push(`<div>&nbsp;&nbsp;${_escapeHtml(probe.explanation)}</div>`);
+
+    if (result.loginAttempt && result.loginAttempt.diagnosis) {
+        const ldiag = result.loginAttempt.diagnosis;
+        rows.push(`<div style="margin-top:6px"><strong>Backend-Login</strong> (Python OpenSSL, mit eingegebenen Credentials):</div>`);
+        rows.push(`<div>&nbsp;&nbsp;Kategorie: ${_escapeHtml(ldiag.category || "?")}${ldiag.code ? " (" + _escapeHtml(ldiag.code) + ")" : ""}</div>`);
+        if (ldiag.explanation) rows.push(`<div>&nbsp;&nbsp;${_escapeHtml(ldiag.explanation)}</div>`);
+    } else if (opts && opts.hadCredentials) {
+        rows.push(`<div style="margin-top:6px"><em>Backend-Login wurde uebersprungen (API-Key oder Provider haben Probleme).</em></div>`);
+    } else {
+        rows.push(`<div style="margin-top:6px"><em>Tipp: Email + Passwort eingeben und Diagnose nochmal starten – fuer den vollen 3-Wege-Vergleich.</em></div>`);
+    }
+
+    // Browser-Direct-Probe (NEU)
+    if (browserDirectAttempted) {
+        rows.push(`<div style="margin-top:6px"><strong>Browser-Direct-Fetch</strong> (Browser, gleicher POST wie Firebase-SDK, aber ohne SDK):</div>`);
+        if (browserDirectOk) {
+            rows.push(`<div>&nbsp;&nbsp;<span style="color:#16a34a">✓ HTTP ${browserDirect.status}</span> in ${browserDirect.ms}ms – Browser kann den Auth-Endpoint direkt erreichen.</div>`);
+        } else if (browserDirect.fetchError) {
+            rows.push(`<div>&nbsp;&nbsp;<span style="color:#dc2626">✗ fetch fehlgeschlagen</span> nach ${browserDirect.ms}ms: ${_escapeHtml(browserDirect.fetchError)}</div>`);
+        } else {
+            rows.push(`<div>&nbsp;&nbsp;<span style="color:#dc2626">✗ HTTP ${browserDirect.status}</span> in ${browserDirect.ms}ms – Code: ${_escapeHtml(browserDirect.errorCode || "?")}</div>`);
+            if (browserDirect.errorMessage) rows.push(`<div>&nbsp;&nbsp;Nachricht: ${_escapeHtml(browserDirect.errorMessage)}</div>`);
+        }
+    } else if (opts && opts.hadCredentials) {
+        rows.push(`<div style="margin-top:6px"><em>Browser-Direct-Probe uebersprungen (kein apiKey in window.__MM_FIREBASE_CONFIG__ gefunden).</em></div>`);
+    }
+    rows.push("</div>");
+
+    // Zielgerichtete Empfehlungen aus dem 3-Wege-Vergleich
+    if (backendLoginOk && browserDirectAttempted && browserDirectOk) {
+        const appCheck = probeAppCheckStatus();
+        const appCheckLine = appCheck.siteKeyPresent
+            ? `<div style="font-family:monospace;font-size:0.85em;color:#6b7280">App Check: Site-Key gesetzt (${_escapeHtml(appCheck.siteKeyValue)}), Provider ${_escapeHtml(appCheck.provider)}.</div>`
+            : `<div style="font-family:monospace;font-size:0.85em;color:#dc2626">App Check: kein Site-Key in firebase-config.js. ${_escapeHtml(appCheck.hint)}</div>`;
+        rows.push(`<div style="margin-top:10px;background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
+            <strong>🩺 Diagnose-Fokus: Das Firebase-SDK selbst.</strong> Backend + Browser-Direct funktionieren –
+            der Auth-Aufruf kommt am Server an. Der SDK-Layer dazwischen scheitert.<br><br>
+            ${appCheckLine}<br>
+            <strong>Automatische Reparatur (empfohlene Reihenfolge):</strong>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-primary" id="auto-reset-state-btn">🧹 Browser-State zuruecksetzen (1 Klick)</button>
+                <button type="button" class="btn btn-secondary" id="auto-reload-btn">🔄 Mit Cache-Bypass neu laden</button>
+                <button type="button" class="btn btn-secondary" id="open-app-check-console-btn">🔗 App Check in Firebase-Console oeffnen</button>
+            </div>
+            <div id="auto-reset-result" style="margin-top:8px"></div>
+            <details style="margin-top:8px">
+                <summary>Was macht 'Browser-State zuruecksetzen'?</summary>
+                <p style="font-size:0.9em">Loescht fuer 127.0.0.1:8765: <em>localStorage</em>, <em>sessionStorage</em>,
+                alle <em>IndexedDB</em>-Datenbanken (insb. <code>firebaseLocalStorageDb</code>, App-Check-DB, Heartbeat-DB),
+                <em>CacheStorage</em>, alle <em>Service-Worker</em>-Registrierungen und Cookies. Andere Sites bleiben unberuehrt.</p>
+            </details>
+            <details style="margin-top:8px">
+                <summary>Wenn das nicht hilft: Inkognito-Modus probieren</summary>
+                <p style="font-size:0.9em">Tastenkuerzel: <strong>Strg+Shift+N</strong> (Chrome/Edge) bzw.
+                <strong>Strg+Shift+P</strong> (Firefox). Dort die Login-Seite oeffnen
+                <code>http://127.0.0.1:8765/admin-panel/</code>. Wenn der Login dort funktioniert, ist eine Extension
+                der Uebeltaeter – im normalen Profil eine nach der anderen deaktivieren bis der Login klappt.</p>
+            </details>
+        </div>`);
+    } else if (backendLoginOk && browserDirectAttempted && !browserDirectOk) {
+        rows.push(`<div style="margin-top:10px;background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+            <strong>🩺 Diagnose-Fokus: Browser-Layer (Extension oder Antivirus).</strong>
+            Server kommt durch, Browser-fetch dorthin nicht.
+            <ol>
+                <li><strong>Browser-Erweiterungen deaktivieren</strong> (uBlock Origin, Privacy Badger, AdBlock Plus, Ghostery, Brave Shields). Im Inkognito-Modus laufen Extensions standardmaessig nicht.</li>
+                <li><strong>Antivirus mit SSL-/HTTPS-Scanning</strong>: Kaspersky, Avast, Norton, Sophos, Bitdefender. SSL-Inspection testweise deaktivieren ODER eine Ausnahme fuer <code>*.googleapis.com</code> einrichten.</li>
+                <li><strong>Anderen Browser probieren</strong>: Firefox nutzt einen eigenen TLS-Stack und Extensions-Set – schliesst beide Verdaechtige auf einen Schlag aus.</li>
+            </ol>
+        </div>`);
+    }
+
+    // Backend-Aktionen, falls Backend selbst Probleme meldet
+    const actions = result.recommendedActions || [];
+    if (actions.length > 0 && !backendLoginOk) {
+        rows.push("<div style=\"margin-top:10px\"><strong>Konkrete naechste Schritte (Backend-Befund):</strong><ul>");
+        for (const a of actions) {
+            rows.push(`<li>${_escapeHtml(a)}</li>`);
+        }
+        rows.push("</ul></div>");
+    }
+
+    node.innerHTML = rows.join("\n");
+
+    // Buttons in der Fall-A-Box verdrahten (dynamisch injiziertes DOM).
+    const resetBtn = document.getElementById("auto-reset-state-btn");
+    if (resetBtn && !resetBtn.__bound) {
+        resetBtn.__bound = true;
+        resetBtn.addEventListener("click", _handleAutoResetClick);
+    }
+    const reloadBtn = document.getElementById("auto-reload-btn");
+    if (reloadBtn && !reloadBtn.__bound) {
+        reloadBtn.__bound = true;
+        reloadBtn.addEventListener("click", () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("_mmReset", String(Date.now()));
+            window.location.replace(url.toString());
+        });
+    }
+    const consoleBtn = document.getElementById("open-app-check-console-btn");
+    if (consoleBtn && !consoleBtn.__bound) {
+        consoleBtn.__bound = true;
+        consoleBtn.addEventListener("click", () => {
+            const pid = (result && result.projectId) || "_";
+            window.open(
+                `https://console.firebase.google.com/project/${encodeURIComponent(pid)}/appcheck/products`,
+                "_blank", "noopener",
+            );
+        });
+    }
+}
+
+async function _handleAutoResetClick() {
+    const btn = document.getElementById("auto-reset-state-btn");
+    const target = document.getElementById("auto-reset-result");
+    if (!target) return;
+    const ok = window.confirm(
+        "Das loescht localStorage, IndexedDB, Caches, Service Worker und Cookies "
+        + "fuer 127.0.0.1:8765 / localhost:8765 (keine anderen Sites).\n\n"
+        + "Danach wird die Seite mit Cache-Bypass neu geladen. Fortfahren?"
+    );
+    if (!ok) return;
+    if (btn) btn.disabled = true;
+    target.innerHTML = "<em>Loesche Browser-State …</em>";
+    let report;
+    try {
+        report = await autoResetFirebaseBrowserState();
+    } catch (err) {
+        target.innerHTML = `<div style="background:#fee2e2;padding:8px;border-left:4px solid #dc2626">
+            ✗ Reset fehlgeschlagen: ${_escapeHtml(err.message || String(err))}</div>`;
+        if (btn) btn.disabled = false;
+        return;
+    }
+    const rows = report.map(r => {
+        const mark = r.ok ? "✓" : "✗";
+        const color = r.ok ? "#16a34a" : "#dc2626";
+        return `<div style="font-family:monospace;font-size:0.9em;color:${color}">${mark} ${_escapeHtml(r.step)} – ${_escapeHtml(r.detail)}</div>`;
+    });
+    rows.push(`<div style="margin-top:8px;padding:8px;background:#d1fae5;border-left:4px solid #16a34a">
+        <strong>✓ Reset abgeschlossen.</strong>
+        <div id="reset-reload-zone" style="margin-top:6px"></div>
+    </div>`);
+    target.innerHTML = rows.join("\n");
+    _hardReloadWithCountdown(document.getElementById("reset-reload-zone"), 5);
+}
+
+function _boolBadge(value) {
+    if (value === true) return "<span style=\"color:#16a34a\">✓ ja</span>";
+    if (value === false) return "<span style=\"color:#dc2626\">✗ nein</span>";
+    return "<span style=\"color:#6b7280\">? unbekannt</span>";
+}
+
+function _tristateBadge(value) {
+    if (value === null || value === undefined) {
+        return "<span style=\"color:#6b7280\">? nicht ermittelbar (vorgelagerter Fehler)</span>";
+    }
+    return _boolBadge(value);
+}
+
+// ── Auto-Reset: alle Browser-Stores, die das Firebase-SDK nutzt ──────
+//
+// Loescht localStorage, sessionStorage, alle IndexedDB-Datenbanken,
+// CacheStorage-Eintraege, Service-Worker-Registrierungen und Cookies
+// fuer die aktuelle Origin. Wird ueber den "Browser-State zuruecksetzen"-
+// Button in der Diagnose-Box ausgeloest.
+//
+// Sicherheit: betrifft NUR die aktuelle Origin (127.0.0.1:8765 /
+// localhost:8765) – andere Sites bleiben unberuehrt.
+async function autoResetFirebaseBrowserState() {
+    const report = [];
+
+    // 1) localStorage
+    try {
+        const count = (typeof localStorage !== "undefined") ? localStorage.length : 0;
+        if (typeof localStorage !== "undefined") localStorage.clear();
+        report.push({ step: "localStorage", ok: true, detail: `${count} Eintrag(e) geloescht` });
+    } catch (err) {
+        report.push({ step: "localStorage", ok: false, detail: err.message || String(err) });
+    }
+
+    // 2) sessionStorage
+    try {
+        const count = (typeof sessionStorage !== "undefined") ? sessionStorage.length : 0;
+        if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+        report.push({ step: "sessionStorage", ok: true, detail: `${count} Eintrag(e) geloescht` });
+    } catch (err) {
+        report.push({ step: "sessionStorage", ok: false, detail: err.message || String(err) });
+    }
+
+    // 3) IndexedDB – primaer ueber databases() (Chromium/Firefox), sonst
+    //    Fallback auf bekannte Firebase-DB-Namen.
+    const _FIREBASE_DB_NAMES = [
+        "firebaseLocalStorageDb",
+        "firebase-installations-database",
+        "firebase-heartbeat-database",
+        "firebase-messaging-database",
+        "firebase-app-check-database",
+        "firebase-analytics-database",
+    ];
+    try {
+        const dbs = [];
+        if (typeof indexedDB !== "undefined" && typeof indexedDB.databases === "function") {
+            const listed = await indexedDB.databases();
+            for (const entry of listed) {
+                if (entry && entry.name) dbs.push(entry.name);
+            }
+        } else {
+            // Browser ohne databases()-API (Safari teilweise): fallback
+            for (const name of _FIREBASE_DB_NAMES) dbs.push(name);
+        }
+        let deleted = 0;
+        const failed = [];
+        for (const name of dbs) {
+            const ok = await new Promise((resolve) => {
+                try {
+                    const req = indexedDB.deleteDatabase(name);
+                    req.onsuccess = () => resolve(true);
+                    req.onerror = () => resolve(false);
+                    req.onblocked = () => resolve(false);
+                    // Timeout-Safety: nach 2s aufgeben
+                    setTimeout(() => resolve(false), 2000);
+                } catch (_e) {
+                    resolve(false);
+                }
+            });
+            if (ok) deleted += 1;
+            else failed.push(name);
+        }
+        const detailParts = [`${deleted}/${dbs.length} DB(s) geloescht`];
+        if (failed.length) detailParts.push(`blockiert: ${failed.join(", ")}`);
+        report.push({
+            step: "IndexedDB",
+            ok: failed.length === 0,
+            detail: detailParts.join(" – "),
+        });
+    } catch (err) {
+        report.push({ step: "IndexedDB", ok: false, detail: err.message || String(err) });
+    }
+
+    // 4) CacheStorage (Service-Worker-Caches)
+    try {
+        if (typeof caches !== "undefined" && typeof caches.keys === "function") {
+            const names = await caches.keys();
+            await Promise.all(names.map(n => caches.delete(n)));
+            report.push({
+                step: "CacheStorage",
+                ok: true,
+                detail: `${names.length} Cache(s) geloescht${names.length ? `: ${names.join(", ")}` : ""}`,
+            });
+        } else {
+            report.push({ step: "CacheStorage", ok: true, detail: "API nicht verfuegbar" });
+        }
+    } catch (err) {
+        report.push({ step: "CacheStorage", ok: false, detail: err.message || String(err) });
+    }
+
+    // 5) Service-Worker-Registrierungen
+    try {
+        if (typeof navigator !== "undefined"
+            && navigator.serviceWorker
+            && typeof navigator.serviceWorker.getRegistrations === "function") {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister().catch(() => false)));
+            report.push({
+                step: "Service Workers",
+                ok: true,
+                detail: `${regs.length} Worker entregistriert`,
+            });
+        } else {
+            report.push({ step: "Service Workers", ok: true, detail: "API nicht verfuegbar" });
+        }
+    } catch (err) {
+        report.push({ step: "Service Workers", ok: false, detail: err.message || String(err) });
+    }
+
+    // 6) Cookies fuer aktuelle Origin
+    try {
+        const rawCookies = (document.cookie || "").split(";");
+        let cleared = 0;
+        for (const raw of rawCookies) {
+            const trimmed = raw.trim();
+            if (!trimmed) continue;
+            const name = trimmed.split("=")[0].trim();
+            if (!name) continue;
+            // Mit / ohne Pfad ablaufen lassen – manche Cookies sind auf
+            // konkrete Pfade gesetzt.
+            document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            document.cookie = `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            cleared += 1;
+        }
+        report.push({ step: "Cookies", ok: true, detail: `${cleared} Cookie(s) entfernt` });
+    } catch (err) {
+        report.push({ step: "Cookies", ok: false, detail: err.message || String(err) });
+    }
+
+    return report;
+}
+
+// ── App-Check-Probe (clientseitig) ──────────────────────────────────
+//
+// Schaut, ob die aktuelle firebase-config.js einen Site Key fuer App
+// Check setzt und ob App Check beim SDK-Init eine Instanz angelegt hat.
+// Erkennt typische Fehl-Konfigurationen: enforced ohne Provider.
+function probeAppCheckStatus() {
+    const cfg = (typeof window !== "undefined" && window.__MM_FIREBASE_CONFIG__) || null;
+    const siteKey = cfg && cfg.appCheck && cfg.appCheck.siteKey ? cfg.appCheck.siteKey : "";
+    const globalSiteKey = (typeof window !== "undefined" && window.MINIMASTER_APP_CHECK_SITE_KEY) || "";
+    const effective = siteKey || globalSiteKey;
+    return {
+        siteKeyPresent: !!effective,
+        siteKeyValue: effective ? `${String(effective).slice(0, 6)}…(${String(effective).length} chars)` : "",
+        provider: cfg && cfg.appCheck ? (cfg.appCheck.provider || "?") : "(nicht konfiguriert)",
+        hint: effective
+            ? "App Check ist clientseitig konfiguriert. Falls trotzdem Login-Probleme: "
+              + "in der Firebase-Console pruefen, ob der reCAPTCHA-Site-Key in App Check "
+              + "fuer die Web-App registriert ist (gleicher Schluessel wie hier)."
+            : "Kein Site Key gesetzt. Wenn App Check fuer Authentication in der Firebase-"
+              + "Console auf 'Enforced' steht, wird der Login geblockt – Site Key in der "
+              + "firebase-config.js eintragen ODER Enforcement zurueck auf 'Unenforced'.",
+    };
+}
+
+// ── Auto-Reload mit Countdown ───────────────────────────────────────
+function _hardReloadWithCountdown(targetNode, seconds = 5) {
+    let remaining = seconds;
+    const tick = () => {
+        if (targetNode) {
+            targetNode.innerHTML = `<strong>Seite wird in ${remaining}s neu geladen …</strong>
+                <button type="button" class="btn btn-secondary" id="reset-cancel-reload-btn">Abbrechen</button>`;
+            const cancelBtn = document.getElementById("reset-cancel-reload-btn");
+            if (cancelBtn) {
+                cancelBtn.addEventListener("click", () => {
+                    clearInterval(handle);
+                    targetNode.innerHTML = "<em>Reload abgebrochen. Klick 'Anmelden' um es zu probieren.</em>";
+                }, { once: true });
+            }
+        }
+        if (remaining <= 0) {
+            clearInterval(handle);
+            // Cache-Bypass-Reload: location.reload(true) ist deprecated;
+            // Trick: ein Query-Parameter zwingt einen frischen Server-Request.
+            const url = new URL(window.location.href);
+            url.searchParams.set("_mmReset", String(Date.now()));
+            window.location.replace(url.toString());
+            return;
+        }
+        remaining -= 1;
+    };
+    tick();
+    const handle = setInterval(tick, 1000);
+}
+
+// ── Connectivity-Self-Test (Backend + Browser-Stack parallel) ───────
+//
+// Bei "auth/network-request-failed" ist die haeufigste Ursache nicht ein
+// echtes Netzwerkproblem, sondern: (a) Browser-Erweiterung blockt Google-
+// APIs, (b) Antivirus mit SSL-Inspection scheitert bei der OCSP-/CRL-
+// Pruefung, (c) Authorized Domain fehlt. Dieser Test ruft den Backend-
+// Endpoint und parallel direkte fetch()-Probes – die Differenz zwischen
+// beiden zeigt direkt, ob das Problem im Browser-TLS-Stack liegt.
+const _CONNECTIVITY_BROWSER_ENDPOINTS = [
+    { id: "identitytoolkit", name: "Firebase Auth",     url: "https://identitytoolkit.googleapis.com/", critical: true },
+    { id: "securetoken",     name: "Token Refresh",     url: "https://securetoken.googleapis.com/",     critical: true },
+    { id: "firestore",       name: "Firestore",         url: "https://firestore.googleapis.com/",       critical: true },
+    { id: "storage",         name: "Storage",           url: "https://firebasestorage.googleapis.com/", critical: true },
+    // OCSP wird vom Browser-TLS-Handshake INTERN genutzt, nicht via fetch().
+    // Direkter no-cors-fetch dorthin scheitert in Chrome/Edge fast immer mit
+    // "Failed to fetch" – das ist KEIN Indiz fuer ein TLS-Stack-Problem.
+    // Wir lassen den Probe drin als informativen Indikator, werten ihn aber
+    // nicht mehr als Diagnose-Kriterium.
+    { id: "ocsp_google",     name: "OCSP (informativ, scheitert oft)", url: "https://ocsp.pki.goog/", critical: false },
+];
+
+async function _probeBrowserEndpoint(endpoint) {
+    const start = performance.now();
+    try {
+        // 'no-cors' erlaubt uns nur 'opaque'-Responses, aber: Bei TLS-/Netzwerk-
+        // Fehlern wirft fetch() trotzdem – genau das ist die Information die wir
+        // brauchen. Status-Codes lesen geht nicht, ist hier aber nicht das Ziel.
+        await fetch(endpoint.url, { mode: "no-cors", cache: "no-store" });
+        return { ok: true, ms: Math.round(performance.now() - start) };
+    } catch (err) {
+        return {
+            ok: false,
+            ms: Math.round(performance.now() - start),
+            error: (err && err.message) || String(err),
+        };
+    }
+}
+
+function _renderConnectivityResult(backend, browser) {
+    const node = document.getElementById("connectivity-test-result");
+    if (!node) return "";
+    const rows = [];
+
+    rows.push("<strong>Backend (Python urllib, OpenSSL-TLS):</strong>");
+    if (backend && backend.diagnosis) {
+        rows.push(`<div>${_escapeHtml(backend.diagnosis.headline || "")}</div>`);
+        for (const ep of (backend.endpoints || [])) {
+            const strict = ep.strict || {};
+            const mark = strict.ok ? "✓" : "✗";
+            const detail = strict.ok
+                ? `${strict.statusCode || "?"} (${strict.elapsedMs}ms)`
+                : `${strict.category || "fail"}: ${(strict.errorReason || "").slice(0, 80)}`;
+            rows.push(`<div style="font-family:monospace">${mark} ${_escapeHtml(ep.name)} — ${_escapeHtml(detail)}</div>`);
+        }
+        for (const hint of (backend.diagnosis.hints || [])) {
+            rows.push(`<div style="margin-top:6px"><em>Hinweis:</em> ${_escapeHtml(hint)}</div>`);
+        }
+        const proxyKeys = backend.proxies ? Object.keys(backend.proxies) : [];
+        if (proxyKeys.length > 0) {
+            const desc = proxyKeys.map(k => `${k}=${backend.proxies[k]}`).join(", ");
+            rows.push(`<div style="margin-top:6px;font-family:monospace">Python-Proxy: ${_escapeHtml(desc)}</div>`);
+        } else if (backend.proxies) {
+            rows.push(`<div style="margin-top:6px;font-family:monospace">Python-Proxy: keiner erkannt</div>`);
+        }
+    } else if (backend && backend.__fetchError) {
+        rows.push(`<div>Backend-Endpoint nicht erreichbar: ${_escapeHtml(backend.__fetchError)}</div>`);
+    } else {
+        rows.push(`<div>Backend-Test fehlgeschlagen oder nicht verfuegbar.</div>`);
+    }
+
+    rows.push("<hr>");
+    rows.push("<strong>Browser (dein TLS-Stack, inkl. Antivirus/Extensions):</strong>");
+    if (browser && browser.length > 0) {
+        for (const entry of browser) {
+            const r = entry.result;
+            const mark = r.ok ? "✓" : "✗";
+            const detail = r.ok ? `OK (${r.ms}ms)` : `Fehler: ${r.error || "unbekannt"}`;
+            const tag = entry.endpoint.critical ? "" : " <em>(nicht kritisch)</em>";
+            rows.push(`<div style="font-family:monospace">${mark} ${_escapeHtml(entry.endpoint.name)} — ${_escapeHtml(detail)}${tag}</div>`);
+        }
+    }
+
+    // KRITISCHE Endpoints (Firebase selbst) entscheiden ueber die Diagnose,
+    // nicht informative wie OCSP – ein OCSP-fetch scheitert in Chrome/Edge
+    // fast immer mit "Failed to fetch", obwohl der TLS-Handshake intern
+    // funktioniert.
+    const criticalFails = (browser || []).filter(b => b.endpoint.critical && !b.result.ok);
+    const allCriticalOk = criticalFails.length === 0;
+    const backendOk = backend && backend.diagnosis && backend.diagnosis.level === "ok";
+
+    rows.push("<hr>");
+    if (backendOk && allCriticalOk) {
+        // Konnektivitaet ist nachweislich OK. auth/network-request-failed
+        // hat hier eine Konfig-Ursache.
+        rows.push(
+            `<div style="background:#d1fae5;padding:10px;border-left:4px solid #16a34a">
+                <strong>✓ Diagnose: Konnektivitaet ist OK.</strong> Alle Firebase-Endpoints
+                sind aus Server- und Browser-Sicht erreichbar.<br><br>
+                Wenn der Login trotzdem mit <code>auth/network-request-failed</code> scheitert,
+                ist es <strong>kein</strong> Netzwerk-/TLS-Problem. Pruefe in dieser Reihenfolge:
+                <ol>
+                    <li>
+                        <strong>Email/Password als Provider aktivieren</strong> (haeufigste Ursache):<br>
+                        Firebase-Console → <em>Authentication → Sign-in method</em> → Eintrag
+                        „Email/Password" → <em>Enable</em>.
+                    </li>
+                    <li>
+                        <strong>Authorized Domains pruefen</strong>: Firebase-Console →
+                        <em>Authentication → Settings → Authorized domains</em> →
+                        muss enthalten: <code>localhost</code>, <code>127.0.0.1</code>,
+                        <code>&lt;projectId&gt;.firebaseapp.com</code>.
+                    </li>
+                    <li>
+                        <strong>App Check pruefen</strong>: Firebase-Console → <em>App Check</em>
+                        → wenn fuer „Authentication" auf <em>Enforced</em>, aber kein reCAPTCHA-
+                        Provider konfiguriert ist → entweder Provider hinterlegen oder
+                        Enforcement zurueck auf <em>Unenforced</em>.
+                    </li>
+                    <li>
+                        <strong>F12 → Tab „Netzwerk" → Login erneut probieren</strong>: such die
+                        rote Zeile zu <code>identitytoolkit.googleapis.com</code> → der Response-
+                        Body verraet die echte Ursache (z.B. <code>OPERATION_NOT_ALLOWED</code>,
+                        <code>API_KEY_HTTP_REFERRER_BLOCKED</code>, …).
+                    </li>
+                </ol>
+            </div>`
+        );
+    } else if (backendOk && !allCriticalOk) {
+        // Backend kommt durch, kritische Browser-Endpoints scheitern.
+        rows.push(
+            `<div style="background:#fef3c7;padding:10px;border-left:4px solid #f59e0b">
+                <strong>⚠ Diagnose: Browser-TLS-Stack ist das Problem.</strong> Server kommt
+                durch (${(browser || []).filter(b => b.endpoint.critical && b.result.ok).length}
+                von ${(browser || []).filter(b => b.endpoint.critical).length} kritischen
+                Browser-Tests fehlgeschlagen).
+                <ol>
+                    <li><strong>Browser-Erweiterung</strong> (uBlock, Privacy Badger, AdBlock)
+                        blockt Google-API-Aufrufe. Test: Inkognito-Modus, oder Erweiterungen
+                        fuer 127.0.0.1:8765 deaktivieren.</li>
+                    <li><strong>Antivirus mit SSL-Inspection</strong> (Kaspersky, Avast, Norton,
+                        Sophos, Bitdefender). Test: SSL-Scanning testweise deaktivieren oder
+                        Ausnahme fuer *.googleapis.com einrichten.</li>
+                    <li><strong>Anderen Browser probieren</strong>: Firefox nutzt einen eigenen
+                        TLS-Stack (NSS) und ist meist nicht betroffen.</li>
+                </ol>
+            </div>`
+        );
+    } else if (!backendOk && allCriticalOk) {
+        // Zwei Unterfaelle: (a) der Endpoint war gar nicht erreichbar
+        // (__fetchError) -> meist Browser↔lokaler Server; (b) der Endpoint hat
+        // geantwortet, aber Python erreicht Firebase nicht -> Proxy/TLS.
+        const fetchErr = backend && backend.__fetchError;
+        const detail = fetchErr
+            ? `<br><span style="font-family:monospace">${_escapeHtml(fetchErr)}</span>`
+            : "";
+        rows.push(
+            `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>⚠ Diagnose: Server-Routing-Problem.</strong>${detail}<br>
+                Browser kommt durch, der Python-Backend-Test nicht. Pruefe in dieser Reihenfolge:
+                <ol>
+                    <li><strong>Laeuft der Admin-Server?</strong> Er muss unter
+                        <code>http://127.0.0.1:8765</code> erreichbar sein
+                        (per <code>Setup.bat --start</code> bzw. <code>start.bat</code>).</li>
+                    <li><strong>Proxy ohne localhost-Bypass:</strong> Wenn dein System-/
+                        Unternehmens-Proxy auch <code>127.0.0.1</code> umleitet, scheitert der
+                        lokale Aufruf mit „Failed to fetch". <code>127.0.0.1</code> und
+                        <code>localhost</code> in die Proxy-Ausnahmen (No-Proxy) aufnehmen.</li>
+                    <li><strong>Python erreicht Firebase nicht</strong> (falls der Endpoint
+                        geantwortet, aber Fehler gemeldet hat): <code>HTTPS_PROXY</code>/
+                        <code>HTTP_PROXY</code> fuer Python setzen und Server neu starten –
+                        ein PAC-/Auto-Config-Proxy wird von Python nicht ausgewertet.</li>
+                </ol>
+            </div>`
+        );
+    } else {
+        rows.push(
+            `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
+                <strong>✗ Diagnose: Komplettes Netzwerkproblem.</strong><br>
+                Weder Browser noch Server erreichen alle kritischen Firebase-Endpoints. Pruefe
+                Internetverbindung, Router/Firewall und DNS-Aufloesung.
+            </div>`
+        );
+    }
+    node.hidden = false;
+    node.innerHTML = rows.join("\n");
+}
+
+function _escapeHtml(text) {
+    return String(text == null ? "" : text)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+async function runConnectivityTest() {
+    const btn = document.getElementById("connectivity-test-btn");
+    const node = document.getElementById("connectivity-test-result");
+    if (btn) btn.disabled = true;
+    if (node) {
+        node.hidden = false;
+        node.innerHTML = "<em>Teste Konnektivitaet aus Browser- und Backend-Sicht parallel …</em>";
+    }
+    let backendResult = null;
+    const browserResults = [];
+    try {
+        const [backend, ...probes] = await Promise.all([
+            _fetchBackendConnectivity(),
+            ..._CONNECTIVITY_BROWSER_ENDPOINTS.map(ep => _probeBrowserEndpoint(ep).then(result => ({ endpoint: ep, result }))),
+        ]);
+        backendResult = backend;
+        browserResults.push(...probes);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+    _renderConnectivityResult(backendResult, browserResults);
+}
+
+// Backend-Probe mit hartem Timeout. Liefert entweder das Diagnose-JSON oder
+// ein { __fetchError } / { __httpStatus }-Objekt, damit die UI die echte
+// Ursache zeigt statt nur "nicht verfuegbar".
+async function _fetchBackendConnectivity() {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    try {
+        const r = await fetch("/api/tools/firebase-connectivity", { signal: controller.signal, cache: "no-store" });
+        if (!r.ok) {
+            let body = "";
+            try { body = JSON.stringify(await r.json()); } catch (_) { /* ignore */ }
+            return { __httpStatus: r.status, __fetchError: `HTTP ${r.status}${body ? " " + body : ""}` };
+        }
+        return await r.json();
+    } catch (err) {
+        const aborted = err && err.name === "AbortError";
+        return { __fetchError: aborted ? "Zeitüberschreitung (25s) – Backend antwortet nicht." : ((err && err.message) || String(err)) };
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 function initializeAuthStateObserver() {
@@ -184,6 +1028,8 @@ function isPlaceholderFirebaseConfig(config) {
 }
 
 function loadFirebaseConfig() {
+    // 1) Lokaler Override (Bootstrap-Dialog -> localStorage) gewinnt, damit
+    //    Operatoren ohne Datei-Schreibrechte trotzdem konfigurieren koennen.
     try {
         const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
@@ -192,6 +1038,16 @@ function loadFirebaseConfig() {
         }
     } catch (error) {
         console.warn("Failed to load Firebase config override:", error);
+    }
+    // 2) Vom Setup-Wizard generierte firebase-config.js (window.__MM_FIREBASE_CONFIG__).
+    //    Wird per <script src="firebase-config.js"> vor app.js geladen.
+    try {
+        const injected = typeof window !== "undefined" ? window.__MM_FIREBASE_CONFIG__ : null;
+        if (hasCompleteFirebaseConfig(injected) && !isPlaceholderFirebaseConfig(injected)) {
+            return injected;
+        }
+    } catch (error) {
+        console.warn("Failed to read injected Firebase config:", error);
     }
     return fallbackFirebaseConfig;
 }
@@ -242,6 +1098,7 @@ let androidCompatibilityFormDraft = {
     timeoutSec: "3600",
 };
 let suiteRunHistoryPayload = [];
+let releaseDoctorPayload = null;
 let qaDashboardLoadPromise = null;
 let qaTestWorkspaceSelection = { kind: "", id: "" };
 let qaRefreshState = {
@@ -269,7 +1126,7 @@ const setupChecklistItems = [
     { key: "android-apps", label: "Android-Apps registriert (Master + Child)" },
     { key: "ios-apps", label: "iOS-Apps registriert (Master + Child)" },
     { key: "apple-app-store-api", label: "Apple App Store Server API konfiguriert (JWT, Bundle ID, Environment)" },
-    { key: "ai-config", label: "KI-Provider konfiguriert (Google Gemini 3.0)" },
+    { key: "ai-config", label: "KI-Provider konfiguriert (Google Gemini 2.0)" },
     { key: "support-workflow", label: "Support-Ticket-Workflow getestet" },
     { key: "compliance-flow", label: "DSAR/Export-Prozess geprüft" },
     { key: "deploy-verified", label: "Deploy erfolgreich und Functions live" }
@@ -282,7 +1139,7 @@ const commissioningQaRegisterDefinitions = [
     { key: "functions-enabled", label: "Cloud Functions aktiviert", automationType: "automatic" },
     { key: "messaging-enabled", label: "Cloud Messaging aktiviert oder bewusst nicht benötigt", automationType: "manual" },
     { key: "android-master-registered", label: "Android-App com.minimaster.masterapp registriert", automationType: "manual" },
-    { key: "android-child-registered", label: "Android-App com.google.pairing registriert", automationType: "manual" },
+    { key: "android-child-registered", label: "Android-App com.minimaster.childapp registriert", automationType: "manual" },
     { key: "ios-master-registered", label: "iOS-App MiniMasterParent registriert (App Store Connect)", automationType: "manual" },
     { key: "ios-child-registered", label: "iOS-App MiniMasterChild registriert (App Store Connect + Family Controls)", automationType: "manual" },
     { key: "firebase-project-bound", label: "firebase use --add lokal durchgeführt", automationType: "automatic" },
@@ -366,6 +1223,81 @@ function buildEffectivePlayStoreReadinessState(state = getPlayStoreReadinessStat
         ...state,
         privacyUrl: String(state?.privacyUrl || "").trim() || recommendedPlayStorePrivacyUrl,
         supportEmail: String(state?.supportEmail || "").trim() || recommendedPlayStoreSupportEmail,
+    };
+}
+
+const playStoreReadinessCheckLabels = {
+    dataSafety: "Data-Safety-Formular vollständig und geprüft",
+    iarc: "IARC-Altersfreigabe abgeschlossen",
+    listing: "Store Listing vollständig",
+    privacyUrlLinked: "Privacy-Policy-URL in Store und App verlinkt",
+    permissionsDeclaration: "Permissions Declaration eingereicht",
+    appAccessGuide: "App-Access-Anleitung für Reviewer hinterlegt",
+    securityRotationDone: "Schlüsselrotation/-restriktion durchgeführt",
+    goNoGoSignedOff: "Interne Go/No-Go-Freigabe dokumentiert",
+};
+
+const playStoreRequiredConsoleEvidence = [
+    "Play Console Data-Safety final submitted/reviewed Screenshot",
+    "Sensitive permissions declaration submitted/reviewed Screenshots",
+    "IARC certificate oder Play Console Age-Rating Screenshot",
+    "Store listing preview Screenshot inklusive Privacy-URL und Support-Kontakt",
+    "Reviewer App Access instructions in der Play Console hinterlegt",
+];
+
+const playStoreReadinessCheckKeys = Object.keys(playStoreReadinessCheckLabels);
+
+function validatePlayStoreReadinessState(state) {
+    if (!state) return { ok: false, code: "missing-state", message: "Kein State zum Speichern übergeben." };
+    const privacyUrl = String(state.privacyUrl || "").trim();
+    if (!privacyUrl || !/^https:\/\//i.test(privacyUrl)) {
+        return { ok: false, code: "invalid-privacy-url", message: "Bitte eine gültige Privacy-Policy-URL mit https:// eintragen." };
+    }
+    const supportEmail = String(state.supportEmail || "").trim();
+    if (!supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) {
+        return { ok: false, code: "invalid-email", message: "Bitte eine gültige Support-/Privacy-E-Mail eintragen." };
+    }
+    return { ok: true };
+}
+
+function computePlayStoreReadinessSummary(state) {
+    const checks = state?.checks || {};
+    const keys = playStoreReadinessCheckKeys;
+    const total = keys.length;
+    const completed = keys.reduce((sum, key) => sum + (checks[key] ? 1 : 0), 0);
+    const ready = completed === total
+        && Boolean(String(state?.privacyUrl || "").trim())
+        && Boolean(String(state?.supportEmail || "").trim());
+    return { total, completed, ready };
+}
+
+function buildPlayStoreComplianceProtocol(state = getPlayStoreReadinessState(), options = {}) {
+    const effective = buildEffectivePlayStoreReadinessState(state);
+    const summary = computePlayStoreReadinessSummary(effective);
+    const openChecks = playStoreReadinessCheckKeys
+        .filter(key => !effective.checks?.[key])
+        .map(key => ({ key, label: playStoreReadinessCheckLabels[key] || key }));
+    const validation = validatePlayStoreReadinessState(effective);
+    const blockers = [
+        ...openChecks.map(item => ({ id: "check-" + item.key, type: "check", label: item.label })),
+        ...(validation.ok ? [] : [{ id: validation.code, type: "metadata", label: validation.message }]),
+    ];
+
+    return {
+        generatedAt: options.generatedAt || new Date().toISOString(),
+        type: "google-playstore-compliance-protocol",
+        ready: summary.ready && blockers.length === 0,
+        summary,
+        checks: playStoreReadinessCheckKeys.map(key => ({
+            key,
+            label: playStoreReadinessCheckLabels[key] || key,
+            passed: Boolean(effective.checks?.[key]),
+        })),
+        blockers,
+        privacyUrl: effective.privacyUrl,
+        supportEmail: effective.supportEmail,
+        listingUrl: effective.listingUrl || "",
+        manualConsoleEvidenceRequired: [...playStoreRequiredConsoleEvidence],
     };
 }
 
@@ -667,6 +1599,125 @@ function updateQaRefreshSummary(reason, sectionResults = []) {
     renderQaRefreshStatus();
 }
 
+function getReleaseDoctorStatusClass(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "pass") return "success-box";
+    if (normalized === "warn" || normalized === "unknown") return "info";
+    return "error";
+}
+
+function formatReleaseDoctorStatus(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "pass") return "OK";
+    if (normalized === "warn") return "Warnung";
+    if (normalized === "blocked_external") return "Extern blockiert";
+    if (normalized === "unknown") return "Unbekannt";
+    if (normalized === "fail") return "Blockiert";
+    return status || "-";
+}
+
+function renderReleaseDoctor(payload) {
+    const summaryEl = document.getElementById("release-doctor-summary");
+    const sectionsEl = document.getElementById("release-doctor-sections");
+    const blockersEl = document.getElementById("release-doctor-blockers");
+    if (!summaryEl || !sectionsEl || !blockersEl) return;
+
+    const data = payload && typeof payload === "object" ? payload : {};
+    const summary = data.summary || {};
+    const sections = Array.isArray(data.sections) ? data.sections : [];
+    const git = data.git || {};
+    const ready = Boolean(summary.releaseReady);
+    const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString("de-DE") : "-";
+
+    summaryEl.innerHTML =
+        `<div class='${ready ? "success-box" : "error"}'>` +
+        `<p><strong>Status:</strong> ${ready ? "Release Doctor gruen" : "Release Doctor blockiert"}</p>` +
+        `<p><strong>Checks:</strong> ${escapeHtml(String(summary.passedCount || 0))}/${escapeHtml(String(summary.totalCount || sections.length))} bestanden; ` +
+        `Blocker: ${escapeHtml(String(summary.hardBlockerCount || 0))}; Warnungen: ${escapeHtml(String(summary.warningCount || 0))}</p>` +
+        `<p><strong>Commit:</strong> <code>${escapeHtml(String(git.shortHead || ""))}</code> ${git.dirty ? "(lokale Aenderungen vorhanden)" : ""}</p>` +
+        `<p><strong>Aktualisiert:</strong> ${escapeHtml(generated)}</p>` +
+        `</div>`;
+
+    sectionsEl.innerHTML = sections.map(section => {
+        const status = String(section.status || "");
+        const boxClass = getReleaseDoctorStatusClass(status);
+        return (
+            `<div class='python-automation-metric ${boxClass}'>` +
+            `<span>${escapeHtml(String(section.title || section.id || "-"))}</span>` +
+            `<strong>${escapeHtml(formatReleaseDoctorStatus(status))}</strong>` +
+            `<small>${escapeHtml(String(section.summary || ""))}</small>` +
+            `</div>`
+        );
+    }).join("") || "<div class='info'>Keine Release-Doctor-Sektionen vorhanden.</div>";
+
+    const blockerRows = [];
+    sections.forEach(section => {
+        const blockers = Array.isArray(section.blockers) ? section.blockers : [];
+        blockers.forEach(blocker => {
+            blockerRows.push({
+                section: String(section.title || section.id || "-"),
+                title: String(blocker.title || blocker.id || blocker.name || blocker.package || "-"),
+                detail: String(blocker.nextAction || blocker.recommendation || blocker.details || blocker.fixHint || blocker.url || ""),
+            });
+        });
+    });
+
+    if (blockerRows.length === 0) {
+        blockersEl.innerHTML = "<div class='success-box'>Keine Release-Doctor-Blocker gemeldet.</div>";
+        return;
+    }
+
+    blockersEl.innerHTML =
+        "<table><tr><th>Bereich</th><th>Blocker</th><th>Naechste Aktion</th></tr>" +
+        blockerRows.map(row => (
+            `<tr>` +
+            `<td>${escapeHtml(row.section)}</td>` +
+            `<td>${escapeHtml(row.title)}</td>` +
+            `<td>${escapeHtml(row.detail || "-")}</td>` +
+            `</tr>`
+        )).join("") +
+        "</table>";
+}
+
+async function loadReleaseDoctor() {
+    const summaryEl = document.getElementById("release-doctor-summary");
+    if (summaryEl) summaryEl.innerHTML = "<div class='loading'>Release Doctor laeuft...</div>";
+
+    try {
+        const response = await fetch("/api/release-doctor", { cache: "no-store" });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `HTTP ${response.status}`);
+        }
+        releaseDoctorPayload = await response.json();
+        renderReleaseDoctor(releaseDoctorPayload);
+        showNotification("Release Doctor aktualisiert.", "success");
+    } catch (error) {
+        console.error("Release Doctor failed:", error);
+        if (summaryEl) {
+            summaryEl.innerHTML = `<div class='error'>Release Doctor fehlgeschlagen: ${escapeHtml(error.message || String(error))}</div>`;
+        }
+        showNotification("Release Doctor fehlgeschlagen.", "error");
+    }
+}
+
+function exportReleaseDoctor() {
+    if (!releaseDoctorPayload) {
+        showNotification("Bitte zuerst den Release Doctor ausfuehren.", "warning");
+        return;
+    }
+    const blob = new Blob([JSON.stringify(releaseDoctorPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeDate = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "release-doctor-" + safeDate + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 function getQaDashboardSectionLoaders() {
     return [
         ["catalog", loadPythonAutomationCatalog],
@@ -761,7 +1812,9 @@ function renderCommandBuilderConfig(config) {
 
 function saveCommandBuilderConfig(showMessage = true) {
     const values = getCommandBuilderFormValues();
-    localStorage.setItem(COMMAND_BUILDER_STORAGE_KEY, JSON.stringify(values));
+    const toSave = { ...values };
+    delete toSave.firstAdminPassword;
+    localStorage.setItem(COMMAND_BUILDER_STORAGE_KEY, JSON.stringify(toSave));
     if (showMessage) {
         showNotification("Befehlszentrale gespeichert.", "success");
     }
@@ -820,8 +1873,11 @@ async function copyTextToClipboard(text) {
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
     textarea.select();
-    document.execCommand("copy");
+    const success = document.execCommand("copy");
     document.body.removeChild(textarea);
+    if (!success) {
+        throw new Error("Kopieren nicht möglich. Bitte manuell kopieren (Strg+C).");
+    }
 }
 
 async function copyRenderedCommand(payload, mode) {
@@ -1445,7 +2501,11 @@ function ensurePythonAutomationSelectedTest() {
 }
 
 function openPythonAutomationProtocol(encodedTestId) {
-    pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
+    try {
+        pythonCommissioningSelectedTestId = decodeURIComponent(encodedTestId || "");
+    } catch {
+        pythonCommissioningSelectedTestId = encodedTestId || "";
+    }
     renderPythonAutomationProtocolEditor();
     scrollQaSection("qa-protocol-card");
 }
@@ -2103,7 +3163,7 @@ function renderPythonAutomationResult(run) {
                         <strong>${escapeHtml(item.title || "Aktion")}</strong><br />
                         ${escapeHtml(item.detail || "")}
                         <div class='setup-actions' style='margin-block-start: 8px'>
-                            <button class='btn btn-secondary btn-sm' onclick="${item.action || ""}">${escapeHtml(item.buttonLabel || "Öffnen")}</button>
+                            <button class='btn btn-secondary btn-sm' data-action="${(item.action || '').replace(/"/g, '&quot;')}">${escapeHtml(item.buttonLabel || "Öffnen")}</button>
                         </div>
                     </div>
                 `).join("")}
@@ -2175,6 +3235,17 @@ function renderPythonAutomationResult(run) {
         </section>
 
     `;
+    if (!window._adminActionListenerAttached) {
+        window._adminActionListenerAttached = true;
+        document.addEventListener('click', e => {
+            if (e.target.matches('[data-action]')) {
+                const fn = e.target.dataset.action;
+                if (fn) {
+                    try { new Function(fn)(); } catch(ex) { console.error(ex); }
+                }
+            }
+        });
+    }
     renderQaTestWorkspace();
 }
 
@@ -7674,9 +8745,9 @@ const platformReadinessItems = {
     masterApp: {
         label: "MasterApp (Eltern-Android)",
         items: [
-            { key: "ma-registration-flow", label: "Geräteregistrierung & SecretKey-Persistierung funktionsfähig", severity: "critical" },
-            { key: "ma-credentials-encrypted", label: "IMEI/SecretKey verschlüsselt gespeichert (EncryptedSharedPreferences)", severity: "critical" },
-            { key: "ma-imei-fallback", label: "IMEI-Fallback für Android 10+ implementiert (kein READ_PHONE_STATE)", severity: "critical" },
+            { key: "ma-registration-flow", label: "Geräteregistrierung via registerAuthenticatedMaster + Firebase Auth funktionsfähig", severity: "critical" },
+            { key: "ma-credentials-encrypted", label: "Master-ID verschlüsselt gespeichert (EncryptedSharedPreferences, ohne secretKey)", severity: "critical" },
+            { key: "ma-imei-fallback", label: "Stabile Geräte-ID via ANDROID_ID/UUID-Fallback (kein READ_PHONE_STATE)", severity: "critical" },
             { key: "ma-proguard-enabled", label: "ProGuard/R8 in Release-Build aktiviert (minifyEnabled=true)", severity: "critical" },
             { key: "ma-pairing-works", label: "Pairing-Link-Generierung und Kopplung mit ChildApp getestet", severity: "critical" },
             { key: "ma-lock-unlock", label: "Lock/Unlock Toggle für Kindergeräte funktionsfähig", severity: "critical" },
@@ -7686,9 +8757,9 @@ const platformReadinessItems = {
             { key: "ma-usage-rules-nav", label: "UsageRulesScreen über Navigation erreichbar und datengebunden", severity: "high" },
             { key: "ma-date-picker", label: "DatePicker statt Freitext-Timestamp für Task-Deadline", severity: "medium" },
             { key: "ma-subscription-check", label: "Abo-Status wird beim Start geprüft (queryPurchases)", severity: "high" },
-            { key: "ma-subscription-enforce", label: "Free-Tier-Limit (1 Kind) wird vor Aktionen erzwungen", severity: "high" },
+            { key: "ma-subscription-enforce", label: "Trial-/Abo-Zugang wird vor Kopplung und Aktionen erzwungen (hasActiveAccess)", severity: "high" },
             { key: "ma-fcm-working", label: "FCM Push-Empfang (task_pending_approval, device_status) getestet", severity: "high" },
-            { key: "ma-debug-hidden", label: "Debug-Infos (IMEI/SecretKey) in Release-Builds ausgeblendet", severity: "critical" },
+            { key: "ma-debug-hidden", label: "Debug-Infos (Master-ID) in Release-Builds ausgeblendet", severity: "critical" },
             { key: "ma-firebase-appcheck", label: "Firebase App Check aktiviert", severity: "high" },
             { key: "ma-offline-handling", label: "Offline-Hinweis oder -Caching implementiert", severity: "medium" },
             { key: "ma-qr-pairing", label: "QR-Code-Anzeige für Pairing (nicht nur Link)", severity: "medium" },
@@ -8238,8 +9309,8 @@ const setupWizards = {
             },
             {
                 title: "2. Geräteregistrierung",
-                instruction: "Öffnen Sie die App. Sie werden automatisch zur Registrierung geleitet. Die App fordert <strong>READ_PHONE_STATE</strong> an und registriert das Gerät über <code>registerMasterDevice</code>.",
-                detail: "Nach Registrierung erhalten Sie einen <strong>SecretKey</strong>, der im DataStore gespeichert wird. <em>Wichtig:</em> Auf Android 10+ kann die IMEI nicht direkt gelesen werden – hier wird eine alternative Geräte-ID benötigt.",
+                instruction: "Öffnen Sie die App. Sie werden zur Registrierung geleitet. Die App meldet sich per <strong>Firebase Anonymous Auth</strong> an und registriert das Gerät über <code>registerAuthenticatedMaster</code>.",
+                detail: "Es wird nur die kanonische <strong>masterId</strong> lokal gespeichert — kein <code>secretKey</code>. Die Geräte-ID basiert auf ANDROID_ID oder einem persistenten UUID-Fallback.",
             },
             {
                 title: "3. Kind-Gerät koppeln",
@@ -8269,7 +9340,7 @@ const setupWizards = {
             {
                 title: "8. Abonnement prüfen",
                 instruction: "Öffnen Sie den <strong>Subscription-Screen</strong>. Prüfen Sie, ob Produkte angezeigt werden und ein Testkauf möglich ist.",
-                detail: "SKUs: single_child_monthly (€1,99), family_monthly (€4,99), single_child_yearly (€19,99), family_yearly (€49,99). Testmodus über Google Play Console aktivieren.",
+                detail: "SKUs (netto, zzgl. MwSt.): single_child_monthly (€4,99/Monat), family_monthly (€9,99/Monat), single_child_yearly (€39,99/Jahr), family_yearly (€79,99/Jahr), family_yearly_premium (€99,99/Jahr). Testmodus über Google Play Console aktivieren.",
             },
         ],
     },
@@ -8278,13 +9349,13 @@ const setupWizards = {
         steps: [
             {
                 title: "1. App installieren",
-                instruction: "Installieren Sie die ChildApp auf dem Kind-Smartphone. Paketname: <strong>com.google.pairing</strong> (Legacy-Paketname).",
+                instruction: "Installieren Sie die ChildApp auf dem Kind-Smartphone. Paketname: <strong>com.minimaster.childapp</strong>.",
                 detail: "Für Tests: <code>gradlew.bat :childApp:assembleDebug</code>. Per ADB installieren: <code>adb install childApp/build/outputs/apk/debug/childApp-debug.apk</code>.",
             },
             {
                 title: "2. Kopplung durchführen",
                 instruction: "Öffnen Sie die ChildApp und geben Sie den <strong>6-stelligen Code</strong> ein oder öffnen Sie den <strong>Pairing-Link</strong> auf dem Kind-Gerät.",
-                detail: "Die App ruft <code>validatePairingCode</code> oder <code>validatePairingToken</code> auf. Nach Erfolg wird ein Child-Dokument in Firestore erstellt und die App wechselt in den überwachten Modus.",
+                detail: "Die App meldet sich per Firebase Anonymous Auth an und ruft <code>pairAuthenticatedChild</code> auf. Nach Erfolg wird ein Child-Dokument in Firestore erstellt und die App wechselt in den überwachten Modus.",
             },
             {
                 title: "3. Berechtigungen erteilen",
@@ -8650,7 +9721,7 @@ function extractFirebaseConfigFromGoogleServices(rawConfig, metaOut = null) {
 
     const preferredClient = clients.find(client => {
         const packageName = client?.client_info?.android_client_info?.package_name;
-        return packageName === "com.google.pairing";
+        return packageName === "com.minimaster.childapp";
     }) || clients[0];
 
     const selectedPackageName = String(preferredClient?.client_info?.android_client_info?.package_name || "").trim();
@@ -10219,6 +11290,10 @@ function renderAdminActivationContent(user) {
                 können Sie sich direkt als Admin aktivieren:
             </p>
             <div class="phase-actions" style="margin-block-start: 12px">
+                <label for="bootstrap-admin-pin" class="muted" style="display:block;margin-block-end:6px">
+                    Admin-PIN (6–8 Ziffern, empfohlen für T4-Aktionen):
+                </label>
+                <input type="password" id="bootstrap-admin-pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" class="form-input" style="max-width:220px;margin-block-end:8px" placeholder="z. B. 123456" />
                 <button onclick="bootstrapFirstAdminAction()" class="btn btn-primary" id="btn-bootstrap-admin">
                     🔑 Als ersten Admin aktivieren
                 </button>
@@ -10610,8 +11685,12 @@ async function bootstrapFirstAdminAction() {
     }
 
     try {
+        const adminPin = (document.getElementById("bootstrap-admin-pin")?.value || "").trim();
+        const payload = {};
+        if (adminPin) payload.adminPin = adminPin;
+
         const bootstrapFunc = functions.httpsCallable("bootstrapFirstAdmin");
-        const result = await bootstrapFunc({});
+        const result = await bootstrapFunc(payload);
 
         if (statusEl) {
             statusEl.innerHTML = `<div class="admin-success-box">
@@ -10692,6 +11771,12 @@ async function resetAllUsersFromOnboarding() {
     if ((secondConfirm || "").trim() !== "RESET_ALL_AUTH_USERS") {
         dbg("❌ ABBRUCH: Text stimmt nicht überein.");
         if (statusEl) statusEl.innerHTML = `<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein. Eingabe war: <code>${escapeHtml(String(secondConfirm || "(leer)"))}</code></div>`;
+        window._resetBlocksPhaseChange = false;
+        return;
+    }
+
+    if (!(await ensureOperatorTier("T4"))) {
+        if (statusEl) statusEl.innerHTML = "<div class='info'>Reset abgebrochen — Admin-PIN/Re-Auth erforderlich.</div>";
         window._resetBlocksPhaseChange = false;
         return;
     }
@@ -11013,6 +12098,30 @@ function getAuthErrorHint(error, fallbackMessage, scope) {
             title: "Methode deaktiviert",
             tip: "In Firebase Authentication ist die gewünschte Anmeldemethode nicht aktiviert.",
         },
+        "auth/project-soft-deleted": {
+            title: "Firebase-Projekt gelöscht",
+            tip: "Das hinterlegte Firebase-/Google-Cloud-Projekt wurde gelöscht (Soft-Delete, ~30 Tage wiederherstellbar). Das ist KEIN Zugangsdaten-Problem. Lösung: Projekt in der Google-Cloud-Konsole wiederherstellen (console.cloud.google.com → IAM & Verwaltung → Ressourcen verwalten → Projekt auswählen → Wiederherstellen) oder per 'gcloud projects undelete <PROJECT_ID>'. Alternativ ein aktives Projekt in der Firebase-Konfiguration hinterlegen.",
+        },
+        "auth/project-not-found": {
+            title: "Firebase-Projekt nicht gefunden",
+            tip: "Das in der Konfiguration hinterlegte Projekt existiert nicht (mehr). Project-ID/API-Key in der Firebase-Konfiguration gegen ein aktives Projekt prüfen.",
+        },
+        "auth/configuration-not-found": {
+            title: "Auth-Konfiguration fehlt",
+            tip: "Firebase Authentication ist im Projekt nicht initialisiert oder die Konfiguration zeigt auf ein falsches Projekt. Firebase-Console → Authentication aktivieren und Konfiguration prüfen.",
+        },
+        "auth/invalid-api-key": {
+            title: "API-Key ungültig",
+            tip: "Der Firebase Web-API-Key ist ungültig oder gehört zu einem anderen/gelöschten Projekt. Korrekten Key aus der Firebase-Console (Projekteinstellungen → Allgemein) übernehmen.",
+        },
+        "auth/api-key-not-valid": {
+            title: "API-Key ungültig",
+            tip: "Der Firebase Web-API-Key ist ungültig oder gehört zu einem anderen/gelöschten Projekt. Korrekten Key aus der Firebase-Console (Projekteinstellungen → Allgemein) übernehmen.",
+        },
+        "auth/app-deleted": {
+            title: "Firebase-App gelöscht",
+            tip: "Die Firebase-App-Instanz wurde gelöscht oder das Projekt ist nicht mehr verfügbar. Konfiguration gegen ein aktives Projekt prüfen.",
+        },
         "permission-denied": {
             title: "Keine Berechtigung",
             tip: "Der Vorgang ist mit dem aktuellen Konto nicht erlaubt.",
@@ -11258,7 +12367,7 @@ function showDashboard(user) {
  */
 function applyRoleRestrictions(role) {
     const tabAccess = {
-        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup", "platforms", "qa", "admin", "firebase", "ai", "legal"],
+        admin: ["overview", "users", "devices", "subscriptions", "pairing", "support", "errorlogs", "compliance", "setup", "platforms", "qa", "admin", "firebase", "ai", "automation", "legal"],
         support: ["overview", "support"],
         auditor: ["overview", "errorlogs", "compliance"]
     };
@@ -11307,6 +12416,7 @@ function _startTabAutoRefresh(tabName) {
         "devices": () => loadDevices(),
         "errorlogs": () => loadErrorLogs(),
         "compliance": () => loadComplianceRequests(),
+        "automation": () => loadAutomationDashboard(),
     };
     const fn = refreshMap[tabName];
     if (fn) {
@@ -11357,6 +12467,9 @@ function switchTab(tabName, evt) {
             renderQaRefreshStatus();
         }
     }
+    if (tabName === "automation") {
+        loadAutomationDashboard();
+    }
 }
 
 // ==================== CLOUD SETUP & OPERATOR ASSISTANT ====================
@@ -11376,6 +12489,7 @@ function initializeSetupAssistant() {
     renderPrioritizedActionPlan();
     initOperatorReadinessCard();
     initExternalIntegrationsCard();
+    initAdminPinCard();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {
@@ -11409,6 +12523,77 @@ function initOperatorReadinessCard() {
     if (exportEvidenceBtn) exportEvidenceBtn.addEventListener("click", exportReleaseEvidenceBundle);
     const exportArtefactBtn = document.querySelector("[data-action='exportReleaseArtefact']");
     if (exportArtefactBtn) exportArtefactBtn.addEventListener("click", exportReleaseArtefact);
+}
+
+function initAdminPinCard() {
+    const saveBtn = document.getElementById("btn-save-admin-pin");
+    const verifyBtn = document.getElementById("btn-verify-admin-pin");
+    if (saveBtn) saveBtn.addEventListener("click", () => saveOperatorAdminPinFromPanel());
+    if (verifyBtn) verifyBtn.addEventListener("click", () => verifyOperatorAdminPinFromPanel());
+    loadOperatorAdminPinStatus();
+}
+
+async function loadOperatorAdminPinStatus() {
+    const statusEl = document.getElementById("admin-pin-status");
+    if (!statusEl || !functions) return;
+
+    try {
+        const statusFn = functions.httpsCallable("getOperatorAdminPinStatus");
+        const response = await statusFn({});
+        const data = response?.data || {};
+        const configured = Boolean(data.configured);
+        const fresh = Boolean(data.verificationFresh);
+        statusEl.innerHTML = configured
+            ? `PIN konfiguriert${fresh ? " · T4-Bestätigung aktiv (≤30 Min)" : " · T4-Bestätigung ausstehend"}`
+            : "Noch keine Admin-PIN gesetzt — T4-Aktionen sind ohne PIN-Schutz möglich.";
+    } catch (error) {
+        statusEl.textContent = "PIN-Status konnte nicht geladen werden.";
+    }
+}
+
+async function saveOperatorAdminPinFromPanel() {
+    const resultEl = document.getElementById("admin-pin-result");
+    const currentPin = (document.getElementById("admin-pin-current")?.value || "").trim();
+    const newPin = (document.getElementById("admin-pin-new")?.value || "").trim();
+    const confirmPin = (document.getElementById("admin-pin-confirm")?.value || "").trim();
+
+    if (!newPin || newPin !== confirmPin) {
+        showNotification("Neue PIN und Bestätigung müssen übereinstimmen.", "error");
+        return;
+    }
+    if (!/^\d{6,8}$/.test(newPin)) {
+        showNotification("Admin-PIN muss 6–8 Ziffern enthalten.", "error");
+        return;
+    }
+    if (!(await ensureOperatorTier("T3"))) return;
+
+    if (resultEl) resultEl.innerHTML = "<div class='loading'>Speichere Admin-PIN...</div>";
+    try {
+        const payload = { pin: newPin };
+        if (currentPin) payload.currentPin = currentPin;
+        await functions.httpsCallable("setOperatorAdminPin")(payload);
+        if (resultEl) resultEl.innerHTML = "<div class='success-box'>Admin-PIN gespeichert.</div>";
+        document.getElementById("admin-pin-current").value = "";
+        document.getElementById("admin-pin-new").value = "";
+        document.getElementById("admin-pin-confirm").value = "";
+        showNotification("Admin-PIN gespeichert.", "success");
+        loadOperatorAdminPinStatus();
+    } catch (error) {
+        if (resultEl) resultEl.innerHTML = `<div class='error'>${escapeHtml(error.message || "Speichern fehlgeschlagen")}</div>`;
+        showNotification("Admin-PIN konnte nicht gespeichert werden: " + error.message, "error");
+    }
+}
+
+async function verifyOperatorAdminPinFromPanel() {
+    const resultEl = document.getElementById("admin-pin-result");
+    if (!(await ensureOperatorTier("T4"))) {
+        if (resultEl) resultEl.innerHTML = "<div class='info'>T4-Bestätigung abgebrochen.</div>";
+        return;
+    }
+
+    if (resultEl) resultEl.innerHTML = "<div class='success-box'>Admin-PIN bestätigt — T4-Aktionen für 30 Minuten freigegeben.</div>";
+    showNotification("Admin-PIN bestätigt.", "success");
+    loadOperatorAdminPinStatus();
 }
 
 async function loadOperatorReadiness() {
@@ -11907,6 +13092,10 @@ async function onExternalIntegrationFieldChange(input) {
     const field = input.getAttribute("data-ext-field");
     const type = input.getAttribute("data-ext-type");
     if (!category || !field) return;
+    if (!(await ensureOperatorTier("T3"))) {
+        if (type === "bool") input.checked = !input.checked;
+        return;
+    }
     const value = type === "bool" ? !!input.checked : input.value;
     input.disabled = true;
     try {
@@ -11970,6 +13159,7 @@ function onOemAction(target) {
 }
 
 async function saveOemMatrix() {
+    if (!(await ensureOperatorTier("T3"))) return;
     const rows = readOemMatrixFromDom();
     try {
         if (!firebase || !firebase.functions) throw new Error("Firebase Functions nicht verfügbar");
@@ -12294,6 +13484,7 @@ async function loadOperatorConfig() {
 
 async function saveOperatorConfig() {
     const status = document.getElementById("operator-config-status");
+    if (!(await ensureOperatorTier("T3"))) return;
     if (status) status.innerHTML = "<div class='loading'>Speichere Konfiguration...</div>";
 
     try {
@@ -12440,7 +13631,7 @@ async function runFullSetupValidation() {
             check: "AI Secret Configuration",
             status: ai.geminiConfigured ? "ok" : "warn",
             message: ai.geminiConfigured
-                ? `Backend-KI konfiguriert (Gemini 3.0: ${Boolean(ai.geminiConfigured)}).`
+                ? `Backend-KI konfiguriert (Gemini 2.0: ${Boolean(ai.geminiConfigured)}).`
                 : "Keine produktiven KI-Secrets im Backend erkannt (GEMINI_API_KEY fehlt)."
         });
     } catch (error) {
@@ -12583,23 +13774,87 @@ function collectEnvFormUpdates() {
     return updates;
 }
 
+function _readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Datei nicht lesbar"));
+        reader.readAsText(file);
+    });
+}
+
+async function collectArtifactUploads() {
+    const inputs = document.querySelectorAll("[data-artifact-key]");
+    const artifacts = {};
+    const errors = [];
+    for (const input of inputs) {
+        const key = input.getAttribute("data-artifact-key");
+        const file = input.files && input.files[0];
+        if (!key || !file) continue;
+        try {
+            const text = await _readFileAsText(file);
+            try {
+                JSON.parse(text);
+            } catch (err) {
+                errors.push(`${key}: kein gueltiges JSON (${err.message})`);
+                continue;
+            }
+            artifacts[key] = { content: text };
+        } catch (err) {
+            errors.push(`${key}: ${err.message}`);
+        }
+    }
+    if (errors.length) {
+        throw new Error(errors.join("; "));
+    }
+    return artifacts;
+}
+
+function renderArtifactStatus(artifacts) {
+    if (!artifacts || typeof artifacts !== "object") return;
+    Object.entries(artifacts).forEach(([key, info]) => {
+        const node = document.getElementById(`artifact-status-${key}`);
+        if (!node || !info) return;
+        if (info.valid) {
+            const detail = info.projectId ? ` (project_id=${info.projectId}` + (info.packageName ? `, package=${info.packageName})` : ")") : "";
+            node.textContent = `✓ vorhanden${detail}`;
+            node.className = "text-muted phase-status-success";
+        } else if (info.exists) {
+            node.textContent = `⚠ ${info.error || "ungueltig"}`;
+            node.className = "text-muted phase-status-error";
+        } else {
+            node.textContent = "✗ fehlt";
+            node.className = "text-muted phase-status-error";
+        }
+    });
+}
+
 async function transferBootstrapConfig() {
     const firebase = getBootstrapFirebaseFormValues();
     const env = collectEnvFormUpdates();
+    let artifacts = {};
+    try {
+        artifacts = await collectArtifactUploads();
+    } catch (error) {
+        setConfigTransferStatus("Datei-Auswahl fehlerhaft: " + error.message, "error");
+        showNotification("Übertragen abgebrochen: " + error.message, "error");
+        return;
+    }
 
     const hasFirebaseValue = Object.values(firebase).some(v => v && v.toString().trim() !== "");
-    if (!hasFirebaseValue && Object.keys(env).length === 0) {
-        setConfigTransferStatus("Keine Werte zum Übertragen – bitte mindestens ein Feld ausfüllen.", "error");
+    const hasArtifacts = Object.keys(artifacts).length > 0;
+    if (!hasFirebaseValue && Object.keys(env).length === 0 && !hasArtifacts) {
+        setConfigTransferStatus("Keine Werte zum Übertragen – bitte mindestens ein Feld ausfüllen oder eine Datei waehlen.", "error");
         showNotification("Übertragen abgebrochen: keine Werte angegeben.", "warning");
         return;
     }
 
-    setConfigTransferStatus("Übertrage Konfiguration in .env und admin-panel/firebase-config.js …", "info");
+    setConfigTransferStatus("Übertrage Konfiguration in .env, admin-panel/firebase-config.js und Pflicht-Artefakte …", "info");
     try {
         const response = await fetch("/api/config/transfer", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ firebase, env }),
+            body: JSON.stringify({ firebase, env, artifacts }),
         });
         if (!response.ok) {
             const errPayload = await response.json().catch(() => ({}));
@@ -12607,14 +13862,22 @@ async function transferBootstrapConfig() {
         }
         const result = await response.json();
         const wrote = result.envWritten || [];
+        const artifactsWritten = result.artifactsWritten || [];
         const summary = [
             result.adminPanelFirebaseConfigWritten ? "firebase-config.js geschrieben" : null,
             wrote.length ? `${wrote.length} Werte in .env geschrieben` : null,
+            artifactsWritten.length ? `${artifactsWritten.length} Pflicht-Datei(en) geschrieben` : null,
         ].filter(Boolean).join(" – ") || "Keine Änderung erforderlich.";
+
+        renderArtifactStatus(result.artifacts || {});
 
         // Lokale Bootstrap-Konfiguration aus dem Formular ebenfalls persistieren,
         // damit der Browser dieselben Werte nutzt wie die Festplatte.
         try { persistBootstrapFirebaseConfig(false); } catch (_err) { /* nicht kritisch */ }
+
+        // Datei-Inputs zuruecksetzen, damit beim naechsten Klick nicht erneut
+        // dieselbe Datei hochgeladen wird.
+        document.querySelectorAll("[data-artifact-key]").forEach(input => { input.value = ""; });
 
         setConfigTransferStatus(`✓ ${summary}`, "success");
         showNotification("Konfiguration übertragen. " + summary, "success");
@@ -12657,10 +13920,11 @@ async function reloadConfigTransferState() {
                 input.value = value;
             }
         });
+        renderArtifactStatus(data.artifacts || {});
         setConfigTransferStatus(
             data.envFileExists
                 ? `✓ Geladen aus ${data.envFile}. Geheime Werte sind maskiert.`
-                : "ℹ Keine .env vorhanden. Felder sind leer; nach „Übertragen" wird sie angelegt.",
+                : 'ℹ Keine .env vorhanden. Felder sind leer; nach „Übertragen" wird sie angelegt.',
             "success",
         );
     } catch (error) {
@@ -12670,9 +13934,178 @@ async function reloadConfigTransferState() {
     }
 }
 
+// Hilfs-Scheduler: ruft initFn nach DOMContentLoaded auf (oder direkt, wenn
+// das DOM bereits steht). Macht in DOM-losen Umgebungen (Test-Harness ohne
+// jsdom) einen No-Op, statt mit `querySelector is not a function` zu sterben.
+function _mmScheduleDomInit(initFn) {
+    if (typeof document === "undefined") return;
+    if (typeof document.querySelector !== "function") return;
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initFn, { once: true });
+    } else {
+        initFn();
+    }
+}
+
 if (typeof window !== "undefined") {
     window.transferBootstrapConfig = transferBootstrapConfig;
     window.reloadConfigTransferState = reloadConfigTransferState;
+
+    // Beim Laden des Panels den Artefakt-Status leise abfragen, damit der
+    // Benutzer ohne Klick sofort sieht, welche der drei Pflicht-Dateien
+    // bereits vorhanden sind. Schlaegt im rein statischen Modus (ohne
+    // Python-Admin-Server) leise fehl.
+    _mmScheduleDomInit(() => {
+        if (!document.querySelector("[data-artifact-key]")) return;
+        fetch("/api/config/transfer")
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => { if (data) renderArtifactStatus(data.artifacts || {}); })
+            .catch(() => { /* ohne Server: Status bleibt "unbekannt" */ });
+    });
+}
+
+// ─── Konfigurations-Snapshots (Baustein A) ──────────────────────────
+
+function setConfigSnapshotStatus(message, level = "info") {
+    const node = document.getElementById("config-snapshots-status");
+    if (!node) return;
+    node.textContent = message || "";
+    node.className = `phase-status phase-status-${level}`;
+}
+
+function _escapeHtml(text) {
+    return String(text == null ? "" : text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function renderConfigSnapshotsList(snapshots, snapshotRoot) {
+    const list = document.getElementById("config-snapshots-list");
+    const rootNode = document.getElementById("config-snapshots-root");
+    if (rootNode && snapshotRoot) {
+        rootNode.textContent = `Ablage: ${snapshotRoot}`;
+    }
+    if (!list) return;
+    if (!Array.isArray(snapshots) || snapshots.length === 0) {
+        list.innerHTML = '<p class="text-muted">Noch keine Snapshots vorhanden.</p>';
+        return;
+    }
+    const rows = snapshots.slice(0, 30).map(entry => {
+        const id = _escapeHtml(entry.snapshotId);
+        const created = _escapeHtml(entry.createdAt || "?");
+        const reason = _escapeHtml(entry.reason || "-");
+        const files = Array.isArray(entry.filesIncluded) ? entry.filesIncluded : [];
+        const commit = entry.gitCommit ? _escapeHtml(String(entry.gitCommit).slice(0, 8)) : "—";
+        return `
+            <div class="config-field" style="border-top:1px solid var(--border, #ccc); padding-top:6px;">
+                <div><strong>${id}</strong></div>
+                <small class="text-muted">
+                    ${created} · reason=${reason} · git=${commit} · ${files.length} Datei(en)
+                </small>
+                <div class="phase-actions mm-u034" style="margin-top:6px;">
+                    <button type="button" class="btn btn-secondary" data-snapshot-action="restore" data-snapshot-id="${id}" title="Diesen Snapshot wiederherstellen (mit Pre-Restore-Sicherung)">↺ Wiederherstellen</button>
+                </div>
+            </div>
+        `;
+    }).join("");
+    list.innerHTML = rows;
+
+    list.querySelectorAll('[data-snapshot-action="restore"]').forEach(btn => {
+        btn.addEventListener("click", () => restoreConfigSnapshot(btn.getAttribute("data-snapshot-id")));
+    });
+}
+
+async function reloadConfigSnapshots() {
+    setConfigSnapshotStatus("Lade Snapshot-Liste …", "info");
+    try {
+        const response = await fetch("/api/config/snapshots");
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        renderConfigSnapshotsList(data.snapshots || [], data.snapshotRoot || "");
+        setConfigSnapshotStatus(
+            `✓ ${(data.snapshots || []).length} Snapshot(s).`, "success",
+        );
+    } catch (error) {
+        console.error("[reloadConfigSnapshots]", error);
+        setConfigSnapshotStatus(
+            "Laden fehlgeschlagen: " + error.message + " (nur im Python-Admin-Modus verfuegbar).",
+            "error",
+        );
+    }
+}
+
+async function createConfigSnapshot() {
+    setConfigSnapshotStatus("Lege Snapshot an …", "info");
+    try {
+        const response = await fetch("/api/config/snapshots/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: "manual-admin-panel" }),
+        });
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const info = await response.json();
+        const files = (info.filesIncluded || []).length;
+        setConfigSnapshotStatus(`✓ Snapshot ${info.snapshotId} angelegt (${files} Datei(en)).`, "success");
+        showNotification("Konfigurations-Snapshot angelegt.", "success");
+        await reloadConfigSnapshots();
+    } catch (error) {
+        console.error("[createConfigSnapshot]", error);
+        setConfigSnapshotStatus("Anlegen fehlgeschlagen: " + error.message, "error");
+        showNotification("Snapshot anlegen fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+async function restoreConfigSnapshot(snapshotId) {
+    if (!snapshotId) return;
+    if (!confirm(`Snapshot ${snapshotId} wiederherstellen?\n\nDer aktuelle Stand wird vorher automatisch als pre-restore-Snapshot gesichert.`)) {
+        return;
+    }
+    setConfigSnapshotStatus(`Stelle Snapshot ${snapshotId} wieder her …`, "info");
+    try {
+        const response = await fetch("/api/config/snapshots/restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ snapshotId }),
+        });
+        if (!response.ok) {
+            const errPayload = await response.json().catch(() => ({}));
+            throw new Error(errPayload.error || `HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        const restored = (result.restored || []).length;
+        setConfigSnapshotStatus(
+            `✓ ${restored} Datei(en) wiederhergestellt. Pre-Restore-Backup: ${result.preRestoreSnapshot || "—"}.`,
+            "success",
+        );
+        showNotification("Snapshot wiederhergestellt.", "success");
+        await reloadConfigSnapshots();
+        // Status der Pflicht-Artefakte erneut laden (kann sich geaendert haben).
+        try { await reloadConfigTransferState(); } catch (_err) { /* nicht kritisch */ }
+    } catch (error) {
+        console.error("[restoreConfigSnapshot]", error);
+        setConfigSnapshotStatus("Wiederherstellen fehlgeschlagen: " + error.message, "error");
+        showNotification("Wiederherstellen fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+if (typeof window !== "undefined") {
+    window.createConfigSnapshot = createConfigSnapshot;
+    window.reloadConfigSnapshots = reloadConfigSnapshots;
+    window.restoreConfigSnapshot = restoreConfigSnapshot;
+
+    _mmScheduleDomInit(() => {
+        if (!document.getElementById("config-snapshots-list")) return;
+        reloadConfigSnapshots().catch(() => { /* still */ });
+    });
 }
 
 function initializeFirebaseAfterConfigSave() {
@@ -12727,6 +14160,11 @@ function appendAssistantMessage(text, role) {
 }
 
 function generateOperatorAssistantAnswer(question) {
+    const moduleGenerate = window.MM?.operatorAssistant?.generate;
+    if (typeof moduleGenerate === "function") {
+        return moduleGenerate(question);
+    }
+
     const q = question.toLowerCase();
 
     if (q.includes("admin") || q.includes("claim") || q.includes("rolle")) {
@@ -12778,7 +14216,9 @@ function generateOperatorAssistantAnswer(question) {
     }
 
     if (q.includes("subscription") || q.includes("abo") || q.includes("ablauf") || q.includes("trial")) {
-        return "Subscriptions: In der Übersicht werden Warnungen für ablaufende Trials (<7 Tage) und Abos angezeigt. Im User-Detail sind alle Abo-Infos sichtbar: Typ, Start, Ablauf, Kinderlimit, Purchase-Token. SKUs: single_child_monthly (€1.99), family_monthly (€4.99), single_child_yearly (€19.99), family_yearly (€49.99).";
+        const moduleAnswer = window.MM?.pricingLookup?.buildOperatorSubscriptionAnswerDe?.();
+        if (moduleAnswer) return moduleAnswer;
+        return "Subscriptions: In der Übersicht werden Warnungen für ablaufende Trials (<7 Tage) und Abos angezeigt. Im User-Detail sind alle Abo-Infos sichtbar: Typ, Start, Ablauf, Kinderlimit, Purchase-Token. SKUs (netto): single_child_monthly (€4,99/Monat), family_monthly (€9,99/Monat), single_child_yearly (€39,99/Jahr), family_yearly (€79,99/Jahr), family_yearly_premium (€99,99/Jahr).";
     }
 
     return "Empfohlener Ablauf: 1) Full Validation starten, 2) Fehler zuerst in Firebase-Config/Claims beheben, 3) Firestore/Functions erneut prüfen, 4) Support- und Compliance-Workflow testweise durchlaufen, 5) Setup-Report exportieren.";
@@ -12835,11 +14275,7 @@ function loadStats() {
         let monthlyRevenue = 0;
         snapshot.forEach(doc => {
             const subscriptionType = doc.data().subscription?.type || "";
-
-            if (subscriptionType === "single_child_monthly") monthlyRevenue += 1.99;
-            else if (subscriptionType === "family_monthly") monthlyRevenue += 4.99;
-            else if (subscriptionType === "single_child_yearly") monthlyRevenue += 19.99 / 12;
-            else if (subscriptionType === "family_yearly") monthlyRevenue += 49.99 / 12;
+            monthlyRevenue += getSubscriptionMonthlyRevenueEur(subscriptionType);
         });
 
         document.getElementById("stat-current-revenue").textContent = `€${monthlyRevenue.toFixed(2)}`;
@@ -13206,6 +14642,7 @@ function getOnlineStatus(lastSeen) {
 
 async function revokeUserTokens(uid) {
     if (!confirm(`Alle Tokens für User ${uid} widerrufen? Der User muss sich neu einloggen.`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
     try {
         const revokeFunc = functions.httpsCallable("revokeUserTokens");
         await revokeFunc({ uid: uid });
@@ -13220,6 +14657,24 @@ function closeUserDetailsModal() {
 }
 
 // ==================== SUBSCRIPTION MANAGEMENT ====================
+
+function getSubscriptionMonthlyRevenueEur(subscriptionType) {
+    const lookup = window.MM?.pricingLookup;
+    if (lookup?.monthlyRevenueEur) {
+        return lookup.monthlyRevenueEur(subscriptionType);
+    }
+    const fallbackNetCents = {
+        single_child_monthly: 499,
+        family_monthly: 999,
+        single_child_yearly: 3999,
+        family_yearly: 7999,
+        family_yearly_premium: 9999,
+    };
+    const cents = fallbackNetCents[subscriptionType];
+    if (!cents) return 0;
+    const yearly = subscriptionType.includes("yearly");
+    return (yearly ? Math.round(cents / 12) : cents) / 100;
+}
 
 function filterSubscriptions(status) {
     currentSubFilter = status;
@@ -13304,6 +14759,7 @@ async function loadSubscriptions(direction) {
 
 async function revokeUserSubscription(masterId) {
     if (!confirm(`Are you sure you want to revoke the subscription for ${masterId}?`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
 
     try {
         const revokeFunc = functions.httpsCallable("revokeSubscription");
@@ -13459,12 +14915,25 @@ async function viewTicketDetails(ticketId) {
             }
         }
 
+        html += `<h4>Support-Automation</h4>`;
+        html += `<div class="support-automation-actions">`;
+        if (!ticket.accessGranted) {
+            html += `<button data-action="invokeGrantSupportAccessGuide" data-args='["${encodedTicketId}"]' class="btn btn-secondary" title="grantSupportAccess – Master muss im Parent-/Web-Control-Panel freigeben">Master-Freigabe anfordern</button>`;
+        } else if (ticket.accessGrantId) {
+            const encodedGrantId = encodeInlineArgument(String(ticket.accessGrantId));
+            html += `<button data-action="invokeRevokeSupportAccess" data-args='["${encodedGrantId}"]' class="btn btn-secondary" title="revokeSupportAccess – Master kann aktive Freigabe entziehen">Freigabe widerrufen (Master)</button>`;
+        }
+        if (String(ticket.conversationStatus || "") === "awaiting_debug_consent") {
+            html += `<button data-action="invokeGrantDebugAccessGuide" data-args='["${encodedTicketId}"]' class="btn btn-secondary" title="grantDebugAccess – Master aktiviert Debug-Modus nach Einwilligung">Debug-Einwilligung anfordern</button>`;
+        }
         if (currentUserRole === "admin" || currentUserRole === "support") {
             const debugLabel = ticket.accessGranted && ticket.debugAccessGrantId
                 ? "🤖 KI-Reanalyse mit Debug-Daten"
                 : "🤖 KI-Reanalyse anstoßen";
             html += `<button onclick="reanalyzeTicketWithAi(decodeInlineArgument('${encodedTicketId}'))" class="btn btn-secondary" title="Ruft analyzeWithDebugData auf. Nutzt Debug-Snapshot, sofern Master Debug-Modus freigegeben hat.">${debugLabel}</button>`;
         }
+        html += `</div>`;
+
         html += `</div>`;
         html += `<div id="ticket-ai-reanalyze-status" class="info" style="margin-block-start:10px;display:none"></div>`;
 
@@ -13500,6 +14969,52 @@ async function reanalyzeTicketWithAi(ticketId) {
             statusEl.innerHTML = `<div class='error'>KI-Reanalyse fehlgeschlagen: ${escapeHtml(error?.message || "Unbekannter Fehler")}</div>`;
         }
         showNotification("KI-Reanalyse fehlgeschlagen: " + (error?.message || ""), "error");
+    }
+}
+
+function showSupportAutomationGuide() {
+    const html = "<div class='success-box'><h4>Support-Automation</h4><ul>"
+        + "<li><strong>grantSupportAccess</strong> (Master)</li>"
+        + "<li><strong>revokeSupportAccess</strong> (Master)</li>"
+        + "<li><strong>grantDebugAccess</strong> (Master)</li>"
+        + "<li><strong>analyzeWithDebugData</strong> (Operator)</li></ul></div>";
+    showNotification("Support-Automation-Workflow angezeigt.", "info");
+    const listEl = document.getElementById("support-tickets-list");
+    if (!listEl) return;
+    let guideEl = document.getElementById("support-automation-guide");
+    if (!guideEl) {
+        guideEl = document.createElement("div");
+        guideEl.id = "support-automation-guide";
+        listEl.parentNode.insertBefore(guideEl, listEl);
+    }
+    guideEl.innerHTML = html;
+}
+
+function invokeGrantSupportAccessGuide(encodedTicketId) {
+    showSupportAutomationGuide();
+    showNotification("grantSupportAccess: Master-Freigabe im Parent-/Web-Control-Panel für Ticket "
+        + decodeInlineArgument(encodedTicketId), "info");
+}
+
+function invokeGrantDebugAccessGuide(encodedTicketId) {
+    showSupportAutomationGuide();
+    showNotification("grantDebugAccess: Debug-Einwilligung im Parent-Panel für Ticket "
+        + decodeInlineArgument(encodedTicketId), "info");
+}
+
+async function invokeRevokeSupportAccess(encodedGrantId) {
+    const grantId = decodeInlineArgument(encodedGrantId);
+    if (!grantId || !functions?.httpsCallable) {
+        showNotification("revokeSupportAccess: Firebase nicht bereit oder keine Grant-ID.", "error");
+        return;
+    }
+    if (!confirm("revokeSupportAccess für Grant " + grantId + "?")) return;
+    try {
+        const result = await functions.httpsCallable("revokeSupportAccess")({ grantId });
+        showNotification(result?.data?.success ? "revokeSupportAccess erfolgreich." : "revokeSupportAccess abgeschlossen.", "success");
+        loadSupportTickets();
+    } catch (error) {
+        showNotification("revokeSupportAccess (master-initiiert): " + (error?.message || ""), "warning");
     }
 }
 
@@ -13568,6 +15083,7 @@ async function saveAdminResponse(ticketId) {
         showNotification("Bitte geben Sie eine Antwort ein.", "info");
         return;
     }
+    if (!(await ensureOperatorTier("T3"))) return;
 
     try {
         await db.collection("supportTickets").doc(ticketId).update({
@@ -13584,6 +15100,7 @@ async function saveAdminResponse(ticketId) {
 }
 
 async function updateTicketStatus(ticketId, newStatus) {
+    if (!(await ensureOperatorTier("T3"))) return;
     try {
         await db.collection("supportTickets").doc(ticketId).update({
             status: newStatus,
@@ -13657,6 +15174,8 @@ async function triggerAccountDeletion() {
     if (!confirm(`LETZTE BESTÄTIGUNG: Sind Sie absolut sicher, dass Sie User ${masterId} löschen möchten?`)) {
         return;
     }
+
+    if (!(await ensureOperatorTier("T4"))) return;
 
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Lösche Account...</div>";
 
@@ -14074,6 +15593,11 @@ function closeDeviceDetailsModal() {
 }
 
 async function toggleDeviceLock(childId, currentState) {
+    const sessionManager = getSessionManager();
+    if (sessionManager && typeof sessionManager.ensureTier === "function") {
+        const allowed = await sessionManager.ensureTier("T3");
+        if (!allowed) return;
+    }
     if (!confirm(`Gerät ${childId} ${currentState ? "entsperren" : "sperren"}?`)) return;
     try {
         const result = await functions.httpsCallable("setDeviceLocked")({ childId, isLocked: !currentState });
@@ -14331,7 +15855,7 @@ function searchErrorLogs() {
 }
 
 function renderErrorLogTable(container, docs) {
-    let html = "<table><tr><th>Zeitpunkt</th><th>Funktion</th><th>Fehlermeldung</th><th>User</th><th>Severity</th></tr>";
+    let html = "<table><tr><th>Zeitpunkt</th><th>Funktion</th><th>Fehlermeldung</th><th>User</th><th>Severity</th><th>Aktion</th></tr>";
     docs.forEach(doc => {
         const d = typeof doc.data === "function" ? doc.data() : doc;
         const ts = d.timestamp ? new Date(d.timestamp.seconds * 1000).toLocaleString() : "N/A";
@@ -14345,6 +15869,7 @@ function renderErrorLogTable(container, docs) {
             <td title="${escapeHtml(d.message || "")}">${escapeHtml(msg)}${(d.message || "").length > 80 ? "..." : ""}</td>
             <td>${escapeHtml(userId.substring(0, 12))}</td>
             <td><span class="status-expired">${escapeHtml(severity)}</span></td>
+            <td><button data-action="analyzeErrorWithGemini" data-error-ctx='${escapeHtml(JSON.stringify({ functionName: funcName, message: d.message || "", severity: severity, timestamp: d.timestamp }))}' class="btn btn-secondary btn-sm" title="Mit Gemini analysieren">🤖 Gemini</button></td>
         </tr>`;
     });
     html += "</table>";
@@ -14479,6 +16004,7 @@ async function grantAdminClaim() {
     }
 
     if (!confirm(`Admin-Claim für UID "${uid}" setzen?`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
 
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Admin-Claim...</div>";
 
@@ -14573,6 +16099,7 @@ async function assignUserRole() {
     }
 
     if (!confirm(`Rolle '${role}' für User ${uid} setzen?`)) return;
+    if (!(await ensureOperatorTier("T3"))) return;
 
     if (resultEl) resultEl.innerHTML = "<div class='loading'>Setze Rolle...</div>";
 
@@ -14613,6 +16140,8 @@ async function resetOperatorAccountsFromAdminPanel() {
         }
         return;
     }
+
+    if (!(await ensureOperatorTier("T4"))) return;
 
     if (resultEl) {
         resultEl.innerHTML = "<div class='loading'>Betreiberkonten werden zurückgesetzt...</div>";
@@ -14747,6 +16276,8 @@ async function saveKnowledgeBase() {
         showNotification("Knowledge Base darf nicht leer sein.", "info");
         return;
     }
+
+    if (!(await ensureOperatorTier("T3"))) return;
 
     resultEl.innerHTML = "<div class='loading'>Speichere...</div>";
 
@@ -15291,6 +16822,14 @@ async function executeAiFix(errorIndex, action) {
     if (!confirmed) return;
 
     const btn = document.getElementById("btn-fix-" + errorIndex);
+    if (!(await ensureOperatorTier("T3"))) {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "⚡ Auto-Fix ausführen";
+        }
+        return;
+    }
+
     if (btn) {
         btn.disabled = true;
         btn.textContent = "⏳ Wird ausgeführt...";
@@ -15750,8 +17289,9 @@ function exportP0BlockerCockpit() {
     setP0BlockerCockpitState(state);
     renderP0BlockerCockpit();
 
+    const exportedAt = new Date().toISOString();
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         type: "p0-blocker-cockpit",
         ...state,
@@ -15892,12 +17432,9 @@ function savePlayStoreReadiness() {
     const resultEl = document.getElementById("playstore-readiness-result");
     const state = collectPlayStoreReadinessFromUi();
 
-    if (!state.privacyUrl || !/^https:\/\//i.test(state.privacyUrl)) {
-        if (resultEl) resultEl.innerHTML = "<div class='error'>Bitte eine gültige Privacy-Policy-URL mit https:// eintragen.</div>";
-        return;
-    }
-    if (!state.supportEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.supportEmail)) {
-        if (resultEl) resultEl.innerHTML = "<div class='error'>Bitte eine gültige Support-/Privacy-E-Mail eintragen.</div>";
+    const validation = validatePlayStoreReadinessState(state);
+    if (!validation.ok) {
+        if (resultEl) resultEl.innerHTML = "<div class='error'>" + escapeHtml(validation.message) + "</div>";
         return;
     }
 
@@ -15923,11 +17460,13 @@ function resetPlayStoreReadiness() {
 
 function exportPlayStoreReadiness() {
     const state = getPlayStoreReadinessState();
+    const exportedAt = new Date().toISOString();
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         type: "play-store-readiness",
         ...state,
+        complianceProtocol: buildPlayStoreComplianceProtocol(state, { generatedAt: exportedAt }),
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -16051,9 +17590,10 @@ function exportReleaseArtefact() {
     const platformState = buildEffectivePlatformState({}, testingRegisterPayload);
     const attestations = getCommissioningAttestations();
     const status = computeGoLiveStatus();
+    const exportedAt = new Date().toISOString();
 
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         version: "1.0",
         type: "release-artefact",
@@ -16069,6 +17609,7 @@ function exportReleaseArtefact() {
         commissioningSummary: commissioningSummary || null,
         p0BlockerCockpit: p0BlockerState,
         playStoreReadiness: playStoreState,
+        playStoreComplianceProtocol: buildPlayStoreComplianceProtocol(playStoreState, { generatedAt: exportedAt }),
         platformChecksSummary: status.platformStatus,
         platformChecksDetail: platformState,
         attestations,
@@ -16180,8 +17721,9 @@ function exportReleaseEvidenceBundle() {
         })),
     };
 
+    const exportedAt = new Date().toISOString();
     const payload = {
-        exportedAt: new Date().toISOString(),
+        exportedAt,
         tool: "MiniMaster Admin Panel",
         version: "1.0",
         type: "release-evidence-bundle",
@@ -16198,6 +17740,7 @@ function exportReleaseEvidenceBundle() {
         commissioningHistory: commissioningHistorySummary,
         p0BlockerCockpit: p0BlockerState,
         playStoreReadiness: playStoreState,
+        playStoreComplianceProtocol: buildPlayStoreComplianceProtocol(playStoreState, { generatedAt: exportedAt }),
         platformChecksSummary: status.platformStatus,
         platformChecksDetail: platformState,
         attestations,
@@ -16322,6 +17865,354 @@ function _mmInstallFacade() {
     } catch (error) {
         try { console.warn("[MM] Fassaden-Installation fehlgeschlagen:", error); } catch (_e) { /* noop */ }
     }
+}
+
+// ==================== AUTOMATION DASHBOARD ====================
+
+function loadAutomationDashboard() {
+    const healthCard = document.getElementById("automation-health-card");
+    const errorQueue = document.getElementById("automation-error-queue");
+    const MM = window.MM;
+    const auto = MM && MM.autoManagement ? MM.autoManagement : null;
+
+    if (!auto) {
+        if (healthCard) healthCard.innerHTML = "<div class='info'>Automatisierungs-Modul nicht geladen.</div>";
+        return;
+    }
+
+    try {
+        syncAutomationConfigForm(auto);
+        const health = auto.computeSystemHealth();
+        if (healthCard) {
+            const statusClass = health.status === "healthy" ? "status-active" : health.status === "degraded" ? "status-expired" : "status-expired";
+            healthCard.innerHTML = `
+                <div class="form-group">
+                    <div class="status-badge ${statusClass}">Status: ${escapeHtml(health.status.toUpperCase())}</div>
+                    <p class="muted">Aktive Automatisierungen: ${health.activeAutomations} | Ausstehende Genehmigungen: ${health.pendingApprovals}</p>
+                    <p class="muted">Kritisch: ${health.criticalPending} | Hoch: ${health.highPending} | Fehler (24h): ${health.failedExecutions24h}</p>
+                    <p class="muted">Letzte Aktualisierung: ${new Date(health.lastUpdated).toLocaleString("de-DE")}</p>
+                </div>
+            `;
+        }
+
+        const pending = auto.getPendingActions();
+        if (errorQueue) {
+            if (!pending || pending.length === 0) {
+                errorQueue.innerHTML = "<div class='info'>Keine Fehler in der Warteschlange.</div>";
+            } else {
+                let html = "<table><tr><th>Zeitpunkt</th><th>Typ</th><th>Schwere</th><th>Diagnose</th><th>Aktionen</th></tr>";
+                pending.forEach((action) => {
+                    html += `<tr>
+                        <td>${new Date(action.createdAt).toLocaleString("de-DE")}</td>
+                        <td>${escapeHtml(action.type)}</td>
+                        <td><span class="status-expired">${escapeHtml(action.severity)}</span></td>
+                        <td>${escapeHtml(action.diagnosis.substring(0, 60))}${action.diagnosis.length > 60 ? "..." : ""}</td>
+                        <td>
+                            <button data-action="automationApprove" data-action-id="${escapeHtml(action.id)}" class="btn btn-primary btn-sm">✅ Genehmigen</button>
+                            <button data-action="automationReject" data-action-id="${escapeHtml(action.id)}" class="btn btn-danger btn-sm">❌ Ablehnen</button>
+                        </td>
+                    </tr>`;
+                });
+                html += "</table>";
+                errorQueue.innerHTML = html;
+            }
+        }
+
+        const logsContainer = document.getElementById("automation-logs");
+        if (logsContainer) {
+            const logs = auto.getLogs({ since: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() });
+            if (!logs || logs.length === 0) {
+                logsContainer.innerHTML = "<div class='info'>Keine Logs in den letzten 24 Stunden.</div>";
+            } else {
+                let html = "<table><tr><th>Zeitpunkt</th><th>Typ</th><th>Nachricht</th></tr>";
+                logs.slice(0, 20).forEach((log) => {
+                    html += `<tr>
+                        <td>${new Date(log.timestamp).toLocaleString("de-DE")}</td>
+                        <td>${escapeHtml(log.type)}</td>
+                        <td>${escapeHtml(JSON.stringify(log).substring(0, 100))}...</td>
+                    </tr>`;
+                });
+                html += "</table>";
+                logsContainer.innerHTML = html;
+            }
+        }
+    } catch (err) {
+        if (healthCard) healthCard.innerHTML = `<div class='error'>Fehler beim Laden: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+// ==================== AUTOMATION ACTION HANDLER ====================
+
+function showAutomationConfigStatus(message, isError = false) {
+    const statusEl = document.getElementById("automation-config-status");
+    if (!statusEl) return;
+    statusEl.innerHTML = `<div class="${isError ? "error" : "success-box"}">${escapeHtml(message)}</div>`;
+}
+
+function getAutomationConfigDefaults(auto) {
+    return {
+        model: auto && auto.DEFAULT_MODEL ? auto.DEFAULT_MODEL : "gemini-3.0-flash",
+        promptTemplate: auto && auto.DEFAULT_PROMPT_TEMPLATE ? auto.DEFAULT_PROMPT_TEMPLATE : "",
+        autoMode: false,
+    };
+}
+
+function getAutomationConfigFormValues(auto) {
+    const defaults = getAutomationConfigDefaults(auto);
+    const modelEl = document.getElementById("automation-model");
+    const promptEl = document.getElementById("automation-prompt-template");
+    const autoModeEl = document.getElementById("automation-auto-mode");
+    const model = String(modelEl && modelEl.value ? modelEl.value : defaults.model).trim() || defaults.model;
+    const promptTemplate = promptEl && promptEl.value ? promptEl.value : defaults.promptTemplate;
+    return {
+        model,
+        promptTemplate,
+        autoMode: Boolean(autoModeEl && autoModeEl.checked),
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+function setAutomationConfigFormValues(config, auto) {
+    const defaults = getAutomationConfigDefaults(auto);
+    const value = { ...defaults, ...(config || {}) };
+    const modelEl = document.getElementById("automation-model");
+    const promptEl = document.getElementById("automation-prompt-template");
+    const autoModeEl = document.getElementById("automation-auto-mode");
+    if (modelEl) modelEl.value = value.model || defaults.model;
+    if (promptEl) promptEl.value = value.promptTemplate || defaults.promptTemplate;
+    if (autoModeEl) autoModeEl.checked = Boolean(value.autoMode);
+}
+
+function syncAutomationConfigForm(auto) {
+    const fields = [
+        document.getElementById("automation-model"),
+        document.getElementById("automation-prompt-template"),
+        document.getElementById("automation-auto-mode"),
+    ].filter(Boolean);
+    if (fields.includes(document.activeElement)) return;
+    const config = auto && typeof auto.getGeminiConfig === "function" ? auto.getGeminiConfig() : {};
+    setAutomationConfigFormValues(config, auto);
+}
+
+function saveAutomationConfigFromUi(auto) {
+    if (!auto || typeof auto.setGeminiConfig !== "function") {
+        throw new Error("Automatisierungs-Konfiguration kann nicht gespeichert werden.");
+    }
+    const values = getAutomationConfigFormValues(auto);
+    const saved = auto.setGeminiConfig(values);
+    if (typeof auto.appendLog === "function") {
+        auto.appendLog({
+            type: "config-updated",
+            model: saved.model,
+            autoMode: Boolean(saved.autoMode),
+        });
+    }
+    setAutomationConfigFormValues(saved, auto);
+    showAutomationConfigStatus(`Konfiguration gespeichert. Modell: ${saved.model}; Auto-Modus: ${saved.autoMode ? "aktiv" : "inaktiv"}.`);
+    return saved;
+}
+
+function resetAutomationConfigUi(auto) {
+    if (!auto || typeof auto.setGeminiConfig !== "function") {
+        throw new Error("Automatisierungs-Konfiguration kann nicht zurueckgesetzt werden.");
+    }
+    const defaults = {
+        ...getAutomationConfigDefaults(auto),
+        updatedAt: new Date().toISOString(),
+    };
+    const saved = auto.setGeminiConfig(defaults);
+    if (typeof auto.appendLog === "function") {
+        auto.appendLog({ type: "config-reset", model: saved.model, autoMode: Boolean(saved.autoMode) });
+    }
+    setAutomationConfigFormValues(saved, auto);
+    showAutomationConfigStatus("Konfiguration auf Standardwerte zurueckgesetzt.");
+    return saved;
+}
+
+function toggleAutomationAutoMode(auto) {
+    const autoModeEl = document.getElementById("automation-auto-mode");
+    if (autoModeEl) autoModeEl.checked = !autoModeEl.checked;
+    const saved = saveAutomationConfigFromUi(auto);
+    showAutomationConfigStatus(`Auto-Modus ${saved.autoMode ? "aktiviert" : "deaktiviert"}.`);
+    return saved;
+}
+
+async function handleAutomationAction(action, evt) {
+    const MM = window.MM;
+    const auto = MM && MM.autoManagement ? MM.autoManagement : null;
+    const resultEl = document.getElementById("automation-manual-result");
+
+    function showResult(msg, isError) {
+        if (resultEl) resultEl.innerHTML = `<div class="${isError ? "error" : "success-box"}">${escapeHtml(msg)}</div>`;
+    }
+
+    if (!auto) {
+        showResult("Automatisierungs-Modul nicht verfügbar.", true);
+        return;
+    }
+
+    try {
+        switch (action) {
+            case "automationHealthCheck": {
+                const health = auto.computeSystemHealth();
+                showResult(`System-Health: ${health.status.toUpperCase()} | Aktiv: ${health.activeAutomations} | Ausstehend: ${health.pendingApprovals}`);
+                break;
+            }
+            case "automationErrorAnalysis": {
+                const pending = auto.getPendingActions();
+                if (!pending || pending.length === 0) {
+                    showResult("Keine ausstehenden Fehler zur Analyse.");
+                } else {
+                    showResult(`${pending.length} Fehler in der Warteschlange. Wählen Sie einen aus, um Gemini-Analyse zu starten.`);
+                }
+                break;
+            }
+            case "automationProposeFixes": {
+                const pending = auto.getPendingActions();
+                if (!pending || pending.length === 0) {
+                    showResult("Keine ausstehenden Aktionen für Behebungsvorschläge.");
+                } else {
+                    const proposals = pending.map((a) => `- ${a.type}: ${a.diagnosis}`).join("\n");
+                    showResult(`Behebungsvorschläge:\n${proposals}`);
+                }
+                break;
+            }
+            case "automationClearPending": {
+                const pending = auto.getPendingActions();
+                pending.forEach((a) => auto.removePendingAction(a.id));
+                showResult(`${pending.length} ausstehende Aktionen gelöscht.`);
+                loadAutomationDashboard();
+                break;
+            }
+            case "automationSaveConfig": {
+                const saved = saveAutomationConfigFromUi(auto);
+                showResult(`Konfiguration gespeichert. Modell: ${saved.model}; Auto-Modus: ${saved.autoMode ? "aktiv" : "inaktiv"}.`);
+                break;
+            }
+            case "automationResetConfig": {
+                const saved = resetAutomationConfigUi(auto);
+                showResult(`Standardwerte wiederhergestellt. Modell: ${saved.model}; Auto-Modus: ${saved.autoMode ? "aktiv" : "inaktiv"}.`);
+                break;
+            }
+            case "automationToggleAutoMode": {
+                const saved = toggleAutomationAutoMode(auto);
+                showResult(`Auto-Modus ${saved.autoMode ? "aktiviert" : "deaktiviert"}.`);
+                break;
+            }
+            case "automationSaveApiKey": {
+                const keyInput = document.getElementById("automation-api-key");
+                const passInput = document.getElementById("automation-passphrase");
+                const key = keyInput ? keyInput.value : "";
+                const passphrase = passInput ? passInput.value : "";
+                if (!key || !passphrase) {
+                    showResult("API-Key und Passphrase erforderlich.", true);
+                    return;
+                }
+                auto.storeApiKey(key, passphrase);
+                showResult("API-Key verschlüsselt gespeichert.");
+                if (keyInput) keyInput.value = "";
+                if (passInput) passInput.value = "";
+                break;
+            }
+            case "automationClearApiKey": {
+                auto.clearApiKey();
+                showResult("API-Key gelöscht.");
+                break;
+            }
+            case "automationRefreshLogs": {
+                loadAutomationDashboard();
+                showResult("Logs aktualisiert.");
+                break;
+            }
+            case "automationClearLogs": {
+                const logs = auto.getLogs();
+                logs.forEach((l) => { /* Logs werden durch appendLog verwaltet; kein direktes Löschen nötig */ });
+                showResult("Logs können nicht direkt gelöscht werden – werden automatisch auf 500 Einträge begrenzt.");
+                break;
+            }
+            case "automationApprove": {
+                const actionId = evt && evt.target ? evt.target.getAttribute("data-action-id") : null;
+                if (!actionId) {
+                    showResult("Keine Aktion-ID gefunden.", true);
+                    return;
+                }
+                const result = auto.approveAction(actionId);
+                showResult(result.success ? "Aktion genehmigt." : `Fehler: ${result.error}`, !result.success);
+                loadAutomationDashboard();
+                break;
+            }
+            case "automationReject": {
+                const rejectId = evt && evt.target ? evt.target.getAttribute("data-action-id") : null;
+                if (!rejectId) {
+                    showResult("Keine Aktion-ID gefunden.", true);
+                    return;
+                }
+                const result = auto.rejectAction(rejectId, "Manuell abgelehnt");
+                showResult(result.success ? "Aktion abgelehnt." : `Fehler: ${result.error}`, !result.success);
+                loadAutomationDashboard();
+                break;
+            }
+            case "analyzeErrorWithGemini": {
+                const errorCtx = evt && evt.target ? evt.target.getAttribute("data-error-ctx") : null;
+                if (!errorCtx) {
+                    showResult("Kein Fehler-Kontext gefunden.", true);
+                    return;
+                }
+                try {
+                    const ctx = JSON.parse(errorCtx);
+                    const sm = auto.createStateMachine({ error: ctx, source: "errorlogs" });
+                    const config = auto.getGeminiConfig();
+                    const diagnosis = await auto.diagnoseError(ctx, config);
+                    const planned = auto.planAction(diagnosis, ctx);
+                    planned._stateMachineId = sm.id;
+                    auto.queuePendingAction(planned);
+                    auto.transitionStateMachine(sm.id, "pending-approval");
+                    showResult(`Gemini-Analyse abgeschlossen. Status: ${diagnosis.severity} | Empfohlene Aktion: ${diagnosis.recommendedAction}`);
+                    loadAutomationDashboard();
+                } catch (err) {
+                    showResult(`Fehler bei Gemini-Analyse: ${err.message}`, true);
+                }
+                break;
+            }
+            default:
+                showResult(`Unbekannte Aktion: ${action}`, true);
+        }
+    } catch (err) {
+        showResult(`Fehler: ${err.message}`, true);
+    }
+}
+
+// ==================== GLOBAL AUTOMATION CLICK LISTENER ====================
+
+if (typeof document !== "undefined") {
+    document.addEventListener("click", function(e) {
+        const btn = e.target.closest("[data-action]");
+        if (!btn) return;
+        const action = btn.getAttribute("data-action");
+        if (!action) return;
+        // Nur Automation-Actions hier abfangen
+        const automationActions = [
+            "automationHealthCheck",
+            "automationErrorAnalysis",
+            "automationProposeFixes",
+            "automationClearPending",
+            "automationSaveConfig",
+            "automationResetConfig",
+            "automationToggleAutoMode",
+            "automationSaveApiKey",
+            "automationClearApiKey",
+            "automationRefreshLogs",
+            "automationClearLogs",
+            "automationApprove",
+            "automationReject",
+            "analyzeErrorWithGemini",
+        ];
+        if (automationActions.includes(action)) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAutomationAction(action, e);
+        }
+    });
 }
 
 if (typeof document !== "undefined") {

@@ -2,6 +2,8 @@
  * Revenue Analytics Tab for MiniMaster Admin Panel.
  * Fully automated — aggregates live data from Firestore.
  */
+import { monthlyRevenueEur } from "../shared/pricing-lookup.js";
+
 export function createRevenueAnalytics(container) {
   container.innerHTML = `
     <div class="revenue-analytics">
@@ -78,25 +80,8 @@ export function createRevenueAnalytics(container) {
   container.querySelector("#revenue-platform").addEventListener("change", loadRevenueData);
 }
 
-// --- Price lookup (sync with pricing-config.ts) ---
-const SKU_PRICES = {
-  single_child_monthly: 1.99,
-  family_monthly: 4.99,
-  single_child_yearly: 19.99,
-  family_yearly: 49.99,
-  family_yearly_premium: 99.99,
-};
-const SKU_PERIOD = {
-  single_child_monthly: "monthly",
-  family_monthly: "monthly",
-  single_child_yearly: "yearly",
-  family_yearly: "yearly",
-  family_yearly_premium: "yearly",
-};
-
 function monthlyEquivalent(sku) {
-  const price = SKU_PRICES[sku] || 0;
-  return SKU_PERIOD[sku] === "yearly" ? price / 12 : price;
+  return monthlyRevenueEur(sku);
 }
 
 async function loadRevenueData() {

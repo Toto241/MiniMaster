@@ -22,7 +22,7 @@ import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { randomUUID } from "crypto";
 import { db } from "../firebase";
-import { requireAuth, validateAppCheck, AuditLogger } from "./shared";
+import { requireAuth, validateAppCheck, AuditLogger, checkRateLimitShared } from "./shared";
 
 
 
@@ -153,6 +153,7 @@ export const registerDeviceEndpoint = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    await checkRateLimitShared(callerId, "device-sync.register", 30, 60000);
     validateAppCheck(context, true);
     const { childId, platform, provider, token, appVersion, capabilities = [] } = data;
 
@@ -247,6 +248,7 @@ export const publishDeviceEvent = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    await checkRateLimitShared(callerId, "device-sync.publish", 30, 60000);
     validateAppCheck(context, true);
     const { childId, eventType, payload, idempotencyKey } = data;
 
@@ -322,6 +324,7 @@ export const fetchPendingCommands = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    await checkRateLimitShared(callerId, "device-sync.fetch", 60, 60000);
     validateAppCheck(context, true);
     const { childId, sinceCursor, maxItems = 20 } = data;
 
@@ -393,6 +396,7 @@ export const acknowledgeCommand = functions.https.onCall(
     context: CallableContext
   ) => {
     const callerId = requireAuth(context);
+    await checkRateLimitShared(callerId, "device-sync.ack", 60, 60000);
     validateAppCheck(context, true);
     const { childId, commandId, status, appliedAt, errorCode } = data;
 
