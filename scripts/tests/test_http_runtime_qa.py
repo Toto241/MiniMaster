@@ -5,6 +5,7 @@ import importlib
 import json
 import sys
 import threading
+import time
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -62,7 +63,7 @@ def _read_json(url: str, *, method: str = "GET", body: dict[str, object] | None 
     # zurueck (WinError 10054). HTTPError (echte 4xx/5xx) und alle Assertions
     # bleiben scharf – es wird ausschliesslich der Transport erneut versucht.
     last_error: Exception | None = None
-    for _attempt in range(3):
+    for attempt in range(4):
         try:
             with urlopen(request, timeout=_HTTP_CLIENT_TIMEOUT_SECONDS) as response:  # noqa: S310 - local test server only
                 return response.status, dict(response.headers), json.loads(response.read().decode("utf-8"))
@@ -70,6 +71,9 @@ def _read_json(url: str, *, method: str = "GET", body: dict[str, object] | None 
             raise
         except (TimeoutError, ConnectionError, OSError) as error:
             last_error = error
+            # Kurzes Backoff, damit sich der lokale Server nach einem
+            # Verbindungs-Reset erholen kann, bevor erneut versucht wird.
+            time.sleep(0.25 * (attempt + 1))
     raise AssertionError(f"HTTP-Transport nach Wiederholungen fehlgeschlagen: {url}: {last_error}")
 
 
