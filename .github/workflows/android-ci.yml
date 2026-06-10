@@ -114,6 +114,20 @@ jobs:
       - name: Prepare Firebase placeholder configs
         if: steps.network-check.outputs.available == 'true'
         run: ./scripts/ci/write-placeholder-google-services.sh
+      - name: Free up disk space for emulator
+        if: steps.network-check.outputs.available == 'true'
+        # Der Emulator braucht ~7,4 GB fuer die userdata-Partition; der Runner
+        # hat das ohne Aufraeumen nicht frei (FATAL: Not enough space). Hier
+        # nicht benoetigte Toolchains entfernen (Android-SDK bleibt erhalten).
+        run: |
+          echo "Vorher:"; df -h /home/runner | tail -1
+          # /opt/hostedtoolcache NICHT loeschen – dort liegt das von setup-java
+          # bereitgestellte JDK 17 (JAVA_HOME), das der Gradle-Build braucht.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+            /usr/share/swift /opt/hostedtoolcache/CodeQL \
+            /usr/local/lib/android/sdk/ndk || true
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          echo "Nachher:"; df -h /home/runner | tail -1
       - name: Enable KVM hardware acceleration
         if: steps.network-check.outputs.available == 'true'
         run: |
