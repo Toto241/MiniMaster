@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "matrixId": "android-10-16-parent-child-release-matrix",
+  "title": "Android 10-16 Parent/Child Release Matrix",
+  "description": "Release-blocking QA matrix for MiniMaster parent and child applications across Android 10 through Android 16.",
+  "priority": "P1",
+  "blockingForRelease": true,
+  "owner": "QA Automation",
+  "deviceMode": "dual-device",
+  "apps": [
+    {
+      "role": "parent",
+      "module": "masterApp",
+      "applicationId": "com.minimaster.masterapp"
+    },
+    {
+      "role": "child",
+      "module": "childApp",
+      "applicationId": "com.google.pairing"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "smoke",
+      "title": "Smoke",
+      "requiredForRelease": true,
+      "description": "Minimal install, launch, pairing and command roundtrip validation."
+    },
+    {
+      "id": "standard",
+      "title": "Standard",
+      "requiredForRelease": true,
+      "description": "Core release validation for pairing, tasks, lock/unlock, app blocking, offline cache and sync recovery."
+    },
+    {
+      "id": "full",
+      "title": "Full",
+      "requiredForRelease": false,
+      "description": "Extended validation including repeated recovery, reboot, permission and long-running stability checks."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "install-launch",
+      "title": "Install and launch both apps",
+      "level": "system",
+      "requiredForProfiles": ["smoke", "standard", "full"],
+      "expectedEvidence": ["install-log-parent", "install-log-child", "launch-screenshot-parent", "launch-screenshot-child"]
+    },
+    {
+      "id": "pairing-roundtrip",
+      "title": "Parent generates pairing code and child redeems it",
+      "level": "integration",
+      "requiredForProfiles": ["smoke", "standard", "full"],
+      "expectedEvidence": ["pairing-log", "firestore-pairing-state", "parent-device-list-screenshot"]
+    },
+    {
+      "id": "lock-unlock-command",
+      "title": "Parent sends lock/unlock command and child acknowledges it",
+      "level": "system",
+      "requiredForProfiles": ["smoke", "standard", "full"],
+      "expectedEvidence": ["command-log", "child-ack-log", "parent-command-state"]
+    },
+    {
+      "id": "task-proof-workflow",
+      "title": "Parent creates task, child submits proof, parent approves",
+      "level": "integration",
+      "requiredForProfiles": ["standard", "full"],
+      "expectedEvidence": ["task-create-log", "proof-upload-log", "approval-log"]
+    },
+    {
+      "id": "app-blocking-usage-rules",
+      "title": "App blocking and usage-limit rules are enforced on child device",
+      "level": "system",
+      "requiredForProfiles": ["standard", "full"],
+      "expectedEvidence": ["accessibility-state", "blocked-app-screenshot", "usage-rule-log"]
+    },
+    {
+      "id": "offline-cache-sync-recovery",
+      "title": "Child keeps safe cached policy offline and recovers sync when network returns",
+      "level": "system",
+      "requiredForProfiles": ["standard", "full"],
+      "expectedEvidence": ["offline-log", "policy-cache-dump", "sync-recovery-log"]
+    },
+    {
+      "id": "push-sync",
+      "title": "Push or realtime sync updates reach both devices",
+      "level": "integration",
+      "requiredForProfiles": ["standard", "full"],
+      "expectedEvidence": ["fcm-log", "firestore-sync-log"]
+    },
+    {
+      "id": "reboot-recovery",
+      "title": "Child enforcement state survives reboot",
+      "level": "system",
+      "requiredForProfiles": ["full"],
+      "expectedEvidence": ["bootreceiver-log", "post-reboot-state"]
+    }
+  ],
+  "androidTargets": [
+    {
+      "androidVersion": "10",
+      "apiLevel": 29,
+      "systemImage": "system-images;android-29;google_apis;x86_64",
+      "requiredProfiles": ["smoke", "standard"],
+      "notes": "Baseline compatibility for Android 10."
+    },
+    {
+      "androidVersion": "11",
+      "apiLevel": 30,
+      "systemImage": "system-images;android-30;google_apis;x86_64",
+      "requiredProfiles": ["smoke", "standard"],
+      "notes": "Android 11 permission and background behavior baseline."
+    },
+    {
+      "androidVersion": "12",
+      "apiLevel": 31,
+      "systemImage": "system-images;android-31;google_apis;x86_64",
+      "requiredProfiles": ["smoke", "standard"],
+      "notes": "Android 12 behavior including updated foreground/background restrictions."
+    },
+    {
+      "androidVersion": "12L",
+      "apiLevel": 32,
+      "systemImage": "system-images;android-32;google_apis;x86_64",
+      "requiredProfiles": ["smoke"],
+      "notes": "Compatibility smoke for Android 12L/tablet-capable runtime."
+    },
+    {
+      "androidVersion": "13",
+      "apiLevel": 33,
+      "systemImage": "system-images;android-33;google_apis;x86_64",
+      "requiredProfiles": ["smoke", "standard"],
+      "notes": "Notification permission and current CI emulator baseline."
+    },
+    {
+      "androidVersion": "14",
+      "apiLevel": 34,
+      "systemImage": "system-images;android-34;google_apis;x86_64",
+      "requiredProfiles": ["smoke", "standard"],
+      "notes": "Modern background execution and permission behavior."
+    },
+    {
+      "androidVersion": "15",
+      "apiLevel": 35,
+      "systemImage": "system-images;android-35;google_apis;x86_64",
+      "requiredProfiles": ["smoke", "standard"],
+      "notes": "Target SDK 35 release compatibility."
+    },
+    {
+      "androidVersion": "16",
+      "apiLevel": 36,
+      "systemImage": "system-images;android-36;google_apis;x86_64",
+      "requiredProfiles": ["smoke"],
+      "previewAllowed": true,
+      "notes": "Preview/beta compatibility where Android 16 system images are available."
+    }
+  ],
+  "evidence": {
+    "requiredManifestFields": [
+      "runId",
+      "androidVersion",
+      "apiLevel",
+      "profile",
+      "deviceMode",
+      "parentDevice",
+      "childDevice",
+      "startedAt",
+      "finishedAt",
+      "status",
+      "scenarioResults",
+      "artifacts",
+      "blockingFailures"
+    ],
+    "requiredArtifacts": [
+      "manifest.json",
+      "parent-logcat.txt",
+      "child-logcat.txt",
+      "test-summary.json"
+    ],
+    "outputRoot": "build/qa-artifacts/android-release-matrix"
+  },
+  "doneDefinition": [
+    "Every non-preview target has smoke and standard profile evidence.",
+    "Android 16 has at least smoke evidence when a system image is available.",
+    "All required scenarios for the executed profile are pass or explicitly waived with reason.",
+    "Every run contains parent and child artifacts plus a manifest with SHA-256 hashes.",
+    "The release evidence exporter includes the latest matrix summary."
+  ]
+}
