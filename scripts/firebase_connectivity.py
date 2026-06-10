@@ -21,6 +21,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import socket
@@ -190,11 +191,15 @@ def _categorize_url_error(reason: str) -> str:
     return "other"
 
 
-def _summarize_diagnosis(results: list[dict[str, object]]) -> dict[str, object]:
+def _summarize_diagnosis(
+    results: list[dict[str, object]], *, proxies: dict[str, str] | None = None
+) -> dict[str, object]:
     """Baut aus den Probe-Ergebnissen eine handlungsfaehige Diagnose."""
+    proxies = proxies or {}
     strict_failures: list[dict[str, object]] = []
     relaxed_successes: list[str] = []
     full_failures: list[str] = []
+    full_failure_categories: set[str] = set()
     crl_issue = False
 
     for entry in results:
@@ -210,6 +215,7 @@ def _summarize_diagnosis(results: list[dict[str, object]]) -> dict[str, object]:
                 relaxed_successes.append(str(entry["id"]))
             else:
                 full_failures.append(str(entry["id"]))
+                full_failure_categories.add(str(relaxed.get("category") or strict.get("category") or "other"))
             if strict.get("category") == "tls_revocation_check_failed":
                 crl_issue = True
 
@@ -239,9 +245,24 @@ def _summarize_diagnosis(results: list[dict[str, object]]) -> dict[str, object]:
             "ohne CRL-Pruefung erreichbar. Vermutlich Antivirus / SSL-Inspection."
         )
     elif full_failures:
+        connection_like = {"connection_refused", "no_route", "dns_failed", "timeout", "other"}
+        if full_failure_categories & connection_like:
+            if proxies:
+                proxy_desc = ", ".join(f"{k}={v}" for k, v in sorted(proxies.items()))
+                hints.append(
+                    f"Python nutzt diese Proxys: {proxy_desc}. Wenn der Browser ohne "
+                    "Proxy funktioniert oder einen anderen nutzt, stimmt die Python-"
+                    "Proxy-Konfiguration nicht – HTTP(S)_PROXY pruefen/anpassen."
+                )
+            else:
+                hints.append(
+                    "Python sieht KEINEN Proxy, der Browser kommt aber durch. Sehr "
+                    "wahrscheinlich ein System-/PAC-Auto-Config-Proxy, den Pythons "
+                    "urllib nicht auswertet. Loesung: 'HTTPS_PROXY' (und 'HTTP_PROXY') "
+                    "auf den Unternehmens-Proxy setzen, dann den Admin-Server neu starten."
+                )
         hints.append(
-            "Endpoints sind komplett unerreichbar. Pruefe Internetverbindung, "
-            "Firewall und ob DNS funktioniert."
+            "Sonst: Internetverbindung, Firewall und DNS-Aufloesung pruefen."
         )
         level = "error"
         headline = f"✗ {len(full_failures)} Endpoint(s) komplett unerreichbar."
@@ -261,29 +282,65 @@ def _summarize_diagnosis(results: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
-def run_connectivity_check(*, timeout: float = 6.0) -> dict[str, object]:
-    """Fuehrt alle Endpoints zweimal aus (strict + relaxed) und summarisiert."""
-    results: list[dict[str, object]] = []
-    for endpoint in DEFAULT_ENDPOINTS:
-        strict = _probe_endpoint(endpoint["url"], verify_tls=True, timeout=timeout)
-        # Wenn strict bereits OK ist, sparen wir uns den relaxed-Lauf.
-        if strict.get("ok"):
-            relaxed = {"ok": True, "skipped": True}
-        else:
-            relaxed = _probe_endpoint(endpoint["url"], verify_tls=False, timeout=timeout)
-        results.append({
-            "id": endpoint["id"],
-            "name": endpoint["name"],
-            "url": endpoint["url"],
-            "purpose": endpoint["purpose"],
-            "strict": strict,
-            "relaxed": relaxed,
-        })
+def _detect_proxies() -> dict[str, str]:
+    """Proxies, die Pythons urllib tatsaechlich verwenden wuerde.
 
-    diagnosis = _summarize_diagnosis(results)
+    Liest Umgebungsvariablen (HTTP(S)_PROXY) und – auf Windows – die WinINET-/
+    Registry-Einstellungen (dieselben, die ein manuell gesetzter System-Proxy
+    nutzt). PAC-/Auto-Config-Skripte werden von urllib NICHT ausgewertet; in
+    dem Fall ist diese Map leer, obwohl der Browser einen Proxy nutzt.
+    """
+    try:
+        return {str(k): str(v) for k, v in urllib.request.getproxies().items()}
+    except Exception:  # pragma: no cover - defensive
+        return {}
+
+
+def _probe_endpoint_both(endpoint: dict[str, str], timeout: float) -> dict[str, object]:
+    """Strict-Probe und – nur bei Fehler – Relaxed-Probe fuer einen Endpoint."""
+    strict = _probe_endpoint(endpoint["url"], verify_tls=True, timeout=timeout)
+    if strict.get("ok"):
+        relaxed: dict[str, object] = {"ok": True, "skipped": True}
+    else:
+        relaxed = _probe_endpoint(endpoint["url"], verify_tls=False, timeout=timeout)
+    return {
+        "id": endpoint["id"],
+        "name": endpoint["name"],
+        "url": endpoint["url"],
+        "purpose": endpoint["purpose"],
+        "strict": strict,
+        "relaxed": relaxed,
+    }
+
+
+def run_connectivity_check(*, timeout: float = 6.0) -> dict[str, object]:
+    """Fuehrt alle Endpoints (strict + relaxed) NEBENLAEUFIG aus und summarisiert.
+
+    Nebenlaeufig, damit der Aufruf auch dann in ~timeout Sekunden zurueckkehrt,
+    wenn mehrere Endpoints scheitern. Sequenziell waeren es bei 6 Endpoints bis
+    zu 6 * 2 * timeout Sekunden – lange genug, dass der Browser-Fetch im Admin-
+    Panel mit "Failed to fetch" abbricht und nur ein "Server-Routing-Problem"
+    anzeigt, statt der echten Diagnose.
+    """
+    proxies = _detect_proxies()
+    results: list[dict[str, object]] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(DEFAULT_ENDPOINTS)) as pool:
+        futures = {
+            pool.submit(_probe_endpoint_both, endpoint, timeout): endpoint
+            for endpoint in DEFAULT_ENDPOINTS
+        }
+        by_id: dict[str, dict[str, object]] = {}
+        for future in concurrent.futures.as_completed(futures):
+            entry = future.result()
+            by_id[str(entry["id"])] = entry
+        # Reihenfolge der DEFAULT_ENDPOINTS beibehalten (deterministische Anzeige).
+        results = [by_id[str(ep["id"])] for ep in DEFAULT_ENDPOINTS if str(ep["id"]) in by_id]
+
+    diagnosis = _summarize_diagnosis(results, proxies=proxies)
     return {
         "diagnosis": diagnosis,
         "endpoints": results,
+        "proxies": proxies,
         "projectId": _read_env_value("FIREBASE_PROJECT_ID"),
         "platform": sys.platform,
         "tlsBackend": "openssl (python urllib)",

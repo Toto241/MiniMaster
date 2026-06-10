@@ -760,6 +760,15 @@ function _renderConnectivityResult(backend, browser) {
         for (const hint of (backend.diagnosis.hints || [])) {
             rows.push(`<div style="margin-top:6px"><em>Hinweis:</em> ${_escapeHtml(hint)}</div>`);
         }
+        const proxyKeys = backend.proxies ? Object.keys(backend.proxies) : [];
+        if (proxyKeys.length > 0) {
+            const desc = proxyKeys.map(k => `${k}=${backend.proxies[k]}`).join(", ");
+            rows.push(`<div style="margin-top:6px;font-family:monospace">Python-Proxy: ${_escapeHtml(desc)}</div>`);
+        } else if (backend.proxies) {
+            rows.push(`<div style="margin-top:6px;font-family:monospace">Python-Proxy: keiner erkannt</div>`);
+        }
+    } else if (backend && backend.__fetchError) {
+        rows.push(`<div>Backend-Endpoint nicht erreichbar: ${_escapeHtml(backend.__fetchError)}</div>`);
     } else {
         rows.push(`<div>Backend-Test fehlgeschlagen oder nicht verfuegbar.</div>`);
     }
@@ -842,11 +851,30 @@ function _renderConnectivityResult(backend, browser) {
             </div>`
         );
     } else if (!backendOk && allCriticalOk) {
+        // Zwei Unterfaelle: (a) der Endpoint war gar nicht erreichbar
+        // (__fetchError) -> meist Browser↔lokaler Server; (b) der Endpoint hat
+        // geantwortet, aber Python erreicht Firebase nicht -> Proxy/TLS.
+        const fetchErr = backend && backend.__fetchError;
+        const detail = fetchErr
+            ? `<br><span style="font-family:monospace">${_escapeHtml(fetchErr)}</span>`
+            : "";
         rows.push(
             `<div style="background:#fee2e2;padding:10px;border-left:4px solid #dc2626">
-                <strong>⚠ Diagnose: Server-Routing-Problem.</strong><br>
-                Browser kommt durch, der Python-Server nicht. Pruefe ggf. eine Proxy-Konfiguration
-                fuer Python (HTTPS_PROXY-Umgebungsvariable).
+                <strong>⚠ Diagnose: Server-Routing-Problem.</strong>${detail}<br>
+                Browser kommt durch, der Python-Backend-Test nicht. Pruefe in dieser Reihenfolge:
+                <ol>
+                    <li><strong>Laeuft der Admin-Server?</strong> Er muss unter
+                        <code>http://127.0.0.1:8765</code> erreichbar sein
+                        (per <code>Setup.bat --start</code> bzw. <code>start.bat</code>).</li>
+                    <li><strong>Proxy ohne localhost-Bypass:</strong> Wenn dein System-/
+                        Unternehmens-Proxy auch <code>127.0.0.1</code> umleitet, scheitert der
+                        lokale Aufruf mit „Failed to fetch". <code>127.0.0.1</code> und
+                        <code>localhost</code> in die Proxy-Ausnahmen (No-Proxy) aufnehmen.</li>
+                    <li><strong>Python erreicht Firebase nicht</strong> (falls der Endpoint
+                        geantwortet, aber Fehler gemeldet hat): <code>HTTPS_PROXY</code>/
+                        <code>HTTP_PROXY</code> fuer Python setzen und Server neu starten –
+                        ein PAC-/Auto-Config-Proxy wird von Python nicht ausgewertet.</li>
+                </ol>
             </div>`
         );
     } else {
@@ -880,7 +908,7 @@ async function runConnectivityTest() {
     const browserResults = [];
     try {
         const [backend, ...probes] = await Promise.all([
-            fetch("/api/tools/firebase-connectivity").then(r => r.ok ? r.json() : null).catch(() => null),
+            _fetchBackendConnectivity(),
             ..._CONNECTIVITY_BROWSER_ENDPOINTS.map(ep => _probeBrowserEndpoint(ep).then(result => ({ endpoint: ep, result }))),
         ]);
         backendResult = backend;
@@ -889,6 +917,28 @@ async function runConnectivityTest() {
         if (btn) btn.disabled = false;
     }
     _renderConnectivityResult(backendResult, browserResults);
+}
+
+// Backend-Probe mit hartem Timeout. Liefert entweder das Diagnose-JSON oder
+// ein { __fetchError } / { __httpStatus }-Objekt, damit die UI die echte
+// Ursache zeigt statt nur "nicht verfuegbar".
+async function _fetchBackendConnectivity() {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    try {
+        const r = await fetch("/api/tools/firebase-connectivity", { signal: controller.signal, cache: "no-store" });
+        if (!r.ok) {
+            let body = "";
+            try { body = JSON.stringify(await r.json()); } catch (_) { /* ignore */ }
+            return { __httpStatus: r.status, __fetchError: `HTTP ${r.status}${body ? " " + body : ""}` };
+        }
+        return await r.json();
+    } catch (err) {
+        const aborted = err && err.name === "AbortError";
+        return { __fetchError: aborted ? "Zeitüberschreitung (25s) – Backend antwortet nicht." : ((err && err.message) || String(err)) };
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 function initializeAuthStateObserver() {
