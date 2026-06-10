@@ -27,12 +27,15 @@ def _reset_testing_register_cache():
     """
     try:
         import app
+        clear_cache = getattr(app, "clear_testing_register_cache", None)
     except Exception:
-        yield
-        return
-    app.clear_testing_register_cache()
+        clear_cache = None
+
+    if clear_cache:
+        clear_cache()
     yield
-    app.clear_testing_register_cache()
+    if clear_cache:
+        clear_cache()
 
 
 @pytest.fixture()

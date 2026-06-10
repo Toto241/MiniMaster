@@ -3285,7 +3285,12 @@ def build_repo_test_inventory_entries(
 # jedem Lauf zurueck (conftest-Fixture), sodass das Verhalten unveraendert ist.
 TESTING_REGISTER_CACHE_TTL_SECONDS = 5.0
 _testing_register_cache: dict[str, object] = {"value": None, "expires_at": 0.0}
+# Kurzlebiger Lock fuer das Lesen/Schreiben der Cache-Felder.
 _testing_register_cache_lock = threading.Lock()
+# Serialisiert die ~4s teure Neuberechnung: nur ein Thread rechnet, parallele
+# Anfragen warten und erhalten danach den frisch gecachten Wert (kein
+# Cache-Stampede / Thundering Herd beim Polling des Admin-Panels).
+_testing_register_compute_lock = threading.Lock()
 
 
 def clear_testing_register_cache() -> None:
@@ -3295,27 +3300,46 @@ def clear_testing_register_cache() -> None:
         _testing_register_cache["expires_at"] = 0.0
 
 
+def _read_fresh_testing_register_cache() -> dict[str, object] | None:
+    """Gibt eine Kopie des Cache zurueck, falls er noch gueltig ist, sonst None."""
+    now = time.monotonic()
+    with _testing_register_cache_lock:
+        cached = _testing_register_cache["value"]
+        if cached is not None and now < cast(float, _testing_register_cache["expires_at"]):
+            return copy.deepcopy(cast(dict[str, object], cached))
+    return None
+
+
 def build_testing_register(*, use_cache: bool = True) -> dict[str, object]:
     """Liefert das Testing-Register, optional aus einem kurzlebigen TTL-Cache.
 
     use_cache=False erzwingt eine frische Berechnung (umgeht und aktualisiert den
     Cache nicht). Rueckgaben sind tiefe Kopien, damit Aufrufer den Snapshot
     gefahrlos mutieren koennen, ohne den Cache zu beschaedigen.
+
+    Double-Checked Locking verhindert, dass parallele Anfragen die teure
+    Berechnung gleichzeitig ausloesen.
     """
     if not use_cache:
         return _compute_testing_register()
 
-    now = time.monotonic()
-    with _testing_register_cache_lock:
-        cached = _testing_register_cache["value"]
-        if cached is not None and now < cast(float, _testing_register_cache["expires_at"]):
-            return copy.deepcopy(cast(dict[str, object], cached))
+    # 1. Schneller Pfad ohne Compute-Lock.
+    cached = _read_fresh_testing_register_cache()
+    if cached is not None:
+        return cached
 
-    fresh = _compute_testing_register()
-    with _testing_register_cache_lock:
-        _testing_register_cache["value"] = copy.deepcopy(fresh)
-        _testing_register_cache["expires_at"] = time.monotonic() + TESTING_REGISTER_CACHE_TTL_SECONDS
-    return fresh
+    # 2. Nur ein Thread berechnet; die uebrigen blockieren hier und sehen nach
+    #    Freigabe den frischen Cache (zweite Pruefung).
+    with _testing_register_compute_lock:
+        cached = _read_fresh_testing_register_cache()
+        if cached is not None:
+            return cached
+
+        fresh = _compute_testing_register()
+        with _testing_register_cache_lock:
+            _testing_register_cache["value"] = copy.deepcopy(fresh)
+            _testing_register_cache["expires_at"] = time.monotonic() + TESTING_REGISTER_CACHE_TTL_SECONDS
+        return fresh
 
 
 def _compute_testing_register() -> dict[str, object]:

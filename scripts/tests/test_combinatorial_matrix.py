@@ -61,6 +61,12 @@ class TestCoveringArray:
     def test_empty_params(self):
         assert generate_covering_array([], strength=2) == []
 
+    def test_empty_value_list_raises(self):
+        import pytest
+
+        with pytest.raises(ValueError):
+            generate_covering_array([("ver", ["10"]), ("mode", [])], strength=2)
+
     def test_single_param(self):
         params = [("a", ["1", "2", "3"])]
         rows = generate_covering_array(params, strength=2)

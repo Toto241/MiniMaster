@@ -86,6 +86,9 @@ def generate_covering_array(
         raise ValueError("strength muss >= 1 sein")
     if not params:
         return []
+    for name, values in params:
+        if not values:
+            raise ValueError(f"Parameter '{name}' darf keine leere Werteliste haben")
     effective_strength = min(strength, len(params))
     required = _required_combinations(params, effective_strength)
 
