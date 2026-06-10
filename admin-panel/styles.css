@@ -635,6 +635,13 @@ body {
     margin: 8px 0;
 }
 
+.support-automation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-block-end: 10px;
+}
+
 .admin-waiting-hint {
     background: #fefce8;
     border: 1px solid #fde68a;
