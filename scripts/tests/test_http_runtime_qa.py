@@ -5,6 +5,7 @@ import importlib
 import json
 import sys
 import threading
+import time
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -16,6 +17,13 @@ REPO_ROOT = SCRIPTS_DIR.parent
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(REPO_ROOT / "python_admin"))
+
+# Einige Endpunkte (z. B. /api/testing/register) berechnen ihre Antwort live
+# aus Repo-Inventar, statischer Analyse und Docs-Validierung und brauchen
+# mehrere Sekunden. Der Client-Timeout muss deutlich darueber liegen, sonst
+# laufen die Tests unter Last sporadisch in einen TimeoutError statt die
+# eigentliche Assertion zu pruefen.
+_HTTP_CLIENT_TIMEOUT_SECONDS = 30
 
 
 def load_app_module():
@@ -49,8 +57,24 @@ def _read_json(url: str, *, method: str = "GET", body: dict[str, object] | None 
         method=method,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
     )
-    with urlopen(request, timeout=5) as response:  # noqa: S310 - local test server only
-        return response.status, dict(response.headers), json.loads(response.read().decode("utf-8"))
+    # Nur *transportbedingte* Fehler werden begrenzt wiederholt: schwere
+    # Endpunkte koennen unter Last in einen Timeout laufen und der lokale
+    # ThreadingHTTPServer setzt auf Windows gelegentlich eine Verbindung
+    # zurueck (WinError 10054). HTTPError (echte 4xx/5xx) und alle Assertions
+    # bleiben scharf – es wird ausschliesslich der Transport erneut versucht.
+    last_error: Exception | None = None
+    for attempt in range(4):
+        try:
+            with urlopen(request, timeout=_HTTP_CLIENT_TIMEOUT_SECONDS) as response:  # noqa: S310 - local test server only
+                return response.status, dict(response.headers), json.loads(response.read().decode("utf-8"))
+        except HTTPError:
+            raise
+        except (TimeoutError, ConnectionError, OSError) as error:
+            last_error = error
+            # Kurzes Backoff, damit sich der lokale Server nach einem
+            # Verbindungs-Reset erholen kann, bevor erneut versucht wird.
+            time.sleep(0.25 * (attempt + 1))
+    raise AssertionError(f"HTTP-Transport nach Wiederholungen fehlgeschlagen: {url}: {last_error}")
 
 
 class TestQaRuntimeHttpContracts:
