@@ -27,6 +27,9 @@ export {
   resetAllAuthUsersHealth,
   getLegacyAuthUsageStats,
   migrateToFamiliesSchema,
+  getOperatorAdminPinStatus,
+  setOperatorAdminPin,
+  verifyAdminPin,
 } from "./src/auth";
 
 // ==================== PAIRING ====================
@@ -139,6 +142,12 @@ export {
   getOperatorSetupStatus,
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
+
+export {
+  getAcceptanceStatus,
+  submitAcceptanceRun,
+  checkAcceptanceGates,
+} from "./src/acceptance";
 
 // ==================== EXTERNAL INTEGRATIONS COCKPIT ====================
 export {

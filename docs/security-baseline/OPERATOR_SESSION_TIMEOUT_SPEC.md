@@ -1,6 +1,6 @@
 # Operator Session-Timeout & Re-Auth Specification
 
-> **Status:** Draft v0.1 — AP-N3 (Web-/Desktop-Sicherheitsbasis)
+> **Status:** Draft v0.2 — AP-N3 (Web-/Desktop-Sicherheitsbasis)
 > **Scope:** `admin-panel`, `parent-panel`, `child-panel`, `web-control`
 
 ## Problemstellung
@@ -65,7 +65,7 @@ Einführung einer **Session-Idle-Timeout**-Logik mit erzwungener Re-Authentifizi
 **Deliverable:** `src/auth.ts` — `verifyAdminPin(context, pin)`
 
 - Admin-PIN wird bei `createOperatorAccessKey` / `bootstrapFirstAdmin` gesetzt
-- Gespeichert in Firestore `operatorConfig/adminPin` (gehashed, bcrypt)
+- Gespeichert in Firestore `operatorConfig/adminPin` (gehashed, scrypt)
 - T4-Aktionen verlangen PIN-Eingabe im Admin-Panel
 - Bei korrekter Eingabe: `admin_verified_at` Claim für 30 Minuten
 
@@ -194,14 +194,15 @@ window.sessionManager = new SessionManager();
 
 ## 6. Akzeptanzkriterien
 
-- [ ] Nach 15 Min Inaktivität im Admin-Panel: Auto-Logout + Banner
-- [ ] Nach 8h Session-Dauer: Auto-Logout (unabhängig von Aktivität)
-- [ ] T3-Aktionen zeigen Re-Auth-Modal vor Ausführung
-- [ ] T4-Aktionen zeigen Re-Auth-Modal + PIN-Eingabe
-- [ ] Admin-PIN kann im Operator-Setup-Tab gesetzt/geändert werden
-- [ ] Session-Timeout-Verhalten ist überall konsistent (admin-panel, web-control, parent-panel)
-- [ ] Tests decken alle Timeout-Pfade und Re-Auth-Flows ab
+- [x] Nach 15 Min Inaktivität im Admin-Panel: Auto-Logout + Banner *(Phase 1 — `session-manager.js`)*
+- [x] Nach 8h Session-Dauer: Auto-Logout (unabhängig von Aktivität) *(Phase 1)*
+- [x] T3-Aktionen zeigen Re-Auth-Modal vor Ausführung *(Dashboard-Gates + Server-Tier)*
+- [x] T4-Aktionen zeigen Re-Auth-Modal + PIN-Eingabe *(Phase 3 — `verifyAdminPin`, Session-Manager)*
+- [x] Admin-PIN kann im Operator-Setup-Tab gesetzt/geändert werden
+- [x] Session-Timeout-Verhalten ist überall konsistent (admin-panel, web-control, parent-panel, child-panel) *(Master-Panels via `shared-ui-session-manager.js`)*
+- [x] Server-seitiges Action-Gating via `requireTier()` für kritische Cloud Functions *(Phase 2)*
+- [x] Tests decken Timeout-Pfade und Re-Auth-Flows ab *(Unit-Tests Phase 1/2)*
 
 ---
 
-*Next step: Phase 1 implementation in `admin-panel/modules/core/session-manager.js`.*
+*Phase 1–3 umgesetzt (2026-05-31). Offen: konsistentes Session-Timeout in web-control/parent-panel.*

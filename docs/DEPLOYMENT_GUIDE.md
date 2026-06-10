@@ -34,7 +34,7 @@ In der Firebase Console aktivieren:
 Android Apps registrieren:
 
 1. `com.minimaster.masterapp`
-2. `com.google.pairing`
+2. `com.minimaster.childapp`
 
 ## 4. Web-Konfiguration
 

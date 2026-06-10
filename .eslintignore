@@ -2,6 +2,8 @@
 web-control/**
 coverage/**
 admin-panel/**
+parent-panel/**
+child-panel/**
 scripts/**
 desktop/**
 lib/**

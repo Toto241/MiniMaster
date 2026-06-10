@@ -49,6 +49,7 @@ function resetState() {
 function buildQuery(collectionName: string, filters: Array<{ field: string; value: any }> = [], maxItems?: number): any {
   return {
     where: jest.fn((field: string, _op: string, value: any) => buildQuery(collectionName, [...filters, { field, value }], maxItems)),
+    orderBy: jest.fn((_field: string, _direction?: string) => buildQuery(collectionName, filters, maxItems)),
     limit: jest.fn((nextLimit: number) => buildQuery(collectionName, filters, nextLimit)),
     get: jest.fn(async () => {
       const docs = Object.entries(state[collectionName] || {})

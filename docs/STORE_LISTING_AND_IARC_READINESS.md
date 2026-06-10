@@ -4,7 +4,7 @@
 **Timeline:** Submit IARC form this week; listing content over next 2 weeks
 **Apps:**
 - Parent App: `com.minimaster.masterapp`
-- Child App: `com.google.pairing`
+- Child App: `com.minimaster.childapp`
 
 **Companion docs:** [PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md](PLAY_CONSOLE_DATA_SAFETY_TEMPLATE.md), [PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md](PLAY_PERMISSIONS_DECLARATION_CHECKLIST.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 
@@ -39,7 +39,6 @@ Manage your child's device usage with industry-grade security and real-time enfo
 • Lock/unlock child device remotely from parent app
 • Enforce app blocking via AccessibilityService integration
 • Set hourly usage limits (e.g., 2 hours max per day)
-• Geo-fencing with GPS-based app locking
 
 📋 Task Management
 • Create & assign daily tasks (homework, chores, etc.)
@@ -115,7 +114,7 @@ Questions? Issues?
 
 ═══════════════════════════════════════════════════════════════════
 
-Version: 2.2.0 · © 2026 MiniMaster Development
+Version: 1.1.0 · © 2026 MiniMaster Development
 ```
 
 #### Promo Text / Highlights
@@ -131,7 +130,7 @@ Version: 2.2.0 · © 2026 MiniMaster Development
 
 ---
 
-### A.2 Child App (com.google.pairing) — Store Listing
+### A.2 Child App (com.minimaster.childapp) — Store Listing
 
 #### App Title (50 chars max)
 ```
@@ -165,7 +164,7 @@ This app:
 ✓ Stores usage rules locally (works offline)
 
 This app does NOT:
-✗ Track location without parent configuration
+✗ Track location in the current release
 ✗ Access child's personal files (contacts, photos, etc.)
 ✗ Spy on messages or calls
 ✗ Install trackers or malware
@@ -186,7 +185,6 @@ This app does NOT:
 When you install this app, you'll be asked to grant:
 • Device Administrator Access → required for device lock/unlock
 • Accessibility Service → required to enforce app blocking rules
-• Location (optional) → only if parent enables geo-fencing rule
 • Camera (optional) → only if parent requires photo task proof
 
 ═══════════════════════════════════════════════════════════════════
@@ -222,7 +220,7 @@ A: Yes, but parent will lose enforcement capability. Parent can re-enable rules 
 
 ═══════════════════════════════════════════════════════════════════
 
-Version: 2.2.0 · © 2026 MiniMaster Development
+Version: 1.1.0 · © 2026 MiniMaster Development
 ```
 
 #### Promo Text
@@ -357,7 +355,7 @@ Q: Real-time internet connection?
 A: Yes (required for rule synchronization)
 
 Q: Location data?
-A: Yes (optional, only if parent enables geo-fencing)
+A: No (not implemented in the current Android release)
 
 Q: Camera, video, or audio access?
 A: Yes (camera optional for task photo proof)
@@ -391,7 +389,7 @@ A: Yes (account creation, device info, app usage tracking)
 | Field | Parent App | Child App |
 |-------|-----------|----------|
 | **Title** | MiniMaster - Parental Control Suite | MiniMaster Child - Device Management Companion |
-| **Package ID** | com.minimaster.masterapp | com.google.pairing |
+| **Package ID** | com.minimaster.masterapp | com.minimaster.childapp |
 | **Category** | Parental Control (if available) or Productivity | Tools |
 | **Content Rating** | PEGI 3 / ESRB E / USK 0+ | PEGI 3 / ESRB E / USK 0+ |
 | **Private/Public** | Public | Public |
@@ -420,7 +418,7 @@ A: Yes (account creation, device info, app usage tracking)
   - [ ] Restricted audience: No
 
 - [ ] **Release Management**
-  - [ ] APK signed with production key
+  - [ ] AAB signed with production upload key
   - [ ] Build uploaded to `internal testing` track first
   - [ ] Closed test via internal testers (QA team)
   - [ ] Release to production (after QA approval)
@@ -484,7 +482,7 @@ A: Yes (account creation, device info, app usage tracking)
 - [ ] Icons, feature images, promo text finalized
 - [ ] IARC ratings obtained for both apps
 - [ ] Privacy policy live on production domain
-- [ ] APK signed & uploaded to internal testing track
+- [ ] AAB signed with the production upload key and uploaded to internal testing track
 - [ ] Internal QA team: testing completed, no P0 bugs
 - [ ] Store listing preview reviewed (check for typos, formatting)
 - [ ] Regional availability double-checked (pilot: DE/AT/CH)
@@ -494,7 +492,7 @@ A: Yes (account creation, device info, app usage tracking)
 
 **Day of release:**
 
-- [ ] Final confirmation: APK builds still passing
+- [ ] Final confirmation: AAB builds still passing
 - [ ] Promote from internal → production track
 - [ ] Monitor first 2 hours: no spike in crashes
 - [ ] Tweet/announce release

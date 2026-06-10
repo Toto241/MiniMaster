@@ -14,6 +14,48 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
     let auth = null;
     let currentMasterImei = null;
     let appCheckConfigured = false;
+    let masterSessionManager = null;
+
+    function getMasterSessionManager() {
+      if (!masterSessionManager && typeof MiniMasterSessionManager === "function") {
+        masterSessionManager = new MiniMasterSessionManager({
+          isActive: function () { return Boolean(currentMasterImei); },
+          onLogout: function () { logoutMasterSession(); },
+          onNotify: function (message, type) {
+            setStatus("ticket-auth-status", message, type === "error" ? "error" : "success");
+          },
+        });
+      }
+      return masterSessionManager;
+    }
+
+    function ensureMasterSession() {
+      var manager = getMasterSessionManager();
+      if (!manager) return true;
+      return manager.ensureActiveSession();
+    }
+
+    function startMasterSessionMonitoring() {
+      var manager = getMasterSessionManager();
+      if (!manager) return;
+      manager.markLoggedIn();
+      manager.start();
+    }
+
+    function stopMasterSessionMonitoring() {
+      var manager = getMasterSessionManager();
+      if (manager) manager.stop();
+    }
+
+    function logoutMasterSession() {
+      stopMasterSessionMonitoring();
+      currentMasterImei = null;
+      updateSecureWebControlButtonState();
+      if (auth) {
+        auth.signOut().catch(function () { /* noop */ });
+      }
+      setStatus("ticket-auth-status", "Session abgelaufen — bitte erneut anmelden.", "error");
+    }
 
     function getAppCheckSiteKey() {
       const globalSiteKey = typeof window !== "undefined" ? window.MINIMASTER_APP_CHECK_SITE_KEY : null;
@@ -67,12 +109,26 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
     }
 
     function loadFirebaseConfig() {
+      // 1) Lokaler Override (Bootstrap-Dialog -> localStorage) gewinnt.
       try {
         const raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
-        if (parsed && parsed.projectId && parsed.apiKey) return parsed;
+        if (parsed && parsed.projectId && parsed.apiKey
+            && !String(parsed.projectId).includes("your-")) {
+          return parsed;
+        }
       } catch (error) {
         console.warn("Firebase override konnte nicht geladen werden:", error);
+      }
+      // 2) Vom Setup-Wizard generierte firebase-config.js.
+      try {
+        const injected = typeof window !== "undefined" ? window.__MM_FIREBASE_CONFIG__ : null;
+        if (injected && injected.projectId && injected.apiKey
+            && !String(injected.projectId).includes("your-")) {
+          return injected;
+        }
+      } catch (error) {
+        console.warn("Injected Firebase-Konfiguration konnte nicht gelesen werden:", error);
       }
       return fallbackFirebaseConfig;
     }
@@ -124,8 +180,8 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       setStatus("ticket-auth-status", "Authentifiziere über sicheren Web-Link...", "");
       const redeemFn = functions.httpsCallable("redeemMasterWebBootstrapToken");
       const tokenResult = await redeemFn({ bootstrapToken });
-      clearMasterWebBootstrapTokenFromLocation();
       await auth.signInWithCustomToken(tokenResult.data.customToken);
+      clearMasterWebBootstrapTokenFromLocation();
       return true;
     }
 
@@ -144,6 +200,9 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       try {
         if (!functions || !auth || !currentMasterImei) {
           setStatus("ticket-auth-status", "Bitte zuerst im Eltern-Panel authentifizieren.", "error");
+          return false;
+        }
+        if (!ensureMasterSession()) {
           return false;
         }
         if (!ensureAppCheckConfigured(app, "ticket-auth-status")) {
@@ -204,12 +263,13 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
         return;
       }
       db = firebase.firestore(app);
-      functions = firebase.app("parent-panel-app").functions();
+      functions = firebase.app("parent-panel-app").functions("europe-west1");
       auth = firebase.app("parent-panel-app").auth();
 
       auth.onAuthStateChanged(async (user) => {
         if (user) {
           currentMasterImei = user.uid;
+          startMasterSessionMonitoring();
           let platformLabel = "";
           try {
             const masterDoc = await db.collection("masters").doc(user.uid).get();
@@ -225,6 +285,7 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
         }
 
         currentMasterImei = null;
+        stopMasterSessionMonitoring();
         updateSecureWebControlButtonState();
       });
 
@@ -243,6 +304,9 @@ const FIREBASE_STORAGE_KEY = "operatorFirebaseConfigOverride";
       try {
         if (!functions || !currentMasterImei) {
           setStatus("ticket-submit-status", "Bitte zuerst authentifizieren.", "error");
+          return;
+        }
+        if (!ensureMasterSession()) {
           return;
         }
         if (!ensureAppCheckConfigured(app, "ticket-submit-status")) {

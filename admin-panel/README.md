@@ -33,7 +33,8 @@ Die ueberarbeitete Operator-Konsole nutzt folgende Hauptbereiche:
 - Befehlszentrale mit USB-Debug/Commissioning-Kommandos inkl. APK-Installations-Schnittstelle (`run-usb-tests.ps1 -InstallApk`, Dual-Runner)
 - **Lightweight Operator Panel** (`simple.html`): moderne Start-/Admin-Konsole mit strukturierten Operator-Karten, eigenem `style.css` und PWA-Icons
 - **Support-Panel** (`support.js`): Support-Zugriff gewaehren/entziehen, Debug-Zugriff und Analyse mit Debug-Daten ueber Backend-APIs
-- **Debug-Panel** (`debug.js`): Erweiterbarer Platzhalter fuer Debugging-Tools
+- **Debug-Panel** (`debug.js`): Laufzeit-Status, Modul-Liste und JSON-Snapshot mit Links zu Setup/QA im Voll-Dashboard
+- **Session-Manager** (`modules/core/session-manager.js`): Idle-Timeout (15 Min), 8h-Session-Limit, Re-Auth für T3/T4-Aktionen, Admin-PIN für T4
 - **Firebase-Konfigurationsmodul** (`firebase-config.js`): Zentrale, umgebungsbasierte Firebase-Konfiguration fuer neue Module
 
 ## Start-Panel-Logik

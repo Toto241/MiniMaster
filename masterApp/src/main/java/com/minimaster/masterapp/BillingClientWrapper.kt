@@ -43,11 +43,7 @@ class BillingClientWrapper @Inject constructor(
      */
     private val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
         if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-            for (purchase in purchases) {
-                if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                    _purchaseStatus.value = purchase
-                }
-            }
+            purchases.forEach(::handlePurchasedSubscription)
         } else {
             Log.e("BillingClient", "Purchase error: ${billingResult.debugMessage}")
         }
@@ -56,7 +52,12 @@ class BillingClientWrapper @Inject constructor(
     /** The instance of the [BillingClient]. */
     private var billingClient: BillingClient = BillingClient.newBuilder(context)
         .setListener(purchasesUpdatedListener)
-        .enablePendingPurchases()
+        .enableAutoServiceReconnection()
+        .enablePendingPurchases(
+            PendingPurchasesParams.newBuilder()
+                .enableOneTimeProducts()
+                .build()
+        )
         .build()
 
     /**
@@ -69,6 +70,7 @@ class BillingClientWrapper @Inject constructor(
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                     Log.d("BillingClient", "Billing client setup finished.")
                     queryProducts()
+                    queryActiveSubscriptions()
                 }
             }
             override fun onBillingServiceDisconnected() {
@@ -110,6 +112,46 @@ class BillingClientWrapper @Inject constructor(
                 _productDetails.value = result.productDetailsList.orEmpty()
             } else {
                 Log.e("BillingClient", "Error querying products: ${result.billingResult.debugMessage}")
+            }
+        }
+    }
+
+    private fun handlePurchasedSubscription(purchase: Purchase) {
+        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+            _purchaseStatus.value = purchase
+        }
+    }
+
+    private fun queryActiveSubscriptions() {
+        val params = QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.SUBS)
+            .build()
+
+        billingScope.launch {
+            val result = billingClient.queryPurchasesAsync(params)
+            if (result.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                result.purchasesList.forEach(::handlePurchasedSubscription)
+            } else {
+                Log.e("BillingClient", "Error querying active subscriptions: ${result.billingResult.debugMessage}")
+            }
+        }
+    }
+
+    fun acknowledgePurchase(purchase: Purchase) {
+        if (purchase.isAcknowledged) {
+            return
+        }
+
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+
+        billingScope.launch {
+            val result = billingClient.acknowledgePurchase(params)
+            if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                Log.d("BillingClient", "Purchase acknowledged.")
+            } else {
+                Log.e("BillingClient", "Purchase acknowledgement failed: ${result.debugMessage}")
             }
         }
     }

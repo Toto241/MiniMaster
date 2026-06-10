@@ -236,11 +236,24 @@ describe("analyzeTaskPhoto", () => {
 
   it("löst echten Abort-Timer nach 30s aus", async () => {
     process.env.GEMINI_API_KEY = "test-key";
-    jest.useFakeTimers();
+    process.env.GEMINI_TIMEOUT_MS = "0";
 
+    // Mock photo download (first fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(1),
+      headers: { get: () => "image/jpeg" },
+    });
+
+    // Mock Gemini API call (second fetch) with abort signal handling
     mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      const signal = init?.signal as AbortSignal | undefined;
+      if (signal?.aborted) {
+        const abortErr = new Error("The operation was aborted");
+        abortErr.name = "AbortError";
+        return Promise.reject(abortErr);
+      }
       return new Promise((_, reject) => {
-        const signal = init?.signal as AbortSignal | undefined;
         signal?.addEventListener("abort", () => {
           const abortErr = new Error("The operation was aborted");
           abortErr.name = "AbortError";
@@ -250,7 +263,7 @@ describe("analyzeTaskPhoto", () => {
     });
 
     const wrapped = wrapV2(myFunctions.analyzeTaskPhoto);
-    const pending = wrapped({
+    await wrapped({
       data: {
         before: { status: "pending", description: "Timer Test" },
         after: {
@@ -261,10 +274,8 @@ describe("analyzeTaskPhoto", () => {
       params: { childId: "c1", taskId: "t9" },
     });
 
-    await jest.advanceTimersByTimeAsync(30000);
-    await pending;
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     delete process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_TIMEOUT_MS;
   });
 });
