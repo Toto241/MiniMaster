@@ -1,15 +1,15 @@
 # Go/No-Go — Externe Restpunkte (Checkliste)
 
-**Stand:** 2026-05-30  
-**Zweck:** Kompakte Abarbeitungsliste für alles, was **nicht im Repo** geschlossen werden kann. Technische Repo-Arbeit (Session-Security, Auth Phase 2, Evidence-Skripte, Play-Console-Paket) ist erledigt.
+**Stand:** 2026-06-10  
+**Zweck:** Kompakte Abarbeitungsliste für alles, was **nicht im Repo** geschlossen werden kann. Repo-Arbeit abgeschlossen (`repo_ready=true`, PRs #186/#175/#176/#177 gemergt). Verbleibend sind externe Owner-Aktionen.
 
 ## Vor dem Release (P0 — alle müssen Done sein)
 
 | # | Aktion | Owner | Nachweis | Status |
 |---|--------|-------|----------|--------|
-| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | Kein Billing-Blocker in CI; Runs starten | ⬜ |
-| 2 | Code Scanning aktivieren (Issue #158) | Engineering | Frischer grüner CodeQL-Run + SARIF | ⬜ |
-| 3 | Android CI grün | Engineering | Link zu erfolgreichem `android-release` Run | ⬜ |
+| 1 | GitHub Actions Billing/Spending-Limit beheben | Repo Owner | Kein Billing-Blocker in CI; Runs starten | ✅ |
+| 2 | Code Scanning aktivieren (Issue #158) | Repo Owner | `gh api repos/Toto241/MiniMaster/code-scanning/default-setup` liefert 200 | ⬜ (API noch 403) |
+| 3 | Android CI grün | Engineering | [run 27233004667](https://github.com/Toto241/MiniMaster/actions/runs/27233004667) | ✅ |
 | 4 | Physisches/Emulator-Commissioning | QA/Operations | `scripts/run-dual-device-commissioning.ps1` + Checkliste | ⬜ |
 | 5 | Play Console: Data Safety | Product/Ops | Screenshot / Review-Status | ⬜ |
 | 6 | Play Console: IARC Rating | Product/Ops | Freigabe im Dashboard | ⬜ |
@@ -28,6 +28,10 @@ npm run security:evidence:collect
 npm run commissioning:evidence:collect
 npm run playstore:protocol:gate
 npm run analyze:fertigungsstand:gate
+npm run plan:android-release-matrix
+npm run run:android-release-matrix:smoke
+npm run validate:android-release-matrix
+npm run evidence:release
 ```
 
 ## Referenzen

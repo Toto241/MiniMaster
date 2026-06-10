@@ -113,6 +113,7 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | Store Listing DE vollständig | Finaler Store-Listing-Entwurf + Asset-Paket | ⬜ | Product/Ops | offen |
 | Permissions Declaration einreichen | Finale Einreichbestaetigung aus Play Console | ⬜ | Compliance Owner | offen |
 | App-Access-Anleitung in Play Console hinterlegen | Link/Screenshot zur Reviewer-Anleitung | ⬜ | Product/Ops | offen |
+| Android 10-16 Matrix Smoke (Dry-Run) | `npm run run:android-release-matrix:smoke` + `validate:android-release-matrix` | ✅ Dry-Run | Engineering | 2026-06-10 |
 | Physische/Emulator-Commissioning-Checks durchführen | Ausgefüllte Commissioning-Checkliste mit Evidence | ⬜ | QA/Operations | offen |
 | On-call/Eskalations-Roster verbindlich benennen | Roster mit Namen, Kontakt, Vertretung und Reachability-Test | ⬜ | Operations Lead | offen |
 
@@ -122,8 +123,8 @@ Every release candidate must have traceable evidence for all mandatory gates. Th
 | --- | --- | --- | --- | --- | --- |
 | 1 | GitHub Code Scanning in Repository Settings aktivieren | Repo Owner | GitHub Admin Settings | Code scanning API liefert 200 und Security tab zeigt CodeQL | ⬜ |
 | 2 | CodeQL, Android CI und Android Release Bundles neu ausfuehren | Engineering | 1 + Push | CodeQL und Android CI completed/success; Android Release Bundles play-ready noch offen | 🔄 |
-| 3 | `npm run analyze:fertigungsstand:gate` ausfuehren und archivieren | Engineering | Checkout/CI | latest-summary.json + latest-report.md | ⬜ |
-| 4 | Release-Evidence mit aktuellen Run-Links aktualisieren | Engineering | 2, 3 | dieses Register aktualisiert | ⬜ |
+| 3 | `npm run analyze:fertigungsstand:gate` ausfuehren und archivieren | Engineering | Checkout/CI | latest-summary.json + latest-report.md | ✅ |
+| 4 | Release-Evidence mit aktuellen Run-Links aktualisieren | Engineering | 2, 3 | dieses Register aktualisiert | 🔄 |
 | 5 | Finalen Deploy-Nachweis erfassen | Engineering | 2 | Deployment-Referenz | ⬜ |
 | 6 | Firebase-Key-Rotation nach Runbook durchfuehren | Security Owner | Console-Zugriff | Key-ID alt/neu + Revocation-Zeitpunkt dokumentiert; neue child Firebase app fuer `com.minimaster.childapp` | ⬜ |
 | 7 | Play Console Paket finalisieren | Product/Ops + Compliance | Play Console Zugriff | Data Safety, IARC, Permissions, App Access | ⬜ |
