@@ -1,0 +1,37 @@
+name: Release Evidence Export
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - fix/**
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  export-release-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run release evidence pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_BIN="python3"
+          if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+            PYTHON_BIN="python"
+          fi
+          "$PYTHON_BIN" --version
+          "$PYTHON_BIN" scripts/build_android_release_matrix_plan.py
+          "$PYTHON_BIN" scripts/run_android_release_matrix.py --profile smoke
+          "$PYTHON_BIN" scripts/validate_android_release_matrix_evidence.py --allow-dry-run
+          "$PYTHON_BIN" scripts/export_release_evidence.py
+          echo "Release evidence pipeline completed."
+          find build -maxdepth 5 -type f | sort || true
