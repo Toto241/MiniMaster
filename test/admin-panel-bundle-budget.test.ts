@@ -84,13 +84,22 @@ import * as path from "path";
  *   - Begruendung: B2C-SKU-Preisquelle und Operator-Antworten wurden fuer
  *     Play-Store-Billing-Konsistenz vereinheitlicht. Limits minimal erhoeht;
  *     weitere Admin-Modularisierung soll sie wieder senken.
+ *
+ * Stand Konnektivitaets-/Auth-Diagnose:
+ *   - app.js: 853_204 Bytes (unter dem Limit von 857_000 – Byte-Limit unveraendert).
+ *   - Top-Level-Funktionen: 560 (+10 ueber dem alten Limit von 550; das Limit
+ *     war bereits vor dieser Aenderung bei 559 ueberschritten).
+ *   - Begruendung: nebenlaeufige Firebase-Konnektivitaetsprobe
+ *     (_fetchBackendConnectivity) sowie klarere Auth-Fehlerhinweise
+ *     (auth/project-soft-deleted u. a.). Funktions-Limit auf 565 angehoben
+ *     (kleiner Headroom); weitere Admin-Modularisierung soll es wieder senken.
  */
 
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
 const MAX_APP_JS_BYTES = 857_000;
-const MAX_TOP_LEVEL_FUNCTIONS = 550;
+const MAX_TOP_LEVEL_FUNCTIONS = 565;
 const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;

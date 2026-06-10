@@ -12098,6 +12098,30 @@ function getAuthErrorHint(error, fallbackMessage, scope) {
             title: "Methode deaktiviert",
             tip: "In Firebase Authentication ist die gewünschte Anmeldemethode nicht aktiviert.",
         },
+        "auth/project-soft-deleted": {
+            title: "Firebase-Projekt gelöscht",
+            tip: "Das hinterlegte Firebase-/Google-Cloud-Projekt wurde gelöscht (Soft-Delete, ~30 Tage wiederherstellbar). Das ist KEIN Zugangsdaten-Problem. Lösung: Projekt in der Google-Cloud-Konsole wiederherstellen (console.cloud.google.com → IAM & Verwaltung → Ressourcen verwalten → Projekt auswählen → Wiederherstellen) oder per 'gcloud projects undelete <PROJECT_ID>'. Alternativ ein aktives Projekt in der Firebase-Konfiguration hinterlegen.",
+        },
+        "auth/project-not-found": {
+            title: "Firebase-Projekt nicht gefunden",
+            tip: "Das in der Konfiguration hinterlegte Projekt existiert nicht (mehr). Project-ID/API-Key in der Firebase-Konfiguration gegen ein aktives Projekt prüfen.",
+        },
+        "auth/configuration-not-found": {
+            title: "Auth-Konfiguration fehlt",
+            tip: "Firebase Authentication ist im Projekt nicht initialisiert oder die Konfiguration zeigt auf ein falsches Projekt. Firebase-Console → Authentication aktivieren und Konfiguration prüfen.",
+        },
+        "auth/invalid-api-key": {
+            title: "API-Key ungültig",
+            tip: "Der Firebase Web-API-Key ist ungültig oder gehört zu einem anderen/gelöschten Projekt. Korrekten Key aus der Firebase-Console (Projekteinstellungen → Allgemein) übernehmen.",
+        },
+        "auth/api-key-not-valid": {
+            title: "API-Key ungültig",
+            tip: "Der Firebase Web-API-Key ist ungültig oder gehört zu einem anderen/gelöschten Projekt. Korrekten Key aus der Firebase-Console (Projekteinstellungen → Allgemein) übernehmen.",
+        },
+        "auth/app-deleted": {
+            title: "Firebase-App gelöscht",
+            tip: "Die Firebase-App-Instanz wurde gelöscht oder das Projekt ist nicht mehr verfügbar. Konfiguration gegen ein aktives Projekt prüfen.",
+        },
         "permission-denied": {
             title: "Keine Berechtigung",
             tip: "Der Vorgang ist mit dem aktuellen Konto nicht erlaubt.",
