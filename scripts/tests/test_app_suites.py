@@ -1107,6 +1107,23 @@ class TestMiniMasterAdminHandlerRoutes:
         enqueue_job_mock = MagicMock()
         monkeypatch.setattr(app, "create_job", create_job_mock)
         monkeypatch.setattr(app, "enqueue_job", enqueue_job_mock)
+        # Umgebungs-Preconditions (SDK/ADB/Emulator/AVD) erfuellen, damit der
+        # Handler den frueheren Hard-Blocker passiert und das eigentlich
+        # getestete Warnlagen-Freigabe-Gate (HTTP 409) erreicht. Ohne diese
+        # Mocks haengt das Ergebnis davon ab, ob auf dem Lauf-Host ein Android-
+        # SDK + AVD-Manager provisioniert ist.
+        monkeypatch.setattr(app, "_build_android_automation_sweep_plan", lambda: {
+            "androidVersions": ["10", "14"],
+            "masterTestClasses": ["master.PairingTest"],
+            "childTestClasses": ["child.PairingTest"],
+            "selectedScenarioIds": ["pairing"],
+        })
+        monkeypatch.setattr(app, "get_emulator_lab_overview", lambda: {
+            "sdkConfigured": True,
+            "adbAvailable": True,
+            "emulatorBinaryAvailable": True,
+            "avdManagerAvailable": True,
+        })
         monkeypatch.setattr(app, "_build_android_automation_sweep_preflight", lambda: {
             "status": "warning",
             "canStart": False,

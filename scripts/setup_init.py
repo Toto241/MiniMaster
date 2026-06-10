@@ -174,18 +174,43 @@ def main() -> int:
     print("serviceAccountKey.json herunterladen) muessen weiterhin im Browser")
     print("durchgefuehrt werden – das Pre-Flight am Ende zeigt, was fehlt.\n")
 
-    step_env(args.yes)
+    # Harte Schritte: ein False bedeutet einen echten Einrichtungsfehler
+    # (z. B. .env.example fehlt, 'npm install' bricht ab). Weiche Schritte
+    # (Firebase-CLI/Login/Use/Config-Transfer) sind optional und liefern bei
+    # fehlendem globalem Werkzeug oder Operator-Abbruch nur eine Warnung.
+    hard_failures: list[str] = []
+    soft_warnings: list[str] = []
+
+    if not step_env(args.yes):
+        hard_failures.append("env")
     if not args.skip_install:
-        step_npm_install(args.yes)
-        step_firebase_cli(args.yes)
+        if not step_npm_install(args.yes):
+            hard_failures.append("npm-install")
+        if not step_firebase_cli(args.yes):
+            soft_warnings.append("firebase-cli")
     if not args.skip_cli:
-        step_firebase_login(args.yes)
-        step_firebase_use(args.yes)
-    step_config_transfer(args.yes)
-    step_preflight(args.yes)
+        if not step_firebase_login(args.yes):
+            soft_warnings.append("firebase-login")
+        if not step_firebase_use(args.yes):
+            soft_warnings.append("firebase-use")
+    if not step_config_transfer(args.yes):
+        soft_warnings.append("config-transfer")
+    preflight_rc = step_preflight(args.yes)
 
     print("\nSetup-Init abgeschlossen. Bei roten Pre-Flight-Punkten die genannten")
     print("Fixes ausfuehren und 'python scripts/preflight.py' erneut starten.")
+
+    if soft_warnings:
+        print(f"[WARN] Optionale Schritte uebersprungen/fehlgeschlagen: "
+              f"{', '.join(soft_warnings)}")
+    if hard_failures:
+        print(f"[FEHLER] Pflicht-Schritte fehlgeschlagen: "
+              f"{', '.join(hard_failures)} (Exit 2)")
+        return 2
+    # Pre-Flight ist das massgebliche Abschluss-Gate.
+    if preflight_rc:
+        print(f"[FEHLER] Pre-Flight meldet offene Punkte (Exit {preflight_rc}).")
+        return preflight_rc
     return 0
 
 
