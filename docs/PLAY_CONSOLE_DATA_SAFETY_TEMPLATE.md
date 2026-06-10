@@ -4,7 +4,7 @@
 **App:** MiniMaster Parent Control Suite
 **Package IDs:**
 - Parent App: `com.minimaster.masterapp`
-- Child App: `com.google.pairing`
+- Child App: `com.minimaster.childapp`
 
 **Timeline:** Submit this week to avoid review delays
 **References:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md), [COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md](COMPLIANCE_EVIDENCE_BUNDLE_2026-03-19.md), [STORE_LISTING_AND_IARC_READINESS.md](STORE_LISTING_AND_IARC_READINESS.md), [APP_ACCESS_REVIEWER_GUIDE.md](APP_ACCESS_REVIEWER_GUIDE.md), [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
@@ -61,16 +61,14 @@ MiniMaster is a parental control application that:
 
 | Data Type | Collected | Purpose | Retention | Shared? |
 |-----------|----------|---------|-----------|---------|
-| **Precise location (GPS)** | ✅ YES (if parent enables) | Optional: enforce location-based rules (e.g., "lock phone outside home") | Until rule deleted or location disabled | ❌ No (stored only in parent's account) |
-| **Approximate location (network)** | ✅ YES (if parent enables) | Fallback if GPS unavailable | Same as GPS | ❌ No |
+| **Precise location (GPS)** | ❌ NO | Not implemented in current Android release | - | - |
+| **Approximate location (network)** | ❌ NO | Not implemented in current Android release | - | - |
 
-**📍 User Control:**
-- Parent must explicitly activate location rule in task settings
-- Child cannot disable location tracking if enforced
-- Location data sent to parent via Firestore (encrypted)
-- Deleted when parent removes location rule or account is deleted
+**Release note:**
+- Current `childApp` manifest does not request location permissions.
+- Do not select Location in Google Play Data Safety, IARC, or store-listing declarations until a location feature is implemented and reviewed.
 
-**⚠️ Permission:** `android.permission.ACCESS_FINE_LOCATION` (child app manifest)
+**Permission:** None in current release.
 
 ---
 
@@ -167,7 +165,7 @@ MiniMaster is a parental control application that:
 - ✅ **Firebase Storage encryption at rest** (Google-managed keys)
 - ✅ **SharedPreferences encryption** (Android Encryptipref lib, child app)
 - ✅ **No credentials in logs** (all sensitive fields redacted in logcat)
-- ✅ **Service account key not in repo** (`.gitignore` + GitHub Secrets)
+- 🔄 **Service account key not in repo** (`.gitignore` + GitHub Secrets; historical tracked key must be rotated and removed from release evidence before launch)
 
 ### 4.3 Access Control
 
@@ -184,7 +182,7 @@ MiniMaster is a parental control application that:
 
 ### 4.4 Regular Security Testing
 
-- ✅ **CodeQL automated scanning** (weekly + on-push)
+- 🔄 **CodeQL automated scanning** configured in `.github/workflows/codeql-analysis.yml`; repository Code Scanning must still be enabled in GitHub Settings before release evidence can be marked complete.
 - ✅ **SSRF protection** (photo URLs validated as Firebase Storage URIs)
 - ✅ **Injection prevention** (no dynamic SQL; Firestore queries parameterized)
 - ✅ **Tamper detection** (reports device-admin disables, accessibility service stops)
@@ -201,7 +199,7 @@ MiniMaster is a parental control application that:
 
 | Policy | Compliance | Notes |
 |--------|-----------|-------|
-| **Permissions** | ✅ Required only (device_admin, accessibility, camera, location) | Each gated by user/parent consent in setup wizard |
+| **Permissions** | ✅ Required only (device_admin, accessibility, usage access, overlay, camera) | Each gated by user/parent consent in setup wizard |
 | **Family Policies** | ✅ Yes, parent control app | Declared as "parental control" in Play Console |
 | **Appropriate Content** | ✅ App does not target children directly | Parent-facing UI, child app minimal UI designed for enforcement only |
 | **User Consent** | ✅ GDPR/CCPA compliant | Privacy policy + consent before data collection |
@@ -212,7 +210,7 @@ MiniMaster is a parental control application that:
 ### 5.2 Privacy Policy Link
 
 **Location:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md) (in repo)
-**Link for Play Console:** `https://[your-domain]/privacy` (to be hosted)
+**Link for Play Console:** `https://toto241.github.io/MiniMaster/privacy/` until a production domain is approved.
 
 **Key sections included:**
 - What data is collected
@@ -229,7 +227,8 @@ MiniMaster is a parental control application that:
 
 **Answer:** ✅ **YES**
 
-- Parent: [`exportUserData()` + `deleteUserAccount()`](../src/user-data.ts) cloud functions
+- Parent: [`exportUserData()` + `deleteUserAccount()`](../src/admin.ts) cloud functions
+- Release blocker: expose a customer-facing in-app deletion path and public deletion request URL before Play production submission.
 - Response time: **Within 30 days** (Google standard)
 - Process: Parent initiates in Admin Panel → Manual review trigger → Purge handler
 
@@ -241,7 +240,7 @@ MiniMaster is a parental control application that:
 |-----------|-------------------|
 | Account credentials | ❌ No (required for app function) |
 | Device ID | ❌ No (required for pairing) |
-| Location | ✅ Yes (parent can disable location rule) |
+| Location | N/A (not collected in current release) |
 | Photos | ✅ Yes (parent can uncheck "photo required" for tasks) |
 | App usage tracking | ❌ No (required for enforcement) |
 
@@ -257,14 +256,14 @@ MiniMaster is a parental control application that:
 
 - [ ] **App name & package ID** filled in
   - `com.minimaster.masterapp` (Parent App)
-  - `com.google.pairing` (Child App)
+  - `com.minimaster.childapp` (Child App)
 
 - [ ] **Select "Parental Control"** as app category (if available)
 
 - [ ] **Data types section:**
   - [ ] Account info: ✅ Checked
   - [ ] Device ID: ✅ Checked
-  - [ ] Location (if applicable): ✅ Checked
+  - [ ] Location: ❌ Do not check for current release
   - [ ] Photos/media: ✅ Checked
   - [ ] App activity: ✅ Checked
   - [ ] Contact info: ✅ Checked
@@ -274,7 +273,7 @@ MiniMaster is a parental control application that:
 - [ ] **Security practices:**
   - [ ] Data encryption in transit: ✅ Enable
   - [ ] Data encryption at rest: ✅ Enable
-  - [ ] Security testing: ✅ Enable (CodeQL automated)
+  - [ ] Security testing: ✅ Enable only after GitHub Code Scanning is active and a green CodeQL run is linked
 
 - [ ] **Privacy policy:**
   - [ ] URL provided: `https://[your-domain]/privacy`

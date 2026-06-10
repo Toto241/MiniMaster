@@ -12,6 +12,29 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CATALOG_ROOT = REPO_ROOT / "qa" / "catalog"
 DEFAULT_JSON_OUT = REPO_ROOT / "build" / "test-automation" / "qa-catalog.json"
 
+CLASSIFICATION_TYPES: tuple[dict[str, str], ...] = (
+    {
+        "automationType": "automated",
+        "classification": "automation",
+        "description": "Laeuft ohne externe Operator-Aktion auf Host oder CI.",
+    },
+    {
+        "automationType": "automated-with-device-prereqs",
+        "classification": "automation",
+        "description": "Automatisiert, benoetigt aber ADB, Emulator oder Testgeraet.",
+    },
+    {
+        "automationType": "manual",
+        "classification": "manual",
+        "description": "Operator muss den Nachweis protokollieren.",
+    },
+    {
+        "automationType": "external",
+        "classification": "external",
+        "description": "Externe Konsole, Store Review, GitHub-Repository-Setting oder physischer Sign-off.",
+    },
+)
+
 
 def _read_json_file(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -48,6 +71,10 @@ def load_automation_backlog() -> list[dict[str, object]]:
             str(item.get("id", "")),
         ),
     )
+
+
+def load_classification_types() -> list[dict[str, str]]:
+    return [dict(item) for item in CLASSIFICATION_TYPES]
 
 
 def _all_android_versions(matrix: list[dict[str, object]]) -> list[str]:
@@ -222,19 +249,30 @@ def build_suite_entries(
         device_mode = _device_mode_from_suite(group, suite_id)
         test_level = _test_level_id(group, suite_id)
         app_role = _app_role_id(group, suite_id)
+        automation_type = "automated-with-device-prereqs" if device_mode != "host" else "automated"
+        environment_requirement = (
+            "ADB + Emulator/Testgeraet" if device_mode == "single-device"
+            else "zwei ADB-Targets oder Dual-AVD-Konfiguration" if device_mode == "dual-device"
+            else "lokaler Host/CI"
+        )
+        priority = _priority_from_suite_id(suite_id, group)
         entries.append(
             {
                 "id": suite_id,
                 "title": str(suite.get("title", suite_id)),
                 "entryType": "suite",
                 "automationStatus": "automated",
+                "automationType": automation_type,
+                "environmentRequirement": environment_requirement,
+                "evidenceTarget": "build/test-automation/latest-summary.json",
+                "migrationPriority": priority,
                 "level": _level_from_suite(group, suite_id),
                 "deviceMode": device_mode,
                 "testLevel": test_level,
                 "testLevelLabel": _test_level_label(test_level),
                 "appRole": app_role,
                 "appRoleLabel": _app_role_label(app_role),
-                "priority": _priority_from_suite_id(suite_id, group),
+                "priority": priority,
                 "risk": _risk_from_suite_id(suite_id, group),
                 "owner": _owner_from_suite(group, suite_id),
                 "group": group,
@@ -313,12 +351,22 @@ def _inventory_entry_for_path(path: Path, matrix: list[dict[str, object]]) -> di
         priority = "P2"
 
     risk = "critical" if priority == "P0" else "high" if priority == "P1" else "medium"
+    automation_type = "automated-with-device-prereqs" if device_mode != "host" else "automated"
+    environment_requirement = (
+        "ADB + Emulator/Testgeraet" if device_mode == "single-device"
+        else "zwei ADB-Targets oder Dual-AVD-Konfiguration" if device_mode == "dual-device"
+        else "lokaler Host/CI"
+    )
     return {
         "id": f"inventory:{relative.replace('/', ':')}",
         "title": path.stem,
         "entryType": "inventory",
         "sourcePath": relative,
         "automationStatus": "automated",
+        "automationType": automation_type,
+        "environmentRequirement": environment_requirement,
+        "evidenceTarget": relative,
+        "migrationPriority": priority,
         "level": level,
         "testLevel": test_level,
         "testLevelLabel": _test_level_label(test_level),
@@ -360,6 +408,7 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
     scenarios = load_dual_device_scenarios()
     scenario_mappings = load_android_scenario_mappings()
     backlog = load_automation_backlog()
+    classification_types = load_classification_types()
     suite_entries = build_suite_entries(matrix, suites=suites)
     inventory_entries = build_repo_inventory(matrix)
 
@@ -389,6 +438,7 @@ def build_qa_catalog(suites: Iterable[object] | None = None) -> dict[str, object
         "suiteEntries": suite_entries,
         "inventoryEntries": inventory_entries,
         "automationBacklog": backlog,
+        "classificationTypes": classification_types,
         "summary": {
             "suiteCount": len(suite_entries),
             "inventoryCount": len(inventory_entries),

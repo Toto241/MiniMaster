@@ -49,8 +49,7 @@ sealed class LinkGenerationState {
  * A data class holding the master device's credentials for debugging purposes.
  */
 data class DebugState(
-    val imei: String? = null,
-    val secretKey: String? = null
+    val masterId: String? = null
 )
 
 data class ActiveLegalPolicies(
@@ -112,9 +111,9 @@ class MasterViewModel @Inject constructor(
      */
     private fun checkRegistrationStatus() {
         viewModelScope.launch {
-            credentialsRepository.getCredentials.collect { (imei, secret) ->
-                _debugState.value = DebugState(imei = imei, secretKey = secret)
-                if (!imei.isNullOrEmpty()) {
+            credentialsRepository.getMasterId.collect { masterId ->
+                _debugState.value = DebugState(masterId = masterId)
+                if (!masterId.isNullOrEmpty()) {
                     _registrationState.value = RegistrationState.Success("Device already registered.")
                 }
             }
@@ -147,8 +146,8 @@ class MasterViewModel @Inject constructor(
                 val payload = result.getData() as? Map<*, *>
                 val masterId = payload?.get("masterId") as? String
                 if (masterId != null) {
-                    credentialsRepository.saveCredentials(masterId, "")
-                    _debugState.value = DebugState(imei = masterId, secretKey = null)
+                    credentialsRepository.saveMasterId(masterId)
+                    _debugState.value = DebugState(masterId = masterId)
                     _registrationState.value = RegistrationState.Success("Device registered successfully!")
                 } else {
                     _registrationState.value = RegistrationState.Error("Backend returned no masterId.")
@@ -166,9 +165,9 @@ class MasterViewModel @Inject constructor(
      */
     fun generateLink() {
         val currentState = debugState.value
-        val currentImei = currentState.imei
+        val currentMasterId = currentState.masterId
 
-        if (currentImei == null) {
+        if (currentMasterId == null) {
             _linkGenerationState.value = LinkGenerationState.Error("Device not registered yet.")
             return
         }

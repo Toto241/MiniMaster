@@ -1,18 +1,53 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f6fb;
+  --surface: #ffffff;
+  --surface-muted: #eef4ff;
+  --text: #162033;
+  --muted: #5f6f89;
+  --border: #d8e2f0;
+  --primary: #005ab3;
+  --primary-dark: #003f82;
+  --primary-soft: #e6f1ff;
+  --shadow: 0 12px 32px rgba(22, 32, 51, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #f5f5f5;
+  color: var(--text);
+  background: linear-gradient(180deg, #eaf2ff 0%, var(--bg) 28%, var(--bg) 100%);
 }
 
 .app-header {
-  background-color: #005ab3;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: #fff;
-  padding: 1rem;
+  padding: 1.5rem clamp(1rem, 3vw, 2.5rem);
+  box-shadow: var(--shadow);
 }
 
 .app-header h1 {
+  margin: 0.1rem 0 0.35rem;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+}
+
+.eyebrow {
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.78rem;
+  opacity: 0.86;
+}
+
+.header-subtitle {
+  max-width: 860px;
+  margin: 0 0 1.2rem;
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .app-nav ul {
@@ -21,28 +56,111 @@ body {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.6rem;
 }
 
 .app-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.35rem;
   color: #fff;
   text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  background-color: #0066cc;
-  transition: background-color 0.3s;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-.app-nav a:hover {
-  background-color: #004c99;
+.app-nav a:hover,
+.app-nav a:focus-visible {
+  background-color: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .app-content {
-  padding: 2rem;
-  background-color: #fff;
-  margin: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: clamp(1rem, 3vw, 2rem);
+  background-color: var(--surface);
+  margin: clamp(1rem, 3vw, 2rem);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.panel-hero {
+  padding: clamp(1rem, 3vw, 1.6rem);
+  border-radius: 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  margin-bottom: 1.2rem;
+}
+
+.panel-hero h2 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.panel-hero p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 920px;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.panel-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 230px;
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(22, 32, 51, 0.08);
+}
+
+.panel-card h3 {
+  margin: 0 0 0.75rem;
+  color: var(--primary-dark);
+}
+
+.panel-card ul {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.panel-card li + li {
+  margin-top: 0.35rem;
+}
+
+.primary-action,
+.support-actions button {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.primary-action:hover,
+.primary-action:focus-visible,
+.support-actions button:hover,
+.support-actions button:focus-visible {
+  background-color: var(--primary-dark);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .support-actions {
@@ -52,21 +170,26 @@ body {
   margin-bottom: 1rem;
 }
 
-.support-actions button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  border: none;
-  border-radius: 4px;
-  background-color: #0080ff;
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.support-actions button:hover {
-  background-color: #0066cc;
-}
-
 .support-result {
   font-weight: bold;
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    padding: 1rem;
+  }
+
+  .app-nav ul {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .app-nav a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .app-content {
+    margin: 1rem;
+  }
 }

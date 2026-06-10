@@ -202,7 +202,7 @@ describe("Commissioning & Readiness – automated checks", () => {
       expect(missing).toContain("Firebase Authentication aktiviert");
       expect(missing).toContain("Cloud Messaging aktiviert oder bewusst nicht benötigt");
       expect(missing).toContain("Android-App com.minimaster.masterapp registriert");
-      expect(missing).toContain("Android-App com.google.pairing registriert");
+      expect(missing).toContain("Android-App com.minimaster.childapp registriert");
       expect(missing).toContain("iOS-App MiniMasterParent registriert (App Store Connect)");
       expect(missing).toContain("iOS-App MiniMasterChild registriert (App Store Connect + Family Controls)");
       expect(missing).toContain("Parent Web Panel Login geprüft");

@@ -13,7 +13,7 @@ Diese Checkliste sammelt alle benoetigten Nachweise fuer die Google Play Permiss
 | Feld | Wert |
 | ----- | ----- |
 | App | MiniMaster Child App |
-| Package Name | com.google.pairing |
+| Package Name | com.minimaster.childapp |
 | Version Scope | RC-2026-03-21 |
 | Owner | Compliance Owner |
 | Co-Owner | Product/Ops |

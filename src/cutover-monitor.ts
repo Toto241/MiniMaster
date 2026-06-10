@@ -52,7 +52,8 @@ export const legacyAuthCutoverMonitor = functions.pubsub
             results.daysWithUsage++;
             let dayCalls = 0;
             snapshot.forEach((doc) => {
-              dayCalls += (doc.data().count || 0) as number;
+              const rawCount = doc.data().count;
+              dayCalls += typeof rawCount === "number" ? rawCount : 0;
             });
             results.totalCalls += dayCalls;
           }

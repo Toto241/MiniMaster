@@ -1009,14 +1009,17 @@ The following functions enforce active subscription/trial:
 
 **Subscription Plans**:
 
-| Plan | `childLimit` | Price |
-|------|-------------|-------|
-| `single_child_monthly` | 1 | €1.99/mo |
-| `single_child_yearly` | 1 | €19.99/yr |
-| `family_monthly` | 99 (unlimited) | €4.99/mo |
-| `family_yearly` | 99 (unlimited) | €49.99/yr |
+| Plan | `childLimit` | Net price (excl. VAT) |
+|------|-------------|------------------------|
+| `single_child_monthly` | 1 | €4.99/mo |
+| `family_monthly` | 4 | €9.99/mo |
+| `single_child_yearly` | 1 | €39.99/yr |
+| `family_yearly` | 4 | €79.99/yr |
+| `family_yearly_premium` | 6 | €99.99/yr |
 
-Trial: 7-day trial on `registerMasterDevice`, `trialEndsAt` checked by `hasActiveAccess()`.
+Source of truth: `src/pricing-config.ts` (`B2C_TIERS`). VAT is added at checkout per billing country.
+
+Trial: 7-day trial starts on first pairing (`trial_pending` → `trial`); `trialEndsAt` checked by `hasActiveAccess()`.
 
 ---
 

@@ -47,6 +47,53 @@ export function requireAuditorOrAbove(context: CallableContext): void {
   }
 }
 
+export type SessionTier = "T1" | "T2" | "T3" | "T4";
+
+const SESSION_TIER_MAX_MINUTES: Record<SessionTier, number> = {
+  T1: 15,
+  T2: 8 * 60,
+  T3: 2 * 60,
+  T4: 30,
+};
+
+export function getSessionAgeMinutes(context: CallableContext): number {
+  const authTime = context.auth?.token?.auth_time;
+  if (typeof authTime !== "number") return 0;
+  return (Date.now() / 1000 - authTime) / 60;
+}
+
+/**
+ * Enforces maximum session age for privileged operator actions (AP-N3 Phase 2).
+ * T4 additionally requires a fresh admin_verified_at custom claim when present.
+ */
+export function requireTier(context: CallableContext, minTier: SessionTier, actionName: string): void {
+  requireAuth(context);
+  const sessionAgeMinutes = getSessionAgeMinutes(context);
+  const maxMinutes = SESSION_TIER_MAX_MINUTES[minTier];
+  if (sessionAgeMinutes > maxMinutes) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Session tier ${minTier} required for ${actionName}. Re-authenticate and retry.`
+    );
+  }
+
+  if (minTier === "T4") {
+    const verifiedAt = context.auth?.token?.admin_verified_at;
+    if (typeof verifiedAt === "number") {
+      const verifiedAgeMinutes = (Date.now() / 1000 - verifiedAt) / 60;
+      if (verifiedAgeMinutes > SESSION_TIER_MAX_MINUTES.T4) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          `Admin verification expired for ${actionName}. Confirm admin PIN and retry.`
+        );
+      }
+    }
+  }
+}
+
+/** Re-export for T4 callables that also require configured admin PIN verification. */
+export { requireAdminPinVerification } from "./admin-pin";
+
 /**
  * Verifies that the authenticated user (master) owns the specified child document.
  * Prevents cross-tenant access for child-related operations.
@@ -176,6 +223,8 @@ export type AuditAction =
   | "admin.grant_support_access"
   | "admin.revoke_support_access"
   | "admin.set_admin_claim"
+  | "admin.set_admin_pin"
+  | "admin.verify_admin_pin"
   | "admin.reset_operator_accounts"
   | "admin.user_impersonation"
   | "admin.revoke_subscription"
@@ -197,7 +246,9 @@ export type AuditAction =
   | "admin.b2b.activate"
   | "admin.b2b.add_device"
   | "admin.b2b.remove_device"
-  | "admin.b2b.revoke";
+  | "admin.b2b.revoke"
+  | "gdpr.dsar_export"
+  | "acceptance.run_submitted";
 
 export interface AuditLog {
   timestamp: admin.firestore.Timestamp;

@@ -74,7 +74,15 @@ jest.mock("firebase-admin/auth", () => ({
 
 // ── State-backed Firestore mock (matches wave2 pattern) ────────────────────
 
-const mockDbObj = { collection: jest.fn() };
+const mockDbObj = { collection: jest.fn(), runTransaction: jest.fn(async (fn: any) => await fn({
+  get: jest.fn(async (refOrQuery: any) => {
+    if (refOrQuery.get) return await refOrQuery.get();
+    return await refOrQuery.get();
+  }),
+  set: jest.fn((ref: any, data: any, opts?: any) => ref.set(data, opts)),
+  update: jest.fn((ref: any, data: any) => ref.update(data)),
+  delete: jest.fn((ref: any) => ref.delete()),
+})) };
 
 jest.mock("../firebase", () => ({
   db: jest.fn(() => mockDbObj),
@@ -110,6 +118,11 @@ jest.mock("googleapis", () => ({
       purchases: { subscriptions: { get: jest.fn() } },
     })),
   },
+}));
+
+jest.mock("../src/shared", () => ({
+  ...jest.requireActual("../src/shared"),
+  checkRateLimit: jest.fn(),
 }));
 
 const mockFetch = jest.fn();
@@ -148,6 +161,7 @@ function resetState() {
     error_logs: {},
     error_summaries: {},
     performance_metrics: {},
+    rateLimits: {},
     operatorConfig: {},
     ai_error_analyses: {},
     legacyAuthUsage: {},

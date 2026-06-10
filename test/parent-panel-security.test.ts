@@ -27,6 +27,12 @@ describe("parent-panel security regressions", () => {
     expect(indexSource).toContain("<link rel=\"stylesheet\" href=\"./styles.css\" />");
   });
 
+  it("loads shared master session manager", () => {
+    expect(indexSource).toContain("shared-ui-session-manager.js");
+    expect(appSource).toContain("MiniMasterSessionManager");
+    expect(appSource).toContain("ensureMasterSession");
+  });
+
   it("sets parent/child CSP style-src without unsafe-inline", () => {
     const parentCspMatch = firebaseJsonSource.match(/"target"\s*:\s*"parent-panel"[\s\S]*?"Content-Security-Policy"[\s\S]*?"value"\s*:\s*"([^"]+)"/);
     const childCspMatch = firebaseJsonSource.match(/"target"\s*:\s*"child-panel"[\s\S]*?"Content-Security-Policy"[\s\S]*?"value"\s*:\s*"([^"]+)"/);

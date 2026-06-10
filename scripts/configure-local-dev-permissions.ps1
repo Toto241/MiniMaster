@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Configures common local Windows development permissions to reduce repeated prompts for trusted MiniMaster development work.
+  Configures common local Windows development permissions to reduce repeated prompts for trusted local development work.
 
 .DESCRIPTION
   This script is intended for a trusted local development machine. It helps reduce repeated confirmations from
@@ -10,20 +10,13 @@
 
   Recommended usage from an elevated PowerShell session:
 
-    pwsh -ExecutionPolicy Bypass -File .\scripts\configure-local-dev-permissions.ps1 -Apply -WorkspaceRoot D:\Tools\MiniMaster
-
-  Safer non-admin/current-user-only usage:
-
-    pwsh -ExecutionPolicy Bypass -File .\scripts\configure-local-dev-permissions.ps1 -Apply -CurrentUserOnly -WorkspaceRoot D:\Tools\MiniMaster
+    pwsh -ExecutionPolicy Bypass -File .\scripts\configure-local-dev-permissions.ps1 -Apply -WorkspaceRoot D:\Tools\GitRightsAndMore
 
 .PARAMETER Apply
   Actually applies changes. Without this switch, the script only prints the planned actions.
 
 .PARAMETER WorkspaceRoot
   Trusted repository or tool root. Defaults to the current repository root if the script is run from inside the repo.
-
-.PARAMETER CurrentUserOnly
-  Avoids machine-wide changes where possible. PowerShell execution policy is set for CurrentUser only.
 
 .PARAMETER DisableControlledFolderAccess
   Disables Windows Defender Controlled Folder Access. This requires elevation and should only be used on trusted machines.
@@ -37,42 +30,26 @@
 .PARAMETER ConfigureVSCodeSettings
   Writes a workspace .vscode/settings.json with trust-friendly development settings.
 
-.PARAMETER IncludeCopilotAutoApproveHints
-  Adds commented Copilot/agent auto-approval hints to .vscode/settings.json. Exact setting names may vary by VS Code/Copilot version.
-
 .NOTES
   This script cannot disable security prompts from browser-based connectors or ChatGPT's own safety confirmations.
-  Those prompts are controlled by the platform and cannot be reliably bypassed from PowerShell.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [switch]$Apply,
     [string]$WorkspaceRoot,
-    [switch]$CurrentUserOnly,
     [switch]$DisableControlledFolderAccess,
     [switch]$AddDefenderExclusions = $true,
     [switch]$ConfigureGitHubCli = $true,
-    [switch]$ConfigureVSCodeSettings = $true,
-    [switch]$IncludeCopilotAutoApproveHints
+    [switch]$ConfigureVSCodeSettings = $true
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Step {
-    param([string]$Message)
-    Write-Host "`n==> $Message" -ForegroundColor Cyan
-}
-
-function Write-Plan {
-    param([string]$Message)
-    if ($Apply) {
-        Write-Host "APPLY: $Message" -ForegroundColor Green
-    } else {
-        Write-Host "PLAN : $Message" -ForegroundColor Yellow
-    }
-}
+function Write-Step { param([string]$Message) Write-Host "`n==> $Message" -ForegroundColor Cyan }
+function Write-Plan { param([string]$Message) if ($Apply) { Write-Host "APPLY: $Message" -ForegroundColor Green } else { Write-Host "PLAN : $Message" -ForegroundColor Yellow } }
+function Write-Skip { param([string]$Message) Write-Host "SKIP : $Message" -ForegroundColor DarkYellow }
 
 function Test-IsElevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -82,140 +59,74 @@ function Test-IsElevated {
 
 function Resolve-WorkspaceRoot {
     param([string]$RequestedRoot)
-
-    if (-not [string]::IsNullOrWhiteSpace($RequestedRoot)) {
-        return (Resolve-Path -LiteralPath $RequestedRoot).Path
-    }
-
+    if (-not [string]::IsNullOrWhiteSpace($RequestedRoot)) { return (Resolve-Path -LiteralPath $RequestedRoot).Path }
     $scriptDir = Split-Path -Parent $PSCommandPath
-    $candidate = Resolve-Path -LiteralPath (Join-Path $scriptDir '..')
-    return $candidate.Path
+    return (Resolve-Path -LiteralPath (Join-Path $scriptDir '..')).Path
 }
 
 function Invoke-WhenApplying {
-    param(
-        [string]$Description,
-        [scriptblock]$Action,
-        [switch]$RequiresElevation
-    )
-
+    param([string]$Description, [scriptblock]$Action, [switch]$RequiresElevation, [switch]$ContinueOnError)
     Write-Plan $Description
-
-    if (-not $Apply) {
-        return
-    }
-
-    if ($RequiresElevation -and -not (Test-IsElevated)) {
-        Write-Warning "Skipped because this action requires an elevated PowerShell session: $Description"
-        return
-    }
-
+    if (-not $Apply) { return }
+    if ($RequiresElevation -and -not (Test-IsElevated)) { Write-Warning "Skipped because this action requires an elevated PowerShell session: $Description"; return }
     if ($PSCmdlet.ShouldProcess($Description, 'Apply')) {
-        & $Action
+        try { & $Action }
+        catch {
+            if ($ContinueOnError) { Write-Warning "Skipped after non-fatal error: $Description :: $($_.Exception.Message)" }
+            else { throw }
+        }
     }
 }
 
 function Set-PowerShellPolicy {
     Write-Step 'PowerShell execution policy'
-
-    $scope = if ($CurrentUserOnly) { 'CurrentUser' } else { 'CurrentUser' }
-    Invoke-WhenApplying "Set PowerShell execution policy to RemoteSigned for scope $scope" {
-        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope $scope -Force
-    }
-
-    Write-Host "Current policies:" -ForegroundColor Gray
+    Invoke-WhenApplying 'Set PowerShell execution policy to RemoteSigned for CurrentUser' {
+        try { Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction Stop }
+        catch { Write-Warning "Execution policy could not be changed or is overridden by a more specific scope. Continuing. Details: $($_.Exception.Message)" }
+    } -ContinueOnError
+    Write-Host 'Current policies:' -ForegroundColor Gray
     Get-ExecutionPolicy -List | Format-Table -AutoSize
+}
+
+function Test-DefenderAvailable {
+    if (-not (Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $status = Get-MpComputerStatus -ErrorAction Stop
+        return [bool]$status
+    } catch { return $false }
 }
 
 function Set-DefenderConfiguration {
     param([string]$Root)
-
     Write-Step 'Windows Defender developer exclusions'
 
-    if (-not (Get-Command Add-MpPreference -ErrorAction SilentlyContinue)) {
-        Write-Warning 'Windows Defender PowerShell cmdlets are not available on this system.'
-        return
-    }
+    if (-not (Get-Command Add-MpPreference -ErrorAction SilentlyContinue)) { Write-Skip 'Windows Defender PowerShell cmdlets are not available on this system.'; return }
+    if (-not (Test-DefenderAvailable)) { Write-Skip 'Microsoft Defender does not appear to be active/available. Error 0x800106ba usually means Defender service is disabled, replaced by another AV product, or controlled by policy.'; return }
 
     if ($AddDefenderExclusions) {
-        $paths = @(
-            $Root,
-            'D:\Tools',
-            "$env:USERPROFILE\.gradle",
-            "$env:USERPROFILE\.npm",
-            "$env:USERPROFILE\.cache",
-            "$env:LOCALAPPDATA\Android",
-            "$env:APPDATA\npm"
-        ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
-
-        foreach ($path in $paths) {
-            Invoke-WhenApplying "Add Defender folder exclusion: $path" {
-                Add-MpPreference -ExclusionPath $path
-            } -RequiresElevation
-        }
-
-        $processCandidates = @(
-            'Code.exe',
-            'git.exe',
-            'gh.exe',
-            'node.exe',
-            'npm.cmd',
-            'npx.cmd',
-            'python.exe',
-            'python3.exe',
-            'pwsh.exe',
-            'powershell.exe',
-            'java.exe',
-            'adb.exe',
-            'emulator.exe',
-            'gradle.exe'
-        )
-
-        foreach ($process in $processCandidates) {
-            Invoke-WhenApplying "Add Defender process exclusion: $process" {
-                Add-MpPreference -ExclusionProcess $process
-            } -RequiresElevation
-        }
+        $paths = @($Root, 'D:\Tools', "$env:USERPROFILE\.gradle", "$env:USERPROFILE\.npm", "$env:USERPROFILE\.cache", "$env:LOCALAPPDATA\Android", "$env:APPDATA\npm") | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+        foreach ($path in $paths) { Invoke-WhenApplying "Add Defender folder exclusion: $path" { Add-MpPreference -ExclusionPath $path -ErrorAction Stop } -RequiresElevation -ContinueOnError }
+        $processCandidates = @('Code.exe','git.exe','gh.exe','node.exe','npm.cmd','npx.cmd','python.exe','python3.exe','pwsh.exe','powershell.exe','java.exe','adb.exe','emulator.exe','gradle.exe')
+        foreach ($process in $processCandidates) { Invoke-WhenApplying "Add Defender process exclusion: $process" { Add-MpPreference -ExclusionProcess $process -ErrorAction Stop } -RequiresElevation -ContinueOnError }
     }
 
-    if ($DisableControlledFolderAccess) {
-        Invoke-WhenApplying 'Disable Windows Defender Controlled Folder Access' {
-            Set-MpPreference -EnableControlledFolderAccess Disabled
-        } -RequiresElevation
-    } else {
-        Write-Host 'Controlled Folder Access will not be disabled. Use -DisableControlledFolderAccess to disable it explicitly.' -ForegroundColor Gray
-    }
+    if ($DisableControlledFolderAccess) { Invoke-WhenApplying 'Disable Windows Defender Controlled Folder Access' { Set-MpPreference -EnableControlledFolderAccess Disabled -ErrorAction Stop } -RequiresElevation -ContinueOnError }
+    else { Write-Host 'Controlled Folder Access will not be disabled. Use -DisableControlledFolderAccess to disable it explicitly.' -ForegroundColor Gray }
 }
 
 function Set-GitHubCliConfiguration {
     Write-Step 'GitHub CLI authentication'
-
-    $gh = Get-Command gh -ErrorAction SilentlyContinue
-    if (-not $gh) {
-        Write-Warning 'GitHub CLI was not found. Install it first: winget install GitHub.cli'
-        return
-    }
-
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Warning 'GitHub CLI was not found. Install it first: winget install GitHub.cli'; return }
     Write-Host 'Current gh auth status:' -ForegroundColor Gray
-    try {
-        gh auth status
-    } catch {
-        Write-Warning 'gh auth status failed. Run: gh auth login'
-    }
-
-    Invoke-WhenApplying 'Configure Git to use GitHub CLI credentials' {
-        gh auth setup-git
-    }
+    try { gh auth status } catch { Write-Warning 'gh auth status failed. Run: gh auth login' }
+    Invoke-WhenApplying 'Configure Git to use GitHub CLI credentials' { gh auth setup-git } -ContinueOnError
 }
 
 function Set-VSCodeWorkspaceSettings {
     param([string]$Root)
-
     Write-Step 'VS Code workspace settings'
-
     $vscodeDir = Join-Path $Root '.vscode'
     $settingsPath = Join-Path $vscodeDir 'settings.json'
-
     $settings = [ordered]@{
         'security.workspace.trust.enabled' = $true
         'terminal.integrated.enablePersistentSessions' = $true
@@ -224,46 +135,33 @@ function Set-VSCodeWorkspaceSettings {
         'git.autofetch' = $true
         'git.confirmSync' = $false
         'git.enableSmartCommit' = $true
-        'npm.fetchOnlinePackageInfo' = $true
     }
-
-    if ($IncludeCopilotAutoApproveHints) {
-        $settings['github.copilot.chat.codeGeneration.useInstructionFiles'] = $true
-        $settings['github.copilot.chat.agent.autoFix'] = $true
-    }
-
     $json = $settings | ConvertTo-Json -Depth 5
-
     Invoke-WhenApplying "Write VS Code workspace settings: $settingsPath" {
-        if (-not (Test-Path -LiteralPath $vscodeDir)) {
-            New-Item -ItemType Directory -Path $vscodeDir | Out-Null
-        }
+        if (-not (Test-Path -LiteralPath $vscodeDir)) { New-Item -ItemType Directory -Path $vscodeDir | Out-Null }
         $json | Set-Content -LiteralPath $settingsPath -Encoding UTF8
-    }
-
-    if (-not $Apply) {
-        Write-Host $json -ForegroundColor Gray
-    }
+    } -ContinueOnError
+    if (-not $Apply) { Write-Host $json -ForegroundColor Gray }
 }
 
 function Show-ManualSteps {
     Write-Step 'Manual settings that PowerShell cannot safely force'
-
     Write-Host @'
-1. VS Code Workspace Trust
-   Open the MiniMaster folder in VS Code and choose:
+1. VS Code Workspace Trust:
+   Open the repository folder in VS Code and choose:
    Manage Workspace Trust -> Trust this workspace
 
-2. ChatGPT / browser connector confirmations
+2. ChatGPT/browser connector confirmations:
    These are platform security prompts and cannot be disabled by this script.
 
-3. GitHub repository / branch protection
-   Check GitHub repository settings manually if PR merges are blocked by required checks.
+3. Windows Defender error 0x800106ba:
+   Defender is likely disabled, replaced by another antivirus product, or controlled by policy.
+   In that case, set exclusions in the active antivirus product instead.
 
-4. Windows UAC
+4. Windows UAC:
    Lowering UAC reduces prompts but weakens system security. This script does not change UAC.
 
-5. OneDrive / synced folders
+5. Repository location:
    Keep repositories under D:\Tools\ or another local non-synced path to avoid sync locks and permission prompts.
 '@ -ForegroundColor Gray
 }
@@ -271,7 +169,7 @@ function Show-ManualSteps {
 $workspace = Resolve-WorkspaceRoot -RequestedRoot $WorkspaceRoot
 $isElevated = Test-IsElevated
 
-Write-Host 'MiniMaster Local Development Permission Helper' -ForegroundColor Magenta
+Write-Host 'Local Development Permission Helper' -ForegroundColor Magenta
 Write-Host "WorkspaceRoot: $workspace"
 Write-Host "Apply mode   : $Apply"
 Write-Host "Elevated     : $isElevated"
@@ -284,6 +182,4 @@ if ($ConfigureVSCodeSettings) { Set-VSCodeWorkspaceSettings -Root $workspace }
 Show-ManualSteps
 
 Write-Step 'Done'
-if (-not $Apply) {
-    Write-Host 'No changes were applied. Re-run with -Apply to make changes.' -ForegroundColor Yellow
-}
+if (-not $Apply) { Write-Host 'No changes were applied. Re-run with -Apply to make changes.' -ForegroundColor Yellow }
