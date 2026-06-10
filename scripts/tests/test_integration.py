@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from adb_client import AdbClient, AdbDevice, AdbResult
+from adb_client import AdbClient, AdbDevice, AdbResult, ChallengeRequestResult
 from debug_token import compute_debug_token, SUFFIXES, PACKAGES
 from usb_test_runner import UsbTestRunResult, parse_junit_xml, run_usb_test
 from dual_device_runner import DualDeviceResult, run_dual_device
@@ -105,7 +105,7 @@ class TestFullUsbTestFlow:
         mock_client = MagicMock()
         mock_client.get_device_model.return_value = "Pixel 7"
         mock_client.get_android_version.return_value = "14"
-        mock_client.request_debug_challenge.return_value = "challenge_xyz"
+        mock_client.request_debug_challenge_result.return_value = ChallengeRequestResult(challenge="challenge_xyz")
         mock_client.activate_debug_session.return_value = True
         mock_client.deactivate_debug_session.return_value = AdbResult(0, "", "")
         mock_client_cls.return_value = mock_client
@@ -124,7 +124,7 @@ class TestFullUsbTestFlow:
         assert result.app_id == "master"
         assert result.gradle_exit_code == 0
         # Challenge, Token, Activate, Deactivate sollten aufgerufen worden sein
-        mock_client.request_debug_challenge.assert_called_once()
+        mock_client.request_debug_challenge_result.assert_called_once()
         mock_gen_token.assert_called_once_with("master", "challenge_xyz")
         mock_client.activate_debug_session.assert_called_once()
         mock_client.deactivate_debug_session.assert_called_once()
@@ -151,7 +151,7 @@ class TestFullUsbTestFlow:
             verbose=False,
         )
 
-        mock_client.request_debug_challenge.assert_not_called()
+        mock_client.request_debug_challenge_result.assert_not_called()
         mock_gen_token.assert_not_called()
         mock_client.activate_debug_session.assert_not_called()
         mock_client.deactivate_debug_session.assert_not_called()
