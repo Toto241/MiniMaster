@@ -47,5 +47,10 @@ service firebase.storage {
     match /families/{familyId}/children/{childId}/photos/{fileName} {
       allow read, write: if false;
     }
+
+    // Explicit catch-all deny for all unspecified storage paths.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
   }
 }

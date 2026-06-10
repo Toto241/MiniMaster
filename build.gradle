@@ -24,12 +24,12 @@ buildscript {
         }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.7.3' // Updated December 2025
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21' // Updated for security
-        classpath 'com.google.dagger:hilt-android-gradle-plugin:2.51.1' // Updated for security
-        classpath 'com.google.gms:google-services:4.4.2' // Updated Google services plugin
-        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.2' // Updated Firebase Crashlytics plugin
-        classpath 'com.google.firebase:perf-plugin:1.4.2' // Firebase Performance plugin
+        classpath 'com.android.tools.build:gradle:8.7.3'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21'
+        classpath 'com.google.dagger:hilt-android-gradle-plugin:2.51.1'
+        classpath 'com.google.gms:google-services:4.4.2'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.2'
+        classpath 'com.google.firebase:perf-plugin:1.4.2'
     }
 }
 

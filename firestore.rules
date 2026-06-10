@@ -450,10 +450,5 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/affiliates/$(affiliateId))
         && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.userId == request.auth.uid;
     }
-
-    // families collection is blocked during migration.
-    match /families/{familyId} {
-      allow read, write: if false;
-    }
   }
 }
