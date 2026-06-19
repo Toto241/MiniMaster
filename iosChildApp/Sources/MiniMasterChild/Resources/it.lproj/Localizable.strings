@@ -16,6 +16,12 @@
 "childMain.status.policyVersion" = "Versione policy %@";
 "childMain.status.lastSync" = "Ultima sincronizzazione: %@";
 "childMain.status.offlineStale" = "Offline – policy obsoleta";
+"childMain.section.familyControls" = "Tempo di utilizzo";
+"childMain.familyControls.authorized" = "Autorizzazione Tempo di utilizzo attiva";
+"childMain.familyControls.missing" = "Autorizzazione Tempo di utilizzo mancante";
+"childMain.familyControls.description" = "MiniMaster richiede questa autorizzazione per applicare blocchi e regole app come su Android.";
+"childMain.familyControls.button" = "Concedi autorizzazione";
+"childMain.familyControls.requesting" = "Richiesta autorizzazione…";
 "childMain.section.blacklist" = "Blacklist app";
 "childMain.sync.progress" = "Applicazione comandi…";
 "childMain.section.tasks" = "Le mie attività";

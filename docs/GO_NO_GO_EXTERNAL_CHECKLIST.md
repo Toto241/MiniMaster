@@ -1,7 +1,7 @@
 # Go/No-Go — Externe Restpunkte (Checkliste)
 
-**Stand:** 2026-06-10  
-**Zweck:** Kompakte Abarbeitungsliste für alles, was **nicht im Repo** geschlossen werden kann. Repo-Arbeit abgeschlossen (`repo_ready=true`, PRs #186/#175/#176/#177 gemergt). Verbleibend sind externe Owner-Aktionen.
+**Stand:** 2026-06-19  
+**Zweck:** Kompakte Abarbeitungsliste für alles, was **nicht im Repo** geschlossen werden kann. Android/Play und iOS trennen Repo-Gates von externen Store-/Device-Nachweisen.
 
 ## Vor dem Release (P0 — alle müssen Done sein)
 
@@ -21,6 +21,10 @@
 | 12 | Produktions-Deploy | Engineering | Deployment-Referenz in `RELEASE_EVIDENCE_REGISTER.md` | ⬜ |
 | 13 | Go/No-Go Unterschriften | Release Manager | `RELEASE_EVIDENCE_REGISTER.md` §4 ausgefüllt | ⬜ |
 | 14 | Play-Upload-Assistent dry-run | Engineering | `npm run play:plan` schreibt `build/play-console-release/latest-plan.md`; offene Checks dokumentiert | ⬜ |
+| 15 | iOS Family Controls entitlement | Product/Ops | Apple Developer Capability/Provisioning-Nachweis fuer `com.minimaster.childapp` | ⬜ |
+| 16 | iOS Xcode 26+/TestFlight Build | Engineering | Archive-/Upload-Logs und TestFlight Processing fuer Parent und Child | ⬜ |
+| 17 | iOS physisches FamilyControls-E2E | QA/Operations | Pairing, Lock/Unlock, App-Token-Blacklist, Offline-Policy auf echtem iPhone/iPad | ⬜ |
+| 18 | App Store Connect iOS Metadata | Product/Ops/Compliance | Privacy Labels, Age Rating, Review Notes, Subscription Products | ⬜ |
 
 ## Hilfskommandos (Repo)
 
@@ -34,15 +38,18 @@ npm run run:android-release-matrix:smoke
 npm run validate:android-release-matrix
 npm run evidence:release
 npm run play:plan
+npm run ios:readiness
+npm run ios:readiness:gate
 ```
 
 ## Referenzen
 
 - Vollständiges Register: [RELEASE_EVIDENCE_REGISTER.md](RELEASE_EVIDENCE_REGISTER.md)
 - Play Console Paket: [PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md](PLAY_CONSOLE_SUBMISSION_PACKET_2026-05-30.md)
+- iOS Paritätsplan: [IOS_ANDROID_PARITY_PLAN_2026-06-19.md](IOS_ANDROID_PARITY_PLAN_2026-06-19.md)
 - Externes Ausführungspaket: [RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md](RELEASE_EXTERNAL_EXECUTION_PACKET_2026-03-22.md)
 
 ## Entscheidungskriterium
 
-**Go** nur wenn P0 #1–#13 Done mit verlinktem Nachweis.  
+**Go** nur wenn P0 #1–#18 Done mit verlinktem Nachweis.  
 **Conditional Go** nur wenn dokumentierte Restrisiken vom Security/Compliance Owner akzeptiert sind.

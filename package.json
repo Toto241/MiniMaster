@@ -43,7 +43,9 @@
     "playstore:protocol:gate": "node scripts/run_python.js scripts/playstore_compliance_protocol.py --fail-on-open",
     "play:plan": "node scripts/play_console_release.js --dry-run",
     "play:plan:gate": "node scripts/play_console_release.js --dry-run --require-upload-ready",
-    "play:upload:internal": "node scripts/play_console_release.js --upload --track internal --status draft"
+    "play:upload:internal": "node scripts/play_console_release.js --upload --track internal --status draft",
+    "ios:readiness": "node scripts/run_python.js scripts/ios_readiness.py",
+    "ios:readiness:gate": "node scripts/run_python.js scripts/ios_readiness.py --fail-on-repo-open"
   },
   "keywords": [],
   "author": "",

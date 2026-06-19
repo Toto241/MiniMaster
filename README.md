@@ -5,11 +5,11 @@
 > [!NOTE]
 > Current status: actively maintained prototype with production-oriented backend hardening.
 > Core flows are usable; some enforcement capabilities are intentionally still in rollout.
-> Release readiness is tracked through explicit QA, CI, legal, Firebase/App Check and Android device-evidence gates.
+> Release readiness is tracked through explicit QA, CI, legal, Firebase/App Check, Android device-evidence and iOS Apple/TestFlight gates.
 
 [![CI/CD Status](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml)
 
-Mini-Master is a comprehensive parental control solution for Android with a Firebase backend. It consists of two Android apps (`masterApp` for parents, `childApp` for children), web/PWA panels, a lightweight operator/admin panel and a Python-powered local operator API. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
+Mini-Master is a cross-platform parental control suite with a Firebase backend. It consists of Android apps (`masterApp` for parents, `childApp` for children), native iOS Swift apps (`iosMasterApp`, `iosChildApp`), web/PWA panels, a lightweight operator/admin panel and a Python-powered local operator API. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
 
 ## Table of Contents
 
@@ -45,6 +45,7 @@ The Mini-Master suite is designed to give parents control over their children's 
 - **Python Operator API:** Local operator service for QA catalog, commissioning, emulator visibility and approved command execution.
 - **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
 - **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
+- **Native iOS Apps:** SwiftUI parent and child apps cover owner dashboard, pairing, task review, StoreKit subscriptions, FamilyControls/ManagedSettings policy application and iOS readiness gates.
 
 ## Project Structure
 
@@ -54,6 +55,8 @@ The repository is organized as follows:
 - **`/src`:** Cloud Functions implementation modules for auth, pairing, device control, tasks, subscriptions, support, legal, admin, decisioning, B2B, affiliate, resilience, validation, rate limiting and error handling.
 - **`/masterApp`:** Android application for parents (Kotlin, Jetpack Compose, Hilt).
 - **`/childApp`:** Android application for children (Kotlin, Jetpack Compose, Hilt). Includes enforcement via `MiniMasterAccessibilityService`.
+- **`/iosMasterApp`:** Native iOS parent app (SwiftUI, Firebase, StoreKit2).
+- **`/iosChildApp`:** Native iOS child app (SwiftUI, Firebase, FamilyControls, ManagedSettings, DeviceActivity).
 - **`/web-control`:** Static web application for parental control.
 - **`/admin-panel`:** Operator/admin dashboard including the lightweight `simple.html` operator console.
 - **`/python_admin`:** Local Python web application and operator API for admin-panel delivery, QA, commissioning and command orchestration.
@@ -69,6 +72,7 @@ The repository is organized as follows:
 - **Android Apps:** Kotlin, Jetpack Compose, Coroutines, Flow, Dagger Hilt, WorkManager.
 - **Web Frontend:** HTML5, CSS3, Vanilla JavaScript.
 - **Operator Tooling:** Python local API, PowerShell/ADB/Gradle command orchestration, Electron desktop launcher.
+- **iOS Apps:** SwiftUI, Firebase iOS SDK, StoreKit2, FamilyControls, ManagedSettings, DeviceActivity.
 
 ---
 
@@ -80,6 +84,7 @@ The repository is organized as follows:
 - **Firebase Account:** A Google account to create a Firebase project.
 - **Firebase CLI:** Install globally via `npm install -g firebase-tools`.
 - **Android Studio:** Latest version with Android SDK and JDK 17.
+- **iOS Build Host:** macOS with Xcode 26+ and iOS 26 SDK for App Store Connect/TestFlight uploads.
 - **Python:** Python 3 for local operator tooling and QA orchestration.
 - **PowerShell:** Required for Windows release-gate and commissioning helper scripts.
 
@@ -89,7 +94,7 @@ The repository is organized as follows:
 2.  Enable **Firestore Database**, **Cloud Functions**, **Authentication**, and **Storage**.
 3.  Add two Android apps to your project:
     - Parent App Package: `com.minimaster.masterapp`
-    - Child App Package: `com.google.pairing`
+    - Child App Package: `com.minimaster.childapp`
 4.  Download the `google-services.json` file for each app.
 
 ### Backend Setup
@@ -127,6 +132,13 @@ Notes:
 
 1.  Place the downloaded `google-services.json` files in `masterApp/` and `childApp/`. These files are git-ignored and must not be committed. Use the `.template.json` files as a reference.
 2.  Open the project root in Android Studio, sync Gradle, and run the apps on separate devices/emulators.
+
+### iOS Apps Setup
+
+1.  Create Firebase iOS apps for `com.minimaster.parentapp` and `com.minimaster.childapp`.
+2.  Place `GoogleService-Info.plist` in `iosMasterApp/` and `iosChildApp/`.
+3.  Enable Family Controls, Managed Settings and Device Activity for the child app in Apple Developer.
+4.  Build on macOS with Xcode 26+ and validate repo readiness from the root with `npm run ios:readiness:gate`.
 
 ### Web Control Panel Setup
 

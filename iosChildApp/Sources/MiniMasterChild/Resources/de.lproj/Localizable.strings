@@ -16,6 +16,12 @@
 "childMain.status.policyVersion" = "Richtlinien-Version %@";
 "childMain.status.lastSync" = "Letzte Synchronisierung: %@";
 "childMain.status.offlineStale" = "Offline – Richtlinie veraltet";
+"childMain.section.familyControls" = "Bildschirmzeit";
+"childMain.familyControls.authorized" = "Bildschirmzeit-Freigabe aktiv";
+"childMain.familyControls.missing" = "Bildschirmzeit-Freigabe fehlt";
+"childMain.familyControls.description" = "MiniMaster braucht diese Freigabe, damit Sperren und App-Regeln wie auf Android angewendet werden.";
+"childMain.familyControls.button" = "Freigabe erteilen";
+"childMain.familyControls.requesting" = "Freigabe anfragen…";
 "childMain.section.blacklist" = "App-Blacklist";
 "childMain.sync.progress" = "Befehle werden angewendet…";
 "childMain.section.tasks" = "Meine Aufgaben";

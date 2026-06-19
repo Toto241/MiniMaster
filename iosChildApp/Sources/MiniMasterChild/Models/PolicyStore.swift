@@ -73,6 +73,16 @@ final class PolicyStore: ObservableObject {
         persist()
     }
 
+    func reset() {
+        policy = PolicyState()
+        lastSyncDate = nil
+        cachedAt = nil
+        cacheVersion = 0
+        defaults.removeObject(forKey: storeKey)
+        defaults.removeObject(forKey: cachedAtKey)
+        defaults.removeObject(forKey: cacheVersionKey)
+    }
+
     // MARK: - Private
 
     private func persist() {
