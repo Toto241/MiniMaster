@@ -12,7 +12,10 @@
  * Neue Felder in children/{childId}:
  *   platform            — 'android' | 'ios'
  *   capabilities        — string[]  z.B. ['lock','appBlacklist','usageRules','screenTime']
- *   pushEndpoints       — Array<{endpointId, provider, token, appVersion, registeredAt}>
+ *   pushEndpoints       — Array<{endpointId, provider, token, appVersion, registeredAt, ...metadata}>
+ *   component           — 'android-child' | 'ios-child' | ...
+ *   componentInterfaceVersion — number (backend/client interface contract version)
+ *   supportedProtocols  — string[]  z.B. ['control-plane/v1','device-events/v1']
  *   lastPolicyVersion   — number    (letzte vom Gerät bestätigte Policy-Version)
  *   policyVersion       — number    (aktuelle, serverseitig inkrementierte Version)
  */
@@ -30,6 +33,15 @@ import { requireAuth, validateAppCheck, AuditLogger, checkRateLimitShared } from
 
 export type DevicePlatform = "android" | "ios";
 export type PushProvider = "fcm" | "apns";
+export type ReleaseChannel = "development" | "internal" | "beta" | "production" | "unknown";
+export type ClientComponent =
+  | "android-child"
+  | "ios-child"
+  | "android-parent"
+  | "ios-parent"
+  | "web-parent"
+  | "admin-panel"
+  | "unknown";
 
 export type CommandType =
   | "policy_update"
@@ -52,7 +64,21 @@ export interface PushEndpoint {
   provider: PushProvider;
   token: string;
   appVersion: string;
+  buildNumber?: string;
+  releaseChannel?: ReleaseChannel;
+  component?: ClientComponent;
+  interfaceVersion?: number;
+  supportedProtocols?: string[];
+  runtime?: RuntimeContext;
   registeredAt: admin.firestore.Timestamp;
+}
+
+export interface RuntimeContext {
+  osVersion?: string;
+  deviceModel?: string;
+  locale?: string;
+  timeZone?: string;
+  appCheckMode?: string;
 }
 
 export interface DeviceCommand {
@@ -70,12 +96,109 @@ export interface DeviceCommand {
 
 // Current schema version — increment when payload structure changes
 const SCHEMA_VERSION = 1;
+const COMPONENT_INTERFACE_VERSION = 2;
 // Commands expire after 48h if not acknowledged
 const COMMAND_TTL_SECONDS = 48 * 60 * 60;
 const MAX_ENDPOINTS_PER_DEVICE = 5;
 const MAX_FETCH_COMMANDS = 50;
+const MAX_METADATA_FIELD_LENGTH = 96;
+const MAX_PROTOCOLS = 12;
+
+const KNOWN_CAPABILITIES = new Set([
+  "lock",
+  "appBlacklist",
+  "usageRules",
+  "screenTime",
+  "screenTimeTokens",
+  "offlinePolicy",
+  "pushWakeup",
+  "foregroundHeartbeat",
+  "deviceActivityMonitor",
+  "tamperDetection",
+  "heartbeat",
+  "taskProof",
+  "taskPhotoUpload",
+]);
+
+const KNOWN_PROTOCOLS = new Set([
+  "control-plane/v1",
+  "device-events/v1",
+  "android-accessibility-enforcement/v1",
+  "android-task-proof/v1",
+  "screen-time-token/v1",
+  "device-activity-monitor/v1",
+  "foreground-heartbeat/v1",
+  "remote-mac-evidence/v1",
+]);
+
+const KNOWN_COMPONENTS = new Set<ClientComponent>([
+  "android-child",
+  "ios-child",
+  "android-parent",
+  "ios-parent",
+  "web-parent",
+  "admin-panel",
+  "unknown",
+]);
+
+const KNOWN_RELEASE_CHANNELS = new Set<ReleaseChannel>([
+  "development",
+  "internal",
+  "beta",
+  "production",
+  "unknown",
+]);
 
 // ----------------------------------------- Helpers -------------------------
+
+function sanitizeMetadataString(value: unknown, maxLength = MAX_METADATA_FIELD_LENGTH): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeInterfaceVersion(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    return COMPONENT_INTERFACE_VERSION;
+  }
+  return Math.min(value, COMPONENT_INTERFACE_VERSION);
+}
+
+function normalizeReleaseChannel(value: unknown): ReleaseChannel {
+  const channel = sanitizeMetadataString(value, 32) as ReleaseChannel | undefined;
+  return channel && KNOWN_RELEASE_CHANNELS.has(channel) ? channel : "unknown";
+}
+
+function normalizeComponent(value: unknown, platform: DevicePlatform): ClientComponent {
+  const component = sanitizeMetadataString(value, 48) as ClientComponent | undefined;
+  if (component && KNOWN_COMPONENTS.has(component)) return component;
+  return platform === "ios" ? "ios-child" : "android-child";
+}
+
+function filterKnownList(values: unknown, allowed: Set<string>, maxItems = MAX_PROTOCOLS): string[] {
+  if (!Array.isArray(values)) return [];
+  const result: string[] = [];
+  for (const value of values) {
+    const normalized = sanitizeMetadataString(value, 64);
+    if (!normalized || !allowed.has(normalized) || result.includes(normalized)) continue;
+    result.push(normalized);
+    if (result.length >= maxItems) break;
+  }
+  return result;
+}
+
+function sanitizeRuntimeContext(value: unknown): RuntimeContext {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const raw = value as Record<string, unknown>;
+  return {
+    osVersion: sanitizeMetadataString(raw.osVersion),
+    deviceModel: sanitizeMetadataString(raw.deviceModel),
+    locale: sanitizeMetadataString(raw.locale, 32),
+    timeZone: sanitizeMetadataString(raw.timeZone, 64),
+    appCheckMode: sanitizeMetadataString(raw.appCheckMode, 32),
+  };
+}
 
 /**
  * Increments and returns the next policyVersion for a child document.
@@ -137,8 +260,8 @@ export async function writeCommand(
  * Kompatibel nach hinten: ersetzt intern registerFcmToken für Android,
  * unterstützt neu auch iOS (APNs-Token).
  *
- * Input:  { childId, platform, provider, token, appVersion, capabilities? }
- * Output: { endpointId, acceptedCapabilities }
+ * Input:  { childId, platform, provider, token, appVersion, capabilities?, metadata... }
+ * Output: { endpointId, acceptedCapabilities, acceptedProtocols, interfaceVersion }
  */
 export const registerDeviceEndpoint = functions.https.onCall(
   async (
@@ -149,6 +272,12 @@ export const registerDeviceEndpoint = functions.https.onCall(
       token: string;
       appVersion: string;
       capabilities?: string[];
+      buildNumber?: string;
+      releaseChannel?: ReleaseChannel;
+      component?: ClientComponent;
+      interfaceVersion?: number;
+      supportedProtocols?: string[];
+      runtime?: RuntimeContext;
     },
     context: CallableContext
   ) => {
@@ -185,12 +314,13 @@ export const registerDeviceEndpoint = functions.https.onCall(
       throw new functions.https.HttpsError("permission-denied", "Keine Berechtigung für dieses Gerät.");
     }
 
-    // Capabilities-Negotiation: Nur bekannte Capabilities akzeptieren
-    const knownCapabilities = new Set([
-      "lock", "appBlacklist", "usageRules", "screenTime",
-      "tamperDetection", "heartbeat", "taskProof",
-    ]);
-    const acceptedCapabilities = capabilities.filter((c) => knownCapabilities.has(c));
+    const acceptedCapabilities = filterKnownList(capabilities, KNOWN_CAPABILITIES, 24);
+    const acceptedProtocols = filterKnownList(data.supportedProtocols, KNOWN_PROTOCOLS);
+    const interfaceVersion = normalizeInterfaceVersion(data.interfaceVersion);
+    const component = normalizeComponent(data.component, platform);
+    const releaseChannel = normalizeReleaseChannel(data.releaseChannel);
+    const buildNumber = sanitizeMetadataString(data.buildNumber, 48);
+    const runtime = sanitizeRuntimeContext(data.runtime);
 
     // Endpunkt-Liste aktualisieren: gleichen Token deduplicieren, dann voranstellen
     const existing: PushEndpoint[] = (childDoc.data()?.pushEndpoints as PushEndpoint[]) || [];
@@ -204,6 +334,12 @@ export const registerDeviceEndpoint = functions.https.onCall(
       provider,
       token,
       appVersion,
+      ...(buildNumber ? { buildNumber } : {}),
+      releaseChannel,
+      component,
+      interfaceVersion,
+      supportedProtocols: acceptedProtocols,
+      runtime,
       registeredAt: admin.firestore.Timestamp.now(),
     };
 
@@ -211,8 +347,16 @@ export const registerDeviceEndpoint = functions.https.onCall(
 
     await childRef.update({
       platform,
+      component,
+      componentInterfaceVersion: interfaceVersion,
       capabilities: acceptedCapabilities,
+      supportedProtocols: acceptedProtocols,
+      appVersion,
+      ...(buildNumber ? { buildNumber } : {}),
+      releaseChannel,
+      runtime,
       pushEndpoints: updatedEndpoints,
+      lastEndpointRegisteredAt: admin.firestore.FieldValue.serverTimestamp(),
       // Legacy-Feld fcmToken weiterhin befüllen für Rückwärtskompatibilität mit vorhandenem Android-Code
       ...(provider === "fcm" ? { fcmToken: token } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -220,11 +364,22 @@ export const registerDeviceEndpoint = functions.https.onCall(
 
     await AuditLogger.logSuccess(
       "device.register", context, `children/${childId}`, "device",
-      { childId, platform, provider, appVersion, acceptedCapabilities }
+      {
+        childId,
+        platform,
+        provider,
+        appVersion,
+        buildNumber,
+        releaseChannel,
+        component,
+        interfaceVersion,
+        acceptedCapabilities,
+        acceptedProtocols,
+      }
     );
 
     functions.logger.info(`Endpoint registered for child ${childId} [${platform}/${provider}]`);
-    return { endpointId, acceptedCapabilities };
+    return { endpointId, acceptedCapabilities, acceptedProtocols, interfaceVersion };
   }
 );
 
@@ -276,15 +431,24 @@ export const publishDeviceEvent = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Kinder-Gerät nicht gefunden.");
     }
 
-    const platform: DevicePlatform = (childDoc.data()?.platform as DevicePlatform) || "android";
+    const childData = childDoc.data() ?? {};
+    const platform: DevicePlatform = childData.platform === "ios" ? "ios" : "android";
+    const senderComponent = normalizeComponent(childData.component, platform);
+    const senderAppVersion = sanitizeMetadataString(childData.appVersion);
+    const senderBuildNumber = sanitizeMetadataString(childData.buildNumber, 48);
+    const senderInterfaceVersion = normalizeInterfaceVersion(childData.componentInterfaceVersion);
 
     // Idempotenz: existierendes Dokument mit diesem Key zurückgeben
     const eventsRef = childRef.collection("events");
     const existing = await eventsRef.where("idempotencyKey", "==", idempotencyKey).limit(1).get();
     if (!existing.empty) {
-      const doc = existing.docs[0]!;
+      const doc = existing.docs[0];
+      if (!doc) {
+        throw new functions.https.HttpsError("internal", "Event-Deduplizierung fehlgeschlagen.");
+      }
       functions.logger.info(`Duplicate event suppressed for child ${childId}, key: ${idempotencyKey}`);
-      return { eventId: doc.id, receivedAt: doc.data().createdAt };
+      const eventData = doc.data() as { createdAt?: unknown };
+      return { eventId: doc.id, receivedAt: eventData.createdAt ?? null };
     }
 
     const eventId = randomUUID();
@@ -294,6 +458,10 @@ export const publishDeviceEvent = functions.https.onCall(
       payload,
       idempotencyKey,
       senderPlatform: platform,
+      senderComponent,
+      senderInterfaceVersion,
+      ...(senderAppVersion ? { senderAppVersion } : {}),
+      ...(senderBuildNumber ? { senderBuildNumber } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -365,9 +533,8 @@ export const fetchPendingCommands = functions.https.onCall(
 
     const snap = await query.get();
     const commands = snap.docs.map((d) => ({ ...d.data() }));
-    const nextCursor = snap.docs.length === maxItems
-      ? snap.docs[snap.docs.length - 1]!.id
-      : null;
+    const lastDoc = snap.docs[snap.docs.length - 1];
+    const nextCursor = snap.docs.length === maxItems && lastDoc ? lastDoc.id : null;
 
     const policyVersion = (childDoc.data()?.policyVersion as number) || 0;
 
@@ -493,15 +660,28 @@ export const syncPolicySnapshot = functions.https.onCall(
       throw new functions.https.HttpsError("permission-denied", "Keine Berechtigung für dieses Gerät.");
     }
 
-    const childData = childDoc.data()!;
-    const currentPolicyVersion = (childData.policyVersion as number) || 0;
+    const childData = childDoc.data() ?? {};
+    const currentPolicyVersion =
+      typeof childData.policyVersion === "number" ? childData.policyVersion : 0;
+    const platform: DevicePlatform = childData.platform === "ios" ? "ios" : "android";
+    const usageRules = childData.usageRules &&
+      typeof childData.usageRules === "object" &&
+      !Array.isArray(childData.usageRules)
+      ? childData.usageRules as Record<string, unknown>
+      : {};
 
     const fullPolicy = {
-      isLocked: childData.isLocked || false,
-      appBlacklist: childData.appBlacklist || [],
-      usageRules: childData.usageRules || {},
-      platform: (childData.platform as DevicePlatform) || "android",
-      capabilities: (childData.capabilities as string[]) || [],
+      isLocked: childData.isLocked === true,
+      appBlacklist: Array.isArray(childData.appBlacklist) ? childData.appBlacklist : [],
+      usageRules,
+      platform,
+      capabilities: filterKnownList(childData.capabilities, KNOWN_CAPABILITIES, 24),
+      component: normalizeComponent(childData.component, platform),
+      componentInterfaceVersion: normalizeInterfaceVersion(childData.componentInterfaceVersion),
+      supportedProtocols: filterKnownList(childData.supportedProtocols, KNOWN_PROTOCOLS),
+      appVersion: sanitizeMetadataString(childData.appVersion) ?? null,
+      buildNumber: sanitizeMetadataString(childData.buildNumber, 48) ?? null,
+      releaseChannel: normalizeReleaseChannel(childData.releaseChannel),
     };
 
     // Offene kritische Commands (lock_state, policy_update) zurückgeben

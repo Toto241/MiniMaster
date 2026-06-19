@@ -42,15 +42,26 @@ final class ChildCloudFunctionsClient {
         childId: String,
         token: String,
         appVersion: String,
-        capabilities: [String]
+        buildNumber: String,
+        releaseChannel: String,
+        capabilities: [String],
+        supportedProtocols: [String],
+        runtime: [String: Any],
+        interfaceVersion: Int = 2
     ) async throws -> String {
         let params: [String: Any] = [
             "childId": childId,
+            "component": "ios-child",
+            "interfaceVersion": interfaceVersion,
             "platform": "ios",
             "provider": "apns",         // iOS devices use APNs tokens
             "token": token,
             "appVersion": appVersion,
-            "capabilities": capabilities
+            "buildNumber": buildNumber,
+            "releaseChannel": releaseChannel,
+            "capabilities": capabilities,
+            "supportedProtocols": supportedProtocols,
+            "runtime": runtime
         ]
         let result = try await functions.httpsCallable("registerDeviceEndpoint").call(params)
         let data = try cast(result.data)

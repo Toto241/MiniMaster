@@ -99,16 +99,28 @@ final class CloudFunctionsClient {
         provider: String,
         token: String,
         appVersion: String,
-        capabilities: [String]
+        capabilities: [String],
+        buildNumber: String? = nil,
+        releaseChannel: String? = nil,
+        component: String? = nil,
+        interfaceVersion: Int = 2,
+        supportedProtocols: [String] = [],
+        runtime: [String: Any] = [:]
     ) async throws -> (endpointId: String, acceptedCapabilities: [String]) {
-        let params: [String: Any] = [
+        var params: [String: Any] = [
             "childId": childId,
             "platform": platform,
             "provider": provider,
             "token": token,
             "appVersion": appVersion,
-            "capabilities": capabilities
+            "capabilities": capabilities,
+            "interfaceVersion": interfaceVersion,
+            "supportedProtocols": supportedProtocols,
+            "runtime": runtime
         ]
+        if let buildNumber { params["buildNumber"] = buildNumber }
+        if let releaseChannel { params["releaseChannel"] = releaseChannel }
+        if let component { params["component"] = component }
         let result = try await functions.httpsCallable("registerDeviceEndpoint").call(params)
         let data = try cast(result.data, to: [String: Any].self)
         let endpointId = try require(data["endpointId"] as? String, key: "endpointId")

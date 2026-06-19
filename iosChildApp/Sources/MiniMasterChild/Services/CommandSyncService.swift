@@ -2,6 +2,7 @@ import Foundation
 import FirebaseMessaging
 import Network
 import os.log
+import UIKit
 
 /// Drives the Control-Plane pull loop on iOS.
 ///
@@ -227,14 +228,25 @@ final class CommandSyncService: ObservableObject {
     func _registerEndpoint(childId: String, apnsToken: String, appVersion: String) async {
         let capabilities = [
             "lock", "appBlacklist", "usageRules", "screenTime",
-            "tamperDetection", "heartbeat", "taskProof"
+            "screenTimeTokens", "offlinePolicy", "pushWakeup",
+            "foregroundHeartbeat", "heartbeat"
+        ]
+        let supportedProtocols = [
+            "control-plane/v1",
+            "device-events/v1",
+            "screen-time-token/v1",
+            "foreground-heartbeat/v1"
         ]
         do {
             _ = try await client.registerDeviceEndpoint(
                 childId: childId,
                 token: apnsToken,
                 appVersion: appVersion,
-                capabilities: capabilities
+                buildNumber: buildNumber,
+                releaseChannel: releaseChannel,
+                capabilities: capabilities,
+                supportedProtocols: supportedProtocols,
+                runtime: runtimeContext
             )
         } catch { /* non-fatal: will retry on next token refresh */ }
     }
@@ -276,5 +288,23 @@ final class CommandSyncService: ObservableObject {
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    private var releaseChannel: String {
+        Bundle.main.infoDictionary?["MINIMASTER_RELEASE_CHANNEL"] as? String ?? "unknown"
+    }
+
+    private var runtimeContext: [String: Any] {
+        [
+            "osVersion": UIDevice.current.systemVersion,
+            "deviceModel": UIDevice.current.model,
+            "locale": Locale.current.identifier,
+            "timeZone": TimeZone.current.identifier,
+            "appCheckMode": "apple"
+        ]
     }
 }

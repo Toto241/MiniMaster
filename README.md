@@ -46,6 +46,7 @@ The Mini-Master suite is designed to give parents control over their children's 
 - **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
 - **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
 - **Native iOS Apps:** SwiftUI parent and child apps cover owner dashboard, pairing, task review, StoreKit subscriptions, FamilyControls/ManagedSettings policy application and iOS readiness gates.
+- **Component Interface Contract:** Android/iOS clients register capabilities, protocol support, version/build metadata and runtime context via a shared backend contract.
 
 ## Project Structure
 
@@ -65,6 +66,7 @@ The repository is organized as follows:
 - **`/qa`:** Machine-readable QA catalogs and release-matrix definitions.
 - **`/test`:** Backend unit, integration and Firebase rules tests.
 - **`/docs`:** Architecture, legal, release, QA and implementation documentation.
+- **`/docs/COMPONENT_INTERFACE_CONTRACT_2026-06-19.md`:** Shared interface contract between Android, iOS, backend, admin and release gates.
 
 ## Technology Stack
 

@@ -213,6 +213,55 @@ describe("registerDeviceEndpoint", () => {
     expect(updateCall).not.toHaveProperty("fcmToken");
   });
 
+  it("speichert Component-Metadaten und akzeptierte Protokolle", async () => {
+    const wrapped = testEnv.wrap(fns.registerDeviceEndpoint);
+    const result = await wrapped(
+      {
+        childId: "c1",
+        platform: "ios",
+        provider: "apns",
+        token: "apns-token-meta",
+        appVersion: "2.1.0",
+        buildNumber: "42",
+        releaseChannel: "beta",
+        component: "ios-child",
+        interfaceVersion: 2,
+        capabilities: ["lock", "screenTimeTokens", "taskProof", "unknownCap"],
+        supportedProtocols: ["control-plane/v1", "screen-time-token/v1", "bad/v99"],
+        runtime: {
+          osVersion: "26.0",
+          deviceModel: "iPhone",
+          locale: "de-DE",
+          timeZone: "Europe/Berlin",
+          appCheckMode: "apple",
+        },
+      },
+      asChild
+    );
+
+    expect(result.acceptedCapabilities).toEqual(["lock", "screenTimeTokens", "taskProof"]);
+    expect(result.acceptedProtocols).toEqual(["control-plane/v1", "screen-time-token/v1"]);
+    expect(result.interfaceVersion).toBe(2);
+
+    const updateCall = updateStub.mock.calls[0][0];
+    expect(updateCall).toEqual(expect.objectContaining({
+      component: "ios-child",
+      componentInterfaceVersion: 2,
+      appVersion: "2.1.0",
+      buildNumber: "42",
+      releaseChannel: "beta",
+      supportedProtocols: ["control-plane/v1", "screen-time-token/v1"],
+      runtime: expect.objectContaining({ locale: "de-DE", appCheckMode: "apple" }),
+    }));
+    expect(updateCall.pushEndpoints[0]).toEqual(expect.objectContaining({
+      component: "ios-child",
+      interfaceVersion: 2,
+      buildNumber: "42",
+      releaseChannel: "beta",
+      supportedProtocols: ["control-plane/v1", "screen-time-token/v1"],
+    }));
+  });
+
   it("filtert unbekannte Capabilities heraus", async () => {
     const wrapped = testEnv.wrap(fns.registerDeviceEndpoint);
     const result = await wrapped(
@@ -298,7 +347,13 @@ describe("publishDeviceEvent", () => {
     };
     jest.spyOn(db, "collection").mockReturnValue({
       doc: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue(makeChildDoc()),
+        get: jest.fn().mockResolvedValue(makeChildDoc({
+          platform: "ios",
+          component: "ios-child",
+          appVersion: "2.1.0",
+          buildNumber: "42",
+          componentInterfaceVersion: 2,
+        })),
         collection: jest.fn().mockReturnValue(subColMock),
       }),
     } as any);
@@ -315,6 +370,13 @@ describe("publishDeviceEvent", () => {
     );
     expect(result).toHaveProperty("eventId");
     expect(setStub).toHaveBeenCalled();
+    expect(setStub).toHaveBeenCalledWith(expect.objectContaining({
+      senderPlatform: "ios",
+      senderComponent: "ios-child",
+      senderAppVersion: "2.1.0",
+      senderBuildNumber: "42",
+      senderInterfaceVersion: 2,
+    }));
   });
 
   it("unterdrückt Duplikat via idempotencyKey", async () => {
@@ -561,7 +623,15 @@ describe("syncPolicySnapshot", () => {
     };
     jest.spyOn(db, "collection").mockReturnValue({
       doc: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue(makeChildDoc({ policyVersion: 5 })),
+        get: jest.fn().mockResolvedValue(makeChildDoc({
+          policyVersion: 5,
+          component: "ios-child",
+          componentInterfaceVersion: 2,
+          supportedProtocols: ["control-plane/v1", "screen-time-token/v1"],
+          appVersion: "2.1.0",
+          buildNumber: "42",
+          releaseChannel: "beta",
+        })),
         collection: jest.fn().mockReturnValue(subColMock),
       }),
     } as any);
@@ -571,6 +641,14 @@ describe("syncPolicySnapshot", () => {
     expect(result.upToDate).toBe(false);
     expect(result.policyVersion).toBe(5);
     expect(result.fullPolicy).toHaveProperty("isLocked");
+    expect(result.fullPolicy).toEqual(expect.objectContaining({
+      component: "ios-child",
+      componentInterfaceVersion: 2,
+      supportedProtocols: ["control-plane/v1", "screen-time-token/v1"],
+      appVersion: "2.1.0",
+      buildNumber: "42",
+      releaseChannel: "beta",
+    }));
     expect(result.pendingCriticalCommands).toHaveLength(1);
   });
 

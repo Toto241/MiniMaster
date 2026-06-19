@@ -89,6 +89,11 @@ final class DashboardViewModel: ObservableObject {
             }(),
             platform: DevicePlatform(rawValue: d["platform"] as? String ?? "android") ?? .android,
             capabilities: d["capabilities"] as? [String] ?? [],
+            supportedProtocols: d["supportedProtocols"] as? [String] ?? [],
+            appVersion: d["appVersion"] as? String,
+            buildNumber: d["buildNumber"] as? String,
+            releaseChannel: d["releaseChannel"] as? String ?? "unknown",
+            componentInterfaceVersion: d["componentInterfaceVersion"] as? Int ?? 1,
             lastSeen: (d["lastSeen"] as? Timestamp)?.dateValue(),
             policyVersion: d["policyVersion"] as? Int ?? 0,
             lastPolicyVersion: d["lastPolicyVersion"] as? Int ?? 0
