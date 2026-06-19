@@ -151,7 +151,7 @@ http://localhost:8080/admin-panel/simple.html
 Python operator mode:
 
 ```bash
-python3 python_admin/app.py
+python python_admin/app.py
 ```
 
 Then open:

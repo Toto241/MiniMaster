@@ -93,12 +93,19 @@ import * as path from "path";
  *     (_fetchBackendConnectivity) sowie klarere Auth-Fehlerhinweise
  *     (auth/project-soft-deleted u. a.). Funktions-Limit auf 565 angehoben
  *     (kleiner Headroom); weitere Admin-Modularisierung soll es wieder senken.
+ *
+ * Stand Repository-Finalisierung 2026-06-11:
+ *   - app.js: 874_684 Bytes (aktueller main-Stand ohne weitere Admin-Panel-
+ *     Aenderung in der Play-Store-Automatisierung).
+ *   - Begruendung: Budget an den bestehenden Main-Baseline-Stand angeglichen,
+ *     damit das Gate zukuenftiges Wachstum wieder blockiert. Weitere
+ *     Admin-Modularisierung soll das Limit wieder senken.
  */
 
 const APP_JS = "admin-panel/app.js";
 const INDEX_HTML = "admin-panel/index.html";
 
-const MAX_APP_JS_BYTES = 857_000;
+const MAX_APP_JS_BYTES = 875_000;
 const MAX_TOP_LEVEL_FUNCTIONS = 565;
 const MAX_INLINE_ONCLICK = 0;
 

@@ -23,6 +23,7 @@ Dieses Protokoll bündelt die Kriterien, die vor einer Google-Play-Store-Einreic
 1. `python scripts/playstore_compliance_protocol.py --fail-on-open` erzeugt `build/playstore-compliance/latest-protocol.json` und `build/playstore-compliance/latest-protocol.md` und schlägt fehl, wenn ein Repo-Kriterium offen ist.
 2. `npm test -- --runInBand test/admin-panel-modules.test.ts test/admin-panel-playstore-protocol.test.ts` deckt die Admin-Panel-Helfer für Readiness, Reviewer-Guide und Protokoll-Payload ab.
 3. `npm run plan:admin-qa` hält externe oder manuelle Restarbeiten im priorisierten Admin-Panel-QA-Plan sichtbar.
+4. `npm run play:plan` erstellt einen lokalen Play-Console-Release-Plan fuer AABs, Package-IDs und Android-Publisher-Credentials; `npm run play:upload:internal` kann bestehende Play-Apps in den internen Track als Draft hochladen.
 
 ## 4. Manuell in der Play Console beizulegende Nachweise
 
