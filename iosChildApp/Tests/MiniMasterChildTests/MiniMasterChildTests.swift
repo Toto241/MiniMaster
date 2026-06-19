@@ -29,6 +29,9 @@ final class MiniMasterChildTests: XCTestCase {
         XCTAssertTrue(source.contains("startForegroundHeartbeat"))
         XCTAssertTrue(source.contains("reportHeartbeat(childId:"))
         XCTAssertTrue(source.contains("clearConfiguration()"))
+        XCTAssertTrue(source.contains("supportedProtocols"))
+        XCTAssertTrue(source.contains("\"screenTimeTokens\""))
+        XCTAssertFalse(source.contains("\"taskProof\""))
     }
 
     func testAppBlockingManagerCanClearLocalScreenTimePolicy() throws {

@@ -57,6 +57,64 @@ components:
           description: Indicates if the operation was successful.
           example: true
 
+    DeviceRuntimeContext:
+      type: object
+      additionalProperties: false
+      properties:
+        osVersion: { type: string, example: "26.0" }
+        deviceModel: { type: string, example: "iPhone" }
+        locale: { type: string, example: "de-DE" }
+        timeZone: { type: string, example: "Europe/Berlin" }
+        appCheckMode: { type: string, example: "apple" }
+
+    RegisterDeviceEndpointRequest:
+      type: object
+      required: [childId, platform, provider, token, appVersion]
+      properties:
+        childId: { type: string }
+        platform:
+          type: string
+          enum: [android, ios]
+        provider:
+          type: string
+          enum: [fcm, apns]
+        token: { type: string }
+        appVersion: { type: string, example: "1.1.0" }
+        buildNumber: { type: string, example: "42" }
+        releaseChannel:
+          type: string
+          enum: [development, internal, beta, production, unknown]
+        component:
+          type: string
+          example: ios-child
+        interfaceVersion:
+          type: integer
+          example: 2
+        capabilities:
+          type: array
+          items: { type: string }
+          example: [lock, appBlacklist, usageRules, screenTimeTokens]
+        supportedProtocols:
+          type: array
+          items: { type: string }
+          example: [control-plane/v1, device-events/v1, screen-time-token/v1]
+        runtime:
+          $ref: '#/components/schemas/DeviceRuntimeContext'
+
+    RegisterDeviceEndpointResponse:
+      type: object
+      properties:
+        endpointId: { type: string }
+        acceptedCapabilities:
+          type: array
+          items: { type: string }
+        acceptedProtocols:
+          type: array
+          items: { type: string }
+        interfaceVersion:
+          type: integer
+          example: 2
+
   responses:
     Unauthenticated:
       description: Authentication failed. The request did not include a valid Firebase Auth ID token.
@@ -260,6 +318,34 @@ paths:
         '200': { $ref: '#/components/responses/Success' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
+
+  /registerDeviceEndpoint:
+    post:
+      summary: Register or refresh a child-device endpoint
+      description: >
+        Registers FCM/APNs wake-up endpoints and negotiates the shared component
+        interface. Optional metadata is stored for parent/admin/release views.
+      operationId: registerDeviceEndpoint
+      tags: [Device Control]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceEndpointRequest'
+      responses:
+        '200':
+          description: Endpoint registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterDeviceEndpointResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { description: "Child device not found." }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   # ==================== User Data & Compliance ====================
   /exportUserData:

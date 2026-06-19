@@ -89,9 +89,16 @@ struct ChildDetailView: View {
         List {
             Section(header: Text("dashboard.section.status")) {
                 LabeledContent("dashboard.status.platform", value: child.platform.rawValue.capitalized)
+                LabeledContent("Interface", value: "v\(child.componentInterfaceVersion)")
+                LabeledContent("App-Version", value: child.versionSummary)
+                LabeledContent("Release-Kanal", value: child.releaseChannel)
                 LabeledContent("dashboard.status.policyVersion", value: "\(child.policyVersion)")
                 LabeledContent("dashboard.status.lastSeen",
                                value: child.lastSeen.map { $0.formatted(.relative(presentation: .named)) } ?? "–")
+            }
+            Section(header: Text("Schnittstelle")) {
+                LabeledContent("Capabilities", value: child.capabilities.joined(separator: ", "))
+                LabeledContent("Protokolle", value: child.supportedProtocols.joined(separator: ", "))
             }
             Section(header: Text("dashboard.quickActions.title")) {
                 Button(child.isLocked ? "dashboard.quickActions.unlock" : "dashboard.quickActions.lock") {

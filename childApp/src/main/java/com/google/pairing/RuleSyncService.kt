@@ -13,6 +13,9 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import android.content.pm.PackageManager
+import android.os.Build
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * A service that extends [FirebaseMessagingService] to handle incoming FCM messages.
@@ -313,20 +316,40 @@ class RuleSyncService : FirebaseMessagingService() {
                         .getPackageInfo(applicationContext.packageName, 0)
                         .versionName ?: "unknown"
                 }.getOrDefault("unknown")
+                val buildNumber = BuildConfig.VERSION_CODE.toString()
+                val releaseChannel = if (BuildConfig.DEBUG) "development" else "production"
 
                 val endpointData = hashMapOf(
                     "childId" to childId,
+                    "component" to "android-child",
+                    "interfaceVersion" to 2,
                     "platform" to "android",
                     "provider" to "fcm",
                     "token" to token,
                     "appVersion" to appVersion,
+                    "buildNumber" to buildNumber,
+                    "releaseChannel" to releaseChannel,
                     "capabilities" to listOf(
                         "lock", "appBlacklist", "usageRules",
-                        "tamperDetection", "heartbeat", "taskProof"
+                        "tamperDetection", "heartbeat", "taskProof",
+                        "offlinePolicy", "pushWakeup"
+                    ),
+                    "supportedProtocols" to listOf(
+                        "control-plane/v1",
+                        "device-events/v1",
+                        "android-accessibility-enforcement/v1",
+                        "android-task-proof/v1"
+                    ),
+                    "runtime" to mapOf(
+                        "osVersion" to Build.VERSION.RELEASE,
+                        "deviceModel" to "${Build.MANUFACTURER} ${Build.MODEL}",
+                        "locale" to Locale.getDefault().toLanguageTag(),
+                        "timeZone" to TimeZone.getDefault().id,
+                        "appCheckMode" to "play-integrity"
                     )
                 )
                 functions.getHttpsCallable("registerDeviceEndpoint").call(endpointData).await()
-                Log.d(TAG, "Registered device endpoint for child: $childId (v$appVersion)")
+                Log.d(TAG, "Registered device endpoint for child: $childId (v$appVersion+$buildNumber)")
             } catch (e: Exception) {
                 Log.e(TAG, "Error in onNewToken", e)
             }

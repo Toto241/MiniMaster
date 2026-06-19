@@ -9,6 +9,11 @@ struct ChildDevice: Identifiable, Codable, Hashable {
     var usageRules: UsageRules
     var platform: DevicePlatform
     var capabilities: [String]
+    var supportedProtocols: [String]
+    var appVersion: String?
+    var buildNumber: String?
+    var releaseChannel: String
+    var componentInterfaceVersion: Int
     var lastSeen: Date?
     var policyVersion: Int
     var lastPolicyVersion: Int
@@ -17,6 +22,12 @@ struct ChildDevice: Identifiable, Codable, Hashable {
     var isOnline: Bool {
         guard let lastSeen else { return false }
         return Date().timeIntervalSince(lastSeen) < 300 // 5 minutes
+    }
+
+    var versionSummary: String {
+        let version = appVersion ?? "unknown"
+        guard let buildNumber, !buildNumber.isEmpty else { return version }
+        return "\(version)+\(buildNumber)"
     }
 }
 
