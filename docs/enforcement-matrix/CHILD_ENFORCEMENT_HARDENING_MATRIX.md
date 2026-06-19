@@ -37,7 +37,7 @@ Erfassung aller Enforcement-Pfade (App-Blocking, Task-Erzwingung, Screen-Time-Li
 | `UsageRuleEngine.applyDailyLimit()` | `UsageRuleEngine.kt` | 6 Unit-Tests | ✅ |
 | `UsageRuleEngine.applyBedtime()` | `UsageRuleEngine.kt` | 5 Unit-Tests | ✅ |
 | **Cross-Day-Rollover** (Limit überschreitet Mitternacht) | `UsageRuleEngine.kt` | 2 Unit-Tests | ⚠️ |
-| **iOS DeviceActivitySchedule** | `AppBlockingManager.swift` | *Nur Build-Tests* | ⚠️ |
+| **iOS DeviceActivitySchedule** | `AppBlockingManager.swift` | Source-Contract + iOS Readiness Gate; DeviceActivityMonitor Extension offen | ⚠️ |
 
 ### 2.4 Offline-Fallback / Safe-Mode
 
@@ -67,7 +67,9 @@ Erfassung aller Enforcement-Pfade (App-Blocking, Task-Erzwingung, Screen-Time-Li
 
 - [ ] **iOS App Blocking E2E-Tests:** XCTest-UI-Tests für ManagedSettings-Integration
 - [ ] **FamilyActivityPicker-E2E:** Master wählt Apps → Token → Child enforced
-- [ ] **iOS Offline-Policy:** Äquivalent zu Androids `OfflinePolicyCache`
+- [x] **iOS Offline-Policy:** `OfflinePolicyCache.swift` + `PolicyStore` persistieren letzte Policy
+- [ ] **DeviceActivityMonitor Extension:** Daily-Limit-Thresholds erzwingen
+- [ ] **Task Photo Upload:** iOS Child Proof-Upload auf Android-Niveau bringen
 
 ---
 

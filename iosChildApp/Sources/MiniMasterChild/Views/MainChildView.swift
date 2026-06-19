@@ -11,6 +11,7 @@ struct MainChildView: View {
 
     @State private var tasks: [ChildTask] = []
     @State private var isLoadingTasks = false
+    @State private var isRequestingFamilyControls = false
     @State private var taskError: Error?
     @State private var showUnpairAlert = false
 
@@ -18,6 +19,7 @@ struct MainChildView: View {
         NavigationStack {
             List {
                 statusSection
+                familyControlsSection
                 if let blacklistNotice = blockingManager.appBlacklistNotice {
                     blacklistNoticeSection(blacklistNotice)
                 }
@@ -31,12 +33,18 @@ struct MainChildView: View {
             .toolbar { toolbarContent }
             .refreshable { await refresh() }
             .alert("childMain.unpair.alert.title", isPresented: $showUnpairAlert) {
-                Button("childMain.unpair.alert.confirm", role: .destructive) { authService.unpair() }
+                Button("childMain.unpair.alert.confirm", role: .destructive) {
+                    Task { await unpairDevice() }
+                }
                 Button("childMain.unpair.alert.cancel", role: .cancel) {}
             } message: {
-                Text("Das Gerät wird von der Eltern-App getrennt.")
+                Text("childMain.unpair.alert.message")
             }
-            .task { await syncService.onAppStart() }
+            .task {
+                await blockingManager.checkAuthorization()
+                await syncService.onAppStart()
+                await loadTasks()
+            }
         }
     }
 
@@ -67,6 +75,38 @@ struct MainChildView: View {
                     tint: .orange,
                     label: "Offline – Richtlinie veraltet"
                 )
+            }
+        }
+    }
+
+    private var familyControlsSection: some View {
+        Section(header: Text("childMain.section.familyControls")) {
+            statusRow(
+                icon: blockingManager.isAuthorized ? "checkmark.shield.fill" : "exclamationmark.shield.fill",
+                tint: blockingManager.isAuthorized ? .green : .orange,
+                label: blockingManager.isAuthorized
+                    ? NSLocalizedString("childMain.familyControls.authorized", comment: "")
+                    : NSLocalizedString("childMain.familyControls.missing", comment: "")
+            )
+            if !blockingManager.isAuthorized {
+                Text("childMain.familyControls.description")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Button {
+                    Task { await requestFamilyControls() }
+                } label: {
+                    if isRequestingFamilyControls {
+                        ProgressView("childMain.familyControls.requesting")
+                    } else {
+                        Label("childMain.familyControls.button", systemImage: "shield.lefthalf.filled")
+                    }
+                }
+                .disabled(isRequestingFamilyControls)
+            }
+            if let error = blockingManager.authorizationError {
+                Text(error.localizedDescription)
+                    .font(.caption)
+                    .foregroundColor(.red)
             }
         }
     }
@@ -131,8 +171,24 @@ struct MainChildView: View {
     // MARK: - Actions
 
     private func refresh() async {
+        await blockingManager.checkAuthorization()
         await syncService.onFcmWakeUp()
         await loadTasks()
+    }
+
+    private func requestFamilyControls() async {
+        isRequestingFamilyControls = true
+        await blockingManager.requestAuthorization()
+        if blockingManager.isAuthorized {
+            blockingManager.applyPolicy(policyStore.policy)
+        }
+        isRequestingFamilyControls = false
+    }
+
+    private func unpairDevice() async {
+        blockingManager.clearPolicy()
+        policyStore.reset()
+        authService.unpair()
     }
 
     private func loadTasks() async {

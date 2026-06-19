@@ -6,6 +6,7 @@ import SwiftUI
 struct ChildPairingView: View {
 
     @EnvironmentObject private var authService: ChildAuthService
+    @EnvironmentObject private var blockingManager: AppBlockingManager
 
     @State private var code = ""
     @State private var isLoading = false
@@ -105,6 +106,9 @@ struct ChildPairingView: View {
         isLoading = true
         Task {
             await authService.pairWithCode(code)
+            if authService.isPaired {
+                await blockingManager.requestAuthorization()
+            }
             await MainActor.run { isLoading = false }
         }
     }
@@ -117,6 +121,9 @@ struct ChildPairingView: View {
         isLoading = true
         Task {
             await authService.pairWithToken(token)
+            if authService.isPaired {
+                await blockingManager.requestAuthorization()
+            }
             await MainActor.run { isLoading = false }
         }
     }
@@ -132,4 +139,5 @@ struct ChildPairingView: View {
                 blockingManager: AppBlockingManager()
             )
         ))
+        .environmentObject(AppBlockingManager())
 }

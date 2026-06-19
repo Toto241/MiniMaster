@@ -16,6 +16,12 @@
 "childMain.status.policyVersion" = "Policy version %@";
 "childMain.status.lastSync" = "Last sync: %@";
 "childMain.status.offlineStale" = "Offline – policy stale";
+"childMain.section.familyControls" = "Screen Time";
+"childMain.familyControls.authorized" = "Screen Time permission active";
+"childMain.familyControls.missing" = "Screen Time permission missing";
+"childMain.familyControls.description" = "MiniMaster needs this permission so locks and app rules can be applied like on Android.";
+"childMain.familyControls.button" = "Grant permission";
+"childMain.familyControls.requesting" = "Requesting permission…";
 "childMain.section.blacklist" = "App Blacklist";
 "childMain.sync.progress" = "Applying commands…";
 "childMain.section.tasks" = "My Tasks";

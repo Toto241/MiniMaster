@@ -22,6 +22,8 @@ struct MainTabView: View {
         TabView {
             DashboardView()
                 .tabItem { Label("Dashboard", systemImage: "house.fill") }
+            PairingView()
+                .tabItem { Label("Koppeln", systemImage: "link.badge.plus") }
             TaskListView()
                 .tabItem { Label("Aufgaben", systemImage: "checklist") }
             SubscriptionView()

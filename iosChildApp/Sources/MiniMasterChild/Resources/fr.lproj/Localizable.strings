@@ -16,6 +16,12 @@
 "childMain.status.policyVersion" = "Version de la politique %@";
 "childMain.status.lastSync" = "Dernière synchro : %@";
 "childMain.status.offlineStale" = "Hors ligne – politique obsolète";
+"childMain.section.familyControls" = "Temps d'écran";
+"childMain.familyControls.authorized" = "Autorisation Temps d'écran active";
+"childMain.familyControls.missing" = "Autorisation Temps d'écran manquante";
+"childMain.familyControls.description" = "MiniMaster a besoin de cette autorisation pour appliquer les verrous et règles d'apps comme sur Android.";
+"childMain.familyControls.button" = "Accorder l'autorisation";
+"childMain.familyControls.requesting" = "Demande d'autorisation…";
 "childMain.section.blacklist" = "Liste noire d'apps";
 "childMain.sync.progress" = "Application des commandes…";
 "childMain.section.tasks" = "Mes tâches";

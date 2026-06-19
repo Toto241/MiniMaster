@@ -16,6 +16,12 @@
 "childMain.status.policyVersion" = "Versión de política %@";
 "childMain.status.lastSync" = "Última sincronización: %@";
 "childMain.status.offlineStale" = "Sin conexión – política obsoleta";
+"childMain.section.familyControls" = "Tiempo de uso";
+"childMain.familyControls.authorized" = "Permiso de Tiempo de uso activo";
+"childMain.familyControls.missing" = "Falta el permiso de Tiempo de uso";
+"childMain.familyControls.description" = "MiniMaster necesita este permiso para aplicar bloqueos y reglas de apps como en Android.";
+"childMain.familyControls.button" = "Conceder permiso";
+"childMain.familyControls.requesting" = "Solicitando permiso…";
 "childMain.section.blacklist" = "Lista negra de apps";
 "childMain.sync.progress" = "Aplicando comandos…";
 "childMain.section.tasks" = "Mis tareas";

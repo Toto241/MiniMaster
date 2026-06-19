@@ -52,9 +52,8 @@ final class AppBlockingManager: ObservableObject {
 
     /// Applies the full [PolicyState] to ManagedSettings + DeviceActivity.
     func applyPolicy(_ policy: PolicyState) {
-        applyLockState(policy.isLocked)
-        applyAppBlacklist(policy.appBlacklist)
         applyUsageRules(policy.usageRules)
+        applyShields(isLocked: policy.isLocked, appBlacklist: policy.appBlacklist)
     }
 
     /// Applies changes from a single [DeviceCommand].
@@ -62,10 +61,10 @@ final class AppBlockingManager: ObservableObject {
         switch command.type {
         case .lockState:
             let isLocked = command.payload["isLocked"]?.value as? Bool ?? false
-            applyLockState(isLocked)
+            applyShields(isLocked: isLocked, appBlacklist: [])
         case .appBlacklist:
             let apps = command.payload["appBlacklist"]?.value as? [String] ?? []
-            applyAppBlacklist(apps)
+            applyShields(isLocked: false, appBlacklist: apps)
         case .usageRules, .screenTime:
             applyUsageRules(PolicyState.UsageRulesState(
                 dailyLimitMinutes: command.payload["dailyLimit"]?.value as? Int,
@@ -73,24 +72,31 @@ final class AppBlockingManager: ObservableObject {
                 bedtimeEnd: command.payload["bedtimeEnd"]?.value as? String
             ))
         case .policyUpdate:
-            if let locked = command.payload["isLocked"]?.value as? Bool {
-                applyLockState(locked)
-            }
-            if let apps = command.payload["appBlacklist"]?.value as? [String] {
-                applyAppBlacklist(apps)
-            }
+            let locked = command.payload["isLocked"]?.value as? Bool ?? false
+            let apps = command.payload["appBlacklist"]?.value as? [String] ?? []
+            applyShields(isLocked: locked, appBlacklist: apps)
         }
+    }
+
+    /// Removes local Screen Time shields and DeviceActivity schedules.
+    func clearPolicy() {
+        activityCenter.stopMonitoring([activityName])
+        store.shield.applicationCategories = nil
+        store.shield.applications = nil
+        appBlacklistNotice = nil
     }
 
     // MARK: - Private
 
-    private func applyLockState(_ isLocked: Bool) {
+    private func applyShields(isLocked: Bool, appBlacklist: [String]) {
         guard isAuthorized else { return }
         if isLocked {
             store.shield.applicationCategories = .all(except: Set())
+            store.shield.applications = nil
+            appBlacklistNotice = nil
         } else {
             store.shield.applicationCategories = nil
-            store.shield.applications = nil
+            applyAppBlacklist(appBlacklist)
         }
     }
 

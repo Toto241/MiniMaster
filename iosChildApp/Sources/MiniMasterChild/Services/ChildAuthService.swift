@@ -88,6 +88,7 @@ final class ChildAuthService: ObservableObject {
         do {
             try Auth.auth().signOut()
         } catch {}
+        syncService.clearConfiguration()
         isPaired = false
         childId = nil
         isSignedInToFirebase = false

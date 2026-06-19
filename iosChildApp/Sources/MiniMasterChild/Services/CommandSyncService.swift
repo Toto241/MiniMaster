@@ -31,6 +31,7 @@ final class CommandSyncService: ObservableObject {
     private let networkMonitor = NWPathMonitor()
     private let networkQueue = DispatchQueue(label: "minimaster.sync.network")
     private var previousPathStatus: NWPath.Status = .satisfied
+    private var foregroundHeartbeatTask: Task<Void, Never>?
 
     init(
         client: ChildCloudFunctionsClient,
@@ -65,12 +66,21 @@ final class CommandSyncService: ObservableObject {
     }
 
     deinit {
+        foregroundHeartbeatTask?.cancel()
         networkMonitor.cancel()
     }
 
     /// Store the childId after successful pairing.
     func configure(childId: String) {
         self.childId = childId
+    }
+
+    func clearConfiguration() {
+        childId = nil
+        pendingCommandCount = 0
+        syncError = nil
+        foregroundHeartbeatTask?.cancel()
+        foregroundHeartbeatTask = nil
     }
 
     // MARK: - Convenience wrappers (no childId arg)
@@ -80,6 +90,7 @@ final class CommandSyncService: ObservableObject {
         await syncPolicySnapshot(childId: id)
         await fetchAndApplyAllCommands(childId: id)
         await reportHeartbeat(childId: id)
+        startForegroundHeartbeat()
     }
 
     func onFcmWakeUp() async {
@@ -197,6 +208,20 @@ final class CommandSyncService: ObservableObject {
         } catch { /* non-fatal */ }
     }
 
+    func startForegroundHeartbeat(intervalSeconds: UInt64 = 900) {
+        guard foregroundHeartbeatTask == nil else { return }
+        foregroundHeartbeatTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.sendForegroundHeartbeat()
+                do {
+                    try await Task.sleep(nanoseconds: intervalSeconds * 1_000_000_000)
+                } catch {
+                    break
+                }
+            }
+        }
+    }
+
     // MARK: - Endpoint Registration
 
     func _registerEndpoint(childId: String, apnsToken: String, appVersion: String) async {
@@ -220,7 +245,7 @@ final class CommandSyncService: ObservableObject {
         guard !command.isExpired else { return }
         do {
             policyStore.apply(command: command)
-            blockingManager.applyCommand(command)
+            blockingManager.applyPolicy(policyStore.policy)
             try await client.acknowledgeCommand(
                 childId: childId,
                 commandId: command.id,
@@ -236,6 +261,11 @@ final class CommandSyncService: ObservableObject {
                 errorCode: String(describing: error)
             )
         }
+    }
+
+    private func sendForegroundHeartbeat() async {
+        guard let id = childId else { return }
+        await reportHeartbeat(childId: id)
     }
 
     @objc private func onFcmTokenRefreshed(_ notification: Notification) {
