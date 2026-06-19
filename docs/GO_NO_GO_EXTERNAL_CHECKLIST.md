@@ -20,6 +20,7 @@
 | 11 | On-Call/Eskalations-Roster | Operations | Namen, Kontakt, Reachability-Test | ⬜ |
 | 12 | Produktions-Deploy | Engineering | Deployment-Referenz in `RELEASE_EVIDENCE_REGISTER.md` | ⬜ |
 | 13 | Go/No-Go Unterschriften | Release Manager | `RELEASE_EVIDENCE_REGISTER.md` §4 ausgefüllt | ⬜ |
+| 14 | Play-Upload-Assistent dry-run | Engineering | `npm run play:plan` schreibt `build/play-console-release/latest-plan.md`; offene Checks dokumentiert | ⬜ |
 
 ## Hilfskommandos (Repo)
 
@@ -32,6 +33,7 @@ npm run plan:android-release-matrix
 npm run run:android-release-matrix:smoke
 npm run validate:android-release-matrix
 npm run evidence:release
+npm run play:plan
 ```
 
 ## Referenzen
