@@ -1490,7 +1490,7 @@ COMMISSIONING_TEST_GROUPS = (
     },
     {
         "id": "functional-readiness-desktop",
-        "title": "Desktop: Betrieb & Integrations-Readiness",
+        "title": "Deskinset-block-start: Betrieb & Integrations-Readiness",
         "description": "Manuelle Betriebs- und Integrationspruefungen aus dem bisherigen Plattform-Readiness-Panel fuer die Electron-App.",
         "tests": (
             {
