@@ -4,10 +4,9 @@ import FirebaseFunctions
 
 /// Manages Firebase Authentication for the parent (master) user.
 ///
-/// Flow: `registerMasterDevice(imei, deviceName?)` → receives
-/// `{ masterId, customToken }` → signs in with the returned Firebase custom token.
-/// Subsequent cold-starts reuse FirebaseAuth session persistence instead of
-/// storing a legacy `secretKey` locally.
+/// Flow: sign in anonymously → call `registerAuthenticatedMaster(deviceId, deviceName?)`
+/// → receive `{ masterId }`. Subsequent cold-starts reuse FirebaseAuth session
+/// persistence instead of storing a legacy `secretKey` locally.
 @MainActor
 final class AuthService: ObservableObject {
 
@@ -70,10 +69,6 @@ final class AuthService: ObservableObject {
 
     // MARK: - Private
 
-    private func signInWithCustomToken(_ customToken: String) async throws {
-        try await Auth.auth().signIn(withCustomToken: customToken)
-    }
-
     private func syncFromCurrentUser(_ user: User? = Auth.auth().currentUser, fallbackMasterId: String? = nil) {
         let resolvedMasterId = user?.uid ?? fallbackMasterId
         isAuthenticated = resolvedMasterId != nil
@@ -82,13 +77,10 @@ final class AuthService: ObservableObject {
 }
 
 enum AuthError: LocalizedError {
-    case missingCustomToken
     case missingMasterId
 
     var errorDescription: String? {
         switch self {
-        case .missingCustomToken:
-            return "Der Server hat keinen Firebase Custom Token zurückgegeben."
         case .missingMasterId:
             return "Der Server hat keine Master-ID zurückgegeben."
         }
