@@ -109,6 +109,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
       "commissioningPending",
       "commissioningQa",
       "cryptoDebug",
+      "cspRuntimeMigrator",
       "dates",
       "effectivePlatformState",
       "encoding",
@@ -1825,7 +1826,7 @@ describe("admin-panel module wiring", () => {
     const sandboxLoad = makeLoader(sandboxGlobal);
     sandboxLoad(path.join(MODULES_DIR, "index.js"));
     expect(sandboxGlobal.MM).toBeDefined();
-    expect(sandboxGlobal.MM.list().length).toBe(29);
+    expect(sandboxGlobal.MM.list().length).toBe(30);
 
     // Pruefe: facade-Aufruf gegen ein dummy-Originalset zeigt, dass swap stattfindet.
     // Wir pruefen das hier rein deklarativ: jede der geswappten Funktionen taucht im app.js
