@@ -8,6 +8,95 @@ const FIREBASE_FIELDS = [
   { key: "appId",             inputId: "fb-appId" },
 ];
 
+const START_WORK_DEFAULT_ETA_SECONDS = 10;
+const startWorkState = {
+  hideTimer: null,
+  tickTimer: null,
+  startedAtMs: 0,
+  etaSeconds: START_WORK_DEFAULT_ETA_SECONDS,
+  label: "Arbeit in Gange",
+};
+
+function getStartWorkElements() {
+  return {
+    root: document.getElementById("global-work-status"),
+    label: document.getElementById("global-work-label"),
+    eta: document.getElementById("global-work-eta"),
+  };
+}
+
+function formatStartEta(seconds) {
+  const normalized = Math.max(1, Math.ceil(Number(seconds) || START_WORK_DEFAULT_ETA_SECONDS));
+  if (normalized >= 60) {
+    return Math.ceil(normalized / 60) + " min";
+  }
+  return normalized + "s";
+}
+
+function updateStartWorkIndicator() {
+  const elements = getStartWorkElements();
+  if (!elements.root || elements.root.hidden) return;
+
+  const elapsedSeconds = Math.floor((Date.now() - startWorkState.startedAtMs) / 1000);
+  const remainingSeconds = Math.max(1, startWorkState.etaSeconds - elapsedSeconds);
+  const etaText = elapsedSeconds >= startWorkState.etaSeconds
+    ? "Zeitliche Einschätzung: fast fertig …"
+    : "Zeitliche Einschätzung: noch ca. " + formatStartEta(remainingSeconds);
+
+  if (elements.label) elements.label.textContent = startWorkState.label;
+  if (elements.eta) elements.eta.textContent = etaText;
+}
+
+function showStartWorkIndicator(label, etaSeconds) {
+  const elements = getStartWorkElements();
+  if (!elements.root) return;
+
+  startWorkState.label = label || "Arbeit in Gange";
+  startWorkState.etaSeconds = Math.max(3, Number(etaSeconds) || START_WORK_DEFAULT_ETA_SECONDS);
+  startWorkState.startedAtMs = Date.now();
+
+  if (startWorkState.hideTimer) {
+    window.clearTimeout(startWorkState.hideTimer);
+    startWorkState.hideTimer = null;
+  }
+  if (!startWorkState.tickTimer) {
+    startWorkState.tickTimer = window.setInterval(updateStartWorkIndicator, 1000);
+  }
+
+  elements.root.hidden = false;
+  updateStartWorkIndicator();
+}
+
+function hideStartWorkIndicator(delayMs = 0) {
+  const elements = getStartWorkElements();
+  if (!elements.root) return;
+
+  if (startWorkState.hideTimer) {
+    window.clearTimeout(startWorkState.hideTimer);
+  }
+
+  const hideNow = () => {
+    elements.root.hidden = true;
+    if (startWorkState.tickTimer) {
+      window.clearInterval(startWorkState.tickTimer);
+      startWorkState.tickTimer = null;
+    }
+  };
+
+  if (delayMs > 0) {
+    startWorkState.hideTimer = window.setTimeout(hideNow, delayMs);
+  } else {
+    hideNow();
+  }
+}
+
+function runWithStartWorkIndicator(label, etaSeconds, action) {
+  showStartWorkIndicator(label, etaSeconds);
+  return Promise.resolve()
+    .then(action)
+    .finally(() => hideStartWorkIndicator(1200));
+}
+
 function getStoredFirebaseConfig() {
   try {
     const raw = localStorage.getItem(FIREBASE_STORAGE_KEY);
@@ -89,6 +178,7 @@ function collectFirebaseConfigFromInputs() {
 
 function saveFirebaseConfig() {
   try {
+    showStartWorkIndicator("Firebase-Konfiguration wird gespeichert", 6);
     const config = collectFirebaseConfigFromInputs();
     localStorage.setItem(FIREBASE_STORAGE_KEY, JSON.stringify(config));
     setModalStatus("✅ Firebase-Konfiguration gespeichert. Admin-Dashboard und Eltern-Panel verwenden diese Werte beim nächsten Laden.", "success");
@@ -96,6 +186,8 @@ function saveFirebaseConfig() {
     setTimeout(closeFirebaseModal, 2200);
   } catch (e) {
     setModalStatus(e.message || "Fehler beim Speichern der Firebase-Konfiguration.", "error");
+  } finally {
+    hideStartWorkIndicator(1200);
   }
 }
 
@@ -148,10 +240,20 @@ function bindStartPageUiActions() {
 
   bindClick("open-firebase-modal-btn-1", openFirebaseModal);
   bindClick("open-firebase-modal-btn-2", openFirebaseModal);
-  bindClick("copy-master-apk-path-btn", () => copyPath("master-apk-path"));
-  bindClick("copy-child-apk-path-btn", () => copyPath("child-apk-path"));
+  bindClick("copy-master-apk-path-btn", () => runWithStartWorkIndicator("APK-Pfad wird kopiert", 4, () => copyPath("master-apk-path")));
+  bindClick("copy-child-apk-path-btn", () => runWithStartWorkIndicator("APK-Pfad wird kopiert", 4, () => copyPath("child-apk-path")));
   bindClick("close-firebase-modal-btn", closeFirebaseModal);
   bindClick("save-firebase-config-btn", saveFirebaseConfig);
+
+  document.querySelectorAll("a.btn[href]").forEach((link) => {
+    if (link.__workStatusBound) return;
+    link.__workStatusBound = true;
+    link.addEventListener("click", () => {
+      const label = (link.textContent || "Panel wird geöffnet").trim() || "Panel wird geöffnet";
+      showStartWorkIndicator(label + " läuft", 8);
+      hideStartWorkIndicator(3500);
+    });
+  });
 
   const modal = document.getElementById("fb-modal");
   if (modal) {

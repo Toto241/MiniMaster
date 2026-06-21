@@ -7,6 +7,129 @@ const COMMAND_BUILDER_STORAGE_KEY = "operatorCommandBuilderConfig";
 const COMMISSIONING_ATTESTATION_STORAGE_KEY = "operatorCommissioningAttestations";
 const P0_BLOCKER_COCKPIT_STORAGE_KEY = "operatorP0BlockerCockpit";
 
+const WORK_STATUS_DEFAULT_ETA_SECONDS = 20;
+const workStatusState = {
+    pendingCount: 0,
+    startedAtMs: 0,
+    etaSeconds: WORK_STATUS_DEFAULT_ETA_SECONDS,
+    label: "Arbeit in Gange",
+    tickHandle: null,
+};
+
+function getWorkStatusElements() {
+    return {
+        root: document.getElementById("global-work-status"),
+        label: document.getElementById("global-work-status-label"),
+        eta: document.getElementById("global-work-status-eta"),
+    };
+}
+
+function formatWorkEta(seconds) {
+    const normalized = Math.max(1, Math.ceil(Number(seconds) || WORK_STATUS_DEFAULT_ETA_SECONDS));
+    if (normalized >= 60) {
+        const minutes = Math.ceil(normalized / 60);
+        return `${minutes} min`;
+    }
+    return `${normalized}s`;
+}
+
+function renderWorkStatus() {
+    const elements = getWorkStatusElements();
+    if (!elements.root) return;
+
+    if (workStatusState.pendingCount <= 0) {
+        elements.root.hidden = true;
+        return;
+    }
+
+    const elapsedSeconds = Math.floor((Date.now() - workStatusState.startedAtMs) / 1000);
+    const remainingSeconds = Math.max(1, workStatusState.etaSeconds - elapsedSeconds);
+    const etaText = elapsedSeconds >= workStatusState.etaSeconds
+        ? "Zeitliche Einschätzung: fast fertig …"
+        : `Zeitliche Einschätzung: noch ca. ${formatWorkEta(remainingSeconds)}`;
+
+    elements.root.hidden = false;
+    if (elements.label) elements.label.textContent = workStatusState.label || "Arbeit in Gange";
+    if (elements.eta) elements.eta.textContent = etaText;
+}
+
+function startWorkStatusTicker() {
+    if (workStatusState.tickHandle) return;
+    workStatusState.tickHandle = window.setInterval(renderWorkStatus, 1000);
+}
+
+function stopWorkStatusTicker() {
+    if (!workStatusState.tickHandle) return;
+    window.clearInterval(workStatusState.tickHandle);
+    workStatusState.tickHandle = null;
+}
+
+function beginWorkStatusActivity(label, etaSeconds) {
+    const normalizedEta = Math.max(5, Number(etaSeconds) || WORK_STATUS_DEFAULT_ETA_SECONDS);
+    workStatusState.pendingCount += 1;
+    if (workStatusState.pendingCount === 1) {
+        workStatusState.startedAtMs = Date.now();
+        workStatusState.etaSeconds = normalizedEta;
+        workStatusState.label = label || "Arbeit in Gange";
+        startWorkStatusTicker();
+    } else {
+        workStatusState.etaSeconds = Math.max(workStatusState.etaSeconds, normalizedEta);
+        if (label) workStatusState.label = label;
+    }
+    renderWorkStatus();
+
+    let finished = false;
+    return function finishWorkStatusActivity() {
+        if (finished) return;
+        finished = true;
+        workStatusState.pendingCount = Math.max(0, workStatusState.pendingCount - 1);
+        if (workStatusState.pendingCount === 0) {
+            stopWorkStatusTicker();
+        }
+        renderWorkStatus();
+    };
+}
+
+function estimateWorkEtaFromUrl(url) {
+    const endpoint = String(url || "");
+    if (!endpoint) return WORK_STATUS_DEFAULT_ETA_SECONDS;
+    if (endpoint.includes("/api/commands/run")) return 75;
+    if (endpoint.includes("/api/suites")) return 90;
+    if (endpoint.includes("/api/commissioning/run")) return 120;
+    if (endpoint.includes("/api/commissioning")) return 45;
+    if (endpoint.includes("/api/runtime-info")) return 10;
+    return WORK_STATUS_DEFAULT_ETA_SECONDS;
+}
+
+function estimateWorkLabelFromUrl(url) {
+    const endpoint = String(url || "");
+    if (endpoint.includes("/api/commands/run")) return "PowerShell-Befehl läuft";
+    if (endpoint.includes("/api/suites")) return "Testsuite wird gestartet";
+    if (endpoint.includes("/api/commissioning")) return "Commissioning wird verarbeitet";
+    if (endpoint.includes("/api/runtime-info")) return "Laufzeitprüfung läuft";
+    return "Backend-Anfrage läuft";
+}
+
+function instrumentFetchWithWorkStatus() {
+    if (typeof window === "undefined" || typeof window.fetch !== "function") return;
+    if (window.__mmWorkStatusFetchWrapped) return;
+    window.__mmWorkStatusFetchWrapped = true;
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+        const req = args[0];
+        const url = typeof req === "string" ? req : req?.url;
+        const finish = beginWorkStatusActivity(estimateWorkLabelFromUrl(url), estimateWorkEtaFromUrl(url));
+        try {
+            return await originalFetch(...args);
+        } finally {
+            finish();
+        }
+    };
+}
+
+instrumentFetchWithWorkStatus();
+
 // ==================== SESSION TIMEOUT ====================
 function getSessionManager() {
     return window.MM && window.MM.sessionManager ? window.MM.sessionManager : null;
@@ -1943,6 +2066,21 @@ const OWNER_SETUP_MODES = new Set([
 ]);
 let ownerSetupLastMode = "setup";
 
+function estimateOwnerSetupEtaSeconds(mode) {
+    switch (mode) {
+    case "setup":
+        return 120;
+    case "preflight":
+        return 90;
+    case "doctor":
+        return 60;
+    case "open-all-pc":
+        return 20;
+    default:
+        return 30;
+    }
+}
+
 function normalizeOwnerSetupMode(mode) {
     const normalizedMode = String(mode || "setup").trim();
     return OWNER_SETUP_MODES.has(normalizedMode) ? normalizedMode : "setup";
@@ -1998,6 +2136,7 @@ async function executeOwnerSetupMode(mode) {
     if (!confirmed) return;
 
     setOwnerSetupStatus(`Fuehre ${normalizedMode} aus ...`, "info");
+    const finishWork = beginWorkStatusActivity(`Owner-Setup "${normalizedMode}" läuft`, estimateOwnerSetupEtaSeconds(normalizedMode));
     try {
         const result = isElectronOperator
             ? await window.miniMasterDesktop.runCLI(command, cwd)
@@ -2012,6 +2151,8 @@ async function executeOwnerSetupMode(mode) {
     } catch (error) {
         setOwnerSetupStatus(`Fehler: ${error.message}`, "error");
         showNotification("Owner-Setup fehlgeschlagen: " + error.message, "error");
+    } finally {
+        finishWork();
     }
 }
 

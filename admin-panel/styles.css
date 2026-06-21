@@ -22,6 +22,50 @@ body {
     margin-block-end: 24px;
 }
 
+.global-work-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: -10px 0 16px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1e3a8a;
+}
+
+.global-work-status-spinner {
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 50%;
+    border: 2px solid #93c5fd;
+    border-block-start-color: #2563eb;
+    animation: global-work-spin 0.9s linear infinite;
+    flex-shrink: 0;
+}
+
+.global-work-status-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.global-work-status-copy strong {
+    font-size: 0.9rem;
+    color: #1e3a8a;
+}
+
+.global-work-status-copy span {
+    font-size: 0.8rem;
+    color: #1d4ed8;
+}
+
+@keyframes global-work-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .header h1 {
     margin: 0;
     font-size: 1.3rem;

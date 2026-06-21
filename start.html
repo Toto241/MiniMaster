@@ -537,6 +537,51 @@
     .modal-status.success { display: block; background: var(--green-soft); color: #065f46; }
     .modal-status.error { display: block; background: var(--red-soft); color: #991b1b; }
 
+    .global-work-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(31, 111, 235, 0.24);
+      background: #eef4ff;
+      color: #1e3a8a;
+    }
+
+    .global-work-status[hidden] {
+      display: none;
+    }
+
+    .global-work-spinner {
+      inline-size: 18px;
+      block-size: 18px;
+      border-radius: 50%;
+      border: 2px solid #93c5fd;
+      border-top-color: #2563eb;
+      animation: global-work-spin 0.9s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .global-work-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .global-work-copy strong {
+      font-size: 0.9rem;
+      color: #1e3a8a;
+    }
+
+    .global-work-copy span {
+      font-size: 0.8rem;
+      color: #1d4ed8;
+    }
+
+    @keyframes global-work-spin {
+      to { transform: rotate(360deg); }
+    }
+
     @media (max-inline-size: 920px) {
       .hero { grid-template-columns: 1fr; }
     }
@@ -561,6 +606,14 @@
 </head>
 <body>
   <div class="shell">
+    <div id="global-work-status" class="global-work-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <span class="global-work-spinner" aria-hidden="true"></span>
+      <div class="global-work-copy">
+        <strong id="global-work-label">Arbeit in Gange</strong>
+        <span id="global-work-eta">Zeitliche Einschätzung: ca. 10s</span>
+      </div>
+    </div>
+
     <section class="hero">
       <div class="hero-main">
         <ul class="hero-badges">
