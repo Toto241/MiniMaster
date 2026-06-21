@@ -6,8 +6,14 @@ describe("Additional Panels CSP Hardening", () => {
   const adminPanelLogsJs = readFileSync(path.join(__dirname, "..", "admin-panel", "logs.js"), "utf8");
   const startHtml = readFileSync(path.join(__dirname, "..", "start.html"), "utf8");
   const startJs = readFileSync(path.join(__dirname, "..", "start.js"), "utf8");
+  const parentPanelHtml = readFileSync(path.join(__dirname, "..", "parent-panel", "index.html"), "utf8");
   const launcherHtml = readFileSync(path.join(__dirname, "..", "desktop", "launcher.html"), "utf8");
   const launcherJs = readFileSync(path.join(__dirname, "..", "desktop", "launcher.js"), "utf8");
+  const adminModulesIndex = readFileSync(path.join(__dirname, "..", "admin-panel", "modules", "index.js"), "utf8");
+  const cspRuntimeMigrator = readFileSync(
+    path.join(__dirname, "..", "admin-panel", "modules", "core", "csp-runtime-migrator.js"),
+    "utf8"
+  );
 
   describe("admin-panel/logs.html", () => {
     it("removes all inline onclick handlers from logs.html", () => {
@@ -54,6 +60,35 @@ describe("Additional Panels CSP Hardening", () => {
 
     it("has idle timeout setup in launcher.js", () => {
       expect(launcherJs).toContain("idleTimeoutMs");
+    });
+  });
+
+  describe("parent-panel/index.html", () => {
+    it("uses SRI for Firebase App Check like the other web panels", () => {
+      expect(parentPanelHtml).toContain("firebase-app-check-compat.js");
+      expect(parentPanelHtml).toContain("integrity=\"sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK\"");
+      expect(parentPanelHtml).toContain("crossorigin=\"anonymous\"");
+    });
+  });
+
+  describe("admin-panel generated DOM CSP compatibility", () => {
+    it("loads the runtime migrator before legacy app.js executes", () => {
+      expect(adminModulesIndex).toContain("import \"./core/csp-runtime-migrator.js\";");
+    });
+
+    it("migrates generated inline events without eval or new Function", () => {
+      expect(cspRuntimeMigrator).toContain("onclick");
+      expect(cspRuntimeMigrator).toContain("onchange");
+      expect(cspRuntimeMigrator).toContain("MutationObserver");
+      expect(cspRuntimeMigrator).toContain("addEventListener");
+      expect(cspRuntimeMigrator).not.toContain("new Function");
+      expect(cspRuntimeMigrator).not.toContain("eval(");
+    });
+
+    it("migrates generated inline styles into stylesheet-backed classes", () => {
+      expect(cspRuntimeMigrator).toContain("insertRule");
+      expect(cspRuntimeMigrator).toContain("removeAttribute(\"style\")");
+      expect(cspRuntimeMigrator).toContain("mm-csp-style-");
     });
   });
 });

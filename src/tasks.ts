@@ -37,10 +37,11 @@ const ALLOWED_PHOTO_MIME_TYPES = new Set<string>([
 ]);
 
 /**
- * Maximale erlaubte Bildgröße in Bytes (10 MB).
+ * Maximale erlaubte Bildgröße in Bytes (5 MB).
  * Verhindert Speicher-/Kosten-/AI-Quota-Missbrauch durch übergroße Uploads.
+ * Muss mit storage.rules synchron bleiben.
  */
-const MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Minimale Bildgröße in Bytes — verhindert leere oder Stub-Dateien als Proof.
@@ -227,6 +228,65 @@ export const createTask = functions.https.onCall(
 
       logger.info(`Task ${taskRef.id} created for child ${childId}`);
       return { success: true, taskId: taskRef.id };
+    }
+  )
+);
+
+// ==================== COMPLETE TASK ====================
+
+// ==================== GET TASKS FOR CHILD ====================
+
+export const getTasksForChild = functions.https.onCall(
+  withErrorHandling(
+    "getTasksForChild",
+    async (data: { childId: string; limit?: number }, context: CallableContext) => {
+      const requesterId = requireAuth(context);
+      validateAppCheck(context, true);
+      checkRateLimit(requesterId, "getTasksForChild", 60);
+
+      const childId = validateDeviceId(data.childId);
+      const requestedLimit = data.limit === undefined
+        ? 50
+        : validateNumber(data.limit, "limit", { integer: true, min: 1, max: 100 });
+
+      const childRef = db().collection("children").doc(childId);
+      const childDoc = await childRef.get();
+      if (!childDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Child device not found.");
+      }
+
+      const childData = childDoc.data();
+      const isChildDevice = requesterId === childId;
+      const isOwningMaster = childData?.masterImei === requesterId;
+      if (!isChildDevice && !isOwningMaster) {
+        throw new functions.https.HttpsError("permission-denied", "Not authorized to read tasks for this child.");
+      }
+
+      const snapshot = await childRef
+        .collection("tasks")
+        .orderBy("createdAt", "desc")
+        .limit(requestedLimit)
+        .get();
+
+      const tasks = snapshot.docs.map((doc) => {
+        const task = doc.data();
+        return {
+          id: doc.id,
+          description: typeof task.description === "string" ? task.description : "",
+          status: typeof task.status === "string" ? task.status : "",
+          photoUrl: typeof task.photoUrl === "string" ? task.photoUrl : null,
+          deadline: task.deadline ?? null,
+          createdAt: task.createdAt ?? null,
+          completedAt: task.completedAt ?? null,
+          updatedAt: task.updatedAt ?? null,
+          unlockDuration: typeof task.unlockDuration === "number" ? task.unlockDuration : null,
+          unlockUntil: task.unlockUntil ?? null,
+          rejectionReason: typeof task.rejectionReason === "string" ? task.rejectionReason : null,
+          aiAnalysis: task.aiAnalysis ?? null,
+        };
+      });
+
+      return { tasks };
     }
   )
 );

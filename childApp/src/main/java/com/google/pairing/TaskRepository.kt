@@ -34,7 +34,9 @@ class TaskRepository @Inject constructor(
 
     /**
      * Returns a Flow that monitors the latest assigned task in real-time.
-     * The "current" task is defined as the most recent one that is NOT in the 'APPROVED' state.
+     * The "current" task is the most recent task, including an approved task,
+     * because the accessibility service needs the approved status and
+     * unlockDuration to start the temporary unlock window.
      *
      * @return A [Flow] emitting the current [TaskModel] or null if none exists.
      */
@@ -48,13 +50,12 @@ class TaskRepository @Inject constructor(
             return@callbackFlow
         }
 
-        // Query for the latest task that is pending, submitted, or rejected.
-        // We exclude APPROVED tasks as they are considered "done" history.
+        // Query for the latest task regardless of status. Excluding approved
+        // tasks would prevent the unlock timer from ever being started.
         val taskQuery = firestore
             .collection("children")
             .document(childId)
             .collection("tasks")
-            .whereIn("status", listOf(TaskStatus.PENDING.value, TaskStatus.PENDING_APPROVAL.value, TaskStatus.REJECTED.value))
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(1)
 

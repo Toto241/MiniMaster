@@ -80,7 +80,9 @@ class TaskMonitoringService : Service() {
                 // or unlock the device.
                 val broadcastIntent = Intent("com.google.pairing.TASK_STATUS_UPDATE")
                 broadcastIntent.setPackage(packageName)
-                broadcastIntent.putExtra("task_status", task?.status)
+                broadcastIntent.putExtra("has_active_task", task != null)
+                broadcastIntent.putExtra("task_status", task?.status ?: TaskStatus.NONE.value)
+                broadcastIntent.putExtra("unlock_duration", task?.unlockDuration ?: 0L)
                 sendBroadcast(broadcastIntent)
             }
         }

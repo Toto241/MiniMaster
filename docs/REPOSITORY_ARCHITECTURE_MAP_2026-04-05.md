@@ -59,40 +59,40 @@ flowchart TB
 
 ### Backend
 
-- [index.ts](index.ts): Barrel-Export aller Cloud Functions
-- [firebase.ts](firebase.ts): zentrale Firebase-Admin-Initialisierung
-- [src/shared.ts](src/shared.ts): Auth-Helfer, Audit-Logging, Rate-Limits, App Check
-- [src/auth.ts](src/auth.ts): Rollen, Bootstrap, Token, Recovery- und Reset-Pfade
-- [src/pairing.ts](src/pairing.ts): Pairing-Codes, Pairing-Links, Trial-Aktivierung
-- [src/device.ts](src/device.ts): Locking, Blacklists, Usage-Rules, Heartbeat, FCM-Token
-- [src/device-sync.ts](src/device-sync.ts): bidirektionaler Command-/Event-Kanal
-- [src/tasks.ts](src/tasks.ts): Task-State-Machine und Proof-Handling
-- [src/support.ts](src/support.ts): Tickets, Debug-Consent, AI-gestützte Hilfslogik
-- [src/legal.ts](src/legal.ts): Policies, Consent und Reconsent
-- [src/subscription.ts](src/subscription.ts): Abo-Status und Kaufprüfung
-- [src/admin.ts](src/admin.ts): DSAR, Health, Knowledge Base, AI-Error-Analyse, Operator-Aktionen
-- [src/triggers.ts](src/triggers.ts): Firestore-Trigger, FCM-Diff-Push, Bildanalyse
+- [index.ts](../index.ts): Barrel-Export aller Cloud Functions
+- [firebase.ts](../firebase.ts): zentrale Firebase-Admin-Initialisierung
+- [src/shared.ts](../src/shared.ts): Auth-Helfer, Audit-Logging, Rate-Limits, App Check
+- [src/auth.ts](../src/auth.ts): Rollen, Bootstrap, Token, Recovery- und Reset-Pfade
+- [src/pairing.ts](../src/pairing.ts): Pairing-Codes, Pairing-Links, Trial-Aktivierung
+- [src/device.ts](../src/device.ts): Locking, Blacklists, Usage-Rules, Heartbeat, FCM-Token
+- [src/device-sync.ts](../src/device-sync.ts): bidirektionaler Command-/Event-Kanal
+- [src/tasks.ts](../src/tasks.ts): Task-State-Machine und Proof-Handling
+- [src/support.ts](../src/support.ts): Tickets, Debug-Consent, AI-gestützte Hilfslogik
+- [src/legal.ts](../src/legal.ts): Policies, Consent und Reconsent
+- [src/subscription.ts](../src/subscription.ts): Abo-Status und Kaufprüfung
+- [src/admin.ts](../src/admin.ts): DSAR, Health, Knowledge Base, AI-Error-Analyse, Operator-Aktionen
+- [src/triggers.ts](../src/triggers.ts): Firestore-Trigger, FCM-Diff-Push, Bildanalyse
 
 ### Datenhaltung
 
-- [firestore.rules](firestore.rules): Zugriffsschutz für Firestore
-- [storage.rules](storage.rules): Zugriffsschutz für Task- und Foto-Uploads
+- [firestore.rules](../firestore.rules): Zugriffsschutz für Firestore
+- [storage.rules](../storage.rules): Zugriffsschutz für Task- und Foto-Uploads
 - Flaches Modell mit Collections wie `masters`, `children`, `supportTickets`, `supportAccessGrants`, `subscriptions`
 
 ### Android
 
-- [masterApp](masterApp): Eltern-App mit Billing, Task-Review, Regelverwaltung
-- [childApp](childApp): Kinder-App mit Rule Sync, Accessibility-Service, Heartbeat, Debug-Broadcasts
+- [masterApp](../masterApp): Eltern-App mit Billing, Task-Review, Regelverwaltung
+- [childApp](../childApp): Kinder-App mit Rule Sync, Accessibility-Service, Heartbeat, Debug-Broadcasts
 
 ### Web / Desktop
 
-- [web-control](web-control): Eltern-Steuerpanel
-- [admin-panel](admin-panel): Operator- und Support-Panel
-- [desktop](desktop): Electron-Container für beide Panels
+- [web-control](../web-control): Eltern-Steuerpanel
+- [admin-panel](../admin-panel): Operator- und Support-Panel
+- [desktop](../desktop): Electron-Container für beide Panels
 
 ### iOS
 
-- [iosMasterApp](iosMasterApp), [iosChildApp](iosChildApp), [iosSharedServices](iosSharedServices)
+- [iosMasterApp](../iosMasterApp), [iosChildApp](../iosChildApp), [iosSharedServices](../iosSharedServices)
 - Architektur vorhanden, operative Reife deutlich unter Android
 
 ## Zentrale Datenflüsse
@@ -108,7 +108,7 @@ flowchart TB
 
 1. Parent ändert Sperr- oder Nutzungsregeln.
 2. Backend schreibt die neue Policy in Firestore.
-3. [src/triggers.ts](src/triggers.ts) erzeugt Commands in [src/device-sync.ts](src/device-sync.ts).
+3. [src/triggers.ts](../src/triggers.ts) erzeugt Commands in [src/device-sync.ts](../src/device-sync.ts).
 4. FCM dient als Wake-up-Hinweis, Firestore bleibt kanonische Quelle.
 
 ### Task-Flow
@@ -128,7 +128,7 @@ flowchart TB
 
 ## Architekturhotspots
 
-- [src/auth.ts](src/auth.ts): privilegierte Operator- und Recovery-Funktionen
-- [src/device-sync.ts](src/device-sync.ts): plattformübergreifender Kontrollkanal
-- [src/support.ts](src/support.ts): komplexe Zustands- und Zugriffslogik
-- [firestore.rules](firestore.rules): tragende Mandanten- und Ownership-Schicht
+- [src/auth.ts](../src/auth.ts): privilegierte Operator- und Recovery-Funktionen
+- [src/device-sync.ts](../src/device-sync.ts): plattformübergreifender Kontrollkanal
+- [src/support.ts](../src/support.ts): komplexe Zustands- und Zugriffslogik
+- [firestore.rules](../firestore.rules): tragende Mandanten- und Ownership-Schicht

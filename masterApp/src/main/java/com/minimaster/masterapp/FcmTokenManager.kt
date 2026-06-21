@@ -30,7 +30,7 @@ object FcmTokenManager {
             Log.d(TAG, "Current FCM token: ${token.take(10)}...")
 
             val data = hashMapOf("fcmToken" to token)
-            functions.getHttpsCallable("updateFcmToken").call(data).await()
+            functions.getHttpsCallable("updateFCMToken").call(data).await()
             Log.i(TAG, "FCM token successfully registered with backend.")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register FCM token.", e)

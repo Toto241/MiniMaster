@@ -15,6 +15,7 @@ import "./core/dates.js";
 import "./core/event-delegation.js";
 import "./core/nav-bootstrap.js";
 import "./core/global-action-bootstrap.js";
+import "./core/csp-runtime-migrator.js";
 import "./core/crypto-debug.js";
 import "./core/session-manager.js";
 import "./shared/pricing-lookup.js";
