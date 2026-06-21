@@ -16,6 +16,8 @@ import java.util.Date
  * @property deadline The deadline for the task.
  * @property createdAt The timestamp when the task was created/assigned.
  * @property completedAt The timestamp when the task was completed.
+ * @property unlockDuration The approved unlock duration in minutes, if configured.
+ * @property unlockUntil Server-computed unlock end timestamp, if available.
  */
 data class TaskModel(
     @DocumentId
@@ -28,7 +30,9 @@ data class TaskModel(
     @ServerTimestamp
     val createdAt: Date? = null,
     @ServerTimestamp
-    val completedAt: Date? = null
+    val completedAt: Date? = null,
+    val unlockDuration: Long? = null,
+    val unlockUntil: Date? = null
 )
 
 /**
@@ -37,6 +41,8 @@ data class TaskModel(
  * @property value The string representation of the status as stored in Firestore.
  */
 enum class TaskStatus(val value: String) {
+    /** There is no active task to enforce. */
+    NONE("none"),
     /** The task has been assigned but not yet completed. */
     PENDING("pending"),
     /** The child has submitted a proof, waiting for approval. */
@@ -49,10 +55,11 @@ enum class TaskStatus(val value: String) {
     companion object {
         /**
          * Converts a string status to the corresponding [TaskStatus] enum.
-         * Defaults to [PENDING] if the string does not match.
+         * Defaults to [NONE] if the string is missing or unknown so a missing
+         * task snapshot cannot accidentally lock the child device.
          * @param status The string status to convert.
          * @return The matching [TaskStatus].
          */
-        fun fromString(status: String): TaskStatus = values().firstOrNull { it.value == status } ?: PENDING
+        fun fromString(status: String?): TaskStatus = values().firstOrNull { it.value == status } ?: NONE
     }
 }
