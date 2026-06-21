@@ -1109,7 +1109,7 @@ Trial: 7-day trial starts on first pairing (`trial_pending` → `trial`); `trial
 
 ## AI Task Photo Analysis
 
-`completeTask` validates that `photoUrl` is a valid Firebase Storage URL (`https://firebasestorage.googleapis.com/...`) and enforces a max length of 2048 characters to prevent SSRF and injection attacks.
+`completeTask` validates that `photoUrl` is a valid Firebase Storage URL (`https://firebasestorage.googleapis.com/...`) and enforces a max length of 2048 characters to prevent SSRF and injection attacks. The referenced object must be in the calling child's own `children/{childId}/photos/` or `proofs/{childId}/` path, have an allowed image MIME type, be 256 bytes to 5 MB in size, and pass the EXIF-GPS privacy scan.
 
 `analyzeTaskPhoto` (Firestore trigger on task status change to `pending_approval`):
 

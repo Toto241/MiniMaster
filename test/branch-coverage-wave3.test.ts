@@ -1052,7 +1052,7 @@ describe("tasks.ts branch coverage", () => {
 
     it("rejects photoUrl whose Storage object exceeds maximum size", async () => {
       const originalSize = mockBucketFileMetadata.size;
-      mockBucketFileMetadata.size = 11 * 1024 * 1024; // 11 MB > 10 MB Limit
+      mockBucketFileMetadata.size = 6 * 1024 * 1024; // 6 MB > 5 MB Limit
       try {
         const wrapped = testEnv.wrap(fns.completeTask);
         await expect(wrapped({

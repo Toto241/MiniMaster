@@ -71,17 +71,17 @@ final class PhotoProofService: ObservableObject {
             throw PhotoProofError.compressionFailed
         }
 
-        // 2. Validate size (256 B – 10 MB)
+        // 2. Validate size (256 B – 5 MB, aligned with storage.rules and completeTask)
         let size = jpegData.count
         guard size >= 256 else {
             throw PhotoProofError.tooSmall
         }
-        guard size <= 10 * 1024 * 1024 else {
+        guard size <= 5 * 1024 * 1024 else {
             throw PhotoProofError.tooLarge
         }
 
         // 3. Upload to Firebase Storage
-        let path = "children/\(childId)/tasks/\(taskId)/proof.jpg"
+        let path = "proofs/\(childId)/\(taskId)/\(Int(Date().timeIntervalSince1970 * 1000)).jpg"
         let ref = storage.reference().child(path)
 
         let metadata = StorageMetadata()
@@ -109,7 +109,6 @@ final class PhotoProofService: ObservableObject {
 
         // 5. Call completeTask Cloud Function
         _ = try await functions.httpsCallable("completeTask").call([
-            "childId": childId,
             "taskId": taskId,
             "photoUrl": urlString
         ])
@@ -144,7 +143,7 @@ enum PhotoProofError: LocalizedError {
         case .unsupportedMedia:    return "Nur Bilder werden unterstützt."
         case .compressionFailed:   return "Bildkomprimierung fehlgeschlagen."
         case .tooSmall:            return "Das Bild ist zu klein (min. 256 Bytes)."
-        case .tooLarge:            return "Das Bild ist zu groß (max. 10 MB)."
+        case .tooLarge:            return "Das Bild ist zu groß (max. 5 MB)."
         case .uploadFailed:        return "Upload fehlgeschlagen."
         }
     }
