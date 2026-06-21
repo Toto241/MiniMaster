@@ -37,10 +37,11 @@ const ALLOWED_PHOTO_MIME_TYPES = new Set<string>([
 ]);
 
 /**
- * Maximale erlaubte Bildgröße in Bytes (10 MB).
+ * Maximale erlaubte Bildgröße in Bytes (5 MB).
  * Verhindert Speicher-/Kosten-/AI-Quota-Missbrauch durch übergroße Uploads.
+ * Muss mit storage.rules synchron bleiben.
  */
-const MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Minimale Bildgröße in Bytes — verhindert leere oder Stub-Dateien als Proof.
