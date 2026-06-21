@@ -5,6 +5,9 @@ const config = {
   roots: ['<rootDir>/test'],
   setupFiles: ['<rootDir>/test/setup-env.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
+  moduleNameMapper: {
+    '^ts-deepmerge$': '<rootDir>/test/shims/ts-deepmerge.cjs',
+  },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
