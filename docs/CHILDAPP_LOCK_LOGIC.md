@@ -12,9 +12,9 @@ Ein Hintergrunddienst (z.B. ein `Service` oder `Worker` in Android) muss die Fir
 
 1.  **Initialisierung:** Der Dienst abonniert den Firestore-Listener für die neueste Aufgabe.
 2.  **Status-Check:** Bei jeder Änderung der Aufgabe wird der `status` geprüft:
-    *   **`ASSIGNED` oder `REJECTED`:** Die Sperrlogik wird aktiviert.
-    *   **`APPROVED`:** Die Freischaltlogik wird aktiviert.
-    *   **`SUBMITTED`:** Die Sperre bleibt aktiv, aber die Benutzeroberfläche zeigt an, dass auf die Genehmigung des Elternteils gewartet wird.
+    *   **`pending` oder `rejected`:** Die Sperrlogik wird aktiviert.
+    *   **`pending_approval`:** Die Sperre bleibt aktiv, aber die Benutzeroberfläche zeigt an, dass auf die Genehmigung des Elternteils gewartet wird.
+    *   **`approved`:** Die Freischaltlogik wird aktiviert.
 
 ## 2. Sperr-Mechanismus (Lock Logic)
 
@@ -37,17 +37,17 @@ Die Lock-Activity muss die Funktionalität zur Einreichung des Nachweises bereit
 
 1.  Kind klickt auf **"Nachweis einreichen"**.
 2.  Die App öffnet eine Oberfläche zur **Fotoaufnahme** oder **Dateiauswahl**.
-3.  Das Foto wird in **Firebase Storage** hochgeladen (Pfad: `tasks/{taskId}/proof.jpg`).
-4.  Nach erfolgreichem Upload wird die Cloud Function `submitTaskProof` mit der `taskId` und der generierten `proofUrl` aufgerufen.
-5.  Der Task-Monitoring-Service erkennt den Statuswechsel zu `SUBMITTED` und die Lock-Activity ändert die Anzeige auf **"Warte auf Genehmigung durch Elternteil..."**.
+3.  Das Foto wird in **Firebase Storage** hochgeladen (Pfad: `proofs/{childId}/{taskId}/{timestamp}.jpg`).
+4.  Nach erfolgreichem Upload wird die Cloud Function `completeTask` mit der `taskId` und der generierten `photoUrl` aufgerufen.
+5.  Der Task-Monitoring-Service erkennt den Statuswechsel zu `pending_approval` und die Lock-Activity ändert die Anzeige auf **"Warte auf Genehmigung durch Elternteil..."**.
 
 ## 4. Freischalt-Mechanismus (Unlock Logic)
 
-Die Freischaltung erfolgt, wenn der Aufgabenstatus auf `APPROVED` wechselt.
+Die Freischaltung erfolgt, wenn der Aufgabenstatus auf `approved` wechselt.
 
 **Ablauf:**
 
-1.  Der Task-Monitoring-Service erkennt den Status `APPROVED`.
+1.  Der Task-Monitoring-Service erkennt den Status `approved`.
 2.  Der Dienst liest den Wert von `unlockDuration` (in Minuten) aus der Aufgabe.
 3.  Ein **Timer** wird gestartet, der für die Dauer von `unlockDuration` läuft.
 4.  **Aktion:** Während der Timer läuft, **deaktiviert** der Accessibility Service die Sperrlogik. Das Kind kann das Handy normal nutzen.
