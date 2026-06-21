@@ -39,6 +39,17 @@ describe("admin-panel helper functions", () => {
     expect(exports.sanitizeApkPath("bad\npath.apk", "fallback.apk")).toBe("fallback.apk");
   });
 
+  it("builds owner setup PowerShell commands with safe defaults", () => {
+    const { exports } = loadAdminPanelTestExports();
+
+    expect(exports.buildOwnerSetupCommand("preflight")).toBe(
+      "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/owner-setup.ps1 -Mode preflight -Port 8765",
+    );
+    expect(exports.buildOwnerSetupCommand("open-all-pc", 9876)).toContain("-Mode open-all-pc -Port 9876");
+    expect(exports.buildOwnerSetupCommand("", 99999)).toContain("-Mode setup -Port 65535");
+    expect(exports.normalizeOwnerSetupMode("bad;mode")).toBe("setup");
+  });
+
   it("renders the QA runtime banner for read-only and operator mode", () => {
     const { exports, elements } = loadAdminPanelTestExports();
 

@@ -190,6 +190,8 @@ export function loadAdminPanelTestExports(initialStorage: StorageMap = {}): Admi
     "  sanitizeAdbSerial,",
     "  sanitizeApkPath,",
     "  buildPowerShellScript,",
+    "  buildOwnerSetupCommand,",
+    "  normalizeOwnerSetupMode,",
     "  buildDeployCommand,",
     "  collectCommissioningAutomationContext,",
     "  buildValidationSummaryFromResults,",
