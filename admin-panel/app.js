@@ -1929,6 +1929,106 @@ function downloadPowerShellCommand(payload) {
     }
 }
 
+const OWNER_SETUP_MODES = new Set([
+    "setup",
+    "preflight",
+    "doctor",
+    "start-admin",
+    "open-parent-pc",
+    "open-child-pc",
+    "open-web-control",
+    "open-all-pc",
+    "desktop-parent",
+    "desktop-operator",
+]);
+let ownerSetupLastMode = "setup";
+
+function normalizeOwnerSetupMode(mode) {
+    const normalizedMode = String(mode || "setup").trim();
+    return OWNER_SETUP_MODES.has(normalizedMode) ? normalizedMode : "setup";
+}
+
+function buildOwnerSetupCommand(mode = "setup", port = 8765) {
+    const normalizedMode = normalizeOwnerSetupMode(mode);
+    const normalizedPort = Number.isFinite(Number(port)) ? Math.max(1, Math.min(65535, Number(port))) : 8765;
+    return `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/owner-setup.ps1 -Mode ${normalizedMode} -Port ${normalizedPort}`;
+}
+
+function setOwnerSetupStatus(message, level = "info") {
+    const statusEl = document.getElementById("owner-setup-status");
+    if (!statusEl) return;
+    statusEl.textContent = message || "";
+    statusEl.className = `phase-status phase-status-${level}`;
+}
+
+function updateOwnerSetupRuntimeBadge() {
+    const badge = document.getElementById("owner-setup-runtime-badge");
+    if (!badge) return;
+    if (canExecuteCommandsDirectly()) {
+        badge.textContent = "Direkte PowerShell-Ausführung aktiv";
+        badge.className = "status-badge status-ok";
+    } else {
+        badge.textContent = "PowerShell manuell kopieren";
+        badge.className = "status-badge status-warning";
+    }
+}
+
+async function copyOwnerSetupCommand(mode = ownerSetupLastMode) {
+    const selectedMode = normalizeOwnerSetupMode(mode);
+    const command = buildOwnerSetupCommand(selectedMode);
+    await copyTextToClipboard(buildPowerShellScript(command, getCommandBuilderFormValues().workspacePath));
+    setOwnerSetupStatus(`PowerShell-Aufruf fuer "${selectedMode}" kopiert.`, "success");
+    showNotification("Owner-Setup-PowerShell kopiert.", "success");
+}
+
+async function executeOwnerSetupMode(mode) {
+    const normalizedMode = normalizeOwnerSetupMode(mode);
+    ownerSetupLastMode = normalizedMode;
+    const command = buildOwnerSetupCommand(normalizedMode);
+    const cwd = getCommandBuilderFormValues().workspacePath;
+
+    if (!canExecuteCommandsDirectly()) {
+        await copyTextToClipboard(buildPowerShellScript(command, cwd));
+        setOwnerSetupStatus("Direkte Ausfuehrung ist nur im Python-Operator-/Desktop-Modus verfuegbar. PowerShell-Aufruf wurde kopiert.", "info");
+        showNotification("PowerShell-Aufruf kopiert.", "info");
+        return;
+    }
+
+    const confirmed = confirm(`Owner-Setup ausfuehren?\n\n${command}\n\nArbeitsverzeichnis: ${cwd}`);
+    if (!confirmed) return;
+
+    setOwnerSetupStatus(`Fuehre ${normalizedMode} aus ...`, "info");
+    try {
+        const result = isElectronOperator
+            ? await window.miniMasterDesktop.runCLI(command, cwd)
+            : await executeCommandViaPythonBridge({ command, cwd });
+        if (Number(result?.code) === 0) {
+            setOwnerSetupStatus(`${normalizedMode} erfolgreich abgeschlossen.`, "success");
+            showNotification(`Owner-Setup "${normalizedMode}" abgeschlossen.`, "success");
+        } else {
+            setOwnerSetupStatus(`${normalizedMode} beendet mit Code ${result?.code ?? "?"}.`, "error");
+            showNotification(`Owner-Setup "${normalizedMode}" fehlgeschlagen.`, "error");
+        }
+    } catch (error) {
+        setOwnerSetupStatus(`Fehler: ${error.message}`, "error");
+        showNotification("Owner-Setup fehlgeschlagen: " + error.message, "error");
+    }
+}
+
+function initOwnerSetupCard() {
+    updateOwnerSetupRuntimeBadge();
+    document.querySelectorAll("[data-owner-mode]").forEach(button => {
+        if (button.__ownerSetupBound) return;
+        button.__ownerSetupBound = true;
+        button.addEventListener("click", () => executeOwnerSetupMode(button.getAttribute("data-owner-mode")));
+    });
+    const copyBtn = document.getElementById("copy-owner-setup-command-btn");
+    if (copyBtn && !copyBtn.__ownerCopyBound) {
+        copyBtn.__ownerCopyBound = true;
+        copyBtn.addEventListener("click", () => copyOwnerSetupCommand(ownerSetupLastMode));
+    }
+}
+
 // ── CLI-Ausführung via Electron Bridge ──────────────────────────────────
 let activeCLICommandId = null;
 let cliOutputCleanup = null;
@@ -7711,6 +7811,30 @@ function buildCommandCatalog(projectId) {
 
     return [
         {
+            id: "owner-setup-preflight",
+            label: "Owner Setup: Preflight",
+            description: "Prueft die lokale Installation und Pflichtkonfiguration ueber das zentrale Owner-PowerShell-Skript.",
+            command: buildOwnerSetupCommand("preflight"),
+            cwd: values.workspacePath,
+            fileName: "minimaster-owner-preflight",
+        },
+        {
+            id: "owner-setup-admin-server",
+            label: "Owner Setup: Admin-Server starten",
+            description: "Startet den lokalen Python-Admin-Server und oeffnet das Admin-Panel.",
+            command: buildOwnerSetupCommand("start-admin"),
+            cwd: values.workspacePath,
+            fileName: "minimaster-owner-admin-server",
+        },
+        {
+            id: "owner-open-pc-access",
+            label: "Owner Setup: PC-Zugaenge oeffnen",
+            description: "Oeffnet Admin-, Eltern- und Kinderansicht ueber den lokalen Python-Server.",
+            command: buildOwnerSetupCommand("open-all-pc"),
+            cwd: values.workspacePath,
+            fileName: "minimaster-owner-pc-access",
+        },
+        {
             id: "preflight-install",
             label: "Projekt vorbereiten",
             description: "Installiert Abhängigkeiten und prüft Build, Lint und Tests.",
@@ -10662,6 +10786,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     renderPlayStoreReadiness();
     renderPythonAutomationOverview(null, null);
     renderPythonAutomationProtocolRequirements();
+    initOwnerSetupCard();
 
     const openOnlyChecksEl = document.getElementById("python-automation-show-open-only");
     if (openOnlyChecksEl) {
@@ -12490,6 +12615,7 @@ function initializeSetupAssistant() {
     initOperatorReadinessCard();
     initExternalIntegrationsCard();
     initAdminPinCard();
+    initOwnerSetupCard();
 
     const assistantInput = document.getElementById("assistant-input");
     if (assistantInput) {

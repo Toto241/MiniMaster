@@ -1524,6 +1524,47 @@ input:focus, select:focus, textarea:focus {
     background: #f0fdf4;
 }
 
+.owner-setup-card {
+    border-color: #bfdbfe;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.owner-onboarding-card {
+    margin-block: 18px;
+}
+
+.owner-setup-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.owner-setup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-block-start: 14px;
+}
+
+.owner-setup-block {
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.owner-setup-block h4 {
+    margin-block: 0 6px;
+    color: #0f172a;
+}
+
+.owner-setup-block p {
+    margin-block: 0 12px;
+    color: #475569;
+}
+
 .python-automation-shell {
     border: 1px solid #dbeafe;
     background:

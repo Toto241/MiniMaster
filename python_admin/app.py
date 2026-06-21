@@ -26,6 +26,7 @@ from uuid import uuid4
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Importiere zentrale Test-Module
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from adb_client import AdbClient, adb_available  # noqa: E402
 from test_automation import (  # noqa: E402
@@ -92,10 +93,15 @@ ANDROID_AUTOMATION_SWEEP_APPROVAL_TTL_SEC = int(os.environ.get("MINIMASTER_SWEEP
 
 ALLOWED_COMMANDS = {
     "adb",
+    "bash",
     "firebase",
     "node",
     "npm",
     "npx",
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
     "python",
     "python3",
     "gradlew.bat",

@@ -150,6 +150,35 @@
                         </p>
                     </div>
 
+                    <div class="setup-card owner-setup-card owner-onboarding-card">
+                        <div class="owner-setup-header">
+                            <div>
+                                <h3>Eigentümer-Start: Installation, Konfiguration und PC-Zugänge</h3>
+                                <p>
+                                    Vor der Anmeldung kann der lokale Eigentümer Setup, Preflight und PC-Ansichten starten.
+                                    Detailkonfiguration, Rollen und Freigaben bleiben danach im geschützten Einrichtungstab.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="owner-setup-grid">
+                            <section class="owner-setup-block">
+                                <h4>Installation</h4>
+                                <div class="setup-actions">
+                                    <button type="button" class="btn btn-primary" data-owner-mode="setup" title="Lokalen Setup-Assistenten via PowerShell starten">Setup</button>
+                                    <button type="button" class="btn btn-secondary" data-owner-mode="preflight" title="Pflichtchecks via PowerShell ausführen">Preflight</button>
+                                </div>
+                            </section>
+                            <section class="owner-setup-block">
+                                <h4>PC-Zugänge</h4>
+                                <div class="setup-actions">
+                                    <a class="btn btn-primary" href="../parent-panel/index.html" title="Eltern-Zugang am PC oeffnen">Eltern-PC</a>
+                                    <a class="btn btn-secondary" href="../child-panel/index.html" title="Kinder-Zugang am PC oeffnen">Kinder-PC</a>
+                                    <button type="button" class="btn btn-secondary" data-owner-mode="open-all-pc" title="Alle lokalen PC-Ansichten ueber den Python-Server oeffnen">Alle öffnen</button>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
                     <!-- Stepper -->
                     <div class="onboarding-stepper">
                         <div class="stepper-step" id="stepper-step-1">
@@ -1049,6 +1078,54 @@
                     <!-- ==================== TAB: EINRICHTUNG ==================== -->
                     <div id="tab-setup" class="tab-content mm-u010">
                         <h2>⚙️ Einrichtung &amp; Inbetriebnahme</h2>
+
+                        <div class="setup-card owner-setup-card mm-u043" id="owner-setup-card">
+                            <div class="owner-setup-header">
+                                <div>
+                                    <h3>Eigentümer-Schnellstart</h3>
+                                    <p>
+                                        Dieses Admin-Panel ist der zentrale Einstieg fuer Installation, Konfiguration und lokale
+                                        PC-Zugaenge. PowerShell-Aktionen laufen ueber <code>scripts/owner-setup.ps1</code>
+                                        und koennen im Python-Operator-Modus direkt ausgefuehrt werden.
+                                    </p>
+                                </div>
+                                <span id="owner-setup-runtime-badge" class="status-badge">Modus wird geprüft</span>
+                            </div>
+                            <div class="owner-setup-grid">
+                                <section class="owner-setup-block">
+                                    <h4>1. Installation &amp; Konfiguration</h4>
+                                    <p>Setup, Preflight und Release-Doctor sind als PowerShell-Startwege gebuendelt.</p>
+                                    <div class="setup-actions">
+                                        <button type="button" class="btn btn-primary" data-owner-mode="setup" title="Lokalen Setup-Assistenten via PowerShell starten">Setup ausführen</button>
+                                        <button type="button" class="btn btn-secondary" data-owner-mode="preflight" title="Pflichtchecks via PowerShell ausführen">Preflight prüfen</button>
+                                        <button type="button" class="btn btn-secondary" data-owner-mode="doctor" title="Release Doctor via PowerShell ausführen">Release Doctor</button>
+                                    </div>
+                                </section>
+                                <section class="owner-setup-block">
+                                    <h4>2. PC-Zugänge</h4>
+                                    <p>Eltern- und Kinderansicht sind am PC erreichbar; Admin-Funktionen bleiben hier getrennt.</p>
+                                    <div class="setup-actions">
+                                        <a class="btn btn-primary" href="../parent-panel/index.html" title="Eltern-Zugang am PC oeffnen">Eltern-PC öffnen</a>
+                                        <a class="btn btn-secondary" href="../child-panel/index.html" title="Kinder-Zugang am PC oeffnen">Kinder-PC öffnen</a>
+                                        <a class="btn btn-secondary" href="../web-control/index.html" title="Direkte Elternsteuerung am PC oeffnen">Web-Control öffnen</a>
+                                    </div>
+                                    <div class="setup-actions">
+                                        <button type="button" class="btn btn-secondary" data-owner-mode="open-parent-pc" title="Eltern-PC ueber lokalen Python-Server oeffnen">Eltern-PC via Server</button>
+                                        <button type="button" class="btn btn-secondary" data-owner-mode="open-child-pc" title="Kinder-PC ueber lokalen Python-Server oeffnen">Kinder-PC via Server</button>
+                                        <button type="button" class="btn btn-secondary" data-owner-mode="open-all-pc" title="Admin-, Eltern- und Kinderansicht gemeinsam oeffnen">Alle PC-Zugaenge</button>
+                                    </div>
+                                </section>
+                                <section class="owner-setup-block">
+                                    <h4>3. Lokaler Betrieb</h4>
+                                    <p>Startet den lokalen Admin-Server oder kopiert den PowerShell-Aufruf fuer manuelle Ausfuehrung.</p>
+                                    <div class="setup-actions">
+                                        <button type="button" class="btn btn-primary" data-owner-mode="start-admin" title="Lokalen Admin-Server starten und Admin-Panel oeffnen">Admin-Server starten</button>
+                                        <button type="button" class="btn btn-secondary" id="copy-owner-setup-command-btn" title="PowerShell-Aufruf fuer den zuletzt gewaehlten Modus kopieren">PS-Aufruf kopieren</button>
+                                    </div>
+                                    <div id="owner-setup-status" class="phase-status"></div>
+                                </section>
+                            </div>
+                        </div>
 
                         <!-- ==================== Operator-Readiness ==================== -->
                         <div class="setup-card mm-u043" id="operator-readiness-card">
