@@ -18,6 +18,7 @@ export {
   createMasterWebBootstrapToken,
   redeemMasterWebBootstrapToken,
   registerMasterDevice,
+  registerAuthenticatedMaster,
   revokeUserTokens,
   bootstrapFirstAdmin,
   createOperatorAccessKey,
@@ -38,6 +39,7 @@ export {
   validatePairingCode,
   generatePairingLink,
   validatePairingToken,
+  pairAuthenticatedChild,
 } from "./src/pairing";
 
 // ==================== DEVICE MANAGEMENT ====================
@@ -73,6 +75,7 @@ export {
 // ==================== TASKS ====================
 export {
   createTask,
+  getTasksForChild,
   completeTask,
   approveTask,
   rejectTask,
