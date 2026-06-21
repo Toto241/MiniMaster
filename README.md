@@ -159,7 +159,7 @@ python -m http.server 8080
 Then open:
 
 ```text
-http://localhost:8080/admin-panel/simple.html
+http://localhost:8080/admin-panel/operator-dashboard-light_NEW.html
 ```
 
 Python operator mode:
@@ -171,7 +171,7 @@ python python_admin/app.py
 Then open:
 
 ```text
-http://127.0.0.1:8765/admin-panel/simple.html
+http://127.0.0.1:8765/admin-panel/operator-dashboard-light_NEW.html
 ```
 
 ### Desktop Launcher Setup (PC)
