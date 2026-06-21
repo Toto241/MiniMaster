@@ -70,7 +70,7 @@ Das Panel kann weiterhin statisch mit einem beliebigen HTTP-Server gestartet wer
 python -m http.server 8080
 ```
 
-Dann `http://localhost:8080/admin-panel/simple.html` aufrufen.
+Dann `http://localhost:8080/admin-panel/operator-dashboard-light_NEW.html` aufrufen.
 
 ## Python-Webanwendung
 
@@ -78,7 +78,7 @@ Dann `http://localhost:8080/admin-panel/simple.html` aufrufen.
 python3 python_admin/app.py
 ```
 
-Dann `http://127.0.0.1:8765/admin-panel/simple.html` aufrufen. In diesem Modus lassen sich die bisherigen freigegebenen CLI- und PowerShell-Kommandos direkt aus der Befehlszentrale starten.
+Dann `http://127.0.0.1:8765/admin-panel/operator-dashboard-light_NEW.html` aufrufen. In diesem Modus lassen sich die bisherigen freigegebenen CLI- und PowerShell-Kommandos direkt aus der Befehlszentrale starten.
 
 ## QA-Register-Regeln
 
@@ -103,7 +103,21 @@ Dann `http://127.0.0.1:8765/admin-panel/simple.html` aufrufen. In diesem Modus l
 Eine schlanke, modulare Alternative zum vollstaendigen Dashboard befindet sich unter:
 
 ```text
-http://localhost:8080/admin-panel/simple.html
+http://localhost:8080/admin-panel/operator-dashboard-light_NEW.html
 ```
 
 Die Light-Version nutzt ES Modules (`app-simple.js`, `support.js`, `debug.js`) und ein eigenes Stylesheet (`style.css`). Sie eignet sich fuer schnelle Operator-, QA-, Release-, Support- und Debug-Aufgaben ohne Laden des gesamten Dashboards.
+
+## Klare Dateinamen (neu)
+
+- `operator-dashboard-full_NEW.html`: Vollständiges Operator-Dashboard (neuer Standard)
+- `operator-dashboard-light_NEW.html`: Schlankes Dashboard für schnelle Operator-Flows
+- `operator-setup-wizard_NEW.html`: Einrichtungs-/Wizard-Ansicht
+- `operator-audit-logs_NEW.html`: Audit- und Log-Ansicht
+
+## Legacy-Dateinamen (weiterhin erreichbar)
+
+- `index.html` → Weiterleitung auf `operator-dashboard-full_NEW.html`
+- `simple.html` → Weiterleitung auf `operator-dashboard-light_NEW.html`
+- `wizard.html` → Weiterleitung auf `operator-setup-wizard_NEW.html`
+- `logs.html` → Weiterleitung auf `operator-audit-logs_NEW.html`

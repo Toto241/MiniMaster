@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit-Logs – MiniMaster Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .filters {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .filters input,
+        .filters select,
+        .filters button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .filters button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .filters button:hover {
+            background: #45a049;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        thead {
+            background: #333;
+            color: white;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .status-success {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+
+        .status-failure {
+            color: #f44336;
+            font-weight: 600;
+        }
+
+        .status-denied {
+            color: #ff9800;
+            font-weight: 600;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 20px;
+            padding: 20px;
+        }
+
+        .pagination button {
+            padding: 10px 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .pagination button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .pagination button:not(:disabled):hover {
+            background: #0b7dda;
+        }
+
+        .details-button {
+            padding: 5px 12px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .details-button:hover {
+            background: #0b7dda;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 700px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error-message {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2196F3;
+            text-decoration: none;
+        }
+
+        .nav-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="nav-link" title="Zurück zum Operator-Dashboard">← Back to Admin Panel</a>
+
+        <h1>🔍 Audit Logs</h1>
+
+        <div class="stats" id="statsContainer">
+            <!-- Stats will be populated dynamically -->
+        </div>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label for="startDate">Start Date</label>
+                <input type="date" id="startDate" title="Startdatum für den Filterzeitraum" />
+            </div>
+            <div class="filter-group">
+                <label for="endDate">End Date</label>
+                <input type="date" id="endDate" title="Enddatum für den Filterzeitraum" />
+            </div>
+            <div class="filter-group">
+                <label for="actionFilter">Action</label>
+                <select id="actionFilter" title="Audit-Logs nach bestimmter Aktion filtern">
+                    <option value="">All Actions</option>
+                    <option value="device.lock">Device Lock</option>
+                    <option value="device.unlock">Device Unlock</option>
+                    <option value="device.register">Device Register</option>
+                    <option value="device.pair">Device Pair</option>
+                    <option value="device.delete">Device Delete</option>
+                    <option value="task.create">Task Create</option>
+                    <option value="task.complete">Task Complete</option>
+                    <option value="task.approve">Task Approve</option>
+                    <option value="rules.update_blacklist">Rules Update Blacklist</option>
+                    <option value="rules.update_usage">Rules Update Usage</option>
+                    <option value="auth.token_generated">Auth Token Generated</option>
+                    <option value="admin.set_admin_claim">Admin Set Claim</option>
+                    <option value="admin.grant_support_access">Admin Grant Support</option>
+                    <option value="admin.revoke_support_access">Admin Revoke Support</option>
+                    <option value="admin.revoke_subscription">Admin Revoke Subscription</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="statusFilter">Status</label>
+                <select id="statusFilter" title="Audit-Logs nach Ergebnisstatus filtern">
+                    <option value="">All Status</option>
+                    <option value="success">Success</option>
+                    <option value="failure">Failure</option>
+                    <option value="denied">Denied</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="userFilter">User ID</label>
+                <input type="text" id="userFilter" placeholder="Filter by user ID..." title="Audit-Logs nach bestimmter Benutzer-ID filtern" />
+            </div>
+            <div class="filter-group">
+                <button id="apply-logs-filter-btn" title="Ausgewählte Filter auf die Audit-Logs anwenden">Apply Filters</button>
+            </div>
+        </div>
+
+        <div id="errorContainer"></div>
+        <div id="loadingContainer" class="loading is-hidden">Loading logs...</div>
+
+        <table id="logsTable">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                    <th>Resource</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="logsBody">
+                <!-- Logs will be populated dynamically -->
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <button id="logs-prev-page-btn" title="Zur vorherigen Seite der Audit-Logs">Previous</button>
+            <span id="pageInfo">Page 1</span>
+            <button id="logs-next-page-btn" title="Zur nächsten Seite der Audit-Logs">Next</button>
+        </div>
+    </div>
+
+    <!-- Modal for log details -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span id="logs-modal-close" class="close" title="Logdetails schließen">&times;</span>
+            <h2>Log Details</h2>
+            <pre id="logDetails"></pre>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+    <script src="../shared-ui-tooltips.js"></script>
+    <script src="appcheck-init.js"></script>
+    <script src="logs.js"></script>
+</body>
+</html>
