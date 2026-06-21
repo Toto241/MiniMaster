@@ -49,7 +49,7 @@ class MasterFcmService : FirebaseMessagingService() {
     }
 
     /**
-     * Sends the FCM token to the backend via the `updateFcmToken` Cloud Function.
+     * Sends the FCM token to the backend via the `updateFCMToken` Cloud Function.
      * This ensures the backend always has the latest token for this device.
      *
      * @param token The FCM token to register.
@@ -59,7 +59,7 @@ class MasterFcmService : FirebaseMessagingService() {
             try {
                 val data = hashMapOf("fcmToken" to token)
                 FirebaseFunctions.getInstance()
-                    .getHttpsCallable("updateFcmToken")
+                    .getHttpsCallable("updateFCMToken")
                     .call(data)
                     .await()
                 Log.i(TAG, "FCM token successfully registered with backend.")
