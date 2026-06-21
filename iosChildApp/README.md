@@ -99,8 +99,9 @@ setDeviceLocked() ────→ children/{id}/commands/ ────→ fetchP
 ## Cloud Functions (Backend)
 
 ### Authentication
-- `validatePairingCode(code)` → `{ childId, firebaseToken }`
-- `validatePairingToken(token)` → `{ childId, firebaseToken }`
+- `pairAuthenticatedChild(pairingCode)` → `{ childId, masterId? }`
+- `pairAuthenticatedChild(pairingToken)` → `{ childId, masterId? }`
+- Die App meldet sich vor dem Pairing per Firebase Anonymous Auth an; die UID ist der kanonische `childId`.
 
 ### Device Endpoint
 - `registerDeviceEndpoint(childId, token, appVersion, capabilities, provider=apns)`
@@ -112,10 +113,10 @@ setDeviceLocked() ────→ children/{id}/commands/ ────→ fetchP
 
 ### Events
 - `publishDeviceEvent(childId, eventType, payload, idempotencyKey)`
-  - Types: `heartbeat`, `usage_report`, `tamper_detected`, `task_proof`
+  - Types: `heartbeat`, `usage_report`, `tamper_event`, `command_ack`, `policy_applied`
 
 ### Tasks
-- `getTasks(childId)` → `[{ id, description, status, deadline, ... }]`
+- `getTasksForChild(childId)` → `{ tasks: [{ id, description, status, deadline, ... }] }`
 
 ## Firestore Data (Read-Only)
 
@@ -137,7 +138,7 @@ children/{childId}/commands/{commandId}
 └── expiresAt: Timestamp
 
 children/{childId}/events/{eventId}
-├── eventType: String (heartbeat, usage_report, task_proof)
+├── eventType: String (heartbeat, usage_report, tamper_event, command_ack, policy_applied)
 ├── payload: { JSON }
 ├── createdAt: Timestamp
 └── deviceVersion: Int (policyVersion zur Zeit des Events)
@@ -192,9 +193,9 @@ Hinweis zur iOS-App-Blacklist:
 ```
 1. ChildPairingView: User gibt 6-stelligen Code ein
 2. ChildAuthService.pairWithCode(code)
-   → validatePairingCode() → customToken
-3. Firebase.signIn(withCustomToken:)
-4. Gespeichert: childId, Token in Keychain
+   → ensureAnonymousAuth() → pairAuthenticatedChild(pairingCode)
+3. Backend bestätigt das Pairing für die bereits authentifizierte Firebase-UID.
+4. Gespeichert: childId in UserDefaults; FirebaseAuth hält die Session.
 5. CommandSyncService.configure(childId: ...)
 6. MainChildView eingeblendet
 ```

@@ -89,7 +89,7 @@ This PR completes the following changes. Reviewers should pay attention to the a
 
 1. ✅ Das Kinder-Panel rendert Support-Tickets und Fehlerzustaende nicht mehr ueber unescaped HTML-Strings, sondern ueber DOM-APIs. Damit ist der bestaetigte DOM-XSS-Pfad aus dem Ticket-Listing unmittelbar reduziert.
 2. ✅ Die Workflow-Haertung wurde vereinheitlicht: bislang fehlende explizite `permissions`-Bloecke werden jetzt fuer die betroffenen CI-Workflows nachgezogen, waehrend strengere bestehende Workflows unveraendert bleiben.
-3. ✅ Die Firebase-Android-Konfigurationen sind im aktuellen Git-Stand nicht getrackt. Die Templates in [masterApp/google-services.template.json](masterApp/google-services.template.json) und [childApp/google-services.template.json](childApp/google-services.template.json) bleiben die alleinige Repository-Quelle.
+3. ✅ Die Firebase-Android-Konfigurationen sind im aktuellen Git-Stand nicht getrackt. Die Templates in [masterApp/google-services.template.json](../masterApp/google-services.template.json) und [childApp/google-services.template.json](../childApp/google-services.template.json) bleiben die alleinige Repository-Quelle.
 4. ✅ Der Legacy-Web-Auth-Cutover fuer die Ziel-Panels ist umgesetzt: Web-Control und Kinder-Panel akzeptieren keine Secret-Key-Anmeldung mehr. Das Eltern-Panel erzeugt fuer beide Ziele kurzlebige sichere Sitzungslinks ueber `createMasterWebBootstrapToken`.
 5. ✅ Lint-Warnings bereinigt (0 Errors, 0 Warnings).
 6. ✅ Static readiness checks korrigiert und vollstaendig grün (26/26).

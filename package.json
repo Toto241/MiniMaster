@@ -62,7 +62,9 @@
     "protobufjs": "7.6.3",
     "qs": "^6.15.2",
     "@google-cloud/storage": "^7.21.0",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "js-yaml": "^4.2.0",
+    "ts-deepmerge": "^8.0.0"
   },
   "resolutions": {
     "google-gax": "^5.0.6",
@@ -74,7 +76,9 @@
     "protobufjs": "7.6.3",
     "qs": "^6.15.2",
     "@google-cloud/storage": "^7.21.0",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "js-yaml": "^4.2.0",
+    "ts-deepmerge": "^8.0.0"
   },
   "engines": {
     "node": ">=22"

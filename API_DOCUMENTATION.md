@@ -6,8 +6,10 @@ This document provides comprehensive documentation for all Cloud Functions in th
 
 Most Cloud Functions require an authenticated Firebase user context.
 
-- Device ownership and authorization are enforced via server-side checks (`masterId`/`childId`, `secretKey`, ownership relations).
-- `generateCustomToken` additionally supports web-control login via `masterImei + secretKey`.
+- Device ownership and authorization are enforced via server-side checks (`masterId`/`childId`, ownership relations).
+- Modern Android/iOS clients authenticate first (anonymous or email/password Firebase Auth) and then call
+  authenticated registration/pairing functions. Legacy `masterImei + secretKey` flows are frozen behind
+  cutover controls and must not be used by new clients.
 - Field names like `imei`, `masterImei`, `childImei` are legacy API names and currently carry app-scoped stable device IDs (not Telephony IMEI reads in Android apps).
 
 ## Cloud Functions
@@ -113,6 +115,49 @@ Registers a new master (parent) device in the system.
 {
   success: boolean,
   message: string
+}
+```
+
+### 3a. registerAuthenticatedMaster
+
+Registers or refreshes a master device for the already authenticated Firebase caller.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  deviceId?: string,      // Optional: app-scoped stable device ID
+  deviceName?: string     // Optional: human-readable device name
+}
+```
+
+**Response**:
+```typescript
+{
+  masterId: string        // Equal to context.auth.uid
+}
+```
+
+### 3b. pairAuthenticatedChild
+
+Pairs the already authenticated child Firebase caller with a master using either a 6-digit code or a token.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  pairingCode?: string,   // 6-digit code from the parent app
+  pairingToken?: string   // Token from pairing link / QR flow
+}
+```
+
+**Response**:
+```typescript
+{
+  childId: string,        // Equal to context.auth.uid
+  masterId: string
 }
 ```
 
@@ -376,6 +421,45 @@ Creates a new task assigned to a child device.
 - `not-found`: Master account not found
 - `permission-denied`: Master not authorized for this child
 - `resource-exhausted`: No active subscription or trial
+
+### getTasksForChild
+
+Returns the latest tasks for a child. The caller must be the child device itself or the owning master.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**:
+```typescript
+{
+  childId: string,        // Required: Child device ID
+  limit?: number          // Optional: 1..100, default 50
+}
+```
+
+**Response**:
+```typescript
+{
+  tasks: Array<{
+    id: string,
+    description: string,
+    status: "pending" | "pending_approval" | "approved" | "rejected",
+    photoUrl: string | null,
+    deadline: unknown,
+    createdAt: unknown,
+    completedAt: unknown,
+    updatedAt: unknown,
+    unlockDuration: number | null,
+    unlockUntil: unknown,
+    rejectionReason: string | null,
+    aiAnalysis: unknown
+  }>
+}
+```
+
+**Errors**:
+- `invalid-argument`: Missing/invalid `childId` or `limit`
+- `not-found`: Child document not found
+- `permission-denied`: Caller is not the child device or owning master
 
 ### completeTask
 
@@ -1025,7 +1109,7 @@ Trial: 7-day trial starts on first pairing (`trial_pending` → `trial`); `trial
 
 ## AI Task Photo Analysis
 
-`completeTask` validates that `photoUrl` is a valid Firebase Storage URL (`https://firebasestorage.googleapis.com/...`) and enforces a max length of 2048 characters to prevent SSRF and injection attacks.
+`completeTask` validates that `photoUrl` is a valid Firebase Storage URL (`https://firebasestorage.googleapis.com/...`) and enforces a max length of 2048 characters to prevent SSRF and injection attacks. The referenced object must be in the calling child's own `children/{childId}/photos/` or `proofs/{childId}/` path, have an allowed image MIME type, be 256 bytes to 5 MB in size, and pass the EXIF-GPS privacy scan.
 
 `analyzeTaskPhoto` (Firestore trigger on task status change to `pending_approval`):
 

@@ -38,7 +38,7 @@ Sources/MiniMasterParent/
 │   ├── ChildDevice.swift               # Device-Daten + Status
 │   └── TaskItem.swift                  # Task mit Status/AI-Analyse
 ├── Services/
-│   ├── AuthService.swift               # Firebase Auth + CustomToken-Session
+│   ├── AuthService.swift               # Firebase Auth + authenticated registration
 │   ├── CloudFunctionsClient.swift      # Alle callable functions
 │   └── SubscriptionService.swift       # StoreKit2 + Verify
 ├── ViewModels/
@@ -57,7 +57,8 @@ Sources/MiniMasterParent/
 Diese App ruft folgende Firebase Cloud Functions auf:
 
 ### Authentifizierung
-- `registerMasterDevice(imei, deviceName?)` → `{ masterId, customToken }`
+- `registerAuthenticatedMaster(deviceId, deviceName?)` → `{ masterId }`
+- Die App meldet sich vor dem Callable per Firebase Anonymous Auth an; die UID ist der kanonische `masterId`.
 - Kein separater Legacy-`login(imei, secretKey, ...)`-Schritt mehr im iOS-Client.
 - Cold-Start nutzt FirebaseAuth-Sessionpersistenz statt lokaler `secretKey`-Speicherung.
 

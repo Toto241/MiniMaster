@@ -19,10 +19,10 @@ Der QA Release Workspace erweitert das bestehende Admin-Panel um eine fokussiert
 
 ## Technische Bausteine
 
-- Frontend-Rendering: [admin-panel/app.js](admin-panel/app.js)
-- Pure Helper: [admin-panel/modules/tabs/qa-release-workspace.js](admin-panel/modules/tabs/qa-release-workspace.js)
-- Python-Aggregation: [python_admin/app.py](python_admin/app.py)
-- PowerShell-Automation: [scripts/qa-release-workspace.ps1](scripts/qa-release-workspace.ps1)
+- Frontend-Rendering: [admin-panel/app.js](../admin-panel/app.js)
+- Pure Helper: [admin-panel/modules/tabs/qa-release-workspace.js](../admin-panel/modules/tabs/qa-release-workspace.js)
+- Python-Aggregation: [python_admin/app.py](../python_admin/app.py)
+- PowerShell-Automation: [scripts/qa-release-workspace.ps1](../scripts/qa-release-workspace.ps1)
 
 ## Agentenbild
 

@@ -2,11 +2,11 @@
 
 ## Scope
 
-Analysiert wurden die sicherheitskritischen Backend-Module in [src/auth.ts](src/auth.ts), [src/support.ts](src/support.ts), [src/admin.ts](src/admin.ts), [src/device.ts](src/device.ts), [src/device-sync.ts](src/device-sync.ts), [src/tasks.ts](src/tasks.ts), [src/pairing.ts](src/pairing.ts), [src/triggers.ts](src/triggers.ts), [src/shared.ts](src/shared.ts), [firestore.rules](firestore.rules) und [storage.rules](storage.rules).
+Analysiert wurden die sicherheitskritischen Backend-Module in [src/auth.ts](../src/auth.ts), [src/support.ts](../src/support.ts), [src/admin.ts](../src/admin.ts), [src/device.ts](../src/device.ts), [src/device-sync.ts](../src/device-sync.ts), [src/tasks.ts](../src/tasks.ts), [src/pairing.ts](../src/pairing.ts), [src/triggers.ts](../src/triggers.ts), [src/shared.ts](../src/shared.ts), [firestore.rules](../firestore.rules) und [storage.rules](../storage.rules).
 
 ## Executive Summary
 
-Das Backend ist insgesamt deutlich reifer als die übrigen Plattformteile. Positiv sind die zentrale Auth- und Audit-Infrastruktur, die konsistente Nutzung von `HttpsError`, Ownership-Prüfungen vor Mutationen und die relativ breite Testabdeckung im Ordner [test](test).
+Das Backend ist insgesamt deutlich reifer als die übrigen Plattformteile. Positiv sind die zentrale Auth- und Audit-Infrastruktur, die konsistente Nutzung von `HttpsError`, Ownership-Prüfungen vor Mutationen und die relativ breite Testabdeckung im Ordner [test](../test).
 
 Die höchsten realen Risiken lagen nicht in den Standard-CRUD-Flows, sondern in administrativen und Support-nahen Pfaden:
 
@@ -18,32 +18,32 @@ Diese drei Punkte wurden im Rahmen dieser Arbeit direkt behoben.
 
 In einer zweiten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
 
-1. Recovery- und Legacy-Secret-Vergleiche in [src/auth.ts](src/auth.ts) laufen jetzt über einen konstanten Vergleich statt einfacher String-Gleichheit.
-2. Mehrere mutierende Device-Endpunkte in [src/device.ts](src/device.ts) erzwingen jetzt konsistent App Check.
+1. Recovery- und Legacy-Secret-Vergleiche in [src/auth.ts](../src/auth.ts) laufen jetzt über einen konstanten Vergleich statt einfacher String-Gleichheit.
+2. Mehrere mutierende Device-Endpunkte in [src/device.ts](../src/device.ts) erzwingen jetzt konsistent App Check.
 
 In einer dritten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
 
-1. Privilegierte Admin- und Operator-Callables in [src/admin.ts](src/admin.ts) erzwingen jetzt konsistent App Check.
-2. Die App-Check-Initialisierung im [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) wurde an den produktionsnäheren Modus aus [web-control/appcheck-init.js](web-control/appcheck-init.js) angeglichen.
+1. Privilegierte Admin- und Operator-Callables in [src/admin.ts](../src/admin.ts) erzwingen jetzt konsistent App Check.
+2. Die App-Check-Initialisierung im [admin-panel/appcheck-init.js](../admin-panel/appcheck-init.js) wurde an den produktionsnäheren Modus aus [web-control/appcheck-init.js](../web-control/appcheck-init.js) angeglichen.
 
 In einer vierten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
 
-1. Sensible Support-Callables in [src/support.ts](src/support.ts) erzwingen jetzt ebenfalls konsistent App Check.
+1. Sensible Support-Callables in [src/support.ts](../src/support.ts) erzwingen jetzt ebenfalls konsistent App Check.
 2. Der Operator-Assistent `aiExplainProblem` wurde zusätzlich mit einem dedizierten Rate Limit versehen.
 
 In einer fünften Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
 
-1. Die un-authentifizierten Legacy-Branches in [src/auth.ts](src/auth.ts) erzwingen jetzt App Check.
+1. Die un-authentifizierten Legacy-Branches in [src/auth.ts](../src/auth.ts) erzwingen jetzt App Check.
 2. Die Legacy-Pfade `generateCustomToken` und `registerMasterDevice` haben zusätzliche Missbrauchsgrenzen über lokale Rate Limits erhalten.
 
 In einer sechsten Härtungsrunde wurden zusätzlich zwei weitere Maßnahmen umgesetzt:
 
-1. Die destruktiven Reset-Endpunkte in [src/auth.ts](src/auth.ts) sind jetzt zusätzlich über eine Projekt-Allowlist für Deployments abgesichert.
-2. Auch Reset-Aufrufe mit Admin-Kontext oder Recovery-Token erzwingen jetzt App Check, und [src/auth.ts](src/auth.ts) stellt den Guard-Status im Health-Endpunkt transparenter bereit.
+1. Die destruktiven Reset-Endpunkte in [src/auth.ts](../src/auth.ts) sind jetzt zusätzlich über eine Projekt-Allowlist für Deployments abgesichert.
+2. Auch Reset-Aufrufe mit Admin-Kontext oder Recovery-Token erzwingen jetzt App Check, und [src/auth.ts](../src/auth.ts) stellt den Guard-Status im Health-Endpunkt transparenter bereit.
 
 In einer siebten Härtungsrunde wurde zusaetzlich ein unmittelbar bestaetigter Web-Pfad entschaerft:
 
-1. Das Ticket-Rendering im [child-panel/index.html](child-panel/index.html) verwendet fuer Support-Tickets und Fehlerzustaende jetzt DOM-APIs statt zusammengebauter `innerHTML`-Strings.
+1. Das Ticket-Rendering im [child-panel/index.html](../child-panel/index.html) verwendet fuer Support-Tickets und Fehlerzustaende jetzt DOM-APIs statt zusammengebauter `innerHTML`-Strings.
 
 ## Angriffsflächen
 
@@ -51,7 +51,7 @@ In einer siebten Härtungsrunde wurde zusaetzlich ein unmittelbar bestaetigter W
 
 Betroffene Stellen:
 
-- [src/auth.ts](src/auth.ts)
+- [src/auth.ts](../src/auth.ts)
 
 Konkrete Endpunkte:
 
@@ -84,7 +84,7 @@ Restrisiko:
 
 Betroffene Stellen:
 
-- [src/support.ts](src/support.ts)
+- [src/support.ts](../src/support.ts)
 
 Konkreter Pfad:
 
@@ -110,7 +110,7 @@ Restrisiko:
 
 Betroffene Stellen:
 
-- [src/support.ts](src/support.ts)
+- [src/support.ts](../src/support.ts)
 
 Konkrete Pfade:
 
@@ -145,9 +145,9 @@ Restrisiko:
 
 Betroffene Stellen:
 
-- [src/admin.ts](src/admin.ts)
-- [src/support.ts](src/support.ts)
-- [src/triggers.ts](src/triggers.ts)
+- [src/admin.ts](../src/admin.ts)
+- [src/support.ts](../src/support.ts)
+- [src/triggers.ts](../src/triggers.ts)
 
 Bewertung:
 
@@ -168,9 +168,9 @@ Restrisiko:
 
 Betroffene Stellen:
 
-- [src/auth.ts](src/auth.ts)
-- [docs/LEGACY_AUTH_INVENTORY.md](docs/LEGACY_AUTH_INVENTORY.md)
-- [docs/AUTH_MIGRATION_PLAN.md](docs/AUTH_MIGRATION_PLAN.md)
+- [src/auth.ts](../src/auth.ts)
+- [docs/LEGACY_AUTH_INVENTORY.md](LEGACY_AUTH_INVENTORY.md)
+- [docs/AUTH_MIGRATION_PLAN.md](AUTH_MIGRATION_PLAN.md)
 
 Bewertung:
 
@@ -192,15 +192,15 @@ Restrisiko:
 
 Bewertung:
 
-- Die fruehere Annahme, im Electron-Desktop fehle eine explizite `contextIsolation`, trifft auf den geprueften Stand nicht zu. [desktop/main.js](desktop/main.js) setzt `contextIsolation: true` bereits explizit.
-- Die pauschale SRI-Kritik fuer das Web-Control-Panel war zu breit. [web-control/index.html](web-control/index.html) nutzt fuer seine externen Skripte bereits Integrity-Attribute.
-- Ein echter, unmittelbar bestaetigter DOM-XSS-Pfad lag dagegen im [child-panel/index.html](child-panel/index.html) vor und wurde deshalb priorisiert adressiert.
+- Die fruehere Annahme, im Electron-Desktop fehle eine explizite `contextIsolation`, trifft auf den geprueften Stand nicht zu. [desktop/main.js](../desktop/main.js) setzt `contextIsolation: true` bereits explizit.
+- Die pauschale SRI-Kritik fuer das Web-Control-Panel war zu breit. [web-control/index.html](../web-control/index.html) nutzt fuer seine externen Skripte bereits Integrity-Attribute.
+- Ein echter, unmittelbar bestaetigter DOM-XSS-Pfad lag dagegen im [child-panel/index.html](../child-panel/index.html) vor und wurde deshalb priorisiert adressiert.
 
 ### Flaches Firestore-Modell
 
 Betroffene Stellen:
 
-- [firestore.rules](firestore.rules)
+- [firestore.rules](../firestore.rules)
 
 Bewertung:
 
@@ -211,7 +211,7 @@ Bewertung:
 
 Betroffene Stellen:
 
-- [src/admin.ts](src/admin.ts)
+- [src/admin.ts](../src/admin.ts)
 
 Bewertung:
 
@@ -227,7 +227,7 @@ Umgesetzt:
 
 ### P0
 
-- Legacy-Auth-Cutover aus [docs/AUTH_MIGRATION_PLAN.md](docs/AUTH_MIGRATION_PLAN.md) fortsetzen und neue UI-/Client-Pfade auf reines Firebase Auth umstellen.
+- Legacy-Auth-Cutover aus [docs/AUTH_MIGRATION_PLAN.md](AUTH_MIGRATION_PLAN.md) fortsetzen und neue UI-/Client-Pfade auf reines Firebase Auth umstellen.
 - Recovery-Token für All-User-Reset in Secret-Management und Betriebsprozess rotierbar machen.
 
 ### P1
@@ -249,7 +249,7 @@ Umgesetzt:
 - Konstante Secret-Vergleiche für Recovery-Token und Legacy-`secretKey` in `generateCustomToken`
 - App-Check-Erzwingung für mutierende Device-Callables wie `updateAppBlacklist`, `setUsageRules`, `recordHeartbeat`, `registerFcmToken`, `updateFCMToken`, `reportDailyUsage` und `reportTamperEvent`
 - App-Check-Erzwingung für privilegierte Admin-Callables wie `deleteUserAccount`, `adminHealthCheck`, `testGeminiConnection`, `getKnowledgeBase`, `updateKnowledgeBase`, `sendTestFcmMessage`, `triggerScheduledJob` und `analyzeSystemErrors`
-- Angleichung von [admin-panel/appcheck-init.js](admin-panel/appcheck-init.js) an die operative Site-Key-Konfiguration aus [web-control/appcheck-init.js](web-control/appcheck-init.js)
+- Angleichung von [admin-panel/appcheck-init.js](../admin-panel/appcheck-init.js) an die operative Site-Key-Konfiguration aus [web-control/appcheck-init.js](../web-control/appcheck-init.js)
 - App-Check-Erzwingung für sensible Support-Callables wie `createSupportTicket`, `analyzeWithDebugData`, `grantDebugAccess`, `processUserReplyMessage`, `getTicketUserData` und `aiExplainProblem`
 - Dediziertes Rate Limit für den Operator-Assistenten `aiExplainProblem`
 - App-Check-Erzwingung für die un-authentifizierten Legacy-Zweige von `generateCustomToken` und `registerMasterDevice`
