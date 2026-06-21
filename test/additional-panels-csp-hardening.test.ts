@@ -8,6 +8,11 @@ describe("Additional Panels CSP Hardening", () => {
   const startJs = readFileSync(path.join(__dirname, "..", "start.js"), "utf8");
   const launcherHtml = readFileSync(path.join(__dirname, "..", "desktop", "launcher.html"), "utf8");
   const launcherJs = readFileSync(path.join(__dirname, "..", "desktop", "launcher.js"), "utf8");
+  const adminModulesIndex = readFileSync(path.join(__dirname, "..", "admin-panel", "modules", "index.js"), "utf8");
+  const cspRuntimeMigrator = readFileSync(
+    path.join(__dirname, "..", "admin-panel", "modules", "core", "csp-runtime-migrator.js"),
+    "utf8"
+  );
 
   describe("admin-panel/logs.html", () => {
     it("removes all inline onclick handlers from logs.html", () => {
@@ -54,6 +59,27 @@ describe("Additional Panels CSP Hardening", () => {
 
     it("has idle timeout setup in launcher.js", () => {
       expect(launcherJs).toContain("idleTimeoutMs");
+    });
+  });
+
+  describe("admin-panel generated DOM CSP compatibility", () => {
+    it("loads the runtime migrator before legacy app.js executes", () => {
+      expect(adminModulesIndex).toContain("import \"./core/csp-runtime-migrator.js\";");
+    });
+
+    it("migrates generated inline events without eval or new Function", () => {
+      expect(cspRuntimeMigrator).toContain("onclick");
+      expect(cspRuntimeMigrator).toContain("onchange");
+      expect(cspRuntimeMigrator).toContain("MutationObserver");
+      expect(cspRuntimeMigrator).toContain("addEventListener");
+      expect(cspRuntimeMigrator).not.toContain("new Function");
+      expect(cspRuntimeMigrator).not.toContain("eval(");
+    });
+
+    it("migrates generated inline styles into stylesheet-backed classes", () => {
+      expect(cspRuntimeMigrator).toContain("insertRule");
+      expect(cspRuntimeMigrator).toContain("removeAttribute(\"style\")");
+      expect(cspRuntimeMigrator).toContain("mm-csp-style-");
     });
   });
 });
