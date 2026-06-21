@@ -53,7 +53,7 @@ import java.util.Locale
  */
 class MiniMasterAccessibilityService : AccessibilityService() {
 
-    private var currentTaskStatus: TaskStatus = TaskStatus.PENDING
+    private var currentTaskStatus: TaskStatus = TaskStatus.NONE
     private var unlockEndTime: Long = 0 // System.currentTimeMillis() + unlockDuration in ms
 
     /**
@@ -63,22 +63,30 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     private val taskStatusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.google.pairing.TASK_STATUS_UPDATE") {
+                val hasActiveTask = intent.getBooleanExtra("has_active_task", true)
                 val statusString = intent.getStringExtra("task_status")
                 val unlockDuration = intent.getLongExtra("unlock_duration", 0)
 
-                currentTaskStatus = TaskStatus.fromString(statusString ?: TaskStatus.PENDING.value)
+                currentTaskStatus = if (hasActiveTask) {
+                    TaskStatus.fromString(statusString)
+                } else {
+                    TaskStatus.NONE
+                }
 
                 if (currentTaskStatus == TaskStatus.APPROVED && unlockDuration > 0) {
                     // Start the timer for unlocking
                     unlockEndTime = System.currentTimeMillis() + unlockDuration * 60 * 1000 // minutes to milliseconds
+                    persistUnlockEndTime(unlockEndTime)
                     Log.d(TAG, "Task approved. Unlocking for $unlockDuration minutes. End time: $unlockEndTime")
                     processDeterministicEvent(
                         DeviceEventType.DEVICE_UNLOCKED,
                         mapOf("unlockDurationMinutes" to unlockDuration.toString())
                     )
-                } else if (currentTaskStatus != TaskStatus.APPROVED) {
+                } else {
                     // Reset the timer if status is not APPROVED
+                    // or if an approved task has no positive unlock duration.
                     unlockEndTime = 0
+                    persistUnlockEndTime(0)
                 }
             }
         }
@@ -87,6 +95,8 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "MiniMasterAccessService"
         private const val CHECK_INTERVAL = 1000L // 1 second
+        private const val TASK_LOCK_PREFS = "task_lock_state"
+        private const val KEY_UNLOCK_END_TIME = "unlock_end_time"
         // Settings package names that could be used to disable the service
         private val SETTINGS_PACKAGES = setOf(
             "com.android.settings",
@@ -168,6 +178,7 @@ class MiniMasterAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        unlockEndTime = loadPersistedUnlockEndTime()
         // Register as not exported since only in-app broadcasts are expected.
         val filter = IntentFilter("com.google.pairing.TASK_STATUS_UPDATE")
         ContextCompat.registerReceiver(
@@ -368,7 +379,23 @@ class MiniMasterAccessibilityService : AccessibilityService() {
             return false
         }
         // If the task is pending or rejected, the device should be locked
-        return currentTaskStatus == TaskStatus.PENDING || currentTaskStatus == TaskStatus.REJECTED
+        return currentTaskStatus == TaskStatus.PENDING ||
+            currentTaskStatus == TaskStatus.PENDING_APPROVAL ||
+            currentTaskStatus == TaskStatus.REJECTED
+    }
+
+    private fun loadPersistedUnlockEndTime(): Long {
+        return getSharedPreferences(TASK_LOCK_PREFS, Context.MODE_PRIVATE)
+            .getLong(KEY_UNLOCK_END_TIME, 0L)
+            .takeIf { it > System.currentTimeMillis() }
+            ?: 0L
+    }
+
+    private fun persistUnlockEndTime(value: Long) {
+        getSharedPreferences(TASK_LOCK_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_UNLOCK_END_TIME, value)
+            .apply()
     }
 
     /**
