@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Einrichtungs-Assistenten (Wizards)**: Mehrere geführte Wizards für die Einrichtung von MiniMaster — von null beginnend oder je Konfiguration.
+  - **Backend** `src/wizard-progress.ts`: generischer Fortschritts-Tracker (`getWizardProgress` / `setWizardProgress` / `listWizardProgress`) pro Nutzer in `wizardProgress/{uid}` (validiert, größenbegrenzt, nur nicht-geheime Daten), neue Audit-Aktion `wizard.progress_update`, Firestore-Deny-Regel (nur Cloud Functions).
+  - **Wizard-Hub** (`admin-panel/wizards.html`): zentrale Übersicht aller Assistenten mit Live-Fortschritt und Projekt-Readiness; verlinkt aus dem Betreiber-Dashboard.
+  - **Komplett-Einrichtung von Null** (`admin-panel/setup-complete-wizard.html`): orchestriert Firebase → Secrets → Rollen/Admin-PIN → Commissioning-Gates → Validierung.
+  - **Eltern-Onboarding** (`parent-panel/onboarding-wizard.html`): Kindgerät koppeln, erste Regeln/Aufgaben, Abo prüfen.
+  - **Kind-Pairing & Berechtigungen** (`child-panel/pairing-wizard.html`): Koppeln per Code/Link + Erklärung der nötigen Berechtigungen.
+  - **Konfig-Wizards** (`admin-panel/config-wizards.html`): Externe Integrationen, Abo/Preise (informativ), Backup & Reset.
+  - Alle Wizards CSP-konform (keine Inline-Handler/Skripte) und mit Fortschritts-Persistenz; 9 neue Backend-Tests.
 - **Vollständige Projektlöschung** (`purgeAllProjectData`): Neue Admin-Cloud-Function, die ALLE Projektdaten unwiderruflich entfernt — sämtliche Firestore-Collections inkl. verschachtelter Subcollections (`usageHistory`, `tamperEvents`, `commands`, `events`, `conversationHistory` …), alle Cloud-Storage-Objekte und optional alle Firebase-Auth-Nutzer. Ergänzt `deleteUserAccount` (Einzelkonto) und `resetAllAuthUsers` (nur Auth). Abgesichert durch dieselbe Reset-Gating (Feature-Flag, Projekt-Allowlist, Admin/Recovery-Token, T4 + Admin-PIN, Bestätigungstext `DELETE_ALL_PROJECT_DATA`).
 - Betreiber-Dashboard: Button „🗑️ Alle Projektdaten löschen" im Einrichtungs-/Recovery-Bereich mit Doppelbestätigung.
 - 8 neue Tests (`test/purge-project-data.test.ts`) für Gating, Firestore-/Storage-/Auth-Löschung und Fehlerpfade.
