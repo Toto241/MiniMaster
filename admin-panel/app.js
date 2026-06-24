@@ -11586,6 +11586,20 @@ function renderAdminActivationContent(user) {
             </div>
             <div id="reset-all-users-health" class="phase-status" style="margin-block-start: 8px"></div>
             <div id="reset-all-users-status" class="phase-status" style="margin-block-start: 8px"></div>
+
+            <hr style="margin: 14px 0; border: none; border-block-start: 1px solid #bbf7d0;" />
+            <p>
+                <strong>Vollständige Projektlöschung:</strong> Löscht <strong>ALLE</strong> Projektdaten
+                unwiderruflich — sämtliche Firestore-Collections (Master, Kinder, Aufgaben, Abos,
+                Support, Logs …), alle Cloud-Storage-Dateien und alle Auth-Nutzer. Nur für
+                Neuaufsetzung/Stilllegung gedacht.
+            </p>
+            <div class="phase-actions" style="margin-block-start: 12px">
+                <button onclick="purgeAllProjectDataFromOnboarding()" class="btn btn-danger" id="btn-purge-all-project-data">
+                    🗑️ Alle Projektdaten löschen
+                </button>
+            </div>
+            <div id="purge-all-project-data-status" class="phase-status" style="margin-block-start: 8px"></div>
             <div id="reset-debug-log" style="margin-block-start: 10px; background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; max-block-size: 300px; overflow-y: auto; display: none; white-space: pre-wrap;"></div>
         </div>
 
@@ -12127,6 +12141,94 @@ async function resetAllUsersFromOnboarding() {
             btn.textContent = "🧨 Alle Nutzer zurücksetzen";
         }
         window._resetBlocksPhaseChange = false;
+    }
+}
+
+async function purgeAllProjectDataFromOnboarding() {
+    const btn = document.getElementById("btn-purge-all-project-data");
+    const statusEl = document.getElementById("purge-all-project-data-status");
+    const requestId = `ui-purge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ORIGINAL_LABEL = "🗑️ Alle Projektdaten löschen";
+
+    if (!functions) {
+        if (statusEl) statusEl.innerHTML = "<div class='error'>❌ Firebase Functions ist nicht initialisiert. Seite neu laden.</div>";
+        return;
+    }
+
+    const firstConfirm = window.confirm(
+        "ACHTUNG: ALLE Projektdaten unwiderruflich löschen?\n\n" +
+        "Dies entfernt sämtliche Firestore-Collections, alle Cloud-Storage-Dateien und alle Auth-Nutzer.\n" +
+        "Diese Aktion kann NICHT rückgängig gemacht werden."
+    );
+    if (!firstConfirm) {
+        if (statusEl) statusEl.innerHTML = "<div class='info'>Löschung abgebrochen.</div>";
+        return;
+    }
+
+    const typed = window.prompt("Zur Bestätigung exakt eingeben: DELETE_ALL_PROJECT_DATA");
+    if ((typed || "").trim() !== "DELETE_ALL_PROJECT_DATA") {
+        if (statusEl) statusEl.innerHTML = `<div class='error'>Bestätigung abgebrochen: Text stimmt nicht überein. Eingabe war: <code>${escapeHtml(String(typed || "(leer)"))}</code></div>`;
+        return;
+    }
+
+    if (!(await ensureOperatorTier("T4"))) {
+        if (statusEl) statusEl.innerHTML = "<div class='info'>Löschung abgebrochen — Admin-PIN/Re-Auth erforderlich.</div>";
+        return;
+    }
+
+    const recoveryToken = (window.prompt(
+        "Optional: Recovery-Token eingeben (nur nötig, wenn Sie kein Admin sind oder Zugangsdaten verloren wurden)."
+    ) || "").trim();
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ Lösche alle Projektdaten...";
+    }
+    if (statusEl) {
+        statusEl.innerHTML = `<div class='loading'>Projektlöschung wird ausgeführt...</div><div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(requestId)}</code></div>`;
+    }
+
+    try {
+        const purgeFn = functions.httpsCallable("purgeAllProjectData");
+        const result = await purgeFn({
+            confirmText: "DELETE_ALL_PROJECT_DATA",
+            requestId,
+            includeAuthUsers: true,
+            includeCurrentSessionUser: true,
+            recoveryToken,
+        });
+        const data = result?.data || {};
+        const collections = Number(data.collectionsClearedCount || 0);
+        const files = Number(data.storageFilesDeleted || 0);
+        const deletedUsers = Number(data.deletedUsers || 0);
+        const backendRequestId = String(data.requestId || requestId);
+        const storageWarning = data.storageWarning
+            ? `<div class='info' style='margin-block-start:6px'>⚠ Storage-Hinweis: ${escapeHtml(String(data.storageWarning))}</div>`
+            : "";
+
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='success-box'>✅ Projektlöschung abgeschlossen. Collections: <strong>${escapeHtml(String(collections))}</strong>, Storage-Dateien: <strong>${escapeHtml(String(files))}</strong>, Nutzer: <strong>${escapeHtml(String(deletedUsers))}</strong>.</div>${storageWarning}<div class='info' style='margin-block-start:6px'>Request-ID: <code>${escapeHtml(backendRequestId)}</code></div><div style='margin-block-start:10px'><button class='btn btn-primary' onclick='auth.signOut().then(function(){window.location.reload()})'>Weiter zur Anmeldung →</button></div>`;
+        }
+        showNotification(`Projektlöschung abgeschlossen: ${collections} Collections, ${files} Dateien, ${deletedUsers} Nutzer. [${backendRequestId}]`, "success");
+    } catch (error) {
+        let msg = error?.message || "Projektlöschung fehlgeschlagen.";
+        const code = normalizeAuthErrorCode(error);
+        if (code === "failed-precondition") {
+            msg = "Projektlöschung ist deaktiviert. Aktivieren Sie ENABLE_OPERATOR_ACCOUNT_RESET, MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET oder den Emulator-Modus und stellen Sie sicher, dass das Projekt in MINIMASTER_RESET_ALLOWED_PROJECTS freigegeben ist.";
+        } else if (code === "permission-denied") {
+            msg = "Keine Berechtigung für die Projektlöschung. Als Nicht-Admin bitte gültigen Recovery-Token verwenden.";
+        } else if (code === "unauthenticated") {
+            msg = "Nicht angemeldet bzw. Recovery-Token ungültig. Bitte anmelden oder korrekten Recovery-Token eingeben.";
+        }
+        if (statusEl) {
+            statusEl.innerHTML = `<div class='error'>${escapeHtml(msg)}</div>${renderCallableDebugInfo(error, { functionName: "purgeAllProjectData", requestId })}`;
+        }
+        showNotification(msg, "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = ORIGINAL_LABEL;
+        }
     }
 }
 

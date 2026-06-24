@@ -26,6 +26,7 @@ export {
   resetOperatorAccounts,
   resetAllAuthUsers,
   resetAllAuthUsersHealth,
+  purgeAllProjectData,
   getLegacyAuthUsageStats,
   migrateToFamiliesSchema,
   getOperatorAdminPinStatus,

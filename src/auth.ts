@@ -7,7 +7,7 @@ import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
-import { db, auth } from "../firebase";
+import { db, auth, storage } from "../firebase";
 import { requireAdmin, requireAuth, AuditLogger, checkRateLimitShared, validateAppCheck, getTracedLogger, requireTier } from "./shared";
 import type { OperatorRole } from "./shared";
 import {
@@ -1071,6 +1071,273 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
     };
   }
 );
+
+/** Confirmation phrase required to wipe ALL project data. */
+const PURGE_PROJECT_DATA_CONFIRM_TEXT = "DELETE_ALL_PROJECT_DATA";
+
+/**
+ * Recursively deletes every top-level Firestore collection (including all
+ * nested subcollections). Returns the list of collection names that were
+ * processed so callers can audit exactly what was wiped.
+ */
+async function purgeAllFirestoreCollections(): Promise<string[]> {
+  const collections = await db().listCollections();
+  const cleared: string[] = [];
+  for (const collection of collections) {
+    // recursiveDelete walks the whole subtree, so subcollections that the
+    // per-account delete missed (usageHistory, tamperEvents, commands,
+    // events, conversationHistory, …) are removed here as well.
+    await db().recursiveDelete(collection);
+    cleared.push(collection.id);
+  }
+  return cleared;
+}
+
+/**
+ * Deletes every object in the default Cloud Storage bucket (task photos,
+ * exports, uploads, …). Best-effort: returns the number of files removed, or
+ * a warning string if the bucket is missing/unreachable.
+ */
+async function purgeAllStorageObjects(): Promise<{ filesDeleted: number; warning: string | null }> {
+  try {
+    const bucket = storage().bucket();
+    let filesDeleted = 0;
+    try {
+      const [files] = await bucket.getFiles();
+      filesDeleted = files.length;
+    } catch {
+      // Counting is best-effort only; proceed with the deletion regardless.
+    }
+    await bucket.deleteFiles({ force: true });
+    return { filesDeleted, warning: null };
+  } catch (error) {
+    return { filesDeleted: 0, warning: (error as Error).message || "unknown storage cleanup error" };
+  }
+}
+
+/**
+ * Completely deletes ALL data of the current Firebase project: every Firestore
+ * collection (incl. subcollections), every Cloud Storage object and — when
+ * `includeAuthUsers` is set — every Firebase Auth user.
+ *
+ * This is the project-wide counterpart to {@link deleteUserAccount} (single
+ * account) and {@link resetAllAuthUsers} (auth users only). It is guarded by
+ * the same destructive-reset gating: the reset feature must be enabled, the
+ * deployment/project must be allow-listed, the caller must be an admin (or
+ * present a valid recovery token), pass T4 + admin-PIN verification and supply
+ * the exact confirmation phrase `DELETE_ALL_PROJECT_DATA`.
+ */
+export const purgeAllProjectData = functions
+  .runWith({ timeoutSeconds: 540, memory: "1GB" })
+  .https.onCall(
+    async (
+      data: {
+        confirmText?: string;
+        requestId?: string;
+        includeAuthUsers?: boolean;
+        includeCurrentSessionUser?: boolean;
+        recoveryToken?: string;
+      },
+      context: CallableContext
+    ) => {
+      const { logger, traceId } = getTracedLogger(context, "purgeAllProjectData");
+      const startTime = Date.now();
+
+      const resetEnabled = isOperatorResetEnabled();
+
+      const recoveryTokens = getAdminRecoveryTokens();
+      const recoveryTokenData = typeof data?.recoveryToken === "string" ? data.recoveryToken.trim() : "";
+      const recoveryTokenAllowed =
+        recoveryTokens.length > 0 &&
+        recoveryTokenData.length > 0 &&
+        recoveryTokens.some((expected) => safeSecretEquals(expected, recoveryTokenData));
+
+      const callerRole = context.auth && typeof context.auth.token.role === "string" ? context.auth.token.role : "";
+
+      if (!resetEnabled) {
+        requireAdmin(context);
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Project data purge is disabled. Enable via FUNCTIONS_EMULATOR=true, ENABLE_OPERATOR_ACCOUNT_RESET=true, or MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET=true."
+        );
+      }
+
+      assertResetDeploymentAllowed();
+
+      if (!context.auth && !recoveryTokenAllowed) {
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Sie müssen angemeldet sein oder einen gültigen Recovery-Token angeben."
+        );
+      }
+
+      if (!recoveryTokenAllowed && callerRole !== "admin") {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "Admin privileges or a valid recovery token are required to purge all project data."
+        );
+      }
+
+      if (context.auth && !recoveryTokenAllowed) {
+        requireTier(context, "T4", "purgeAllProjectData");
+        await requireAdminPinVerification(context, "purgeAllProjectData");
+      }
+
+      validateAppCheck(context, true);
+
+      const confirmText = typeof data?.confirmText === "string" ? data.confirmText.trim() : "";
+      if (confirmText !== PURGE_PROJECT_DATA_CONFIRM_TEXT) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          `confirmText must be exactly ${PURGE_PROJECT_DATA_CONFIRM_TEXT}.`
+        );
+      }
+
+      const includeAuthUsers = data?.includeAuthUsers !== false; // default: true
+      const includeCurrentSessionUser = data?.includeCurrentSessionUser === true;
+      const requestId =
+        typeof data?.requestId === "string" && data.requestId.trim().length > 0
+          ? data.requestId.trim().slice(0, 80)
+          : `srv-purge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      const callerUid = context.auth?.uid || "recovery-token";
+
+      logger.warn("purgeAllProjectData invoked.", {
+        requestId,
+        requestedBy: callerUid,
+        requestedByRole: callerRole || "none",
+        includeAuthUsers,
+        includeCurrentSessionUser,
+        recoveryTokenUsed: recoveryTokenAllowed,
+      });
+
+      try {
+        // 1) Firestore: wipe every collection and all nested subcollections.
+        const collectionsCleared = await purgeAllFirestoreCollections();
+
+        // 2) Cloud Storage: remove every stored object (best-effort).
+        const storageResult = await purgeAllStorageObjects();
+
+        // 3) Auth users (optional): delete every account, preserving the
+        //    current caller unless explicitly included so the operator keeps a
+        //    session to observe the result and re-bootstrap.
+        const deletedUids: string[] = [];
+        const failedUids: string[] = [];
+        const skippedCurrentUserUids: string[] = [];
+        if (includeAuthUsers) {
+          let pageToken: string | undefined;
+          do {
+            const listResult = await auth().listUsers(1000, pageToken);
+            for (const user of listResult.users) {
+              const isCurrentCaller = context.auth ? user.uid === callerUid : false;
+              if (isCurrentCaller && !includeCurrentSessionUser) {
+                skippedCurrentUserUids.push(user.uid);
+                continue;
+              }
+              try {
+                await auth().deleteUser(user.uid);
+                deletedUids.push(user.uid);
+              } catch (error) {
+                logger.error("Failed to delete user during project data purge.", {
+                  requestId,
+                  uid: user.uid,
+                  error: (error as Error).message,
+                });
+                failedUids.push(user.uid);
+              }
+            }
+            pageToken = listResult.pageToken;
+          } while (pageToken);
+        }
+
+        // 4) Audit trail. The audit_logs collection was just wiped above; this
+        //    re-creates it with a single record documenting the purge.
+        let auditLogWarning: string | null = null;
+        try {
+          await AuditLogger.logSuccess(
+            "admin.purge_project_data",
+            context,
+            "project/purge-all-data",
+            "system",
+            {
+              requestId,
+              requestedBy: callerUid,
+              requestedByRole: callerRole || "none",
+              recoveryTokenUsed: recoveryTokenAllowed,
+              collectionsCleared,
+              collectionsClearedCount: collectionsCleared.length,
+              storageFilesDeleted: storageResult.filesDeleted,
+              storageWarning: storageResult.warning,
+              includeAuthUsers,
+              deletedUsers: deletedUids.length,
+              skippedCurrentSessionUsers: skippedCurrentUserUids.length,
+              failedUsers: failedUids.length,
+              duration: Date.now() - startTime,
+              traceId,
+            }
+          );
+        } catch (auditError) {
+          auditLogWarning = (auditError as Error).message || "unknown audit logging error";
+          logger.error("purgeAllProjectData audit logging failed (non-fatal).", {
+            requestId,
+            auditLogWarning,
+          });
+        }
+
+        logger.info("purgeAllProjectData complete.", {
+          requestId,
+          collectionsClearedCount: collectionsCleared.length,
+          storageFilesDeleted: storageResult.filesDeleted,
+          deletedUsers: deletedUids.length,
+        });
+
+        return {
+          success: failedUids.length === 0,
+          requestId,
+          requestedBy: callerUid,
+          collectionsCleared,
+          collectionsClearedCount: collectionsCleared.length,
+          storageFilesDeleted: storageResult.filesDeleted,
+          storageWarning: storageResult.warning,
+          includeAuthUsers,
+          deletedUsers: deletedUids.length,
+          skippedCurrentSessionUsers: skippedCurrentUserUids,
+          failedUsers: failedUids,
+          auditLogWarning,
+        };
+      } catch (error) {
+        logger.error("purgeAllProjectData failed.", {
+          requestId,
+          requestedBy: callerUid,
+          message: (error as Error).message,
+          stack: (error as Error).stack,
+        });
+
+        try {
+          await AuditLogger.logFailure(
+            "admin.purge_project_data",
+            context,
+            "project/purge-all-data",
+            "system",
+            error as Error,
+            { requestId, requestedBy: callerUid, traceId }
+          );
+        } catch (auditFailureError) {
+          logger.error("purgeAllProjectData failure-audit logging failed (non-fatal).", {
+            requestId,
+            message: (auditFailureError as Error).message,
+          });
+        }
+
+        if (error instanceof functions.https.HttpsError) throw error;
+        throw new functions.https.HttpsError(
+          "internal",
+          `Project data purge failed: ${(error as Error).message}`,
+          { requestId, callerUid }
+        );
+      }
+    }
+  );
 
 /**
  * Bootstrap the very first admin user.
