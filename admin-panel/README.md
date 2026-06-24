@@ -1,12 +1,12 @@
-# MiniMaster Operator Dashboard
+# MiniMaster Betreiber-Dashboard
 
-Web-Dashboard fuer Betreiber/Admins.
+Web-Dashboard fuer Betreiber (Admin/Support).
 
-Das Panel kann statisch ausgeliefert oder als Python-Webanwendung ueber `python_admin/app.py` betrieben werden. Die Lightweight-Ansicht `simple.html` wurde als aktuelle Operator-Konsole neu strukturiert und dient als Start-/Admin-Panel fuer QA, Release, Commissioning, Support und Datenschutz.
+Das Panel kann statisch ausgeliefert oder als Python-Webanwendung ueber `python_admin/app.py` betrieben werden. Die Lightweight-Ansicht `simple.html` wurde als aktuelle Betreiber-Konsole neu strukturiert und dient als Start-/Admin-Panel fuer QA, Release, Commissioning, Support und Datenschutz.
 
 ## Aktueller Panel-Aufbau
 
-Die ueberarbeitete Operator-Konsole nutzt folgende Hauptbereiche:
+Die ueberarbeitete Betreiber-Konsole nutzt folgende Hauptbereiche:
 
 - **Start**: zentrale Lageuebersicht fuer Systemzustand, Release-Lage, QA-Lage und CI-/Workflow-Lage
 - **Qualitaetssicherung & Tests**: Android-10-bis-16-Matrix, Smoke-/Standard-/Full-Profile, Evidence, Unsupported-Tests und Rerun-Flows
@@ -14,7 +14,7 @@ Die ueberarbeitete Operator-Konsole nutzt folgende Hauptbereiche:
 - **Einrichtung & Commissioning**: Firebase-Konfiguration, Admin-Claims, USB/ADB, Debug-Token und Dual-Device-Commissioning
 - **Betrieb & Support**: Supportzugriff, Debug-Freigaben, Fehleranalyse, DSAR und Audit-Exports
 - **Recht & Datenschutz**: Policies, Consent-Versionen, Re-Consent und Store-Pflichtangaben
-- **Befehlszentrale**: Einstiegspunkt fuer freigegebene lokale Operator-Kommandos
+- **Befehlszentrale**: Einstiegspunkt fuer freigegebene lokale Betreiber-Kommandos
 
 ## Funktionen
 
@@ -31,7 +31,7 @@ Die ueberarbeitete Operator-Konsole nutzt folgende Hauptbereiche:
 - Android-10-bis-16-QA-Matrix als fuehrende Test- und Evidence-Struktur
 - Release-Evidence-Struktur fuer Matrixplan, Matrix-Summary, Validation-Summary und exportierte Manifestpakete
 - Befehlszentrale mit USB-Debug/Commissioning-Kommandos inkl. APK-Installations-Schnittstelle (`run-usb-tests.ps1 -InstallApk`, Dual-Runner)
-- **Lightweight Operator Panel** (`simple.html`): moderne Start-/Admin-Konsole mit strukturierten Operator-Karten, eigenem `style.css` und PWA-Icons
+- **Lightweight Betreiber-Dashboard** (`simple.html`): moderne Start-/Admin-Konsole mit strukturierten Betreiber-Karten, eigenem `style.css` und PWA-Icons
 - **Support-Panel** (`support.js`): Support-Zugriff gewaehren/entziehen, Debug-Zugriff und Analyse mit Debug-Daten ueber Backend-APIs
 - **Debug-Panel** (`debug.js`): Laufzeit-Status, Modul-Liste und JSON-Snapshot mit Links zu Setup/QA im Voll-Dashboard
 - **Session-Manager** (`modules/core/session-manager.js`): Idle-Timeout (15 Min), 8h-Session-Limit, Re-Auth für T3/T4-Aktionen, Admin-PIN für T4
@@ -39,7 +39,7 @@ Die ueberarbeitete Operator-Konsole nutzt folgende Hauptbereiche:
 
 ## Start-Panel-Logik
 
-Das Start-Panel zeigt maximal die wichtigsten Operator-Karten:
+Das Start-Panel zeigt maximal die wichtigsten Betreiber-Karten:
 
 1. Systemzustand
 2. Release-Lage
@@ -83,7 +83,7 @@ Dann `http://127.0.0.1:8765/admin-panel/operator-dashboard-light_NEW.html` aufru
 ## QA-Register-Regeln
 
 - `Release-Blocker` bedeutet: Der Eintrag ist fuer einen Go-Live fachlich relevant und braucht einen aktuellen bestaetigten PASS.
-- `PASS, aber veraltet` gilt in der Operator-Sicht nicht als sauberer Freigabestatus. Veraltete Nachweise muessen vor einer Freigabe erneuert werden.
+- `PASS, aber veraltet` gilt in der Betreiber-Sicht nicht als sauberer Freigabestatus. Veraltete Nachweise muessen vor einer Freigabe erneuert werden.
 - `Unsupported` bedeutet: Ein Repo-Test ist inventarisiert, aber aktuell keiner ausfuehrbaren Suite oder keinem automatischen Startweg zugeordnet.
 - iOS-XCTest-Dateien werden im QA-Register ebenfalls inventarisiert. Ohne macOS-/Xcode-Suite erscheinen sie derzeit bewusst als offene Automationsluecke statt unsichtbar zu bleiben.
 - `Offene Nachweise` umfasst fehlende, fehlgeschlagene oder veraltete Evidenz fuer manuelle bzw. dokumentierte Checks.
@@ -98,7 +98,7 @@ Dann `http://127.0.0.1:8765/admin-panel/operator-dashboard-light_NEW.html` aufru
 - P0-Cockpit aktualisiert sich nicht: Browser-Cache leeren und sicherstellen, dass Aktionen erfolgreich durchlaufen (nur erfolgreiche Flows auto-markieren).
 - QA-Matrix leer: pruefen, ob `qa/catalog/android-10-16-release-matrix.json` vorhanden ist und die Python-API unter `/api/qa/catalog` erreichbar ist.
 
-## Lightweight Operator Panel
+## Lightweight Betreiber-Dashboard
 
 Eine schlanke, modulare Alternative zum vollstaendigen Dashboard befindet sich unter:
 
@@ -106,12 +106,12 @@ Eine schlanke, modulare Alternative zum vollstaendigen Dashboard befindet sich u
 http://localhost:8080/admin-panel/operator-dashboard-light_NEW.html
 ```
 
-Die Light-Version nutzt ES Modules (`app-simple.js`, `support.js`, `debug.js`) und ein eigenes Stylesheet (`style.css`). Sie eignet sich fuer schnelle Operator-, QA-, Release-, Support- und Debug-Aufgaben ohne Laden des gesamten Dashboards.
+Die Light-Version nutzt ES Modules (`app-simple.js`, `support.js`, `debug.js`) und ein eigenes Stylesheet (`style.css`). Sie eignet sich fuer schnelle Betreiber-, QA-, Release-, Support- und Debug-Aufgaben ohne Laden des gesamten Dashboards.
 
 ## Klare Dateinamen (neu)
 
-- `operator-dashboard-full_NEW.html`: Vollständiges Operator-Dashboard (neuer Standard)
-- `operator-dashboard-light_NEW.html`: Schlankes Dashboard für schnelle Operator-Flows
+- `operator-dashboard-full_NEW.html`: Vollstaendiges Betreiber-Dashboard (neuer Standard)
+- `operator-dashboard-light_NEW.html`: Schlankes Dashboard fuer schnelle Betreiber-Flows
 - `operator-setup-wizard_NEW.html`: Einrichtungs-/Wizard-Ansicht
 - `operator-audit-logs_NEW.html`: Audit- und Log-Ansicht
 

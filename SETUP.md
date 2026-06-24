@@ -19,7 +19,7 @@ npm run preflight        # alle Pflichtchecks grün?
 # 4. Deploy
 firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 node scripts/setup-admin.js <email> <pw>
-# 5. Operator-Konsole starten
+# 5. Betreiber-Dashboard starten
 ./start.sh               # Linux/macOS
 start.bat                # Windows
 ```
@@ -130,7 +130,7 @@ firebase deploy --only hosting
 ./deploy.sh
 ```
 
-## Operator-Konsole starten
+## Betreiber-Dashboard starten
 
 | Plattform | Befehl |
 |---|---|

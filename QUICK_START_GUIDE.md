@@ -1,6 +1,6 @@
 # MiniMaster - Quick Start (aktueller Stand)
 
-Diese Anleitung bringt ein neues Operator-Setup schnell auf einen lauffaehigen Stand.
+Diese Anleitung bringt ein neues Betreiber-Setup schnell auf einen lauffaehigen Stand.
 
 ## 1. Repository klonen
 
@@ -86,8 +86,8 @@ firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 
 ## 8. UIs starten und pruefen
 
-1. Operator Panel: `admin-panel/index.html` (Hosting-URL)
-2. Parent Web Panel: `web-control/index.html` (Hosting-URL)
+1. Betreiber-Dashboard: `admin-panel/index.html` (Hosting-URL)
+2. Eltern-Panel: `web-control/index.html` (Hosting-URL)
 3. Desktop Launcher (Electron):
 
 ```bash

@@ -165,7 +165,7 @@ http://localhost:8080/admin-panel/operator-dashboard-light_NEW.html
 Python operator mode:
 
 ```bash
-python python_admin/app.py
+python3 python_admin/app.py
 ```
 
 Then open:

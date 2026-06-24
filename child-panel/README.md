@@ -1,6 +1,6 @@
-# Mini-Master Child Panel
+# Mini-Master Kinder-Panel
 
-The Child Panel is a lightweight web interface designed for children to submit support tickets and request help from their parents or the support team. It is typically accessed from the child's device browser.
+The Kinder-Panel is a lightweight web interface designed for children to submit support tickets and request help from their parents or the support team. It is typically accessed from the child's device browser.
 
 ## Features
 
@@ -17,7 +17,7 @@ The Child Panel is a lightweight web interface designed for children to submit s
 ## Integration
 
 - Shares the same Firebase backend as the Android child app and web control panel.
-- Tickets submitted here appear in the parent web control panel and support dashboard.
+- Tickets submitted here appear in the Eltern-Panel (web-control) and Betreiber-Dashboard.
 
 ## Security
 

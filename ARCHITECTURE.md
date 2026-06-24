@@ -8,9 +8,9 @@ This document outlines the high-level architecture of the Mini-Master applicatio
 
 Bis ein formales C4-Diagramm gepflegt ist, gilt folgender textueller Kontext als verbindlich:
 
-- **Parent User** -> `masterApp` (Android, Kotlin/Compose) bzw. `iosMasterApp` (Swift, Family Controls — Beta)
-- **Child User** -> `childApp` (Android, Accessibility Service) bzw. `iosChildApp` (Swift, Screen Time API — Beta)
-- **Operator / Support** -> `admin-panel` (PWA, Firebase Auth + App Check) bzw. `desktop` (Electron-Wrapper)
+- **Eltern** -> `masterApp` (Android, Kotlin/Compose) bzw. `iosMasterApp` (Swift, Family Controls — Beta)
+- **Kinder** -> `childApp` (Android, Accessibility Service) bzw. `iosChildApp` (Swift, Screen Time API — Beta)
+- **Betreiber / Support** -> `admin-panel` (PWA, Firebase Auth + App Check) bzw. `desktop` (Electron-Wrapper)
 - `masterApp` / `childApp` / `admin-panel` <-> **Firebase Backend** (Auth, Firestore, Storage, Cloud Functions, FCM/APNs, App Check)
 - **Firebase Backend** <-> **Google Play Billing API** (Subscription-Verifikation)
 - **Firebase Backend** <-> **Apple App Store Server API** (geplant, derzeit Stub)
