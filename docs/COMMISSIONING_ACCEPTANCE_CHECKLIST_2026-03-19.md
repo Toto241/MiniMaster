@@ -12,7 +12,7 @@ Use this document as the final evidence artifact before production release appro
 
 1. Backend deployment completed successfully (`firebase deploy --only functions` green).
 2. Backend quality gates green (`npm run build`, `npm run lint`, `npm test -- --runInBand`).
-3. Operator panel validation executed once after the latest deployment.
+3. Betreiber-Dashboard validation executed once after the latest deployment.
 
 ## 3. Acceptance Blocks
 
@@ -29,7 +29,7 @@ Steps:
 
 Evidence to capture:
 
-1. Screenshot/operator export of parent dashboard with child listed.
+1. Screenshot/operator export of Eltern-Panel with child listed.
 2. Firestore document proof (`children/{childId}` with `masterImei`).
 3. Timestamp of successful pairing event.
 

@@ -4,7 +4,7 @@
 
 Status: security baseline assessment for operator-facing web and desktop surfaces.
 
-## 1. Web Panel: web-control (Parent Panel)
+## 1. Web Panel: web-control (Eltern-Panel)
 
 ### Content Security Policy (CSP)
 
@@ -49,7 +49,7 @@ Status: security baseline assessment for operator-facing web and desktop surface
 
 ---
 
-## 2. Web Panel: admin-panel (Operator Dashboard)
+## 2. Web Panel: admin-panel (Betreiber-Dashboard)
 
 ### Content Security Policy (CSP)
 

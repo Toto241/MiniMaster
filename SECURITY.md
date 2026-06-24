@@ -77,7 +77,7 @@ All operator and master web panels enforce aligned session policies (AP-N3):
 | `admin-panel` | 15 min | 8 h (+ T3/T4 tiers) | Password + Admin-PIN for critical ops |
 | `web-control`, `parent-panel`, `child-panel` | 15 min | 8 h | Auto-logout (custom-token sessions) |
 
-Master panels use `shared-ui-session-manager.js`; the operator dashboard uses `admin-panel/modules/core/session-manager.js`. On expiry, users are signed out via `firebase.auth().signOut()`.
+Master panels use `shared-ui-session-manager.js`; the Betreiber-Dashboard uses `admin-panel/modules/core/session-manager.js`. On expiry, users are signed out via `firebase.auth().signOut()`.
 
 ### Content Security Policy (CSP)
 

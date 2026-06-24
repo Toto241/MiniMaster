@@ -85,7 +85,7 @@ Supportprobleme mit KI schneller lösen, ohne Governance, Datenschutz oder Quali
 
 ## Betreiber-Setup & Cloud-Integrations-Assistent (Neu)
 
-Das Operator Dashboard enthält einen dedizierten Tab **Cloud Setup & Assistant** mit folgenden Funktionen:
+Das Betreiber-Dashboard enthaelt einen dedizierten Tab **Cloud Setup & Assistant** mit folgenden Funktionen:
 
 1. **Integration Health Check**
 
