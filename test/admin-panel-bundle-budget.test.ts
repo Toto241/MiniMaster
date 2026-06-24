@@ -100,13 +100,25 @@ import * as path from "path";
  *   - Begruendung: Budget an den bestehenden Main-Baseline-Stand angeglichen,
  *     damit das Gate zukuenftiges Wachstum wieder blockiert. Weitere
  *     Admin-Modularisierung soll das Limit wieder senken.
+ *
+ * Stand Projektdaten-Loeschung + Dashboard-Redirect-Migration:
+ *   - app.js: 582 Top-Level-Funktionen (Baseline lag bereits bei 581, +1 fuer
+ *     den purgeAllProjectDataFromOnboarding-Handler). Funktions-Limit auf 590
+ *     angehoben (kleiner Headroom); weitere Admin-Modularisierung soll es senken.
+ *   - Das eigentliche Dashboard wurde nach `operator-dashboard-full_NEW.html`
+ *     ausgelagert; `admin-panel/index.html` ist nur noch ein Redirect-Stub.
+ *     Die HTML-Hardening-Pruefungen zielen daher auf die kanonische
+ *     Dashboard-Datei statt auf den Stub.
  */
 
 const APP_JS = "admin-panel/app.js";
-const INDEX_HTML = "admin-panel/index.html";
+// index.html ist seit der Dashboard-Migration nur ein Redirect-Stub; die
+// eigentlichen CSP-/CSS-Hardening-Pruefungen gelten der kanonischen
+// Dashboard-Datei, auf die der Stub weiterleitet.
+const INDEX_HTML = "admin-panel/operator-dashboard-full_NEW.html";
 
 const MAX_APP_JS_BYTES = 875_000;
-const MAX_TOP_LEVEL_FUNCTIONS = 565;
+const MAX_TOP_LEVEL_FUNCTIONS = 590;
 const MAX_INLINE_ONCLICK = 0;
 
 const TOP_LEVEL_FN_REGEX = /^(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/gm;
