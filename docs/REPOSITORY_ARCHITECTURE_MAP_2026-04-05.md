@@ -15,8 +15,8 @@ flowchart TB
   subgraph Clients
     MasterApp[masterApp\nAndroid Parent App]
     ChildApp[childApp\nAndroid Child App]
-    WebControl[web-control\nStatic Parent Panel]
-    AdminPanel[admin-panel\nOperator Dashboard]
+    WebControl[web-control\nEltern-Panel]
+    AdminPanel[admin-panel\nBetreiber-Dashboard]
     Desktop[desktop\nElectron Launcher]
     IOSParent[iosMasterApp\nSwift Parent App]
     IOSChild[iosChildApp\nSwift Child App]
@@ -87,7 +87,7 @@ flowchart TB
 ### Web / Desktop
 
 - [web-control](../web-control): Eltern-Steuerpanel
-- [admin-panel](../admin-panel): Operator- und Support-Panel
+- [admin-panel](../admin-panel): Betreiber- und Support-Panel
 - [desktop](../desktop): Electron-Container für beide Panels
 
 ### iOS

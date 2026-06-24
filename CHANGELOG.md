@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0] - 2026-03-19
 
 ### Fixed
-- **Admin-Panel INTERNAL-Fehler behoben**: `bootstrapFirstAdmin` verwendete `admin.auth()` direkt statt des lazy Getters `auth()` aus `firebase.ts`. Bei Cold Start war die Firebase-App nicht initialisiert → unbehandelte Exception → "INTERNAL"-Fehler. Alle `admin.auth()`-Aufrufe in `src/auth.ts` und `src/admin.ts` auf `auth()` migriert.
+- **Betreiber-Dashboard INTERNAL-Fehler behoben**: `bootstrapFirstAdmin` verwendete `admin.auth()` direkt statt des lazy Getters `auth()` aus `firebase.ts`. Bei Cold Start war die Firebase-App nicht initialisiert -> unbehandelte Exception -> "INTERNAL"-Fehler. Alle `admin.auth()`-Aufrufe in `src/auth.ts` und `src/admin.ts` auf `auth()` migriert.
 - Test-Mocks in 6 Test-Dateien aktualisiert um `../firebase`-Mock mit `auth`-Export zu unterstützen.
 
 ### Added
-- **Session-Timeout (30 Min Inaktivität)**: Automatischer Logout bei Inaktivität in Admin-Panel und Web-Control-Panel. Warnung 5 Minuten vor Ablauf. Tracking von mousedown, keydown, scroll, touchstart Events.
+- **Session-Timeout (30 Min Inaktivität)**: Automatischer Logout bei Inaktivität in Betreiber-Dashboard und Eltern-Panel. Warnung 5 Minuten vor Ablauf. Tracking von mousedown, keydown, scroll, touchstart Events.
 - **Legacy-Auth Inventar** (`docs/LEGACY_AUTH_INVENTORY.md`): Vollständige Auflistung aller secretKey/IMEI-Endpunkte mit Freeze-Richtlinie. Keine neuen Legacy-Auth-Endpunkte erlaubt.
 - **Foto-Proof Server-Validierung**: `completeTask` validiert jetzt `photoUrl` als Firebase Storage URL (SSRF-Schutz) und erzwingt max. 2048 Zeichen URL-Länge.
 - **Erweiterte Firestore-Emulator-Tests**: 6 neue Tests für `families/*` Deny-Guard, unauthentifizierten Zugriff, ungültige Task-Felder, Cross-Tenant-Zugriff und Child-eigene Task-Reads.
@@ -148,8 +148,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Firebase Cloud Functions backend with TypeScript
 - Firestore security rules for data access control
 - Storage rules for task proof photos
-- Web control panel for browser-based management
-- Admin panel for operator dashboard
+- Eltern-Panel for browser-based management
+- Betreiber-Dashboard for operations and support
 - AI-powered support agent with Gemini 2.5 Flash integration
 - GDPR-compliant support interface
 - Complete production deployment automation

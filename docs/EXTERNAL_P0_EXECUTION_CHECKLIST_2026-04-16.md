@@ -93,7 +93,7 @@ Steps:
 Suggested validation:
 
 1. Admin login works.
-2. Parent web panel works.
+2. Eltern-Panel works.
 3. Functions reachable.
 4. Storage health OK.
 

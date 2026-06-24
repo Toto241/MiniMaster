@@ -69,7 +69,7 @@ Activities:
 Required evidence:
 
 1. Command outputs or CI artifacts for all gate runs.
-2. Validation summary export from operator panel.
+2. Validation summary export from Betreiber-Dashboard.
 
 Exit criteria:
 

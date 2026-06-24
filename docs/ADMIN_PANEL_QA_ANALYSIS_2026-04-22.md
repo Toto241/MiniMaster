@@ -1,14 +1,14 @@
-# Admin-Panel & Qualitätssicherung: Detaillierte Analyse
+# Betreiber-Dashboard & Qualitaetssicherung: Detaillierte Analyse
 
 **Datum:** 22. April 2026
 **Analyst:** Repository-Validation-Agent
-**Scope:** Admin-Panel Bedienung, QA-Reiter, Tests, Automatisierung
+**Scope:** Betreiber-Dashboard Bedienung, QA-Reiter, Tests, Automatisierung
 
 ---
 
 ## 1. Executive Summary
 
-Das MiniMaster Admin-Panel (Operator Dashboard) ist ein **funktional sehr umfangreiches** Web-Dashboard mit 13 Tabs, modularer ESM-Architektur (20 Module) und einer extrem ausgefeilten Qualitätssicherungs-Oberfläche. Die Bedienung deckt nahezu alle operativen Anforderungen ab — von Benutzer- und Geräteverwaltung über Support-Tickets bis hin zu Compliance, KI-Assistent und Recht/Datenschutz.
+Das MiniMaster Betreiber-Dashboard ist ein **funktional sehr umfangreiches** Web-Dashboard mit 13 Tabs, modularer ESM-Architektur (20 Module) und einer extrem ausgefeilten Qualitaetssicherungs-Oberflaeche. Die Bedienung deckt nahezu alle operativen Anforderungen ab - von Benutzer- und Geraeteverwaltung ueber Support-Tickets bis hin zu Compliance, KI-Assistent und Recht/Datenschutz.
 
 Die **Testabdeckung ist hoch** (~7.000 Zeilen Jest-Testcode nur für das Admin-Panel), aber es gibt gezielte Automatisierungslücken im QA-Bereich, die vor einem breiten Rollout geschlossen werden sollten.
 
@@ -19,7 +19,7 @@ Die **Testabdeckung ist hoch** (~7.000 Zeilen Jest-Testcode nur für das Admin-P
 
 ---
 
-## 2. Admin-Panel Feature-Matrix
+## 2. Betreiber-Dashboard Feature-Matrix
 
 ### Tab-Übersicht (13 Tabs)
 
@@ -52,7 +52,7 @@ Die **Testabdeckung ist hoch** (~7.000 Zeilen Jest-Testcode nur für das Admin-P
 
 ## 3. QA-Reiter (Qualitätssicherung) — Deep Dive
 
-Der QA-Tab ist der **komplexeste und am besten ausgearbeitete Bereich** des Admin-Panels. Er umfasst über 100 Funktionen in `app.js` plus 8 dedizierte Module.
+Der QA-Tab ist der **komplexeste und am besten ausgearbeitete Bereich** des Betreiber-Dashboards. Er umfasst ueber 100 Funktionen in `app.js` plus 8 dedizierte Module.
 
 ### 3.1 Unterbereiche
 
