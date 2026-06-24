@@ -1,6 +1,6 @@
-# Mini-Master Web Control Panel
+# Mini-Master Eltern-Panel (Web-Control)
 
-This web interface provides PC-based control functionality equivalent to the Mini-Master parent Android app. It allows parents to manage their children's devices directly from a computer browser.
+This web interface provides PC-based control functionality equivalent to the Mini-Master parent Android app. It serves as the Eltern-Panel and allows parents to manage their children's devices directly from a computer browser.
 
 ## Features
 
@@ -62,7 +62,7 @@ If you plan to host this on a different domain than your Firebase project, you m
 ### Login
 The web panel no longer supports direct Secret-Key login. Instead, authentication is performed via secure session links:
 
-1. Open the **Parent Panel** (`parent-panel/index.html`) on your mobile device or desktop
+1. Open the **Parent Panel (Support-Kanal)** (`parent-panel/index.html`) on your mobile device or desktop
 2. Log in with your credentials
 3. Generate a secure web control link (bootstrap token)
 4. Open the generated link in your browser — the web control panel will automatically authenticate you via Firebase Custom Token
@@ -161,7 +161,7 @@ For testing and development:
 - Ensure your Firebase project is active
 
 **"Authentication failed"**
-- Make sure you are opening the panel via a valid secure link from the Parent Panel
+- Make sure you are opening the panel via a valid secure link from the Parent Panel (Support-Kanal)
 - Check that the bootstrap token has not expired
 
 **"Error loading devices"**

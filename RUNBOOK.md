@@ -48,7 +48,7 @@ firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 ### Safe rollout order
 
 1. Deploy Firestore rules + indexes + functions together.
-2. Validate operator login, support dashboard and parent web login.
+2. Validate Betreiber-Dashboard login, support dashboard and Eltern-Panel login.
 3. Validate one pairing flow on test devices.
 4. Validate one task lifecycle including proof upload and review.
 
@@ -56,7 +56,7 @@ firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 
 If the current release causes breakage:
 
-1. Pause further operator changes.
+1. Pause further Betreiber-Dashboard changes.
 2. Roll back Hosting to the last known good release.
 3. Redeploy last known good Functions/Firestore bundle from the tagged commit.
 4. Re-run smoke checks for login, pairing, child sync and task review.
@@ -124,7 +124,7 @@ Recommended query dimensions:
 3. Check parent review UI and child upload logs for failed upload attempts.
 4. If review notifications fail, verify FCM token freshness for master and child.
 
-### D. Admin / operator access problems
+### D. Betreiber access problems
 
 1. Verify Firebase Auth login works.
 2. Confirm custom claim (`role=admin|support|auditor`) exists.
@@ -150,9 +150,9 @@ Recommended query dimensions:
 
 After every production deploy, complete this sequence:
 
-1. Operator login succeeds.
-2. Full Validation in operator dashboard shows no critical blockers.
-3. Parent web panel login succeeds.
+1. Betreiber-Dashboard login succeeds.
+2. Full Validation in Betreiber-Dashboard shows no critical blockers.
+3. Eltern-Panel login succeeds.
 4. Pairing on test devices succeeds.
 5. Child receives sync after a rule change.
 6. Task proof upload and review work end-to-end.

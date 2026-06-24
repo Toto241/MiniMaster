@@ -88,15 +88,15 @@ firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
 node scripts/setup-admin.js <email> <passwort>
 ```
 
-1. Login im Operator Dashboard pruefen (`admin-panel/index.html`).
+1. Login im Betreiber-Dashboard pruefen (`admin-panel/index.html`).
 
 ## 7. Produktions-Checks
 
 Nach Deploy mindestens diese Checks ausfuehren:
 
-1. Operator Login und Admin-Claim funktionieren.
+1. Betreiber-Dashboard Login und Admin-Claim funktionieren.
 1. Cloud Setup & Assistant > Full Validation ohne kritische Fehler.
-1. Parent Web Panel Login und Device-Sync funktionieren.
+1. Eltern-Panel Login und Device-Sync funktionieren.
 1. Support Ticket Flow inkl. Pflichtfeedback/Kommentar funktioniert.
 1. Firestore/Storage Rules sind aktiv und erzwingen Besitz-/Rollenlogik.
 

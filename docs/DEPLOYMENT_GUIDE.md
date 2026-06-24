@@ -2,7 +2,7 @@
 
 Stand: 2026-03-21
 
-Diese Anleitung beschreibt den aktuellen Deploy- und Inbetriebnahmepfad fuer Backend, Hosting und Operator-Setup.
+Diese Anleitung beschreibt den aktuellen Deploy- und Inbetriebnahmepfad fuer Backend, Hosting und Betreiber-Setup.
 
 ## 1. Voraussetzungen
 
@@ -107,7 +107,7 @@ Oder per Script:
 ./deploy.sh
 ```
 
-## 8. Operator/Admin freischalten
+## 8. Betreiber freischalten
 
 Erstadmin erstellen (lokaler Service Account Key als `serviceAccountKey.json` im Projektroot erforderlich):
 
@@ -115,13 +115,13 @@ Erstadmin erstellen (lokaler Service Account Key als `serviceAccountKey.json` im
 node scripts/setup-admin.js <email> <passwort>
 ```
 
-Danach Login im Operator-Dashboard pruefen (`admin-panel/index.html`).
+Danach Login im Betreiber-Dashboard pruefen (`admin-panel/index.html`).
 
 ## 9. Validierung nach Deploy
 
-1. Operator-Dashboard Login (Admin-Claim)
+1. Betreiber-Dashboard Login (Admin-Claim)
 2. Cloud Setup & Assistant Tab: Full Validation starten
-3. Parent Web Panel Login und Device-Sync pruefen
+3. Eltern-Panel Login und Device-Sync pruefen
 4. Support-Ticket-Workflow inkl. Feedback-Pflicht pruefen
 
 ## 10. CI/CD Hinweise

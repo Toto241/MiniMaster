@@ -1,6 +1,6 @@
 # MiniMaster Desktop Launcher
 
-Native Desktop-Oberfläche (Electron) für die MiniMaster-Panels – getrennt nach Eltern und Operator.
+Native Desktop-Oberflaeche (Electron) fuer die MiniMaster-Panels – getrennt nach Eltern und Betreiber.
 
 ## Start
 
@@ -10,7 +10,7 @@ Vom Repository-Root:
 # Eltern-Panel (Standard – kein CLI-Zugriff)
 npm run desktop-start
 
-# Operator Dashboard (mit CLI-Ausführung)
+# Betreiber-Dashboard (mit CLI-Ausfuehrung)
 npm run desktop-operator
 ```
 
@@ -18,20 +18,20 @@ Alternativ direkt:
 
 ```bash
 npx electron desktop/main.js              # Eltern
-npx electron desktop/main.js --operator   # Operator
+npx electron desktop/main.js --operator   # Betreiber
 ```
 
 ## Architektur
 
 | Modus | Fenster | Preload | CLI-Zugriff |
 |-------|---------|---------|-------------|
-| Standard | `launcher.html` → Eltern Control Panel | `preload.js` | Nein |
+| Standard | `launcher.html` -> Eltern-Panel | `preload.js` | Nein |
 | `--operator` | `admin-panel/index.html` direkt | `operator-preload.js` | Ja (Whitelist) |
 
 ### Sicherheitskonzept
 
 - Das **Eltern-Panel** läuft in einer Standard-Sandbox ohne Shell-Zugriff.
-- Das **Operator Dashboard** erhält über `operator-preload.js` eine IPC-Bridge zum Main-Prozess, die CLI-Befehle ausführen kann.
+- Das **Betreiber-Dashboard** erhaelt ueber `operator-preload.js` eine IPC-Bridge zum Main-Prozess, die CLI-Befehle ausfuehren kann.
 - `contextIsolation: true` und `nodeIntegration: false` bleiben in **beiden** Modi aktiv.
 - Nur explizit erlaubte Befehle werden akzeptiert: `firebase`, `npm`, `npx`, `node`, `adb`.
 - Jede Ausführung erfordert einen Bestätigungsdialog im UI.
@@ -40,7 +40,7 @@ npx electron desktop/main.js --operator   # Operator
 ## Enthaltene Oberflächen
 
 - **Eltern-Panel**: `web-control/index.html` (über `launcher.html`)
-- **Operator Dashboard**: `admin-panel/index.html` (direkt, nur im Operator-Modus)
+- **Betreiber-Dashboard**: `admin-panel/index.html` (direkt, nur im Betreiber-Modus)
 - **Audit Logs**: `admin-panel/logs.html`
 
 ## Hinweis
