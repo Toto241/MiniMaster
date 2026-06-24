@@ -41,6 +41,9 @@ const mockDbObj: any = {
 const mockAuth = {
   listUsers: jest.fn().mockResolvedValue({ users: [], pageToken: undefined }),
   deleteUser: jest.fn().mockResolvedValue(undefined),
+  deleteUsers: jest.fn((uids: string[]) =>
+    Promise.resolve({ successCount: uids.length, failureCount: 0, errors: [] })
+  ),
 };
 
 jest.mock("../firebase", () => ({
@@ -88,6 +91,9 @@ beforeEach(() => {
   recursiveDeleted.length = 0;
   auditAdded.length = 0;
   mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+  mockAuth.deleteUsers.mockImplementation((uids: string[]) =>
+    Promise.resolve({ successCount: uids.length, failureCount: 0, errors: [] })
+  );
   process.env.MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET = "true";
 });
 
@@ -156,7 +162,7 @@ describe("purgeAllProjectData", () => {
 
     expect(res.includeAuthUsers).toBe(false);
     expect(res.deletedUsers).toBe(0);
-    expect(mockAuth.deleteUser).not.toHaveBeenCalled();
+    expect(mockAuth.deleteUsers).not.toHaveBeenCalled();
     // Firestore + storage are still wiped.
     expect(recursiveDeleted.length).toBe(4);
   });
@@ -197,6 +203,36 @@ describe("purgeAllProjectData", () => {
     );
     expect(res.success).toBe(true);
     expect(res.deletedUsers).toBe(1);
+    // The destructive action must still be audit-logged without an auth context.
+    expect(auditAdded.length).toBe(1);
+    expect(auditAdded[0].action).toBe("admin.purge_project_data");
+    expect(auditAdded[0].userId).toBe("recovery-token");
+    expect(auditAdded[0].metadata.recoveryTokenUsed).toBe(true);
+  });
+
+  it("records per-user failures from a partial batch deletion", async () => {
+    mockAuth.listUsers.mockResolvedValue({
+      users: [
+        { uid: "ok1", customClaims: {} },
+        { uid: "bad", customClaims: {} },
+      ],
+      pageToken: undefined,
+    });
+    mockAuth.deleteUsers.mockResolvedValueOnce({
+      successCount: 1,
+      failureCount: 1,
+      errors: [{ index: 1, error: { message: "delete failed" } }],
+    });
+
+    const wrapped = testEnv.wrap(fns.purgeAllProjectData);
+    const res = await wrapped(
+      { confirmText: "DELETE_ALL_PROJECT_DATA", includeCurrentSessionUser: true },
+      asAdmin
+    );
+
+    expect(res.deletedUsers).toBe(1);
+    expect(res.failedUsers).toEqual(["bad"]);
+    expect(res.success).toBe(false);
   });
 
   it("reports a storage warning when the bucket is unreachable", async () => {

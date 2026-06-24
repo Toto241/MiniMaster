@@ -1228,22 +1228,45 @@ export const purgeAllProjectData = functions
           let pageToken: string | undefined;
           do {
             const listResult = await auth().listUsers(1000, pageToken);
+            const uidsToDelete: string[] = [];
             for (const user of listResult.users) {
               const isCurrentCaller = context.auth ? user.uid === callerUid : false;
               if (isCurrentCaller && !includeCurrentSessionUser) {
                 skippedCurrentUserUids.push(user.uid);
                 continue;
               }
+              uidsToDelete.push(user.uid);
+            }
+
+            // Batch-delete (up to 1000 per call) instead of one request per
+            // user — sequential deletes would be slow and risk a function
+            // timeout on large projects.
+            if (uidsToDelete.length > 0) {
               try {
-                await auth().deleteUser(user.uid);
-                deletedUids.push(user.uid);
+                const deleteResult = await auth().deleteUsers(uidsToDelete);
+                const failedIndices = new Set(deleteResult.errors.map((e) => e.index));
+                for (const err of deleteResult.errors) {
+                  const failedUid = uidsToDelete[err.index];
+                  if (failedUid) {
+                    failedUids.push(failedUid);
+                    logger.error("Failed to delete user during project data purge.", {
+                      requestId,
+                      uid: failedUid,
+                      error: err.error.message,
+                    });
+                  }
+                }
+                uidsToDelete.forEach((uid, index) => {
+                  if (!failedIndices.has(index)) deletedUids.push(uid);
+                });
               } catch (error) {
-                logger.error("Failed to delete user during project data purge.", {
+                // Whole-batch failure: mark every uid in this page as failed.
+                logger.error("Batch user deletion failed during project data purge.", {
                   requestId,
-                  uid: user.uid,
+                  batchSize: uidsToDelete.length,
                   error: (error as Error).message,
                 });
-                failedUids.push(user.uid);
+                failedUids.push(...uidsToDelete);
               }
             }
             pageToken = listResult.pageToken;
@@ -1254,28 +1277,44 @@ export const purgeAllProjectData = functions
         //    re-creates it with a single record documenting the purge.
         let auditLogWarning: string | null = null;
         try {
-          await AuditLogger.logSuccess(
-            "admin.purge_project_data",
-            context,
-            "project/purge-all-data",
-            "system",
-            {
-              requestId,
-              requestedBy: callerUid,
-              requestedByRole: callerRole || "none",
-              recoveryTokenUsed: recoveryTokenAllowed,
-              collectionsCleared,
-              collectionsClearedCount: collectionsCleared.length,
-              storageFilesDeleted: storageResult.filesDeleted,
-              storageWarning: storageResult.warning,
-              includeAuthUsers,
-              deletedUsers: deletedUids.length,
-              skippedCurrentSessionUsers: skippedCurrentUserUids.length,
-              failedUsers: failedUids.length,
-              duration: Date.now() - startTime,
-              traceId,
-            }
-          );
+          const auditMetadata = {
+            requestId,
+            requestedBy: callerUid,
+            requestedByRole: callerRole || "none",
+            recoveryTokenUsed: recoveryTokenAllowed,
+            collectionsCleared,
+            collectionsClearedCount: collectionsCleared.length,
+            storageFilesDeleted: storageResult.filesDeleted,
+            storageWarning: storageResult.warning,
+            includeAuthUsers,
+            deletedUsers: deletedUids.length,
+            skippedCurrentSessionUsers: skippedCurrentUserUids.length,
+            failedUsers: failedUids.length,
+            duration: Date.now() - startTime,
+            traceId,
+          };
+          if (context.auth) {
+            await AuditLogger.logSuccess(
+              "admin.purge_project_data",
+              context,
+              "project/purge-all-data",
+              "system",
+              auditMetadata
+            );
+          } else {
+            // Recovery-token path: no authenticated context, so logSuccess would
+            // bail out early. Log directly to keep this destructive action
+            // tamper-evident in the audit trail.
+            await AuditLogger.log(
+              "admin.purge_project_data",
+              callerUid,
+              "unknown",
+              "project/purge-all-data",
+              "system",
+              "success",
+              auditMetadata
+            );
+          }
         } catch (auditError) {
           auditLogWarning = (auditError as Error).message || "unknown audit logging error";
           logger.error("purgeAllProjectData audit logging failed (non-fatal).", {

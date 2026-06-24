@@ -23,6 +23,10 @@ const ALLOWLIST_SUFFIXES = [
   "admin-panel/operator-setup-wizard_NEW.html",
   "scripts/openssl_tools.py",
   "test/external-integrations.test.ts",
+  // The guard's own source necessarily contains the secret regexes it scans
+  // for (e.g. the literal "-----BEGIN PRIVATE KEY-----" pattern); exclude it so
+  // it does not flag its own pattern definitions.
+  "scripts/secret-leak-guard.js",
 ];
 
 const DISALLOWED_FILE_PATTERNS = [
