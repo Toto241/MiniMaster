@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniMaster Eltern-Onboarding</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .wizard-progress {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-block-end: 4px;
+    }
+    .wizard-progress .step-dot {
+      flex: 1 1 auto;
+      min-inline-size: 60px;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 6px 4px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: var(--muted);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .wizard-progress .step-dot.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .wizard-progress .step-dot.done {
+      background: #ecfdf5;
+      color: #166534;
+      border-color: #86efac;
+    }
+    .wizard-step { display: none; }
+    .wizard-step.active { display: grid; gap: 12px; }
+    .wizard-nav {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-block-start: 8px;
+    }
+    .code-box {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: 0.3rem;
+      text-align: center;
+      padding: 14px;
+      border-radius: 12px;
+      background: #f8fbff;
+      border: 1px dashed var(--primary);
+      color: var(--ink);
+    }
+    .muted-note { font-size: 0.86rem; color: var(--muted); line-height: 1.5; }
+    .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <h1>Eltern-Onboarding</h1>
+      <p>Dieser Assistent richtet MiniMaster Schritt fuer Schritt ein: Anmeldung, Kindgeraet koppeln, erste Regeln, eine erste Aufgabe und der Abo-Status.</p>
+      <div id="wizard-progress" class="wizard-progress"></div>
+    </section>
+
+    <section class="card">
+      <!-- Schritt 1: Willkommen -->
+      <div class="wizard-step" id="step-0" data-step="0">
+        <h2>1. Willkommen</h2>
+        <p>Willkommen beim MiniMaster Eltern-Onboarding. In wenigen Minuten richten Sie die Kindersicherung vollstaendig ein.</p>
+        <ul>
+          <li>Anmeldung pruefen</li>
+          <li>Kindgeraet koppeln</li>
+          <li>Erste Nutzungsregeln festlegen</li>
+          <li>Eine erste Aufgabe anlegen</li>
+          <li>Abo-Status pruefen</li>
+        </ul>
+        <p class="muted-note">Ihr Fortschritt wird gespeichert. Sie koennen den Assistenten jederzeit verlassen und spaeter fortsetzen.</p>
+      </div>
+
+      <!-- Schritt 2: Anmeldung -->
+      <div class="wizard-step" id="step-1" data-step="1">
+        <h2>2. Anmeldung</h2>
+        <div id="auth-status" class="status">Pruefe Anmeldestatus...</div>
+        <div id="auth-login-hint" class="muted-note" hidden>
+          Sie sind noch nicht angemeldet. Bitte melden Sie sich zuerst im Web-Control an, danach koennen Sie hier fortfahren.
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="../web-control/index.html" title="Zur Anmeldung im Web-Control">Zur Anmeldung (Web-Control)</a>
+        </div>
+        <p class="muted-note">Die weiteren Schritte sind erst nach erfolgreicher Anmeldung verfuegbar.</p>
+      </div>
+
+      <!-- Schritt 3: Kindgeraet koppeln -->
+      <div class="wizard-step" id="step-2" data-step="2">
+        <h2>3. Kindgeraet koppeln</h2>
+        <div class="form-grid">
+          <div>
+            <label for="pair-child-id">Kind-Bezeichnung (childId)</label>
+            <input id="pair-child-id" type="text" placeholder="z. B. Lena oder Tablet-Kueche" />
+          </div>
+        </div>
+        <div class="inline">
+          <button id="btn-create-pairing-code" class="btn btn-primary" type="button">Kopplungscode erzeugen</button>
+          <button id="btn-generate-pairing-link" class="btn btn-ghost" type="button">Kopplungslink erzeugen</button>
+        </div>
+        <div id="pairing-code-box" class="code-box" hidden></div>
+        <div id="pairing-link-box" class="muted-note" hidden></div>
+        <div id="pairing-status" class="status">Noch kein Code erzeugt.</div>
+        <p class="muted-note">Geben Sie den 6-stelligen Code (oder oeffnen Sie den Link) auf dem Kindgeraet in der MiniMaster-App ein, um das Geraet zu koppeln.</p>
+      </div>
+
+      <!-- Schritt 4: Erste Regeln -->
+      <div class="wizard-step" id="step-3" data-step="3">
+        <h2>4. Erste Regeln</h2>
+        <div class="form-grid">
+          <div>
+            <label for="rules-child-id">Kind-Bezeichnung (childId)</label>
+            <input id="rules-child-id" type="text" placeholder="z. B. Lena" />
+          </div>
+          <div>
+            <label for="rules-daily-limit">Tageslimit (Minuten)</label>
+            <input id="rules-daily-limit" type="number" min="0" step="5" placeholder="z. B. 120" />
+          </div>
+          <div>
+            <label for="rules-bedtime-start">Schlafenszeit Beginn</label>
+            <input id="rules-bedtime-start" type="time" />
+          </div>
+          <div>
+            <label for="rules-bedtime-end">Schlafenszeit Ende</label>
+            <input id="rules-bedtime-end" type="time" />
+          </div>
+        </div>
+        <div class="inline">
+          <button id="btn-save-rules" class="btn btn-primary" type="button">Speichern</button>
+        </div>
+        <div id="rules-status" class="status">Noch keine Regeln gespeichert.</div>
+
+        <div>
+          <label for="rules-blacklist">App-Blacklist (optional, Paketnamen mit Komma getrennt)</label>
+          <input id="rules-blacklist" type="text" placeholder="com.example.app, com.spiel.x" />
+        </div>
+        <div class="inline">
+          <button id="btn-save-blacklist" class="btn btn-ghost" type="button">App-Blacklist speichern</button>
+        </div>
+        <div id="blacklist-status" class="status">Optional.</div>
+      </div>
+
+      <!-- Schritt 5: Erste Aufgabe -->
+      <div class="wizard-step" id="step-4" data-step="4">
+        <h2>5. Erste Aufgabe</h2>
+        <div class="form-grid">
+          <div>
+            <label for="task-child-id">Kind-Bezeichnung (childId)</label>
+            <input id="task-child-id" type="text" placeholder="z. B. Lena" />
+          </div>
+        </div>
+        <div>
+          <label for="task-description">Aufgabenbeschreibung</label>
+          <textarea id="task-description" placeholder="z. B. Hausaufgaben erledigen, dann 30 Minuten Bonuszeit."></textarea>
+        </div>
+        <div class="inline">
+          <button id="btn-create-task" class="btn btn-primary" type="button">Aufgabe anlegen</button>
+        </div>
+        <div id="task-status" class="status">Noch keine Aufgabe angelegt.</div>
+      </div>
+
+      <!-- Schritt 6: Abo pruefen -->
+      <div class="wizard-step" id="step-5" data-step="5">
+        <h2>6. Abo pruefen</h2>
+        <p>Pruefen Sie hier den Status Ihres Test- oder Abo-Zeitraums.</p>
+        <div class="inline">
+          <button id="btn-load-subscription" class="btn btn-primary" type="button">Status laden</button>
+        </div>
+        <div id="subscription-status" class="status">Noch nicht geladen.</div>
+        <div id="subscription-details" class="muted-note"></div>
+      </div>
+
+      <!-- Schritt 7: Fertig -->
+      <div class="wizard-step" id="step-6" data-step="6">
+        <h2>7. Fertig</h2>
+        <p>Geschafft! MiniMaster ist eingerichtet. Hier eine kurze Zusammenfassung:</p>
+        <div id="summary-box" class="muted-note"></div>
+        <div class="actions">
+          <a class="btn btn-primary" href="../web-control/index.html" title="Web-Control oeffnen">Zur Eltern-Steuerung</a>
+          <a class="btn btn-ghost" href="./index.html" title="Zurueck zum Eltern-Panel">Zum Eltern-Panel</a>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button id="btn-prev" class="btn btn-ghost" type="button">Zurueck</button>
+        <button id="btn-next" class="btn btn-primary" type="button">Weiter</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Vom Setup-Wizard generierte Firebase-Werte (optional; 404 ohne Wizard
+       ist erwartet und wird vom Browser stillschweigend ignoriert). -->
+  <script src="./firebase-config.js"></script>
+  <script src="./onboarding-wizard.js"></script>
+</body>
+</html>
