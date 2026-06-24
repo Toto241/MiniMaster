@@ -9,7 +9,7 @@
 
 [![CI/CD Status](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/Toto241/MiniMaster/actions/workflows/ci.yml)
 
-Mini-Master is a cross-platform parental control suite with a Firebase backend. It consists of Android apps (`masterApp` for parents, `childApp` for children), native iOS Swift apps (`iosMasterApp`, `iosChildApp`), web/PWA panels, a lightweight operator/admin panel and a Python-powered local operator API. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
+Mini-Master is a cross-platform parental control suite with a Firebase backend. It consists of Android apps (`masterApp` for parents, `childApp` for children), native iOS Swift apps (`iosMasterApp`, `iosChildApp`), web/PWA panels, a lightweight Betreiber-Dashboard (Admin/Support) and a Python-powered local operator API. The system allows parents to manage their children's device usage, assign tasks, and enforce rules.
 
 ## Table of Contents
 
@@ -41,7 +41,7 @@ The Mini-Master suite is designed to give parents control over their children's 
 - **Real-time Synchronization:** Rules and status updates are synced in real-time using Firebase Firestore and Cloud Messaging (FCM).
 - **First-Start Language Selection:** Both Android apps require language selection on first launch and persist the selected locale.
 - **Web Control Panel:** A web-based interface for parents to manage devices from a browser.
-- **Operator Dashboard:** A secure admin panel for the service operator to manage users, monitor subscriptions, review QA evidence and track release blockers.
+- **Betreiber-Dashboard (Admin/Support):** A secure admin panel for the service operator to manage users, monitor subscriptions, review QA evidence and track release blockers.
 - **Python Operator API:** Local operator service for QA catalog, commissioning, emulator visibility and approved command execution.
 - **Desktop Launcher:** A native Electron launcher to open both PC panels in one desktop app.
 - **PWA Support:** Web panels can be installed on mobile devices (including iOS/Android browsers) as home-screen apps.
@@ -59,7 +59,7 @@ The repository is organized as follows:
 - **`/iosMasterApp`:** Native iOS parent app (SwiftUI, Firebase, StoreKit2).
 - **`/iosChildApp`:** Native iOS child app (SwiftUI, Firebase, FamilyControls, ManagedSettings, DeviceActivity).
 - **`/web-control`:** Static web application for parental control.
-- **`/admin-panel`:** Operator/admin dashboard including the lightweight `simple.html` operator console.
+- **`/admin-panel`:** Betreiber-Dashboard (Admin/Support) including the lightweight `simple.html` console.
 - **`/python_admin`:** Local Python web application and operator API for admin-panel delivery, QA, commissioning and command orchestration.
 - **`/desktop`:** Electron launcher for local PC panels.
 - **`/scripts`:** Test, security, Android, QA, CI and release-gate automation.
@@ -148,7 +148,7 @@ Notes:
 2.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration from the Firebase Console.
 3.  Serve the directory using a simple HTTP server (e.g., `python -m http.server 8000`).
 
-### Operator Panel Setup
+### Betreiber-Dashboard Setup
 
 Static mode:
 
@@ -180,8 +180,8 @@ http://127.0.0.1:8765/admin-panel/operator-dashboard-light_NEW.html
 2.  Install desktop-specific dependencies: `cd desktop && npm install`
 3.  Start desktop launcher: `npm run desktop-start` (from repository root)
 4.  Use launcher to open:
-    - Parent panel (`web-control`)
-    - Operator dashboard (`admin-panel`)
+    - Eltern-Panel (`web-control`)
+    - Betreiber-Dashboard (`admin-panel`)
 
 ---
 
@@ -191,7 +191,7 @@ http://127.0.0.1:8765/admin-panel/operator-dashboard-light_NEW.html
 2.  **Setup Child Device:** Follow the onboarding flow on the child device and grant the crucial **Accessibility Service** permission for app blocking to work.
 3.  **Select App Language:** On first launch of each Android app, select the preferred app language before continuing.
 4.  **Management:** Use the Master App or Web Panel to lock the device, block apps, or assign tasks.
-5.  **Operator Oversight:** Use the operator panel to review QA evidence, release blockers, support access, legal status and commissioning state.
+5.  **Betreiber-Oversight:** Use the Betreiber-Dashboard to review QA evidence, release blockers, support access, legal status and commissioning state.
 
 ### Supported Android App Languages
 

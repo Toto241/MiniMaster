@@ -618,7 +618,7 @@
       <div class="hero-main">
         <ul class="hero-badges">
           <li>🧭 Startseite</li>
-          <li>🔗 Web- & Admin-Integration</li>
+          <li>🔗 Web- & Betreiber-Dashboard-Integration</li>
           <li>🧪 Test- und Rollout-Hinweise</li>          <li>🔐 USB-Debug-Schnittstelle</li>
           <li>📦 v1.1.0</li>        </ul>
 
@@ -635,7 +635,7 @@
         </div>
 
         <div class="quick-links">
-          <a class="btn btn-primary" href="http://127.0.0.1:8765/admin-panel/operator-dashboard-full_NEW.html">🛡️ Operator-Dashboard (Full) öffnen</a>
+          <a class="btn btn-primary" href="http://127.0.0.1:8765/admin-panel/operator-dashboard-full_NEW.html">🛡️ Betreiber-Dashboard (Admin/Support, Full) öffnen</a>
           <a class="btn btn-green" href="parent-panel/index.html">👨‍👩‍👧 Eltern-Panel öffnen</a>
           <a class="btn btn-green" href="child-panel/index.html">📱 Kinder-Panel öffnen</a>
           <button class="btn btn-outline" type="button" id="open-firebase-modal-btn-1">🔥 Firebase-Konfiguration bearbeiten</button>
@@ -689,12 +689,12 @@
         <div class="flow-step">
           <span class="kicker">Schritt 1 · Setup</span>
           <strong>Firebase-Konfiguration speichern</strong>
-          <p>Ohne g&uuml;ltige Werte sind Admin- und Eltern-Panel nur eingeschr&auml;nkt nutzbar.</p>
+          <p>Ohne g&uuml;ltige Werte sind Betreiber-Dashboard und Eltern-Panel nur eingeschr&auml;nkt nutzbar.</p>
         </div>
         <div class="flow-step">
           <span class="kicker">Schritt 2 · Einstieg</span>
           <strong>Rolle w&auml;hlen und Panel &ouml;ffnen</strong>
-          <p>Operatoren starten im Admin-Dashboard, Eltern im Eltern-Panel, Kinderfluss im Kinder-Panel.</p>
+          <p>Betreiber starten im Betreiber-Dashboard, Eltern im Eltern-Panel, Kinder im Kinder-Panel.</p>
         </div>
         <div class="flow-step">
           <span class="kicker">Schritt 3 · Android</span>
@@ -704,7 +704,7 @@
       </div>
       <div class="panel-grid panel-grid-spaced">
         <div class="mini-card">
-          <strong>Operator</strong>
+          <strong>Betreiber</strong>
           <p>Admin-Rollen, Audit, Betrieb, Kommandos und Commissioning.</p>
         </div>
         <div class="mini-card">
@@ -723,7 +723,7 @@
         <div class="card-top">
           <div class="card-icon icon-admin">🛡️</div>
           <div>
-            <h2>Operator-Dashboard</h2>
+            <h2>Betreiber-Dashboard</h2>
             <p>Steuerzentrale für Admin-Rollen, Audit-Logs, Support, Deploy-Checks und Betriebsfreigaben.</p>
           </div>
         </div>
@@ -738,10 +738,10 @@
         </div>
         <div class="callout callout-warning">
           <strong>⚙️ Python-Server erforderlich</strong>
-          <p>Die <strong>Python-basierte Testzentrale</strong> (Commissioning, Automationsläufe, Nachweise) ist nur verfügbar, wenn das Dashboard über <code>start.bat</code> oder <code>python -m python_admin.app</code> gestartet wurde. Der Link "Admin öffnen" verweist auf <code>http://127.0.0.1:8765</code>.</p>
+          <p>Die <strong>Python-basierte Testzentrale</strong> (Commissioning, Automationsläufe, Nachweise) ist nur verfügbar, wenn das Dashboard über <code>start.bat</code> oder <code>python -m python_admin.app</code> gestartet wurde. Der Link "Betreiber-Dashboard öffnen" verweist auf <code>http://127.0.0.1:8765</code>.</p>
         </div>
         <div class="actions">
-          <a class="btn btn-purple" href="http://127.0.0.1:8765/admin-panel/operator-dashboard-full_NEW.html">Admin öffnen (Full)</a>
+          <a class="btn btn-purple" href="http://127.0.0.1:8765/admin-panel/operator-dashboard-full_NEW.html">Betreiber-Dashboard öffnen (Full)</a>
           <a class="btn btn-outline" href="admin-panel/operator-audit-logs_NEW.html">Audit-Logs</a>
           <button class="btn btn-outline" type="button" id="open-firebase-modal-btn-2">Firebase-Config laden</button>
         </div>
@@ -751,7 +751,7 @@
         <div class="card-top">
           <div class="card-icon icon-parent">👨‍👩‍👧</div>
           <div>
-            <h2>Eltern Control Panel</h2>
+            <h2>Eltern-Panel</h2>
             <p>Remote-Steuerung für Sperren, Aufgaben, Nutzungsregeln, Aufgabenfreigabe und Support-Aktivitäten.</p>
           </div>
         </div>
@@ -777,12 +777,12 @@
         <div class="card-top">
           <div class="card-icon icon-child">📱</div>
           <div>
-            <h2>Kinder-App & Gerätekopplung</h2>
-            <p>Installations- und Validierungsbereich für Child-App, Pairing, Aufgabenfreigabe und spätere Durchsetzung.</p>
+            <h2>Kinder-Panel & Gerätekopplung</h2>
+            <p>Installations- und Validierungsbereich für Kinder-App, Pairing, Aufgabenfreigabe und spätere Durchsetzung.</p>
           </div>
         </div>
         <ul>
-          <li>Pairing erfolgt per QR-/Link-Flow oder 6-stelligem Code aus dem Parent-/Master-Bereich.</li>
+          <li>Pairing erfolgt per QR-/Link-Flow oder 6-stelligem Code aus dem Eltern-/Master-Bereich.</li>
           <li>Nach Installation sollten Accessibility, Live-Sync und Task-Review bewusst geprüft werden.</li>
           <li>Die APK-Pfade sind auf ADB-/Datei-Workflows abgestimmt und können lokal kopiert werden.</li>
         </ul>
@@ -854,14 +854,14 @@
             <li><code>run-usb-tests.ps1 -AppId child</code> &mdash; Kinder-App komplett</li>
             <li>Ablauf: Challenge &rarr; Token &rarr; Aktivierung &rarr; <code>connectedDebugAndroidTest</code> &rarr; Deaktivierung &rarr; XML-Auswertung</li>
             <li>Ampelausgabe: 🟢 BESTANDEN / 🔴 FEHLGESCHLAGEN + Testdetails</li>
-            <li>11 Admin-Panel-Kommandos: <code>debug-master-*</code> / <code>debug-child-*</code> / <code>debug-usb-run-tests-*</code></li>
+            <li>11 Betreiber-Dashboard-Kommandos: <code>debug-master-*</code> / <code>debug-child-*</code> / <code>debug-usb-run-tests-*</code></li>
           </ul>
         </section>
       </div>
       </details>
       <div class="actions">
         <a class="btn btn-outline" href="docs/DEBUG_INTERFACE_GUIDE.md">📘 Vollständiger Debug-Guide</a>
-        <a class="btn btn-outline" href="http://127.0.0.1:8765/admin-panel/operator-dashboard-full_NEW.html">🛡️ Admin-Panel mit Debug-Kommandos</a>
+        <a class="btn btn-outline" href="http://127.0.0.1:8765/admin-panel/operator-dashboard-full_NEW.html">🛡️ Betreiber-Dashboard mit Debug-Kommandos</a>
       </div>
     </section>
 
@@ -883,7 +883,7 @@
             <li>HMAC-SHA256 Token-Generierung via <code>generate-debug-token.ps1</code>.</li>
             <li>Vollständiger USB-Testlauf via <code>run-usb-tests.ps1</code>: Challenge &rarr; Aktivierung &rarr; <code>connectedDebugAndroidTest</code> &rarr; Deaktivierung &rarr; XML-Parsing &rarr; Ampelausgabe.</li>
             <li>Gradle Instrumented Tests für beide Apps (<code>:masterApp:connectedDebugAndroidTest</code>, <code>:childApp:connectedDebugAndroidTest</code>).</li>
-            <li>Unit-Tests: <code>:masterApp:testDebugUnitTest</code>, <code>:childApp:testDebugUnitTest</code> (via Admin-Panel-Kommandos).</li>
+            <li>Unit-Tests: <code>:masterApp:testDebugUnitTest</code>, <code>:childApp:testDebugUnitTest</code> (via Betreiber-Dashboard-Kommandos).</li>
           </ul>
         </section>
         <section>
@@ -891,11 +891,11 @@
           <ul>
             <li>Visuelles Layout, Responsive Verhalten und Lesbarkeit auf Desktop/Tablet/Mobil.</li>
             <li>Browser-spezifisches Clipboard-Verhalten unter <code>file://</code> und <code>http://</code>.</li>
-            <li>Echte Navigation in Admin-Panel, Eltern-Panel und Dokumentationslinks.</li>
+            <li>Echte Navigation im Betreiber-Dashboard, Eltern-Panel und Dokumentationslinks.</li>
             <li>Reale Wirkung der gespeicherten Firebase-Konfiguration in den angebundenen Panels.</li>
             <li>Gerätekopplung per QR-Code oder 6-stelligem Code auf echten Geräten testen.</li>
             <li>AccessibilityService-Durchsetzung (App-Blockierung, Overlay) auf echtem Gerät prüfen.</li>
-            <li>USB-Debug-Session manuell komplett durchspielen: Admin-Panel &rarr; Challenge &rarr; Token &rarr; Dump-State &rarr; Deaktivieren.</li>
+            <li>USB-Debug-Session manuell komplett durchspielen: Betreiber-Dashboard &rarr; Challenge &rarr; Token &rarr; Dump-State &rarr; Deaktivieren.</li>
             <li>Automatisches Session-Ablaufen nach 30 Minuten verifizieren.</li>
           </ul>
         </section>
@@ -916,7 +916,7 @@
       </div>
       <ol class="step-list">
         <li>Firebase-Konfiguration speichern oder gegen vorhandene Werte verifizieren.</li>
-        <li>Operator-Dashboard öffnen und Projekt-/Commissioning-Status kontrollieren.</li>
+        <li>Betreiber-Dashboard öffnen und Projekt-/Commissioning-Status kontrollieren.</li>
         <li>Eltern-Panel starten und Login, Geräteübersicht sowie Task-/Rules-Flow kurz prüfen.</li>
         <li>APKs oder Android Studio nutzen, um Child- und Master-App auf realen Geräten zu validieren.</li>
         <li><strong>Debug-Secrets einrichten (einmalig):</strong> <code>generate-debug-token.ps1 -GenSecret</code> ausführen, Werte in <code>local.properties</code> eintragen, beide Apps neu bauen.</li>
@@ -947,7 +947,7 @@
     <div class="modal">
       <h3>🔥 Firebase-Konfiguration verwalten</h3>
       <p class="modal-sub">
-        Die Werte werden unter <code>operatorFirebaseConfigOverride</code> gespeichert und damit vom Operator-Dashboard sowie vom Web-Control-Panel gemeinsam genutzt.
+        Die Werte werden unter <code>operatorFirebaseConfigOverride</code> gespeichert und damit vom Betreiber-Dashboard sowie vom Web-Control-Panel gemeinsam genutzt.
       </p>
       <div class="modal-grid">
         <div class="modal-field">
