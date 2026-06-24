@@ -312,7 +312,7 @@
     auth.onAuthStateChanged(function (user) {
       if (user) {
         currentUser = user;
-        setStatus("signin-status", "Angemeldet. Geräte-Kennung: " + escapeHtml(user.uid), "success");
+        setStatus("signin-status", "Angemeldet. Geräte-Kennung: " + user.uid, "success");
         progressSaveSupported = true;
         // Fortschritt erst jetzt laden/speichern (benötigt angemeldeten Nutzer).
         loadProgress().then(function () {
@@ -465,7 +465,7 @@
       .then(function (res) {
         var data = res && res.data ? res.data : {};
         if (data.success === false) {
-          setStatus("pair-status", "Kopplung fehlgeschlagen: " + escapeHtml(data.message || "Unbekannter Fehler."), "error");
+          setStatus("pair-status", "Kopplung fehlgeschlagen: " + (data.message || "Unbekannter Fehler."), "error");
           return;
         }
         applyPairingSuccess(data);

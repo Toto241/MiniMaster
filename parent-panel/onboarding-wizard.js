@@ -420,11 +420,17 @@ async function loadSubscription() {
     const callable = functions.httpsCallable("getSubscriptionStatus");
     const result = await callable();
     const data = result && result.data ? result.data : {};
-    const status = data.status || data.subscriptionStatus || (data.trial ? "trial" : "unbekannt");
+    // getSubscriptionStatus liefert `status` als String; ältere/andere Antworten
+    // können `subscriptionStatus` als String ODER Objekt ({ status }) enthalten.
+    const rawSubStatus = data.subscriptionStatus;
+    const subStatusStr = (rawSubStatus && typeof rawSubStatus === "object")
+      ? (rawSubStatus.status || "")
+      : (rawSubStatus ? String(rawSubStatus) : "");
+    const status = data.status || subStatusStr || (data.trial ? "trial" : "unbekannt");
     const details = document.getElementById("subscription-details");
     if (details) {
       const lines = [];
-      if (data.status || data.subscriptionStatus) lines.push("Status: " + escapeHtml(String(data.status || data.subscriptionStatus)));
+      if (data.status || subStatusStr) lines.push("Status: " + escapeHtml(String(data.status || subStatusStr)));
       if (data.plan) lines.push("Plan: " + escapeHtml(String(data.plan)));
       if (data.trialEndsAt || data.trialEnd) lines.push("Test endet: " + escapeHtml(String(data.trialEndsAt || data.trialEnd)));
       if (data.expiresAt || data.currentPeriodEnd) lines.push("Abo bis: " + escapeHtml(String(data.expiresAt || data.currentPeriodEnd)));

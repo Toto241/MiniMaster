@@ -37,6 +37,15 @@ export type WizardId = (typeof WIZARD_IDS)[number];
 export const WIZARD_STATUSES = ["not_started", "in_progress", "completed", "skipped"] as const;
 export type WizardStatus = (typeof WIZARD_STATUSES)[number];
 
+/**
+ * Deploy the wizard-progress callables to BOTH regions used across the panels:
+ * admin-panel calls Functions in the default `us-central1`, while parent-panel
+ * and child-panel initialize Functions in `europe-west1`. Exposing the
+ * functions in both regions keeps them reachable from every wizard regardless
+ * of which region its panel uses.
+ */
+const WIZARD_FUNCTION_REGIONS = ["us-central1", "europe-west1"] as const;
+
 const WIZARD_PROGRESS_COLLECTION = "wizardProgress";
 const MAX_STEP = 100;
 const MAX_COMPLETED_STEPS = 200;
@@ -87,7 +96,7 @@ function normalizeEntry(wizardId: WizardId, raw: unknown): WizardEntry {
  *
  * data: { wizardId: WizardId }
  */
-export const getWizardProgress = functions.https.onCall(
+export const getWizardProgress = functions.region(...WIZARD_FUNCTION_REGIONS).https.onCall(
   async (data: { wizardId?: string }, context: CallableContext) => {
     const uid = requireAuth(context);
     validateAppCheck(context, true);
@@ -116,7 +125,7 @@ export const getWizardProgress = functions.https.onCall(
  *   data?: Record<string, unknown>,   // small, non-secret
  * }
  */
-export const setWizardProgress = functions.https.onCall(
+export const setWizardProgress = functions.region(...WIZARD_FUNCTION_REGIONS).https.onCall(
   async (
     data: {
       wizardId?: string;
@@ -196,7 +205,7 @@ export const setWizardProgress = functions.https.onCall(
  * Wizard-Hub to render status chips). Returns one summary per known wizard,
  * defaulting to "not_started" where no progress exists yet.
  */
-export const listWizardProgress = functions.https.onCall(
+export const listWizardProgress = functions.region(...WIZARD_FUNCTION_REGIONS).https.onCall(
   async (_data: Record<string, never>, context: CallableContext) => {
     const uid = requireAuth(context);
     validateAppCheck(context, true);
