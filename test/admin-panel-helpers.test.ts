@@ -180,7 +180,22 @@ describe("admin-panel helper functions", () => {
     expect(workspaceEl.innerHTML).toContain("Python Test");
   });
 });
-*/import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
+*/import { loadAdminPanelTestExports as loadRawAdminPanelTestExports } from "./utils/admin-panel-test-harness";
+
+// app.js wraps `window.fetch` at module load (instrumentFetchWithWorkStatus),
+// which replaces the harness `jest.fn()` with a plain async passthrough that no
+// longer exposes `.mockResolvedValue`/`.mockResolvedValueOnce` and is no longer
+// recognized by `toHaveBeenCalled()`. Re-install a fresh jest mock as the active
+// fetch so these tests get a usable mock again. Production code calls the bare
+// `fetch(...)` global, which resolves to `context.fetch` at call time, so it hits
+// this mock directly.
+const loadAdminPanelTestExports: typeof loadRawAdminPanelTestExports = (initialStorage) => {
+  const harness = loadRawAdminPanelTestExports(initialStorage);
+  const freshFetch = jest.fn();
+  harness.context.fetch = freshFetch;
+  harness.fetchMock = freshFetch;
+  return harness;
+};
 
 function createDomSinkElement() {
   return {

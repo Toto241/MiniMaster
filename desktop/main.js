@@ -9,7 +9,6 @@ let crashHandlersRegistered = false;
 
 // ── Sicherheit: Nur explizit erlaubte CLI-Befehle ──────────────────────
 const ALLOWED_COMMANDS = [
-  "powershell",
   "pwsh",
   "firebase",
   "npm",
@@ -22,7 +21,6 @@ const ALLOWED_COMMANDS = [
 const runningProcesses = new Map();
 
 const WINDOWS_EXECUTABLE_MAP = {
-  powershell: "powershell.exe",
   pwsh: "pwsh.exe",
   firebase: "firebase.cmd",
   npm: "npm.cmd",

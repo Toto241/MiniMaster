@@ -1395,7 +1395,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
 
   it("index.html bindet alle Top-Level-Navigations-Tabs per data-tab statt onclick", async () => {
     const html = await fs.readFile(
-      path.resolve(__dirname, "..", "admin-panel", "index.html"), "utf8"
+      path.resolve(__dirname, "..", "admin-panel", "operator-dashboard-full_NEW.html"), "utf8"
     );
     const navMatch = html.match(/<nav id="dashboard-nav"[\s\S]*?<\/nav>/);
     expect(navMatch).not.toBeNull();
@@ -1482,7 +1482,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
 
   it("index.html migriert Bootstrap-Firebase, Modal-Close und Jobs auf data-action (F6 Stufe 2)", async () => {
     const html = await fs.readFile(
-      path.resolve(__dirname, "..", "admin-panel", "index.html"), "utf8"
+      path.resolve(__dirname, "..", "admin-panel", "operator-dashboard-full_NEW.html"), "utf8"
     );
     // Bootstrap-Firebase-Block: keine onclick mehr fuer diese Funktionen
     for (const fn of [
@@ -1745,7 +1745,7 @@ describe("admin-panel module bootstrap (Welle 1)", () => {
 describe("admin-panel module wiring", () => {
   it("index.html laedt modules/index.js VOR app.js", async () => {
     const html = await fs.readFile(
-      path.resolve(__dirname, "..", "admin-panel", "index.html"),
+      path.resolve(__dirname, "..", "admin-panel", "operator-dashboard-full_NEW.html"),
       "utf8",
     );
     const moduleIndex = html.indexOf("modules/index.js");
