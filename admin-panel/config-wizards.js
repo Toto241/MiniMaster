@@ -233,7 +233,7 @@
             refreshReadiness();
             saveProgress("config-integrations", 2, "in_progress").then(refreshChips);
         } catch (err) {
-            setStatus("cw-int-status", `✗ „${escapeHtml(label)}": ${escapeHtml(describeError(err))}`, "err");
+            setStatus("cw-int-status", `✗ „${label}": ${describeError(err)}`, "err");
         }
     }
 
@@ -361,7 +361,7 @@
             renderOemMatrix();
             refreshReadiness();
         } catch (err) {
-            setStatus("cw-int-status", `✗ OEM-Matrix: ${escapeHtml(describeError(err))}`, "err");
+            setStatus("cw-int-status", `✗ OEM-Matrix: ${describeError(err)}`, "err");
             renderOemMatrix();
         }
     }
@@ -403,7 +403,7 @@
             setStatus("cw-int-status", "✓ Konfiguration geladen.", "ok");
             loadedOnce["config-integrations"] = true;
         } catch (err) {
-            setStatus("cw-int-status", `✗ Laden fehlgeschlagen: ${escapeHtml(describeError(err))}`, "err");
+            setStatus("cw-int-status", `✗ Laden fehlgeschlagen: ${describeError(err)}`, "err");
         }
     }
 
