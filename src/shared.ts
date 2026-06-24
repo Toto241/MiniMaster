@@ -226,6 +226,7 @@ export type AuditAction =
   | "admin.set_admin_pin"
   | "admin.verify_admin_pin"
   | "admin.reset_operator_accounts"
+  | "admin.purge_project_data"
   | "admin.user_impersonation"
   | "admin.revoke_subscription"
   | "ai.explain_problem"

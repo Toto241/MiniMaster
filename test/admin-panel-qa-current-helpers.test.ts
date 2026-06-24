@@ -1,6 +1,20 @@
 import * as fs from "fs";
 import * as path from "path";
-import { loadAdminPanelTestExports } from "./utils/admin-panel-test-harness";
+import { loadAdminPanelTestExports as loadRawAdminPanelTestExports } from "./utils/admin-panel-test-harness";
+
+// app.js wraps `window.fetch` at module load (instrumentFetchWithWorkStatus),
+// which replaces the harness `jest.fn()` with a plain async passthrough that no
+// longer exposes `.mockResolvedValueOnce` etc. Re-install a fresh jest mock as
+// the active fetch so these tests get a usable mock again. Production code calls
+// the bare `fetch(...)` global, which resolves to `context.fetch` at call time,
+// so it hits this mock directly.
+const loadAdminPanelTestExports: typeof loadRawAdminPanelTestExports = (initialStorage) => {
+  const harness = loadRawAdminPanelTestExports(initialStorage);
+  const freshFetch = jest.fn();
+  harness.context.fetch = freshFetch;
+  harness.fetchMock = freshFetch;
+  return harness;
+};
 
 function createDomSinkElement() {
   return {
@@ -21,7 +35,12 @@ function createDomSinkElement() {
 
 describe("admin-panel current QA helpers", () => {
   it("keeps the visible QA tab focused on runs, failures and details", () => {
-    const html = fs.readFileSync(path.join(process.cwd(), "admin-panel", "index.html"), "utf8");
+    // admin-panel/index.html is now a redirect stub; the canonical operator
+    // dashboard markup lives in operator-dashboard-full_NEW.html.
+    const html = fs.readFileSync(
+      path.join(process.cwd(), "admin-panel", "operator-dashboard-full_NEW.html"),
+      "utf8",
+    );
 
     expect(html).toContain("id=\"tab-qa\"");
     expect(html).toContain("id=\"qa-section-heading\"");

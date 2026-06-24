@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Vollständige Projektlöschung** (`purgeAllProjectData`): Neue Admin-Cloud-Function, die ALLE Projektdaten unwiderruflich entfernt — sämtliche Firestore-Collections inkl. verschachtelter Subcollections (`usageHistory`, `tamperEvents`, `commands`, `events`, `conversationHistory` …), alle Cloud-Storage-Objekte und optional alle Firebase-Auth-Nutzer. Ergänzt `deleteUserAccount` (Einzelkonto) und `resetAllAuthUsers` (nur Auth). Abgesichert durch dieselbe Reset-Gating (Feature-Flag, Projekt-Allowlist, Admin/Recovery-Token, T4 + Admin-PIN, Bestätigungstext `DELETE_ALL_PROJECT_DATA`).
+- Betreiber-Dashboard: Button „🗑️ Alle Projektdaten löschen" im Einrichtungs-/Recovery-Bereich mit Doppelbestätigung.
+- 8 neue Tests (`test/purge-project-data.test.ts`) für Gating, Firestore-/Storage-/Auth-Löschung und Fehlerpfade.
+
 ## [2.2.0] - 2026-03-19
 
 ### Fixed

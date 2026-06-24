@@ -80,6 +80,18 @@ function loadStartPage(initialStorage: StorageMap = {}, pathname = "/workspace/M
   elements.get("master-apk-path")!.textContent = "masterApp\\build\\outputs\\apk\\debug\\masterApp-debug.apk";
   elements.get("master-apk-path")!.nextElementSibling = copyButton;
 
+  const createLink = (text: string): any => ({
+    textContent: text,
+    classList: { add: jest.fn(), remove: jest.fn() },
+    dataset: {},
+    getAttribute: jest.fn((name: string) => (name === "href" ? "#" : null)),
+    addEventListener: jest.fn(),
+  });
+
+  const querySelectorAllResults = new Map<string, any[]>([
+    ["a.btn[href]", [createLink("Panel A"), createLink("Panel B")]],
+  ]);
+
   const documentMock: any = {
     getElementById: jest.fn((id: string) => elements.get(id) || null),
     createElement: jest.fn((tag: string) => ({
@@ -89,6 +101,11 @@ function loadStartPage(initialStorage: StorageMap = {}, pathname = "/workspace/M
       select: jest.fn(),
       classList: { add: jest.fn(), remove: jest.fn() },
     })),
+    querySelectorAll: jest.fn((selector: string) => {
+      const list = querySelectorAllResults.get(selector) || [];
+      return list;
+    }),
+    addEventListener: jest.fn(),
     body: {
       appendChild: jest.fn(),
       removeChild: jest.fn(),

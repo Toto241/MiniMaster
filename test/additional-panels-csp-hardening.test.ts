@@ -2,7 +2,8 @@ import { readFileSync } from "fs";
 import * as path from "path";
 
 describe("Additional Panels CSP Hardening", () => {
-  const adminPanelLogsHtml = readFileSync(path.join(__dirname, "..", "admin-panel", "logs.html"), "utf8");
+  // logs.html is now a redirect stub to operator-audit-logs_NEW.html, which is the real audit-logs page.
+  const adminPanelLogsHtml = readFileSync(path.join(__dirname, "..", "admin-panel", "operator-audit-logs_NEW.html"), "utf8");
   const adminPanelLogsJs = readFileSync(path.join(__dirname, "..", "admin-panel", "logs.js"), "utf8");
   const startHtml = readFileSync(path.join(__dirname, "..", "start.html"), "utf8");
   const startJs = readFileSync(path.join(__dirname, "..", "start.js"), "utf8");

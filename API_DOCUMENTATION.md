@@ -790,6 +790,21 @@ Health-check variant: reports how many users would be affected without deleting 
 
 **Response**: `{ requestId: string, status: string, totalAuthUsers: number, operatorUsers: number, flags: object }`
 
+### purgeAllProjectData (Admin)
+
+Completely and irreversibly deletes **all** project data: every Firestore collection (including nested subcollections such as `usageHistory`, `tamperEvents`, `commands`, `events`, `conversationHistory`), every Cloud Storage object and — unless disabled — every Firebase Auth user. This is the project-wide counterpart to `deleteUserAccount` (single account) and `resetAllAuthUsers` (auth users only). Intended for re-provisioning or decommissioning a deployment.
+
+**Function Type**: `httpsCallable`
+
+**Parameters**: `{ confirmText: "DELETE_ALL_PROJECT_DATA", requestId?: string, includeAuthUsers?: boolean, includeCurrentSessionUser?: boolean, recoveryToken?: string }`
+
+- `includeAuthUsers` (default `true`): also delete all Firebase Auth users.
+- `includeCurrentSessionUser` (default `false`): when `false`, the calling admin's own account is preserved so the operator keeps a session to observe the result.
+
+**Preconditions**: reset feature enabled (`FUNCTIONS_EMULATOR=true`, `ENABLE_OPERATOR_ACCOUNT_RESET=true` or `MINIMASTER_ENABLE_OPERATOR_ACCOUNT_RESET=true`), the current project allow-listed via `MINIMASTER_RESET_ALLOWED_PROJECTS`, admin caller (or valid `recoveryToken`), T4 session + admin-PIN verification.
+
+**Response**: `{ success: boolean, requestId: string, collectionsCleared: string[], collectionsClearedCount: number, storageFilesDeleted: number, storageWarning: string | null, includeAuthUsers: boolean, deletedUsers: number, skippedCurrentSessionUsers: string[], failedUsers: string[], auditLogWarning: string | null }`
+
 ## Support Functions
 
 ### createSupportTicket
