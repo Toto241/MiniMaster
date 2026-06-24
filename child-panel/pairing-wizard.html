@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniMaster Kind-Geräte-Pairing & Berechtigungen</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .wizard-steps {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-block-end: 4px;
+    }
+    .wizard-steps .step-pill {
+      flex: 1 1 auto;
+      min-inline-size: 90px;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 8px 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #f5f9f7;
+      color: var(--muted);
+    }
+    .wizard-steps .step-pill.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .wizard-steps .step-pill.done {
+      background: #ecfdf5;
+      color: #166534;
+      border-color: #86efac;
+    }
+    .progress-track {
+      block-size: 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .progress-fill {
+      block-size: 100%;
+      inline-size: 0%;
+      background: var(--primary);
+      transition: inline-size 0.25s ease;
+    }
+    .wizard-step { display: none; }
+    .wizard-step.active { display: grid; gap: 12px; }
+    .wizard-nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .checklist { list-style: none; display: grid; gap: 10px; }
+    .checklist li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: #f7fcf9;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .checklist li input { inline-size: auto; margin-block-start: 3px; }
+    .checklist li label { font-weight: 600; color: var(--ink); }
+    .perm-block {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fffb;
+      display: grid;
+      gap: 6px;
+    }
+    .perm-block h3 { font-size: 0.98rem; color: #1b4332; }
+    .pair-option {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fbff;
+      display: grid;
+      gap: 8px;
+    }
+    .summary-list { list-style: none; display: grid; gap: 8px; }
+    .summary-list li {
+      background: #f7fcf9;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: var(--muted);
+    }
+    .summary-list strong { color: #1b4332; }
+    .badge {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <h1>Kind-Geräte-Pairing &amp; Berechtigungen</h1>
+      <p>
+        Dieser Assistent koppelt dieses Gerät Schritt für Schritt mit einem Eltern-Konto und
+        erklärt, welche Berechtigungen die Kinder-App auf dem Gerät benötigt.
+      </p>
+      <div class="wizard-steps" id="wizard-steps" aria-label="Fortschritt"></div>
+      <div class="progress-track" aria-hidden="true">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div id="wizard-progress-status" class="status">Assistent wird geladen …</div>
+    </section>
+
+    <!-- Schritt 1: Willkommen -->
+    <section class="card wizard-step" id="step-welcome" data-step="0">
+      <h2>1) Willkommen</h2>
+      <p>
+        Willkommen beim Einrichtungs-Assistenten für dieses Kinder-Gerät. In den nächsten
+        Schritten wird dieses Gerät sicher mit dem Konto eines Elternteils
+        <strong>gekoppelt</strong>. Danach kann das Eltern-Panel Aufgaben, Sperrzeiten und
+        Nutzungsregeln für dieses Gerät verwalten.
+      </p>
+      <p class="help">
+        Du benötigst dafür entweder einen <strong>6-stelligen Pairing-Code</strong> oder einen
+        <strong>Pairing-Link</strong> aus dem Eltern-Bereich. Halte diese Information bereit und
+        klicke auf „Weiter“.
+      </p>
+    </section>
+
+    <!-- Schritt 2: Anmeldung -->
+    <section class="card wizard-step" id="step-signin" data-step="1">
+      <h2>2) Anmeldung</h2>
+      <p>
+        Damit dieses Gerät eine eindeutige Kennung (uid) erhält, melden wir es anonym bei
+        Firebase an. Es werden dabei keine persönlichen Daten abgefragt.
+      </p>
+      <div id="signin-status" class="status">Anmeldung wird vorbereitet …</div>
+      <div class="inline">
+        <button id="retry-signin-btn" class="btn btn-ghost" type="button" title="Anonyme Anmeldung erneut versuchen">Anmeldung erneut versuchen</button>
+      </div>
+      <p class="help">
+        Erst nach erfolgreicher Anmeldung kannst du im nächsten Schritt koppeln.
+      </p>
+    </section>
+
+    <!-- Schritt 3: Koppeln -->
+    <section class="card wizard-step" id="step-pair" data-step="2">
+      <h2>3) Koppeln</h2>
+      <p>Wähle eine der beiden Methoden, um dieses Gerät mit dem Eltern-Konto zu verbinden.</p>
+
+      <div class="pair-option">
+        <h3>Option A: 6-stelliger Code</h3>
+        <label for="pairing-code-input">Pairing-Code</label>
+        <input id="pairing-code-input" type="text" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="z. B. 123456" title="6-stelliger Pairing-Code aus dem Eltern-Bereich" />
+        <div class="inline">
+          <button id="validate-code-btn" class="btn btn-ghost" type="button" title="Code vorab prüfen, ohne zu koppeln">Code prüfen</button>
+          <button id="pair-code-btn" class="btn btn-primary" type="button" title="Mit dem 6-stelligen Code koppeln">Koppeln</button>
+        </div>
+      </div>
+
+      <div class="pair-option">
+        <h3>Option B: Pairing-Link / Token</h3>
+        <label for="pairing-link-input">Pairing-Link oder Token einfügen</label>
+        <input id="pairing-link-input" type="text" autocomplete="off" placeholder="https://… oder Token" title="Pairing-Link oder Token aus dem Eltern-Bereich einfügen" />
+        <div class="inline">
+          <button id="pair-link-btn" class="btn btn-primary" type="button" title="Mit Pairing-Link oder Token koppeln">Koppeln</button>
+        </div>
+      </div>
+
+      <div id="pair-status" class="status">Noch nicht gekoppelt.</div>
+    </section>
+
+    <!-- Schritt 4: Berechtigungen -->
+    <section class="card wizard-step" id="step-permissions" data-step="3">
+      <h2>4) Berechtigungen</h2>
+      <p>
+        Die folgenden Berechtigungen werden in der nativen Kinder-App bzw. in den
+        <strong>Geräte-Einstellungen</strong> erteilt – nicht hier in diesem Assistenten.
+        Diese Übersicht erklärt, warum sie nötig sind.
+      </p>
+
+      <div class="perm-block">
+        <h3><span class="badge">Android</span> Bedienungshilfen / Accessibility-Dienst</h3>
+        <p class="help">
+          Aktiviere den MiniMaster-Accessibility-Dienst unter
+          <em>Einstellungen → Bedienungshilfen</em>. Er ermöglicht das Erkennen und Blockieren
+          gesperrter Apps sowie das zuverlässige Anwenden von Sperrzeiten.
+        </p>
+      </div>
+      <div class="perm-block">
+        <h3><span class="badge">Android</span> „Über anderen Apps anzeigen“ / Overlay</h3>
+        <p class="help">
+          Erlaube die Overlay-Berechtigung unter
+          <em>Einstellungen → Apps → Über anderen Apps anzeigen</em>. Damit kann die Sperr-Ansicht
+          über gesperrten Apps eingeblendet werden.
+        </p>
+      </div>
+      <div class="perm-block">
+        <h3><span class="badge">iOS</span> Bildschirmzeit / Family Controls</h3>
+        <p class="help">
+          Erlaube unter <em>Einstellungen → Bildschirmzeit</em> bzw. beim App-Hinweis den Zugriff
+          auf Family Controls. Damit kann MiniMaster App-Limits und Sperren auf diesem Gerät
+          durchsetzen.
+        </p>
+      </div>
+
+      <p class="help">
+        Bestätige zur Sicherheit, dass du die folgenden Punkte verstanden hast. Diese Häkchen
+        sind nur eine Gedächtnisstütze und werden nicht gespeichert.
+      </p>
+      <ul class="checklist" id="permission-checklist">
+        <li>
+          <input type="checkbox" id="perm-ack-accessibility" data-perm="accessibility" />
+          <label for="perm-ack-accessibility">Ich aktiviere den Accessibility-/Bedienungshilfen-Dienst in den Geräte-Einstellungen (Android).</label>
+        </li>
+        <li>
+          <input type="checkbox" id="perm-ack-overlay" data-perm="overlay" />
+          <label for="perm-ack-overlay">Ich erlaube „Über anderen Apps anzeigen“ / Overlay (Android).</label>
+        </li>
+        <li>
+          <input type="checkbox" id="perm-ack-screentime" data-perm="screentime" />
+          <label for="perm-ack-screentime">Ich erlaube Bildschirmzeit / Family Controls (iOS).</label>
+        </li>
+        <li>
+          <input type="checkbox" id="perm-ack-native" data-perm="native" />
+          <label for="perm-ack-native">Mir ist klar, dass diese Berechtigungen in der App/den OS-Einstellungen erteilt werden, nicht hier.</label>
+        </li>
+      </ul>
+      <div id="permission-status" class="status">Bitte die Punkte oben durchlesen und bestätigen.</div>
+    </section>
+
+    <!-- Schritt 5: Fertig -->
+    <section class="card wizard-step" id="step-done" data-step="4">
+      <h2>5) Fertig</h2>
+      <p>Zusammenfassung der Einrichtung:</p>
+      <ul class="summary-list" id="summary-list"></ul>
+      <p class="help">
+        Nächste Schritte: Öffne die native Kinder-App und prüfe, dass die oben genannten
+        Berechtigungen aktiv sind. Im Eltern-Panel erscheint dieses Gerät danach für die
+        weitere Steuerung (Aufgaben, Sperren, Regeln).
+      </p>
+      <div class="actions">
+        <a class="btn btn-secondary" href="./index.html" title="Zurück zum Kinder-Panel">Zum Kinder-Panel</a>
+        <a class="btn btn-ghost" href="../start.html" title="Zurück zur MiniMaster Startseite">Zur Startseite</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="wizard-nav">
+        <button id="wizard-back-btn" class="btn btn-ghost" type="button" title="Einen Schritt zurück">Zurück</button>
+        <button id="wizard-next-btn" class="btn btn-primary" type="button" title="Einen Schritt weiter">Weiter</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Vom Setup-Wizard generierte Firebase-Werte (optional; 404 ohne Wizard
+       ist erwartet und wird vom Browser stillschweigend ignoriert). -->
+  <script src="./firebase-config.js"></script>
+  <script src="./pairing-wizard.js"></script>
+</body>
+</html>

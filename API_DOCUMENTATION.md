@@ -805,6 +805,42 @@ Completely and irreversibly deletes **all** project data: every Firestore collec
 
 **Response**: `{ success: boolean, requestId: string, collectionsCleared: string[], collectionsClearedCount: number, storageFilesDeleted: number, storageWarning: string | null, includeAuthUsers: boolean, deletedUsers: number, skippedCurrentSessionUsers: string[], failedUsers: string[], auditLogWarning: string | null }`
 
+## Setup Wizard Functions
+
+Generic per-user progress tracker shared by all setup/onboarding/configuration wizards (Wizard-Hub, Komplett-Einrichtung, Eltern-Onboarding, Kind-Pairing, Konfig-Wizards). Progress is stored per authenticated caller at `wizardProgress/{uid}`; only non-secret progress data is persisted. Direct client access to the collection is denied — all access goes through these callables.
+
+Known `wizardId` values: `setup-complete`, `firebase-setup`, `parent-onboarding`, `child-pairing`, `config-pricing`, `config-integrations`, `config-backup-reset`. Status values: `not_started`, `in_progress`, `completed`, `skipped`.
+
+### getWizardProgress
+
+Returns the saved progress for one wizard (or a fresh empty entry).
+
+**Function Type**: `httpsCallable` · **Auth**: any authenticated user + App Check
+
+**Parameters**: `{ wizardId: WizardId }`
+
+**Response**: `{ wizardId, progress: { wizardId, currentStep, completedSteps: number[], status, data: object, updatedAt: string | null } }`
+
+### setWizardProgress
+
+Upserts progress for one wizard. The `data` payload is capped (8 KB) and must be non-secret.
+
+**Function Type**: `httpsCallable` · **Auth**: any authenticated user + App Check
+
+**Parameters**: `{ wizardId: WizardId, currentStep: number, completedSteps?: number[], status?: WizardStatus, data?: object }`
+
+**Response**: `{ ok: true, wizardId, currentStep, status }`
+
+### listWizardProgress
+
+Returns a compact status summary for every known wizard (used by the Wizard-Hub).
+
+**Function Type**: `httpsCallable` · **Auth**: any authenticated user + App Check
+
+**Parameters**: none
+
+**Response**: `{ wizards: Array<{ wizardId, status, currentStep, completedCount, updatedAt }> }`
+
 ## Support Functions
 
 ### createSupportTicket
