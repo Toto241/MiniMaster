@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com; img-src 'self' data: https:; frame-ancestors 'none';"
+        />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#0f172a" />
+        <title>MiniMaster Konfigurations-Wizards</title>
+        <link rel="stylesheet" href="styles.css?v=20260319" />
+        <link rel="stylesheet" href="styles-wizard.css" />
+        <!-- Firebase SDKs (SRI integrity enforced) -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
+        <script src="firebase-config.js"></script>
+        <script src="appcheck-init.js"></script>
+        <style>
+            .cw-hub-nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-block: 16px 24px;
+            }
+            .cw-hub-tab {
+                appearance: none;
+                cursor: pointer;
+                border: 1px solid #cbd5e1;
+                background: #f8fafc;
+                color: #0f172a;
+                font: inherit;
+                font-weight: 600;
+                padding: 10px 16px;
+                border-radius: 999px;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .cw-hub-tab.is-active {
+                background: #0f172a;
+                color: #fff;
+                border-color: #0f172a;
+            }
+            .cw-hub-tab:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            .cw-chip {
+                font-size: 11px;
+                font-weight: 700;
+                line-height: 1;
+                padding: 3px 8px;
+                border-radius: 999px;
+                background: #e2e8f0;
+                color: #334155;
+            }
+            .cw-chip.is-in_progress { background: #fef3c7; color: #92400e; }
+            .cw-chip.is-completed { background: #dcfce7; color: #166534; }
+            .cw-chip.is-skipped { background: #e0e7ff; color: #3730a3; }
+            .cw-panel[hidden] { display: none; }
+            .cw-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 14px;
+            }
+            .cw-field-row {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                margin-block-end: 12px;
+            }
+            .cw-field-row label { font-weight: 600; font-size: 14px; }
+            .cw-field-row input[type="text"] {
+                padding: 8px 10px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                font: inherit;
+            }
+            .cw-inline-row {
+                display: flex;
+                gap: 8px;
+                align-items: flex-end;
+            }
+            .cw-inline-row input { flex: 1; }
+            .cw-readonly { color: #475569; font-size: 13px; }
+            .cw-danger-box {
+                border: 2px solid #dc2626;
+                background: #fef2f2;
+                border-radius: 12px;
+                padding: 16px;
+                margin-block: 16px;
+            }
+            .cw-danger-btn {
+                appearance: none;
+                cursor: pointer;
+                background: #dc2626;
+                color: #fff;
+                border: none;
+                font: inherit;
+                font-weight: 700;
+                padding: 12px 18px;
+                border-radius: 8px;
+                text-decoration: none;
+                display: inline-block;
+            }
+            .cw-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+            .cw-table th, .cw-table td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+            .cw-table th { background: #f1f5f9; }
+            .cw-checklist { list-style: none; padding: 0; margin: 0; }
+            .cw-checklist li {
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+                padding: 6px 0;
+            }
+            .cw-readiness-bar {
+                block-size: 12px;
+                background: #e2e8f0;
+                border-radius: 999px;
+                overflow: hidden;
+                margin-block: 6px;
+            }
+            .cw-readiness-fill { block-size: 100%; background: #16a34a; inline-size: 0%; }
+            .cw-muted { color: #64748b; }
+        </style>
+    </head>
+    <body>
+        <div class="wiz-shell">
+            <header class="wiz-header">
+                <h1>MiniMaster Konfigurations-Wizards</h1>
+                <p class="wiz-purpose">
+                    Geführte Assistenten für Operatoren: externe Integrationen,
+                    Abo &amp; Preise sowie Backup &amp; Reset.
+                </p>
+            </header>
+
+            <div id="cw-auth-gate" class="wiz-card" hidden>
+                <div class="wiz-status is-warn" id="cw-auth-gate-msg">
+                    Zugriff nur für Administratoren.
+                </div>
+                <p>
+                    <a href="./index.html" class="wiz-link-btn">Zurück zur Anmeldung / zum Dashboard</a>
+                </p>
+            </div>
+
+            <nav class="cw-hub-nav" id="cw-hub-nav" aria-label="Konfigurations-Wizards">
+                <button type="button" class="cw-hub-tab is-active" data-wizard="config-integrations">
+                    <span>Externe Integrationen</span>
+                    <span class="cw-chip" data-chip="config-integrations">…</span>
+                </button>
+                <button type="button" class="cw-hub-tab" data-wizard="config-pricing">
+                    <span>Abo &amp; Preise</span>
+                    <span class="cw-chip" data-chip="config-pricing">…</span>
+                </button>
+                <button type="button" class="cw-hub-tab" data-wizard="config-backup-reset">
+                    <span>Backup &amp; Reset</span>
+                    <span class="cw-chip" data-chip="config-backup-reset">…</span>
+                </button>
+            </nav>
+
+            <!-- ============ A) Externe Integrationen ============ -->
+            <section class="cw-panel" id="panel-config-integrations" data-wizard="config-integrations">
+                <div class="wiz-card">
+                    <h2>Externe Integrationen</h2>
+                    <p class="wiz-hint">
+                        Geführter Editor für Apple-, Play-, Secret-Manager-, OEM- und
+                        Release-Konfiguration. Es werden ausschließlich Referenzen und
+                        Pfade gespeichert — niemals Rohwerte von Secrets.
+                    </p>
+                    <div class="wiz-status" id="cw-int-status" role="status" aria-live="polite"></div>
+                    <div class="wiz-actions">
+                        <button type="button" class="wiz-btn" data-cw-action="int-reload">Aktuelle Werte laden</button>
+                    </div>
+                </div>
+
+                <div class="wiz-card" id="cw-int-readiness-card" hidden>
+                    <h3>Release-Readiness</h3>
+                    <div class="cw-readiness-bar"><div class="cw-readiness-fill" id="cw-int-readiness-fill"></div></div>
+                    <p id="cw-int-readiness-summary" class="cw-muted"></p>
+                    <ul id="cw-int-readiness-blockers"></ul>
+                </div>
+
+                <div class="wiz-card" id="cw-int-form" hidden>
+                    <h3>Apple</h3>
+                    <div id="cw-int-apple" class="cw-grid"></div>
+                    <h3>Google Play</h3>
+                    <div id="cw-int-play" class="cw-grid"></div>
+                    <h3>Secret-Manager-Pfade</h3>
+                    <p class="wiz-hint">
+                        Nur Secret-Manager-Pfade der Form
+                        <code>projects/&lt;projekt&gt;/secrets/&lt;name&gt;/versions/&lt;latest|N&gt;</code>.
+                        Niemals Rohwerte einfügen.
+                    </p>
+                    <div id="cw-int-secrets" class="cw-grid"></div>
+                    <h3>Release-Checkliste</h3>
+                    <div id="cw-int-release" class="cw-grid"></div>
+                    <h3>OEM-Validierungsmatrix</h3>
+                    <div id="cw-int-oem"></div>
+                </div>
+            </section>
+
+            <!-- ============ B) Abo & Preise ============ -->
+            <section class="cw-panel" id="panel-config-pricing" data-wizard="config-pricing" hidden>
+                <div class="wiz-card">
+                    <h2>Abo &amp; Preise</h2>
+                    <p class="wiz-hint">
+                        Informativer Überblick. Preise werden in diesem Wizard
+                        <strong>nicht</strong> verändert — die Quelle der Wahrheit ist
+                        <code>src/pricing-config.ts</code>, die tatsächlichen Store-Preise
+                        werden in der Play Console bzw. im App Store Connect gepflegt.
+                    </p>
+                    <div class="wiz-status" id="cw-price-status" role="status" aria-live="polite"></div>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>B2C-Tarife</h3>
+                    <table class="cw-table" id="cw-price-b2c"></table>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>B2B-Tarife</h3>
+                    <table class="cw-table" id="cw-price-b2b"></table>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>SKUs &amp; Promo-Codes</h3>
+                    <p>
+                        Jeder Tarif hat eine eindeutige SKU (z. B.
+                        <code>single_child_monthly</code>, <code>b2b_school_50</code>).
+                        Promo-Codes werden über einen prozentualen Rabatt auf die
+                        Netto-Preise angewendet (siehe <code>applyPromoCode</code>);
+                        Rabatte gelten optional nur für bestimmte SKUs.
+                    </p>
+                    <p>
+                        Affiliate: 30 % Provision für 12 Monate, Auszahlung ab 50 €
+                        (PayPal), 30-Tage-Attributionsfenster.
+                    </p>
+                    <p class="wiz-hint">
+                        Konfigurationsort: <code>src/pricing-config.ts</code>
+                        (B2C_TIERS / B2B_TIERS / AFFILIATE_CONFIG / VAT_RATES).
+                        Store-Preise: Google Play Console &amp; App Store Connect.
+                        Die SKUs müssen dort exakt übereinstimmen.
+                    </p>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>Checkliste: Preis-Setup</h3>
+                    <p class="wiz-hint">Lokale Merkliste (wird im Wizard-Fortschritt gespeichert).</p>
+                    <ul class="cw-checklist" id="cw-price-checklist"></ul>
+                </div>
+            </section>
+
+            <!-- ============ C) Backup & Reset ============ -->
+            <section class="cw-panel" id="panel-config-backup-reset" data-wizard="config-backup-reset" hidden>
+                <div class="wiz-card">
+                    <h2>Backup &amp; Reset</h2>
+                    <p class="wiz-hint">Sicherheit zuerst. Dieser Wizard führt nur — destruktive Aktionen werden im Dashboard hinter ihren Schutzmechanismen ausgelöst.</p>
+                    <div class="wiz-status" id="cw-reset-status" role="status" aria-live="polite"></div>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>1. Konfigurations-Snapshots</h3>
+                    <p>
+                        Vor jedem Konfigurations-Transfer und vor jeder Wiederherstellung
+                        wird automatisch ein Snapshot angelegt. Snapshots schützen vor
+                        versehentlichem Konfigurationsverlust und lassen sich jederzeit
+                        wiederherstellen.
+                    </p>
+                    <p>
+                        <a href="./index.html#tab-setup" class="wiz-link-btn">
+                            Zum Setup-Tab (Snapshots anlegen / wiederherstellen)
+                        </a>
+                    </p>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>2. Projektdaten-Löschung (destruktiv)</h3>
+                    <p>
+                        Die vollständige Projektlöschung (<code>purgeAllProjectData</code>)
+                        entfernt <strong>unwiderruflich</strong> alle Firestore-Collections,
+                        alle Cloud-Storage-Dateien und optional alle Auth-Nutzer.
+                    </p>
+                    <p>Sie ist mehrfach abgesichert:</p>
+                    <ul>
+                        <li>Feature-Flag serverseitig aktiv
+                            (<code>ENABLE_OPERATOR_ACCOUNT_RESET</code> /
+                            <code>FUNCTIONS_EMULATOR</code>) — sonst deaktiviert.</li>
+                        <li>Deployment-Allowlist für das Projekt
+                            (<code>assertResetDeploymentAllowed</code>).</li>
+                        <li>Admin-Rolle (Tier T4) <strong>und</strong> Admin-PIN-Bestätigung.</li>
+                        <li>Bestätigungstext exakt <code>DELETE_ALL_PROJECT_DATA</code>.</li>
+                        <li>App-Check-Validierung.</li>
+                    </ul>
+                    <div class="cw-danger-box">
+                        <p>
+                            <strong>Achtung:</strong> Dieser Wizard löst die Löschung
+                            <strong>nicht</strong> aus. Die Aktion erfolgt ausschließlich über
+                            den abgesicherten Dashboard-Button „Alle Projektdaten löschen".
+                        </p>
+                        <a href="./index.html#tab-setup" class="cw-danger-btn" id="cw-reset-danger-link">
+                            Zum Dashboard: „Alle Projektdaten löschen"
+                        </a>
+                    </div>
+                </div>
+
+                <div class="wiz-card">
+                    <h3>3. Bestätigung gelesen</h3>
+                    <ul class="cw-checklist" id="cw-reset-checklist"></ul>
+                </div>
+            </section>
+        </div>
+
+        <script src="config-wizards.js"></script>
+    </body>
+</html>

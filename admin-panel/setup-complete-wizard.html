@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com; img-src 'self' data: https:; frame-ancestors 'none';">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#0f172a" />
+        <title>MiniMaster – Komplett-Einrichtung von Null</title>
+        <link rel="stylesheet" href="styles.css" />
+        <link rel="stylesheet" href="styles-wizard.css" />
+        <!-- Firebase SDKs (SRI integrity enforced) -->
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
+        <!-- Vom Setup-Wizard generierte Firebase-Werte (optional; ein 404 ist
+             erwartet, solange der Wizard nicht gelaufen ist – wird stillschweigend
+             ignoriert und window.__MM_FIREBASE_CONFIG__ bleibt undefined). -->
+        <script src="firebase-config.js"></script>
+        <script src="appcheck-init.js"></script>
+        <style>
+            /* Ergaenzende, wizard-spezifische Stile (CSP erlaubt Inline-CSS). */
+            .scw-badge {
+                display: inline-block;
+                padding: 2px 10px;
+                border-radius: 999px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                line-height: 1.6;
+                white-space: nowrap;
+            }
+            .scw-badge.is-ok { background: #dcfce7; color: #166534; }
+            .scw-badge.is-warn { background: #fef9c3; color: #854d0e; }
+            .scw-badge.is-err { background: #fee2e2; color: #991b1b; }
+            .scw-badge.is-neutral { background: #e5e7eb; color: #374151; }
+
+            .scw-row {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 10px 0;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .scw-row:last-child { border-bottom: none; }
+            .scw-row-main { flex: 1 1 auto; min-width: 0; }
+            .scw-row-title { font-weight: 600; }
+            .scw-row-hint {
+                font-size: 0.85rem;
+                color: #6b7280;
+                margin-top: 2px;
+                word-break: break-word;
+            }
+            .scw-row-side { flex: 0 0 auto; }
+
+            .scw-check-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 8px 0;
+                border-bottom: 1px solid #eef2f7;
+            }
+            .scw-check-item:last-child { border-bottom: none; }
+            .scw-check-item input[type="checkbox"] { margin-top: 4px; flex: 0 0 auto; }
+            .scw-cat-group { margin-bottom: 18px; }
+            .scw-cat-title {
+                font-weight: 700;
+                margin: 6px 0;
+                text-transform: uppercase;
+                font-size: 0.78rem;
+                letter-spacing: 0.04em;
+                color: #475569;
+            }
+
+            .scw-progressbar {
+                height: 10px;
+                border-radius: 999px;
+                background: #e5e7eb;
+                overflow: hidden;
+                margin: 8px 0;
+            }
+            .scw-progressbar > span {
+                display: block;
+                height: 100%;
+                background: #16a34a;
+                width: 0%;
+                transition: width 0.3s ease;
+            }
+
+            .scw-auth-notice {
+                margin: 16px 0;
+                padding: 14px 16px;
+                border-radius: 10px;
+                background: #fef9c3;
+                border: 1px solid #fde047;
+                color: #713f12;
+            }
+            .scw-auth-notice a { font-weight: 600; }
+            .scw-muted { color: #6b7280; }
+            .wiz-shell[data-locked="true"] .wiz-step .wiz-actions [data-wiz-action] { pointer-events: none; opacity: 0.5; }
+        </style>
+    </head>
+    <body>
+        <main class="wiz-shell" id="wiz-shell" data-locked="true">
+            <header class="wiz-header">
+                <h1>MiniMaster – Komplett-Einrichtung von Null</h1>
+                <p>
+                    Dieser Assistent fuehrt dich als Operator/Admin durch die fuenf Phasen
+                    der Inbetriebnahme. Er liest den aggregierten Setup-Status aus dem
+                    Backend und zeigt dir gezielt, wo noch etwas fehlt. Aenderungen wie
+                    Firebase-Werte, Secrets oder die Admin-PIN setzt du in den jeweils
+                    verlinkten Spezial-Werkzeugen – dieser Assistent orchestriert und
+                    dokumentiert nur den Fortschritt.
+                </p>
+            </header>
+
+            <div class="scw-auth-notice" id="scw-auth-notice" hidden></div>
+
+            <div class="wiz-progress" id="wiz-progress" aria-label="Fortschritt">
+                <div class="wiz-progress-step" data-step="1">1 · Willkommen</div>
+                <div class="wiz-progress-step" data-step="2">2 · Firebase</div>
+                <div class="wiz-progress-step" data-step="3">3 · Secrets</div>
+                <div class="wiz-progress-step" data-step="4">4 · Rollen &amp; PIN</div>
+                <div class="wiz-progress-step" data-step="5">5 · Gates</div>
+                <div class="wiz-progress-step" data-step="6">6 · Validierung</div>
+                <div class="wiz-progress-step" data-step="7">7 · Fertig</div>
+            </div>
+
+            <!-- ── Step 1: Willkommen ─────────────────────────────────────── -->
+            <section class="wiz-step" data-step="1">
+                <div class="wiz-card">
+                    <h2>Willkommen zur Komplett-Einrichtung</h2>
+                    <p>
+                        Du richtest MiniMaster „von Null" ein. Der Assistent begleitet dich
+                        durch <strong>fuenf Phasen</strong>:
+                    </p>
+                    <ol>
+                        <li><strong>Firebase verbinden</strong> – Projekt, Storage und Firestore erreichbar.</li>
+                        <li><strong>Secrets</strong> – Gemini-Key, Admin-Recovery-Token und weitere Geheimnisse.</li>
+                        <li><strong>Rollen &amp; Admin-PIN</strong> – Operator-Berechtigungen und PIN-Schutz.</li>
+                        <li><strong>Commissioning-Gates</strong> – manuelle Pflicht-Checkliste fuer den Go-Live.</li>
+                        <li><strong>Validierung</strong> – Acceptance-Run und Freigabe-Gates.</li>
+                    </ol>
+                    <div class="wiz-purpose">
+                        <strong>Hinweis:</strong> Alle Schritte sind read-only orchestriert –
+                        ausser dem Abhaken der Commissioning-Gates aendert dieser Assistent
+                        keine Werte. Dein Fortschritt wird serverseitig gespeichert, sodass du
+                        spaeter genau hier weitermachen kannst.
+                    </div>
+                </div>
+                <div class="wiz-actions">
+                    <span></span>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+                </div>
+            </section>
+
+            <!-- ── Step 2: Firebase verbinden ─────────────────────────────── -->
+            <section class="wiz-step" data-step="2">
+                <div class="wiz-card">
+                    <h2>Firebase verbinden</h2>
+                    <div class="wiz-purpose">
+                        <strong>Wofuer ist das wichtig?</strong>
+                        Ohne erreichbares Firebase-Projekt (Storage + Firestore) kann das
+                        Backend keine Daten lesen oder schreiben. Hier siehst du den
+                        aktuellen Verbindungsstatus.
+                    </div>
+                    <div class="wiz-status" id="scw-fb-loading">Lade Firebase-Status …</div>
+                    <div id="scw-fb-result" hidden>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Project ID</div>
+                                <div class="scw-row-hint" id="scw-fb-project">–</div>
+                            </div>
+                        </div>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Storage-Bucket</div>
+                                <div class="scw-row-hint" id="scw-fb-storage-hint">–</div>
+                            </div>
+                            <div class="scw-row-side" id="scw-fb-storage-badge"></div>
+                        </div>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Firestore-Sammlungen</div>
+                                <div class="scw-row-hint" id="scw-fb-firestore-hint">–</div>
+                            </div>
+                            <div class="scw-row-side" id="scw-fb-firestore-badge"></div>
+                        </div>
+                    </div>
+                    <div class="wiz-link-row">
+                        <a class="wiz-link-btn" href="operator-setup-wizard_NEW.html">
+                            🔧 Detaillierter Firebase-Setup-Wizard
+                        </a>
+                        <button type="button" class="wiz-btn" data-wiz-action="reloadFirebase">Status erneut laden</button>
+                    </div>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+                </div>
+            </section>
+
+            <!-- ── Step 3: Secrets ────────────────────────────────────────── -->
+            <section class="wiz-step" data-step="3">
+                <div class="wiz-card">
+                    <h2>Secrets</h2>
+                    <div class="wiz-purpose">
+                        <strong>Wofuer ist das wichtig?</strong>
+                        Geheimnisse wie der Gemini-API-Key oder das Admin-Recovery-Token
+                        schalten KI-Funktionen frei und sichern Notfall-Zugaenge ab.
+                        Gesetzt werden sie via <code>.env</code> bzw. Secret Manager – hier
+                        siehst du nur, ob sie vorhanden sind.
+                    </div>
+                    <div class="wiz-status" id="scw-secrets-loading">Lade Secret-Status …</div>
+                    <div id="scw-secrets-list"></div>
+                    <div class="scw-row" id="scw-recovery-row" hidden>
+                        <div class="scw-row-main">
+                            <div class="scw-row-title">Admin-Recovery-Token (Rotation)</div>
+                            <div class="scw-row-hint" id="scw-recovery-hint">–</div>
+                        </div>
+                        <div class="scw-row-side" id="scw-recovery-badge"></div>
+                    </div>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+                </div>
+            </section>
+
+            <!-- ── Step 4: Rollen & Admin-PIN ─────────────────────────────── -->
+            <section class="wiz-step" data-step="4">
+                <div class="wiz-card">
+                    <h2>Rollen &amp; Admin-PIN</h2>
+                    <div class="wiz-purpose">
+                        <strong>Wofuer ist das wichtig?</strong>
+                        Die Admin-PIN schuetzt sensible Operator-Aktionen (Tier-3) zusaetzlich
+                        zur Anmeldung. Ist sie nicht gesetzt, sollte sie vor dem Go-Live im
+                        Dashboard angelegt werden. Dieser Assistent setzt die PIN bewusst
+                        <em>nicht</em>.
+                    </div>
+                    <div class="wiz-status" id="scw-pin-loading">Lade Admin-PIN-Status …</div>
+                    <div id="scw-pin-result" hidden>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Admin-PIN konfiguriert</div>
+                                <div class="scw-row-hint" id="scw-pin-hint">–</div>
+                            </div>
+                            <div class="scw-row-side" id="scw-pin-badge"></div>
+                        </div>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Aktuelle Verifizierung</div>
+                                <div class="scw-row-hint" id="scw-pin-verif-hint">–</div>
+                            </div>
+                            <div class="scw-row-side" id="scw-pin-verif-badge"></div>
+                        </div>
+                    </div>
+                    <div class="wiz-link-row">
+                        <a class="wiz-link-btn" href="./index.html">
+                            👤 Rollen- &amp; PIN-Verwaltung im Dashboard
+                        </a>
+                    </div>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+                </div>
+            </section>
+
+            <!-- ── Step 5: Commissioning-Gates ────────────────────────────── -->
+            <section class="wiz-step" data-step="5">
+                <div class="wiz-card">
+                    <h2>Commissioning-Gates</h2>
+                    <div class="wiz-purpose">
+                        <strong>Wofuer ist das wichtig?</strong>
+                        Diese manuelle Checkliste deckt externe Pflichten ab (Google Play,
+                        Apple, Firebase, Recht, Betrieb, Validierung), die das Backend nicht
+                        automatisch pruefen kann. Hake jeden Punkt ab, sobald er erledigt ist –
+                        die Aenderung wird sofort gespeichert.
+                    </div>
+                    <div id="scw-checklist-progress">
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">
+                                    Pflicht-Fortschritt: <span id="scw-checklist-counts">–</span>
+                                </div>
+                                <div class="scw-progressbar"><span id="scw-checklist-bar"></span></div>
+                            </div>
+                            <div class="scw-row-side" id="scw-checklist-pct-badge"></div>
+                        </div>
+                    </div>
+                    <div class="wiz-status" id="scw-checklist-loading">Lade Checkliste …</div>
+                    <div class="wiz-status" id="scw-checklist-status" hidden></div>
+                    <div id="scw-checklist-groups"></div>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+                </div>
+            </section>
+
+            <!-- ── Step 6: Validierung ────────────────────────────────────── -->
+            <section class="wiz-step" data-step="6">
+                <div class="wiz-card">
+                    <h2>Validierung</h2>
+                    <div class="wiz-purpose">
+                        <strong>Wofuer ist das wichtig?</strong>
+                        Der Acceptance-Run prueft Lint, Build, Tests und Coverage. Erst wenn
+                        alle Gates gruen sind, ist die Codebasis freigabereif. Der Run wird
+                        lokal via <code>start.bat --acceptance</code> erzeugt.
+                    </div>
+                    <div class="wiz-status" id="scw-acc-loading">Lade Acceptance-Status …</div>
+                    <div id="scw-acc-result" hidden>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Letzter Run</div>
+                                <div class="scw-row-hint" id="scw-acc-run-hint">–</div>
+                            </div>
+                            <div class="scw-row-side" id="scw-acc-run-badge"></div>
+                        </div>
+                        <div id="scw-acc-gates"></div>
+                    </div>
+                    <div class="wiz-link-row">
+                        <button type="button" class="wiz-btn" data-wiz-action="reloadAcceptance">Status erneut laden</button>
+                    </div>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+                    <button type="button" class="wiz-btn is-primary" data-wiz-action="next">Weiter →</button>
+                </div>
+            </section>
+
+            <!-- ── Step 7: Fertig ─────────────────────────────────────────── -->
+            <section class="wiz-step" data-step="7">
+                <div class="wiz-card">
+                    <h2>Fertig – Bereitschafts-Zusammenfassung</h2>
+                    <div class="wiz-status" id="scw-summary-loading">Ermittle Gesamtbereitschaft …</div>
+                    <div id="scw-summary-result" hidden>
+                        <div class="scw-row">
+                            <div class="scw-row-main">
+                                <div class="scw-row-title">Gesamt-Bereitschaft</div>
+                                <div class="scw-row-hint" id="scw-summary-hint">–</div>
+                            </div>
+                            <div class="scw-row-side" id="scw-summary-badge"></div>
+                        </div>
+                        <h3 class="scw-cat-title">Offene Blocker</h3>
+                        <ul id="scw-summary-blockers"></ul>
+                    </div>
+                    <p class="scw-muted">
+                        Mit „Einrichtung abschliessen" wird der Wizard-Status auf
+                        <strong>completed</strong> gesetzt. Du kannst ihn jederzeit erneut
+                        oeffnen, um den Status zu pruefen.
+                    </p>
+                    <div class="wiz-status" id="scw-complete-status" hidden></div>
+                    <div class="wiz-link-row">
+                        <button type="button" class="wiz-btn" data-wiz-action="reloadSummary">Zusammenfassung neu laden</button>
+                        <a class="wiz-link-btn" href="./index.html">🏠 Zum Operator-Dashboard</a>
+                    </div>
+                </div>
+                <div class="wiz-actions">
+                    <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
+                    <button type="button" class="wiz-btn is-primary" id="scw-complete-btn" data-wiz-action="complete">Einrichtung abschliessen ✓</button>
+                </div>
+            </section>
+        </main>
+
+        <script src="setup-complete-wizard.js"></script>
+    </body>
+</html>

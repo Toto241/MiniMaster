@@ -347,6 +347,13 @@ service cloud.firestore {
       allow write: if isAdmin() && docId != "externalIntegrations";
     }
 
+    // Per-user wizard progress (setup/onboarding/config wizards). Managed
+    // exclusively through Cloud Functions (getWizardProgress / setWizardProgress
+    // / listWizardProgress); direct client access is denied.
+    match /wizardProgress/{uid} {
+      allow read, write: if false;
+    }
+
     // --- LEGAL POLICY COLLECTIONS ---
     // Policies are published through admin-only Cloud Functions and may be read by
     // authenticated users for support/audit purposes.

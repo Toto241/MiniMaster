@@ -1,0 +1,634 @@
+/* MiniMaster Konfigurations-Wizards
+ *
+ * Ein Hub mit drei geführten Konfigurations-Sub-Wizards für Operatoren:
+ *   A) Externe Integrationen (Apple / Play / Secrets / OEM / Release)
+ *   B) Abo & Preise (rein informativ)
+ *   C) Backup & Reset (sicherheits-orientiert, führt zum Dashboard)
+ *
+ * CSP: KEINE Inline-Handler. Alle Events werden via addEventListener und
+ * data-* / id gebunden. Jeder Callable ist in try/catch gekapselt; Status-
+ * meldungen sind auf Deutsch. Echo-Texte werden via escapeHtml entschärft.
+ */
+(function () {
+    "use strict";
+
+    // ── Firebase-Init ──────────────────────────────────────────────────
+    let auth = null;
+    let functions = null;
+    let firebaseReady = false;
+    try {
+        if (window.__MM_FIREBASE_CONFIG__) {
+            firebase.initializeApp(window.__MM_FIREBASE_CONFIG__);
+            auth = firebase.auth();
+            functions = firebase.functions();
+            firebaseReady = true;
+        }
+    } catch (err) {
+        // Mehrfach-Init oder fehlende Konfig – wird im Auth-Gate behandelt.
+        try {
+            auth = firebase.auth();
+            functions = firebase.functions();
+            firebaseReady = true;
+        } catch (_e) {
+            firebaseReady = false;
+        }
+    }
+
+    const WIZARD_IDS = ["config-integrations", "config-pricing", "config-backup-reset"];
+    let isAdmin = false;
+    let activeWizard = "config-integrations";
+    const loadedOnce = { "config-integrations": false, "config-pricing": false, "config-backup-reset": false };
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function $(id) { return document.getElementById(id); }
+    function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+    function escapeHtml(text) {
+        return String(text == null ? "" : text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function setStatus(id, message, level) {
+        const node = $(id);
+        if (!node) return;
+        node.textContent = message || "";
+        node.className = "wiz-status" + (level ? ` is-${level}` : "");
+    }
+
+    function describeError(err) {
+        if (!err) return "Unbekannter Fehler.";
+        if (err.code === "permission-denied") return "Zugriff verweigert (Admin-Rechte erforderlich).";
+        if (err.code === "unauthenticated") return "Nicht angemeldet. Bitte erneut anmelden.";
+        if (err.code === "failed-precondition") return err.message || "Aktion derzeit nicht möglich.";
+        return err.message || String(err);
+    }
+
+    async function callFn(name, payload) {
+        if (!functions) throw new Error("Firebase Functions nicht verfügbar.");
+        const fn = functions.httpsCallable(name);
+        const res = await fn(payload || {});
+        return res && res.data;
+    }
+
+    // ── Fortschritt (setWizardProgress / getWizardProgress) ────────────
+    async function loadProgress(wizardId) {
+        try {
+            const data = await callFn("getWizardProgress", { wizardId });
+            return (data && data.progress) || null;
+        } catch (_err) {
+            return null;
+        }
+    }
+
+    async function saveProgress(wizardId, currentStep, status, extra) {
+        try {
+            await callFn("setWizardProgress", {
+                wizardId,
+                currentStep: Number(currentStep) || 0,
+                status: status || "in_progress",
+                data: extra && typeof extra === "object" ? extra : {},
+            });
+        } catch (_err) {
+            // Fortschritt ist nicht kritisch – stillschweigend ignorieren.
+        }
+    }
+
+    async function refreshChips() {
+        let summaries = [];
+        try {
+            const data = await callFn("listWizardProgress");
+            summaries = (data && data.wizards) || [];
+        } catch (_err) {
+            summaries = [];
+        }
+        const byId = {};
+        summaries.forEach((s) => { byId[s.wizardId] = s; });
+        WIZARD_IDS.forEach((wizardId) => {
+            const chip = document.querySelector(`[data-chip="${wizardId}"]`);
+            if (!chip) return;
+            const status = (byId[wizardId] && byId[wizardId].status) || "not_started";
+            chip.className = "cw-chip is-" + status;
+            chip.textContent = chipLabel(status);
+        });
+    }
+
+    function chipLabel(status) {
+        switch (status) {
+            case "in_progress": return "in Arbeit";
+            case "completed": return "fertig";
+            case "skipped": return "übersprungen";
+            default: return "offen";
+        }
+    }
+
+    // ── Hub-Navigation ─────────────────────────────────────────────────
+    function selectWizard(wizardId) {
+        if (!WIZARD_IDS.includes(wizardId)) return;
+        activeWizard = wizardId;
+        $$(".cw-hub-tab").forEach((btn) => {
+            btn.classList.toggle("is-active", btn.getAttribute("data-wizard") === wizardId);
+        });
+        $$(".cw-panel").forEach((panel) => {
+            panel.hidden = panel.getAttribute("data-wizard") !== wizardId;
+        });
+        if (!isAdmin) return;
+        // Beim Öffnen: aktuellen Schritt als "in Arbeit" markieren + laden.
+        saveProgress(wizardId, 1, "in_progress").then(refreshChips);
+        if (wizardId === "config-integrations") openIntegrations();
+        else if (wizardId === "config-pricing") openPricing();
+        else if (wizardId === "config-backup-reset") openBackupReset();
+    }
+
+    // ================================================================
+    // A) EXTERNE INTEGRATIONEN
+    // ================================================================
+    const APPLE_FIELDS = [
+        { key: "developerTeamId", label: "Apple Developer Team ID", placeholder: "10 Zeichen, GROSS" },
+        { key: "parentBundleId", label: "Eltern-App Bundle ID", placeholder: "com.example.parent" },
+        { key: "childBundleId", label: "Kind-App Bundle ID", placeholder: "com.example.child" },
+        { key: "appStoreConnectKeySecretPath", label: "App Store Connect Key (Secret-Pfad)", placeholder: "projects/…/secrets/…/versions/latest" },
+    ];
+    const APPLE_BOOLS = [{ key: "provisioningProfilesReady", label: "Provisioning Profiles bestätigt" }];
+    const PLAY_FIELDS = [
+        { key: "parentPackageId", label: "Eltern-App Package ID", placeholder: "com.example.parent" },
+        { key: "childPackageId", label: "Kind-App Package ID", placeholder: "com.example.child" },
+        { key: "serviceAccountSecretPath", label: "Service-Account (Secret-Pfad)", placeholder: "projects/…/secrets/…/versions/latest" },
+        { key: "rtdnTopicName", label: "RTDN Pub/Sub Topic", placeholder: "play-billing-notifications" },
+    ];
+    const PLAY_BOOLS = [{ key: "iapContractsSigned", label: "IAP-Verträge unterzeichnet" }];
+    const SECRET_FIELDS = [
+        { key: "geminiApiKeyPath", label: "Gemini API Key (Secret-Pfad)" },
+        { key: "fcmServerKeyPath", label: "FCM Server Key (Secret-Pfad)" },
+        { key: "playIntegrityKeyPath", label: "Play Integrity Key (Secret-Pfad)" },
+        { key: "deviceCheckKeyPath", label: "DeviceCheck Key (Secret-Pfad)" },
+        { key: "recaptchaV3SiteKey", label: "reCAPTCHA v3 Site Key (öffentlich)" },
+    ];
+    const RELEASE_BOOLS = [
+        { key: "playDataSafetyComplete", label: "Play Data Safety vollständig" },
+        { key: "playIarcRatingComplete", label: "IARC Rating vollständig" },
+        { key: "playStoreListingComplete", label: "Play Store Listing vollständig" },
+        { key: "appleAppPrivacyComplete", label: "Apple App Privacy vollständig" },
+        { key: "appleScreenshotsComplete", label: "Apple Screenshots vollständig" },
+        { key: "legalTextsPublished", label: "Rechtstexte veröffentlicht" },
+    ];
+
+    let oemMatrix = [];
+
+    function buildTextField(category, def, value) {
+        const wrap = document.createElement("div");
+        wrap.className = "cw-field-row";
+        const label = document.createElement("label");
+        label.textContent = def.label;
+        const inputId = `cw-int-${category}-${def.key}`;
+        label.setAttribute("for", inputId);
+        const row = document.createElement("div");
+        row.className = "cw-inline-row";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.id = inputId;
+        input.value = value == null ? "" : String(value);
+        if (def.placeholder) input.placeholder = def.placeholder;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "wiz-btn";
+        btn.textContent = "Speichern";
+        btn.addEventListener("click", () => saveIntegrationField(category, def.key, input.value, def.label));
+        row.appendChild(input);
+        row.appendChild(btn);
+        wrap.appendChild(label);
+        wrap.appendChild(row);
+        return wrap;
+    }
+
+    function buildBoolField(category, def, value) {
+        const wrap = document.createElement("div");
+        wrap.className = "cw-field-row";
+        const label = document.createElement("label");
+        const inputId = `cw-int-${category}-${def.key}`;
+        label.setAttribute("for", inputId);
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.id = inputId;
+        cb.checked = value === true;
+        cb.style.inlineSize = "auto";
+        cb.addEventListener("change", () => saveIntegrationField(category, def.key, cb.checked, def.label));
+        const span = document.createElement("span");
+        span.textContent = " " + def.label;
+        label.appendChild(cb);
+        label.appendChild(span);
+        wrap.appendChild(label);
+        return wrap;
+    }
+
+    async function saveIntegrationField(category, key, rawValue, label) {
+        setStatus("cw-int-status", `Speichere „${label}" …`, "");
+        try {
+            await callFn("patchExternalIntegrationsField", { category, field: key, value: rawValue });
+            setStatus("cw-int-status", `✓ „${label}" gespeichert.`, "ok");
+            // Readiness aktualisieren.
+            refreshReadiness();
+            saveProgress("config-integrations", 2, "in_progress").then(refreshChips);
+        } catch (err) {
+            setStatus("cw-int-status", `✗ „${label}": ${describeError(err)}`, "err");
+        }
+    }
+
+    function renderIntegrationForm(cfg) {
+        const apple = cfg.apple || {};
+        const play = cfg.play || {};
+        const secrets = cfg.secrets || {};
+        const release = cfg.release || {};
+
+        const appleEl = $("cw-int-apple");
+        appleEl.innerHTML = "";
+        APPLE_FIELDS.forEach((d) => appleEl.appendChild(buildTextField("apple", d, apple[d.key])));
+        APPLE_BOOLS.forEach((d) => appleEl.appendChild(buildBoolField("apple", d, apple[d.key])));
+
+        const playEl = $("cw-int-play");
+        playEl.innerHTML = "";
+        PLAY_FIELDS.forEach((d) => playEl.appendChild(buildTextField("play", d, play[d.key])));
+        PLAY_BOOLS.forEach((d) => playEl.appendChild(buildBoolField("play", d, play[d.key])));
+
+        const secEl = $("cw-int-secrets");
+        secEl.innerHTML = "";
+        SECRET_FIELDS.forEach((d) => secEl.appendChild(buildTextField("secrets", d, secrets[d.key])));
+
+        const relEl = $("cw-int-release");
+        relEl.innerHTML = "";
+        RELEASE_BOOLS.forEach((d) => relEl.appendChild(buildBoolField("release", d, release[d.key])));
+
+        oemMatrix = Array.isArray(cfg.oem && cfg.oem.matrix) ? cfg.oem.matrix.slice() : [];
+        renderOemMatrix();
+
+        $("cw-int-form").hidden = false;
+    }
+
+    function renderOemMatrix() {
+        const host = $("cw-int-oem");
+        if (!host) return;
+        host.innerHTML = "";
+        const table = document.createElement("table");
+        table.className = "cw-table";
+        const head = document.createElement("tr");
+        ["Gerät", "OS-Version", "Status", "Sign-off", ""].forEach((t) => {
+            const th = document.createElement("th");
+            th.textContent = t;
+            head.appendChild(th);
+        });
+        table.appendChild(head);
+
+        oemMatrix.forEach((row, idx) => {
+            const tr = document.createElement("tr");
+            tr.appendChild(makeCell(row.deviceModel || ""));
+            tr.appendChild(makeCell(row.osVersion || ""));
+            tr.appendChild(makeCell(row.status || "pending"));
+            tr.appendChild(makeCell(row.signoffBy || "—"));
+            const tdDel = document.createElement("td");
+            const del = document.createElement("button");
+            del.type = "button";
+            del.className = "wiz-btn";
+            del.textContent = "Entfernen";
+            del.addEventListener("click", () => { oemMatrix.splice(idx, 1); saveOemMatrix(); });
+            tdDel.appendChild(del);
+            tr.appendChild(tdDel);
+            table.appendChild(tr);
+        });
+        host.appendChild(table);
+
+        // Add-Row Formular
+        const form = document.createElement("div");
+        form.className = "cw-inline-row";
+        form.style.marginBlockStart = "10px";
+        const dev = inputEl("Gerätemodell");
+        const os = inputEl("OS-Version");
+        const status = document.createElement("select");
+        ["pending", "passed", "failed"].forEach((s) => {
+            const o = document.createElement("option");
+            o.value = s; o.textContent = s; status.appendChild(o);
+        });
+        const signoff = inputEl("Sign-off (optional)");
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "wiz-btn";
+        add.textContent = "OEM-Zeile hinzufügen";
+        add.addEventListener("click", () => {
+            const deviceModel = dev.value.trim();
+            const osVersion = os.value.trim();
+            if (!deviceModel || !osVersion) {
+                setStatus("cw-int-status", "OEM: Gerätemodell und OS-Version sind erforderlich.", "warn");
+                return;
+            }
+            oemMatrix.push({
+                deviceModel, osVersion,
+                status: status.value,
+                signoffBy: signoff.value.trim() || null,
+                testedAt: status.value === "passed" ? new Date().toISOString().slice(0, 10) : null,
+                notes: null,
+            });
+            dev.value = ""; os.value = ""; signoff.value = "";
+            saveOemMatrix();
+        });
+        form.appendChild(dev);
+        form.appendChild(os);
+        form.appendChild(status);
+        form.appendChild(signoff);
+        form.appendChild(add);
+        host.appendChild(form);
+    }
+
+    function inputEl(placeholder) {
+        const i = document.createElement("input");
+        i.type = "text";
+        i.placeholder = placeholder;
+        return i;
+    }
+
+    function makeCell(text) {
+        const td = document.createElement("td");
+        td.textContent = String(text);
+        return td;
+    }
+
+    async function saveOemMatrix() {
+        setStatus("cw-int-status", "Speichere OEM-Matrix …", "");
+        try {
+            await callFn("setOemValidationMatrix", { rows: oemMatrix });
+            setStatus("cw-int-status", "✓ OEM-Matrix gespeichert.", "ok");
+            renderOemMatrix();
+            refreshReadiness();
+        } catch (err) {
+            setStatus("cw-int-status", `✗ OEM-Matrix: ${describeError(err)}`, "err");
+            renderOemMatrix();
+        }
+    }
+
+    async function refreshReadiness() {
+        try {
+            const readiness = await callFn("getReleaseReadinessStatus");
+            renderReadiness(readiness);
+        } catch (_err) {
+            // nicht kritisch
+        }
+    }
+
+    function renderReadiness(readiness) {
+        if (!readiness) return;
+        $("cw-int-readiness-card").hidden = false;
+        const pct = Number(readiness.progressPct) || 0;
+        $("cw-int-readiness-fill").style.inlineSize = pct + "%";
+        const summary = readiness.ready
+            ? `✓ Release-bereit (${pct} %).`
+            : `${pct} % vollständig — ${(readiness.blockers || []).length} offene Punkte.`;
+        $("cw-int-readiness-summary").textContent = summary;
+        const list = $("cw-int-readiness-blockers");
+        list.innerHTML = "";
+        (readiness.blockers || []).forEach((b) => {
+            const li = document.createElement("li");
+            li.textContent = b;
+            list.appendChild(li);
+        });
+    }
+
+    async function openIntegrations() {
+        setStatus("cw-int-status", "Lade aktuelle Konfiguration …", "");
+        try {
+            const data = await callFn("getExternalIntegrationsConfig");
+            const cfg = (data && data.config) || {};
+            renderIntegrationForm(cfg);
+            if (data && data.readiness) renderReadiness(data.readiness);
+            setStatus("cw-int-status", "✓ Konfiguration geladen.", "ok");
+            loadedOnce["config-integrations"] = true;
+        } catch (err) {
+            setStatus("cw-int-status", `✗ Laden fehlgeschlagen: ${describeError(err)}`, "err");
+        }
+    }
+
+    // ================================================================
+    // B) ABO & PREISE (informativ)
+    // ================================================================
+    // Bekannte Tarife (Spiegel von src/pricing-config.ts – Quelle der Wahrheit).
+    const B2C_TIERS = [
+        { sku: "single_child_monthly", name: "Single Child (Monatlich)", priceCents: 499, period: "monatlich", limit: "1 Kind" },
+        { sku: "family_monthly", name: "Family (Monatlich)", priceCents: 999, period: "monatlich", limit: "bis 4 Kinder" },
+        { sku: "single_child_yearly", name: "Single Child (Jährlich)", priceCents: 3999, period: "jährlich", limit: "1 Kind" },
+        { sku: "family_yearly", name: "Family (Jährlich)", priceCents: 7999, period: "jährlich", limit: "bis 4 Kinder" },
+        { sku: "family_yearly_premium", name: "Family Premium (Jährlich)", priceCents: 9999, period: "jährlich", limit: "bis 6 Kinder" },
+    ];
+    const B2B_TIERS = [
+        { sku: "b2b_school_50", name: "School Basic", priceCents: 19900, period: "monatlich", limit: "50 Geräte" },
+        { sku: "b2b_school_200", name: "School Professional", priceCents: 49900, period: "monatlich", limit: "200 Geräte" },
+        { sku: "b2b_school_unlimited", name: "School Enterprise", priceCents: 99900, period: "monatlich", limit: "unbegrenzt" },
+        { sku: "b2b_kita_basic", name: "Kita Basic", priceCents: 9900, period: "monatlich", limit: "25 Geräte" },
+    ];
+
+    const PRICE_CHECKLIST = [
+        "SKUs in src/pricing-config.ts geprüft (B2C_TIERS / B2B_TIERS).",
+        "Play Console: In-App-Produkte/Abos mit identischen SKUs angelegt.",
+        "App Store Connect: Abos mit identischen SKUs angelegt.",
+        "Store-Preise je Region geprüft (Netto vs. Brutto / VAT OSS).",
+        "Promo-Codes & Gültigkeitszeiträume definiert.",
+        "Affiliate-Konditionen (30 %, 12 Monate, 50 € Mindestauszahlung) bestätigt.",
+    ];
+
+    function formatPrice(cents) {
+        try {
+            return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+        } catch (_e) {
+            return (cents / 100).toFixed(2) + " €";
+        }
+    }
+
+    function renderPriceTable(tableId, tiers) {
+        const table = $(tableId);
+        if (!table) return;
+        table.innerHTML = "";
+        const head = document.createElement("tr");
+        ["SKU", "Name", "Preis (netto)", "Abrechnung", "Umfang"].forEach((t) => {
+            const th = document.createElement("th");
+            th.textContent = t;
+            head.appendChild(th);
+        });
+        table.appendChild(head);
+        tiers.forEach((t) => {
+            const tr = document.createElement("tr");
+            tr.appendChild(makeCell(t.sku));
+            tr.appendChild(makeCell(t.name));
+            tr.appendChild(makeCell(formatPrice(t.priceCents)));
+            tr.appendChild(makeCell(t.period));
+            tr.appendChild(makeCell(t.limit));
+            table.appendChild(tr);
+        });
+    }
+
+    function renderPriceChecklist(savedData) {
+        const host = $("cw-price-checklist");
+        if (!host) return;
+        host.innerHTML = "";
+        const checked = (savedData && savedData.checklist) || {};
+        PRICE_CHECKLIST.forEach((text, idx) => {
+            const li = document.createElement("li");
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.id = `cw-price-chk-${idx}`;
+            cb.checked = checked["i" + idx] === true;
+            cb.addEventListener("change", persistPriceChecklist);
+            const label = document.createElement("label");
+            label.setAttribute("for", cb.id);
+            label.textContent = text;
+            li.appendChild(cb);
+            li.appendChild(label);
+            host.appendChild(li);
+        });
+    }
+
+    async function persistPriceChecklist() {
+        const checklist = {};
+        let allDone = true;
+        PRICE_CHECKLIST.forEach((_t, idx) => {
+            const cb = $(`cw-price-chk-${idx}`);
+            const on = !!(cb && cb.checked);
+            checklist["i" + idx] = on;
+            if (!on) allDone = false;
+        });
+        const status = allDone ? "completed" : "in_progress";
+        await saveProgress("config-pricing", 1, status, { checklist });
+        setStatus("cw-price-status", allDone ? "✓ Checkliste vollständig." : "Fortschritt gespeichert.", allDone ? "ok" : "");
+        refreshChips();
+    }
+
+    async function openPricing() {
+        renderPriceTable("cw-price-b2c", B2C_TIERS);
+        renderPriceTable("cw-price-b2b", B2B_TIERS);
+        setStatus("cw-price-status", "Informativer Überblick — keine Preisänderung möglich.", "");
+        const progress = await loadProgress("config-pricing");
+        renderPriceChecklist(progress && progress.data);
+        loadedOnce["config-pricing"] = true;
+    }
+
+    // ================================================================
+    // C) BACKUP & RESET
+    // ================================================================
+    const RESET_CHECKLIST = [
+        "Aktuellen Konfigurations-Snapshot vor Änderungen angelegt.",
+        "Risiken der vollständigen Projektlöschung verstanden (unwiderruflich).",
+        "Schutzmechanismen geprüft: Feature-Flag, Allowlist, Admin+PIN, Bestätigungstext.",
+        "Löschung erfolgt ausschließlich über den abgesicherten Dashboard-Button.",
+    ];
+
+    function renderResetChecklist(savedData) {
+        const host = $("cw-reset-checklist");
+        if (!host) return;
+        host.innerHTML = "";
+        const checked = (savedData && savedData.checklist) || {};
+        RESET_CHECKLIST.forEach((text, idx) => {
+            const li = document.createElement("li");
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.id = `cw-reset-chk-${idx}`;
+            cb.checked = checked["i" + idx] === true;
+            cb.addEventListener("change", persistResetChecklist);
+            const label = document.createElement("label");
+            label.setAttribute("for", cb.id);
+            label.textContent = text;
+            li.appendChild(cb);
+            li.appendChild(label);
+            host.appendChild(li);
+        });
+    }
+
+    async function persistResetChecklist() {
+        const checklist = {};
+        let allDone = true;
+        RESET_CHECKLIST.forEach((_t, idx) => {
+            const cb = $(`cw-reset-chk-${idx}`);
+            const on = !!(cb && cb.checked);
+            checklist["i" + idx] = on;
+            if (!on) allDone = false;
+        });
+        const status = allDone ? "completed" : "in_progress";
+        await saveProgress("config-backup-reset", 2, status, { checklist });
+        setStatus("cw-reset-status", allDone ? "✓ Alle Hinweise bestätigt." : "Fortschritt gespeichert.", allDone ? "ok" : "");
+        refreshChips();
+    }
+
+    async function openBackupReset() {
+        setStatus("cw-reset-status", "", "");
+        const progress = await loadProgress("config-backup-reset");
+        renderResetChecklist(progress && progress.data);
+        loadedOnce["config-backup-reset"] = true;
+    }
+
+    // ── Auth-Gate ──────────────────────────────────────────────────────
+    function disableInteractiveControls() {
+        $$(".cw-hub-tab").forEach((b) => { b.disabled = true; });
+        $$("button[data-cw-action], #panel-config-integrations input, #panel-config-integrations button")
+            .forEach((el) => { el.disabled = true; });
+        $$("#cw-price-checklist input, #cw-reset-checklist input").forEach((el) => { el.disabled = true; });
+    }
+
+    function showAuthGate(message) {
+        const gate = $("cw-auth-gate");
+        if (gate) {
+            gate.hidden = false;
+            const msg = $("cw-auth-gate-msg");
+            if (msg) msg.textContent = message;
+        }
+        disableInteractiveControls();
+    }
+
+    function bindStaticHandlers() {
+        $$(".cw-hub-tab").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (btn.disabled) return;
+                selectWizard(btn.getAttribute("data-wizard"));
+            });
+        });
+        $$("[data-cw-action]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const action = btn.getAttribute("data-cw-action");
+                if (action === "int-reload") openIntegrations();
+            });
+        });
+    }
+
+    function init() {
+        bindStaticHandlers();
+
+        if (!firebaseReady || !auth) {
+            showAuthGate("Firebase ist nicht konfiguriert. Bitte zuerst den Setup-Wizard ausführen.");
+            return;
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                showAuthGate("Nicht angemeldet. Bitte über das Dashboard anmelden.");
+                return;
+            }
+            try {
+                const tokenResult = await user.getIdTokenResult();
+                if (tokenResult.claims.role !== "admin") {
+                    showAuthGate("Zugriff nur für Administratoren. Ihre Rolle reicht nicht aus.");
+                    return;
+                }
+            } catch (_err) {
+                showAuthGate("Rollenprüfung fehlgeschlagen. Bitte erneut anmelden.");
+                return;
+            }
+            isAdmin = true;
+            const gate = $("cw-auth-gate");
+            if (gate) gate.hidden = true;
+            await refreshChips();
+            selectWizard(activeWizard);
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init, { once: true });
+    } else {
+        init();
+    }
+})();
