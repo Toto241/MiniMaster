@@ -38,6 +38,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
+      - run: npm run guard:secrets
       - run: npm run lint
       - run: npm run test:ci
       - name: Manufacturing status gate

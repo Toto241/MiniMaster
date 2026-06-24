@@ -31,6 +31,10 @@ MiniMaster uses Firebase Admin SDK in Cloud Functions to manage authentication, 
   - Check GitHub Actions: no running `firebase deploy`
   - Stagger key rotation: deploy new functions **after** old key is revoked
 
+- [ ] **Secret guard passes locally**
+  - Run `npm run guard:secrets` from repository root
+  - Resolve any reported tracked credential leak before key operations
+
 - [ ] **Firebase Console access** ready (GCP Project: `minimaster-28fbd`)
   - [ ] Able to access Service Accounts page
   - [ ] Able to view/manage keys

@@ -169,10 +169,9 @@ jobs:
           }
           EOF
 
-      # `continue-on-error` mirrors the analyze step below: until the
-      # CodeQL/Android build path is debugged with real CI logs, a build
-      # failure here must not turn the whole Java matrix job red and
-      # block PRs. Step output stays visible in the UI.
+      # Android build failures should not mask CodeQL findings in this job.
+      # Keep this non-blocking because CodeQL can still analyze Java/Kotlin
+      # sources from partial build output.
       - name: Build Android sources for CodeQL
         if: ${{ matrix.language == 'java' && steps.network-check.outputs.available == 'true' }}
         continue-on-error: true
@@ -180,13 +179,10 @@ jobs:
 
       # Perform the analysis on the generated database.
       #
-      # `continue-on-error` is a temporary workaround for Issue #158 (GitHub
-      # Code Scanning is not yet enabled on this repository). With Code
-      # Scanning off, the SARIF upload at the end of this step rejects with
-      # a permission error and the whole job goes red even when the analysis
-      # itself succeeded. The step output remains visible in the UI so the
-      # underlying error is not hidden — drop this flag once Code Scanning
-      # is enabled in Settings → Code security and analysis.
+      # Policy:
+      # - push/schedule/workflow_dispatch on main: hard fail (release gate)
+      # - pull_request: soft-fail fallback to keep developer feedback flowing
+      #   when repository-level Code Scanning settings are temporarily missing.
       #
       # For the Java matrix we additionally skip when the Android build was
       # skipped (no `dl.google.com`): there is no extracted source for
@@ -195,7 +191,7 @@ jobs:
       - name: Perform CodeQL Analysis
         if: ${{ matrix.language != 'java' || steps.network-check.outputs.available == 'true' }}
         id: codeql-analyze
-        continue-on-error: true
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"

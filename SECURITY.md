@@ -38,6 +38,7 @@ A basic threat model should be maintained here.
 - **`secretKey` (master device credential):** UUID v4, single factor + IMEI. Improvement needed: rotation endpoint, replay protection, optional binding to signed Android attestation.
 - **`google-services.json`:** Not committed; required at build time.
 - **Git hygiene enforcement:** `**/google-services.json` is git-ignored; only `google-services.template.json` placeholders are versioned.
+- **Secret leak guard:** Run `npm run guard:secrets` locally and in CI to block tracked credential files and private key material.
 - **Service Account (Play API):** Must be stored in secret manager / CI secret store. Never embed JSON in code. Production deployments should rely on Application Default Credentials (ADC) instead of bundling keys.
 - **Future Hardening:** Replace `secretKey` with short-lived signed tokens (e.g. custom auth tokens + role claims) and enforce claims in Firestore rules.
 
