@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MiniMaster · Einrichtungs-Assistenten</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" integrity="sha384-XMIl1b2Ez9tKAM0R5q67/iLdfnlLBl9kfo40X5WMtCPb+3OLplrjnOxZTYCg1SKY" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js" integrity="sha384-Cn425IPPqYFT0+lUg71+39dOh8zj/Ebpl97FkjUqrd+P37HLlysOYDvdw+N7tPuj" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js" integrity="sha384-HTm9DHQcJ0avSI5BWVmeKtm3+YULHbl/wgtLQaMGgYEZLQ8cINY+UF+ZsliUaBvK" crossorigin="anonymous"></script>
+    <script src="firebase-config.js"></script>
+    <script src="appcheck-init.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-wizard.css" />
+    <style>
+        .hub-shell { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+        .hub-head { margin-bottom: 8px; }
+        .hub-head h1 { margin: 0 0 6px; }
+        .hub-sub { color: #475569; margin: 0 0 18px; }
+        .hub-auth { margin: 0 0 20px; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.95em; }
+        .hub-auth.is-ok { border-color: #bbf7d0; background: #f0fdf4; }
+        .hub-auth.is-warn { border-color: #fed7aa; background: #fff7ed; }
+        .hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .hub-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+        .hub-card h3 { margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 8px; }
+        .hub-card p { margin: 0; color: #475569; font-size: 0.92em; flex: 1; }
+        .hub-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .hub-aud { font-size: 0.78em; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+        .hub-badge { font-size: 0.8em; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #f1f5f9; color: #475569; }
+        .hub-badge.is-progress { background: #dbeafe; color: #1d4ed8; }
+        .hub-badge.is-done { background: #dcfce7; color: #15803d; }
+        .hub-badge.is-skipped { background: #fef9c3; color: #854d0e; }
+        .hub-readiness { margin: 0 0 18px; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; }
+        .hub-readiness .pill { font-weight: 700; }
+        .hub-readiness .pill.ready { color: #15803d; }
+        .hub-readiness .pill.near-ready { color: #b45309; }
+        .hub-readiness .pill.not-ready { color: #b91c1c; }
+        .hub-foot { margin-top: 26px; font-size: 0.85em; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="hub-shell">
+        <div class="hub-head">
+            <h1>🧭 Einrichtungs-Assistenten</h1>
+            <p class="hub-sub">Geführte Wizards für die komplette Einrichtung von MiniMaster — von null beginnend oder für einzelne Konfigurationen. Dein Fortschritt wird pro Assistent gespeichert.</p>
+        </div>
+
+        <div id="hub-auth" class="hub-auth">Anmeldestatus wird geprüft …</div>
+        <div id="hub-readiness" class="hub-readiness" hidden></div>
+        <div id="hub-grid" class="hub-grid"></div>
+
+        <p class="hub-foot">
+            Tipp: Beginne mit der <strong>Komplett-Einrichtung von Null</strong>, falls dieses Projekt frisch ist.
+            <a href="index.html">Zurück zum Betreiber-Dashboard</a>.
+        </p>
+    </div>
+    <script src="wizards.js"></script>
+</body>
+</html>

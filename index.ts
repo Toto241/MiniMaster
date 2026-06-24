@@ -147,6 +147,13 @@ export {
   setOperatorSetupChecklistItem,
 } from "./src/operator-setup";
 
+// ==================== SETUP / CONFIGURATION WIZARDS ====================
+export {
+  getWizardProgress,
+  setWizardProgress,
+  listWizardProgress,
+} from "./src/wizard-progress";
+
 export {
   getAcceptanceStatus,
   submitAcceptanceRun,

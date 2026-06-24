@@ -240,6 +240,7 @@ export type AuditAction =
   | "system.heartbeat"
   | "system.error"
   | "operator.setup_checklist_update"
+  | "wizard.progress_update"
   | "affiliate.register"
   | "admin.affiliate.review"
   | "admin.affiliate.payouts"
