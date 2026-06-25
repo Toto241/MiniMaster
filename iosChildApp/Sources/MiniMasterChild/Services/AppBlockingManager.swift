@@ -29,6 +29,10 @@ final class AppBlockingManager: ObservableObject {
     // DeviceActivity name used to track daily screen time schedules
     private let activityName = DeviceActivityName("minimaster.daily")
 
+    // DeviceActivityEvent name the monitor extension listens for to detect the
+    // daily usage cap (see DeviceActivityMonitorExtension.eventDidReachThreshold).
+    private let dailyLimitEventName = DeviceActivityEvent.Name("minimaster.dailyLimitReached")
+
     init() {
         Task { await checkAuthorization() }
     }
@@ -84,6 +88,7 @@ final class AppBlockingManager: ObservableObject {
         store.shield.applicationCategories = nil
         store.shield.applications = nil
         appBlacklistNotice = nil
+        SharedPolicyDefaults.setDailyLimitMinutes(nil)
     }
 
     // MARK: - Private
@@ -140,7 +145,15 @@ final class AppBlockingManager: ObservableObject {
         // Cancel existing schedule
         activityCenter.stopMonitoring([activityName])
 
-        guard let dailyLimit = rules.dailyLimitMinutes, dailyLimit > 0 else { return }
+        guard let dailyLimit = rules.dailyLimitMinutes, dailyLimit > 0 else {
+            // No active limit — clear the value shared with the monitor extension.
+            SharedPolicyDefaults.setDailyLimitMinutes(nil)
+            return
+        }
+
+        // Share the active limit with the DeviceActivityMonitor extension, which
+        // runs in a separate process and reads it from the App Group suite.
+        SharedPolicyDefaults.setDailyLimitMinutes(dailyLimit)
 
         // Build a DeviceActivitySchedule spanning the full day
         let schedule = DeviceActivitySchedule(
@@ -148,10 +161,32 @@ final class AppBlockingManager: ObservableObject {
             intervalEnd: DateComponents(hour: 23, minute: 59),
             repeats: true
         )
+
+        // Register a usage threshold so the DeviceActivityMonitor extension
+        // receives `eventDidReachThreshold` once the daily allowance is used up —
+        // that callback is where the shield is actually applied. Without an
+        // `events:` entry the schedule alone never enforces anything.
+        //
+        // ⚠️ SCAFFOLDING, NOT YET ENFORCING: the event is created with EMPTY
+        // application/category/web-domain sets, so DeviceActivity counts no usage
+        // and the threshold never fires on a real device. ApplicationToken /
+        // ActivityCategoryToken values cannot be constructed off-device — they
+        // only come from a parent `FamilyActivitySelection` (FamilyActivityPicker).
+        // To make the daily cap actually enforce, pass those tokens here:
+        //   DeviceActivityEvent(applications: selection.applicationTokens,
+        //                       categories: selection.categoryTokens,
+        //                       threshold: DateComponents(minute: dailyLimit))
+        // See AppBlacklistEnforcement / ScreenTimeAppBlacklistCodec for the same
+        // token constraint, and docs/IOS_ANDROID_PARITY_PLAN_2026-06-19.md.
+        let limitEvent = DeviceActivityEvent(
+            threshold: DateComponents(minute: dailyLimit)
+        )
+
         do {
             try activityCenter.startMonitoring(
                 activityName,
-                during: schedule
+                during: schedule,
+                events: [dailyLimitEventName: limitEvent]
             )
         } catch {
             // DeviceActivity monitoring may fail if not authorized or during testing
