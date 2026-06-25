@@ -2,14 +2,14 @@ import XCTest
 
 final class MiniMasterParentUIContractTests: XCTestCase {
     func testLoginViewExposesAccessibilityIdentifiers() throws {
-        let source = try loadSource(relativePath: "Sources/MiniMasterParent/Views/LoginView.swift")
+        let source = try loadSource(relativePath: "iosMasterApp/Sources/MiniMasterParent/Views/LoginView.swift")
         XCTAssertTrue(source.contains("accessibilityIdentifier(\"login.imeiField\")"))
         XCTAssertTrue(source.contains("accessibilityIdentifier(\"login.deviceNameField\")"))
         XCTAssertTrue(source.contains("accessibilityIdentifier(\"login.registerButton\")"))
     }
 
     func testPairingViewExposesAccessibilityIdentifiers() throws {
-        let source = try loadSource(relativePath: "Sources/MiniMasterParent/Views/PairingView.swift")
+        let source = try loadSource(relativePath: "iosMasterApp/Sources/MiniMasterParent/Views/PairingView.swift")
         XCTAssertTrue(source.contains("accessibilityIdentifier(\"pairing.generateCodeButton\")"))
         XCTAssertTrue(source.contains("accessibilityIdentifier(\"pairing.generateLinkButton\")"))
     }
