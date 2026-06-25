@@ -17,7 +17,7 @@ const LANGS = ["de", "en", "es", "fr", "it"];
 describe("iOS child task photo upload contract", () => {
   it("declares FirebaseStorage for the child app target", () => {
     const pkg = read("iosChildApp/Package.swift");
-    expect(pkg).toContain('.product(name: "FirebaseStorage", package: "firebase-ios-sdk")');
+    expect(pkg).toContain(".product(name: \"FirebaseStorage\", package: \"firebase-ios-sdk\")");
   });
 
   it("documents that the shared PhotoProofService is added to the app target in Xcode", () => {
@@ -49,9 +49,9 @@ describe("iOS child task photo upload contract", () => {
 
   it("keeps the shared completeTask contract intact (taskId + photoUrl, no childId param)", () => {
     const svc = read("iosSharedServices/PhotoProofService.swift");
-    expect(svc).toContain('httpsCallable("completeTask")');
-    expect(svc).toContain('"taskId": taskId');
-    expect(svc).toContain('"photoUrl": urlString');
+    expect(svc).toContain("httpsCallable(\"completeTask\")");
+    expect(svc).toContain("\"taskId\": taskId");
+    expect(svc).toContain("\"photoUrl\": urlString");
 
     // Ensure `childId` is used for the storage path only, not sent to
     // completeTask (backend derives UID from auth context).

@@ -71,7 +71,7 @@ describe("iOS DeviceActivityMonitor enforcement contract", () => {
     );
     expect(sync).toContain("reportUsageLimitReachedIfNeeded");
     expect(sync).toContain("consumeLimitReachedFlag");
-    expect(sync).toContain('eventType: "usage_limit_reached"');
+    expect(sync).toContain("eventType: \"usage_limit_reached\"");
     // Wired into both entry points.
     expect(sync).toMatch(/func onAppStart\(\) async \{[\s\S]*reportUsageLimitReachedIfNeeded/);
     expect(sync).toMatch(/func onFcmWakeUp\(\) async \{[\s\S]*reportUsageLimitReachedIfNeeded/);
