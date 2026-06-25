@@ -42,9 +42,11 @@ describe("iOS offline safe-mode fallback contract", () => {
     // would falsely lock after 72h.
     expect(cache).toContain("func recordSuccessfulSync");
     expect(cache).toContain("defaults.object(forKey: lastSuccessfulSyncKey) as? Date");
-    // Recorded on every successful sync (both sync paths).
-    const records = sync.match(/offlinePolicyCache\.recordSuccessfulSync\(\)/g) ?? [];
-    expect(records.length).toBeGreaterThanOrEqual(2);
+    // Server contact is noted (which records the sync timestamp) on both sync
+    // paths and the heartbeat — definition plus >= 3 references.
+    const contacts = sync.match(/noteServerContact\(\)/g) ?? [];
+    expect(contacts.length).toBeGreaterThanOrEqual(3);
+    expect(sync).toContain("offlinePolicyCache.recordSuccessfulSync()");
   });
 
   it("wires the fallback into failed syncs and the foreground heartbeat", () => {
@@ -54,5 +56,20 @@ describe("iOS offline safe-mode fallback contract", () => {
     const calls = sync.match(/enforceOfflineSafeModeIfNeeded/g) ?? [];
     expect(calls.length).toBeGreaterThanOrEqual(3);
     expect(sync).toMatch(/sendForegroundHeartbeat\(\) async \{[\s\S]*enforceOfflineSafeModeIfNeeded/);
+  });
+
+  it("exits safe mode and refreshes the timer on any successful server contact", () => {
+    const cache = read("iosChildApp/Sources/MiniMasterChild/Models/OfflinePolicyCache.swift");
+    const sync = read("iosChildApp/Sources/MiniMasterChild/Services/CommandSyncService.swift");
+    // Safe mode is flagged on entry and lifted on the next contact, so an
+    // upToDate reconnect (which skips applyPolicy) still restores the real policy.
+    expect(cache).toContain("inSafeModeKey");
+    expect(cache).toContain("func restoreFromSafeModeIfNeeded");
+    expect(cache).toContain("defaults.set(true, forKey: inSafeModeKey)");
+    // A successful heartbeat counts as contact (refreshes the 72h timer), so a
+    // foreground-only app doesn't falsely expire.
+    expect(sync).toContain("func noteServerContact");
+    expect(sync).toContain("restoreFromSafeModeIfNeeded");
+    expect(sync).toMatch(/func reportHeartbeat[\s\S]*noteServerContact\(\)/);
   });
 });

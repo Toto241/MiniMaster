@@ -12,6 +12,7 @@ final class OfflinePolicyCache: ObservableObject {
     private let defaults = UserDefaults.standard
     private let lastKnownServerVersionKey = "minimaster.cache.lastKnownServerVersion"
     private let lastSuccessfulSyncKey = "minimaster.cache.lastSuccessfulSync"
+    private let inSafeModeKey = "minimaster.cache.inSafeMode"
 
     private let networkMonitor = NWPathMonitor()
     private let networkQueue = DispatchQueue(label: "minimaster.cache.network")
@@ -131,7 +132,8 @@ final class OfflinePolicyCache: ObservableObject {
     /// If the cached policy has expired (no server contact for > 72 h), enforces
     /// the safe-mode policy via `apply` and returns `true`. The cached real policy
     /// is intentionally left untouched so it is restored on the next successful
-    /// sync. Idempotent — safe to call on every heartbeat / failed sync.
+    /// sync (see `restoreFromSafeModeIfNeeded`). Idempotent — safe to call on every
+    /// heartbeat / failed sync.
     @discardableResult
     func enforceOfflineFallbackIfExpired(now: Date = Date(), apply: (PolicyState) -> Void) -> Bool {
         guard freshness(now: now) == .expiredSafeMode else { return false }
@@ -142,6 +144,20 @@ final class OfflinePolicyCache: ObservableObject {
             Self.safeModeThresholdSeconds / 3600
         )
         apply(safeModePolicy())
+        defaults.set(true, forKey: inSafeModeKey)
+        return true
+    }
+
+    /// Restores the cached real policy if the device had entered offline safe mode.
+    /// Required because the normal `applyPolicy` path is skipped when the server
+    /// reports `upToDate` (no policy change): without this, the safe-mode full-lock
+    /// shield would persist indefinitely after the device reconnects. Call on every
+    /// successful server contact. Returns `true` if it restored the policy.
+    @discardableResult
+    func restoreFromSafeModeIfNeeded(apply: (PolicyState) -> Void) -> Bool {
+        guard defaults.bool(forKey: inSafeModeKey) else { return false }
+        apply(policyStore.policy)
+        defaults.set(false, forKey: inSafeModeKey)
         return true
     }
 }
