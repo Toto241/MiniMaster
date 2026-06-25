@@ -14,6 +14,7 @@ struct MainChildView: View {
     @State private var isRequestingFamilyControls = false
     @State private var taskError: Error?
     @State private var showUnpairAlert = false
+    @State private var proofTask: ChildTask?
 
     var body: some View {
         NavigationStack {
@@ -39,6 +40,29 @@ struct MainChildView: View {
                 Button("childMain.unpair.alert.cancel", role: .cancel) {}
             } message: {
                 Text("childMain.unpair.alert.message")
+            }
+            .alert("childMain.tasks.errorTitle", isPresented: showTaskError) {
+                Button("childMain.proof.ok", role: .cancel) { taskError = nil }
+            } message: {
+                Text(taskError?.localizedDescription ?? "")
+            }
+            .sheet(item: $proofTask) { task in
+                if let childId = authService.currentChildId {
+                    TaskProofView(task: task, childId: childId) {
+                        Task { await loadTasks() }
+                    }
+                } else {
+                    // Defensive: childId vanished between tap and presentation
+                    // (e.g. an unpair race). Avoid a contentless, undismissable
+                    // sheet by offering an explicit close.
+                    VStack(spacing: 16) {
+                        Text("childMain.tasks.errorTitle")
+                            .multilineTextAlignment(.center)
+                        Button("childMain.proof.cancel") { proofTask = nil }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                }
             }
             .task {
                 await blockingManager.checkAuthorization()
@@ -142,7 +166,9 @@ struct MainChildView: View {
                     .foregroundColor(.secondary)
             } else {
                 ForEach(tasks) { task in
-                    TaskRowView(task: task)
+                    TaskRowView(task: task) {
+                        proofTask = task
+                    }
                 }
             }
         }
@@ -209,6 +235,13 @@ struct MainChildView: View {
         return Date().timeIntervalSince(cachedAt) > 300
     }
 
+    private var showTaskError: Binding<Bool> {
+        Binding(
+            get: { taskError != nil },
+            set: { presented in if !presented { taskError = nil } }
+        )
+    }
+
     private func statusRow(icon: String, tint: Color, label: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -232,6 +265,8 @@ struct ChildTask: Identifiable {
 
 private struct TaskRowView: View {
     let task: ChildTask
+    /// Invoked when the child taps "submit photo proof". Only shown for open tasks.
+    var onSubmitProof: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -250,6 +285,14 @@ private struct TaskRowView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+            }
+            if task.status == "pending", let onSubmitProof {
+                Button(action: onSubmitProof) {
+                    Label("childMain.task.action.submitProof", systemImage: "camera.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 2)
             }
         }
         .padding(.vertical, 4)
@@ -292,7 +335,7 @@ extension CommandSyncService {
     }
 }
 
-#Preview {
-    MainChildView()
-        .environmentObject(PolicyStore())
-}
+// NOTE: No #Preview here. MainChildView requires four @EnvironmentObjects
+// (ChildAuthService, PolicyStore, CommandSyncService, AppBlockingManager); the
+// service graph needs a configured Firebase app, so a SwiftUI canvas preview
+// would trap at render time. Exercise this screen on Simulator/device instead.

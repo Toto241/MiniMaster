@@ -65,16 +65,27 @@ Sources/MiniMasterChild/
 ├── Models/
 │   ├── PolicyState.swift               # Lokaler Policy-Zustand (Codable)
 │   ├── PolicyStore.swift               # @MainActor ObservableObject + UserDefaults
+│   ├── SharedPolicyDefaults.swift      # App-Group-Brücke App ↔ Monitor-Extension
 │   └── AnyCodable.swift                # Type-erased Codable für API-Responses
 ├── Services/
 │   ├── CommandSyncService.swift        # Control-Plane Sync (Hauptlogik)
-│   ├── AppBlockingManager.swift        # ManagedSettings + DeviceActivity
+│   ├── AppBlockingManager.swift        # ManagedSettings + DeviceActivity (Limit-Threshold)
 │   ├── ChildAuthService.swift          # Pairing + Firebase Auth
 │   └── ChildCloudFunctionsClient.swift # Cloud Function Wrappers
 └── Views/
-    ├── MainChildView.swift             # Status + Aufgabenliste
+    ├── MainChildView.swift             # Status + Aufgabenliste + Foto-Beweis
+    ├── TaskProofView.swift             # Foto auswählen → Upload → completeTask
     └── ChildPairingView.swift          # 6-stelliger Pairing-Code
+
+DeviceActivityMonitorExtension/        # Eigenes App-Extension-Target (nur Xcode)
+├── DeviceActivityMonitorExtension.swift  # eventDidReachThreshold → Shield + Flag
+├── Info.plist                            # NSExtensionPointIdentifier (monitor-extension)
+└── DeviceActivityMonitorExtension.entitlements  # family-controls + App-Group
 ```
+
+Hinweis: `iosSharedServices/PhotoProofService.swift` (Upload + `completeTask`) und
+`DeviceActivityMonitorExtension/` werden im Xcode-Projekt den jeweiligen Targets
+zugeordnet; das SwiftPM-`Package.swift` bildet nur das App-Library-Target ab.
 
 ## Kommando-Synchronisierung (Control-Plane)
 
@@ -113,7 +124,8 @@ setDeviceLocked() ────→ children/{id}/commands/ ────→ fetchP
 
 ### Events
 - `publishDeviceEvent(childId, eventType, payload, idempotencyKey)`
-  - Types: `heartbeat`, `usage_report`, `tamper_event`, `command_ack`, `policy_applied`
+  - Types: `heartbeat`, `usage_report`, `usage_limit_reached`, `tamper_event`, `command_ack`, `policy_applied`
+  - `usage_limit_reached` is raised by the `DeviceActivityMonitorExtension` (separate process) when the daily limit threshold fires; the app drains the App-Group flag and reports it on next foreground (`reportUsageLimitReachedIfNeeded`).
 
 ### Tasks
 - `getTasksForChild(childId)` → `{ tasks: [{ id, description, status, deadline, ... }] }`
@@ -250,9 +262,17 @@ open .
 
 ## Nächste Schritte
 
+- [x] **Task Photo Upload** (PhotosPicker + Firebase Storage → `completeTask`) — `TaskProofView` + geteilter `PhotoProofService`. Device-/Storage-E2E auf echtem iPhone offen.
+- [x] **Daily-Usage-Limit Enforcement** — `DeviceActivityMonitorExtension` + Threshold-Event in `AppBlockingManager`; meldet `usage_limit_reached`. FamilyActivitySelection-Scope + Geräte-E2E auf echtem iPhone offen.
 - [ ] Periodic Heartbeat (WorkManager-äquivalent für Swift)
-- [ ] Usage Tracking (App-Öffnungen + Bildschirmzeit)
+- [ ] Usage Tracking (App-Öffnungen + Bildschirmzeit, feingranular)
 - [ ] Tamper Detection (Jailbreak-Prüfung)
-- [ ] Task Photo Upload (Camera + Firebase Storage)
 - [ ] TestFlight Beta-Test mit Familie
 - [ ] App Store Submission (Privacy Policy, Family Controls docs)
+
+> **Hinweis (kein Xcode in dieser Umgebung):** Swift-Quellen werden über statische
+> Contract-Tests (`test/ios-task-photo-upload-contract.test.ts`,
+> `test/ios-deviceactivity-monitor-contract.test.ts`) abgesichert. Kompilierung,
+> realer Shield/Threshold-Callback, PhotosPicker, Storage-Upload und App-Group-Zugriff
+> müssen auf einem Mac + echtem iPhone/iPad validiert und in
+> `docs/RELEASE_EVIDENCE_REGISTER.md` belegt werden.

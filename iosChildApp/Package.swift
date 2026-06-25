@@ -4,11 +4,20 @@
 //
 // Required Entitlements (add via Signing & Capabilities in Xcode):
 //   - com.apple.developer.family-controls
+//   - com.apple.security.application-groups → group.com.minimaster.childapp
+//     (shared between the app and the DeviceActivityMonitor extension)
 //
 // Required Frameworks (linked in Xcode target):
 //   - FamilyControls
 //   - ManagedSettings
 //   - DeviceActivity
+//   - FirebaseStorage (task photo-proof upload via PhotoProofService)
+//
+// Xcode-only targets / shared sources (not modelled by SwiftPM):
+//   - iosSharedServices/PhotoProofService.swift is added to THIS app target's
+//     "Compile Sources" in Xcode (same module as Sources/MiniMasterChild).
+//   - DeviceActivityMonitorExtension/ is a separate App Extension target in the
+//     Xcode project; SwiftPM does not build app extensions.
 
 import PackageDescription
 
@@ -29,6 +38,7 @@ let package = Package(
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFunctions", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseStorage", package: "firebase-ios-sdk"),
             ],
             path: "Sources/MiniMasterChild",
             resources: [
