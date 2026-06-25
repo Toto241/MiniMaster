@@ -239,21 +239,27 @@ final class CommandSyncService: ObservableObject {
 
     /// iOS anti-tamper: if Family Controls authorization was revoked (the only
     /// tamper vector iOS exposes), report it to the parent so silent enforcement
-    /// loss is visible. Idempotent per hour; only acknowledged on a successful
-    /// publish so a failed report is retried on the next pass.
+    /// loss is visible. Routed through `reportTamperEvent` (which alerts the
+    /// parent via FCM and writes to `tamperEvents`), not the device-event log.
+    /// Only acknowledged on a successful report so a failed one is re-detected and
+    /// retried on the next pass.
     func reportTamperIfDetected(childId: String) async {
         tamperMonitor.recordIfApproved()
         guard tamperMonitor.isRevoked() else { return }
-        let key = "tamper-fcrevoked-\(childId)-\(tamperMonitor.tamperUUID)"
         do {
-            try await client.publishDeviceEvent(
+            try await client.reportTamperEvent(
                 childId: childId,
-                eventType: "tamper_detected",
-                payload: ["reason": "family_controls_revoked", "ts": Int(Date().timeIntervalSince1970)],
-                idempotencyKey: key
+                eventType: "family_controls_revoked"
             )
             tamperMonitor.markRevocationReported()
         } catch { /* non-fatal: re-detected and retried on next pass */ }
+    }
+
+    /// Records that Family Controls authorization is currently approved, so a
+    /// later revocation can be detected. Called right after the child grants
+    /// authorization (and on every successful tamper check).
+    func recordAuthorizationIfApproved() {
+        tamperMonitor.recordIfApproved()
     }
 
     /// Drains the "daily usage limit reached" flag set by the

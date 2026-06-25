@@ -23,22 +23,31 @@ describe("iOS anti-tamper contract", () => {
     // Persisted so a fresh install (never authorized) is not a false positive and
     // a revocation survives a restart / is reported once.
     expect(mon).toContain("everAuthorizedKey");
-    // Stable per-revocation UUID idempotency key, cleared on successful report.
-    expect(mon).toContain("var tamperUUID");
-    expect(mon).toContain("removeObject(forKey: tamperUUIDKey)");
   });
 
-  it("reports tamper_detected with the revocation reason on app start + heartbeat", () => {
+  it("reports the revocation to the parent-alerting endpoint on app start + heartbeat", () => {
     const sync = read("iosChildApp/Sources/MiniMasterChild/Services/CommandSyncService.swift");
+    const client = read("iosChildApp/Sources/MiniMasterChild/Services/ChildCloudFunctionsClient.swift");
     expect(sync).toContain("func reportTamperIfDetected");
-    expect(sync).toContain("eventType: \"tamper_detected\"");
-    expect(sync).toContain("family_controls_revoked");
-    // Only acknowledge after a successful publish so a failed report retries.
+    // Routed through reportTamperEvent (FCM alert + tamperEvents), not the
+    // device-event log, so the parent actually sees enforcement loss.
+    expect(sync).toContain("client.reportTamperEvent(");
+    expect(sync).toContain("eventType: \"family_controls_revoked\"");
+    expect(client).toContain("func reportTamperEvent");
+    expect(client).toContain("httpsCallable(\"reportTamperEvent\")");
+    // Only acknowledge after a successful report so a failed one retries.
     expect(sync).toContain("tamperMonitor.markRevocationReported()");
-    // Idempotency key uses the stable per-revocation UUID, not an hourly bucket.
-    expect(sync).toContain("tamperMonitor.tamperUUID");
     // Wired into both the app-start path and the foreground heartbeat.
     expect(sync).toMatch(/func onAppStart\(\) async \{[\s\S]*reportTamperIfDetected/);
     expect(sync).toMatch(/sendForegroundHeartbeat\(\) async \{[\s\S]*reportTamperIfDetected/);
+  });
+
+  it("records the approved state when the child grants authorization", () => {
+    const sync = read("iosChildApp/Sources/MiniMasterChild/Services/CommandSyncService.swift");
+    const view = read("iosChildApp/Sources/MiniMasterChild/Views/MainChildView.swift");
+    expect(sync).toContain("func recordAuthorizationIfApproved");
+    // The grant flow must record approval, otherwise a first revocation before any
+    // tamper check would never be flagged.
+    expect(view).toContain("syncService.recordAuthorizationIfApproved()");
   });
 });
