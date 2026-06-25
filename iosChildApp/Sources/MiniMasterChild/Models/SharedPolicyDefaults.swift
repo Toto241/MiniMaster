@@ -64,11 +64,15 @@ enum SharedPolicyDefaults {
     }
 
     /// Consumed by the app on next foreground to report the event to the backend.
-    /// Returns the event name (and clears the flag) or `nil` if nothing pending.
-    static func consumeLimitReachedFlag() -> String? {
+    /// Returns the event name together with the epoch-millis timestamp at which the
+    /// limit was reached (and clears the flag), or `nil` if nothing pending. The
+    /// timestamp lets the caller bucket the report by the day the limit was hit,
+    /// not the day it happens to be reported.
+    static func consumeLimitReachedFlag() -> (event: String, atMs: Double)? {
         guard let suite, let event = suite.string(forKey: Keys.limitReachedEvent) else { return nil }
+        let atMs = suite.double(forKey: Keys.limitReachedAtMs)
         suite.removeObject(forKey: Keys.limitReachedEvent)
         suite.removeObject(forKey: Keys.limitReachedAtMs)
-        return event
+        return (event, atMs)
     }
 }

@@ -88,6 +88,8 @@ struct TaskProofView: View {
             .onChange(of: selectedItem) { _, newItem in
                 Task { await loadPreview(newItem) }
             }
+            // Prevent a swipe-to-dismiss from aborting an in-flight upload.
+            .interactiveDismissDisabled(proofService.isUploading)
         }
     }
 
