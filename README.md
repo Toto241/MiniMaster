@@ -146,13 +146,15 @@ Notes:
 
 1.  Navigate to `web-control/`.
 2.  Replace the placeholder `firebaseConfig` object in `app.js` with your project's configuration from the Firebase Console.
-3.  Serve the directory using a simple HTTP server (e.g., `python -m http.server 8000`).
+3.  Serve the directory using a simple HTTP server (e.g., `python3 -m http.server 8000`; on Windows alternatively `python -m http.server 8000`).
 
 ### Betreiber-Dashboard Setup
 
 Static mode:
 
 ```bash
+python3 -m http.server 8080
+# Windows fallback:
 python -m http.server 8080
 ```
 
