@@ -220,7 +220,7 @@ final class CommandSyncService: ObservableObject {
     func reportTamperIfDetected(childId: String) async {
         tamperMonitor.recordIfApproved()
         guard tamperMonitor.isRevoked() else { return }
-        let key = "tamper-fcrevoked-\(childId)-\(Int(Date().timeIntervalSince1970 / 3600))"
+        let key = "tamper-fcrevoked-\(childId)-\(tamperMonitor.tamperUUID)"
         do {
             try await client.publishDeviceEvent(
                 childId: childId,

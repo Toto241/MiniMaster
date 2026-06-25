@@ -23,6 +23,9 @@ describe("iOS anti-tamper contract", () => {
     // Persisted so a fresh install (never authorized) is not a false positive and
     // a revocation survives a restart / is reported once.
     expect(mon).toContain("everAuthorizedKey");
+    // Stable per-revocation UUID idempotency key, cleared on successful report.
+    expect(mon).toContain("var tamperUUID");
+    expect(mon).toContain("removeObject(forKey: tamperUUIDKey)");
   });
 
   it("reports tamper_detected with the revocation reason on app start + heartbeat", () => {
@@ -32,6 +35,8 @@ describe("iOS anti-tamper contract", () => {
     expect(sync).toContain("family_controls_revoked");
     // Only acknowledge after a successful publish so a failed report retries.
     expect(sync).toContain("tamperMonitor.markRevocationReported()");
+    // Idempotency key uses the stable per-revocation UUID, not an hourly bucket.
+    expect(sync).toContain("tamperMonitor.tamperUUID");
     // Wired into both the app-start path and the foreground heartbeat.
     expect(sync).toMatch(/func onAppStart\(\) async \{[\s\S]*reportTamperIfDetected/);
     expect(sync).toMatch(/sendForegroundHeartbeat\(\) async \{[\s\S]*reportTamperIfDetected/);

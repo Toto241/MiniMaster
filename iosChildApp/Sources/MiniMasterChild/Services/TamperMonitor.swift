@@ -20,6 +20,7 @@ final class TamperMonitor {
 
     private let defaults: UserDefaults
     private let everAuthorizedKey = "minimaster.tamper.everAuthorized"
+    private let tamperUUIDKey = "minimaster.tamper.uuid"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -28,6 +29,19 @@ final class TamperMonitor {
     /// Whether Family Controls authorization is currently approved.
     var isAuthorizationApproved: Bool {
         AuthorizationCenter.shared.authorizationStatus == .approved
+    }
+
+    /// Stable per-revocation idempotency id. Created on first access for the
+    /// current revocation and persisted, so a report retried across an hour
+    /// boundary (or after offline/flaky connectivity) reuses the same key and the
+    /// backend de-duplicates. Cleared by `markRevocationReported`.
+    var tamperUUID: String {
+        if let uuid = defaults.string(forKey: tamperUUIDKey) {
+            return uuid
+        }
+        let uuid = UUID().uuidString
+        defaults.set(uuid, forKey: tamperUUIDKey)
+        return uuid
     }
 
     /// Records that authorization is (still) approved. Must be called whenever the
@@ -52,5 +66,6 @@ final class TamperMonitor {
     /// the child re-authorizes (which calls `recordIfApproved`).
     func markRevocationReported() {
         defaults.set(false, forKey: everAuthorizedKey)
+        defaults.removeObject(forKey: tamperUUIDKey)
     }
 }
