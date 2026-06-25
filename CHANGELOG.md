@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **iOS Anti-Tamper (Family-Controls-Entzug)**: Neuer `TamperMonitor` (iOS Kind) erkennt den Entzug der Family-Controls-/Bildschirmzeit-Autorisierung — den einzigen realistischen Tamper-Vektor auf iOS (kein Uninstall-/Device-Admin-Callback wie Android). Bei `approved → not-approved` meldet `CommandSyncService.reportTamperIfDetected` ein `tamper_detected`-Event (`reason: family_controls_revoked`) an die Eltern (Analogon zu Androids `accessibility_service_disabled`), verdrahtet in App-Start und Foreground-Heartbeat. Zustandspersistenz verhindert Fehlalarme bei Neuinstallation und Doppelmeldungen; nur nach erfolgreichem Publish wird quittiert. Contract-Test `test/ios-anti-tamper-contract.test.ts`.
 - **Einrichtungs-Assistenten (Wizards)**: Mehrere geführte Wizards für die Einrichtung von MiniMaster — von null beginnend oder je Konfiguration.
   - **Backend** `src/wizard-progress.ts`: generischer Fortschritts-Tracker (`getWizardProgress` / `setWizardProgress` / `listWizardProgress`) pro Nutzer in `wizardProgress/{uid}` (validiert, größenbegrenzt, nur nicht-geheime Daten), neue Audit-Aktion `wizard.progress_update`, Firestore-Deny-Regel (nur Cloud Functions).
   - **Wizard-Hub** (`admin-panel/wizards.html`): zentrale Übersicht aller Assistenten mit Live-Fortschritt und Projekt-Readiness; verlinkt aus dem Betreiber-Dashboard.

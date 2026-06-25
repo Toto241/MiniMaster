@@ -27,6 +27,7 @@ final class CommandSyncService: ObservableObject {
     private let policyStore: PolicyStore
     private let blockingManager: AppBlockingManager
     private let offlinePolicyCache: OfflinePolicyCache
+    private let tamperMonitor = TamperMonitor()
     private var childId: String?
 
     private let networkMonitor = NWPathMonitor()
@@ -91,6 +92,7 @@ final class CommandSyncService: ObservableObject {
         await syncPolicySnapshot(childId: id)
         await fetchAndApplyAllCommands(childId: id)
         await reportUsageLimitReachedIfNeeded(childId: id)
+        await reportTamperIfDetected(childId: id)
         await reportHeartbeat(childId: id)
         startForegroundHeartbeat()
     }
@@ -211,6 +213,25 @@ final class CommandSyncService: ObservableObject {
         } catch { /* non-fatal */ }
     }
 
+    /// iOS anti-tamper: if Family Controls authorization was revoked (the only
+    /// tamper vector iOS exposes), report it to the parent so silent enforcement
+    /// loss is visible. Idempotent per hour; only acknowledged on a successful
+    /// publish so a failed report is retried on the next pass.
+    func reportTamperIfDetected(childId: String) async {
+        tamperMonitor.recordIfApproved()
+        guard tamperMonitor.isRevoked() else { return }
+        let key = "tamper-fcrevoked-\(childId)-\(Int(Date().timeIntervalSince1970 / 3600))"
+        do {
+            try await client.publishDeviceEvent(
+                childId: childId,
+                eventType: "tamper_detected",
+                payload: ["reason": "family_controls_revoked", "ts": Int(Date().timeIntervalSince1970)],
+                idempotencyKey: key
+            )
+            tamperMonitor.markRevocationReported()
+        } catch { /* non-fatal: re-detected and retried on next pass */ }
+    }
+
     /// Drains the "daily usage limit reached" flag set by the
     /// `DeviceActivityMonitorExtension` (separate process) and reports it to the
     /// backend. Idempotent per child per day so a re-foreground does not double
@@ -306,6 +327,7 @@ final class CommandSyncService: ObservableObject {
     private func sendForegroundHeartbeat() async {
         guard let id = childId else { return }
         await reportHeartbeat(childId: id)
+        await reportTamperIfDetected(childId: id)
     }
 
     @objc private func onFcmTokenRefreshed(_ notification: Notification) {
