@@ -14,12 +14,13 @@ function read(relPath: string): string {
  * be validated on a Mac + device.
  */
 describe("iOS child task photo upload contract", () => {
-  it("child app target links FirebaseStorage and documents shared-source membership", () => {
+  it("child app target links FirebaseStorage and compiles PhotoProofService", () => {
     const pkg = read("iosChildApp/Package.swift");
-    expect(pkg).toContain('.product(name: "FirebaseStorage", package: "firebase-ios-sdk")');
-    // PhotoProofService.swift lives in the shared folder; Xcode target membership
-    // is documented because SwiftPM cannot reference files outside the package.
-    expect(pkg).toContain("PhotoProofService.swift");
+    expect(pkg).toContain(".product(name: \"FirebaseStorage\", package: \"firebase-ios-sdk\")");
+    // PhotoProofService lives inside the target so SwiftPM/xcodebuild compiles it.
+    expect(() =>
+      read("iosChildApp/Sources/MiniMasterChild/Services/PhotoProofService.swift")
+    ).not.toThrow();
   });
 
   it("MainChildView presents a proof sheet and a per-task proof trigger", () => {
@@ -27,7 +28,7 @@ describe("iOS child task photo upload contract", () => {
     expect(view).toContain(".sheet(item: $proofTask)");
     expect(view).toContain("TaskProofView(");
     // Proof button only for pending tasks.
-    expect(view).toContain('if task.status == "pending"');
+    expect(view).toContain("if task.status == \"pending\"");
     expect(view).toContain("onSubmitProof");
   });
 
@@ -39,13 +40,13 @@ describe("iOS child task photo upload contract", () => {
   });
 
   it("shared PhotoProofService matches the completeTask backend contract", () => {
-    const svc = read("iosSharedServices/PhotoProofService.swift");
-    expect(svc).toContain('httpsCallable("completeTask")');
-    expect(svc).toContain('"taskId": taskId');
-    expect(svc).toContain('"photoUrl": urlString');
+    const svc = read("iosChildApp/Sources/MiniMasterChild/Services/PhotoProofService.swift");
+    expect(svc).toContain("httpsCallable(\"completeTask\")");
+    expect(svc).toContain("\"taskId\": taskId");
+    expect(svc).toContain("\"photoUrl\": urlString");
     // childId is derived from auth on the backend — never sent as a param.
-    expect(svc).not.toContain('"childId"');
-    expect(svc).toContain('"proofs/\\(childId)/\\(taskId)/');
+    expect(svc).not.toContain("\"childId\"");
+    expect(svc).toContain("\"proofs/\\(childId)/\\(taskId)/");
   });
 
   it("adds proof localization keys to all five locales", () => {
@@ -54,10 +55,10 @@ describe("iOS child task photo upload contract", () => {
       const strings = read(
         `iosChildApp/Sources/MiniMasterChild/Resources/${loc}.lproj/Localizable.strings`
       );
-      expect(strings).toContain('"childMain.proof.button"');
-      expect(strings).toContain('"childMain.proof.picker"');
-      expect(strings).toContain('"childMain.proof.error.title"');
-      expect(strings).toContain('"childMain.tasks.error.title"');
+      expect(strings).toContain("\"childMain.proof.button\"");
+      expect(strings).toContain("\"childMain.proof.picker\"");
+      expect(strings).toContain("\"childMain.proof.error.title\"");
+      expect(strings).toContain("\"childMain.tasks.error.title\"");
     }
   });
 });

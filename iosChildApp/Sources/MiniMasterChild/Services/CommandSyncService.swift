@@ -216,8 +216,11 @@ final class CommandSyncService: ObservableObject {
                 idempotencyKey: key
             )
         } catch {
-            // Non-fatal: restore the flag so the next foreground retries the report.
-            SharedPolicyDefaults.markLimitReached(event: flag.event)
+            // Non-fatal: restore the flag so the next foreground retries the
+            // report. Reconstruct the original day from flag.dayBucket so a retry
+            // crossing midnight does not re-stamp the event onto the wrong day.
+            let originalDate = Date(timeIntervalSince1970: TimeInterval(flag.dayBucket) * 86_400)
+            SharedPolicyDefaults.markLimitReached(event: flag.event, now: originalDate)
         }
     }
 

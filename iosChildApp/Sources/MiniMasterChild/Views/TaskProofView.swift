@@ -86,6 +86,7 @@ struct TaskProofView: View {
             } message: {
                 Text(errorMessage ?? NSLocalizedString("childMain.proof.error.generic", comment: ""))
             }
+            .interactiveDismissDisabled(proofService.isUploading)
         }
     }
 

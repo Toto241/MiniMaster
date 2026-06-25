@@ -14,13 +14,11 @@
 //   - FirebaseStorage (task photo-proof upload)
 //
 // Xcode-only target membership (cannot be expressed in SwiftPM):
-//   - Shared file ../iosSharedServices/PhotoProofService.swift must be added to
-//     the app target's "Compile Sources" (task photo-proof upload).
 //   - The DeviceActivityMonitor extension under
 //     DeviceActivityMonitorExtension/ is a separate App-Extension target;
 //     SwiftPM cannot build app extensions. Add it in the Xcode project and
 //     compile DeviceActivityMonitorExtension.swift + SharedPolicyDefaults.swift
-//     into it.
+//     into it (SharedPolicyDefaults is also part of the app target).
 
 import PackageDescription
 

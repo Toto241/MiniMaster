@@ -22,7 +22,10 @@ import FamilyControls
 /// `com.apple.developer.family-controls`.
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
-    private let store = ManagedSettingsStore()
+    /// Dedicated, named store so the daily-limit shield does not clobber — and
+    /// is not clobbered by — the host app's full-lock/blacklist shields (which
+    /// use the default `ManagedSettingsStore`).
+    private let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("minimaster.dailyLimit"))
 
     override func eventDidReachThreshold(
         _ event: DeviceActivityEvent.Name,

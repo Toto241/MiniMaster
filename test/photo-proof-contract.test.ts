@@ -10,7 +10,7 @@ describe("photo proof upload contract", () => {
     const tasks = read("src/tasks.ts");
     const storageRules = read("storage.rules");
     const apiDocs = read("API_DOCUMENTATION.md");
-    const iosPhotoProof = read("iosSharedServices/PhotoProofService.swift");
+    const iosPhotoProof = read("iosChildApp/Sources/MiniMasterChild/Services/PhotoProofService.swift");
 
     expect(tasks).toContain("const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024");
     expect(storageRules).toContain("request.resource.size < 5 * 1024 * 1024");
@@ -23,7 +23,7 @@ describe("photo proof upload contract", () => {
     const tasks = read("src/tasks.ts");
     const storageRules = read("storage.rules");
     const androidPath = read("childApp/src/main/java/com/google/pairing/TaskProofStoragePath.kt");
-    const iosPhotoProof = read("iosSharedServices/PhotoProofService.swift");
+    const iosPhotoProof = read("iosChildApp/Sources/MiniMasterChild/Services/PhotoProofService.swift");
 
     expect(tasks).toContain("`proofs/${childId}/`");
     expect(storageRules).toContain("match /proofs/{childId}/{taskId}/{fileName}");

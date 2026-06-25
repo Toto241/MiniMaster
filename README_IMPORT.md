@@ -5,4 +5,4 @@ Enthaltene Dateien:
 - iosMasterApp/Sources/MiniMasterParent/Services/PairingService.swift
 - iosChildApp/Sources/MiniMasterChild/Managers/AppBlockingManager.swift
 - iosSharedServices/CrossPlatformSyncService.swift
-- iosSharedServices/PhotoProofService.swift
+- iosChildApp/Sources/MiniMasterChild/Services/PhotoProofService.swift

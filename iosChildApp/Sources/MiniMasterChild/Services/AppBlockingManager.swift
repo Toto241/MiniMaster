@@ -148,6 +148,12 @@ final class AppBlockingManager: ObservableObject {
         // (separate process) agrees with the host on the active limit.
         SharedPolicyDefaults.setDailyLimitMinutes(rules.dailyLimitMinutes)
 
+        // Clear any leftover daily-limit shield (same named store the extension
+        // uses) so a previously-hit limit that was raised or removed unblocks
+        // the device. If the new limit is still exceeded the monitor re-triggers.
+        let dailyLimitStore = ManagedSettingsStore(named: ManagedSettingsStore.Name("minimaster.dailyLimit"))
+        dailyLimitStore.shield.applicationCategories = nil
+
         guard let dailyLimit = rules.dailyLimitMinutes, dailyLimit > 0 else { return }
 
         // Build a DeviceActivitySchedule spanning the full day
@@ -171,7 +177,7 @@ final class AppBlockingManager: ObservableObject {
             applications: monitoredApplications,
             categories: [],
             webDomains: [],
-            threshold: DateComponents(minute: dailyLimit)
+            threshold: DateComponents(hour: dailyLimit / 60, minute: dailyLimit % 60)
         )
 
         do {

@@ -22,7 +22,9 @@ describe("iOS DeviceActivityMonitor extension contract", () => {
     expect(ext).toContain("override func eventDidReachThreshold");
     expect(ext).toContain("store.shield.applicationCategories = .all(except: Set())");
     expect(ext).toContain("override func intervalDidEnd");
-    expect(ext).toContain('SharedPolicyDefaults.markLimitReached(event: "usage_limit_reached")');
+    expect(ext).toContain("SharedPolicyDefaults.markLimitReached(event: \"usage_limit_reached\")");
+    // Dedicated named store avoids clobbering the host full-lock shield.
+    expect(ext).toContain("ManagedSettingsStore(named: ManagedSettingsStore.Name(\"minimaster.dailyLimit\"))");
   });
 
   it("extension Info.plist declares the monitor extension point", () => {
@@ -34,9 +36,11 @@ describe("iOS DeviceActivityMonitor extension contract", () => {
   it("host schedules a DeviceActivityEvent with a daily-limit threshold", () => {
     const mgr = read("iosChildApp/Sources/MiniMasterChild/Services/AppBlockingManager.swift");
     expect(mgr).toContain("DeviceActivityEvent");
-    expect(mgr).toContain("threshold: DateComponents(minute: dailyLimit)");
+    expect(mgr).toContain("threshold: DateComponents(hour: dailyLimit / 60, minute: dailyLimit % 60)");
     expect(mgr).toContain("events: [limitEventName: limitEvent]");
     expect(mgr).toContain("SharedPolicyDefaults.setDailyLimitMinutes(rules.dailyLimitMinutes)");
+    // Daily-limit shield is cleared on policy update so raised/removed limits unblock.
+    expect(mgr).toContain("ManagedSettingsStore(named: ManagedSettingsStore.Name(\"minimaster.dailyLimit\"))");
   });
 
   it("App Group is wired across host + extension entitlements and shared defaults", () => {
@@ -48,7 +52,7 @@ describe("iOS DeviceActivityMonitor extension contract", () => {
     expect(appEnt).toContain("group.com.minimaster.childapp");
     expect(extEnt).toContain("com.apple.developer.family-controls");
     expect(extEnt).toContain("group.com.minimaster.childapp");
-    expect(shared).toContain('static let suiteName = "group.com.minimaster.childapp"');
+    expect(shared).toContain("static let suiteName = \"group.com.minimaster.childapp\"");
     expect(shared).toContain("UserDefaults(suiteName: suiteName)");
   });
 

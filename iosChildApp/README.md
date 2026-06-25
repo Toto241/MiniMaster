@@ -270,7 +270,8 @@ App-Extensions nicht bauen — in Xcode anzulegen:
    in dieses Target kompilieren.
 3. App-Group `group.com.minimaster.childapp` auf **App- und Extension-Target** aktivieren
    (Entitlements liegen bereits vor).
-4. Shared file `../iosSharedServices/PhotoProofService.swift` ins App-Target
-   "Compile Sources" aufnehmen (für den Foto-Upload).
-5. Auf echtem iPhone/iPad mit aktiver Bildschirmzeit Limit-Überschreitung verifizieren
+4. Auf echtem iPhone/iPad mit aktiver Bildschirmzeit Limit-Überschreitung verifizieren
    und Nachweis in `docs/RELEASE_EVIDENCE_REGISTER.md` verlinken.
+
+Der Foto-Upload (`PhotoProofService.swift`) liegt im App-Target und wird von
+SwiftPM/xcodebuild direkt kompiliert — kein manueller Xcode-Schritt nötig.
