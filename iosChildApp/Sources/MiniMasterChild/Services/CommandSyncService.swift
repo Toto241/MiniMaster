@@ -148,6 +148,11 @@ final class CommandSyncService: ObservableObject {
             }
             pendingCommandCount = 0
             lastSyncDate = Date()
+            // Record server contact on every success (incl. upToDate syncs) and
+            // restore from safe mode if needed — the 72 h timer must reflect real
+            // contact, not just policy changes (PolicyStore.cachedAt only moves on
+            // a policy change), and an upToDate reconnect skips the applyPolicy path.
+            noteServerContact()
         } catch {
             syncError = error
             if policyStore.lastSyncDate == nil ||
@@ -159,6 +164,7 @@ final class CommandSyncService: ObservableObject {
                     policyStore.lastSyncDate?.description ?? "never"
                 )
             }
+            enforceOfflineSafeModeIfNeeded()
         }
     }
 
@@ -182,8 +188,14 @@ final class CommandSyncService: ObservableObject {
             } while cursor != nil && iterations < maxIterations
             pendingCommandCount = 0
             lastSyncDate = Date()
+            // Record server contact on every success (incl. upToDate syncs) and
+            // restore from safe mode if needed — the 72 h timer must reflect real
+            // contact, not just policy changes (PolicyStore.cachedAt only moves on
+            // a policy change), and an upToDate reconnect skips the applyPolicy path.
+            noteServerContact()
         } catch {
             syncError = error
+            enforceOfflineSafeModeIfNeeded()
         }
     }
 
@@ -198,7 +210,19 @@ final class CommandSyncService: ObservableObject {
                 payload: ["ts": Int(Date().timeIntervalSince1970)],
                 idempotencyKey: key
             )
+            // A successful heartbeat is server contact too — refresh the offline
+            // timer (and exit safe mode) so a foreground app that only heartbeats
+            // doesn't falsely expire after 72 h.
+            noteServerContact()
         } catch { /* non-fatal */ }
+    }
+
+    /// Marks a successful server contact: refreshes the 72 h offline-safe-mode
+    /// timer and, if the device had entered safe mode, restores the cached real
+    /// policy (the `applyPolicy` path is skipped on `upToDate` syncs).
+    private func noteServerContact() {
+        offlinePolicyCache.recordSuccessfulSync()
+        offlinePolicyCache.restoreFromSafeModeIfNeeded { blockingManager.applyPolicy($0) }
     }
 
     func reportUsage(childId: String, appId: String, minutes: Int) async {
@@ -328,6 +352,16 @@ final class CommandSyncService: ObservableObject {
         guard let id = childId else { return }
         await reportHeartbeat(childId: id)
         await reportTamperIfDetected(childId: id)
+        enforceOfflineSafeModeIfNeeded()
+    }
+
+    /// Enters offline safe mode (full lock) if the cached policy has had no
+    /// server contact for > 72 h. Called after failed syncs and on each
+    /// foreground heartbeat so a long-offline device locks itself even without a
+    /// fresh server policy. The cached real policy is preserved and restored on
+    /// the next successful sync.
+    private func enforceOfflineSafeModeIfNeeded() {
+        offlinePolicyCache.enforceOfflineFallbackIfExpired { blockingManager.applyPolicy($0) }
     }
 
     @objc private func onFcmTokenRefreshed(_ notification: Notification) {
