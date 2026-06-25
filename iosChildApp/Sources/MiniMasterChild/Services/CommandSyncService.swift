@@ -222,7 +222,11 @@ final class CommandSyncService: ObservableObject {
         // midnight is still idempotent for the correct day. Fall back to now if the
         // timestamp is missing.
         let reachedSeconds = flag.atMs > 0 ? flag.atMs / 1000 : Date().timeIntervalSince1970
-        let key = "usagelimit-\(childId)-\(Int(reachedSeconds / 86400))" // daily bucket
+        // Bucket by the device's *local* calendar day (the daily limit resets at
+        // local midnight, matching the DeviceActivitySchedule), so the idempotency
+        // key doesn't collide across the UTC day boundary in non-UTC timezones.
+        let tzOffset = Double(TimeZone.current.secondsFromGMT(for: Date(timeIntervalSince1970: reachedSeconds)))
+        let key = "usagelimit-\(childId)-\(Int((reachedSeconds + tzOffset) / 86400))" // local daily bucket
         do {
             try await client.publishDeviceEvent(
                 childId: childId,

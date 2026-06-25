@@ -157,12 +157,12 @@ final class AppBlockingManager: ObservableObject {
         let previousLimit = SharedPolicyDefaults.dailyLimitMinutes()
 
         guard let dailyLimit = rules.dailyLimitMinutes, dailyLimit > 0 else {
-            // No active limit — clear the value shared with the monitor extension.
-            // If a limit was previously enforced, lift its shield so removing the
-            // limit unblocks the device immediately.
-            if previousLimit != nil {
-                dailyLimitStore.shield.applicationCategories = nil
-            }
+            // No active limit — clear the value shared with the monitor extension
+            // and unconditionally lift any usage-cap shield. Without a limit there
+            // must be no cap shield, and nil-ing is idempotent, so this also
+            // recovers from any inconsistent state where the shield outlived its
+            // limit (which would otherwise leave the device locked).
+            dailyLimitStore.shield.applicationCategories = nil
             SharedPolicyDefaults.setDailyLimitMinutes(nil)
             return
         }
