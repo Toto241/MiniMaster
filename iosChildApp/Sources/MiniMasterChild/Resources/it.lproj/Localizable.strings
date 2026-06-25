@@ -32,6 +32,23 @@
 "childMain.task.status.approved" = "Approvata";
 "childMain.task.status.rejected" = "Rifiutata";
 "childMain.task.due" = "Scadenza: %@";
+"childMain.tasks.error.title" = "Impossibile caricare le attività";
+"childMain.tasks.error.ok" = "OK";
+"childMain.tasks.error.generic" = "Errore sconosciuto durante il caricamento delle attività.";
+
+/* TaskProofView */
+"childMain.proof.navTitle" = "Invia prova";
+"childMain.proof.task" = "Attività";
+"childMain.proof.photo" = "Foto";
+"childMain.proof.picker" = "Scegli foto";
+"childMain.proof.pickerChange" = "Cambia foto";
+"childMain.proof.uploading" = "Caricamento…";
+"childMain.proof.button" = "Invia prova";
+"childMain.proof.cancel" = "Annulla";
+"childMain.proof.error.title" = "Caricamento non riuscito";
+"childMain.proof.error.ok" = "OK";
+"childMain.proof.error.generic" = "Non è stato possibile inviare la prova.";
+
 "childMain.unpair.alert.title" = "Deregistrare il dispositivo?";
 "childMain.unpair.alert.message" = "Il dispositivo verrà disconnesso dall'app genitore.";
 "childMain.unpair.alert.confirm" = "Deregistra";

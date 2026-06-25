@@ -32,6 +32,23 @@
 "childMain.task.status.approved" = "Genehmigt";
 "childMain.task.status.rejected" = "Abgelehnt";
 "childMain.task.due" = "Fällig: %@";
+"childMain.tasks.error.title" = "Aufgaben konnten nicht geladen werden";
+"childMain.tasks.error.ok" = "OK";
+"childMain.tasks.error.generic" = "Unbekannter Fehler beim Laden der Aufgaben.";
+
+/* TaskProofView */
+"childMain.proof.navTitle" = "Nachweis senden";
+"childMain.proof.task" = "Aufgabe";
+"childMain.proof.photo" = "Foto";
+"childMain.proof.picker" = "Foto auswählen";
+"childMain.proof.pickerChange" = "Foto ändern";
+"childMain.proof.uploading" = "Wird hochgeladen…";
+"childMain.proof.button" = "Nachweis senden";
+"childMain.proof.cancel" = "Abbrechen";
+"childMain.proof.error.title" = "Upload fehlgeschlagen";
+"childMain.proof.error.ok" = "OK";
+"childMain.proof.error.generic" = "Der Nachweis konnte nicht gesendet werden.";
+
 "childMain.unpair.alert.title" = "Gerät abmelden?";
 "childMain.unpair.alert.message" = "Das Gerät wird von der Eltern-App getrennt.";
 "childMain.unpair.alert.confirm" = "Abmelden";

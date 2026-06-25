@@ -32,6 +32,23 @@
 "childMain.task.status.approved" = "Approuvée";
 "childMain.task.status.rejected" = "Rejetée";
 "childMain.task.due" = "Échéance : %@";
+"childMain.tasks.error.title" = "Impossible de charger les tâches";
+"childMain.tasks.error.ok" = "OK";
+"childMain.tasks.error.generic" = "Erreur inconnue lors du chargement des tâches.";
+
+/* TaskProofView */
+"childMain.proof.navTitle" = "Envoyer la preuve";
+"childMain.proof.task" = "Tâche";
+"childMain.proof.photo" = "Photo";
+"childMain.proof.picker" = "Choisir une photo";
+"childMain.proof.pickerChange" = "Changer de photo";
+"childMain.proof.uploading" = "Envoi…";
+"childMain.proof.button" = "Envoyer la preuve";
+"childMain.proof.cancel" = "Annuler";
+"childMain.proof.error.title" = "Échec de l'envoi";
+"childMain.proof.error.ok" = "OK";
+"childMain.proof.error.generic" = "La preuve n'a pas pu être envoyée.";
+
 "childMain.unpair.alert.title" = "Désenregistrer l'appareil ?";
 "childMain.unpair.alert.message" = "L'appareil sera déconnecté de l'application parent.";
 "childMain.unpair.alert.confirm" = "Désenregistrer";

@@ -32,6 +32,23 @@
 "childMain.task.status.approved" = "Approved";
 "childMain.task.status.rejected" = "Rejected";
 "childMain.task.due" = "Due: %@";
+"childMain.tasks.error.title" = "Could not load tasks";
+"childMain.tasks.error.ok" = "OK";
+"childMain.tasks.error.generic" = "Unknown error while loading tasks.";
+
+/* TaskProofView */
+"childMain.proof.navTitle" = "Submit proof";
+"childMain.proof.task" = "Task";
+"childMain.proof.photo" = "Photo";
+"childMain.proof.picker" = "Choose photo";
+"childMain.proof.pickerChange" = "Change photo";
+"childMain.proof.uploading" = "Uploading…";
+"childMain.proof.button" = "Submit proof";
+"childMain.proof.cancel" = "Cancel";
+"childMain.proof.error.title" = "Upload failed";
+"childMain.proof.error.ok" = "OK";
+"childMain.proof.error.generic" = "The proof could not be submitted.";
+
 "childMain.unpair.alert.title" = "Unregister device?";
 "childMain.unpair.alert.message" = "The device will be disconnected from the parent app.";
 "childMain.unpair.alert.confirm" = "Unregister";

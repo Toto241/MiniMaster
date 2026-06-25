@@ -32,6 +32,23 @@
 "childMain.task.status.approved" = "Aprobada";
 "childMain.task.status.rejected" = "Rechazada";
 "childMain.task.due" = "Vencimiento: %@";
+"childMain.tasks.error.title" = "No se pudieron cargar las tareas";
+"childMain.tasks.error.ok" = "OK";
+"childMain.tasks.error.generic" = "Error desconocido al cargar las tareas.";
+
+/* TaskProofView */
+"childMain.proof.navTitle" = "Enviar prueba";
+"childMain.proof.task" = "Tarea";
+"childMain.proof.photo" = "Foto";
+"childMain.proof.picker" = "Elegir foto";
+"childMain.proof.pickerChange" = "Cambiar foto";
+"childMain.proof.uploading" = "Subiendo…";
+"childMain.proof.button" = "Enviar prueba";
+"childMain.proof.cancel" = "Cancelar";
+"childMain.proof.error.title" = "Error al subir";
+"childMain.proof.error.ok" = "OK";
+"childMain.proof.error.generic" = "No se pudo enviar la prueba.";
+
 "childMain.unpair.alert.title" = "¿Desvincular dispositivo?";
 "childMain.unpair.alert.message" = "El dispositivo se desconectará de la aplicación padre.";
 "childMain.unpair.alert.confirm" = "Desvincular";

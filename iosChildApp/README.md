@@ -251,8 +251,26 @@ open .
 ## Nächste Schritte
 
 - [ ] Periodic Heartbeat (WorkManager-äquivalent für Swift)
-- [ ] Usage Tracking (App-Öffnungen + Bildschirmzeit)
+- [x] Usage Limit Enforcement (DeviceActivityMonitor-Extension) — Quelle vorhanden;
+      Extension-Target-Anlage + Threshold-/Shield-Test auf Mac + echtem Gerät offen
 - [ ] Tamper Detection (Jailbreak-Prüfung)
-- [ ] Task Photo Upload (Camera + Firebase Storage)
+- [x] Task Photo Upload (PhotosPicker + Firebase Storage → `completeTask`) — Quelle
+      vorhanden; realer Upload/Review-Nachweis auf Mac + echtem Gerät offen
 - [ ] TestFlight Beta-Test mit Familie
 - [ ] App Store Submission (Privacy Policy, Family Controls docs)
+
+### DeviceActivityMonitor-Extension (Mac-Schritte)
+
+Die Quellen liegen unter `DeviceActivityMonitorExtension/` (Principal-Class
+`DeviceActivityMonitorExtension`, `Info.plist`, eigenes Entitlement). SwiftPM kann
+App-Extensions nicht bauen — in Xcode anzulegen:
+
+1. Neues Target *DeviceActivity Monitor Extension* hinzufügen.
+2. `DeviceActivityMonitorExtension.swift` + `Sources/.../Models/SharedPolicyDefaults.swift`
+   in dieses Target kompilieren.
+3. App-Group `group.com.minimaster.childapp` auf **App- und Extension-Target** aktivieren
+   (Entitlements liegen bereits vor).
+4. Shared file `../iosSharedServices/PhotoProofService.swift` ins App-Target
+   "Compile Sources" aufnehmen (für den Foto-Upload).
+5. Auf echtem iPhone/iPad mit aktiver Bildschirmzeit Limit-Überschreitung verifizieren
+   und Nachweis in `docs/RELEASE_EVIDENCE_REGISTER.md` verlinken.

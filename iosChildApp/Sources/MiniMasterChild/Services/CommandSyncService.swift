@@ -90,6 +90,7 @@ final class CommandSyncService: ObservableObject {
         guard let id = childId else { return }
         await syncPolicySnapshot(childId: id)
         await fetchAndApplyAllCommands(childId: id)
+        await reportLimitReachedIfNeeded(childId: id)
         await reportHeartbeat(childId: id)
         startForegroundHeartbeat()
     }
@@ -97,6 +98,7 @@ final class CommandSyncService: ObservableObject {
     func onFcmWakeUp() async {
         guard let id = childId else { return }
         await fetchAndApplyAllCommands(childId: id)
+        await reportLimitReachedIfNeeded(childId: id)
     }
 
     func registerEndpoint() async {
@@ -195,6 +197,28 @@ final class CommandSyncService: ObservableObject {
                 idempotencyKey: key
             )
         } catch { /* non-fatal */ }
+    }
+
+    /// If the DeviceActivityMonitor extension flagged that the daily usage limit
+    /// was reached, publish the event here (the background extension cannot
+    /// reliably call Cloud Functions). Idempotent per UTC day.
+    func reportLimitReachedIfNeeded(childId: String) async {
+        guard let flag = SharedPolicyDefaults.consumeLimitReachedFlag() else { return }
+        let key = "limit-\(childId)-\(flag.dayBucket)"
+        do {
+            try await client.publishDeviceEvent(
+                childId: childId,
+                eventType: flag.event,
+                payload: [
+                    "limitMinutes": SharedPolicyDefaults.dailyLimitMinutes() ?? 0,
+                    "dayBucket": flag.dayBucket
+                ],
+                idempotencyKey: key
+            )
+        } catch {
+            // Non-fatal: restore the flag so the next foreground retries the report.
+            SharedPolicyDefaults.markLimitReached(event: flag.event)
+        }
     }
 
     func reportUsage(childId: String, appId: String, minutes: Int) async {

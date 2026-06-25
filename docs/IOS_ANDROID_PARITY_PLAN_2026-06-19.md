@@ -17,8 +17,8 @@ iPhone/iOS soll auf ein mit Android vergleichbares Niveau gebracht werden. Repo-
 | App-Blacklist | Android Bundle-ID Enforcement | iOS Screen-Time-Token Enforcement; Legacy Bundle IDs nur Hinweis | Source vorhanden, Device-E2E offen |
 | Offline Policy | Lokale Policy bleibt aktiv | OfflinePolicyCache + persisted PolicyStore | Source vorhanden, Device-E2E offen |
 | Heartbeat/Sync | Background/FCM/Command Ack | APNs/FCM Token, Command Ack, Foreground-Heartbeat | Source vorhanden, Background-Evidence offen |
-| Usage Limit | Android usage enforcement | DeviceActivitySchedule vorhanden | P0 offen: DeviceActivityMonitor Extension |
-| Aufgaben | Anzeige/Review/Proof Flow | Parent Review vorhanden, Child Task-Liste vorhanden | P0 offen: Task Photo Upload |
+| Usage Limit | Android usage enforcement | DeviceActivityMonitor-Extension + Threshold-Event | Repo-seitig vergleichbar; Device-E2E offen (Mac) |
+| Aufgaben | Anzeige/Review/Proof Flow | Parent Review + Child Task-Liste + Foto-Upload (TaskProofView) | Repo-seitig vergleichbar; Device-E2E offen (Mac) |
 | Abo | Billing/Backend Verify | StoreKit2/Backend Verify | Source vorhanden, ASC Sandbox offen |
 | Release Automation | Play-Gates und AAB-Build | `ios:readiness` Gate, Remote-Mac-Agent Vertrag | Repo-Gate vorhanden, Mac-Adapter offen |
 
@@ -35,15 +35,15 @@ iPhone/iOS soll auf ein mit Android vergleichbares Niveau gebracht werden. Repo-
 
 ## Geplante P0-Implementierungen vor iOS Release
 
-1. DeviceActivityMonitor Extension
+1. DeviceActivityMonitor Extension — **Repo-seitig umgesetzt**
 - Ziel: Daily usage limits wirklich erzwingen, nicht nur Schedule starten.
-- Umsetzung: Xcode Target/Extension anlegen, Threshold Events verarbeiten, ManagedSettings bei Limit erreichen setzen, Events an `publishDeviceEvent` melden.
-- Nachweis: Xcode Build, Unit/XCUITest soweit moeglich, physisches iPhone/iPad mit Limit-Ueberschreitung.
+- Umsetzung (erledigt): `iosChildApp/DeviceActivityMonitorExtension/` (Principal-Class + Info.plist + Entitlement), Threshold-Event in `AppBlockingManager.applyUsageRules`, Shield in `eventDidReachThreshold`, Cross-Prozess-Flag `SharedPolicyDefaults` (App-Group), Reporting via `publishDeviceEvent` in `CommandSyncService.reportLimitReachedIfNeeded`. Statischer Test: `test/ios-deviceactivity-monitor-contract.test.ts`.
+- Offen (Mac): Extension-Target in Xcode anlegen, physisches iPhone/iPad mit Limit-Ueberschreitung.
 
-2. Task Photo Upload
+2. Task Photo Upload — **Repo-seitig umgesetzt**
 - Ziel: Aufgaben-Proof wie auf Android.
-- Umsetzung: PhotosUI/Kamera-Auswahl, Firebase Storage Upload, `task_proof` Event, Parent Review Anzeige pruefen.
-- Nachweis: Child Upload, Backend Event, Parent Task Review, Storage Rules.
+- Umsetzung (erledigt): `TaskProofView` (PhotosUI) + `MainChildView`-Sheet, Upload über `PhotoProofService` → Storage `proofs/{childId}/{taskId}/` → `completeTask`. `FirebaseStorage` ins Target, Lokalisierung de/en/es/fr/it. Statischer Test: `test/ios-task-photo-upload-contract.test.ts`.
+- Offen (Mac): `PhotoProofService.swift` ins App-Target "Compile Sources", realer Upload/Review-Nachweis am Gerät.
 
 3. Remote-Mac-Agent oder Xcode Cloud
 - Ziel: wiederholbarer iOS Build/Test/Upload-Nachweis.

@@ -52,7 +52,8 @@ final class AppBlockingManager: ObservableObject {
 
     /// Applies the full [PolicyState] to ManagedSettings + DeviceActivity.
     func applyPolicy(_ policy: PolicyState) {
-        applyUsageRules(policy.usageRules)
+        let monitored = Set(ScreenTimeAppBlacklistCodec.decodeTokens(from: policy.appBlacklist))
+        applyUsageRules(policy.usageRules, monitoredApplications: monitored)
         applyShields(isLocked: policy.isLocked, appBlacklist: policy.appBlacklist)
     }
 
@@ -134,11 +135,18 @@ final class AppBlockingManager: ObservableObject {
         store.shield.applicationCategories = nil
     }
 
-    private func applyUsageRules(_ rules: PolicyState.UsageRulesState) {
+    private func applyUsageRules(
+        _ rules: PolicyState.UsageRulesState,
+        monitoredApplications: Set<ApplicationToken> = []
+    ) {
         guard isAuthorized else { return }
 
         // Cancel existing schedule
         activityCenter.stopMonitoring([activityName])
+
+        // Persist the configured limit so the DeviceActivityMonitor extension
+        // (separate process) agrees with the host on the active limit.
+        SharedPolicyDefaults.setDailyLimitMinutes(rules.dailyLimitMinutes)
 
         guard let dailyLimit = rules.dailyLimitMinutes, dailyLimit > 0 else { return }
 
@@ -148,10 +156,29 @@ final class AppBlockingManager: ObservableObject {
             intervalEnd: DateComponents(hour: 23, minute: 59),
             repeats: true
         )
+
+        // Register a usage-threshold event. Without it the schedule starts but
+        // nothing fires, so the limit is never enforced. When usage crosses the
+        // threshold iOS launches the DeviceActivityMonitor extension's
+        // `eventDidReachThreshold`, which applies the shield.
+        //
+        // The monitored set comes from the parent's FamilyActivityPicker
+        // selection (same token model as the app blacklist). A device-wide
+        // screen-time limit therefore requires that selection to include the
+        // relevant apps/categories — mirroring the blacklist limitation.
+        let limitEventName = DeviceActivityEvent.Name("minimaster.daily.limit")
+        let limitEvent = DeviceActivityEvent(
+            applications: monitoredApplications,
+            categories: [],
+            webDomains: [],
+            threshold: DateComponents(minute: dailyLimit)
+        )
+
         do {
             try activityCenter.startMonitoring(
                 activityName,
-                during: schedule
+                during: schedule,
+                events: [limitEventName: limitEvent]
             )
         } catch {
             // DeviceActivity monitoring may fail if not authorized or during testing

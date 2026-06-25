@@ -13,6 +13,8 @@ struct MainChildView: View {
     @State private var isLoadingTasks = false
     @State private var isRequestingFamilyControls = false
     @State private var taskError: Error?
+    @State private var showTaskError = false
+    @State private var proofTask: ChildTask?
     @State private var showUnpairAlert = false
 
     var body: some View {
@@ -32,6 +34,14 @@ struct MainChildView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
             .refreshable { await refresh() }
+            .sheet(item: $proofTask) { task in
+                TaskProofView(
+                    childId: authService.currentChildId ?? "",
+                    task: task
+                ) {
+                    Task { await loadTasks() }
+                }
+            }
             .alert("childMain.unpair.alert.title", isPresented: $showUnpairAlert) {
                 Button("childMain.unpair.alert.confirm", role: .destructive) {
                     Task { await unpairDevice() }
@@ -39,6 +49,12 @@ struct MainChildView: View {
                 Button("childMain.unpair.alert.cancel", role: .cancel) {}
             } message: {
                 Text("childMain.unpair.alert.message")
+            }
+            .alert("childMain.tasks.error.title", isPresented: $showTaskError) {
+                Button("childMain.tasks.error.ok", role: .cancel) {}
+            } message: {
+                Text(taskError?.localizedDescription
+                    ?? NSLocalizedString("childMain.tasks.error.generic", comment: ""))
             }
             .task {
                 await blockingManager.checkAuthorization()
@@ -142,7 +158,9 @@ struct MainChildView: View {
                     .foregroundColor(.secondary)
             } else {
                 ForEach(tasks) { task in
-                    TaskRowView(task: task)
+                    TaskRowView(task: task) {
+                        proofTask = task
+                    }
                 }
             }
         }
@@ -199,6 +217,7 @@ struct MainChildView: View {
             tasks = try await syncService.fetchTasks(childId: childId)
         } catch {
             taskError = error
+            showTaskError = true
         }
     }
 
@@ -232,24 +251,37 @@ struct ChildTask: Identifiable {
 
 private struct TaskRowView: View {
     let task: ChildTask
+    /// Invoked when the child taps the proof button (only shown while pending).
+    var onSubmitProof: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(task.description)
-                .font(.body)
-            HStack {
-                Text(statusLabel)
-                    .font(.caption)
-                    .foregroundColor(statusColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(statusColor.opacity(0.15))
-                    .cornerRadius(6)
-                if let deadline = task.deadline {
-                    Text("Fällig: \(deadline.formatted(date: .abbreviated, time: .omitted))")
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.description)
+                    .font(.body)
+                HStack {
+                    Text(statusLabel)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(statusColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(statusColor.opacity(0.15))
+                        .cornerRadius(6)
+                    if let deadline = task.deadline {
+                        Text("Fällig: \(deadline.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
+            }
+            Spacer()
+            if task.status == "pending" {
+                Button(action: onSubmitProof) {
+                    Image(systemName: "camera.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(Text("childMain.proof.button"))
             }
         }
         .padding(.vertical, 4)
