@@ -148,7 +148,7 @@ Since this is a client-side application, you can host it on any static web serve
 
 ### Option 3: Local Development
 For testing and development:
-1. Use a simple HTTP server like `python -m http.server` or `npx http-server`
+1. Use a simple HTTP server like `python3 -m http.server` (Windows fallback: `python -m http.server`) or `npx http-server`
 2. Navigate to the web-control directory
 3. Run the server and access via localhost
 

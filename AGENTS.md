@@ -23,16 +23,18 @@ subset of the products can actually run; the rest need hardware/OS that is unava
   `admin-panel/simple.html` loads with no auth.
 
 ### Operator server (important gotcha)
-- Start it with `python3 python_admin/app.py` (this is what `./start.sh` effectively does).
-  Do **NOT** run `python3 -m python_admin.app` — module mode fails with
-  `ModuleNotFoundError: No module named 'acceptance_runner'` because `app.py` imports its
-  sibling modules by bare name and relies on the script's directory being on `sys.path`.
+- Supported start paths from the repo root:
+  - `./start.sh` (Linux/cloud)
+  - `start.bat` (Windows)
+  - direct start via `python python_admin/app.py` or `python -m python_admin.app`
+- On the Linux cloud VM, only `python3` is on PATH (no `python`), so use the equivalent
+  `python3 ...` commands there (for example `python3 python_admin/app.py` or
+  `python3 -m python_admin.app`).
 - It serves on `http://127.0.0.1:8765`. Health check: `GET /api/runtime-info`.
 - Its `/api/*` endpoints work without Firebase. The console's core action — orchestrating QA
   suites — is reachable via `POST /api/suites/run` with `{"suiteId": "..."}`, then poll
   `GET /api/suites/status/<runId>`. Suite ids come from `GET /api/suites` (e.g.
   `backend-build`, `backend-lint`). These shell out to the real `npm run ...` commands.
-- Only `python3` is on PATH (no `python`).
 
 ### Firebase emulator caveat
 - The Firestore emulator starts fine, but the **Functions emulator fails to load functions**

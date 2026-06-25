@@ -67,6 +67,8 @@ node scripts/setup-admin.js <email> <passwort>
 Das Panel kann weiterhin statisch mit einem beliebigen HTTP-Server gestartet werden, z. B.:
 
 ```bash
+python3 -m http.server 8080
+# Windows fallback:
 python -m http.server 8080
 ```
 
