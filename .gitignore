@@ -83,6 +83,9 @@ admin-panel.zip
 *.pyo
 *.pyd
 
+# Python operator runtime logs (local diagnostics)
+python_admin/logs/*.jsonl
+
 # Swift / Xcode build artefacts
 **/.build/
 *.xcuserdata/
