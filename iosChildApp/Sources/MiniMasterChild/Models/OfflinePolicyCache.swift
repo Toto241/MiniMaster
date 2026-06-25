@@ -11,6 +11,7 @@ final class OfflinePolicyCache: ObservableObject {
     private let policyStore: PolicyStore
     private let defaults = UserDefaults.standard
     private let lastKnownServerVersionKey = "minimaster.cache.lastKnownServerVersion"
+    private let lastSuccessfulSyncKey = "minimaster.cache.lastSuccessfulSync"
 
     private let networkMonitor = NWPathMonitor()
     private let networkQueue = DispatchQueue(label: "minimaster.cache.network")
@@ -87,15 +88,27 @@ final class OfflinePolicyCache: ObservableObject {
         case expiredSafeMode   // no server contact for > safeModeThresholdSeconds
     }
 
-    /// Classifies the cached policy, mirroring Android `assessFreshness`:
-    /// - no cached policy (`cachedAt == nil`) → `.expiredSafeMode` (fail-safe: a
-    ///   paired device with no policy locks down rather than running open),
+    /// Records a successful server contact (sync). Must be called on **every**
+    /// successful sync — including `upToDate` syncs where the policy did not
+    /// change and `PolicyStore.cachedAt` is therefore NOT updated. Without this,
+    /// a device that keeps syncing an unchanged policy would falsely expire into
+    /// safe mode after 72 h despite continuous server contact.
+    func recordSuccessfulSync(now: Date = Date()) {
+        defaults.set(now, forKey: lastSuccessfulSyncKey)
+    }
+
+    /// Classifies the cached policy, mirroring Android `assessFreshness`. Uses the
+    /// most recent successful-sync timestamp (preferred — updated on every sync,
+    /// even `upToDate` ones) and falls back to `PolicyStore.cachedAt`:
+    /// - no contact timestamp at all → `.expiredSafeMode` (fail-safe: a paired
+    ///   device with no policy locks down rather than running open),
     /// - negative age (clock skew) → treated benignly as `.fresh`,
     /// - within the staleness window → `.fresh`,
     /// - within the 72 h safe-mode window → `.staleButUsable`,
     /// - older → `.expiredSafeMode`.
     func freshness(now: Date = Date(), stalenessThresholdSeconds: Int = 300) -> Freshness {
-        guard let cachedAt = policyStore.cachedAt else { return .expiredSafeMode }
+        let lastSync = defaults.object(forKey: lastSuccessfulSyncKey) as? Date
+        guard let cachedAt = lastSync ?? policyStore.cachedAt else { return .expiredSafeMode }
         let elapsed = now.timeIntervalSince(cachedAt)
         if elapsed < 0 { return .fresh }
         if elapsed > TimeInterval(Self.safeModeThresholdSeconds) { return .expiredSafeMode }

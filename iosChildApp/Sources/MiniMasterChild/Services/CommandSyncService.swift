@@ -146,6 +146,10 @@ final class CommandSyncService: ObservableObject {
             }
             pendingCommandCount = 0
             lastSyncDate = Date()
+            // Record server contact on every success (incl. upToDate syncs) so the
+            // 72 h offline safe-mode timer reflects real contact, not just policy
+            // changes (PolicyStore.cachedAt only moves when the policy changes).
+            offlinePolicyCache.recordSuccessfulSync()
         } catch {
             syncError = error
             if policyStore.lastSyncDate == nil ||
@@ -181,6 +185,10 @@ final class CommandSyncService: ObservableObject {
             } while cursor != nil && iterations < maxIterations
             pendingCommandCount = 0
             lastSyncDate = Date()
+            // Record server contact on every success (incl. upToDate syncs) so the
+            // 72 h offline safe-mode timer reflects real contact, not just policy
+            // changes (PolicyStore.cachedAt only moves when the policy changes).
+            offlinePolicyCache.recordSuccessfulSync()
         } catch {
             syncError = error
             enforceOfflineSafeModeIfNeeded()

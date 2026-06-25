@@ -30,8 +30,21 @@ describe("iOS offline safe-mode fallback contract", () => {
     expect(cache).toContain("func enforceOfflineFallbackIfExpired");
     expect(cache).toContain("func safeModePolicy");
     expect(cache).toContain("isLocked: true");
-    // No cached policy is fail-safe (locked), matching Android assessFreshness.
-    expect(cache).toContain("guard let cachedAt = policyStore.cachedAt else { return .expiredSafeMode }");
+    // No contact timestamp at all is fail-safe (locked), matching Android.
+    expect(cache).toContain("guard let cachedAt = lastSync ?? policyStore.cachedAt else { return .expiredSafeMode }");
+  });
+
+  it("times the 72h window off real server contact, not just policy changes", () => {
+    const cache = read("iosChildApp/Sources/MiniMasterChild/Models/OfflinePolicyCache.swift");
+    const sync = read("iosChildApp/Sources/MiniMasterChild/Services/CommandSyncService.swift");
+    // freshness prefers the persisted last-successful-sync over cachedAt, which
+    // only moves on policy changes — otherwise an unchanged-but-online device
+    // would falsely lock after 72h.
+    expect(cache).toContain("func recordSuccessfulSync");
+    expect(cache).toContain("defaults.object(forKey: lastSuccessfulSyncKey) as? Date");
+    // Recorded on every successful sync (both sync paths).
+    const records = sync.match(/offlinePolicyCache\.recordSuccessfulSync\(\)/g) ?? [];
+    expect(records.length).toBeGreaterThanOrEqual(2);
   });
 
   it("wires the fallback into failed syncs and the foreground heartbeat", () => {
