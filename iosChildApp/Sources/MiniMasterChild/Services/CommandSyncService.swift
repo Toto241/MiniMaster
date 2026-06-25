@@ -27,6 +27,7 @@ final class CommandSyncService: ObservableObject {
     private let policyStore: PolicyStore
     private let blockingManager: AppBlockingManager
     private let offlinePolicyCache: OfflinePolicyCache
+    private let tamperMonitor = TamperMonitor()
     private var childId: String?
 
     private let networkMonitor = NWPathMonitor()
@@ -91,6 +92,7 @@ final class CommandSyncService: ObservableObject {
         await syncPolicySnapshot(childId: id)
         await fetchAndApplyAllCommands(childId: id)
         await reportUsageLimitReachedIfNeeded(childId: id)
+        await reportTamperIfDetected(childId: id)
         await reportHeartbeat(childId: id)
         startForegroundHeartbeat()
     }
@@ -235,6 +237,31 @@ final class CommandSyncService: ObservableObject {
         } catch { /* non-fatal */ }
     }
 
+    /// iOS anti-tamper: if Family Controls authorization was revoked (the only
+    /// tamper vector iOS exposes), report it to the parent so silent enforcement
+    /// loss is visible. Routed through `reportTamperEvent` (which alerts the
+    /// parent via FCM and writes to `tamperEvents`), not the device-event log.
+    /// Only acknowledged on a successful report so a failed one is re-detected and
+    /// retried on the next pass.
+    func reportTamperIfDetected(childId: String) async {
+        tamperMonitor.recordIfApproved()
+        guard tamperMonitor.isRevoked() else { return }
+        do {
+            try await client.reportTamperEvent(
+                childId: childId,
+                eventType: "family_controls_revoked"
+            )
+            tamperMonitor.markRevocationReported()
+        } catch { /* non-fatal: re-detected and retried on next pass */ }
+    }
+
+    /// Records that Family Controls authorization is currently approved, so a
+    /// later revocation can be detected. Called right after the child grants
+    /// authorization (and on every successful tamper check).
+    func recordAuthorizationIfApproved() {
+        tamperMonitor.recordIfApproved()
+    }
+
     /// Drains the "daily usage limit reached" flag set by the
     /// `DeviceActivityMonitorExtension` (separate process) and reports it to the
     /// backend. Idempotent per child per day so a re-foreground does not double
@@ -330,6 +357,7 @@ final class CommandSyncService: ObservableObject {
     private func sendForegroundHeartbeat() async {
         guard let id = childId else { return }
         await reportHeartbeat(childId: id)
+        await reportTamperIfDetected(childId: id)
         enforceOfflineSafeModeIfNeeded()
     }
 
