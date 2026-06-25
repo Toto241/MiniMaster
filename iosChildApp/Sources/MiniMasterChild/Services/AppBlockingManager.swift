@@ -39,6 +39,19 @@ final class AppBlockingManager: ObservableObject {
     // stores). The app only clears it here when the limit actually changes.
     private let dailyLimitStore = ManagedSettingsStore(named: ManagedSettingsStore.Name("minimaster.dailyLimit"))
 
+    // Application tokens (parent's FamilyActivityPicker selection, decoded from the
+    // policy app-blacklist) that the daily-usage-limit DeviceActivityEvent counts.
+    // Tracked here so both the full-policy sync and incremental commands keep the
+    // monitored set in sync for `applyUsageRules`.
+    private var monitoredApplications: Set<ApplicationToken> = []
+
+    // Last usage-rules state applied, so an incremental command that only changes
+    // the monitored app set can re-register the DeviceActivityEvent without waiting
+    // for a usage-rules command or a full policy sync.
+    private var lastUsageRules = PolicyState.UsageRulesState(
+        dailyLimitMinutes: nil, bedtimeStart: nil, bedtimeEnd: nil
+    )
+
     init() {
         Task { await checkAuthorization() }
     }
@@ -62,6 +75,7 @@ final class AppBlockingManager: ObservableObject {
 
     /// Applies the full [PolicyState] to ManagedSettings + DeviceActivity.
     func applyPolicy(_ policy: PolicyState) {
+        monitoredApplications = Set(ScreenTimeAppBlacklistCodec.decodeTokens(from: policy.appBlacklist))
         applyUsageRules(policy.usageRules)
         applyShields(isLocked: policy.isLocked, appBlacklist: policy.appBlacklist)
     }
@@ -74,6 +88,9 @@ final class AppBlockingManager: ObservableObject {
             applyShields(isLocked: isLocked, appBlacklist: [])
         case .appBlacklist:
             let apps = command.payload["appBlacklist"]?.value as? [String] ?? []
+            monitoredApplications = Set(ScreenTimeAppBlacklistCodec.decodeTokens(from: apps))
+            // Re-register the usage-limit event so it monitors the new app set.
+            applyUsageRules(lastUsageRules)
             applyShields(isLocked: false, appBlacklist: apps)
         case .usageRules, .screenTime:
             applyUsageRules(PolicyState.UsageRulesState(
@@ -84,6 +101,9 @@ final class AppBlockingManager: ObservableObject {
         case .policyUpdate:
             let locked = command.payload["isLocked"]?.value as? Bool ?? false
             let apps = command.payload["appBlacklist"]?.value as? [String] ?? []
+            monitoredApplications = Set(ScreenTimeAppBlacklistCodec.decodeTokens(from: apps))
+            // Re-register the usage-limit event so it monitors the new app set.
+            applyUsageRules(lastUsageRules)
             applyShields(isLocked: locked, appBlacklist: apps)
         }
     }
@@ -94,6 +114,10 @@ final class AppBlockingManager: ObservableObject {
         store.shield.applicationCategories = nil
         store.shield.applications = nil
         dailyLimitStore.shield.applicationCategories = nil
+        monitoredApplications = []
+        lastUsageRules = PolicyState.UsageRulesState(
+            dailyLimitMinutes: nil, bedtimeStart: nil, bedtimeEnd: nil
+        )
         appBlacklistNotice = nil
         SharedPolicyDefaults.setDailyLimitMinutes(nil)
     }
@@ -147,6 +171,10 @@ final class AppBlockingManager: ObservableObject {
     }
 
     private func applyUsageRules(_ rules: PolicyState.UsageRulesState) {
+        // Remember the latest rules so a later app-set change can re-register
+        // the event with the same limit (see applyCommand).
+        lastUsageRules = rules
+
         guard isAuthorized else { return }
 
         // Cancel existing schedule
@@ -192,20 +220,20 @@ final class AppBlockingManager: ObservableObject {
         // that callback is where the shield is actually applied. Without an
         // `events:` entry the schedule alone never enforces anything.
         //
-        // ⚠️ SCAFFOLDING, NOT YET ENFORCING: the event is created with EMPTY
-        // application/category/web-domain sets, so DeviceActivity counts no usage
-        // and the threshold never fires on a real device. ApplicationToken /
-        // ActivityCategoryToken values cannot be constructed off-device — they
-        // only come from a parent `FamilyActivitySelection` (FamilyActivityPicker).
-        // To make the daily cap actually enforce, pass those tokens here:
-        //   DeviceActivityEvent(applications: selection.applicationTokens,
-        //                       categories: selection.categoryTokens,
-        //                       threshold: DateComponents(minute: dailyLimit))
-        // See AppBlacklistEnforcement / ScreenTimeAppBlacklistCodec for the same
-        // token constraint, and docs/IOS_ANDROID_PARITY_PLAN_2026-06-19.md.
+        // The monitored set is the parent's FamilyActivityPicker selection,
+        // decoded from the policy app-blacklist via `ScreenTimeAppBlacklistCodec`
+        // (the same tokens used for the blacklist shield). The daily cap therefore
+        // counts time spent in those parent-selected apps. ApplicationToken values
+        // cannot be constructed off-device, so if the parent selected nothing the
+        // set is empty and the event cannot fire — a documented no-op until a
+        // selection exists. See docs/IOS_ANDROID_PARITY_PLAN_2026-06-19.md.
+        //
         // Normalize into hours+minutes rather than passing a raw minute count that
         // can exceed 59, which DateComponents/DeviceActivity may handle unevenly.
         let limitEvent = DeviceActivityEvent(
+            applications: monitoredApplications,
+            categories: [],
+            webDomains: [],
             threshold: DateComponents(hour: dailyLimit / 60, minute: dailyLimit % 60)
         )
 

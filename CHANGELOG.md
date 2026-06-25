@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **iOS-Tageslimit erzwingt jetzt real**: `AppBlockingManager.applyUsageRules` registriert das `DeviceActivityEvent` nun mit den vom Elternteil per FamilyActivityPicker ausgewählten App-Tokens (dekodiert aus dem Policy-App-Blacklist via `ScreenTimeAppBlacklistCodec`) statt mit leeren Token-Sets. Vorher war das Event reines „scaffolding" — DeviceActivity zählte keine Nutzung und der Schwellwert feuerte nie. Die Tokens werden über `applyPolicy` sowie die `appBlacklist`/`policyUpdate`-Commands konsistent in `monitoredApplications` gehalten. Bei leerer Auswahl bleibt es ein dokumentierter No-op. Contract-Test `test/ios-deviceactivity-monitor-contract.test.ts` erweitert.
 - **Einrichtungs-Assistenten (Wizards)**: Mehrere geführte Wizards für die Einrichtung von MiniMaster — von null beginnend oder je Konfiguration.
   - **Backend** `src/wizard-progress.ts`: generischer Fortschritts-Tracker (`getWizardProgress` / `setWizardProgress` / `listWizardProgress`) pro Nutzer in `wizardProgress/{uid}` (validiert, größenbegrenzt, nur nicht-geheime Daten), neue Audit-Aktion `wizard.progress_update`, Firestore-Deny-Regel (nur Cloud Functions).
   - **Wizard-Hub** (`admin-panel/wizards.html`): zentrale Übersicht aller Assistenten mit Live-Fortschritt und Projekt-Readiness; verlinkt aus dem Betreiber-Dashboard.
