@@ -52,6 +52,12 @@ describe("iOS child task photo upload contract", () => {
     expect(svc).toContain('httpsCallable("completeTask")');
     expect(svc).toContain('"taskId": taskId');
     expect(svc).toContain('"photoUrl": urlString');
+
+    // Ensure `childId` is used for the storage path only, not sent to
+    // completeTask (backend derives UID from auth context).
+    const payloadBlock =
+      svc.match(/httpsCallable\("completeTask"\)\.call\(\[([\s\S]*?)\]\)/)?.[1] ?? "";
+    expect(payloadBlock).not.toContain("childId");
   });
 
   it("adds proof localization keys to all five languages", () => {
