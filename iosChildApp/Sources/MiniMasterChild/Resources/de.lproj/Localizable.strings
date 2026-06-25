@@ -36,3 +36,16 @@
 "childMain.unpair.alert.message" = "Das Gerät wird von der Eltern-App getrennt.";
 "childMain.unpair.alert.confirm" = "Abmelden";
 "childMain.unpair.alert.cancel" = "Abbrechen";
+
+/* Task photo proof */
+"childMain.task.action.submitProof" = "Foto-Beweis senden";
+"childMain.tasks.errorTitle" = "Aufgaben konnten nicht geladen werden";
+"childMain.proof.section" = "Aufgabe";
+"childMain.proof.navTitle" = "Foto-Beweis";
+"childMain.proof.pick" = "Foto auswählen";
+"childMain.proof.preview" = "Vorschau des ausgewählten Fotos";
+"childMain.proof.uploading" = "Foto wird hochgeladen…";
+"childMain.proof.submit" = "Senden";
+"childMain.proof.cancel" = "Abbrechen";
+"childMain.proof.ok" = "OK";
+"childMain.proof.error.load" = "Das Foto konnte nicht geladen werden.";
