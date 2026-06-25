@@ -107,11 +107,18 @@ final class PhotoProofService: ObservableObject {
         let downloadURL = try await ref.downloadURL()
         let urlString = downloadURL.absoluteString
 
-        // 5. Call completeTask Cloud Function
-        _ = try await functions.httpsCallable("completeTask").call([
-            "taskId": taskId,
-            "photoUrl": urlString
-        ])
+        // 5. Call completeTask Cloud Function. If it fails, best-effort delete the
+        //    object we just uploaded so a retry does not orphan blobs (each retry
+        //    writes a new timestamped path) and Storage costs stay bounded.
+        do {
+            _ = try await functions.httpsCallable("completeTask").call([
+                "taskId": taskId,
+                "photoUrl": urlString
+            ])
+        } catch {
+            try? await ref.delete()
+            throw error
+        }
 
         lastUploadedUrl = urlString
         return urlString

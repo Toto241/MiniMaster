@@ -36,3 +36,16 @@
 "childMain.unpair.alert.message" = "L'appareil sera déconnecté de l'application parent.";
 "childMain.unpair.alert.confirm" = "Désenregistrer";
 "childMain.unpair.alert.cancel" = "Annuler";
+
+/* Task photo proof */
+"childMain.task.action.submitProof" = "Envoyer la preuve photo";
+"childMain.tasks.errorTitle" = "Impossible de charger les tâches";
+"childMain.proof.section" = "Tâche";
+"childMain.proof.navTitle" = "Preuve photo";
+"childMain.proof.pick" = "Choisir une photo";
+"childMain.proof.preview" = "Aperçu de la photo sélectionnée";
+"childMain.proof.uploading" = "Envoi de la photo…";
+"childMain.proof.submit" = "Envoyer";
+"childMain.proof.cancel" = "Annuler";
+"childMain.proof.ok" = "OK";
+"childMain.proof.error.load" = "La photo n'a pas pu être chargée.";
