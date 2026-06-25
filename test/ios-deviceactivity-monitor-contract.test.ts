@@ -57,6 +57,10 @@ describe("iOS DeviceActivityMonitor enforcement contract", () => {
     expect(mgr).toContain("threshold:");
     expect(mgr).toContain("events:");
     expect(mgr).toContain("SharedPolicyDefaults.setDailyLimitMinutes");
+    // The threshold event must monitor the parent-selected app tokens, otherwise
+    // DeviceActivity counts no usage and the cap never fires.
+    expect(mgr).toContain("applications: monitoredApplications");
+    expect(mgr).toContain("ScreenTimeAppBlacklistCodec.decodeTokens(from: policy.appBlacklist)");
   });
 
   it("shares limit + reached-flag through one App Group across app and extension", () => {
