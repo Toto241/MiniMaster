@@ -216,13 +216,22 @@ final class CommandSyncService: ObservableObject {
     /// backend. Idempotent per child per day so a re-foreground does not double
     /// count. Called on app start and FCM wake-up.
     func reportUsageLimitReachedIfNeeded(childId: String) async {
-        guard let event = SharedPolicyDefaults.consumeLimitReachedFlag() else { return }
-        let key = "usagelimit-\(childId)-\(Int(Date().timeIntervalSince1970 / 86400))" // daily bucket
+        guard let flag = SharedPolicyDefaults.consumeLimitReachedFlag() else { return }
+        // Bucket by the day the limit was actually reached (atMs from the
+        // extension), not the day it is reported, so a report deferred across
+        // midnight is still idempotent for the correct day. Fall back to now if the
+        // timestamp is missing.
+        let reachedSeconds = flag.atMs > 0 ? flag.atMs / 1000 : Date().timeIntervalSince1970
+        // Bucket by the device's *local* calendar day (the daily limit resets at
+        // local midnight, matching the DeviceActivitySchedule), so the idempotency
+        // key doesn't collide across the UTC day boundary in non-UTC timezones.
+        let tzOffset = Double(TimeZone.current.secondsFromGMT(for: Date(timeIntervalSince1970: reachedSeconds)))
+        let key = "usagelimit-\(childId)-\(Int((reachedSeconds + tzOffset) / 86400))" // local daily bucket
         do {
             try await client.publishDeviceEvent(
                 childId: childId,
                 eventType: "usage_limit_reached",
-                payload: ["event": event, "ts": Int(Date().timeIntervalSince1970)],
+                payload: ["event": flag.event, "ts": Int(reachedSeconds)],
                 idempotencyKey: key
             )
         } catch { /* non-fatal */ }
