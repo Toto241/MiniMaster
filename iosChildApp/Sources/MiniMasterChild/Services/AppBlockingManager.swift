@@ -45,6 +45,13 @@ final class AppBlockingManager: ObservableObject {
     // monitored set in sync for `applyUsageRules`.
     private var monitoredApplications: Set<ApplicationToken> = []
 
+    // Last usage-rules state applied, so an incremental command that only changes
+    // the monitored app set can re-register the DeviceActivityEvent without waiting
+    // for a usage-rules command or a full policy sync.
+    private var lastUsageRules = PolicyState.UsageRulesState(
+        dailyLimitMinutes: nil, bedtimeStart: nil, bedtimeEnd: nil
+    )
+
     init() {
         Task { await checkAuthorization() }
     }
@@ -82,6 +89,8 @@ final class AppBlockingManager: ObservableObject {
         case .appBlacklist:
             let apps = command.payload["appBlacklist"]?.value as? [String] ?? []
             monitoredApplications = Set(ScreenTimeAppBlacklistCodec.decodeTokens(from: apps))
+            // Re-register the usage-limit event so it monitors the new app set.
+            applyUsageRules(lastUsageRules)
             applyShields(isLocked: false, appBlacklist: apps)
         case .usageRules, .screenTime:
             applyUsageRules(PolicyState.UsageRulesState(
@@ -93,6 +102,8 @@ final class AppBlockingManager: ObservableObject {
             let locked = command.payload["isLocked"]?.value as? Bool ?? false
             let apps = command.payload["appBlacklist"]?.value as? [String] ?? []
             monitoredApplications = Set(ScreenTimeAppBlacklistCodec.decodeTokens(from: apps))
+            // Re-register the usage-limit event so it monitors the new app set.
+            applyUsageRules(lastUsageRules)
             applyShields(isLocked: locked, appBlacklist: apps)
         }
     }
@@ -103,6 +114,10 @@ final class AppBlockingManager: ObservableObject {
         store.shield.applicationCategories = nil
         store.shield.applications = nil
         dailyLimitStore.shield.applicationCategories = nil
+        monitoredApplications = []
+        lastUsageRules = PolicyState.UsageRulesState(
+            dailyLimitMinutes: nil, bedtimeStart: nil, bedtimeEnd: nil
+        )
         appBlacklistNotice = nil
         SharedPolicyDefaults.setDailyLimitMinutes(nil)
     }
@@ -156,6 +171,10 @@ final class AppBlockingManager: ObservableObject {
     }
 
     private func applyUsageRules(_ rules: PolicyState.UsageRulesState) {
+        // Remember the latest rules so a later app-set change can re-register
+        // the event with the same limit (see applyCommand).
+        lastUsageRules = rules
+
         guard isAuthorized else { return }
 
         // Cancel existing schedule
