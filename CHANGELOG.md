@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **iOS Offline-Safe-Mode (72 h)**: `OfflinePolicyCache` (iOS Kind) erhält die fehlende `EXPIRED_SAFE_MODE`-Stufe analog zur Android-Version. Neue Freshness-Tiers (`fresh`/`staleButUsable`/`expiredSafeMode`), 72-h-Schwelle (`safeModeThresholdSeconds`, lock-step mit Android `DEFAULT_HARD_EXPIRE_MS`), `enforceOfflineFallbackIfExpired` erzwingt bei >72 h ohne Serverkontakt eine Safe-Mode-Policy (Voll-Lock, leere Whitelist, 0-Limit); kein Serverkontakt-Cache → fail-safe gesperrt (wie Android). Verdrahtet in `CommandSyncService` (beide Fehlerpfade von Sync + Foreground-Heartbeat); die gecachte echte Policy bleibt erhalten und wird beim nächsten erfolgreichen Sync wiederhergestellt. Contract-Test `test/ios-offline-safemode-contract.test.ts`.
 - **Einrichtungs-Assistenten (Wizards)**: Mehrere geführte Wizards für die Einrichtung von MiniMaster — von null beginnend oder je Konfiguration.
   - **Backend** `src/wizard-progress.ts`: generischer Fortschritts-Tracker (`getWizardProgress` / `setWizardProgress` / `listWizardProgress`) pro Nutzer in `wizardProgress/{uid}` (validiert, größenbegrenzt, nur nicht-geheime Daten), neue Audit-Aktion `wizard.progress_update`, Firestore-Deny-Regel (nur Cloud Functions).
   - **Wizard-Hub** (`admin-panel/wizards.html`): zentrale Übersicht aller Assistenten mit Live-Fortschritt und Projekt-Readiness; verlinkt aus dem Betreiber-Dashboard.

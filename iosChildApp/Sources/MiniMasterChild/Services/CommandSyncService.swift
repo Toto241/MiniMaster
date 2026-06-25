@@ -157,6 +157,7 @@ final class CommandSyncService: ObservableObject {
                     policyStore.lastSyncDate?.description ?? "never"
                 )
             }
+            enforceOfflineSafeModeIfNeeded()
         }
     }
 
@@ -182,6 +183,7 @@ final class CommandSyncService: ObservableObject {
             lastSyncDate = Date()
         } catch {
             syncError = error
+            enforceOfflineSafeModeIfNeeded()
         }
     }
 
@@ -306,6 +308,16 @@ final class CommandSyncService: ObservableObject {
     private func sendForegroundHeartbeat() async {
         guard let id = childId else { return }
         await reportHeartbeat(childId: id)
+        enforceOfflineSafeModeIfNeeded()
+    }
+
+    /// Enters offline safe mode (full lock) if the cached policy has had no
+    /// server contact for > 72 h. Called after failed syncs and on each
+    /// foreground heartbeat so a long-offline device locks itself even without a
+    /// fresh server policy. The cached real policy is preserved and restored on
+    /// the next successful sync.
+    private func enforceOfflineSafeModeIfNeeded() {
+        offlinePolicyCache.enforceOfflineFallbackIfExpired { blockingManager.applyPolicy($0) }
     }
 
     @objc private func onFcmTokenRefreshed(_ notification: Notification) {
