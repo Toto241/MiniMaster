@@ -33,6 +33,12 @@ final class AppBlockingManager: ObservableObject {
     // daily usage cap (see DeviceActivityMonitorExtension.eventDidReachThreshold).
     private let dailyLimitEventName = DeviceActivityEvent.Name("minimaster.dailyLimitReached")
 
+    // Dedicated, *named* store for the daily-usage-limit shield — the same store
+    // the monitor extension writes to. Kept separate from `store` (lock/blacklist)
+    // so the two shields never clobber each other (iOS unions shields across
+    // stores). The app only clears it here when the limit actually changes.
+    private let dailyLimitStore = ManagedSettingsStore(named: ManagedSettingsStore.Name("minimaster.dailyLimit"))
+
     init() {
         Task { await checkAuthorization() }
     }
@@ -87,6 +93,7 @@ final class AppBlockingManager: ObservableObject {
         activityCenter.stopMonitoring([activityName])
         store.shield.applicationCategories = nil
         store.shield.applications = nil
+        dailyLimitStore.shield.applicationCategories = nil
         appBlacklistNotice = nil
         SharedPolicyDefaults.setDailyLimitMinutes(nil)
     }
@@ -145,8 +152,17 @@ final class AppBlockingManager: ObservableObject {
         // Cancel existing schedule
         activityCenter.stopMonitoring([activityName])
 
+        // Previously-active limit (from the shared suite) so we can detect a change
+        // and avoid lifting a shield that was legitimately applied earlier today.
+        let previousLimit = SharedPolicyDefaults.dailyLimitMinutes()
+
         guard let dailyLimit = rules.dailyLimitMinutes, dailyLimit > 0 else {
-            // No active limit — clear the value shared with the monitor extension.
+            // No active limit — clear the value shared with the monitor extension
+            // and unconditionally lift any usage-cap shield. Without a limit there
+            // must be no cap shield, and nil-ing is idempotent, so this also
+            // recovers from any inconsistent state where the shield outlived its
+            // limit (which would otherwise leave the device locked).
+            dailyLimitStore.shield.applicationCategories = nil
             SharedPolicyDefaults.setDailyLimitMinutes(nil)
             return
         }
@@ -154,6 +170,15 @@ final class AppBlockingManager: ObservableObject {
         // Share the active limit with the DeviceActivityMonitor extension, which
         // runs in a separate process and reads it from the App Group suite.
         SharedPolicyDefaults.setDailyLimitMinutes(dailyLimit)
+
+        // Only when the limit value actually changes do we lift any standing
+        // usage-cap shield, so a raised/lowered limit unblocks now and is
+        // re-enforced when the new threshold is hit. We deliberately do NOT clear
+        // it on an unchanged limit — that would unblock the device for the rest of
+        // the day after the cap was legitimately reached.
+        if previousLimit != dailyLimit {
+            dailyLimitStore.shield.applicationCategories = nil
+        }
 
         // Build a DeviceActivitySchedule spanning the full day
         let schedule = DeviceActivitySchedule(
@@ -178,8 +203,10 @@ final class AppBlockingManager: ObservableObject {
         //                       threshold: DateComponents(minute: dailyLimit))
         // See AppBlacklistEnforcement / ScreenTimeAppBlacklistCodec for the same
         // token constraint, and docs/IOS_ANDROID_PARITY_PLAN_2026-06-19.md.
+        // Normalize into hours+minutes rather than passing a raw minute count that
+        // can exceed 59, which DateComponents/DeviceActivity may handle unevenly.
         let limitEvent = DeviceActivityEvent(
-            threshold: DateComponents(minute: dailyLimit)
+            threshold: DateComponents(hour: dailyLimit / 60, minute: dailyLimit % 60)
         )
 
         do {

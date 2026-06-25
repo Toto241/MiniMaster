@@ -27,7 +27,12 @@ import Foundation
 /// (verified by `test/ios-deviceactivity-monitor-contract.test.ts`).
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
-    private let store = ManagedSettingsStore()
+    // Dedicated, *named* store so the daily-limit shield is isolated from the
+    // app's lock/blacklist shields (which use the default, unnamed store). iOS
+    // unions shields across stores, so the two enforce independently and the app
+    // re-applying its policy can no longer clobber the usage-cap shield (and vice
+    // versa). The same named store is cleared by the app when the limit changes.
+    private let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("minimaster.dailyLimit"))
 
     // Must match SharedPolicyDefaults.appGroupId / SharedPolicyDefaults.Keys.*
     private let appGroupId = "group.com.minimaster.childapp"
