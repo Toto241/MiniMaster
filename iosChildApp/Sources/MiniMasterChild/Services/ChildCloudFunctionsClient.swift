@@ -123,6 +123,18 @@ final class ChildCloudFunctionsClient {
         ])
     }
 
+    /// Reports an anti-tamper event to the parent. Unlike `publishDeviceEvent`
+    /// (which only writes to the device-event log), this writes to the child's
+    /// `tamperEvents` collection and pushes an FCM `tamper_alert` to the parent —
+    /// the only path that actually surfaces silent enforcement loss.
+    func reportTamperEvent(childId: String, eventType: String) async throws {
+        _ = try await functions.httpsCallable("reportTamperEvent").call([
+            "childId": childId,
+            "eventType": eventType,
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+        ])
+    }
+
     // MARK: - Heartbeat / Tasks
 
     func recordHeartbeat(childId: String) async throws {

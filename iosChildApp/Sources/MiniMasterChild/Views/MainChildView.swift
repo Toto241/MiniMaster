@@ -207,6 +207,9 @@ struct MainChildView: View {
         await blockingManager.requestAuthorization()
         if blockingManager.isAuthorized {
             blockingManager.applyPolicy(policyStore.policy)
+            // Remember the approved state so a later revocation is detectable as
+            // tamper (the only iOS tamper vector).
+            syncService.recordAuthorizationIfApproved()
         }
         isRequestingFamilyControls = false
     }
