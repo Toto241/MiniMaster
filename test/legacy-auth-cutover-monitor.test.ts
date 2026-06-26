@@ -131,4 +131,102 @@ describe("legacy auth cutover monitor", () => {
 
     await expect(isLegacyAuthCutoverEnabled()).resolves.toBe(true);
   });
+
+  it("does not mark the cutover ready while legacy usage is present", async () => {
+    // Every day reports one user with a numeric call count -> usage present.
+    mockUsageGet.mockImplementation(async () => ({
+      empty: false,
+      forEach: (cb: (doc: { data: () => { count: number } }) => void) => cb({ data: () => ({ count: 5 }) }),
+    }));
+    mockUsageLimit.mockReturnValue({ get: mockUsageGet });
+    mockUsageUsersCollection.mockReturnValue({ limit: mockUsageLimit });
+    mockUsageDoc.mockReturnValue({ collection: mockUsageUsersCollection });
+    mockUsageCollection.mockReturnValue({ doc: mockUsageDoc });
+    mockCollection.mockImplementation((name: string) => {
+      if (name === "legacy_auth_usage") return mockUsageCollection();
+      return { doc: mockDoc };
+    });
+    mockConfigSet.mockImplementation(async () => undefined);
+    mockDoc.mockReturnValue({ get: mockConfigGet, set: mockConfigSet, update: mockConfigUpdate });
+
+    const { legacyAuthCutoverMonitor } = require("../src/cutover-monitor");
+    const result = await legacyAuthCutoverMonitor.run({});
+
+    expect(result.cutoverReady).toBe(false);
+    expect(result.cutoverExecuted).toBe(false);
+    expect(result.daysWithUsage).toBe(14);
+    expect(result.totalCalls).toBe(70); // 14 days * 5 calls
+    expect(mockConfigUpdate).not.toHaveBeenCalled();
+    expect(mockConfigSet).toHaveBeenCalledWith(
+      expect.objectContaining({ legacyAuthCutoverReady: false, legacyAuthCutoverEnabled: false }),
+      { merge: true }
+    );
+  });
+
+  it("skips re-execution when the cutover was already executed", async () => {
+    mockUsageGet.mockImplementation(async () => ({ empty: true, forEach: jest.fn() }));
+    mockUsageLimit.mockReturnValue({ get: mockUsageGet });
+    mockUsageUsersCollection.mockReturnValue({ limit: mockUsageLimit });
+    mockUsageDoc.mockReturnValue({ collection: mockUsageUsersCollection });
+    mockUsageCollection.mockReturnValue({ doc: mockUsageDoc });
+    mockCollection.mockImplementation((name: string) => {
+      if (name === "legacy_auth_usage") return mockUsageCollection();
+      return { doc: mockDoc };
+    });
+    // Config already records an execution timestamp -> alreadyExecuted = true.
+    mockConfigGet.mockImplementation(async () => ({
+      exists: true,
+      data: () => ({ legacyAuthCutoverExecutedAt: "2026-01-01T00:00:00Z" }),
+    }));
+    mockConfigSet.mockImplementation(async () => undefined);
+    mockDoc.mockReturnValue({ get: mockConfigGet, set: mockConfigSet, update: mockConfigUpdate });
+
+    const { legacyAuthCutoverMonitor } = require("../src/cutover-monitor");
+    const result = await legacyAuthCutoverMonitor.run({});
+
+    expect(result.cutoverReady).toBe(true);
+    expect(result.cutoverExecuted).toBe(false);
+    expect(mockConfigUpdate).not.toHaveBeenCalled();
+  });
+
+  it("propagates errors from the config write", async () => {
+    mockUsageGet.mockImplementation(async () => ({ empty: true, forEach: jest.fn() }));
+    mockUsageLimit.mockReturnValue({ get: mockUsageGet });
+    mockUsageUsersCollection.mockReturnValue({ limit: mockUsageLimit });
+    mockUsageDoc.mockReturnValue({ collection: mockUsageUsersCollection });
+    mockUsageCollection.mockReturnValue({ doc: mockUsageDoc });
+    mockCollection.mockImplementation((name: string) => {
+      if (name === "legacy_auth_usage") return mockUsageCollection();
+      return { doc: mockDoc };
+    });
+    mockConfigSet.mockImplementation(async () => {
+      throw new Error("firestore write failed");
+    });
+    mockDoc.mockReturnValue({ get: mockConfigGet, set: mockConfigSet, update: mockConfigUpdate });
+
+    const { legacyAuthCutoverMonitor } = require("../src/cutover-monitor");
+    await expect(legacyAuthCutoverMonitor.run({})).rejects.toThrow(/firestore write failed/);
+  });
+
+  it("falls back to the env override when the config read throws", async () => {
+    mockDoc.mockReturnValue({
+      collection: jest.fn(() => ({ limit: jest.fn(() => ({ get: jest.fn(async () => ({ empty: true })) })) })),
+      get: jest.fn(async () => {
+        throw new Error("read failed");
+      }),
+      set: jest.fn(),
+      update: jest.fn(),
+    });
+
+    const { isLegacyAuthCutoverEnabled } = require("../src/cutover-monitor");
+
+    const prev = process.env.DISABLE_LEGACY_SECRETKEY_AUTH;
+    process.env.DISABLE_LEGACY_SECRETKEY_AUTH = "true";
+    try {
+      await expect(isLegacyAuthCutoverEnabled()).resolves.toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.DISABLE_LEGACY_SECRETKEY_AUTH;
+      else process.env.DISABLE_LEGACY_SECRETKEY_AUTH = prev;
+    }
+  });
 });
