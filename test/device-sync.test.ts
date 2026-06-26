@@ -436,6 +436,60 @@ describe("publishDeviceEvent", () => {
       wrapped({ childId: "c1", eventType: "usage_report", payload: {} }, asChild)
     ).rejects.toMatchObject({ code: "invalid-argument" });
   });
+
+  it("wirft invalid-argument bei fehlendem childId", async () => {
+    const wrapped = testEnv.wrap(fns.publishDeviceEvent);
+    await expect(
+      wrapped({ eventType: "usage_report", payload: {}, idempotencyKey: "k" }, asChild)
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("wirft invalid-argument bei nicht-objekt payload", async () => {
+    const wrapped = testEnv.wrap(fns.publishDeviceEvent);
+    await expect(
+      wrapped({ childId: "c1", eventType: "usage_report", payload: "nope" as any, idempotencyKey: "k" }, asChild)
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("wirft not-found wenn das Kinder-Gerät fehlt", async () => {
+    jest.spyOn(db, "collection").mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({ exists: false, data: () => undefined }),
+        collection: jest.fn(),
+      }),
+    } as any);
+    const wrapped = testEnv.wrap(fns.publishDeviceEvent);
+    await expect(
+      wrapped({ childId: "c1", eventType: "usage_report", payload: {}, idempotencyKey: "k" }, asChild)
+    ).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("lässt sender-Metadaten weg wenn das Kind keine appVersion/buildNumber hat", async () => {
+    const subColMock = {
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({ empty: true, docs: [] }),
+        }),
+      }),
+      doc: jest.fn().mockReturnValue({ set: setStub }),
+    };
+    jest.spyOn(db, "collection").mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(makeChildDoc({ appVersion: null, buildNumber: null })),
+        collection: jest.fn().mockReturnValue(subColMock),
+      }),
+    } as any);
+
+    const wrapped = testEnv.wrap(fns.publishDeviceEvent);
+    await wrapped(
+      { childId: "c1", eventType: "usage_report", payload: { totalMs: 1 }, idempotencyKey: "idk-no-meta" },
+      asChild
+    );
+    const written = setStub.mock.calls[setStub.mock.calls.length - 1][0] as Record<string, unknown>;
+    expect(written.senderPlatform).toBe("android");
+    expect(written).not.toHaveProperty("senderAppVersion");
+    expect(written).not.toHaveProperty("senderBuildNumber");
+  });
 });
 
 // ==================================================== fetchPendingCommands
