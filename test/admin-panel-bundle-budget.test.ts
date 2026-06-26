@@ -129,8 +129,9 @@ async function readUtf8(rel: string): Promise<string> {
 }
 
 async function statBytes(rel: string): Promise<number> {
-  const stat = await fs.stat(path.resolve(__dirname, "..", rel));
-  return stat.size;
+  const source = await readUtf8(rel);
+  // Normalize line endings so the budget is stable across Windows (CRLF) and CI (LF).
+  return Buffer.byteLength(source.replace(/\r\n/g, "\n"), "utf8");
 }
 
 describe("admin-panel bundle budget (Welle 0 baseline)", () => {

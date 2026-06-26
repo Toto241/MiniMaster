@@ -15,6 +15,7 @@ import { db } from "../firebase";
 
 const CUTOVER_WINDOW_DAYS = 14;
 const CUTOVER_READY_FIELD = "legacyAuthCutoverReady";
+const CUTOVER_ENABLED_FIELD = "legacyAuthCutoverEnabled";
 const CUTOVER_EXECUTED_FIELD = "legacyAuthCutoverExecutedAt";
 
 /**
@@ -68,6 +69,7 @@ export const legacyAuthCutoverMonitor = functions.pubsub
       await configRef.set(
         {
           [CUTOVER_READY_FIELD]: results.cutoverReady,
+          [CUTOVER_ENABLED_FIELD]: results.cutoverReady,
           lastCheckedAt: admin.firestore.FieldValue.serverTimestamp(),
           windowDays: CUTOVER_WINDOW_DAYS,
           stats: {
@@ -85,6 +87,7 @@ export const legacyAuthCutoverMonitor = functions.pubsub
         if (!alreadyExecuted) {
           await configRef.update({
             [CUTOVER_EXECUTED_FIELD]: admin.firestore.FieldValue.serverTimestamp(),
+            [CUTOVER_ENABLED_FIELD]: true,
             cutoverRecommended: true,
           });
           results.cutoverExecuted = true;
