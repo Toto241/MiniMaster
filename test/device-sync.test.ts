@@ -580,6 +580,31 @@ describe("acknowledgeCommand", () => {
     expect(cmdUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "applied" }));
   });
 
+  it("applied mit fehlender policyVersion lässt lastPolicyVersion unverändert", async () => {
+    const childUpdate = jest.fn().mockResolvedValue(undefined);
+    const cmdRef = {
+      // Falsy policyVersion -> `|| 0`; child lastPolicyVersion non-numeric -> `|| 0`.
+      get: jest.fn().mockResolvedValue(makeCommandDoc({ policyVersion: 0 })),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    jest.spyOn(db, "collection").mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(makeChildDoc({ lastPolicyVersion: undefined })),
+        update: childUpdate,
+        collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue(cmdRef) }),
+      }),
+    } as any);
+
+    const wrapped = testEnv.wrap(fns.acknowledgeCommand);
+    const result = await wrapped(
+      { childId: "c1", commandId: "cmd-1", status: "applied", appliedAt: Date.now() },
+      asChild
+    );
+    expect(result).toEqual({ success: true });
+    // 0 > 0 is false -> no lastPolicyVersion write.
+    expect(childUpdate).not.toHaveBeenCalled();
+  });
+
   it("setzt Command-Status auf failed mit errorCode", async () => {
     const cmdUpdate = jest.fn().mockResolvedValue(undefined);
     const cmdRef = {
@@ -725,6 +750,56 @@ describe("syncPolicySnapshot", () => {
     const result = await wrapped({ childId: "c1", knownPolicyVersion: 5 }, asChild);
     expect(result.upToDate).toBe(true);
     expect(result.policyVersion).toBe(5);
+  });
+
+  it("normalisiert fehlerhaft typisierte Policy-Felder auf Defaults", async () => {
+    const subColMock = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ docs: [] }),
+    };
+    jest.spyOn(db, "collection").mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(makeChildDoc({
+          policyVersion: "not-a-number", // -> 0
+          usageRules: ["wrong"],          // array -> {}
+          appBlacklist: "nope",           // non-array -> []
+          isLocked: "yes",                // non-true -> false
+        })),
+        collection: jest.fn().mockReturnValue(subColMock),
+      }),
+    } as any);
+
+    const wrapped = testEnv.wrap(fns.syncPolicySnapshot);
+    const result = await wrapped({ childId: "c1" }, asChild);
+    expect(result.policyVersion).toBe(0);
+    expect(result.fullPolicy.usageRules).toEqual({});
+    expect(result.fullPolicy.appBlacklist).toEqual([]);
+    expect(result.fullPolicy.isLocked).toBe(false);
+  });
+
+  it("übernimmt ios-Plattform und gültige usageRules in den Snapshot", async () => {
+    const subColMock = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ docs: [] }),
+    };
+    jest.spyOn(db, "collection").mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(makeChildDoc({
+          platform: "ios",                       // -> platform === "ios" branch
+          usageRules: { dailyLimitSeconds: 3600 }, // valid object branch
+        })),
+        collection: jest.fn().mockReturnValue(subColMock),
+      }),
+    } as any);
+
+    const wrapped = testEnv.wrap(fns.syncPolicySnapshot);
+    const result = await wrapped({ childId: "c1" }, asChild);
+    expect(result.fullPolicy.platform).toBe("ios");
+    expect(result.fullPolicy.usageRules).toEqual({ dailyLimitSeconds: 3600 });
   });
 
   it("Master kann Snapshot für sein Kind abrufen", async () => {
