@@ -108,7 +108,7 @@ export const submitAcceptanceRun = functions.https.onCall(async (data: unknown, 
       : admin.firestore.Timestamp.now(),
     status: payload.status ?? "failed",
     triggeredBy: payload.triggeredBy ?? context.auth?.uid ?? "unknown",
-    results: payload.results as AcceptanceRun["results"],
+    results: payload.results,
     logs: Array.isArray(payload.logs) ? payload.logs.slice(0, 500) : [],
     submittedAt: admin.firestore.Timestamp.now(),
   };
