@@ -193,4 +193,56 @@ describe("decisioning controller", () => {
     expect(trace.ruleId).toBe("daily-limit");
     expect(trace.userId).toBe("m1");
   });
+
+  it("generateSuggestion rejects a request without deviceId", async () => {
+    const wrapped = testEnv.wrap(fns.generateSuggestion);
+    await expect(wrapped({}, asMaster)).rejects.toThrow(/deviceId ist erforderlich/);
+  });
+
+  it("generateSuggestion returns null when no deterministic pattern is found", async () => {
+    // A single APP_OPENED event does not trigger any suggestion heuristic.
+    state.events.e1 = {
+      eventId: "e1",
+      userId: "m1",
+      deviceId: "c1",
+      type: "APP_OPENED",
+      payload: { packageName: "com.video.app" },
+      timestamp: { toMillis: () => 1712736000000 },
+      createdAt: "mock-server-timestamp",
+    };
+
+    const wrapped = testEnv.wrap(fns.generateSuggestion);
+    const result = await wrapped({ deviceId: "c1" }, asMaster);
+
+    expect(result.suggestion).toBeNull();
+    expect(result.message).toMatch(/Keine deterministische Empfehlung/);
+    expect(Object.keys(state.suggestions)).toHaveLength(0);
+  });
+
+  it("getRules without a deviceId returns all rules for the user", async () => {
+    state.rules["c1__daily-limit"] = { ruleId: "daily-limit", userId: "m1", deviceId: "c1" };
+    state.rules["c2__daily-limit"] = { ruleId: "daily-limit", userId: "m1", deviceId: "c2" };
+
+    const getRules = testEnv.wrap(fns.getRules);
+    const result = await getRules({}, asMaster);
+
+    expect(result.rules).toHaveLength(2);
+  });
+
+  it("setUsageRules deletes stale canonical rules that are no longer present", async () => {
+    // Seed a stale rule (with a ruleId) and one without a ruleId field for device c1.
+    state.rules["c1__stale-rule"] = { ruleId: "stale-rule", userId: "m1", deviceId: "c1" };
+    state.rules["c1__legacy-noid"] = { userId: "m1", deviceId: "c1" };
+
+    const saveRules = testEnv.wrap(fns.setUsageRules);
+    await saveRules({
+      childId: "c1",
+      usageRules: { dailyLimitSeconds: 1800 },
+    }, asMaster);
+
+    // Stale rules removed; the freshly synced canonical rule is present.
+    expect(state.rules["c1__stale-rule"]).toBeUndefined();
+    expect(state.rules["c1__legacy-noid"]).toBeUndefined();
+    expect(Object.keys(state.rules).some((id) => id.includes("daily-limit"))).toBe(true);
+  });
 });
