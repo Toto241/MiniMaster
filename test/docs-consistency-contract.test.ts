@@ -10,7 +10,7 @@ function walk(dir: string, extension: string): string[] {
     const absolute = path.join(dir, entry);
     const stats = statSync(absolute);
     if (stats.isDirectory()) {
-      if ([".git", "node_modules", "lib", "build"].includes(entry)) continue;
+      if ([".git", ".claude", "node_modules", "lib", "build"].includes(entry)) continue;
       files.push(...walk(absolute, extension));
     } else if (absolute.endsWith(extension)) {
       files.push(absolute);

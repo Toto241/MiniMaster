@@ -28,6 +28,7 @@ describe("legacy auth telemetry source contract", () => {
   it("writes telemetry into the same collection that cutover-monitor reads", () => {
     expect(authSrc).toContain("collection(\"legacy_auth_usage\")");
     expect(cutoverSrc).toContain("collection(\"legacy_auth_usage\")");
+    expect(cutoverSrc).toContain("legacyAuthCutoverEnabled");
     // The orphaned camelCase collection from the deleted second definition
     // must not reappear — cutover-monitor would never see it.
     expect(authSrc).not.toMatch(/collection\(\s*"legacyAuthUsage"\s*\)/);
