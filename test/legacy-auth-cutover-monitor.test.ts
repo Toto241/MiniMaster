@@ -7,6 +7,15 @@ jest.mock("../firebase", () => ({
 const mockDb = jest.fn();
 const mockCollection = jest.fn();
 const mockDoc = jest.fn();
+const mockUsageCollection = jest.fn();
+const mockUsageDoc = jest.fn();
+const mockUsageUsersCollection = jest.fn();
+const mockUsageLimit = jest.fn();
+const mockUsageGet = jest.fn();
+const mockConfigGet = jest.fn();
+const mockConfigSet = jest.fn();
+const mockConfigUpdate = jest.fn();
+const mockScheduledRun = jest.fn();
 
 jest.mock("firebase-admin", () => ({
   firestore: {
@@ -20,7 +29,10 @@ jest.mock("firebase-functions/v1", () => ({
   pubsub: {
     schedule: jest.fn(() => ({
       timeZone: jest.fn(() => ({
-        onRun: jest.fn((handler) => ({ run: handler })),
+        onRun: jest.fn((handler) => {
+          mockScheduledRun.mockImplementation(handler);
+          return { run: handler };
+        }),
       })),
     })),
   },
@@ -34,12 +46,64 @@ jest.mock("firebase-functions/v1", () => ({
 describe("legacy auth cutover monitor", () => {
   beforeEach(() => {
     jest.resetModules();
+    mockUsageCollection.mockReset();
+    mockUsageDoc.mockReset();
+    mockUsageUsersCollection.mockReset();
+    mockUsageLimit.mockReset();
+    mockUsageGet.mockReset();
+    mockConfigGet.mockReset();
+    mockConfigSet.mockReset();
+    mockConfigUpdate.mockReset();
+    mockScheduledRun.mockReset();
     mockCollection.mockReset();
     mockDoc.mockReset();
     mockDb.mockReset();
     mockDb.mockReturnValue({ collection: mockCollection });
     (require("../firebase").db as jest.Mock).mockImplementation(mockDb);
     mockCollection.mockReturnValue({ doc: mockDoc });
+  });
+
+  it("writes legacyAuthCutoverEnabled when the cutover window is clear", async () => {
+    mockUsageLimit.mockReturnValue({ get: mockUsageGet });
+    mockUsageUsersCollection.mockReturnValue({ limit: mockUsageLimit });
+    mockUsageDoc.mockReturnValue({ collection: mockUsageUsersCollection });
+    mockUsageCollection.mockReturnValue({ doc: mockUsageDoc });
+    mockCollection.mockImplementation((name: string) => {
+      if (name === "legacy_auth_usage") {
+        return mockUsageCollection();
+      }
+
+      return { doc: mockDoc };
+    });
+    mockUsageGet.mockImplementation(async () => ({ empty: true, forEach: jest.fn() }));
+    mockConfigGet.mockImplementation(async () => ({ exists: true, data: () => ({}) }));
+    mockConfigSet.mockImplementation(async () => undefined);
+    mockConfigUpdate.mockImplementation(async () => undefined);
+    mockDoc.mockReturnValue({
+      get: mockConfigGet,
+      set: mockConfigSet,
+      update: mockConfigUpdate,
+    });
+
+    const { legacyAuthCutoverMonitor } = require("../src/cutover-monitor");
+
+    await expect(legacyAuthCutoverMonitor.run({})).resolves.toMatchObject({
+      cutoverReady: true,
+      cutoverExecuted: true,
+    });
+    expect(mockConfigSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        legacyAuthCutoverReady: true,
+        legacyAuthCutoverEnabled: true,
+      }),
+      { merge: true }
+    );
+    expect(mockConfigUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        legacyAuthCutoverEnabled: true,
+        cutoverRecommended: true,
+      })
+    );
   });
 
   it("returns false when the cutover config document is missing", async () => {
