@@ -1,6 +1,6 @@
 {
   "name": "minimaster",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "description": "This repository contains the experimental implementation of the child application of the **Mini‑Master** project and accompanying Firebase Cloud Functions.",
   "main": "lib/index.js",
   "scripts": {
