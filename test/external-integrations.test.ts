@@ -259,6 +259,40 @@ describeCallable("getExternalIntegrationsConfig", () => {
     const res = await wrapped({}, asAuditor);
     expect(res.config).toBeDefined();
   });
+
+  it("merges persisted partial config over the defaults", async () => {
+    // Persist one apple field, then re-read: readConfig must deep-merge the
+    // stored partial document over the default config (lines 247-256).
+    const patch = testEnv.wrap(fns.patchExternalIntegrationsField);
+    await patch({ category: "apple", field: "developerTeamId", value: "ABCDE12345" }, asAdmin);
+
+    const wrapped = testEnv.wrap(fns.getExternalIntegrationsConfig);
+    const res = await wrapped({}, asAdmin);
+    expect(res.config.apple.developerTeamId).toBe("ABCDE12345");
+    // Untouched categories fall back to defaults.
+    expect(res.config.play.parentPackageId).toBeNull();
+    expect(Array.isArray(res.config.oem.matrix)).toBe(true);
+  });
+
+  it("reflects a persisted OEM matrix in the merged config", async () => {
+    const setOem = testEnv.wrap(fns.setOemValidationMatrix);
+    await setOem({
+      rows: [{ deviceModel: "Pixel 8", osVersion: "Android 15", status: "passed", testedAt: "2026-04-01", signoffBy: "qa", notes: null }],
+    }, asAdmin);
+
+    const wrapped = testEnv.wrap(fns.getExternalIntegrationsConfig);
+    const res = await wrapped({}, asAdmin);
+    expect(res.config.oem.matrix).toHaveLength(1);
+    expect(res.config.oem.matrix[0].status).toBe("passed");
+  });
+
+  it("falls back to defaults when the config read throws", async () => {
+    mockDocGet.mockRejectedValueOnce(new Error("firestore unavailable"));
+    const wrapped = testEnv.wrap(fns.getExternalIntegrationsConfig);
+    const res = await wrapped({}, asAdmin);
+    expect(res.config.apple.developerTeamId).toBeNull();
+    expect(res.readiness.ready).toBe(false);
+  });
 });
 
 // ==================== CALLABLE: PATCH ====================
@@ -319,6 +353,51 @@ describeCallable("patchExternalIntegrationsField", () => {
     await wrapped({ category: "apple", field: "developerTeamId", value: "   " }, asAdmin);
     const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
     expect(call.apple.developerTeamId).toBeNull();
+  });
+
+  it("rejects a non-object payload", async () => {
+    const wrapped = testEnv.wrap(fns.patchExternalIntegrationsField);
+    await expect(wrapped(null as any, asAdmin)).rejects.toThrow(/Payload required/);
+  });
+
+  // ---- validatePatch: per-category/field branch coverage ----
+  const accepted: Array<[string, string, unknown]> = [
+    ["apple", "parentBundleId", "com.x.parent"],
+    ["apple", "childBundleId", "com.x.child"],
+    ["apple", "appStoreConnectKeySecretPath", "projects/p/secrets/asc/versions/latest"],
+    ["apple", "provisioningProfilesReady", true],
+    ["play", "parentPackageId", "com.x.parent"],
+    ["play", "childPackageId", "com.x.child"],
+    ["play", "rtdnTopicName", "play-billing-topic"],
+    ["play", "serviceAccountSecretPath", "projects/p/secrets/sa/versions/latest"],
+    ["play", "iapContractsSigned", true],
+    ["secrets", "fcmServerKeyPath", "projects/p/secrets/fcm/versions/latest"],
+    ["secrets", "playIntegrityKeyPath", "projects/p/secrets/pi/versions/latest"],
+    ["secrets", "deviceCheckKeyPath", "projects/p/secrets/dc/versions/latest"],
+    ["secrets", "recaptchaV3SiteKey", "6Lc-abc"],
+    ["release", "appleScreenshotsComplete", false],
+  ];
+  it.each(accepted)("accepts a valid value for %s.%s", async (category, field, value) => {
+    const wrapped = testEnv.wrap(fns.patchExternalIntegrationsField);
+    await wrapped({ category, field, value }, asAdmin);
+    const call = mockDocSet.mock.calls[mockDocSet.mock.calls.length - 1][0] as Record<string, any>;
+    expect(call[category][field]).toBe(typeof value === "string" && value.trim() === "" ? null : value);
+  });
+
+  const rejected: Array<[string, string, unknown, RegExp]> = [
+    ["apple", "parentBundleId", "nodot", /Bundle|invalid/i],
+    ["apple", "appStoreConnectKeySecretPath", "AIzaSyRAWKEY", /cleartext|Secret Manager/i],
+    ["apple", "provisioningProfilesReady", "yes", /Boolean/i],
+    ["play", "rtdnTopicName", "1bad", /topic|invalid/i],
+    ["play", "serviceAccountSecretPath", "-----BEGIN PRIVATE KEY-----", /cleartext|Secret Manager/i],
+    ["play", "iapContractsSigned", "nope", /Boolean/i],
+    ["secrets", "fcmServerKeyPath", "AIzaSyRAWKEY", /cleartext|Secret Manager/i],
+    ["secrets", "recaptchaV3SiteKey", "x".repeat(120), /too long/i],
+    ["release", "legalTextsPublished", "true", /Boolean/i],
+  ];
+  it.each(rejected)("rejects an invalid value for %s.%s", async (category, field, value, re) => {
+    const wrapped = testEnv.wrap(fns.patchExternalIntegrationsField);
+    await expect(wrapped({ category, field, value }, asAdmin)).rejects.toThrow(re);
   });
 });
 
