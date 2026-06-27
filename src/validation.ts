@@ -37,11 +37,7 @@ export function escapeHtml(input: string): string {
  */
 export function stripHtml(input: string): string {
   if (typeof input !== "string") return "";
-  // Single linear pass removes complete tags, then any stray angle brackets are
-  // neutralised so no partial/revealed tag can survive. This is complete
-  // (no `<`/`>` remain -> no js/incomplete-multi-character-sanitization) and
-  // linear (no loop over the regex output -> no js/polynomial-redos).
-  return input.replace(/<[^>]*>/g, "").replace(/[<>]/g, "");
+  return input.replace(/<[^>]*>/g, "");
 }
 
 /**
