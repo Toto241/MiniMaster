@@ -15,39 +15,49 @@ GitHub-Deploy-Workflow `.github/workflows/deploy.yml`.
 - Für Blocker 3: 1 Android-Master- + 1 Android-Kind-Gerät (oder Emulator) mit `adb`.
 
 ## Reihenfolge / Abhängigkeiten
-1. **Blocker 1 (CodeQL)** zuerst — `deploy.yml` hat ein **hartes Gate** „Wait for successful
-   CodeQL run on this commit"; ohne grünen CodeQL-Lauf deployt nichts.
-2. **Blocker 2 (Prod-Deploy)** danach — erzeugt die Deployment-Referenz für die Evidenz.
-3. **Blocker 4 (Legacy-Auth)** läuft **parallel** als 14-Tage-Beobachtung; der finale
+0. **Blocker 1 (CodeQL)** ist **entschärft** (privates Repo ohne GHAS, akzeptiertes Risiko)
+   und **blockiert nicht mehr** — kein Vorab-Schritt nötig (Details unten).
+1. **Blocker 2 (Prod-Deploy)** — erzeugt die Deployment-Referenz für die Evidenz.
+2. **Blocker 4 (Legacy-Auth)** läuft **parallel** als 14-Tage-Beobachtung; der finale
    Flag-Schalter erfolgt über einen erneuten Deploy (Blocker 2).
-4. **Blocker 3 (Commissioning)** ist unabhängig und kann jederzeit parallel laufen.
+3. **Blocker 3 (Commissioning)** ist unabhängig und kann jederzeit parallel laufen.
 
-Abschluss-Check nach allen vier: `npm run release:doctor` → `hardBlockerCount: 0`.
+Verbleibende harte Blocker laut `npm run analyze:fertigungsstand`: **2** (Deploy-Referenz +
+Android-Commissioning). CodeQL zählt nicht mehr dazu.
 
 ---
 
-## Blocker 1 — GitHub Code Scanning (CodeQL) aktivieren
+## Blocker 1 — CodeQL / Code Scanning (ENTSCHÄRFT, akzeptiertes Risiko)
 
-**Warum:** `deploy.yml` blockiert ohne grünen CodeQL-Lauf; `fertigungsstand` verlangt
-aktuelle CodeQL-Evidenz. Der Workflow `.github/workflows/codeql-analysis.yml` existiert
-bereits (wöchentlich + push auf `main`), Code Scanning ist aber im Repo noch nicht aktiviert.
+**Befund:** `Toto241/MiniMaster` ist ein **privates Repo ohne GitHub Advanced Security
+(GHAS)**. Code Scanning / CodeQL ist für private Repos **nur mit GHAS** verfügbar — der
+Abschnitt erscheint daher gar nicht in den Repo-Settings, und der `codeql-analysis.yml`-
+Workflow kann seine SARIF-Ergebnisse nicht hochladen.
 
-**Schritte:**
-1. Settings öffnen: `https://github.com/Toto241/MiniMaster/settings/security_analysis`
-2. **Code scanning / CodeQL analysis** aktivieren.
-3. Status prüfen + CodeQL anstoßen (Helfer-Skript ist vorhanden):
-   ```bash
-   npm run code-scanning:enable           # prüft Status, zeigt Settings-URL
-   pwsh ./scripts/enable-code-scanning.ps1 -TriggerWorkflow   # löst CodeQL-Lauf aus
-   ```
-4. Lauf abwarten und auf grün prüfen:
-   ```bash
-   gh run list --repo Toto241/MiniMaster --workflow codeql-analysis.yml --limit 3
-   ```
+**Entscheidung (akzeptiertes Risiko, Repo bleibt privat & kostenlos):** CodeQL ist
+**nicht release-blockierend**, solange Code Scanning nicht verfügbar ist. Das ist im Code
+abgebildet und **selbst-justierend** — es greift automatisch wieder, sobald Code Scanning
+verfügbar wird (GHAS lizenziert oder Repo öffentlich):
 
-**Nachweis:** grüner CodeQL-Run-Link + Screenshot der aktivierten Einstellung.
-**Verifikation:** `npm run release:doctor` → Sektion „GitHub Code Scanning" = `pass`,
-Sektion „GitHub Runs" ohne fehlgeschlagenen CodeQL-Lauf.
+- `deploy.yml` „Wait for successful CodeQL run" prüft per API, ob Code Scanning verfügbar
+  ist, und überspringt das Gate mit Warnung, falls nicht.
+- `codeql-analysis.yml` erkennt Verfügbarkeit (`cs-check`) und ist soft-fail, wenn nicht
+  verfügbar (sonst hart auf `main`).
+- `analyze_fertigungsstand.py` / `release_doctor.py` führen CodeQL als `accepted` bzw.
+  nicht-blockierende Warnung.
+
+**Kompensierende Kontrollen (bleiben aktiv):** `eslint-plugin-security` (Injection/eval/
+unsafe-regex/timing), `npm audit` (0 Schwachstellen), Firestore-/Storage-Rules-Emulator-
+Tests, `secret-leak-guard`, sowie die hohe Unit-/Integrationstest-Abdeckung.
+
+**Optional später aktivieren (re-enforced automatisch):**
+- **GHAS lizenzieren** (kostenpflichtig) → Code Scanning in Settings aktivieren, oder
+- **Repo öffentlich machen** (CodeQL gratis) — für ein Produkt mit Kinderdaten i. d. R. unerwünscht.
+
+Danach werden alle obigen Gates CodeQL wieder hart erzwingen — ohne weitere Code-Änderung.
+
+**Verifikation:** `npm run analyze:fertigungsstand` → CodeQL-Finding `status: accepted`;
+`npm run release:doctor` → Sektion „GitHub Code Scanning" = `warn` (kein hard blocker).
 
 ---
 
