@@ -1529,4 +1529,5 @@ export const __supportTestables = {
   resolveExplainRole,
   shouldEscalateAfterAttempts,
   buildInitialDebugConsentQuestion,
+  sanitizeDebugSnapshot,
 };
