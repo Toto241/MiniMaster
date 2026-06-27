@@ -37,7 +37,16 @@ export function escapeHtml(input: string): string {
  */
 export function stripHtml(input: string): string {
   if (typeof input !== "string") return "";
-  return input.replace(/<[^>]*>/g, "");
+  // Loop until stable so that removing one tag cannot reveal another tag that a
+  // single pass would miss (CodeQL js/incomplete-multi-character-sanitization).
+  // The `<[^>]*>` pattern is linear (no nested quantifiers), so this is not ReDoS-prone.
+  let out = input;
+  let prev: string;
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, "");
+  } while (out !== prev);
+  return out;
 }
 
 /**
