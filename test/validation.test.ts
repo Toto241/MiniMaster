@@ -59,6 +59,12 @@ describe("stripHtml", () => {
   it("returns empty string for non-strings", () => {
     expect(stripHtml(null as unknown as string)).toBe("");
   });
+
+  it("leaves no angle brackets, even for tags revealed by removal", () => {
+    expect(stripHtml("<<b>script>alert(1)<</b>/script>")).not.toMatch(/[<>]/);
+    expect(stripHtml("<scr<ipt>ipt>x")).not.toMatch(/[<>]/);
+    expect(stripHtml("plain & safe")).toBe("plain & safe"); // non-bracket text untouched
+  });
 });
 
 describe("validateString", () => {
