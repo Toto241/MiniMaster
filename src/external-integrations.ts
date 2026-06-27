@@ -250,7 +250,7 @@ async function readConfig(): Promise<ExternalIntegrationsConfig> {
       apple: { ...base.apple, ...(raw.apple || {}) },
       play: { ...base.play, ...(raw.play || {}) },
       secrets: { ...base.secrets, ...(raw.secrets || {}) },
-      oem: { matrix: Array.isArray(raw.oem?.matrix) ? (raw.oem!.matrix as OemValidationRow[]) : [] },
+      oem: { matrix: Array.isArray(raw.oem?.matrix) ? raw.oem.matrix : [] },
       release: { ...base.release, ...(raw.release || {}) },
       meta: { ...base.meta, ...(raw.meta || {}) },
     };

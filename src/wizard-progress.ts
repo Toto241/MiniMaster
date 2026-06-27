@@ -87,7 +87,7 @@ function normalizeEntry(wizardId: WizardId, raw: unknown): WizardEntry {
   const status: WizardStatus = (WIZARD_STATUSES as readonly string[]).includes(v.status as string)
     ? (v.status as WizardStatus)
     : "not_started";
-  const data = v.data && typeof v.data === "object" && !Array.isArray(v.data) ? (v.data as Record<string, unknown>) : {};
+  const data = v.data && typeof v.data === "object" && !Array.isArray(v.data) ? v.data : {};
   return { wizardId, currentStep, completedSteps, status, data, updatedAt: coerceTimestamp(v.updatedAt) };
 }
 

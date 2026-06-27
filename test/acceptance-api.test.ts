@@ -148,6 +148,28 @@ describe("Acceptance Cloud Functions", () => {
       expect(result.gates.coverageFunctions).toBe(false);
       expect(result.allGatesPassed).toBe(false);
     });
+
+    it("defaults coverage gates to 0 and reads completedAt when present", async () => {
+      setupFirestoreDoc({
+        runId: "acc-no-cov",
+        startedAt: admin.firestore.Timestamp.now(),
+        completedAt: admin.firestore.Timestamp.now(),
+        status: "partial",
+        triggeredBy: "admin-123",
+        results: {
+          lint: { passed: true, errors: 0, warnings: 0, durationMs: 1000 },
+          build: { passed: true, durationMs: 5000 },
+          test: { passed: true, suitesTotal: 91, suitesPassed: 91, testsTotal: 10, testsPassed: 10, durationMs: 1000 },
+          // no coverage field -> all coverage gates fall back to 0
+        },
+        logs: [],
+      });
+      const result = await getAcceptanceStatus({}, makeAdminContext());
+      expect(result.lastRun.completedAt).not.toBeNull();
+      expect(result.gates.coverageBranches).toBe(false);
+      expect(result.gates.coverageStatements).toBe(false);
+      expect(result.allGatesPassed).toBe(false);
+    });
   });
 
   describe("submitAcceptanceRun", () => {
@@ -182,6 +204,31 @@ describe("Acceptance Cloud Functions", () => {
       expect(mockLog).toHaveBeenCalledWith("acceptance.run_submitted", "admin-123", "admin", "acc-submit-1", "acceptance_run", "success", expect.objectContaining({
         allPassed: true,
       }));
+    });
+
+    it("applies defaults for a minimal payload and audits a failure", async () => {
+      setupFirestoreDoc(null);
+      // Only the required fields; everything else must fall back to defaults.
+      const payload = {
+        runId: "acc-minimal",
+        results: {
+          lint: { passed: false, errors: 1, warnings: 0, durationMs: 1 },
+          build: { passed: false, durationMs: 1 },
+          test: { passed: false, suitesTotal: 1, suitesPassed: 0, testsTotal: 1, testsPassed: 0, durationMs: 1 },
+        },
+        logs: "not-an-array", // exercises the Array.isArray(false) -> [] branch
+      };
+      const result = await submitAcceptanceRun(payload, makeAdminContext("admin-789"));
+      expect(result.success).toBe(true);
+      expect(mockSet).toHaveBeenCalledTimes(1);
+      const written = mockSet.mock.calls[0][0];
+      expect(written.status).toBe("failed"); // status ?? "failed"
+      expect(written.triggeredBy).toBe("admin-789"); // ?? context.auth.uid
+      expect(written.logs).toEqual([]); // non-array -> []
+      expect(mockLog).toHaveBeenCalledWith(
+        "acceptance.run_submitted", "admin-789", "admin", "acc-minimal", "acceptance_run", "failure",
+        expect.objectContaining({ allPassed: false })
+      );
     });
   });
 

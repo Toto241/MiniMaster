@@ -610,6 +610,41 @@ describe("getDebugInfo", () => {
     const wrapped = testEnv.wrap(fns.getDebugInfo);
     await expect(wrapped({ ticketId: "ticket-open" }, asOtherMaster)).rejects.toThrow(/denied/);
   });
+
+  it("wirft not-found bei unbekanntem Ticket", async () => {
+    const wrapped = testEnv.wrap(fns.getDebugInfo);
+    await expect(wrapped({ ticketId: "ghost-ticket" }, asMaster)).rejects.toThrow(/not found/i);
+  });
+
+  it("verweigert einen Grant, dessen ticketId nicht zum Ticket passt", async () => {
+    state.supportAccessGrants["grant-wrong-ticket"] = {
+      masterImei: "m1", ticketId: "some-other-ticket", status: "active",
+      expiresAt: makeExpiresAt(3600), debugScope: ["diagnostic_logs"],
+    };
+    state.supportTickets["ticket-open"].debugAccessGrantId = "grant-wrong-ticket";
+    const wrapped = testEnv.wrap(fns.getDebugInfo);
+    await expect(wrapped({ ticketId: "ticket-open" }, asMaster)).rejects.toThrow(/does not belong/i);
+  });
+
+  it("verweigert einen Grant, dessen masterImei nicht zum Ticket passt", async () => {
+    state.supportAccessGrants["grant-wrong-master"] = {
+      masterImei: "someone-else", ticketId: "ticket-open", status: "active",
+      expiresAt: makeExpiresAt(3600), debugScope: ["diagnostic_logs"],
+    };
+    state.supportTickets["ticket-open"].debugAccessGrantId = "grant-wrong-master";
+    const wrapped = testEnv.wrap(fns.getDebugInfo);
+    await expect(wrapped({ ticketId: "ticket-open" }, asSupport)).rejects.toThrow(/does not belong/i);
+  });
+
+  it("verweigert Zugriff wenn debugScope kein Array ist", async () => {
+    state.supportAccessGrants["grant-scope-string"] = {
+      masterImei: "m1", ticketId: "ticket-open", status: "active",
+      expiresAt: makeExpiresAt(3600), debugScope: "diagnostic_logs", // kein Array -> null
+    };
+    state.supportTickets["ticket-open"].debugAccessGrantId = "grant-scope-string";
+    const wrapped = testEnv.wrap(fns.getDebugInfo);
+    await expect(wrapped({ ticketId: "ticket-open" }, asMaster)).rejects.toThrow(/scope/i);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
