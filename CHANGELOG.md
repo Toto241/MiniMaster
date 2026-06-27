@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Betreiber-Dashboard: Button „🗑️ Alle Projektdaten löschen" im Einrichtungs-/Recovery-Bereich mit Doppelbestätigung.
 - 8 neue Tests (`test/purge-project-data.test.ts`) für Gating, Firestore-/Storage-/Auth-Löschung und Fehlerpfade.
 
+### Changed
+- **CodeQL-Release-Gate entschärft (akzeptiertes Risiko)**: Das Repo ist privat ohne GitHub Advanced Security, daher ist Code Scanning/CodeQL nicht verfügbar. Die Gates erkennen das jetzt **selbst-justierend** und behandeln CodeQL als nicht-blockierend, solange Code Scanning fehlt — und erzwingen es automatisch wieder, sobald es verfügbar ist (GHAS lizenziert oder Repo öffentlich): `deploy.yml` (Verfügbarkeits-Check vor dem CodeQL-Wait-Gate), `codeql-analysis.yml` (`cs-check`-Step + bedingtes `continue-on-error`), `analyze_fertigungsstand.py` (neuer `accepted`-Status) und `release_doctor.py` (Code-Scanning-Sektion als `warn` statt hard blocker). Kompensierende Kontrollen bleiben aktiv: `eslint-plugin-security`, `npm audit`, Firestore-/Storage-Rules-Tests, `secret-leak-guard`. Siehe `docs/RELEASE_BLOCKER_RUNBOOK_DE.md`.
+
+### Testing
+- Erweiterte Backend-Testabdeckung über alle vier projekteigenen Schwellen (`src/acceptance.ts`): Statements 96,7 %, Branches 89,1 %, Functions 96,4 %, Lines 97,1 % (2775+ Tests). Neue/erweiterte Suites u. a. für admin-pin, rate-limiter, tracing, cutover-monitor, decisioning, external-integrations, getTasksForChild, operator-setup, device-sync, auth Operator/Admin-PIN-Callables, subscription RTDN/Reverify und support (sanitizeDebugSnapshot + getDebugInfo-Grant-Ownership).
+
 ## [2.2.0] - 2026-03-19
 
 ### Fixed

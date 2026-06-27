@@ -71,8 +71,14 @@ def collect_findings() -> list[Finding]:
     code_scanning_blocker = contains(ci, "Code Scanning not enabled") or contains(release, "Code Scanning not enabled")
     codeql_success = contains(ci, "CodeQL Security Analysis", "Latest status: completed / success")
     android_success = contains(ci, "Android CI", "Latest status: completed / success")
+    # Code scanning (CodeQL) requires GitHub Advanced Security on private repos.
+    # On this private repo without GHAS it cannot run, which is an accepted risk
+    # backed by compensating controls (eslint-plugin-security, npm audit,
+    # Firestore/Storage rules tests, secret-leak guard). It is therefore not a
+    # release blocker; see docs/RELEASE_BLOCKER_RUNBOOK_DE.md. The CodeQL workflow
+    # stays in place and re-enforces if GHAS is licensed or the repo is made public.
     codeql_status = (
-        "blocked_external"
+        "accepted"
         if code_scanning_blocker
         else status_from_bool(codeql_success, billing_blocker)
     )
@@ -81,17 +87,20 @@ def collect_findings() -> list[Finding]:
         area="CI / Security Gate",
         status=codeql_status,
         severity="P0",
-        title="Current CodeQL evidence is required before release",
+        title="CodeQL evidence (accepted N/A on private repo without GHAS)",
         evidence=(
-            "CodeQL workflow is green, but GitHub Code Scanning API is still disabled in repository settings"
-            if codeql_success and code_scanning_blocker
-            else "GitHub Code Scanning is not enabled in repository settings"
+            "Code scanning unavailable (private repo without GitHub Advanced Security); "
+            "accepted with compensating controls: eslint-plugin-security, npm audit, "
+            "Firestore/Storage rules tests, secret-leak guard"
             if code_scanning_blocker
             else "CI_REVALIDATION_LATEST.md reports a billing/spending-limit blocker"
             if billing_blocker
             else "CI_REVALIDATION_LATEST.md inspected"
         ),
-        next_action="Enable GitHub Code Scanning in repository settings, rerun CodeQL, and update release evidence with a green run.",
+        next_action=(
+            "No action required while private without GHAS. To enforce CodeQL, license "
+            "GitHub Advanced Security or make the repository public, then rerun CodeQL."
+        ),
     ))
 
     findings.append(Finding(
@@ -203,14 +212,18 @@ def collect_findings() -> list[Finding]:
 
 
 def summarize(findings: list[Finding]) -> dict[str, object]:
-    release_blockers = [f for f in findings if f.severity == "P0" and f.status != "done"]
+    # "accepted" = accepted risk / not-applicable with documented compensating
+    # controls (e.g. CodeQL on a private repo without GHAS). Treated like "done"
+    # for blocker purposes but kept distinct for transparency in the report.
+    resolved = {"done", "accepted"}
+    release_blockers = [f for f in findings if f.severity == "P0" and f.status not in resolved]
     repo_blockers = [f for f in findings if f.severity == "P0" and f.status == "open"]
     external_blockers = [f for f in findings if f.severity == "P0" and f.status == "blocked_external"]
-    p1_open = [f for f in findings if f.severity == "P1" and f.status not in {"done"}]
-    p2_open = [f for f in findings if f.severity == "P2" and f.status not in {"done", "review_required"}]
+    p1_open = [f for f in findings if f.severity == "P1" and f.status not in resolved]
+    p2_open = [f for f in findings if f.severity == "P2" and f.status not in {"done", "accepted", "review_required"}]
 
     repo_done = max(0, 100 - len(repo_blockers) * 10 - len(p1_open) * 5 - len(p2_open) * 2)
-    release_ready = len(release_blockers) == 0 and all(f.status == "done" for f in findings if f.severity == "P1")
+    release_ready = len(release_blockers) == 0 and all(f.status in resolved for f in findings if f.severity == "P1")
     repo_ready = len(repo_blockers) == 0 and all(
         f.status in {"done", "in_progress", "blocked_external"} for f in findings if f.severity == "P1"
     )
