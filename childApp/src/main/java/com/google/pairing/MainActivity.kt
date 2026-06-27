@@ -214,7 +214,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == Intent.ACTION_VIEW && intent.data != null) {
             val token = intent.data?.lastPathSegment
             if (token != null) {
-                Log.d("MainActivity", "Deep link received with token: $token")
+                // Do not log the raw token: it is untrusted deep-link input
+                // (log-injection / forged log entries) and a sensitive value.
+                // Log only that a deep link arrived, plus its length.
+                Log.d("MainActivity", "Deep link received (token length: ${token.length})")
                 viewModel.validateToken(token, getStableChildId(this))
             }
         }
