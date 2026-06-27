@@ -55,7 +55,7 @@ The backend has **no error-level** CodeQL findings.
 Every `error`-severity CodeQL finding has been resolved or accounted for:
 - **Fixed:** `stripHtml` (PR #201), `log-injection` (PR #203), stale `TaskStatusTest` (PR #204).
 - **False positives:** `js/call-to-non-callable` ×6 (exported callees), `java/android/implicit-pendingintents` ×3 (explicit + immutable intents).
-- **By design / not a bug:** `js/clear-text-storage` ×5 (public client identifiers), `java/comparison-of-identical-expressions` (build-config constant).
+- **By design / not a bug:** `js/clear-text-storage` ×5 (public client identifiers), `java/comparison-of-identical-expressions` (build-config constant), `js/clear-text-logging` ×1 (scripts/setup-admin.js prints the admin password to the local setup console once, with a "change after first login" warning — intended setup UX, not persisted/transmitted), `js/function-declaration-conflict` ×1 (admin-panel/app.js declares `_escapeHtml` twice with **functionally identical** bodies — harmless redundancy; candidate for a dedupe cleanup).
 
 **No real error-level security bug remains.** Outstanding items are owner actions:
 1. **Dismiss** the verified false-positive / by-design alerts in the code-scanning UI (agent token is not authorized to dismiss).
