@@ -37,11 +37,24 @@ export function escapeHtml(input: string): string {
  */
 export function stripHtml(input: string): string {
   if (typeof input !== "string") return "";
-  // Tag body excludes BOTH delimiters (`[^<>]`), so the pattern is unambiguous
-  // and linear — no backtracking (avoids js/polynomial-redos). A single pass
-  // then any stray angle brackets are removed so no `<`/`>` can remain and no
-  // partial/revealed tag can survive (avoids js/incomplete-multi-character-sanitization).
-  return input.replace(/<[^<>]*>/g, "").replace(/[<>]/g, "");
+  // Linear single-pass character scan: drop everything between '<' and '>'
+  // (inclusive) and any stray angle brackets. Using no regex avoids both
+  // js/polynomial-redos and js/incomplete-multi-character-sanitization, and the
+  // result provably contains no '<'/'>' so no tag — complete or partial — can
+  // survive. O(n), no backtracking.
+  let out = "";
+  let inTag = false;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === "<") {
+      inTag = true;
+    } else if (ch === ">") {
+      inTag = false;
+    } else if (!inTag) {
+      out += ch;
+    }
+  }
+  return out;
 }
 
 /**
