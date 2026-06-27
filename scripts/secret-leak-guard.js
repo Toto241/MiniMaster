@@ -30,7 +30,12 @@ const ALLOWLIST_SUFFIXES = [
 ];
 
 const DISALLOWED_FILE_PATTERNS = [
-  /(^|\/)firebase-adminsdk[^/]*\.json$/i,
+  // Match firebase-adminsdk service-account keys anywhere in the filename, not
+  // just as a prefix. A real key named `minimaster-28fbd-firebase-adminsdk-*.json`
+  // previously slipped past a prefix-anchored pattern (see SECURITY_INCIDENT docs).
+  /firebase-adminsdk[^/]*\.json$/i,
+  // JVM heap dumps can contain in-memory secrets/PII and must never be committed.
+  /\.hprof$/i,
 ];
 
 const SECRET_PATTERNS = [
