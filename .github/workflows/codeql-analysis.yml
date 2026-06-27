@@ -177,12 +177,36 @@ jobs:
         continue-on-error: true
         run: ./scripts/run-android-checks.sh :masterApp:assembleDebug :childApp:assembleDebug
 
+      # Detect whether GitHub code scanning is available for this repository.
+      # CodeQL requires GitHub Advanced Security on private repos; when it is
+      # unavailable the SARIF upload cannot succeed, so the analysis is treated
+      # as non-blocking (accepted risk with compensating controls). This makes
+      # the gate self-adjusting: it re-enforces automatically once code scanning
+      # becomes available (GHAS licensed or repo made public).
+      - name: Check code scanning availability
+        id: cs-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts?per_page=1")
+          if [ "$code" = "403" ] || [ "$code" = "404" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Code scanning unavailable (private repo without GitHub Advanced Security). CodeQL analysis is non-blocking; compensating controls apply (eslint-plugin-security, npm audit, Firestore/Storage rules tests, secret-leak guard)."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # Perform the analysis on the generated database.
       #
       # Policy:
       # - push/schedule/workflow_dispatch on main: hard fail (release gate)
-      # - pull_request: soft-fail fallback to keep developer feedback flowing
-      #   when repository-level Code Scanning settings are temporarily missing.
+      #   WHEN code scanning is available.
+      # - pull_request: soft-fail fallback to keep developer feedback flowing.
+      # - code scanning unavailable (private repo without GHAS): soft-fail
+      #   (accepted risk); auto-enforces again once code scanning is available.
       #
       # For the Java matrix we additionally skip when the Android build was
       # skipped (no `dl.google.com`): there is no extracted source for
@@ -191,7 +215,7 @@ jobs:
       - name: Perform CodeQL Analysis
         if: ${{ matrix.language != 'java' || steps.network-check.outputs.available == 'true' }}
         id: codeql-analyze
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        continue-on-error: ${{ github.event_name == 'pull_request' || steps.cs-check.outputs.available != 'true' }}
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"

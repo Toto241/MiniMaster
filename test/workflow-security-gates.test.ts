@@ -31,12 +31,22 @@ describe("Workflow security gates", () => {
     expect(guardIdx).toBeLessThan(pipelineIdx);
   });
 
-  it("keeps deploy workflow blocked by successful CodeQL run", async () => {
+  it("enforces a successful CodeQL run when code scanning is available", async () => {
     const workflow = await readUtf8(".github/workflows/deploy.yml");
 
     expect(workflow).toContain("name: 'Wait for successful CodeQL run on this commit'");
     expect(workflow).toContain("actions/workflows/codeql-analysis.yml/runs?head_sha=");
     expect(workflow).toContain("if conclusion != \"success\"");
     expect(workflow).toContain("CodeQL gate passed.");
+  });
+
+  it("treats the CodeQL gate as non-blocking when code scanning is unavailable", async () => {
+    const workflow = await readUtf8(".github/workflows/deploy.yml");
+
+    // Private repos without GitHub Advanced Security cannot run code scanning;
+    // the gate self-detects this and skips with a warning (compensating controls),
+    // and auto-enforces again once code scanning becomes available.
+    expect(workflow).toContain("def code_scanning_available");
+    expect(workflow).toContain("CodeQL gate skipped (code scanning unavailable).");
   });
 });
