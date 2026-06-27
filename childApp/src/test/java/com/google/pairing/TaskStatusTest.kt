@@ -12,7 +12,10 @@ class TaskStatusTest {
     }
 
     @Test
-    fun fromString_defaults_to_pending_for_unknown_status() {
-        assertEquals(TaskStatus.PENDING, TaskStatus.fromString("unexpected"))
+    fun fromString_defaults_to_none_for_unknown_status() {
+        // Unknown/missing status must default to NONE (not an active task) so a
+        // missing task snapshot cannot accidentally lock the child device.
+        assertEquals(TaskStatus.NONE, TaskStatus.fromString("unexpected"))
+        assertEquals(TaskStatus.NONE, TaskStatus.fromString(null))
     }
 }
