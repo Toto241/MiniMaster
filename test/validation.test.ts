@@ -59,13 +59,6 @@ describe("stripHtml", () => {
   it("returns empty string for non-strings", () => {
     expect(stripHtml(null as unknown as string)).toBe("");
   });
-
-  it("strips tags revealed by removing an outer tag (no single-pass bypass)", () => {
-    // A single pass could leave a tag that only forms after the first removal.
-    expect(stripHtml("<<b>script>alert(1)<</b>/script>")).not.toContain("<");
-    expect(stripHtml("<scr<ipt>ipt>x")).not.toMatch(/<[^>]*>/);
-    expect(stripHtml("<b>ok</b>")).toBe("ok"); // normal case unchanged
-  });
 });
 
 describe("validateString", () => {

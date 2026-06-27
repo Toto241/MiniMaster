@@ -16,13 +16,22 @@ real analysis: **181 open alerts** (18 error · 25 warning · 138 note).
 ## Backend (`src/`) — in scope
 | Severity | Rule | Location | Status |
 |---|---|---|---|
-| warning | js/incomplete-multi-character-sanitization | validation.ts:40 | **FIXED** — `stripHtml` now loops until stable |
-| warning | js/polynomial-redos | validation.ts:40 | addressed (regex is linear; documented) |
+| warning (high sec) | js/polynomial-redos | validation.ts:40 (`stripHtml`) | **pre-existing; dedicated follow-up** (see below) |
+| warning | js/incomplete-multi-character-sanitization | validation.ts:40 (`stripHtml`) | **pre-existing; dedicated follow-up** |
 | warning | js/file-access-to-http | support.ts:117 | accepted — intended Gemini API call (outbound) |
 | warning | js/file-access-to-http | admin.ts:683 | accepted — intended outbound API call |
 | warning | js/useless-assignment-to-local | support.ts:761 | low; cosmetic |
 
 The backend has **no error-level** CodeQL findings.
+
+> **Note on `stripHtml` (validation.ts:40):** CodeQL flags the `<[^>]*>` tag-strip
+> regex for both `polynomial-redos` and `incomplete-multi-character-sanitization`.
+> A naive loop-until-stable fix trades one for the other (the loop re-introduces a
+> polynomial-time alert). A correct fix needs a bounded, single-pass approach that
+> also neutralises stray angle brackets, verified against the CodeQL PR diff check.
+> This is deferred to a dedicated PR so it does not block the security-leak
+> remediation here. Callers (`validateString` strip mode, task/reason fields) keep
+> the existing behaviour meanwhile; `escapeHtml` remains available for escape-mode.
 
 ## Priority backlog (out of the backend scope; needs Android/web build envs to fix+verify)
 
