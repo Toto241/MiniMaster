@@ -286,15 +286,30 @@ def collect_code_scanning(repo: str) -> dict[str, object]:
             blockers=payload[:20],
         )
     blocked = "Code scanning is not enabled" in f"{result.stdout}\n{result.stderr}"
+    # Code scanning (CodeQL) requires GitHub Advanced Security on private repos.
+    # When unavailable it is an accepted risk with documented compensating controls
+    # (eslint-plugin-security, npm audit, Firestore/Storage rules tests, secret-leak
+    # guard) and is therefore NOT a release blocker. See RELEASE_BLOCKER_RUNBOOK_DE.md.
+    if blocked:
+        return _section(
+            "code-scanning",
+            "GitHub Code Scanning",
+            "warn",
+            "Code Scanning nicht verfuegbar (privates Repo ohne GitHub Advanced Security) - "
+            "akzeptiert mit kompensierenden Kontrollen (eslint-plugin-security, npm audit, "
+            "Firestore-/Storage-Rules-Tests, secret-leak-guard).",
+            blockers=[],
+            evidence={"returncode": result.returncode, "accepted": True},
+        )
     return _section(
         "code-scanning",
         "GitHub Code Scanning",
-        "blocked_external" if blocked else "warn",
-        "Code Scanning ist im Repository nicht aktiviert." if blocked else "Code-Scanning-Status konnte nicht abgefragt werden.",
+        "warn",
+        "Code-Scanning-Status konnte nicht abgefragt werden.",
         blockers=[{
-            "id": "code-scanning-disabled" if blocked else "code-scanning-api",
-            "title": "GitHub Code Scanning aktivieren" if blocked else "Code-Scanning-API pruefen",
-            "nextAction": "Repository Settings -> Code security -> Code Scanning aktivieren und CodeQL erneut ausfuehren.",
+            "id": "code-scanning-api",
+            "title": "Code-Scanning-API pruefen",
+            "nextAction": "Repository Settings -> Code security pruefen und Status erneut abfragen.",
         }],
         evidence={"returncode": result.returncode, "stderr": result.stderr[-2000:]},
     )
