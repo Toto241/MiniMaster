@@ -4,6 +4,18 @@
 **Audience:** Security Team / DevOps Lead
 **Timeline:** ~2 hours (with GCP approval buffer)
 
+> **Fast path (post-incident, 2026-06-28):** after generating the new key in the
+> GCP Console, install it everywhere in one step:
+> ```powershell
+> npm run key:install -- -KeyPath C:\path\to\new-key.json -SetCiSecret
+> ```
+> This validates the file (rejects the revoked key `7e76f1c1d4…`, the template,
+> and wrong-project keys), writes the git-ignored `serviceAccountKey.json`, runs
+> the secret-leak guard, and updates the `FIREBASE_SERVICE_ACCOUNT_KEY` Actions
+> secret via `gh` — without ever printing the key. Production Cloud Functions use
+> Application Default Credentials and need **no** key file. The manual steps below
+> remain the reference / rollback procedure.
+
 ---
 
 ## Overview
@@ -23,7 +35,7 @@ MiniMaster uses Firebase Admin SDK in Cloud Functions to manage authentication, 
   ```bash
   # Current key location:
   # - Local: Not committed (in .gitignore ✅)
-  # - CI/CD: GitHub Secrets FIREBASE_SERVICE_ACCOUNT_JSON
+  # - CI/CD: GitHub Secrets FIREBASE_SERVICE_ACCOUNT_KEY
   # - Secure?: IAM Editor role restricted to `toto241@...` (verify)
   ```
 
@@ -135,7 +147,7 @@ Admin Dashboard → Debug Commands
 **Location:** GitHub Repo → Settings → Secrets and variables → Actions
 
 1. Go to **Secrets** section
-2. Find secret: `FIREBASE_SERVICE_ACCOUNT_JSON`
+2. Find secret: `FIREBASE_SERVICE_ACCOUNT_KEY`
 3. Click **Update secret**
 4. Paste **entire contents** of new JSON key
 5. Click **Update secret**
@@ -282,7 +294,7 @@ Set recurring calendar event:
 
 2. **Restore old key in GitHub Secrets**
    - If old key was deleted: restore from backup (1Password / Key Vault)
-   - Update `FIREBASE_SERVICE_ACCOUNT_JSON` secret
+   - Update `FIREBASE_SERVICE_ACCOUNT_KEY` secret
    - Re-trigger Actions
 
 3. **Redeploy Cloud Functions**

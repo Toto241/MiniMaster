@@ -16,6 +16,7 @@
     "test:security": "node scripts/run-security-tests.js",
     "test:security:ci": "node scripts/run-security-tests.js --mode ci",
     "guard:secrets": "node scripts/secret-leak-guard.js",
+    "key:install": "pwsh ./scripts/install-firebase-key.ps1",
     "analyze:fertigungsstand": "node scripts/run_python.js scripts/analyze_fertigungsstand.py",
     "analyze:fertigungsstand:gate": "node scripts/run_python.js scripts/analyze_fertigungsstand.py --fail-on-p0",
     "analyze:admin-qa": "node scripts/run_python.js scripts/admin_panel_qa_audit.py",
