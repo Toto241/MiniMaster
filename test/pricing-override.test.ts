@@ -113,6 +113,22 @@ describeCallable("getPricingConfig + override", () => {
     const family = res.b2c.find((t: any) => t.sku === "family_monthly");
     expect(family.priceCents).toBe(999);
   });
+
+  it("falls back to code defaults when the persisted override is malformed", async () => {
+    mockDocData.b2c = "garbage";
+    (mockDocData as any).b2b = 42;
+    const wrapped = testEnv.wrap(fns.getPricingConfig);
+    const res = await wrapped({}, asAdmin);
+    expect(res.b2c.find((t: any) => t.sku === "single_child_monthly").priceCents).toBe(499);
+    expect(res.b2b.find((t: any) => t.sku === "b2b_school_50").priceCents).toBe(19900);
+  });
+
+  it("returns code defaults when the override read throws", async () => {
+    mockDocGet.mockRejectedValueOnce(new Error("firestore unavailable"));
+    const wrapped = testEnv.wrap(fns.getPricingConfig);
+    const res = await wrapped({}, asAdmin);
+    expect(res.b2c.find((t: any) => t.sku === "single_child_monthly").priceCents).toBe(499);
+  });
 });
 
 describeCallable("patchPricingOverride", () => {
@@ -133,6 +149,14 @@ describeCallable("patchPricingOverride", () => {
   it("rejects an unknown SKU (no new SKUs)", async () => {
     const wrapped = testEnv.wrap(fns.patchPricingOverride);
     await expect(wrapped({ scope: "b2c", sku: "does_not_exist", field: "priceCents", value: 100 }, asAdmin)).rejects.toThrow(/Unknown sku/);
+  });
+
+  it("rejects prototype-chain keys as SKUs (e.g. constructor, __proto__)", async () => {
+    const wrapped = testEnv.wrap(fns.patchPricingOverride);
+    for (const sku of ["constructor", "__proto__", "toString"]) {
+      await expect(wrapped({ scope: "b2c", sku, field: "priceCents", value: 100 }, asAdmin)).rejects.toThrow(/Unknown sku/);
+    }
+    expect(mockDocSet).not.toHaveBeenCalled();
   });
 
   it("rejects a non-overridable field (e.g. childLimit)", async () => {

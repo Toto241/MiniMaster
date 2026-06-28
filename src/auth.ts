@@ -1424,18 +1424,21 @@ export const bootstrapFirstAdmin = functions.https.onCall(
         });
       });
 
-      // No admin exists → promote caller to admin. On failure, release the
-      // sentinel so a retry remains possible.
+      // No admin exists → promote caller to admin and (optionally) persist the
+      // admin PIN as ONE atomic step. If any part fails, roll back the role
+      // claim AND release the sentinel so a clean retry remains possible —
+      // otherwise a transient failure would leave the caller silently promoted
+      // while reporting failure and blocking every future bootstrap.
       try {
         await auth().setCustomUserClaims(callerUid, { role: "admin" });
-      } catch (claimErr) {
+        if (adminPin) {
+          const pinHash = await hashAdminPin(adminPin);
+          await persistAdminPinHash(pinHash, callerUid);
+        }
+      } catch (bootstrapErr) {
+        await auth().setCustomUserClaims(callerUid, {}).catch(() => undefined);
         await sentinelRef.delete().catch(() => undefined);
-        throw claimErr;
-      }
-
-      if (adminPin) {
-        const pinHash = await hashAdminPin(adminPin);
-        await persistAdminPinHash(pinHash, callerUid);
+        throw bootstrapErr;
       }
 
       await AuditLogger.logSuccess(
