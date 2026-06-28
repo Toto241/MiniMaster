@@ -410,20 +410,8 @@
     // ================================================================
     // B) ABO & PREISE (informativ)
     // ================================================================
-    // Bekannte Tarife (Spiegel von src/pricing-config.ts – Quelle der Wahrheit).
-    const B2C_TIERS = [
-        { sku: "single_child_monthly", name: "Single Child (Monatlich)", priceCents: 499, period: "monatlich", limit: "1 Kind" },
-        { sku: "family_monthly", name: "Family (Monatlich)", priceCents: 999, period: "monatlich", limit: "bis 4 Kinder" },
-        { sku: "single_child_yearly", name: "Single Child (Jährlich)", priceCents: 3999, period: "jährlich", limit: "1 Kind" },
-        { sku: "family_yearly", name: "Family (Jährlich)", priceCents: 7999, period: "jährlich", limit: "bis 4 Kinder" },
-        { sku: "family_yearly_premium", name: "Family Premium (Jährlich)", priceCents: 9999, period: "jährlich", limit: "bis 6 Kinder" },
-    ];
-    const B2B_TIERS = [
-        { sku: "b2b_school_50", name: "School Basic", priceCents: 19900, period: "monatlich", limit: "50 Geräte" },
-        { sku: "b2b_school_200", name: "School Professional", priceCents: 49900, period: "monatlich", limit: "200 Geräte" },
-        { sku: "b2b_school_unlimited", name: "School Enterprise", priceCents: 99900, period: "monatlich", limit: "unbegrenzt" },
-        { sku: "b2b_kita_basic", name: "Kita Basic", priceCents: 9900, period: "monatlich", limit: "25 Geräte" },
-    ];
+    // Tarife werden live via getPricingConfig geladen (Override-bewusst) und sind
+    // hier editierbar — Wirkung nur auf Anzeige/Invoicing, nicht auf Store-Preise.
 
     const PRICE_CHECKLIST = [
         "SKUs in src/pricing-config.ts geprüft (B2C_TIERS / B2B_TIERS).",
@@ -442,26 +430,98 @@
         }
     }
 
-    function renderPriceTable(tableId, tiers) {
+    // Editierbare Preistabelle. scope: "b2c" | "b2b". Speichert via patchPricingOverride.
+    function renderEditablePriceTable(tableId, scope, tiers) {
         const table = $(tableId);
         if (!table) return;
         table.innerHTML = "";
+        const flagLabel = scope === "b2c" ? "Premium" : "Vertrag nötig";
         const head = document.createElement("tr");
-        ["SKU", "Name", "Preis (netto)", "Abrechnung", "Umfang"].forEach((t) => {
+        ["SKU", "Name", "Preis netto (Cent)", flagLabel, ""].forEach((t) => {
             const th = document.createElement("th");
             th.textContent = t;
             head.appendChild(th);
         });
         table.appendChild(head);
-        tiers.forEach((t) => {
+
+        (tiers || []).forEach((t) => {
             const tr = document.createElement("tr");
             tr.appendChild(makeCell(t.sku));
-            tr.appendChild(makeCell(t.name));
-            tr.appendChild(makeCell(formatPrice(t.priceCents)));
-            tr.appendChild(makeCell(t.period));
-            tr.appendChild(makeCell(t.limit));
+
+            const nameInput = document.createElement("input");
+            nameInput.type = "text";
+            nameInput.value = t.name == null ? "" : String(t.name);
+            const tdName = document.createElement("td");
+            tdName.appendChild(nameInput);
+            tr.appendChild(tdName);
+
+            const priceInput = document.createElement("input");
+            priceInput.type = "number";
+            priceInput.min = "0";
+            priceInput.step = "1";
+            priceInput.value = Number(t.priceCents) || 0;
+            priceInput.style.inlineSize = "110px";
+            const priceHint = document.createElement("div");
+            priceHint.className = "wiz-hint";
+            priceHint.textContent = formatPrice(Number(t.priceCents) || 0);
+            priceInput.addEventListener("input", () => {
+                priceHint.textContent = formatPrice(Number(priceInput.value) || 0);
+            });
+            const tdPrice = document.createElement("td");
+            tdPrice.appendChild(priceInput);
+            tdPrice.appendChild(priceHint);
+            tr.appendChild(tdPrice);
+
+            const flagField = scope === "b2c" ? "isPremium" : "requiresContract";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.checked = scope === "b2c" ? t.isPremium === true : t.requiresContract === true;
+            cb.addEventListener("change", () => savePricingField(scope, t.sku, flagField, cb.checked));
+            const tdFlag = document.createElement("td");
+            tdFlag.appendChild(cb);
+            tr.appendChild(tdFlag);
+
+            const save = document.createElement("button");
+            save.type = "button";
+            save.className = "wiz-btn";
+            save.textContent = "Speichern";
+            save.addEventListener("click", async () => {
+                save.disabled = true;
+                try {
+                    await savePricingField(scope, t.sku, "name", nameInput.value);
+                    await savePricingField(scope, t.sku, "priceCents", Math.round(Number(priceInput.value) || 0));
+                } finally {
+                    save.disabled = false;
+                }
+            });
+            const tdSave = document.createElement("td");
+            tdSave.appendChild(save);
+            tr.appendChild(tdSave);
+
             table.appendChild(tr);
         });
+    }
+
+    async function savePricingField(scope, sku, field, value) {
+        setStatus("cw-price-status", `Speichere „${sku}.${field}" …`, "");
+        try {
+            await callFn("patchPricingOverride", { scope, sku, field, value });
+            setStatus("cw-price-status", `✓ „${sku}.${field}" gespeichert (nur Anzeige/Invoicing).`, "ok");
+            saveProgress("config-pricing", 1, "in_progress").then(refreshChips);
+        } catch (err) {
+            setStatus("cw-price-status", `✗ „${sku}.${field}": ${describeError(err)}`, "err");
+        }
+    }
+
+    async function resetPricingOverrideAction() {
+        setStatus("cw-price-status", "Setze Preis-Overrides zurück …", "");
+        try {
+            await callFn("resetPricingOverride");
+            setStatus("cw-price-status", "✓ Overrides zurückgesetzt — Defaults aus dem Code aktiv.", "ok");
+            await openPricing();
+        } catch (err) {
+            setStatus("cw-price-status", `✗ Zurücksetzen fehlgeschlagen: ${describeError(err)}`, "err");
+        }
     }
 
     function renderPriceChecklist(savedData) {
@@ -501,9 +561,15 @@
     }
 
     async function openPricing() {
-        renderPriceTable("cw-price-b2c", B2C_TIERS);
-        renderPriceTable("cw-price-b2b", B2B_TIERS);
-        setStatus("cw-price-status", "Informativer Überblick — keine Preisänderung möglich.", "");
+        setStatus("cw-price-status", "Lade aktuelle Preise …", "");
+        try {
+            const data = await callFn("getPricingConfig");
+            renderEditablePriceTable("cw-price-b2c", "b2c", (data && data.b2c) || []);
+            renderEditablePriceTable("cw-price-b2b", "b2b", (data && data.b2b) || []);
+            setStatus("cw-price-status", "✓ Preise geladen. Änderungen wirken nur auf Anzeige/Invoicing.", "ok");
+        } catch (err) {
+            setStatus("cw-price-status", `✗ Laden fehlgeschlagen: ${describeError(err)}`, "err");
+        }
         const progress = await loadProgress("config-pricing");
         renderPriceChecklist(progress && progress.data);
         loadedOnce["config-pricing"] = true;
@@ -568,6 +634,7 @@
         $$("button[data-cw-action], #panel-config-integrations input, #panel-config-integrations button")
             .forEach((el) => { el.disabled = true; });
         $$("#cw-price-checklist input, #cw-reset-checklist input").forEach((el) => { el.disabled = true; });
+        $$("#panel-config-pricing input, #panel-config-pricing button").forEach((el) => { el.disabled = true; });
     }
 
     function showAuthGate(message) {
@@ -593,6 +660,13 @@
                 if (action === "int-reload") openIntegrations();
             });
         });
+        const priceReset = $("cw-price-reset");
+        if (priceReset) {
+            priceReset.addEventListener("click", () => {
+                if (priceReset.disabled) return;
+                resetPricingOverrideAction();
+            });
+        }
     }
 
     function init() {

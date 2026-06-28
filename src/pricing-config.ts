@@ -312,15 +312,132 @@ export function applyPromoCode(priceCents: number, promoCode: PromoCode | null):
 
 import * as functions from "firebase-functions/v1";
 import type { CallableContext } from "firebase-functions/v1/https";
-import { requireAdmin, validateAppCheck } from "./shared";
+import * as admin from "firebase-admin";
+import { db } from "../firebase";
+import { requireAdmin, validateAppCheck, AuditLogger } from "./shared";
+
+// ==================== PRICING OVERRIDE (Firestore, display/invoicing only) ====================
+
+/**
+ * Firestore-backed pricing override. Lets an admin adjust the DISPLAYED pricing
+ * (and any internal VAT/invoice calc that is fed these prices) from the panel
+ * without a code change. Code (`B2C_TIERS`/`B2B_TIERS`) is the fallback default.
+ *
+ * IMPORTANT: This does NOT change what Play Store / App Store Connect actually
+ * charge — store prices are configured there. Entitlement limits (childLimit,
+ * maxDevices, durations) intentionally stay code-sourced and are NOT overridable
+ * here, so a price edit can never silently widen what a subscriber receives.
+ */
+const PRICING_OVERRIDE_DOC = "operatorConfig/pricingOverride";
+
+const B2C_OVERRIDE_FIELDS = ["priceCents", "currency", "name", "description", "features", "isPremium"] as const;
+const B2B_OVERRIDE_FIELDS = ["priceCents", "currency", "name", "description", "features", "requiresContract"] as const;
+
+type PricingScope = "b2c" | "b2b";
+
+interface PricingOverrideDoc {
+  b2c?: Record<string, Partial<B2CTier>>;
+  b2b?: Record<string, Partial<B2BTier>>;
+}
+
+async function readPricingOverride(): Promise<PricingOverrideDoc> {
+  try {
+    const doc = await db().doc(PRICING_OVERRIDE_DOC).get();
+    if (!doc.exists) return {};
+    const raw = (doc.data() || {}) as PricingOverrideDoc;
+    return {
+      b2c: raw.b2c && typeof raw.b2c === "object" ? raw.b2c : {},
+      b2b: raw.b2b && typeof raw.b2b === "object" ? raw.b2b : {},
+    };
+  } catch (err) {
+    functions.logger.warn("readPricingOverride failed; using code defaults", err);
+    return {};
+  }
+}
+
+function mergeTier<T extends B2CTier | B2BTier>(
+  base: T,
+  override: Partial<T> | undefined,
+  allowed: readonly string[]
+): T {
+  if (!override || typeof override !== "object") return base;
+  const out: Record<string, unknown> = { ...base };
+  const ov = override as unknown as Record<string, unknown>;
+  for (const field of allowed) {
+    if (ov[field] !== undefined) out[field] = ov[field];
+  }
+  return out as unknown as T;
+}
+
+/** Returns the effective tier maps: code defaults with the Firestore override applied. */
+async function getEffectiveTiers(): Promise<{ b2c: Record<string, B2CTier>; b2b: Record<string, B2BTier> }> {
+  const override = await readPricingOverride();
+  const b2c: Record<string, B2CTier> = {};
+  for (const sku of Object.keys(B2C_TIERS)) {
+    b2c[sku] = mergeTier(B2C_TIERS[sku]!, override.b2c?.[sku], B2C_OVERRIDE_FIELDS);
+  }
+  const b2b: Record<string, B2BTier> = {};
+  for (const sku of Object.keys(B2B_TIERS)) {
+    b2b[sku] = mergeTier(B2B_TIERS[sku]!, override.b2b?.[sku], B2B_OVERRIDE_FIELDS);
+  }
+  return { b2c, b2b };
+}
+
+const CURRENCY_RE = /^[A-Z]{3}$/;
+const MAX_PRICE_CENTS = 10_000_000; // 100k in major units — generous upper bound.
+
+function validatePricingPatch(
+  scope: unknown,
+  sku: unknown,
+  field: unknown,
+  value: unknown
+): { ok: boolean; reason?: string } {
+  if (scope !== "b2c" && scope !== "b2b") {
+    return { ok: false, reason: "scope must be 'b2c' or 'b2b'." };
+  }
+  const tiers = scope === "b2c" ? B2C_TIERS : B2B_TIERS;
+  if (typeof sku !== "string" || !tiers[sku]) {
+    return { ok: false, reason: "Unknown sku (new SKUs are not allowed — only existing tiers)." };
+  }
+  const allowed = scope === "b2c" ? B2C_OVERRIDE_FIELDS : B2B_OVERRIDE_FIELDS;
+  if (typeof field !== "string" || !(allowed as readonly string[]).includes(field)) {
+    return { ok: false, reason: `field must be one of: ${allowed.join(", ")}.` };
+  }
+  if (field === "priceCents") {
+    if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > MAX_PRICE_CENTS) {
+      return { ok: false, reason: `priceCents must be an integer between 0 and ${MAX_PRICE_CENTS}.` };
+    }
+  } else if (field === "currency") {
+    if (typeof value !== "string" || !CURRENCY_RE.test(value)) {
+      return { ok: false, reason: "currency must be a 3-letter ISO-4217 code (e.g. EUR)." };
+    }
+  } else if (field === "name") {
+    if (typeof value !== "string" || value.length === 0 || value.length > 120) {
+      return { ok: false, reason: "name must be a non-empty string up to 120 chars." };
+    }
+  } else if (field === "description") {
+    if (typeof value !== "string" || value.length > 500) {
+      return { ok: false, reason: "description must be a string up to 500 chars." };
+    }
+  } else if (field === "isPremium" || field === "requiresContract") {
+    if (typeof value !== "boolean") return { ok: false, reason: `${field} must be a boolean.` };
+  } else if (field === "features") {
+    if (!Array.isArray(value) || value.length > 20 || !value.every((f) => typeof f === "string" && f.length <= 60)) {
+      return { ok: false, reason: "features must be an array of ≤20 strings (≤60 chars each)." };
+    }
+  }
+  return { ok: true };
+}
 
 export const getPricingConfig = functions.https.onCall(
   async (_data: unknown, context: CallableContext) => {
     validateAppCheck(context, true);
     requireAdmin(context);
 
+    const { b2c, b2b } = await getEffectiveTiers();
+
     return {
-      b2c: Object.values(B2C_TIERS).map((t) => ({
+      b2c: Object.values(b2c).map((t) => ({
         sku: t.sku,
         name: t.name,
         description: t.description,
@@ -333,7 +450,7 @@ export const getPricingConfig = functions.https.onCall(
         isPremium: t.isPremium,
         platforms: ["android", "ios"],
       })),
-      b2b: Object.values(B2B_TIERS).map((t) => ({
+      b2b: Object.values(b2b).map((t) => ({
         sku: t.sku,
         name: t.name,
         description: t.description,
@@ -354,5 +471,67 @@ export const getPricingConfig = functions.https.onCall(
         payoutMethod: "PayPal",
       },
     };
+  }
+);
+
+interface PricingPatchPayload {
+  scope?: PricingScope;
+  sku?: string;
+  field?: string;
+  value?: unknown;
+}
+
+/**
+ * Patch one overridable field of one existing pricing tier. Admin-only.
+ * Writes a nested structure into `operatorConfig/pricingOverride` so Firestore's
+ * deep-merge semantics apply (dot-notation keys are NOT expanded by set+merge).
+ */
+export const patchPricingOverride = functions.https.onCall(
+  async (data: PricingPatchPayload, context: CallableContext) => {
+    requireAdmin(context);
+    validateAppCheck(context, true);
+
+    if (!data || typeof data !== "object") {
+      throw new functions.https.HttpsError("invalid-argument", "Payload required.");
+    }
+    const check = validatePricingPatch(data.scope, data.sku, data.field, data.value);
+    if (!check.ok) {
+      throw new functions.https.HttpsError("invalid-argument", check.reason || "Invalid value.");
+    }
+
+    const adminUid = context.auth?.uid || "unknown-admin";
+    await db().doc(PRICING_OVERRIDE_DOC).set(
+      {
+        [data.scope as string]: { [data.sku as string]: { [data.field as string]: data.value } },
+        meta: {
+          lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastUpdatedBy: adminUid,
+        },
+      },
+      { merge: true }
+    );
+
+    await AuditLogger.logSuccess(
+      "operator.pricing_override", context, PRICING_OVERRIDE_DOC, "system",
+      { scope: data.scope, sku: data.sku, field: data.field }
+    );
+
+    return { ok: true, scope: data.scope, sku: data.sku, field: data.field };
+  }
+);
+
+/** Remove the entire pricing override, reverting to code defaults. Admin-only. */
+export const resetPricingOverride = functions.https.onCall(
+  async (_data: unknown, context: CallableContext) => {
+    requireAdmin(context);
+    validateAppCheck(context, true);
+
+    await db().doc(PRICING_OVERRIDE_DOC).delete();
+
+    await AuditLogger.logSuccess(
+      "operator.pricing_override", context, PRICING_OVERRIDE_DOC, "system", { reset: true }
+    );
+
+    return { ok: true, reset: true };
   }
 );

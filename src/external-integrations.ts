@@ -340,6 +340,33 @@ export const getExternalIntegrationsConfig = functions.https.onCall(
   }
 );
 
+// ==================== SHARED WRITE HELPER ====================
+
+/**
+ * Deep-merges a single `<category>.<field>` value into the external-integrations
+ * document and stamps `meta`. Shared by `patchExternalIntegrationsField` and the
+ * secret-onboarding endpoint so both write through ONE consistent, audited path.
+ *
+ * Note: `set({ merge: true })` does NOT interpret dot-notation in keys — they
+ * would be persisted as literal field names. A nested structure is built so the
+ * deep-merge semantics apply correctly.
+ */
+export async function writeIntegrationField(
+  category: IntegrationCategory,
+  field: string,
+  value: unknown,
+  adminUid: string
+): Promise<void> {
+  const update: Record<string, unknown> = {
+    [category]: { [field]: value },
+    meta: {
+      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdatedBy: adminUid,
+    },
+  };
+  await db().doc(EXTERNAL_INTEGRATIONS_DOC).set(update, { merge: true });
+}
+
 // ==================== CALLABLE: PATCH ====================
 
 interface PatchPayload {
@@ -434,18 +461,7 @@ export const patchExternalIntegrationsField = functions.https.onCall(
       ? (data.value.trim() === "" ? null : data.value.trim())
       : data.value;
 
-    // `set({ merge: true })` does NOT interpret dot-notation in keys — they
-    // would be persisted as literal field names. Build a nested structure so
-    // the deep-merge semantics of `set({ merge: true })` apply correctly.
-    const update: Record<string, unknown> = {
-      [data.category]: { [data.field]: normalized },
-      meta: {
-        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdatedBy: adminUid,
-      },
-    };
-
-    await db().doc(EXTERNAL_INTEGRATIONS_DOC).set(update, { merge: true });
+    await writeIntegrationField(data.category, data.field, normalized, adminUid);
 
     await AuditLogger.logSuccess(
       "operator.setup_checklist_update",

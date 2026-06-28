@@ -376,6 +376,17 @@ describe("bootstrapFirstAdmin", () => {
     await expect(wrapped({}, asPlainUser)).rejects.toHaveProperty("code", "permission-denied");
   });
 
+  it("blocks a concurrent second bootstrap via the Firestore sentinel", async () => {
+    // First bootstrap succeeds and writes operatorConfig/bootstrapSentinel.
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    await wrapped({}, asPlainUser);
+
+    // A second caller within the Auth-propagation window (listUsers still sees
+    // no admin) must be stopped by the sentinel, not by hasAnyAdminUser().
+    await expect(wrapped({}, asPlainUser)).rejects.toHaveProperty("code", "failed-precondition");
+  });
+
   it("rejects unauthenticated caller", async () => {
     const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
     await expect(wrapped({}, {})).rejects.toHaveProperty("code", "unauthenticated");

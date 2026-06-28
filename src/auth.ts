@@ -1405,8 +1405,33 @@ export const bootstrapFirstAdmin = functions.https.onCall(
         );
       }
 
-      // No admin exists → promote caller to admin
-      await auth().setCustomUserClaims(callerUid, { role: "admin" });
+      // Race-Guard: `hasAnyAdminUser()` allein ist nicht atomar (Firebase Auth
+      // ist eventually consistent). Ein Firestore-Sentinel in einer Transaktion
+      // stellt sicher, dass selbst bei gleichzeitigen Aufrufen nur EIN Bootstrap
+      // durchgeht — der zweite scheitert deterministisch.
+      const sentinelRef = db().collection("operatorConfig").doc("bootstrapSentinel");
+      await db().runTransaction(async (tx) => {
+        const snap = await tx.get(sentinelRef);
+        if (snap.exists) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "Erst-Bootstrap wurde bereits durchgeführt oder läuft gerade."
+          );
+        }
+        tx.set(sentinelRef, {
+          claimedByUid: callerUid,
+          claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      // No admin exists → promote caller to admin. On failure, release the
+      // sentinel so a retry remains possible.
+      try {
+        await auth().setCustomUserClaims(callerUid, { role: "admin" });
+      } catch (claimErr) {
+        await sentinelRef.delete().catch(() => undefined);
+        throw claimErr;
+      }
 
       if (adminPin) {
         const pinHash = await hashAdminPin(adminPin);

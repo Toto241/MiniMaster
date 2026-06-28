@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * Setup Admin User Script
- * 
- * This script helps you create the first admin user for the MiniMaster Admin Panel.
+ * Setup Admin User Script — BREAK-GLASS ONLY.
+ *
+ * ⚠️  Der NORMALE Weg, den ersten Admin anzulegen, ist IN-APP:
+ *     im Operator-Dashboard registrieren und dann "Als ersten Admin
+ *     aktivieren" (Cloud Function `bootstrapFirstAdmin`). Dieser Pfad ist
+ *     gegen Doppel-Bootstrap abgesichert (Firestore-Sentinel) und braucht
+ *     keinen Service-Account-Key.
+ *
+ * Dieses CLI-Skript ist nur der NOTFALL-Pfad (z. B. wenn die App nicht
+ * erreichbar ist) und benötigt einen lokal abgelegten serviceAccountKey.json.
+ *
  * It creates a user in Firebase Auth and sets the admin custom claim.
- * 
+ *
  * Usage:
  *   node scripts/setup-admin.js <email> <password>
- * 
+ *
  * Example:
  *   node scripts/setup-admin.js admin@example.com SecurePassword123
  */
