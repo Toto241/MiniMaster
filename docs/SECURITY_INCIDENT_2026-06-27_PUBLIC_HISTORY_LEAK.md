@@ -60,6 +60,22 @@ the data — Step 1 (rotation) is the only true mitigation.
 
 ## Status
 - Working tree / `HEAD`: clean (`guard:secrets` green).
-- History: contains items #1–#3 until Step 2 is executed.
+- **Step 2 (history purge): DONE (2026-06-28).** `git filter-repo --invert-paths`
+  removed `minimaster-28fbd-firebase-adminsdk-fbsvc-7e76f1c1d4.json` and
+  `java_pid19756.hprof` from all history. All 14 branches + tags `v2.0.0`/`v2.1.0`
+  force-pushed to `origin` (`main`: `459e7a0` → `e54f68b`). Verified: 0 reachable
+  blobs across origin. Web API key (#2) intentionally left in history — it is a
+  client-side identifier that still ships in the working tree; mitigate via API-key
+  restrictions, not history rewrite.
 - Prevention: in place (Step 3).
-- **Owner actions outstanding: Step 1 (rotation) and Step 2 (history purge).**
+- **Owner actions still outstanding:**
+  1. **Step 1 — key rotation (CRITICAL, not yet confirmed).** Scrubbing history does
+     not invalidate the already-exposed key. Delete key `7e76f1c1d4…` in GCP and
+     restrict the Web API key.
+  2. **GitHub-side residue.** GitHub's read-only `refs/pull/*` refs (195 PR snapshots)
+     and cached commit views (e.g. SHA `1cd1ec95…`) can still serve the old blob and
+     are NOT writable by force-push. Open a GitHub Support request to purge cached
+     views / stale PR refs.
+  3. **Local stashes.** Two local-only stashes still reference pre-rewrite commits
+     (not pushed). If their contents are no longer needed, drop them and run
+     `git gc --prune=now` to evict the old objects locally.
