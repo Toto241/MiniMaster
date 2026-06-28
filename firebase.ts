@@ -2,6 +2,7 @@ import { getApps, initializeApp, applicationDefault, App } from "firebase-admin/
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getAuth, Auth } from "firebase-admin/auth";
 import { getStorage, Storage } from "firebase-admin/storage";
+import type { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 
 /**
  * Initializes and returns the Firebase Admin app instance, ensuring it's a singleton.
@@ -42,3 +43,28 @@ export const auth = (): Auth => getAuth(getAdminApp());
  * @returns {Storage} The Firebase Cloud Storage service instance.
  */
 export const storage = (): Storage => getStorage(getAdminApp());
+
+/**
+ * A lazy-loaded, cached getter for the Google Cloud Secret Manager client.
+ *
+ * The client is heavy (pulls in gRPC + google-gax), so it is required and
+ * instantiated only on first use — keeping cold starts and test runs that
+ * never touch Secret Manager fast. It authenticates via Application Default
+ * Credentials, exactly like the Firebase Admin SDK.
+ *
+ * @returns {SecretManagerServiceClientType} The cached Secret Manager client.
+ */
+let secretManagerClient: SecretManagerServiceClient | null = null;
+export const secretManager = (): SecretManagerServiceClient => {
+  if (!secretManagerClient) {
+    // Required lazily (not a static import) so that merely importing this
+    // module never pulls in the heavy gRPC stack. The client — and its gRPC
+    // channel — is only loaded when a caller actually performs a Secret
+    // Manager operation. This keeps cold starts and unit tests that import
+    // firebase.ts but never touch Secret Manager fast and side-effect-free.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
+    secretManagerClient = new SecretManagerServiceClient() as SecretManagerServiceClient;
+  }
+  return secretManagerClient;
+};

@@ -376,6 +376,31 @@ describe("bootstrapFirstAdmin", () => {
     await expect(wrapped({}, asPlainUser)).rejects.toHaveProperty("code", "permission-denied");
   });
 
+  it("blocks a concurrent second bootstrap via the Firestore sentinel", async () => {
+    // First bootstrap succeeds and writes operatorConfig/bootstrapSentinel.
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    await wrapped({}, asPlainUser);
+
+    // A second caller within the Auth-propagation window (listUsers still sees
+    // no admin) must be stopped by the sentinel, not by hasAnyAdminUser().
+    await expect(wrapped({}, asPlainUser)).rejects.toHaveProperty("code", "failed-precondition");
+  });
+
+  it("releases the sentinel when setCustomUserClaims fails, so a retry succeeds", async () => {
+    mockAuth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    // First attempt: claim write throws AFTER the sentinel is set → rollback.
+    mockAuth.setCustomUserClaims.mockRejectedValueOnce(new Error("claim fail"));
+    const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
+    await expect(wrapped({}, asPlainUser)).rejects.toBeDefined();
+
+    // The sentinel must have been deleted: a clean retry now succeeds instead
+    // of hitting failed-precondition forever.
+    const res = await wrapped({}, asPlainUser);
+    expect(res.success).toBe(true);
+    expect(mockAuth.setCustomUserClaims).toHaveBeenCalledWith("u1", { role: "admin" });
+  });
+
   it("rejects unauthenticated caller", async () => {
     const wrapped = testEnv.wrap(fns.bootstrapFirstAdmin);
     await expect(wrapped({}, {})).rejects.toHaveProperty("code", "unauthenticated");

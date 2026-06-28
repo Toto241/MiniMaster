@@ -1405,12 +1405,40 @@ export const bootstrapFirstAdmin = functions.https.onCall(
         );
       }
 
-      // No admin exists → promote caller to admin
-      await auth().setCustomUserClaims(callerUid, { role: "admin" });
+      // Race-Guard: `hasAnyAdminUser()` allein ist nicht atomar (Firebase Auth
+      // ist eventually consistent). Ein Firestore-Sentinel in einer Transaktion
+      // stellt sicher, dass selbst bei gleichzeitigen Aufrufen nur EIN Bootstrap
+      // durchgeht — der zweite scheitert deterministisch.
+      const sentinelRef = db().collection("operatorConfig").doc("bootstrapSentinel");
+      await db().runTransaction(async (tx) => {
+        const snap = await tx.get(sentinelRef);
+        if (snap.exists) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "Erst-Bootstrap wurde bereits durchgeführt oder läuft gerade."
+          );
+        }
+        tx.set(sentinelRef, {
+          claimedByUid: callerUid,
+          claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
 
-      if (adminPin) {
-        const pinHash = await hashAdminPin(adminPin);
-        await persistAdminPinHash(pinHash, callerUid);
+      // No admin exists → promote caller to admin and (optionally) persist the
+      // admin PIN as ONE atomic step. If any part fails, roll back the role
+      // claim AND release the sentinel so a clean retry remains possible —
+      // otherwise a transient failure would leave the caller silently promoted
+      // while reporting failure and blocking every future bootstrap.
+      try {
+        await auth().setCustomUserClaims(callerUid, { role: "admin" });
+        if (adminPin) {
+          const pinHash = await hashAdminPin(adminPin);
+          await persistAdminPinHash(pinHash, callerUid);
+        }
+      } catch (bootstrapErr) {
+        await auth().setCustomUserClaims(callerUid, {}).catch(() => undefined);
+        await sentinelRef.delete().catch(() => undefined);
+        throw bootstrapErr;
       }
 
       await AuditLogger.logSuccess(

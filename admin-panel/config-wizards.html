@@ -207,12 +207,17 @@
             <section class="cw-panel" id="panel-config-pricing" data-wizard="config-pricing" hidden>
                 <div class="wiz-card">
                     <h2>Abo &amp; Preise</h2>
-                    <p class="wiz-hint">
-                        Informativer Überblick. Preise werden in diesem Wizard
-                        <strong>nicht</strong> verändert — die Quelle der Wahrheit ist
-                        <code>src/pricing-config.ts</code>, die tatsächlichen Store-Preise
-                        werden in der Play Console bzw. im App Store Connect gepflegt.
+                    <p class="wiz-hint" style="border-inline-start:4px solid #f59e0b;background:#fffbeb;padding:8px 12px;border-radius:6px">
+                        <strong>⚠️ Wichtig:</strong> Hier gepflegte Preise/Texte wirken nur auf die
+                        <strong>Anzeige &amp; interne Rechnungslogik</strong>. Sie ändern
+                        <strong>nicht</strong> die in Google Play Console / App Store Connect
+                        tatsächlich berechneten Store-Preise — diese müssen dort separat gepflegt
+                        werden. Entitlement-Limits (Kinder-/Geräteanzahl) bleiben im Code.
+                        Werte ohne Eintrag fallen auf die Defaults aus <code>src/pricing-config.ts</code> zurück.
                     </p>
+                    <div class="cw-inline-row" style="margin-block-start:8px">
+                        <button type="button" class="wiz-btn" id="cw-price-reset">Alle Preis-Overrides zurücksetzen</button>
+                    </div>
                     <div class="wiz-status" id="cw-price-status" role="status" aria-live="polite"></div>
                 </div>
 
