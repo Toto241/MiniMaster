@@ -168,6 +168,17 @@ export {
   getReleaseReadinessStatus,
 } from "./src/external-integrations";
 
+// ==================== IN-APP SECRET ONBOARDING ====================
+export {
+  setSecretValue,
+  getSecretInventory,
+} from "./src/secret-onboarding";
+
+// ==================== AI CONFIG ASSISTANT ====================
+export {
+  aiParseFirebaseConfig,
+} from "./src/ai-config-assistant";
+
 // ==================== MONETIZATION ====================
 export {
   B2C_TIERS,
@@ -184,6 +195,9 @@ export {
   getSubscriptionDurationMs,
   formatPriceCents,
   applyPromoCode,
+  getPricingConfig,
+  patchPricingOverride,
+  resetPricingOverride,
 } from "./src/pricing-config";
 
 // B2B Licensing

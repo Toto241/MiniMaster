@@ -54,6 +54,32 @@
             }
             .scw-row-side { flex: 0 0 auto; }
 
+            .scw-write-block { margin-top: 18px; padding-top: 14px; border-top: 1px dashed #cbd5e1; }
+            .scw-write-head { font-size: 1rem; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+            .scw-write-row {
+                display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+                padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+            }
+            .scw-write-row:last-child { border-bottom: none; }
+            .scw-write-label { flex: 1 1 200px; font-weight: 600; min-width: 0; }
+            .scw-write-side { flex: 0 0 auto; }
+            .scw-write-input {
+                flex: 2 1 220px; padding: 6px 8px; border: 1px solid #cbd5e1;
+                border-radius: 6px; font-family: monospace; min-width: 0;
+            }
+
+            .scw-fbparse-block { margin-top: 16px; padding-top: 12px; border-top: 1px dashed #cbd5e1; }
+            .scw-fbparse-block textarea {
+                inline-size: 100%; box-sizing: border-box; margin-block-start: 8px; padding: 8px;
+                border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical;
+            }
+            .scw-fbparse-field { display: flex; gap: 8px; align-items: center; padding: 4px 0; flex-wrap: wrap; }
+            .scw-fbparse-field label { flex: 0 0 170px; font-weight: 600; }
+            .scw-fbparse-field input {
+                flex: 1 1 220px; padding: 4px 6px; border: 1px solid #cbd5e1;
+                border-radius: 6px; font-family: monospace; min-width: 0;
+            }
+
             .scw-check-item {
                 display: flex;
                 align-items: flex-start;
@@ -137,16 +163,19 @@
                     </p>
                     <ol>
                         <li><strong>Firebase verbinden</strong> – Projekt, Storage und Firestore erreichbar.</li>
-                        <li><strong>Secrets</strong> – Gemini-Key, Admin-Recovery-Token und weitere Geheimnisse.</li>
+                        <li><strong>Secrets</strong> – Gemini-Key &amp; Co. direkt hier (In-App) setzen.</li>
                         <li><strong>Rollen &amp; Admin-PIN</strong> – Operator-Berechtigungen und PIN-Schutz.</li>
                         <li><strong>Commissioning-Gates</strong> – manuelle Pflicht-Checkliste fuer den Go-Live.</li>
                         <li><strong>Validierung</strong> – Acceptance-Run und Freigabe-Gates.</li>
                     </ol>
                     <div class="wiz-purpose">
-                        <strong>Hinweis:</strong> Alle Schritte sind read-only orchestriert –
-                        ausser dem Abhaken der Commissioning-Gates aendert dieser Assistent
-                        keine Werte. Dein Fortschritt wird serverseitig gespeichert, sodass du
-                        spaeter genau hier weitermachen kannst.
+                        <strong>In-App vs. Extern:</strong> Schritte mit
+                        <span class="scw-badge is-ok">In-App</span> fuehrst du direkt hier aus
+                        (Secrets setzen, Commissioning-Gates abhaken). Schritte mit
+                        <span class="scw-badge is-neutral">Extern</span> erfordern Arbeiten
+                        ausserhalb der App (z.&nbsp;B. Firebase-/Play-/Apple-Console) – der
+                        Assistent zeigt dafuer nur Status &amp; Anleitung. Dein Fortschritt wird
+                        serverseitig gespeichert, sodass du spaeter genau hier weitermachst.
                     </div>
                 </div>
                 <div class="wiz-actions">
@@ -158,7 +187,7 @@
             <!-- ── Step 2: Firebase verbinden ─────────────────────────────── -->
             <section class="wiz-step" data-step="2">
                 <div class="wiz-card">
-                    <h2>Firebase verbinden</h2>
+                    <h2>Firebase verbinden <span class="scw-badge is-neutral">Extern</span></h2>
                     <div class="wiz-purpose">
                         <strong>Wofuer ist das wichtig?</strong>
                         Ohne erreichbares Firebase-Projekt (Storage + Firestore) kann das
@@ -194,6 +223,23 @@
                         </a>
                         <button type="button" class="wiz-btn" data-wiz-action="reloadFirebase">Status erneut laden</button>
                     </div>
+
+                    <div class="scw-fbparse-block">
+                        <h3 class="scw-write-head">KI-Parse-Assistent <span class="scw-badge is-ok">In-App</span></h3>
+                        <div class="scw-row-hint">
+                            Firebase-Web-Config oder <code>google-services.json</code> einfuegen — der Assistent
+                            erkennt die Felder (deterministisch; KI nur als Fallback).
+                            <strong>Service-Account-Keys werden nie an die KI gesendet</strong> und nicht
+                            gespeichert. Werte pruefen und anschliessend in den Firebase-Transfer uebernehmen.
+                        </div>
+                        <textarea id="scw-fbparse-input" rows="5"
+                            placeholder='{ "apiKey": "...", "projectId": "..." }  – oder google-services.json'></textarea>
+                        <div class="scw-write-row">
+                            <button type="button" class="wiz-btn is-primary" data-wiz-action="parseFirebase">Analysieren</button>
+                        </div>
+                        <div class="wiz-status" id="scw-fbparse-status" hidden></div>
+                        <div id="scw-fbparse-result"></div>
+                    </div>
                 </div>
                 <div class="wiz-actions">
                     <button type="button" class="wiz-btn" data-wiz-action="prev">← Zurueck</button>
@@ -204,13 +250,14 @@
             <!-- ── Step 3: Secrets ────────────────────────────────────────── -->
             <section class="wiz-step" data-step="3">
                 <div class="wiz-card">
-                    <h2>Secrets</h2>
+                    <h2>Secrets <span class="scw-badge is-ok">In-App</span></h2>
                     <div class="wiz-purpose">
                         <strong>Wofuer ist das wichtig?</strong>
                         Geheimnisse wie der Gemini-API-Key oder das Admin-Recovery-Token
                         schalten KI-Funktionen frei und sichern Notfall-Zugaenge ab.
-                        Gesetzt werden sie via <code>.env</code> bzw. Secret Manager – hier
-                        siehst du nur, ob sie vorhanden sind.
+                        Oben siehst du den Vorhanden-Status; unten kannst du die wichtigsten
+                        Secret-Werte <strong>direkt hier (In-App)</strong> setzen – sie landen
+                        verschluesselt in Google Secret Manager, nie in Firestore.
                     </div>
                     <div class="wiz-status" id="scw-secrets-loading">Lade Secret-Status …</div>
                     <div id="scw-secrets-list"></div>
@@ -220,6 +267,25 @@
                             <div class="scw-row-hint" id="scw-recovery-hint">–</div>
                         </div>
                         <div class="scw-row-side" id="scw-recovery-badge"></div>
+                    </div>
+
+                    <div class="scw-write-block" id="scw-secret-write-block" hidden>
+                        <h3 class="scw-write-head">
+                            Secret-Werte direkt setzen <span class="scw-badge is-ok">In-App</span>
+                        </h3>
+                        <div class="scw-row-hint">
+                            Der Wert wird verschluesselt in Google Secret Manager abgelegt – niemals in Firestore.
+                            <strong>Nach dem Setzen die Cloud Functions neu deployen</strong>, damit der neue Wert greift.
+                            Erfordert eine frische Admin-PIN, falls eine konfiguriert ist.
+                        </div>
+                        <div class="scw-write-row">
+                            <label class="scw-write-label" for="scw-secret-pin">Admin-PIN (falls konfiguriert)</label>
+                            <input class="scw-write-input" id="scw-secret-pin" type="password"
+                                   inputmode="numeric" autocomplete="off" maxlength="8"
+                                   placeholder="nur noetig falls PIN aktiv" />
+                        </div>
+                        <div id="scw-secret-write-list"></div>
+                        <div class="wiz-status" id="scw-secret-write-status" hidden></div>
                     </div>
                 </div>
                 <div class="wiz-actions">
@@ -231,7 +297,7 @@
             <!-- ── Step 4: Rollen & Admin-PIN ─────────────────────────────── -->
             <section class="wiz-step" data-step="4">
                 <div class="wiz-card">
-                    <h2>Rollen &amp; Admin-PIN</h2>
+                    <h2>Rollen &amp; Admin-PIN <span class="scw-badge is-neutral">Extern</span></h2>
                     <div class="wiz-purpose">
                         <strong>Wofuer ist das wichtig?</strong>
                         Die Admin-PIN schuetzt sensible Operator-Aktionen (Tier-3) zusaetzlich
@@ -271,7 +337,7 @@
             <!-- ── Step 5: Commissioning-Gates ────────────────────────────── -->
             <section class="wiz-step" data-step="5">
                 <div class="wiz-card">
-                    <h2>Commissioning-Gates</h2>
+                    <h2>Commissioning-Gates <span class="scw-badge is-ok">In-App</span></h2>
                     <div class="wiz-purpose">
                         <strong>Wofuer ist das wichtig?</strong>
                         Diese manuelle Checkliste deckt externe Pflichten ab (Google Play,
@@ -303,7 +369,7 @@
             <!-- ── Step 6: Validierung ────────────────────────────────────── -->
             <section class="wiz-step" data-step="6">
                 <div class="wiz-card">
-                    <h2>Validierung</h2>
+                    <h2>Validierung <span class="scw-badge is-neutral">Extern</span></h2>
                     <div class="wiz-purpose">
                         <strong>Wofuer ist das wichtig?</strong>
                         Der Acceptance-Run prueft Lint, Build, Tests und Coverage. Erst wenn

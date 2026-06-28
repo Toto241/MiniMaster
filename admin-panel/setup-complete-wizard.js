@@ -108,9 +108,13 @@
         const notice = $("scw-auth-notice");
         if (notice) {
             notice.hidden = false;
+            // Erstinbetriebnahme-CTA: ein brandneuer (Nicht-Admin-)Nutzer kann
+            // sich im Dashboard via Bootstrap selbst zum ersten Admin machen.
             notice.innerHTML =
                 escapeHtml(message) +
-                ' <a href="./index.html">Zum Operator-Dashboard (als Admin anmelden) →</a>';
+                ' <a href="./index.html">Zum Operator-Dashboard (als Admin anmelden) →</a>' +
+                '<br><span class="scw-row-hint">Erstinbetriebnahme &amp; noch kein Admin? ' +
+                '<a href="./index.html#btn-bootstrap-admin">Ersten Admin aktivieren →</a></span>';
         }
     }
 
@@ -245,6 +249,95 @@
         }
     }
 
+    // ── Step 2 (In-App): KI-Parse-Assistent ────────────────────────────────
+    const FBPARSE_FIELDS = [
+        ["apiKey", "API Key"],
+        ["authDomain", "Auth Domain"],
+        ["projectId", "Project ID"],
+        ["storageBucket", "Storage Bucket"],
+        ["messagingSenderId", "Messaging Sender ID"],
+        ["appId", "App ID"],
+        ["measurementId", "Measurement ID"],
+    ];
+
+    function renderParseResult(res) {
+        const node = $("scw-fbparse-result");
+        if (!node) return;
+        node.innerHTML = "";
+        const parsed = (res && res.parsed) || {};
+        const warnings = (res && res.warnings) || [];
+        const detected = (res && res.detected) || [];
+
+        if (detected.length) {
+            const det = document.createElement("div");
+            det.style.margin = "8px 0";
+            det.innerHTML = detected.map((d) => badgeHtml(d, "neutral")).join(" ");
+            node.appendChild(det);
+        }
+
+        FBPARSE_FIELDS.forEach((pair) => {
+            const key = pair[0];
+            const label = pair[1];
+            if (parsed[key] == null) return;
+            const row = document.createElement("div");
+            row.className = "scw-fbparse-field";
+            const lab = document.createElement("label");
+            lab.textContent = label;
+            const inp = document.createElement("input");
+            inp.type = "text";
+            inp.readOnly = true;
+            inp.value = String(parsed[key]);
+            row.appendChild(lab);
+            row.appendChild(inp);
+            node.appendChild(row);
+        });
+
+        if (!Object.keys(parsed).length) {
+            const empty = document.createElement("div");
+            empty.className = "scw-row-hint";
+            empty.textContent = "Keine Felder erkannt. Bitte vollstaendige Firebase-Web-Config einfuegen.";
+            node.appendChild(empty);
+        }
+
+        warnings.forEach((w) => {
+            const warn = document.createElement("div");
+            warn.className = "wiz-status is-warn";
+            warn.textContent = "⚠ " + w;
+            warn.style.marginBlockStart = "6px";
+            node.appendChild(warn);
+        });
+
+        if (Object.keys(parsed).length) {
+            const hint = document.createElement("div");
+            hint.className = "scw-row-hint";
+            hint.style.marginBlockStart = "8px";
+            hint.textContent = "Werte pruefen und im Firebase-Transfer (Dashboard) uebernehmen.";
+            node.appendChild(hint);
+        }
+    }
+
+    async function onParseFirebaseConfig() {
+        const input = $("scw-fbparse-input");
+        const statusNode = $("scw-fbparse-status");
+        const raw = input && input.value ? input.value : "";
+        if (!raw.trim()) {
+            setStatus(statusNode, "Bitte Config-Text einfuegen.", "warn");
+            return;
+        }
+        const btn = document.querySelector('[data-wiz-action="parseFirebase"]');
+        if (btn) btn.disabled = true;
+        setStatus(statusNode, "Analysiere …");
+        try {
+            const res = await callFn("aiParseFirebaseConfig", { rawText: raw });
+            renderParseResult(res);
+            setStatus(statusNode, res && res.usedAi ? "✓ Analysiert (mit KI-Hilfe)." : "✓ Analysiert.", "ok");
+        } catch (err) {
+            setStatus(statusNode, "✗ " + friendlyError(err), "err");
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
     // ── Step 3: Secrets ────────────────────────────────────────────────────
     function secretHint(key) {
         const hints = {
@@ -302,8 +395,103 @@
                     else badge.innerHTML = badgeHtml("fehlt", "err");
                 }
             }
+
+            // In-App-Schreibzugriff: Secret-Werte direkt in Secret Manager setzen.
+            await renderWritableSecrets();
         } catch (err) {
             setStatus(loading, "Fehler beim Laden der Secrets: " + friendlyError(err), "err");
+        }
+    }
+
+    // ── Step 3 (In-App): Secret-Werte direkt setzen ────────────────────────
+    // Spiegelt SECRET_REGISTRY aus src/secret-onboarding.ts. Werte gehen in
+    // Google Secret Manager (nie nach Firestore); nur Pfad-Referenzen werden
+    // gespiegelt. Erfordert Admin + (falls konfiguriert) frische Admin-PIN.
+    const WRITABLE_SECRETS = [
+        { secretId: "GEMINI_API_KEY", label: "Gemini API Key" },
+        { secretId: "OPENAI_API_KEY", label: "OpenAI API Key (Fallback)" },
+        { secretId: "RESEND_API_KEY", label: "Resend Email API Key" },
+        { secretId: "APPLE_PRIVATE_KEY", label: "Apple App Store Connect Private Key" },
+    ];
+
+    // Bestaetigt eine Admin-PIN nur, wenn der Operator eine eingegeben hat.
+    async function verifyPinIfProvided() {
+        const pinEl = $("scw-secret-pin");
+        const pin = pinEl && pinEl.value ? pinEl.value.trim() : "";
+        if (!pin) return;
+        await callFn("verifyAdminPin", { pin });
+        if (auth && auth.currentUser) await auth.currentUser.getIdToken(true);
+    }
+
+    async function renderWritableSecrets() {
+        const block = $("scw-secret-write-block");
+        const listNode = $("scw-secret-write-list");
+        if (!block || !listNode) return;
+        try {
+            const data = await callFn("getSecretInventory");
+            const inv = data && Array.isArray(data.secrets) ? data.secrets : [];
+            const byId = {};
+            inv.forEach((s) => { if (s && s.secretId) byId[s.secretId] = s; });
+
+            const rows = WRITABLE_SECRETS.map((def) => {
+                const info = byId[def.secretId] || {};
+                const badge = info.exists
+                    ? badgeHtml(`✓ gesetzt${info.latestVersion ? " · v" + info.latestVersion : ""}`, "ok")
+                    : badgeHtml("fehlt", "warn");
+                const sid = escapeHtml(def.secretId);
+                return (
+                    '<div class="scw-write-row">' +
+                    `<span class="scw-write-label">${escapeHtml(def.label)}</span>` +
+                    `<span class="scw-write-side">${badge}</span>` +
+                    `<input class="scw-write-input" id="scw-secret-input-${sid}" type="password" autocomplete="off" placeholder="neuen Wert einfuegen" />` +
+                    `<button type="button" class="wiz-btn" data-secret-id="${sid}">Wert setzen</button>` +
+                    "</div>"
+                );
+            });
+            listNode.innerHTML = rows.join("");
+            $$("[data-secret-id]", listNode).forEach((btn) => {
+                btn.addEventListener("click", () => onSetSecret(btn.getAttribute("data-secret-id")));
+            });
+            block.hidden = false;
+        } catch (err) {
+            // Inventar kann scheitern, wenn das Secret-Manager-IAM-Recht fehlt –
+            // dann Hinweis zeigen, den Lese-Status aber nicht blockieren.
+            listNode.innerHTML =
+                `<div class="scw-row-hint">Secret-Inventar nicht verfuegbar: ${escapeHtml(friendlyError(err))}</div>`;
+            block.hidden = false;
+        }
+    }
+
+    async function onSetSecret(secretId) {
+        const input = $(`scw-secret-input-${secretId}`);
+        const statusNode = $("scw-secret-write-status");
+        const btn = document.querySelector(`[data-secret-id="${secretId}"]`);
+        const value = input && input.value ? input.value : "";
+        if (!value) {
+            setStatus(statusNode, "Bitte zuerst einen Wert eingeben.", "warn");
+            return;
+        }
+        if (btn) btn.disabled = true;
+        setStatus(statusNode, `Setze ${secretId} …`);
+        try {
+            await verifyPinIfProvided();
+            const res = await callFn("setSecretValue", { secretId, value });
+            const v = res && res.version ? res.version : "?";
+            setStatus(
+                statusNode,
+                `✓ ${secretId} gesetzt (Version ${v}). Wichtig: Cloud Functions neu deployen, damit der neue Wert aktiv wird.`,
+                "ok"
+            );
+            if (input) input.value = "";
+            await renderWritableSecrets();
+        } catch (err) {
+            let msg = friendlyError(err);
+            if (err && (err.code === "failed-precondition" || err.code === "functions/failed-precondition")) {
+                msg += " (Ggf. Admin-PIN oben eingeben und erneut versuchen.)";
+            }
+            setStatus(statusNode, `✗ ${secretId}: ${msg}`, "err");
+        } finally {
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -611,6 +799,7 @@
             case "next": goNext(); break;
             case "prev": goPrev(); break;
             case "reloadFirebase": loadFirebaseStep(true); break;
+            case "parseFirebase": onParseFirebaseConfig(); break;
             case "reloadAcceptance": loadAcceptanceStep(); break;
             case "reloadSummary": loadSummaryStep(true); break;
             case "complete": completeWizard(); break;
