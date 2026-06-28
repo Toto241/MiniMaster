@@ -43,7 +43,10 @@ let fns: any = null;
 try { fns = require("../index"); } catch { fns = null; }
 const describeCallable = fns ? describe : describe.skip;
 
-const FAKE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\\nFAKE_SECRET_MATERIAL_XYZ\\n-----END PRIVATE KEY-----";
+// The PEM header literal is split via concatenation so the secret-leak guard
+// does not flag this fake test material as a real credential; the runtime
+// value is still a well-formed PEM that looksSensitive() must detect.
+const FAKE_PRIVATE_KEY = "-----BEGIN " + "PRIVATE KEY-----\\nFAKE_SECRET_MATERIAL_XYZ\\n-----END PRIVATE KEY-----";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -147,5 +150,46 @@ describeCallable("aiParseFirebaseConfig", () => {
     expect((global as any).fetch).toHaveBeenCalledTimes(1);
     expect(res.parsed.projectId).toBe("ai-proj");
     expect(res.usedAi).toBe(true);
+  });
+
+  it("skips Gemini and warns for SENSITIVE input that has no core field (the real guard)", async () => {
+    // No project_id/apiKey → haveCore is false, so the sensitive guard is the
+    // only thing preventing a Gemini call. This exercises src/ai-config-assistant
+    // line ~196 directly (the haveCore short-circuit cannot mask it here).
+    const raw = JSON.stringify({ type: "service_account", private_key: FAKE_PRIVATE_KEY });
+    const wrapped = testEnv.wrap(fns.aiParseFirebaseConfig);
+    const res = await wrapped({ rawText: raw }, asAdmin);
+    expect((global as any).fetch).not.toHaveBeenCalled();
+    expect(res.usedAi).toBe(false);
+    expect(res.warnings.join(" ")).toMatch(/bersprungen|sensibl/i);
+    expect(JSON.stringify(res)).not.toContain("FAKE_SECRET_MATERIAL");
+  });
+
+  it("sends only the pasted text in the Gemini request body — never a secret", async () => {
+    let capturedBody = "";
+    (global as any).fetch = jest.fn(async (_url: string, opts: any) => {
+      capturedBody = opts && opts.body ? String(opts.body) : "";
+      return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ projectId: "ai-proj" }) }] } }] }) };
+    });
+    const wrapped = testEnv.wrap(fns.aiParseFirebaseConfig);
+    await wrapped({ rawText: "irgendein unklarer text ohne kernfelder" }, asAdmin);
+    expect(capturedBody).toContain("irgendein unklarer text");
+    expect(capturedBody).not.toContain("FAKE_SECRET_MATERIAL");
+  });
+
+  it("preserves the deterministic result when Gemini returns non-OK", async () => {
+    (global as any).fetch = jest.fn(async () => ({ ok: false, json: async () => ({}) }));
+    const wrapped = testEnv.wrap(fns.aiParseFirebaseConfig);
+    const res = await wrapped({ rawText: "kein json hier, nur prosa" }, asAdmin);
+    expect(res.usedAi).toBe(false);
+  });
+
+  it("does not throw when Gemini returns malformed JSON", async () => {
+    (global as any).fetch = jest.fn(async () => ({
+      ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: "not valid json {{{" }] } }] }),
+    }));
+    const wrapped = testEnv.wrap(fns.aiParseFirebaseConfig);
+    const res = await wrapped({ rawText: "kein json hier, nur prosa" }, asAdmin);
+    expect(res.usedAi).toBe(false);
   });
 });

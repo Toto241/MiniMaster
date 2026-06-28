@@ -261,6 +261,7 @@ export const getSecretInventory = functions.https.onCall(
           exists: false,
           latestVersion: null as string | null,
           updatedAt: null as string | null,
+          error: null as string | null,
         };
         if (!projectId) return base;
 
@@ -276,8 +277,12 @@ export const getSecretInventory = functions.https.onCall(
             latestVersion: (version.name || "").split("/versions/")[1] || "latest",
             updatedAt: seconds != null ? new Date(Number(seconds) * 1000).toISOString() : null,
           };
-        } catch {
-          // NOT_FOUND (never set) or permission issue → treat as not configured.
+        } catch (err) {
+          // Distinguish "never set" (NOT_FOUND) from an IAM gap so the panel can
+          // show an actionable permissions warning instead of "not configured".
+          if (grpcCode(err) === GRPC_PERMISSION_DENIED) {
+            return { ...base, error: "permission" };
+          }
           return base;
         }
       })

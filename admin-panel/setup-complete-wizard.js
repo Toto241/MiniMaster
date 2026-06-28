@@ -114,7 +114,8 @@
                 escapeHtml(message) +
                 ' <a href="./index.html">Zum Operator-Dashboard (als Admin anmelden) →</a>' +
                 '<br><span class="scw-row-hint">Erstinbetriebnahme &amp; noch kein Admin? ' +
-                '<a href="./index.html#btn-bootstrap-admin">Ersten Admin aktivieren →</a></span>';
+                'Im Dashboard anmelden/registrieren — dort erscheint „Als ersten Admin aktivieren". ' +
+                '<a href="./index.html">Zum Dashboard →</a></span>';
         }
     }
 

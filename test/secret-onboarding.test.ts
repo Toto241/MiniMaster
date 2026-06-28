@@ -191,6 +191,14 @@ describeCallable("setSecretValue", () => {
     const wrapped = testEnv.wrap(fns.setSecretValue);
     await expect(wrapped({ secretId: "GEMINI_API_KEY", value: RAW_SECRET }, asAdmin)).rejects.toThrow(/secretmanager\.admin/);
   });
+
+  it("requires a fresh admin-PIN confirmation when an operator PIN is configured", async () => {
+    // PIN configured + asAdmin session has no admin_verified_at → not fresh.
+    mockAdminPinGet.mockResolvedValueOnce({ exists: true, data: () => ({ pinHash: "scrypt$salt$hash" }) });
+    const wrapped = testEnv.wrap(fns.setSecretValue);
+    await expect(wrapped({ secretId: "GEMINI_API_KEY", value: RAW_SECRET }, asAdmin)).rejects.toThrow(/PIN/i);
+    expect(mockAddSecretVersion).not.toHaveBeenCalled();
+  });
 });
 
 // ==================== getSecretInventory ====================
@@ -217,5 +225,14 @@ describeCallable("getSecretInventory", () => {
     const wrapped = testEnv.wrap(fns.getSecretInventory);
     const res = await wrapped({}, asAdmin);
     expect(res.secrets.every((s: any) => s.exists === false)).toBe(true);
+    expect(res.secrets.every((s: any) => s.error === null)).toBe(true);
+  });
+
+  it("flags PERMISSION_DENIED distinctly instead of reporting 'not configured'", async () => {
+    mockGetSecretVersion.mockRejectedValue({ code: 7 }); // PERMISSION_DENIED for all
+    const wrapped = testEnv.wrap(fns.getSecretInventory);
+    const res = await wrapped({}, asAdmin);
+    expect(res.secrets.every((s: any) => s.exists === false)).toBe(true);
+    expect(res.secrets.every((s: any) => s.error === "permission")).toBe(true);
   });
 });

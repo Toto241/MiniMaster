@@ -396,7 +396,9 @@ function validatePricingPatch(
     return { ok: false, reason: "scope must be 'b2c' or 'b2b'." };
   }
   const tiers = scope === "b2c" ? B2C_TIERS : B2B_TIERS;
-  if (typeof sku !== "string" || !tiers[sku]) {
+  // hasOwn (not `!tiers[sku]`) so inherited keys like __proto__/constructor/
+  // toString cannot pass the existence check.
+  if (typeof sku !== "string" || !Object.prototype.hasOwnProperty.call(tiers, sku)) {
     return { ok: false, reason: "Unknown sku (new SKUs are not allowed — only existing tiers)." };
   }
   const allowed = scope === "b2c" ? B2C_OVERRIDE_FIELDS : B2B_OVERRIDE_FIELDS;
