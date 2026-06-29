@@ -23,6 +23,17 @@ interface EffectivePolicy {
   checksum?: string;
 }
 
+interface PolicyDoc {
+  policyType?: unknown;
+  country?: unknown;
+  locale?: unknown;
+  version?: unknown;
+  contentUrl?: unknown;
+  effectiveAt?: unknown;
+  isMajorChange?: unknown;
+  checksum?: unknown;
+}
+
 const LEGAL_POLICIES_COLLECTION = "legalPolicies";
 const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
 const DEFAULT_POLICY_VERSION = "2026.03.18-1";
@@ -95,7 +106,8 @@ function parsePublishPolicyInput(input: PublishPolicyInput): {
 }
 
 function resolveAuditRole(context: CallableContext): string {
-  return context.auth?.token?.role || "master";
+  const role = context.auth?.token?.role as string | undefined;
+  return role || "master";
 }
 
 function resolveTargetMaster(raw: unknown): string | null {
@@ -141,7 +153,7 @@ function buildDefaultPolicy(policyType: PolicyType, country: string, locale: str
 
 function mapPolicyDoc(doc: admin.firestore.DocumentSnapshot): EffectivePolicy | null {
   if (!doc.exists) return null;
-  const data = doc.data();
+  const data = doc.data() as PolicyDoc | undefined;
   if (!data) return null;
 
   const policyType = data.policyType;
@@ -211,7 +223,10 @@ async function findActivePolicy(policyType: PolicyType, country: string, locale:
   return buildDefaultPolicy(policyType, country, locale);
 }
 
-async function getEffectivePolicies(country: string, locale: string): Promise<{ terms: EffectivePolicy; privacy: EffectivePolicy }> {
+async function getEffectivePolicies(
+  country: string,
+  locale: string
+): Promise<{ terms: EffectivePolicy; privacy: EffectivePolicy }> {
   const [terms, privacy] = await Promise.all([
     findActivePolicy("terms", country, locale),
     findActivePolicy("privacy", country, locale),
@@ -398,7 +413,9 @@ export const publishLegalPolicy = functions.https.onCall(
     void logger; void traceId;
     requireAdmin(context);
     validateAppCheck(context, true);
-    const { policyType, country, locale, version, contentUrl, status, effectiveAt, isMajorChange } = parsePublishPolicyInput(data);
+    const {
+      policyType, country, locale, version, contentUrl, status, effectiveAt, isMajorChange,
+    } = parsePublishPolicyInput(data);
 
     if (!version) {
       throw new functions.https.HttpsError("invalid-argument", "version is required.");
@@ -453,7 +470,8 @@ export const markLegalReconsentRequired = functions.https.onCall(
     const targetMaster = resolveTargetMaster(data?.masterImei);
 
     if (targetMaster) {
-      const targetRef = db().collection(LEGAL_CONSENTS_COLLECTION).doc(buildConsentDocId(targetMaster, country, locale));
+      const targetDocId = buildConsentDocId(targetMaster, country, locale);
+      const targetRef = db().collection(LEGAL_CONSENTS_COLLECTION).doc(targetDocId);
       await targetRef.set({
         requiresReconsent: true,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),

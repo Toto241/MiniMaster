@@ -11,11 +11,30 @@ import { writeCommand, incrementPolicyVersion } from "./device-sync";
 import { withRetry } from "./resilience";
 import { createTraceContext, TracedLogger } from "./tracing";
 
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes let the call sites read data type-safely. They are
+ * deliberately partial: only the fields this module actually touches are declared.
+ */
+interface ChildDeviceDoc {
+  fcmToken?: unknown;
+  isLocked?: unknown;
+  appBlacklist?: unknown;
+  usageRules?: unknown;
+}
+interface TaskDoc {
+  status?: string;
+  photoUrl?: string;
+  description?: string;
+  masterImei?: string;
+}
+interface FcmTokenDoc { fcmToken?: string }
 
 // Deterministic JSON serialization: object keys are sorted recursively so equal
 // payloads with differing key order compare equal.
 function stableStringify(value: unknown): string {
-  return JSON.stringify(value, (_key, v) => {
+  return JSON.stringify(value, (_key, v: unknown) => {
     if (v && typeof v === "object" && !Array.isArray(v)) {
       const sorted: Record<string, unknown> = {};
       for (const k of Object.keys(v as Record<string, unknown>).sort()) {
@@ -48,8 +67,8 @@ async function sendFcmWithRetry(message: Message, maxAttempts = 3): Promise<stri
  */
 export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", async (event) => {
   const childId = event.params.childId;
-  const newData = event.data?.after.data();
-  const oldData = event.data?.before.data();
+  const newData = event.data?.after.data() as ChildDeviceDoc | undefined;
+  const oldData = event.data?.before.data() as ChildDeviceDoc | undefined;
   const logger = new TracedLogger(createTraceContext("onChildDeviceUpdateV2"));
 
   if (!newData) {
@@ -71,8 +90,10 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
   const payload: { [key: string]: string } = {};
 
   const lockChanged = newData.isLocked !== oldData.isLocked;
-  const newBlacklist: string[] = Array.isArray(newData.appBlacklist) ? [...newData.appBlacklist].sort() : [];
-  const oldBlacklist: string[] = Array.isArray(oldData.appBlacklist) ? [...oldData.appBlacklist].sort() : [];
+  const newAppBlacklist = newData.appBlacklist as unknown[] | undefined;
+  const oldAppBlacklist = oldData.appBlacklist as unknown[] | undefined;
+  const newBlacklist: unknown[] = Array.isArray(newAppBlacklist) ? [...newAppBlacklist].sort() : [];
+  const oldBlacklist: unknown[] = Array.isArray(oldAppBlacklist) ? [...oldAppBlacklist].sort() : [];
   const blacklistChanged = JSON.stringify(newBlacklist) !== JSON.stringify(oldBlacklist);
   const usageChanged = stableStringify(newData.usageRules) !== stableStringify(oldData.usageRules);
 
@@ -138,8 +159,8 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
 export const analyzeTaskPhoto = onDocumentUpdated(
   { document: "children/{childId}/tasks/{taskId}", secrets: ["GEMINI_API_KEY"] },
   async (event) => {
-  const newData = event.data?.after.data();
-  const oldData = event.data?.before.data();
+  const newData = event.data?.after.data() as TaskDoc | undefined;
+  const oldData = event.data?.before.data() as TaskDoc | undefined;
   const logger = new TracedLogger(createTraceContext("analyzeTaskPhoto"));
 
   if (!newData || !oldData) return;
@@ -281,8 +302,8 @@ Respond ONLY with valid JSON (no markdown, no code fences):
 export const onTaskStatusChange = functions.firestore
   .document("/children/{childId}/tasks/{taskId}")
   .onUpdate(async (change, context) => {
-    const newValue = change.after.data();
-    const previousValue = change.before.data();
+    const newValue = change.after.data() as TaskDoc | undefined;
+    const previousValue = change.before.data() as TaskDoc | undefined;
     const logger = new TracedLogger(createTraceContext("onTaskStatusChange"));
 
     if (!newValue || !previousValue) {
@@ -298,7 +319,7 @@ export const onTaskStatusChange = functions.firestore
       }
 
       const masterDoc = await db().collection("masters").doc(masterImei).get();
-      const fcmToken = masterDoc.data()?.fcmToken;
+      const fcmToken = (masterDoc.data() as FcmTokenDoc | undefined)?.fcmToken;
 
       if (!fcmToken) {
         logger.warn(`Master ${masterImei} does not have an FCM token. Cannot send notification.`);
@@ -331,7 +352,7 @@ export const onTaskStatusChange = functions.firestore
     if ((newValue.status === "approved" || newValue.status === "rejected") && newValue.status !== previousValue.status) {
       const childId = context.params.childId;
       const childDoc = await db().collection("children").doc(childId).get();
-      const childFcmToken = childDoc.data()?.fcmToken;
+      const childFcmToken = (childDoc.data() as FcmTokenDoc | undefined)?.fcmToken;
 
       if (!childFcmToken) {
         logger.warn(`Child ${childId} does not have an FCM token. Cannot send review notification.`);

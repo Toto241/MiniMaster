@@ -79,6 +79,18 @@ if (process.env.NODE_ENV !== "test") {
 
 // ==================== FIRESTORE BACKEND ====================
 
+/**
+ * Firestore hands back rate-limit documents as untyped `DocumentData` (`any`-valued).
+ * This narrow shape declares only the fields this module reads. Timestamp fields are
+ * stored as `admin.firestore.Timestamp`; the `?.toMillis?.()` reads tolerate legacy
+ * raw-number values, hence the numeric fallbacks at the call sites.
+ */
+interface RateLimitDoc {
+  windowStart?: admin.firestore.Timestamp;
+  count?: number;
+  blockedUntil?: admin.firestore.Timestamp;
+}
+
 const RATE_LIMIT_COLLECTION = "_rate_limits";
 async function checkFirestoreRateLimit(
   key: string,
@@ -90,11 +102,11 @@ async function checkFirestoreRateLimit(
 
     const result = await db().runTransaction(async (tx) => {
       const doc = await tx.get(docRef);
-      const data = doc.exists ? doc.data() : null;
+      const data = (doc.exists ? doc.data() : null) as RateLimitDoc | null;
 
-      const windowStart = data?.windowStart?.toMillis?.() || data?.windowStart || 0;
+      const windowStart = data?.windowStart?.toMillis?.() || (data?.windowStart as number | undefined) || 0;
       const currentCount = data?.count || 0;
-      const blockedUntil = data?.blockedUntil?.toMillis?.() || data?.blockedUntil || 0;
+      const blockedUntil = data?.blockedUntil?.toMillis?.() || (data?.blockedUntil as number | undefined) || 0;
 
       // Check if currently blocked
       if (blockedUntil > now) {
@@ -211,7 +223,8 @@ export async function checkDistributedRateLimit(
 
   // Build config
   const configKey = `${userRole}_${action}`;
-  const defaultConfig = DEFAULT_LIMITS[configKey] || DEFAULT_LIMITS[`${userRole}_default`] || DEFAULT_LIMITS.master_default;
+  const defaultConfig = DEFAULT_LIMITS[configKey] ||
+    DEFAULT_LIMITS[`${userRole}_default`] || DEFAULT_LIMITS.master_default;
   const config: RateLimitConfig = {
     ...(defaultConfig || { maxRequests: 100, windowMs: 60000 }),
     ...options,
