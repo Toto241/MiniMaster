@@ -168,7 +168,7 @@ describeCallable("aiParseFirebaseConfig", () => {
   it("sends only the pasted text in the Gemini request body — never a secret", async () => {
     let capturedBody = "";
     (global as any).fetch = jest.fn(async (_url: string, opts: any) => {
-      capturedBody = opts && opts.body ? String(opts.body) : "";
+      capturedBody = opts?.body ? String(opts.body) : "";
       return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ projectId: "ai-proj" }) }] } }] }) };
     });
     const wrapped = testEnv.wrap(fns.aiParseFirebaseConfig);

@@ -80,7 +80,7 @@ function regexExtract(text: string, parsed: ParsedWebConfig): void {
     if (parsed[key]) continue;
     const re = new RegExp(`["']?${key}["']?\\s*[:=]\\s*["']([^"']+)["']`);
     const m = text.match(re);
-    if (m && m[1]) parsed[key] = m[1].trim();
+    if (m?.[1]) parsed[key] = m[1].trim();
   }
 }
 
