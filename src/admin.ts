@@ -14,6 +14,23 @@ import { TracedLogger } from "./tracing";
 
 const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
 
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes — plus the `rowData` helper for whole-document spreads —
+ * let the call sites read data type-safely. They are deliberately partial: only
+ * the fields this module actually touches are declared.
+ */
+interface ErrorLogDoc { functionName?: string; message?: string; stack?: string; timestamp?: admin.firestore.Timestamp }
+interface ExpiringDoc { expiresAt?: admin.firestore.Timestamp; accessExpiresAt?: admin.firestore.Timestamp }
+interface ContentDoc { content?: string }
+interface FcmTokenDoc { fcmToken?: string }
+
+/** Reads a query-document's fields as a typed record (Firestore data is `any`-valued). */
+function rowData(snap: FirebaseFirestore.QueryDocumentSnapshot): Record<string, unknown> {
+  return snap.data() as Record<string, unknown>;
+}
+
 async function deleteQuerySnapshot(snapshot: FirebaseFirestore.QuerySnapshot): Promise<number> {
   if (snapshot.empty) return 0;
   await Promise.all(snapshot.docs.map((doc) => doc.ref.delete()));
@@ -200,7 +217,7 @@ export const sendDailyErrorReport = functions.pubsub
       const errorsByType: Record<string, number> = {};
 
       errorSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
+        const data = doc.data() as ErrorLogDoc;
         const functionName = data.functionName || "unknown";
         const errorMessage = data.message || "unknown";
         errorsByFunction[functionName] = (errorsByFunction[functionName] || 0) + 1;
@@ -271,34 +288,34 @@ export const exportUserData = functions.https.onCall(
       const masterData = masterDoc.data();
 
       const childrenSnapshot = await db().collection("children").where("masterImei", "==", masterId).get();
-      const childrenData: any[] = [];
+      const childrenData: Array<Record<string, unknown>> = [];
       for (const childDoc of childrenSnapshot.docs) {
-        const childInfo = childDoc.data();
+        const childInfo = rowData(childDoc);
         const tasksSnapshot = await childDoc.ref.collection("tasks").get();
-        const tasks = tasksSnapshot.docs.map((t) => ({ id: t.id, ...t.data() }));
+        const tasks = tasksSnapshot.docs.map((t) => ({ id: t.id, ...rowData(t) }));
         const usageSnapshot = await childDoc.ref.collection("usageHistory").get();
-        const usageHistory = usageSnapshot.docs.map((u) => ({ id: u.id, ...u.data() }));
+        const usageHistory = usageSnapshot.docs.map((u) => ({ id: u.id, ...rowData(u) }));
         childrenData.push({ id: childDoc.id, ...childInfo, tasks, usageHistory });
       }
 
       const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
-      const subscriptions = subsSnapshot.docs.map((s) => ({ id: s.id, ...s.data() }));
+      const subscriptions = subsSnapshot.docs.map((s) => ({ id: s.id, ...rowData(s) }));
 
       const ticketsSnapshot = await db().collection("supportTickets").where("masterImei", "==", masterId).get();
-      const supportTickets = ticketsSnapshot.docs.map((t) => ({ id: t.id, ...t.data() }));
+      const supportTickets = ticketsSnapshot.docs.map((t) => ({ id: t.id, ...rowData(t) }));
 
       const supportGrantsSnapshot = await db().collection("supportAccessGrants").where("masterImei", "==", masterId).get();
-      const supportAccessGrants = supportGrantsSnapshot.docs.map((g) => ({ id: g.id, ...g.data() }));
+      const supportAccessGrants = supportGrantsSnapshot.docs.map((g) => ({ id: g.id, ...rowData(g) }));
 
       const legalConsentsSnapshot = await db().collection(LEGAL_CONSENTS_COLLECTION).where("masterImei", "==", masterId).get();
-      const legalConsents = legalConsentsSnapshot.docs.map((c) => ({ id: c.id, ...c.data() }));
+      const legalConsents = legalConsentsSnapshot.docs.map((c) => ({ id: c.id, ...rowData(c) }));
 
       const auditSnapshot = await db().collection("audit_logs")
         .where("userId", "==", masterId)
         .orderBy("timestamp", "desc")
         .limit(500)
         .get();
-      const auditLogs = auditSnapshot.docs.map((a) => ({ id: a.id, ...a.data() }));
+      const auditLogs = auditSnapshot.docs.map((a) => ({ id: a.id, ...rowData(a) }));
 
       const exportData = {
         exportedAt: new Date().toISOString(),
@@ -387,8 +404,9 @@ export const getKnowledgeBase = functions.https.onCall(
 
     // Try Firestore first (runtime edits), fall back to deployed file
     const doc = await db().collection("operatorConfig").doc("knowledgeBase").get();
-    if (doc.exists && doc.data()?.content) {
-      return { success: true, content: doc.data()!.content, source: "firestore" };
+    const kbData = doc.data() as ContentDoc | undefined;
+    if (doc.exists && kbData?.content) {
+      return { success: true, content: kbData.content, source: "firestore" };
     }
 
     try {
@@ -406,6 +424,7 @@ export const updateKnowledgeBase = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "updateKnowledgeBase");
     void traceId;
     requireAdmin(context);
+    const adminUid = requireAuth(context);
     requireTier(context, "T3", "updateKnowledgeBase");
     validateAppCheck(context, true);
 
@@ -416,10 +435,10 @@ export const updateKnowledgeBase = functions.https.onCall(
     await db().collection("operatorConfig").doc("knowledgeBase").set({
       content: data.content,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedBy: context.auth!.uid,
+      updatedBy: adminUid,
     });
 
-    logger.info(`Knowledge base updated by admin ${context.auth!.uid} (${data.content.length} chars).`);
+    logger.info(`Knowledge base updated by admin ${adminUid} (${data.content.length} chars).`);
     return { success: true, length: data.content.length };
   }
 );
@@ -431,6 +450,7 @@ export const sendTestFcmMessage = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "sendTestFcmMessage");
     void traceId;
     requireAdmin(context);
+    const adminId = requireAuth(context);
     validateAppCheck(context, true);
 
     let fcmToken = data?.token;
@@ -438,7 +458,7 @@ export const sendTestFcmMessage = functions.https.onCall(
     // If childId provided, look up the FCM token
     if (!fcmToken && data?.childId) {
       const childDoc = await db().collection("children").doc(data.childId).get();
-      fcmToken = childDoc.data()?.fcmToken;
+      fcmToken = (childDoc.data() as FcmTokenDoc | undefined)?.fcmToken;
       if (!fcmToken) {
         return { success: false, error: `Kein FCM-Token für Kind ${data.childId} gefunden.` };
       }
@@ -461,7 +481,7 @@ export const sendTestFcmMessage = functions.https.onCall(
         },
       });
 
-      logger.info(`Test FCM sent by admin ${context.auth!.uid} to token ${fcmToken.substring(0, 20)}...`);
+      logger.info(`Test FCM sent by admin ${adminId} to token ${fcmToken.substring(0, 20)}...`);
       return { success: true, messageId };
     } catch (error) {
       return { success: false, error: `FCM Fehler: ${(error as Error).message}` };
@@ -492,7 +512,7 @@ export const triggerScheduledJob = functions.https.onCall(
             .where("status", "==", "active").get();
           const now = admin.firestore.Timestamp.now();
           const expiredDocs = subsSnapshot.docs.filter((doc) => {
-            const expiresAt = doc.data().expiresAt;
+            const expiresAt = (doc.data() as ExpiringDoc).expiresAt;
             return expiresAt && expiresAt.toMillis() < now.toMillis();
           });
           const BATCH_SIZE = 499;
@@ -504,7 +524,10 @@ export const triggerScheduledJob = functions.https.onCall(
             }
             await batch.commit();
           }
-          return { success: true, jobName, duration: Date.now() - startTime, result: { checked: subsSnapshot.size, expired: expiredDocs.length } };
+          return {
+            success: true, jobName, duration: Date.now() - startTime,
+            result: { checked: subsSnapshot.size, expired: expiredDocs.length },
+          };
         }
 
         case "cleanupExpiredGrants": {
@@ -513,20 +536,26 @@ export const triggerScheduledJob = functions.https.onCall(
           let revoked = 0;
           const now = admin.firestore.Timestamp.now();
           for (const doc of grantsSnapshot.docs) {
-            const expiresAt = doc.data().accessExpiresAt;
+            const expiresAt = (doc.data() as ExpiringDoc).accessExpiresAt;
             if (expiresAt && expiresAt.toMillis() < now.toMillis()) {
               await doc.ref.update({ accessGranted: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
               revoked++;
             }
           }
-          return { success: true, jobName, duration: Date.now() - startTime, result: { checked: grantsSnapshot.size, revoked } };
+          return {
+            success: true, jobName, duration: Date.now() - startTime,
+            result: { checked: grantsSnapshot.size, revoked },
+          };
         }
 
         case "sendDailyErrorReport": {
           const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
           const errorsSnapshot = await db().collection("error_logs")
             .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(since)).get();
-          return { success: true, jobName, duration: Date.now() - startTime, result: { errorsLast24h: errorsSnapshot.size } };
+          return {
+            success: true, jobName, duration: Date.now() - startTime,
+            result: { errorsLast24h: errorsSnapshot.size },
+          };
         }
 
         default:
@@ -579,7 +608,7 @@ export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY
       if (!errDoc.exists) {
         throw new functions.https.HttpsError("not-found", "Fehler-Eintrag nicht gefunden.");
       }
-      const errData = errDoc.data()!;
+      const errData = errDoc.data() as Record<string, unknown>;
       const errors = [{ id: errDoc.id, ...errData }];
       return await performAnalysis(apiKey, errors, adminId, context, logger, traceId);
     }
@@ -590,9 +619,12 @@ export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY
     }
 
     // Group errors by function+message for deduplication
-    const errorGroups: Record<string, { count: number; latestId: string; functionName: string; message: string; stack: string; timestamp: any }> = {};
+    const errorGroups: Record<string, {
+      count: number; latestId: string; functionName: string;
+      message: string; stack: string; timestamp?: admin.firestore.Timestamp;
+    }> = {};
     snapshot.docs.forEach((doc) => {
-      const d = doc.data();
+      const d = doc.data() as ErrorLogDoc;
       const key = `${d.functionName || "unknown"}::${(d.message || "").substring(0, 100)}`;
       if (!errorGroups[key]) {
         errorGroups[key] = { count: 0, latestId: doc.id, functionName: d.functionName || "unknown", message: d.message || "", stack: d.stack || "", timestamp: d.timestamp };
@@ -623,7 +655,10 @@ export const analyzeSystemErrors = functions.runWith({ secrets: ["GEMINI_API_KEY
 
 async function performAnalysis(
   apiKey: string,
-  errors: Array<{ id: string; functionName?: string; message?: string; stack?: string; count?: number; [key: string]: any }>,
+  errors: Array<{
+    id: string; functionName?: string; message?: string;
+    stack?: string; count?: number; [key: string]: unknown;
+  }>,
   adminId: string,
   context: CallableContext,
   logger: TracedLogger,
@@ -635,7 +670,8 @@ async function performAnalysis(
   let kb = knowledgeBaseAdmin;
   try {
     const kbDoc = await db().collection("operatorConfig").doc("knowledgeBase").get();
-    if (kbDoc.exists && kbDoc.data()?.content) kb = kbDoc.data()!.content;
+    const kbData = kbDoc.data() as ContentDoc | undefined;
+    if (kbDoc.exists && kbData?.content) kb = kbData.content;
   } catch { /* use static KB */ }
 
   const errorSummary = errors.map((e, i) => {
@@ -705,7 +741,7 @@ Antworte NUR mit dem JSON-Array, kein Markdown.`;
     }>;
 
     try {
-      analyses = JSON.parse(rawText);
+      analyses = JSON.parse(rawText) as typeof analyses;
       if (!Array.isArray(analyses)) analyses = [analyses];
     } catch {
       analyses = [{ errorIndex: 0, severity: "medium", category: "code", diagnosis: rawText.substring(0, 500), solution: "Manuelle Prüfung erforderlich.", autoFixable: false, autoFixAction: null, autoFixDescription: null }];
@@ -735,10 +771,11 @@ Antworte NUR mit dem JSON-Array, kein Markdown.`;
       { errorCount: errors.length, analysisCount: enriched.length, model, traceId }
     );
 
+    const autoFixableCount = enriched.filter((a) => a.autoFixable).length;
     return {
       analysisId: analysisDoc.id,
       analyses: enriched,
-      summary: `${enriched.length} Fehler analysiert. ${enriched.filter(a => a.autoFixable).length} automatisch behebbar.`,
+      summary: `${enriched.length} Fehler analysiert. ${autoFixableCount} automatisch behebbar.`,
       totalErrors: errors.length,
       model,
     };
@@ -780,19 +817,22 @@ export const executeAutoFix = functions.https.onCall(
     }
 
     // Allowlisted auto-fix actions
-    const ALLOWED_ACTIONS: Record<string, () => Promise<{ result: string; details: any }>> = {
+    const ALLOWED_ACTIONS: Record<string, () => Promise<{ result: string; details: Record<string, unknown> }>> = {
       cleanup_expired_subscriptions: async () => {
         const subsSnap = await db().collection("subscriptions").where("status", "==", "active").get();
         let expired = 0;
         const now = admin.firestore.Timestamp.now();
         for (const doc of subsSnap.docs) {
-          const expiresAt = doc.data().expiresAt;
+          const expiresAt = (doc.data() as ExpiringDoc).expiresAt;
           if (expiresAt && expiresAt.toMillis() < now.toMillis()) {
             await doc.ref.update({ status: "expired", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
             expired++;
           }
         }
-        return { result: `${expired} abgelaufene Abonnements bereinigt.`, details: { checked: subsSnap.size, expired } };
+        return {
+          result: `${expired} abgelaufene Abonnements bereinigt.`,
+          details: { checked: subsSnap.size, expired },
+        };
       },
 
       cleanup_expired_grants: async () => {
@@ -812,7 +852,7 @@ export const executeAutoFix = functions.https.onCall(
           .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(since)).get();
         const errorsByFunction: Record<string, number> = {};
         errSnap.docs.forEach((doc) => {
-          const fn = doc.data().functionName || "unknown";
+          const fn = (doc.data() as ErrorLogDoc).functionName || "unknown";
           errorsByFunction[fn] = (errorsByFunction[fn] || 0) + 1;
         });
         await db().collection("error_summaries").add({
@@ -848,8 +888,8 @@ export const executeAutoFix = functions.https.onCall(
       const fixResult = await ALLOWED_ACTIONS[action]();
 
       // Update analysis doc with fix result
-      const analysisData = analysisDoc.data()!;
-      const updatedAnalyses = [...(analysisData.analyses || [])];
+      const analysisData = analysisDoc.data() as { analyses?: Array<Record<string, unknown>> };
+      const updatedAnalyses = [...(analysisData.analyses ?? [])];
       if (updatedAnalyses[errorIndex]) {
         updatedAnalyses[errorIndex] = {
           ...updatedAnalyses[errorIndex],

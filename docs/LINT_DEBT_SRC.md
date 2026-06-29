@@ -4,21 +4,21 @@
 > Testdateien sind bewusst ausgenommen (dort sind die `no-unsafe-*`/`object-injection`-Regeln abgeschaltet — siehe `.eslintrc.js`).
 > **0 Errors** — alles hier sind `warn`-Level-Hinweise, kein CI-Blocker. Liste dient gezieltem Schuldenabbau.
 
-## Gesamt: 700 Warnungen in 31 Dateien
+## Gesamt: 649 Warnungen in 31 Dateien
 
 ### Nach Regel
 
 | Anzahl | Regel |
 |---:|---|
-| 260 | `@typescript-eslint/prefer-nullish-coalescing` |
-| 159 | `@typescript-eslint/no-unsafe-assignment` |
+| 259 | `@typescript-eslint/prefer-nullish-coalescing` |
+| 142 | `@typescript-eslint/no-unsafe-assignment` |
 | 64 | `security/detect-object-injection` |
-| 64 | `@typescript-eslint/no-unsafe-member-access` |
-| 50 | `@typescript-eslint/no-non-null-assertion` |
-| 29 | `max-len` |
-| 19 | `@typescript-eslint/no-explicit-any` |
-| 16 | `@typescript-eslint/no-unsafe-call` |
-| 16 | `@typescript-eslint/no-unsafe-argument` |
+| 54 | `@typescript-eslint/no-unsafe-member-access` |
+| 43 | `@typescript-eslint/no-non-null-assertion` |
+| 22 | `max-len` |
+| 15 | `@typescript-eslint/no-unsafe-argument` |
+| 15 | `@typescript-eslint/no-explicit-any` |
+| 12 | `@typescript-eslint/no-unsafe-call` |
 | 9 | `@typescript-eslint/no-base-to-string` |
 | 3 | `security/detect-unsafe-regex` |
 | 3 | `@typescript-eslint/no-unsafe-return` |
@@ -31,9 +31,9 @@
 
 | Warnungen | Datei |
 |---:|---|
-| 107 | `src/admin.ts` |
 | 85 | `src/support.ts` |
 | 68 | `src/subscription.ts` |
+| 56 | `src/admin.ts` |
 | 53 | `src/auth.ts` |
 | 41 | `src/affiliate.ts` |
 | 34 | `src/pairing.ts` |
@@ -64,116 +64,6 @@
 | 1 | `src/validators/decisioning.ts` |
 
 ## Detail je Datei
-
-### `src/admin.ts` (107)
-
-- `src/admin.ts:133:9` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:135:9` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:157:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:160:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:160:80` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:204:15` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:204:48` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:205:15` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:205:43` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:206:9` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:206:26` — **@typescript-eslint/no-unsafe-member-access** — Computed name [functionName] resolves to an `any` value.
-- `src/admin.ts:206:43` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:206:60` — **@typescript-eslint/no-unsafe-member-access** — Computed name [functionName] resolves to an `any` value.
-- `src/admin.ts:206:74` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:207:9` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:207:22` — **@typescript-eslint/no-unsafe-member-access** — Computed name [errorMessage] resolves to an `any` value.
-- `src/admin.ts:207:39` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:207:52` — **@typescript-eslint/no-unsafe-member-access** — Computed name [errorMessage] resolves to an `any` value.
-- `src/admin.ts:207:66` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:274:27` — **@typescript-eslint/no-explicit-any** — Unexpected any. Specify a different type.
-- `src/admin.ts:332:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:346:37` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:370:78` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:370:94` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:391:31` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:391:40` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:419:18` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:422:52` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:441:7` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:464:45` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:495:19` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:496:33` — **@typescript-eslint/no-unsafe-call** — Unsafe call of a(n) `any` typed value.
-- `src/admin.ts:496:43` — **@typescript-eslint/no-unsafe-member-access** — Unsafe member access .toMillis on an `any` value.
-- `src/admin.ts:507:1` — **max-len** — This line has a length of 147. Maximum allowed is 120.
-- `src/admin.ts:516:19` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:517:30` — **@typescript-eslint/no-unsafe-call** — Unsafe call of a(n) `any` typed value.
-- `src/admin.ts:517:40` — **@typescript-eslint/no-unsafe-member-access** — Unsafe member access .toMillis on an `any` value.
-- `src/admin.ts:522:1` — **max-len** — This line has a length of 129. Maximum allowed is 120.
-- `src/admin.ts:529:1` — **max-len** — This line has a length of 126. Maximum allowed is 120.
-- `src/admin.ts:568:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:582:23` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:593:1` — **max-len** — This line has a length of 150. Maximum allowed is 120.
-- `src/admin.ts:593:139` — **@typescript-eslint/no-explicit-any** — Unexpected any. Specify a different type.
-- `src/admin.ts:596:37` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:596:54` — **@typescript-eslint/no-unsafe-call** — Unsafe call of a(n) `any` typed value.
-- `src/admin.ts:596:65` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:596:72` — **@typescript-eslint/no-unsafe-member-access** — Unsafe member access .substring on an `any` value.
-- `src/admin.ts:597:7` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.
-- `src/admin.ts:597:12` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:598:9` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:598:58` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:598:87` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:598:101` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:598:120` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:598:127` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:598:142` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:598:149` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:600:7` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:619:7` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:626:1` — **max-len** — This line has a length of 125. Maximum allowed is 120.
-- `src/admin.ts:626:119` — **@typescript-eslint/no-explicit-any** — Unexpected any. Specify a different type.
-- `src/admin.ts:632:42` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:638:48` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:638:53` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:642:58` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:642:88` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:642:120` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:642:165` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:645:1` — **max-len** — This line has a length of 126. Maximum allowed is 120.
-- `src/admin.ts:661:1` — **max-len** — This line has a length of 135. Maximum allowed is 120.
-- `src/admin.ts:699:79` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:699:95` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:708:7` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:717:16` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:717:32` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:717:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:718:21` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:718:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:718:74` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:719:21` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:719:42` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:719:64` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:720:20` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:720:39` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:741:1` — **max-len** — This line has a length of 123. Maximum allowed is 120.
-- `src/admin.ts:783:84` — **@typescript-eslint/no-explicit-any** — Unexpected any. Specify a different type.
-- `src/admin.ts:789:17` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:790:28` — **@typescript-eslint/no-unsafe-call** — Unsafe call of a(n) `any` typed value.
-- `src/admin.ts:790:38` — **@typescript-eslint/no-unsafe-member-access** — Unsafe member access .toMillis on an `any` value.
-- `src/admin.ts:795:1` — **max-len** — This line has a length of 121. Maximum allowed is 120.
-- `src/admin.ts:815:17` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:815:46` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:816:11` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:816:28` — **@typescript-eslint/no-unsafe-member-access** — Computed name [fn] resolves to an `any` value.
-- `src/admin.ts:816:35` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:816:52` — **@typescript-eslint/no-unsafe-member-access** — Computed name [fn] resolves to an `any` value.
-- `src/admin.ts:816:56` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:842:10` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:848:31` — **security/detect-object-injection** — Function Call Object Injection Sink
-- `src/admin.ts:851:28` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/admin.ts:852:32` — **@typescript-eslint/no-unsafe-assignment** — Unsafe spread of an `any` value in an array.
-- `src/admin.ts:852:58` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/admin.ts:853:11` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:854:9` — **@typescript-eslint/no-unsafe-assignment** — Unsafe assignment of an `any` value.
-- `src/admin.ts:854:9` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:855:14` — **security/detect-object-injection** — Generic Object Injection Sink
-- `src/admin.ts:870:9` — **@typescript-eslint/no-unsafe-argument** — Unsafe argument of type `any` assigned to a parameter of type `Record<string, any>`.
 
 ### `src/support.ts` (85)
 
@@ -333,6 +223,65 @@
 - `src/subscription.ts:793:20` — **@typescript-eslint/no-unsafe-member-access** — Unsafe member access .purchaseToken on an `any` value.
 - `src/subscription.ts:829:55` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/subscription.ts:830:57` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+
+### `src/admin.ts` (56)
+
+- `src/admin.ts:150:9` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:152:9` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:174:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:177:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:177:80` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:221:48` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:222:43` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:223:9` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:223:43` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:223:74` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:224:9` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:224:39` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:224:66` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:349:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:363:37` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:387:78` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:387:94` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:597:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:628:37` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:628:65` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:629:7` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.
+- `src/admin.ts:629:12` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:630:9` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:630:87` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:630:120` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:630:142` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:632:7` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:667:42` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:678:58` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:678:88` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:678:120` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:678:165` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:681:1` — **max-len** — This line has a length of 126. Maximum allowed is 120.
+- `src/admin.ts:697:1` — **max-len** — This line has a length of 135. Maximum allowed is 120.
+- `src/admin.ts:735:79` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:735:95` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:753:16` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:753:32` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:753:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:754:21` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:754:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:754:74` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:755:21` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:755:42` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:755:64` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:756:20` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:756:39` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:855:63` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:856:11` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:856:35` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:856:56` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/admin.ts:882:10` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:888:31` — **security/detect-object-injection** — Function Call Object Injection Sink
+- `src/admin.ts:893:11` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:894:9` — **security/detect-object-injection** — Generic Object Injection Sink
+- `src/admin.ts:895:14` — **security/detect-object-injection** — Generic Object Injection Sink
 
 ### `src/auth.ts` (53)
 
