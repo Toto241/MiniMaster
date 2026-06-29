@@ -12,6 +12,20 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const AUDIT_LOG_RETENTION_DAYS = 90;
 const ERROR_LOG_RETENTION_DAYS = 60;
 
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes let the call sites read data type-safely. They are
+ * deliberately partial: only the fields this module actually touches are declared.
+ */
+interface SubscriptionData {
+  status?: string;
+  trialEndsAt?: admin.firestore.Timestamp | number;
+}
+interface MasterAccessData {
+  subscription?: SubscriptionData;
+}
+
 export function buildTtlTimestamp(retentionDays: number): admin.firestore.Timestamp {
   return admin.firestore.Timestamp.fromMillis(Date.now() + (retentionDays * DAY_IN_MS));
 }
@@ -34,14 +48,14 @@ export function requireAdmin(context: CallableContext): void {
 }
 
 export function requireSupportOrAdmin(context: CallableContext): void {
-  const role = context.auth?.token?.role;
+  const role = context.auth?.token?.role as string | undefined;
   if (!context.auth || (role !== "admin" && role !== "support")) {
     throw new functions.https.HttpsError("permission-denied", "Support or admin privileges required.");
   }
 }
 
 export function requireAuditorOrAbove(context: CallableContext): void {
-  const role = context.auth?.token?.role;
+  const role = context.auth?.token?.role as string | undefined;
   if (!context.auth || (role !== "admin" && role !== "support" && role !== "auditor")) {
     throw new functions.https.HttpsError("permission-denied", "Operator privileges required.");
   }
@@ -78,7 +92,7 @@ export function requireTier(context: CallableContext, minTier: SessionTier, acti
   }
 
   if (minTier === "T4") {
-    const verifiedAt = context.auth?.token?.admin_verified_at;
+    const verifiedAt = context.auth?.token?.admin_verified_at as unknown;
     if (typeof verifiedAt === "number") {
       const verifiedAgeMinutes = (Date.now() / 1000 - verifiedAt) / 60;
       if (verifiedAgeMinutes > SESSION_TIER_MAX_MINUTES.T4) {
@@ -264,7 +278,7 @@ export interface AuditLog {
   resource: string;
   resourceType: "device" | "task" | "rule" | "subscription" | "user" | "system";
   status: "success" | "failure" | "denied";
-  metadata: { [key: string]: any };
+  metadata: { [key: string]: unknown };
   ipAddress?: string;
   userAgent?: string;
   errorMessage?: string;
@@ -281,17 +295,17 @@ export class AuditLogger {
     resource: string,
     resourceType: string,
     status: "success" | "failure" | "denied",
-    metadata: Record<string, any> = {},
+    metadata: Record<string, unknown> = {},
     error?: Error
   ): Promise<void> {
     try {
       const logEntry: AuditLog = {
         timestamp: admin.firestore.FieldValue.serverTimestamp() as admin.firestore.Timestamp,
         userId,
-        userRole: userRole as any,
+        userRole: userRole as AuditLog["userRole"],
         action,
         resource,
-        resourceType: resourceType as any,
+        resourceType: resourceType as AuditLog["resourceType"],
         status,
         metadata,
         errorMessage: error?.message,
@@ -316,7 +330,7 @@ export class AuditLogger {
     context: CallableContext,
     resource: string,
     resourceType: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ): Promise<void> {
     if (!context.auth) return;
     await this.log(
@@ -331,7 +345,7 @@ export class AuditLogger {
     resource: string,
     resourceType: string,
     error: Error,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ): Promise<void> {
     await this.log(
       action, context?.auth?.uid || "anonymous", (context?.auth?.token?.role as string) || "unknown",
@@ -345,7 +359,7 @@ export class AuditLogger {
     resource: string,
     resourceType: string,
     reason: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ): Promise<void> {
     if (!context.auth) return;
     await this.log(
@@ -362,7 +376,7 @@ export class AppError extends Error {
     public code: string,
     message: string,
     public severity: "low" | "medium" | "high" | "critical",
-    public metadata: Record<string, any> = {}
+    public metadata: Record<string, unknown> = {}
   ) {
     super(message);
     this.name = "AppError";
@@ -419,7 +433,7 @@ export function getTracedLogger(context: CallableContext, functionName: string):
 
 export function hasActiveAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
   if (!masterData) return false;
-  const subscription = masterData.subscription;
+  const subscription = (masterData as MasterAccessData).subscription;
   if (!subscription) return false;
 
   if (subscription.status === "active") return true;

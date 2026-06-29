@@ -26,6 +26,44 @@ import {
 const DEFAULT_PARENT_APP_LIMIT = 2;
 const DEFAULT_CHILD_LIMIT = 4;
 
+/** Subset of a master document read for affiliate conversion tracking. */
+interface MasterAffiliateDoc {
+  affiliateCode?: string;
+  affiliateId?: string;
+}
+
+/** Subset of a master's subscription sub-document read for status reporting. */
+interface SubscriptionDoc {
+  status?: string;
+  trialEndsAt?: admin.firestore.Timestamp | number;
+  parentAppLimit?: number;
+  childLimit?: number;
+  platform?: string;
+  originalTransactionId?: string | null;
+  expiresDateMs?: number | null;
+}
+
+/** Subset of a master document read for subscription status reporting. */
+interface MasterSubscriptionDoc {
+  subscription?: SubscriptionDoc;
+}
+
+/** Subset of a subscription document read during revocation. */
+interface RevocationSubscriptionDoc {
+  masterId?: string;
+}
+
+/** Subset of a master's subscription sub-document read during Play re-verification. */
+interface ReverifySubscription {
+  purchaseToken?: string;
+  type?: string;
+}
+
+/** Subset of a master document read during Play re-verification. */
+interface ReverifyMasterDoc {
+  subscription?: ReverifySubscription;
+}
+
 // Re-export for backward compatibility
 export { VALID_PRODUCT_IDS, getChildLimit, getParentAppLimit, getSubscriptionDurationMs };
 
@@ -101,7 +139,7 @@ export const verifyPurchase = functions.https.onCall(
             status: "active",
             type: sku,
             tierName: tier?.name || sku,
-            isPremium: (tier as any)?.isPremium || false,
+            isPremium: (tier as { isPremium?: boolean } | undefined)?.isPremium || false,
             parentAppLimit: getParentAppLimit(sku),
             childLimit: getChildLimit(sku),
             startedAt: now,
@@ -113,7 +151,7 @@ export const verifyPurchase = functions.https.onCall(
         });
 
         // Track affiliate conversion if referred
-        const masterData = (await masterDeviceRef.get()).data();
+        const masterData = (await masterDeviceRef.get()).data() as MasterAffiliateDoc | undefined;
         if (masterData?.affiliateCode) {
           try {
             await db().collection("affiliate_conversions").add({
@@ -183,9 +221,9 @@ export const getSubscriptionStatus = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Master account not found.");
     }
 
-    const masterData = masterDoc.data();
-    const subscription = masterData?.subscription || { status: "none" };
-    const result: Record<string, any> = { subscriptionStatus: subscription };
+    const masterData = masterDoc.data() as MasterSubscriptionDoc | undefined;
+    const subscription: SubscriptionDoc = masterData?.subscription || { status: "none" };
+    const result: Record<string, unknown> = { subscriptionStatus: subscription };
 
     if (subscription.status === "trial" && subscription.trialEndsAt) {
       const trialEnd = subscription.trialEndsAt instanceof admin.firestore.Timestamp
@@ -196,7 +234,7 @@ export const getSubscriptionStatus = functions.https.onCall(
       result.isTrialActive = remainingMs > 0;
     }
 
-    result.hasAccess = hasActiveAccess(masterData);
+    result.hasAccess = hasActiveAccess(masterData as admin.firestore.DocumentData | undefined);
     result.parentAppLimit = subscription.parentAppLimit || DEFAULT_PARENT_APP_LIMIT;
     result.childLimit = subscription.childLimit || DEFAULT_CHILD_LIMIT;
     result.platform = subscription.platform || "unknown";
@@ -233,8 +271,9 @@ export const revokeSubscription = functions.https.onCall(
           .where("masterId", "==", targetMasterId)
           .limit(1)
           .get();
-        if (!candidate.empty) {
-          subscriptionId = candidate.docs[0]!.id;
+        const candidateDoc = candidate.docs[0];
+        if (!candidate.empty && candidateDoc) {
+          subscriptionId = candidateDoc.id;
         }
       }
 
@@ -245,7 +284,7 @@ export const revokeSubscription = functions.https.onCall(
         if (!subDoc.exists) {
           throw new functions.https.HttpsError("not-found", "Subscription not found.");
         }
-        masterId = masterId || subDoc.data()?.masterId;
+        masterId = masterId || (subDoc.data() as RevocationSubscriptionDoc | undefined)?.masterId;
 
         await db().collection("subscriptions").doc(subscriptionId).update({
           status: "revoked",
@@ -269,7 +308,10 @@ export const revokeSubscription = functions.https.onCall(
         { subscriptionId, masterId, duration: Date.now() - startTime, traceId }
       );
 
-      return { message: subscriptionId ? `Subscription ${subscriptionId} successfully revoked.` : `Subscription status for master ${masterId} successfully revoked.` };
+      const message = subscriptionId
+        ? `Subscription ${subscriptionId} successfully revoked.`
+        : `Subscription status for master ${masterId} successfully revoked.`;
+      return { message };
     } catch (error) {
       await AuditLogger.logFailure(
         "admin.revoke_subscription", context, `subscriptions/${data.subscriptionId || "unknown"}`, "subscription",
@@ -356,7 +398,14 @@ async function verifyPlaySubscription(
     token: purchaseToken,
   });
   const body = res.data;
-  return body && (body as any).purchaseState === 0 && (body as any).expiryTimeMillis > Date.now();
+  const parsed = body as unknown as PlaySubscriptionGetResponse;
+  return body && parsed.purchaseState === 0 && parsed.expiryTimeMillis > Date.now();
+}
+
+/** Subset of the Play Developer API subscriptions.get response read here. */
+interface PlaySubscriptionGetResponse {
+  purchaseState?: number;
+  expiryTimeMillis: number;
 }
 
 /**
@@ -531,7 +580,7 @@ export function decodeRtdnPayload(data: string | undefined | null): RtdnPayload 
   const logger = new TracedLogger(createTraceContext("decodeRtdnPayload"));
   try {
     const raw = Buffer.from(data, "base64").toString("utf8");
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as unknown;
     return parsed && typeof parsed === "object" ? parsed as RtdnPayload : null;
   } catch (err) {
     logger.warn("Failed to decode RTDN payload", { error: String(err) });
@@ -563,7 +612,8 @@ export async function applyRtdnNotification(
     .limit(1)
     .get();
 
-  if (snapshot.empty) {
+  const doc = snapshot.docs[0];
+  if (snapshot.empty || !doc) {
     logger.warn("RTDN received but no matching master found", {
       purchaseToken: sub.purchaseToken.slice(0, 6) + "…",
       notificationType: sub.notificationType,
@@ -571,7 +621,6 @@ export async function applyRtdnNotification(
     return { handled: false, reason: "master_not_found", notificationType: sub.notificationType };
   }
 
-  const doc = snapshot.docs[0]!;
   const masterId = doc.id;
   const now = admin.firestore.Timestamp.now();
 
@@ -656,7 +705,7 @@ export const onPlayBillingNotification = functions.pubsub
   .topic(process.env.PLAY_BILLING_PUBSUB_TOPIC || "play-billing-notifications")
   .onPublish(async (message) => {
     const logger = new TracedLogger(createTraceContext("onPlayBillingNotification"));
-    const payload = decodeRtdnPayload((message as any)?.data);
+    const payload = decodeRtdnPayload((message as { data?: string } | undefined)?.data);
     if (!payload) {
       logger.warn("RTDN: empty or undecodable payload");
       return null;
@@ -779,8 +828,8 @@ export async function reverifyActiveSubscriptionsRun(
   const androidpublisher = google.androidpublisher({ version: "v3", auth: authClient });
 
   for (const doc of candidates.docs) {
-    const data = doc.data() || {};
-    const sub = data.subscription || {};
+    const data = (doc.data() || {}) as ReverifyMasterDoc;
+    const sub: ReverifySubscription = data.subscription || {};
     if (!sub.purchaseToken || !sub.type) {
       skipped++;
       continue;

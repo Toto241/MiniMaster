@@ -9,9 +9,67 @@ import { getMessaging } from "firebase-admin/messaging";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
-import { AuditLogger, checkRateLimit, requireSupportOrAdmin, validateAppCheck, getTracedLogger } from "./shared";
+import { AuditLogger, checkRateLimit, requireAuth, requireSupportOrAdmin, validateAppCheck, getTracedLogger } from "./shared";
 
 // ==================== AI CLIENT ====================
+
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes — plus the `rowData` helper for whole-document spreads —
+ * let the call sites read data type-safely. They are deliberately partial: only
+ * the fields this module actually touches are declared.
+ */
+interface SupportTicketDoc {
+  masterImei?: string;
+  ticketId?: string;
+  problemDescription?: string;
+  conversationStatus?: string;
+  conversationRound?: number;
+  aiAttemptFailures?: number;
+  status?: string;
+  accessGranted?: boolean;
+  accessGrantId?: string;
+  debugAccessGrantId?: string;
+  adminResponse?: string;
+}
+
+interface SupportGrantDoc {
+  masterImei?: string;
+  ticketId?: string;
+  status?: string;
+  debugScope?: unknown;
+  expiresAt?: admin.firestore.Timestamp;
+}
+
+interface MasterFcmDoc {
+  fcmToken?: string;
+}
+
+/**
+ * Raw child-document fields read by collectDebugSnapshot before sanitization.
+ * Telemetry fields keep the DebugSnapshot field types so the pre-sanitize object
+ * literal type-checks; sanitizeDebugSnapshot re-validates/clamps every value.
+ */
+interface ChildDebugDoc {
+  appBlacklist?: unknown;
+  usageRules?: unknown;
+  isLocked?: unknown;
+  lastSeen?: unknown;
+  updatedAt?: unknown;
+  fcmToken?: unknown;
+  networkType: DebugSnapshot["networkDiagnostics"]["networkType"];
+  batteryLevelPct: DebugSnapshot["deviceTelemetry"]["batteryLevelPct"];
+  isCharging?: unknown;
+  storageFreeBytes: DebugSnapshot["deviceTelemetry"]["storageFreeBytes"];
+  osVersion: DebugSnapshot["deviceTelemetry"]["osVersion"];
+  appVersion: DebugSnapshot["deviceTelemetry"]["appVersion"];
+}
+
+/** Reads a query-document's fields as a typed record (Firestore data is `any`-valued). */
+function rowData(snap: FirebaseFirestore.QueryDocumentSnapshot): Record<string, unknown> {
+  return snap.data() as Record<string, unknown>;
+}
 
 type AiTicketResponse = {
   solution: string;
@@ -217,7 +275,7 @@ function parseAiTicketResponse(rawResponse: string): AiTicketResponse {
 }
 
 function resolveImpersonationRole(context: CallableContext): string {
-  return context.auth!.token.role as string || "support";
+  return context.auth?.token.role as string || "support";
 }
 
 function resolveExplainRole(role: string | undefined): string {
@@ -368,7 +426,10 @@ if (!knowledgeBase) {
 // ==================== SUPPORT TICKETS ====================
 
 export const createSupportTicket = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(
-  async (data: { problemDescription: string; allowSupportAccess: boolean; consentSource?: string }, context: CallableContext) => {
+  async (
+    data: { problemDescription: string; allowSupportAccess: boolean; consentSource?: string },
+    context: CallableContext
+  ) => {
     const { logger, traceId } = getTracedLogger(context, "createSupportTicket");
     void traceId;
     if (!context.auth) {
@@ -474,7 +535,10 @@ export const grantSupportAccess = functions.https.onCall(
 
       await AuditLogger.logSuccess(
         "admin.grant_support_access", context, `supportAccessGrants/${grantRef.id}`, "system",
-        { ticketId, grantId: grantRef.id, expiresAt: expiresAt.toISOString(), duration: Date.now() - startTime, traceId }
+        {
+          ticketId, grantId: grantRef.id, expiresAt: expiresAt.toISOString(),
+          duration: Date.now() - startTime, traceId,
+        }
       );
 
       logger.info(`Support access granted: ${grantRef.id} for ticket ${ticketId}`);
@@ -509,7 +573,7 @@ export const revokeSupportAccess = functions.https.onCall(
 
     try {
       const grantDoc = await db().collection("supportAccessGrants").doc(grantId).get();
-      if (!grantDoc.exists || grantDoc.data()?.masterImei !== masterImei) {
+      if (!grantDoc.exists || (grantDoc.data() as SupportGrantDoc | undefined)?.masterImei !== masterImei) {
         await AuditLogger.logDenied(
           "admin.revoke_support_access", context, `supportAccessGrants/${grantId}`, "system",
           "Grant not found or access denied", { grantId, traceId }
@@ -519,7 +583,7 @@ export const revokeSupportAccess = functions.https.onCall(
 
       await db().collection("supportAccessGrants").doc(grantId).update({ status: "revoked" });
 
-      const ticketId = grantDoc.data()?.ticketId;
+      const ticketId = (grantDoc.data() as SupportGrantDoc | undefined)?.ticketId;
       if (ticketId) {
         await db().collection("supportTickets").doc(ticketId).update({ accessGranted: false });
       }
@@ -564,7 +628,7 @@ export const cleanupExpiredGrants = functions.pubsub.schedule("every 1 hours").o
       const batch = db().batch();
       chunk.forEach((doc) => {
         batch.update(doc.ref, { status: "expired" });
-        const ticketId = doc.data().ticketId;
+        const ticketId = (doc.data() as SupportGrantDoc).ticketId;
         if (ticketId) {
           batch.update(db().collection("supportTickets").doc(ticketId), { accessGranted: false });
         }
@@ -588,7 +652,7 @@ async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> 
     .get();
 
   const childDoc = childrenSnap.docs[0];
-  const childData = childDoc?.data() || {};
+  const childData = (childDoc?.data() || {}) as ChildDebugDoc;
 
   let recentTamperEvents = 0;
   let recentUsageReports = 0;
@@ -815,7 +879,7 @@ export const onTicketCreated = functions.firestore
   .document("supportTickets/{ticketId}")
   .onCreate(async (snapshot, context) => {
     const ticketId = context.params.ticketId;
-    const ticketData = snapshot.data();
+    const ticketData = snapshot.data() as SupportTicketDoc;
 
     functions.logger.info(`New support ticket created: ${ticketId}`);
 
@@ -845,11 +909,11 @@ export const onTicketCreated = functions.firestore
 
       functions.logger.info(`Ticket ${ticketId} moved to debug consent flow.`);
 
-      const masterImei = ticketData.masterImei;
+      const masterImei = ticketData.masterImei as string;
       const masterDoc = await admin.firestore().collection("masters").doc(masterImei).get();
 
       if (masterDoc.exists) {
-        const masterData = masterDoc.data();
+        const masterData = masterDoc.data() as MasterFcmDoc | undefined;
         const fcmToken = masterData?.fcmToken;
 
         if (fcmToken) {
@@ -902,8 +966,8 @@ export const onSupportTicketUpdated = functions.firestore
   .document("supportTickets/{ticketId}")
   .onUpdate(async (change, context) => {
     const ticketId = context.params.ticketId;
-    const before = change.before.data() || {};
-    const after = change.after.data() || {};
+    const before = (change.before.data() || {}) as SupportTicketDoc;
+    const after = (change.after.data() || {}) as SupportTicketDoc;
 
     const adminResponseBefore = typeof before.adminResponse === "string" ? before.adminResponse.trim() : "";
     const adminResponseAfter = typeof after.adminResponse === "string" ? after.adminResponse.trim() : "";
@@ -1255,7 +1319,7 @@ export const getDebugInfo = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticketData = ticketDoc.data() || {};
+    const ticketData = (ticketDoc.data() || {}) as SupportTicketDoc;
     checkRateLimit(context.auth.uid, "support.get_debug_info", 30, 60_000);
     const role = String(context.auth.token.role || "");
     const isSupport = role === "admin" || role === "support";
@@ -1268,11 +1332,11 @@ export const getDebugInfo = functions.https.onCall(
     }
 
     const grantDoc = await db().collection("supportAccessGrants").doc(String(ticketData.debugAccessGrantId)).get();
-    if (!grantDoc.exists || grantDoc.data()?.status !== "active") {
+    if (!grantDoc.exists || (grantDoc.data() as SupportGrantDoc | undefined)?.status !== "active") {
       throw new functions.https.HttpsError("permission-denied", "Debug access grant is not active.");
     }
 
-    const grant = grantDoc.data() || {};
+    const grant = (grantDoc.data() || {}) as SupportGrantDoc;
     if (String(grant.ticketId || "") !== ticketId || String(grant.masterImei || "") !== String(ticketData.masterImei || "")) {
       throw new functions.https.HttpsError("permission-denied", "Debug access grant does not belong to this ticket.");
     }
@@ -1284,7 +1348,7 @@ export const getDebugInfo = functions.https.onCall(
         "Debug scope does not allow diagnostic data access."
       );
     }
-    const expiresAt = grant.expiresAt as admin.firestore.Timestamp | undefined;
+    const expiresAt = grant.expiresAt;
     if (expiresAt && expiresAt.toMillis() <= Date.now()) {
       await grantDoc.ref.update({ status: "expired" });
       throw new functions.https.HttpsError("deadline-exceeded", "Debug access grant expired.");
@@ -1363,7 +1427,7 @@ export const getTicketUserData = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "getTicketUserData");
     void logger; void traceId;
     requireSupportOrAdmin(context);
-    const callerId = context.auth!.uid;
+    const callerId = requireAuth(context);
     validateAppCheck(context, true);
 
     const { ticketId } = data;
@@ -1376,8 +1440,8 @@ export const getTicketUserData = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticket = ticketDoc.data()!;
-    const masterImei = ticket.masterImei;
+    const ticket = ticketDoc.data() as SupportTicketDoc;
+    const masterImei = ticket.masterImei as string;
 
     // Verify active support grant exists for this ticket
     if (!ticket.accessGrantId) {
@@ -1392,7 +1456,7 @@ export const getTicketUserData = functions.https.onCall(
       throw new functions.https.HttpsError("permission-denied", "Support access grant not found.");
     }
 
-    const grant = grantDoc.data()!;
+    const grant = grantDoc.data() as SupportGrantDoc;
     if (grant.status !== "active") {
       throw new functions.https.HttpsError(
         "permission-denied",
@@ -1408,10 +1472,10 @@ export const getTicketUserData = functions.https.onCall(
 
     // Grant is valid — fetch user data
     const masterDoc = await db().collection("masters").doc(masterImei).get();
-    const masterData = masterDoc.exists ? masterDoc.data() : null;
+    const masterData = masterDoc.exists ? (masterDoc.data() as Record<string, unknown>) : null;
 
     const childrenSnap = await db().collection("children").where("masterImei", "==", masterImei).get();
-    const children = childrenSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const children = childrenSnap.docs.map((doc) => ({ id: doc.id, ...rowData(doc) }));
 
     await AuditLogger.log(
       "admin.user_impersonation", callerId, resolveImpersonationRole(context),
@@ -1492,7 +1556,7 @@ Antworte auf Deutsch, präzise und umsetzbar. Gib deine Antwort als JSON zurück
       const aiResult = await generateAiCompletion(prompt);
       let parsed: { explanation: string; suggestion: string };
       try {
-        parsed = JSON.parse(aiResult.rawResponse);
+        parsed = JSON.parse(aiResult.rawResponse) as { explanation: string; suggestion: string };
       } catch {
         parsed = {
           explanation: aiResult.rawResponse.substring(0, 500),

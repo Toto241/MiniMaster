@@ -40,6 +40,42 @@ export interface Affiliate {
   updatedAt: admin.firestore.Timestamp;
 }
 
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes — plus the `rowData` helper for whole-document spreads —
+ * let the call sites read data type-safely. They are deliberately partial: only
+ * the fields this module actually touches are declared.
+ */
+interface AffiliateStatusDoc { status?: string }
+interface AffiliateStatsDoc {
+  code?: string;
+  status?: string;
+  commissionRate: number;
+  totalReferrals?: number;
+  totalEarningsCents?: number;
+  pendingEarningsCents?: number;
+  paidEarningsCents?: number;
+}
+interface ReferralDoc {
+  masterId?: string;
+  sku?: string;
+  commissionCents?: number;
+  status?: string;
+  createdAt?: admin.firestore.Timestamp;
+}
+interface AffiliateListDoc {
+  code?: string;
+  name?: string;
+  email?: string;
+  status?: string;
+  totalReferrals?: number;
+  totalEarningsCents?: number;
+  pendingEarningsCents?: number;
+  createdAt?: admin.firestore.Timestamp;
+}
+interface PendingEarningsDoc { pendingEarningsCents?: number }
+
 // ==================== CLOUD FUNCTIONS ====================
 
 /**
@@ -73,7 +109,7 @@ export const registerAffiliate = functions.https.onCall(
         .get();
 
       if (!existing.empty) {
-        const existingData = existing.docs[0]!.data();
+        const existingData = existing.docs[0]!.data() as AffiliateStatusDoc;
         if (existingData.status === "active") {
           throw new functions.https.HttpsError("already-exists", "An affiliate account with this email already exists.");
         }
@@ -188,7 +224,10 @@ export const reviewAffiliate = functions.https.onCall(
 export const trackAffiliateConversion = functions.https.onCall(
   withErrorHandling(
     "trackAffiliateConversion",
-    async (data: { affiliateCode: string; masterId: string; subscriptionId: string; sku: string }, context: CallableContext) => {
+    async (
+      data: { affiliateCode: string; masterId: string; subscriptionId: string; sku: string },
+      context: CallableContext,
+    ) => {
       validateAppCheck(context, true);
 
       const code = validateString(data.affiliateCode, "affiliateCode", { maxLength: 20 });
@@ -207,7 +246,7 @@ export const trackAffiliateConversion = functions.https.onCall(
       }
 
       const affiliateDoc = affiliateSnapshot.docs[0]!;
-      const affiliateData = affiliateDoc.data();
+      const affiliateData = affiliateDoc.data() as AffiliateStatsDoc;
 
       // Check for duplicate referral
       const existing = await db().collection("affiliate_referrals")
@@ -280,7 +319,7 @@ export const getAffiliateDashboard = functions.https.onCall(
       }
 
       const affiliateDoc = affiliateSnapshot.docs[0]!;
-      const affiliateData = affiliateDoc.data();
+      const affiliateData = affiliateDoc.data() as AffiliateStatsDoc;
 
       // Get recent referrals
       const referralsSnapshot = await db().collection("affiliate_referrals")
@@ -301,11 +340,11 @@ export const getAffiliateDashboard = functions.https.onCall(
         referralLink: `https://minimaster.app/ref/${affiliateData.code}`,
         referrals: referralsSnapshot.docs.map((d) => ({
           id: d.id,
-          masterId: d.data().masterId,
-          sku: d.data().sku,
-          commissionCents: d.data().commissionCents,
-          status: d.data().status,
-          createdAt: d.data().createdAt?.toMillis(),
+          masterId: (d.data() as ReferralDoc).masterId,
+          sku: (d.data() as ReferralDoc).sku,
+          commissionCents: (d.data() as ReferralDoc).commissionCents,
+          status: (d.data() as ReferralDoc).status,
+          createdAt: (d.data() as ReferralDoc).createdAt?.toMillis(),
         })),
       };
     }
@@ -336,7 +375,7 @@ export const listAffiliates = functions.https.onCall(
 
       return {
         affiliates: snapshot.docs.map((doc) => {
-          const d = doc.data();
+          const d = doc.data() as AffiliateListDoc;
           return {
             id: doc.id,
             code: d.code,
@@ -380,7 +419,7 @@ export const processAffiliatePayouts = functions.https.onCall(
       const now = admin.firestore.Timestamp.now();
 
       for (const doc of affiliatesSnapshot.docs) {
-        const data = doc.data();
+        const data = doc.data() as PendingEarningsDoc;
         const pendingCents = data.pendingEarningsCents || 0;
 
         // Reset pending, add to paid
