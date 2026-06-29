@@ -57,18 +57,36 @@ function assignKnownWebKeys(target: ParsedWebConfig, source: Record<string, unkn
   }
 }
 
+/** Shape of the parts of a google-services.json (Android) we read. */
+interface GoogleServicesInfo {
+  project_id?: unknown;
+  storage_bucket?: unknown;
+  project_number?: unknown;
+}
+interface GoogleServicesClient {
+  client_info?: { mobilesdk_app_id?: unknown };
+  api_key?: unknown;
+}
+interface GoogleServicesObject {
+  project_info?: unknown;
+  client?: unknown;
+}
+
 /** Pulls fields from a google-services.json (Android) object structure. */
-function fromGoogleServices(obj: Record<string, any>, parsed: ParsedWebConfig): boolean {
-  const info = obj.project_info;
+function fromGoogleServices(obj: Record<string, unknown>, parsed: ParsedWebConfig): boolean {
+  const info = (obj as GoogleServicesObject).project_info as GoogleServicesInfo | undefined;
   if (!info || typeof info !== "object") return false;
   if (typeof info.project_id === "string") parsed.projectId = info.project_id;
   if (typeof info.storage_bucket === "string") parsed.storageBucket = info.storage_bucket;
   if (typeof info.project_number === "string") parsed.messagingSenderId = info.project_number;
-  const client = Array.isArray(obj.client) ? obj.client[0] : null;
+  const clientArr = (obj as GoogleServicesObject).client;
+  const client = Array.isArray(clientArr) ? (clientArr[0] as GoogleServicesClient | undefined) : null;
   if (client && typeof client === "object") {
     const appId = client.client_info?.mobilesdk_app_id;
     if (typeof appId === "string") parsed.appId = appId;
-    const apiKey = Array.isArray(client.api_key) ? client.api_key[0]?.current_key : undefined;
+    const apiKeyArr = client.api_key;
+    const firstKey = Array.isArray(apiKeyArr) ? (apiKeyArr[0] as { current_key?: unknown } | undefined) : undefined;
+    const apiKey = firstKey?.current_key;
     if (typeof apiKey === "string") parsed.apiKey = apiKey;
   }
   return true;
@@ -93,15 +111,17 @@ export function deterministicParse(rawText: string): ParseResult {
   const detected: string[] = [];
   const warnings: string[] = [];
 
-  let obj: Record<string, any> | null = null;
+  let obj: Record<string, unknown> | null = null;
   try {
-    obj = JSON.parse(rawText);
+    obj = JSON.parse(rawText) as Record<string, unknown> | null;
   } catch {
     // Try the first {...} block (handles `const firebaseConfig = {...};`).
     const start = rawText.indexOf("{");
     const end = rawText.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      try { obj = JSON.parse(rawText.slice(start, end + 1)); } catch { obj = null; }
+      try {
+        obj = JSON.parse(rawText.slice(start, end + 1)) as Record<string, unknown> | null;
+      } catch { obj = null; }
     }
   }
 

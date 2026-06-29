@@ -45,6 +45,23 @@ export interface B2BOrganization {
   notes?: string;
 }
 
+interface B2BAdminDoc {
+  orgId: string;
+  role: string;
+}
+
+interface B2BDeviceDoc {
+  childId?: string;
+  label?: string;
+  addedAt?: admin.firestore.Timestamp;
+}
+
+interface B2BAuditLogDoc {
+  action?: string;
+  actor?: string;
+  timestamp?: admin.firestore.Timestamp;
+}
+
 // ==================== CLOUD FUNCTIONS ====================
 
 /**
@@ -225,7 +242,7 @@ export const getB2BLicenseStatus = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "No organization found for this user.");
       }
 
-      const adminData = adminSnapshot.docs[0]!.data();
+      const adminData = adminSnapshot.docs[0]!.data() as B2BAdminDoc;
       const orgId = adminData.orgId;
 
       const orgDoc = await db().collection("b2b_organizations").doc(orgId).get();
@@ -450,17 +467,23 @@ export const getB2BUsageReport = functions.https.onCall(
         utilization: orgData.maxDevices > 0
           ? Math.round((devicesSnapshot.size / orgData.maxDevices) * 100)
           : 0,
-        devices: devicesSnapshot.docs.map((d) => ({
-          id: d.id,
-          childId: d.data().childId,
-          label: d.data().label,
-          addedAt: d.data().addedAt?.toMillis(),
-        })),
-        recentActivity: auditSnapshot.docs.map((d) => ({
-          action: d.data().action,
-          actor: d.data().actor,
-          timestamp: d.data().timestamp?.toMillis(),
-        })),
+        devices: devicesSnapshot.docs.map((d) => {
+          const deviceData = d.data() as B2BDeviceDoc;
+          return {
+            id: d.id,
+            childId: deviceData.childId,
+            label: deviceData.label,
+            addedAt: deviceData.addedAt?.toMillis(),
+          };
+        }),
+        recentActivity: auditSnapshot.docs.map((d) => {
+          const logData = d.data() as B2BAuditLogDoc;
+          return {
+            action: logData.action,
+            actor: logData.actor,
+            timestamp: logData.timestamp?.toMillis(),
+          };
+        }),
       };
     }
   )

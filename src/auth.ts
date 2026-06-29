@@ -24,6 +24,32 @@ import { isLegacyAuthCutoverEnabled } from "./cutover-monitor";
 const LEGACY_AUTH_DISABLED = process.env.DISABLE_LEGACY_SECRETKEY_AUTH === "true";
 
 /**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes let the call sites read data type-safely. They are
+ * deliberately partial: only the fields this module actually touches are declared.
+ */
+interface BootstrapTokenDoc {
+  masterId?: string;
+  target?: string;
+  usedAt?: unknown;
+  expiresAt?: admin.firestore.Timestamp | null;
+}
+interface OperatorAccessKeyDoc {
+  role?: string;
+  usedAt?: unknown;
+  expiresAt?: admin.firestore.Timestamp | null;
+}
+interface MasterSecretDoc { secretKey?: string }
+interface AdminPinDoc { pinHash?: string; updatedAt?: admin.firestore.Timestamp }
+interface MasterDataDoc {
+  deviceId?: string;
+  deviceName?: string;
+  createdAt?: admin.firestore.Timestamp;
+  subscription?: Record<string, unknown>;
+}
+
+/**
  * Checks if legacy auth is disabled (env var OR dynamic Firestore config).
  * Prefer this over the LEGACY_AUTH_DISABLED constant for runtime decisions.
  */
@@ -418,7 +444,7 @@ export const redeemMasterWebBootstrapToken = functions.https.onCall(
           throw new functions.https.HttpsError("not-found", "Bootstrap-Token nicht gefunden.");
         }
 
-        const payload = tokenDoc.data() || {};
+        const payload = (tokenDoc.data() || {}) as BootstrapTokenDoc;
         const masterId = typeof payload.masterId === "string" ? payload.masterId : "";
         const target = normalizeMasterWebBootstrapTarget(payload.target);
         const usedAt = payload.usedAt || null;
@@ -587,7 +613,7 @@ export const redeemOperatorAccessKey = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
       }
 
-      const payload = keyDoc.data() || {};
+      const payload = (keyDoc.data() || {}) as OperatorAccessKeyDoc;
       const role = typeof payload.role === "string" ? payload.role : "";
       const usedAt = payload.usedAt || null;
       const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
@@ -613,7 +639,8 @@ export const redeemOperatorAccessKey = functions.https.onCall(
     try {
       await auth().setCustomUserClaims(context.auth.uid, { role: grantedRole });
     } catch {
-      await keyRef.update({ usedAt: admin.firestore.FieldValue.delete(), redeemedByUid: admin.firestore.FieldValue.delete() });
+      const deleteField = admin.firestore.FieldValue.delete();
+      await keyRef.update({ usedAt: deleteField, redeemedByUid: deleteField });
       throw new functions.https.HttpsError("internal", "Rolle konnte nicht zugewiesen werden. Bitte erneut versuchen.");
     }
 
@@ -801,7 +828,15 @@ export const resetOperatorAccounts = functions.https.onCall(
  * Deletes users regardless of role. Requires explicit confirmation token.
  */
 export const resetAllAuthUsers = functions.https.onCall(
-  async (data: { confirmText?: string; requestId?: string; includeCurrentSessionUser?: boolean; recoveryToken?: string }, context: CallableContext) => {
+  async (
+    data: {
+      confirmText?: string;
+      requestId?: string;
+      includeCurrentSessionUser?: boolean;
+      recoveryToken?: string;
+    },
+    context: CallableContext
+  ) => {
     const { logger, traceId } = getTracedLogger(context, "resetAllAuthUsers");
     const startTime = Date.now();
     logger.info("resetAllAuthUsers ENTRY — function invoked.", {
@@ -1035,9 +1070,10 @@ export const resetAllAuthUsersHealth = functions.https.onCall(
     }
     validateAppCheck(context, true);
 
+    const rawRequestId = (data as { requestId?: string })?.requestId;
     const requestId =
-      typeof (data as { requestId?: string })?.requestId === "string" && (data as { requestId?: string }).requestId?.trim()
-        ? (data as { requestId?: string }).requestId!.trim().slice(0, 80)
+      typeof rawRequestId === "string" && rawRequestId.trim()
+        ? rawRequestId.trim().slice(0, 80)
         : `srv-health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const resetEnabled = isOperatorResetEnabled();
@@ -1500,7 +1536,7 @@ export const generateCustomToken = functions.https.onCall(
       await checkRateLimitShared(masterImei, "auth.generate_custom_token_legacy", 10, 15 * 60 * 1000);
 
       const masterDoc = await db().collection("masters").doc(masterImei).get();
-      const storedSecretKey = masterDoc.data()?.secretKey;
+      const storedSecretKey = (masterDoc.data() as MasterSecretDoc | undefined)?.secretKey;
       if (!masterDoc.exists || typeof storedSecretKey !== "string" || !safeSecretEquals(storedSecretKey, secretKey)) {
         throw new functions.https.HttpsError("unauthenticated", "Invalid master IMEI or secret key.");
       }
@@ -1798,7 +1834,7 @@ export const getOperatorAdminPinStatus = functions.https.onCall(
     validateAppCheck(context, true);
 
     const doc = await db().collection("operatorConfig").doc("adminPin").get();
-    const payload = doc.data() || {};
+    const payload = (doc.data() || {}) as AdminPinDoc;
 
     return {
       configured: Boolean(payload.pinHash),
@@ -1816,6 +1852,7 @@ export const setOperatorAdminPin = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "setOperatorAdminPin");
     void logger;
     requireAdmin(context);
+    const callerUid = requireAuth(context);
     requireTier(context, "T3", "setOperatorAdminPin");
     validateAppCheck(context, true);
 
@@ -1840,7 +1877,7 @@ export const setOperatorAdminPin = functions.https.onCall(
     }
 
     const pinHash = await hashAdminPin(pin);
-    await persistAdminPinHash(pinHash, context.auth!.uid);
+    await persistAdminPinHash(pinHash, callerUid);
 
     await AuditLogger.logSuccess(
       "admin.set_admin_pin", context, "operatorConfig/adminPin", "config",
@@ -1856,8 +1893,9 @@ export const verifyAdminPin = functions.https.onCall(
     const { logger, traceId } = getTracedLogger(context, "verifyAdminPin");
     void logger;
     requireAdmin(context);
+    const callerUid = requireAuth(context);
     validateAppCheck(context, true);
-    await checkRateLimitShared(context.auth!.uid, "auth.verify_admin_pin", 5, 15 * 60 * 1000);
+    await checkRateLimitShared(callerUid, "auth.verify_admin_pin", 5, 15 * 60 * 1000);
 
     const pin = typeof data?.pin === "string" ? data.pin.trim() : "";
     const pinHash = await getStoredAdminPinHash();
@@ -1878,7 +1916,7 @@ export const verifyAdminPin = functions.https.onCall(
     }
 
     const verifiedAt = Math.floor(Date.now() / 1000);
-    await mergeOperatorCustomClaims(context.auth!.uid, { admin_verified_at: verifiedAt });
+    await mergeOperatorCustomClaims(callerUid, { admin_verified_at: verifiedAt });
 
     await AuditLogger.logSuccess(
       "admin.verify_admin_pin", context, "operatorConfig/adminPin", "config",
@@ -1941,7 +1979,7 @@ export const migrateToFamiliesSchema = functions.https.onCall(
 
       for (const masterDoc of mastersSnap.docs) {
         const masterId = masterDoc.id;
-        const masterData = masterDoc.data();
+        const masterData = masterDoc.data() as MasterDataDoc;
 
         try {
           const familyRef = db().collection("families").doc(masterId);

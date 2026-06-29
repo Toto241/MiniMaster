@@ -21,18 +21,32 @@ const DEFAULT_PARENT_APP_LIMIT = 2;
 const PAIRING_LINK_BASE_URL = process.env.PAIRING_LINK_BASE_URL || "https://minimaster.app/pair";
 const TRIAL_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
-function hasPairingAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
-  if (hasActiveAccess(masterData)) return true;
-  return masterData?.subscription?.status === "trial_pending";
+interface MasterSubscription {
+  status?: string;
+  childLimit?: number;
+  parentAppLimit?: number;
+  [key: string]: unknown;
+}
+interface MasterDoc {
+  subscription?: MasterSubscription;
 }
 
-async function activateTrialIfPending(masterId: string, masterData: admin.firestore.DocumentData | undefined): Promise<void> {
-  if (masterData?.subscription?.status !== "trial_pending") return;
+function hasPairingAccess(masterData: admin.firestore.DocumentData | undefined): boolean {
+  if (hasActiveAccess(masterData)) return true;
+  return (masterData as MasterDoc | undefined)?.subscription?.status === "trial_pending";
+}
+
+async function activateTrialIfPending(
+  masterId: string,
+  masterData: admin.firestore.DocumentData | undefined
+): Promise<void> {
+  const subscription = (masterData as MasterDoc | undefined)?.subscription;
+  if (subscription?.status !== "trial_pending") return;
 
   const now = admin.firestore.Timestamp.now();
   const trialEndsAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + TRIAL_DURATION_MS);
   const nextSubscription = {
-    ...(masterData.subscription || {}),
+    ...(subscription || {}),
     status: "trial",
     trialStartedAt: now,
     trialEndsAt,
@@ -172,7 +186,7 @@ export const validatePairingCode = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
 
-      const masterData = masterDoc.data();
+      const masterData = masterDoc.data() as MasterDoc | undefined;
       if (!hasPairingAccess(masterData)) {
         await AuditLogger.logDenied(
           "device.pair", context, `children/${childId}`, "device",
@@ -239,7 +253,7 @@ export const generatePairingLink = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
 
-      const masterData = doc.data();
+      const masterData = doc.data() as MasterDoc | undefined;
       if (!hasPairingAccess(masterData)) {
         await AuditLogger.logDenied(
           "device.pair", context, `masters/${masterId}`, "device",
@@ -345,7 +359,7 @@ export const validatePairingToken = functions.https.onCall(
       if (!masterDoc.exists) {
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
-      const masterData = masterDoc.data();
+      const masterData = masterDoc.data() as MasterDoc | undefined;
       if (!hasPairingAccess(masterData)) {
         throw new functions.https.HttpsError(
           "resource-exhausted",
@@ -426,7 +440,7 @@ export const pairAuthenticatedChild = functions.https.onCall(
         }
         await db().collection("pairingCodes").doc(pairingCode).delete();
       } else {
-        const pairingToken = validateString(data.pairingToken!, "pairingToken", {
+        const pairingToken = validateString(data.pairingToken, "pairingToken", {
           required: true,
           pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
           sanitize: "none",
@@ -449,7 +463,7 @@ export const pairAuthenticatedChild = functions.https.onCall(
       if (!masterDoc.exists) {
         throw new functions.https.HttpsError("not-found", "Master account not found.");
       }
-      const masterData = masterDoc.data();
+      const masterData = masterDoc.data() as MasterDoc | undefined;
       if (!hasPairingAccess(masterData)) {
         throw new functions.https.HttpsError("resource-exhausted", "Active subscription or trial required for pairing.");
       }
