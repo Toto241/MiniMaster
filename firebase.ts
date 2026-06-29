@@ -63,7 +63,7 @@ export const secretManager = (): SecretManagerServiceClient => {
     // Manager operation. This keeps cold starts and unit tests that import
     // firebase.ts but never touch Secret Manager fast and side-effect-free.
     // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-    const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
+    const { SecretManagerServiceClient } = require("@google-cloud/secret-manager") as typeof import("@google-cloud/secret-manager");
     secretManagerClient = new SecretManagerServiceClient() as SecretManagerServiceClient;
   }
   return secretManagerClient;

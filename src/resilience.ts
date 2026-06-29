@@ -147,14 +147,17 @@ export function getCircuitBreaker(
   name: string,
   options?: Partial<CircuitBreakerOptions>
 ): CircuitBreaker {
-  if (!circuitBreakers.has(name)) {
-    const merged: CircuitBreakerOptions = {
-      ...DEFAULT_CB_OPTIONS,
-      ...options,
-    };
-    circuitBreakers.set(name, new CircuitBreaker(name, merged));
+  const existing = circuitBreakers.get(name);
+  if (existing) {
+    return existing;
   }
-  return circuitBreakers.get(name)!;
+  const merged: CircuitBreakerOptions = {
+    ...DEFAULT_CB_OPTIONS,
+    ...options,
+  };
+  const created = new CircuitBreaker(name, merged);
+  circuitBreakers.set(name, created);
+  return created;
 }
 
 export function resetCircuitBreaker(name: string): void {

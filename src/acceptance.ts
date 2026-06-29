@@ -20,7 +20,14 @@ export interface AcceptanceRun {
   results: {
     lint: { passed: boolean; errors: number; warnings: number; durationMs: number };
     build: { passed: boolean; durationMs: number };
-    test: { passed: boolean; suitesTotal: number; suitesPassed: number; testsTotal: number; testsPassed: number; durationMs: number };
+    test: {
+      passed: boolean;
+      suitesTotal: number;
+      suitesPassed: number;
+      testsTotal: number;
+      testsPassed: number;
+      durationMs: number;
+    };
     coverage?: { branches: number; functions: number; lines: number; statements: number };
   };
   logs: string[];

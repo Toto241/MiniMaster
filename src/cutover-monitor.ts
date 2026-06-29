@@ -13,6 +13,8 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { db } from "../firebase";
 
+interface UsageDoc { count?: number }
+
 const CUTOVER_WINDOW_DAYS = 14;
 const CUTOVER_READY_FIELD = "legacyAuthCutoverReady";
 const CUTOVER_ENABLED_FIELD = "legacyAuthCutoverEnabled";
@@ -53,7 +55,7 @@ export const legacyAuthCutoverMonitor = functions.pubsub
             results.daysWithUsage++;
             let dayCalls = 0;
             snapshot.forEach((doc) => {
-              const rawCount = doc.data().count;
+              const rawCount = (doc.data() as UsageDoc).count;
               dayCalls += typeof rawCount === "number" ? rawCount : 0;
             });
             results.totalCalls += dayCalls;

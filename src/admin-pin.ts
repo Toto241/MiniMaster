@@ -7,6 +7,13 @@ import { auth, db } from "../firebase";
 
 const scryptAsync = promisify(scrypt);
 
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. This narrow,
+ * caller-asserted shape declares only the field this module actually reads.
+ */
+interface AdminPinDoc { pinHash?: string }
+
 export const ADMIN_PIN_DOC_ID = "adminPin";
 export const ADMIN_PIN_VERIFICATION_MINUTES = 30;
 const SCRYPT_KEY_LEN = 64;
@@ -45,7 +52,7 @@ export async function verifyAdminPinHash(pin: string, pinHash: string): Promise<
 
 export async function getStoredAdminPinHash(): Promise<string | null> {
   const doc = await db().collection("operatorConfig").doc(ADMIN_PIN_DOC_ID).get();
-  const pinHash = doc.data()?.pinHash;
+  const pinHash = (doc.data() as AdminPinDoc | undefined)?.pinHash;
   return typeof pinHash === "string" && pinHash.length > 0 ? pinHash : null;
 }
 
@@ -67,7 +74,7 @@ export async function persistAdminPinHash(pinHash: string, uid: string): Promise
 }
 
 export function getAdminVerificationAgeMinutes(context: CallableContext): number | null {
-  const verifiedAt = context.auth?.token?.admin_verified_at;
+  const verifiedAt = context.auth?.token?.admin_verified_at as number | undefined;
   if (typeof verifiedAt !== "number") return null;
   return (Date.now() / 1000 - verifiedAt) / 60;
 }

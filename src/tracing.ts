@@ -102,7 +102,8 @@ export class TracedLogger {
   /** Accepts either an Error object or a plain extra-fields map as the second argument. */
   error(message: string, errorOrExtra?: unknown, extra?: Record<string, unknown>): void {
     if (errorOrExtra instanceof Error) {
-      functions.logger.error(message, this.enrich({ ...extra, error: errorOrExtra.message, stack: errorOrExtra.stack }));
+      const enriched = this.enrich({ ...extra, error: errorOrExtra.message, stack: errorOrExtra.stack });
+      functions.logger.error(message, enriched);
     } else {
       functions.logger.error(message, this.enrich({ ...extra, ...(errorOrExtra as Record<string, unknown> ?? {}) }));
     }

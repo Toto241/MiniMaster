@@ -14,6 +14,10 @@ import { db } from "../firebase";
 
 // ==================== ERROR CLASSIFICATION ====================
 
+interface AuthTokenClaims {
+  role?: string;
+}
+
 export type ErrorCategory =
   | "validation"      // input validation errors
   | "authentication"  // auth/unauthenticated errors
@@ -162,7 +166,7 @@ export async function logStructuredError(
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
     functionName: context.functionName,
     userId: context.callableContext?.auth?.uid || "anonymous",
-    userRole: context.callableContext?.auth?.token?.role || "unknown",
+    userRole: (context.callableContext?.auth?.token as AuthTokenClaims | undefined)?.role || "unknown",
     category: classified.category,
     severity: classified.severity,
     message: classified.internalMessage,
