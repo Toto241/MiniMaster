@@ -408,9 +408,11 @@ const knowledgeBaseCandidates = [
 
 for (const candidate of knowledgeBaseCandidates) {
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- operator config path, not user input
     if (!fs.existsSync(candidate)) {
       continue;
     }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- operator config path, not user input
     knowledgeBase = fs.readFileSync(candidate, "utf-8");
     functions.logger.info(`Knowledge base loaded from ${candidate}`);
     break;

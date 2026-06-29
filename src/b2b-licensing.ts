@@ -93,6 +93,7 @@ export const createB2BOrganization = functions.https.onCall(
         pattern: /^(school|kita|youth_center|enterprise)$/,
       }) as B2BOrganization["type"];
       const licenseTier = validateString(data.licenseTier, "licenseTier", {
+        // eslint-disable-next-line security/detect-non-literal-regexp -- from Object.keys(B2B_TIERS)
         pattern: new RegExp(`^(${Object.keys(B2B_TIERS).join("|")})$`),
       });
       const billingEmail = validateString(data.billingEmail, "billingEmail", {

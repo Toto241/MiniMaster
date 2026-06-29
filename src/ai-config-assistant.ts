@@ -96,6 +96,7 @@ function fromGoogleServices(obj: Record<string, unknown>, parsed: ParsedWebConfi
 function regexExtract(text: string, parsed: ParsedWebConfig): void {
   for (const key of WEB_CONFIG_KEYS) {
     if (parsed[key]) continue;
+    // eslint-disable-next-line security/detect-non-literal-regexp -- key from WEB_CONFIG_KEYS constant
     const re = new RegExp(`["']?${key}["']?\\s*[:=]\\s*["']([^"']+)["']`);
     const m = text.match(re);
     if (m?.[1]) parsed[key] = m[1].trim();

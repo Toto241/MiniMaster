@@ -4,7 +4,7 @@
 > Testdateien sind bewusst ausgenommen (dort sind die `no-unsafe-*`/`object-injection`-Regeln abgeschaltet — siehe `.eslintrc.js`).
 > **0 Errors** — alles hier sind `warn`-Level-Hinweise, kein CI-Blocker. Liste dient gezieltem Schuldenabbau.
 
-## Gesamt: 270 Warnungen in 28 Dateien
+## Gesamt: 263 Warnungen in 27 Dateien
 
 ### Nach Regel
 
@@ -14,9 +14,6 @@
 | 30 | `@typescript-eslint/no-non-null-assertion` |
 | 9 | `@typescript-eslint/no-base-to-string` |
 | 6 | `max-len` |
-| 3 | `security/detect-unsafe-regex` |
-| 2 | `security/detect-non-literal-regexp` |
-| 2 | `security/detect-non-literal-fs-filename` |
 | 1 | `@typescript-eslint/no-unnecessary-type-assertion` |
 | 1 | `@typescript-eslint/require-await` |
 
@@ -25,21 +22,21 @@
 | Warnungen | Datei |
 |---:|---|
 | 36 | `src/admin.ts` |
-| 36 | `src/support.ts` |
+| 34 | `src/support.ts` |
 | 27 | `src/auth.ts` |
-| 22 | `src/external-integrations.ts` |
+| 21 | `src/external-integrations.ts` |
 | 21 | `src/subscription.ts` |
-| 17 | `src/b2b-licensing.ts` |
+| 16 | `src/b2b-licensing.ts` |
 | 12 | `src/pairing.ts` |
 | 12 | `src/rate-limiter.ts` |
 | 11 | `src/affiliate.ts` |
 | 9 | `src/operator-setup.ts` |
 | 9 | `src/secret-onboarding.ts` |
-| 8 | `src/legal.ts` |
 | 8 | `src/triggers.ts` |
+| 7 | `src/legal.ts` |
 | 6 | `src/tasks.ts` |
-| 5 | `src/ai-config-assistant.ts` |
 | 5 | `src/pricing-config.ts` |
+| 4 | `src/ai-config-assistant.ts` |
 | 4 | `src/error-handler.ts` |
 | 4 | `src/shared.ts` |
 | 3 | `firebase.ts` |
@@ -50,7 +47,6 @@
 | 1 | `src/device.ts` |
 | 1 | `src/repositories/decisioning-repository.ts` |
 | 1 | `src/tracing.ts` |
-| 1 | `src/validation.ts` |
 | 1 | `src/validators/decisioning.ts` |
 
 ## Detail je Datei
@@ -94,7 +90,7 @@
 - `src/admin.ts:855:63` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/admin.ts:856:56` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
-### `src/support.ts` (36)
+### `src/support.ts` (34)
 
 - `src/support.ts:154:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/support.ts:209:31` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
@@ -106,32 +102,30 @@
 - `src/support.ts:282:15` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/support.ts:286:42` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/support.ts:371:1` — **max-len** — This line has a length of 130. Maximum allowed is 120.
-- `src/support.ts:411:10` — **security/detect-non-literal-fs-filename** — Found existsSync from package "fs" with non literal argument at index 0
-- `src/support.ts:414:21` — **security/detect-non-literal-fs-filename** — Found readFileSync from package "fs" with non literal argument at index 0
-- `src/support.ts:462:51` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:766:51` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:767:60` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:768:63` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:784:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:787:22` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:833:1` — **max-len** — This line has a length of 146. Maximum allowed is 120.
-- `src/support.ts:887:71` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:986:36` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1007:48` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1040:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1053:80` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1098:46` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1141:90` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1185:46` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1210:80` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1258:62` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1284:79` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1324:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1340:31` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1340:78` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1340:118` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1357:78` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/support.ts:1489:66` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:464:51` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:768:51` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:769:60` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:770:63` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:786:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:789:22` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:835:1` — **max-len** — This line has a length of 146. Maximum allowed is 120.
+- `src/support.ts:889:71` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:988:36` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1009:48` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1042:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1055:80` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1100:46` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1143:90` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1187:46` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1212:80` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1260:62` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1286:79` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1326:49` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1342:31` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1342:78` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1342:118` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1359:78` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/support.ts:1491:66` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
 ### `src/auth.ts` (27)
 
@@ -163,30 +157,29 @@
 - `src/auth.ts:1995:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/auth.ts:2060:43` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
-### `src/external-integrations.ts` (22)
+### `src/external-integrations.ts` (21)
 
-- `src/external-integrations.ts:165:21` — **security/detect-unsafe-regex** — Unsafe Regular Expression
-- `src/external-integrations.ts:384:41` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:384:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:387:38` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:387:44` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:393:47` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:393:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:402:38` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:402:44` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:405:39` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:405:45` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:411:47` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:411:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:427:47` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:427:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:430:24` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
-- `src/external-integrations.ts:430:30` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:456:77` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:459:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/external-integrations.ts:505:75` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/external-integrations.ts:506:22` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/external-integrations.ts:509:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:385:41` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:385:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:388:38` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:388:44` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:394:47` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:394:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:403:38` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:403:44` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:406:39` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:406:45` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:412:47` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:412:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:428:47` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:428:53` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:431:24` — **@typescript-eslint/no-base-to-string** — 'value || ""' will use Object's default stringification format ('[object Object]') when stringified.
+- `src/external-integrations.ts:431:30` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:457:77` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:460:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/external-integrations.ts:506:75` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/external-integrations.ts:507:22` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/external-integrations.ts:510:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
 ### `src/subscription.ts` (21)
 
@@ -212,25 +205,24 @@
 - `src/subscription.ts:878:55` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/subscription.ts:879:57` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
-### `src/b2b-licensing.ts` (17)
+### `src/b2b-licensing.ts` (16)
 
-- `src/b2b-licensing.ts:96:18` — **security/detect-non-literal-regexp** — Found non-literal argument to RegExp Constructor
-- `src/b2b-licensing.ts:127:21` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/b2b-licensing.ts:129:20` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/b2b-licensing.ts:131:45` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:132:27` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:135:55` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:140:27` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:149:34` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:203:26` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/b2b-licensing.ts:211:57` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:211:89` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:245:25` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/b2b-licensing.ts:337:29` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:355:63` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/b2b-licensing.ts:504:34` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:525:34` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/b2b-licensing.ts:550:41` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:128:21` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/b2b-licensing.ts:130:20` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/b2b-licensing.ts:132:45` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:133:27` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:136:55` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:141:27` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:150:34` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:204:26` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/b2b-licensing.ts:212:57` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:212:89` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:246:25` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/b2b-licensing.ts:338:29` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:356:63` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/b2b-licensing.ts:505:34` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:526:34` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/b2b-licensing.ts:551:41` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
 ### `src/pairing.ts` (12)
 
@@ -300,17 +292,6 @@
 - `src/secret-onboarding.ts:277:42` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/secret-onboarding.ts:277:72` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
-### `src/legal.ts` (8)
-
-- `src/legal.ts:40:67` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/legal.ts:99:93` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/legal.ts:110:15` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/legal.ts:129:8` — **security/detect-unsafe-regex** — Unsafe Regular Expression
-- `src/legal.ts:186:20` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/legal.ts:205:35` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/legal.ts:219:33` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
-- `src/legal.ts:447:38` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-
 ### `src/triggers.ts` (8)
 
 - `src/triggers.ts:186:93` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
@@ -322,6 +303,16 @@
 - `src/triggers.ts:364:57` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/triggers.ts:365:46` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
+### `src/legal.ts` (7)
+
+- `src/legal.ts:40:67` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/legal.ts:99:93` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/legal.ts:110:15` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/legal.ts:187:20` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/legal.ts:206:35` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/legal.ts:220:33` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
+- `src/legal.ts:448:38` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+
 ### `src/tasks.ts` (6)
 
 - `src/tasks.ts:144:23` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
@@ -331,14 +322,6 @@
 - `src/tasks.ts:504:43` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/tasks.ts:507:103` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
-### `src/ai-config-assistant.ts` (5)
-
-- `src/ai-config-assistant.ts:25:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/ai-config-assistant.ts:99:16` — **security/detect-non-literal-regexp** — Found non-literal argument to RegExp Constructor
-- `src/ai-config-assistant.ts:176:76` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/ai-config-assistant.ts:176:92` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-- `src/ai-config-assistant.ts:209:54` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-
 ### `src/pricing-config.ts` (5)
 
 - `src/pricing-config.ts:237:25` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
@@ -346,6 +329,13 @@
 - `src/pricing-config.ts:381:26` — **@typescript-eslint/no-non-null-assertion** — Forbidden non-null assertion.
 - `src/pricing-config.ts:501:77` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 - `src/pricing-config.ts:504:40` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+
+### `src/ai-config-assistant.ts` (4)
+
+- `src/ai-config-assistant.ts:25:47` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/ai-config-assistant.ts:177:76` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/ai-config-assistant.ts:177:92` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
+- `src/ai-config-assistant.ts:210:54` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
 
 ### `src/error-handler.ts` (4)
 
@@ -400,10 +390,6 @@
 ### `src/tracing.ts` (1)
 
 - `src/tracing.ts:50:39` — **@typescript-eslint/prefer-nullish-coalescing** — Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.
-
-### `src/validation.ts` (1)
-
-- `src/validation.ts:311:14` — **security/detect-unsafe-regex** — Unsafe Regular Expression
 
 ### `src/validators/decisioning.ts` (1)
 

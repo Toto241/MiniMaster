@@ -162,6 +162,7 @@ export function looksLikeCleartextSecret(value: string): boolean {
   return false;
 }
 
+// eslint-disable-next-line security/detect-unsafe-regex -- bounded, anchored; no ReDoS (audited)
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
 export function validateIsoDate(value: string): { ok: boolean; normalized: string | null } {

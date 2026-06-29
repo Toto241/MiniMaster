@@ -308,6 +308,7 @@ export function validateTimestamp(value: unknown, fieldName: string): number {
 export function validateISODate(value: unknown, fieldName = "deadlineISO"): string {
   const dateStr = validateString(value, fieldName, {
     required: true,
+    // eslint-disable-next-line security/detect-unsafe-regex -- fully bounded; no ReDoS (audited)
     pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})$/,
     sanitize: "none",
   });

@@ -126,6 +126,7 @@ function normalizeLocale(raw: unknown): string {
     throw new functions.https.HttpsError("invalid-argument", "locale must be a valid BCP-47 language tag.");
   }
   const value = raw.trim();
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear; leading separator; no ReDoS
   if (!/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})*$/.test(value)) {
     throw new functions.https.HttpsError("invalid-argument", "locale must be a valid BCP-47 language tag.");
   }
