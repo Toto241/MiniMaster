@@ -77,6 +77,19 @@ module.exports = {
       rules: {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/unbound-method": "off",
+        // Test files exercise the backend through deliberately loosely-typed
+        // mocks, fixtures and partial stubs, so the type-flow `no-unsafe-*`
+        // family fires constantly without catching real defects (it accounted
+        // for ~15k of ~18k warnings, all in test/). Disable it for tests only;
+        // production code under src/ keeps these rules as `warn`.
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        // Object-injection is a heuristic that flags any computed member access;
+        // in tests (bracket access into fixtures) it is pure noise.
+        "security/detect-object-injection": "off",
       },
     },
   ],
