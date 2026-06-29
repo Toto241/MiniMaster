@@ -330,7 +330,7 @@ async function ensureMasterClaims(masterId: string): Promise<Record<string, unkn
   });
 
   const claims = {
-    ...(authUser.customClaims || {}),
+    ...(authUser.customClaims ?? {}),
     role: "master",
     masterImei: masterId,
   };
@@ -444,7 +444,7 @@ export const redeemMasterWebBootstrapToken = functions.https.onCall(
           throw new functions.https.HttpsError("not-found", "Bootstrap-Token nicht gefunden.");
         }
 
-        const payload = (tokenDoc.data() || {}) as BootstrapTokenDoc;
+        const payload = (tokenDoc.data() ?? {}) as BootstrapTokenDoc;
         const masterId = typeof payload.masterId === "string" ? payload.masterId : "";
         const target = normalizeMasterWebBootstrapTarget(payload.target);
         const usedAt = payload.usedAt || null;
@@ -613,7 +613,7 @@ export const redeemOperatorAccessKey = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Zugangsschlüssel nicht gefunden.");
       }
 
-      const payload = (keyDoc.data() || {}) as OperatorAccessKeyDoc;
+      const payload = (keyDoc.data() ?? {}) as OperatorAccessKeyDoc;
       const role = typeof payload.role === "string" ? payload.role : "";
       const usedAt = payload.usedAt || null;
       const expiresAt = payload.expiresAt as admin.firestore.Timestamp | null;
@@ -1549,7 +1549,7 @@ export const generateCustomToken = functions.https.onCall(
 
     try {
       const user = await auth().getUser(uid);
-      const customToken = await auth().createCustomToken(uid, user.customClaims || {});
+      const customToken = await auth().createCustomToken(uid, user.customClaims ?? {});
 
       // Track token refresh for security monitoring (best-effort)
       try {
@@ -1561,7 +1561,7 @@ export const generateCustomToken = functions.https.onCall(
       if (context.auth) {
         await AuditLogger.logSuccess(
           "auth.token_generated", context, `users/${uid}`, "user",
-          { hasClaims: Object.keys(user.customClaims || {}).length > 0, duration: Date.now() - startTime, traceId }
+          { hasClaims: Object.keys(user.customClaims ?? {}).length > 0, duration: Date.now() - startTime, traceId }
         );
       }
 
@@ -1630,12 +1630,12 @@ export const registerMasterDevice = functions.https.onCall(
       const doc = await masterDeviceRef.get();
       if (doc.exists) {
         await auth().setCustomUserClaims(masterId, {
-          ...(authUser.customClaims || {}),
+          ...(authUser.customClaims ?? {}),
           role: "master",
           masterImei: masterId,
         });
         const customToken = await auth().createCustomToken(masterId, {
-          ...(authUser.customClaims || {}),
+          ...(authUser.customClaims ?? {}),
           role: "master",
           masterImei: masterId,
         });
@@ -1661,7 +1661,7 @@ export const registerMasterDevice = functions.https.onCall(
       });
 
       const customClaims = {
-        ...(authUser.customClaims || {}),
+        ...(authUser.customClaims ?? {}),
         role: "master",
         masterImei: masterId,
       };
@@ -1834,7 +1834,7 @@ export const getOperatorAdminPinStatus = functions.https.onCall(
     validateAppCheck(context, true);
 
     const doc = await db().collection("operatorConfig").doc("adminPin").get();
-    const payload = (doc.data() || {}) as AdminPinDoc;
+    const payload = (doc.data() ?? {}) as AdminPinDoc;
 
     return {
       configured: Boolean(payload.pinHash),

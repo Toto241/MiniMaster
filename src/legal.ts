@@ -297,7 +297,7 @@ export const needsLegalReconsent = functions.https.onCall(
       };
     }
 
-    const consentData = consentSnap.data() || {};
+    const consentData = consentSnap.data() ?? {};
     const acceptedTermsVersion = typeof consentData.acceptedTermsVersion === "string" ? consentData.acceptedTermsVersion : "";
     const acceptedPrivacyVersion = typeof consentData.acceptedPrivacyVersion === "string" ? consentData.acceptedPrivacyVersion : "";
     const requiresReconsentFlag = consentData.requiresReconsent === true;

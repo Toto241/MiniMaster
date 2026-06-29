@@ -109,7 +109,7 @@ export async function mergeOperatorCustomClaims(
   patch: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const user = await auth().getUser(uid);
-  const existing = (user.customClaims || {}) as Record<string, unknown>;
+  const existing = (user.customClaims ?? {}) as Record<string, unknown>;
   const merged = { ...existing, ...patch };
   await auth().setCustomUserClaims(uid, merged);
   return merged;

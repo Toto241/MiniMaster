@@ -829,7 +829,7 @@ export async function reverifyActiveSubscriptionsRun(
 
   for (const doc of candidates.docs) {
     const data = (doc.data() || {}) as ReverifyMasterDoc;
-    const sub: ReverifySubscription = data.subscription || {};
+    const sub: ReverifySubscription = data.subscription ?? {};
     if (!sub.purchaseToken || !sub.type) {
       skipped++;
       continue;

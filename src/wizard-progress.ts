@@ -109,7 +109,7 @@ export const getWizardProgress = functions.region(...WIZARD_FUNCTION_REGIONS).ht
     }
 
     const doc = await db().collection(WIZARD_PROGRESS_COLLECTION).doc(uid).get();
-    const wizards = (doc.exists ? (doc.data()?.wizards as Record<string, unknown>) : undefined) || {};
+    const wizards = (doc.exists ? (doc.data()?.wizards as Record<string, unknown>) : undefined) ?? {};
     return { wizardId: data.wizardId, progress: normalizeEntry(data.wizardId, wizards[data.wizardId]) };
   }
 );
@@ -211,7 +211,7 @@ export const listWizardProgress = functions.region(...WIZARD_FUNCTION_REGIONS).h
     validateAppCheck(context, true);
 
     const doc = await db().collection(WIZARD_PROGRESS_COLLECTION).doc(uid).get();
-    const wizards = (doc.exists ? (doc.data()?.wizards as Record<string, unknown>) : undefined) || {};
+    const wizards = (doc.exists ? (doc.data()?.wizards as Record<string, unknown>) : undefined) ?? {};
 
     const summaries = WIZARD_IDS.map((wizardId) => {
       const entry = normalizeEntry(wizardId, wizards[wizardId]);

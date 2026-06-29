@@ -75,8 +75,8 @@ async function readManualChecklistState(): Promise<ManualChecklistState> {
   try {
     const doc = await db().doc(SETUP_CHECKLIST_DOC).get();
     if (!doc.exists) return {};
-    const data = doc.data() || {};
-    const items = (data as { items?: Record<string, unknown> }).items || {};
+    const data = doc.data() ?? {};
+    const items = (data as { items?: Record<string, unknown> }).items ?? {};
     const out: ManualChecklistState = {};
     for (const [id, raw] of Object.entries(items)) {
       const v = raw as { done?: unknown; doneAt?: unknown; doneBy?: unknown; note?: unknown };

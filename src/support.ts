@@ -318,7 +318,7 @@ async function appendConversationEntry(
       role: entry.role,
       content: entry.content,
       confidence: typeof entry.confidence === "number" ? entry.confidence : null,
-      metadata: entry.metadata || {},
+      metadata: entry.metadata ?? {},
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 }
@@ -652,7 +652,7 @@ async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> 
     .get();
 
   const childDoc = childrenSnap.docs[0];
-  const childData = (childDoc?.data() || {}) as ChildDebugDoc;
+  const childData = (childDoc?.data() ?? {}) as ChildDebugDoc;
 
   let recentTamperEvents = 0;
   let recentUsageReports = 0;
@@ -703,10 +703,10 @@ async function collectDebugSnapshot(masterImei: string): Promise<DebugSnapshot> 
  * Wird vor JSON.stringify (AI-Prompt) und vor Firestore-Persistierung angewandt.
  */
 function sanitizeDebugSnapshot(input: Partial<DebugSnapshot>): DebugSnapshot {
-  const appStatus = input.appStatus || {} as DebugSnapshot["appStatus"];
-  const activityData = input.activityData || {} as DebugSnapshot["activityData"];
-  const networkDiagnostics = input.networkDiagnostics || {} as DebugSnapshot["networkDiagnostics"];
-  const deviceTelemetry = input.deviceTelemetry || {} as DebugSnapshot["deviceTelemetry"];
+  const appStatus = input.appStatus ?? {} as DebugSnapshot["appStatus"];
+  const activityData = input.activityData ?? {} as DebugSnapshot["activityData"];
+  const networkDiagnostics = input.networkDiagnostics ?? {} as DebugSnapshot["networkDiagnostics"];
+  const deviceTelemetry = input.deviceTelemetry ?? {} as DebugSnapshot["deviceTelemetry"];
 
   const allowedNetworkTypes = new Set(["wifi", "cellular", "none", "unknown"]);
   const rawNetworkType = typeof networkDiagnostics.networkType === "string"
@@ -1035,7 +1035,7 @@ export const analyzeWithDebugData = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticketData = ticketDoc.data() || {};
+    const ticketData = ticketDoc.data() ?? {};
     checkRateLimit(context.auth.uid, "support.analyze_with_debug_data", 20, 60_000);
     const role = String(context.auth.token.role || "");
     const isSupport = role === "admin" || role === "support";
@@ -1091,7 +1091,7 @@ export const grantDebugAccess = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticketData = ticketDoc.data() || {};
+    const ticketData = ticketDoc.data() ?? {};
     if (ticketData.masterImei !== masterImei) {
       throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
     }
@@ -1133,7 +1133,7 @@ export const grantDebugAccess = functions.https.onCall(
     const refreshedDoc = await ticketRef.get();
     const result = await runAiAnalysisRound({
       ticketId,
-      ticketData: refreshedDoc.data() || {},
+      ticketData: refreshedDoc.data() ?? {},
       userMessage: "Der Nutzer hat Debug-Modus erlaubt. Bitte automatisch analysieren.",
       useDebugData: true,
     });
@@ -1177,7 +1177,7 @@ export const skipDebugMode = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticketData = ticketDoc.data() || {};
+    const ticketData = ticketDoc.data() ?? {};
     checkRateLimit(context.auth.uid, "support.skip_debug_mode", 10, 60_000);
     if (ticketData.masterImei !== context.auth.uid) {
       throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
@@ -1243,7 +1243,7 @@ export const processUserReplyMessage = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticketData = ticketDoc.data() || {};
+    const ticketData = ticketDoc.data() ?? {};
     checkRateLimit(context.auth.uid, "support.process_user_reply", 15, 60_000);
     if (ticketData.masterImei !== context.auth.uid) {
       throw new functions.https.HttpsError("permission-denied", "Ticket access denied.");
@@ -1273,7 +1273,7 @@ export const processUserReplyMessage = functions.https.onCall(
     });
 
     const refreshedDoc = await ticketRef.get();
-    const refreshed = refreshedDoc.data() || {};
+    const refreshed = refreshedDoc.data() ?? {};
     const result = await runAiAnalysisRound({
       ticketId,
       ticketData: refreshed,
@@ -1319,7 +1319,7 @@ export const getDebugInfo = functions.https.onCall(
       throw new functions.https.HttpsError("not-found", "Ticket not found.");
     }
 
-    const ticketData = (ticketDoc.data() || {}) as SupportTicketDoc;
+    const ticketData = (ticketDoc.data() ?? {}) as SupportTicketDoc;
     checkRateLimit(context.auth.uid, "support.get_debug_info", 30, 60_000);
     const role = String(context.auth.token.role || "");
     const isSupport = role === "admin" || role === "support";
@@ -1336,7 +1336,7 @@ export const getDebugInfo = functions.https.onCall(
       throw new functions.https.HttpsError("permission-denied", "Debug access grant is not active.");
     }
 
-    const grant = (grantDoc.data() || {}) as SupportGrantDoc;
+    const grant = (grantDoc.data() ?? {}) as SupportGrantDoc;
     if (String(grant.ticketId || "") !== ticketId || String(grant.masterImei || "") !== String(ticketData.masterImei || "")) {
       throw new functions.https.HttpsError("permission-denied", "Debug access grant does not belong to this ticket.");
     }

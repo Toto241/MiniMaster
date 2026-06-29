@@ -244,15 +244,15 @@ async function readConfig(): Promise<ExternalIntegrationsConfig> {
   try {
     const doc = await db().doc(EXTERNAL_INTEGRATIONS_DOC).get();
     if (!doc.exists) return defaultConfig();
-    const raw = (doc.data() || {}) as Partial<ExternalIntegrationsConfig>;
+    const raw = (doc.data() ?? {}) as Partial<ExternalIntegrationsConfig>;
     const base = defaultConfig();
     return {
-      apple: { ...base.apple, ...(raw.apple || {}) },
-      play: { ...base.play, ...(raw.play || {}) },
-      secrets: { ...base.secrets, ...(raw.secrets || {}) },
+      apple: { ...base.apple, ...(raw.apple ?? {}) },
+      play: { ...base.play, ...(raw.play ?? {}) },
+      secrets: { ...base.secrets, ...(raw.secrets ?? {}) },
       oem: { matrix: Array.isArray(raw.oem?.matrix) ? raw.oem.matrix : [] },
-      release: { ...base.release, ...(raw.release || {}) },
-      meta: { ...base.meta, ...(raw.meta || {}) },
+      release: { ...base.release, ...(raw.release ?? {}) },
+      meta: { ...base.meta, ...(raw.meta ?? {}) },
     };
   } catch (err) {
     functions.logger.warn("readExternalIntegrationsConfig failed", err);

@@ -344,7 +344,7 @@ async function readPricingOverride(): Promise<PricingOverrideDoc> {
   try {
     const doc = await db().doc(PRICING_OVERRIDE_DOC).get();
     if (!doc.exists) return {};
-    const raw = (doc.data() || {}) as PricingOverrideDoc;
+    const raw = (doc.data() ?? {}) as PricingOverrideDoc;
     return {
       b2c: raw.b2c && typeof raw.b2c === "object" ? raw.b2c : {},
       b2b: raw.b2b && typeof raw.b2b === "object" ? raw.b2b : {},

@@ -222,8 +222,8 @@ export const getRulesForChild = functions.https.onCall(
 
       return {
         isLocked: childData?.isLocked || false,
-        appBlacklist: childData?.appBlacklist || [],
-        usageRules: childData?.usageRules || {},
+        appBlacklist: childData?.appBlacklist ?? [],
+        usageRules: childData?.usageRules ?? {},
       };
     }
   )

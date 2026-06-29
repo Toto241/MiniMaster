@@ -123,10 +123,10 @@ export const onChildDeviceUpdateV2 = onDocumentUpdated("children/{childId}", asy
       await writeCommand(childId, "lock_state", { isLocked: newData.isLocked }, policyVersion);
     }
     if (blacklistChanged) {
-      await writeCommand(childId, "app_blacklist", { appBlacklist: newData.appBlacklist || [] }, policyVersion);
+      await writeCommand(childId, "app_blacklist", { appBlacklist: newData.appBlacklist ?? [] }, policyVersion);
     }
     if (usageChanged) {
-      await writeCommand(childId, "usage_rules", { usageRules: newData.usageRules || {} }, policyVersion);
+      await writeCommand(childId, "usage_rules", { usageRules: newData.usageRules ?? {} }, policyVersion);
     }
     logger.info(`Commands written for child ${childId}, policyVersion=${policyVersion}`);
   } catch (cmdError) {

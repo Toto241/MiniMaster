@@ -266,7 +266,7 @@ export const getB2BLicenseStatus = functions.https.onCall(
           ? Math.round((orgData.currentDevices / orgData.maxDevices) * 100)
           : 0,
         expiresAt: orgData.expiresAt,
-        features: tier?.features || [],
+        features: tier?.features ?? [],
         role: adminData.role,
       };
     }
