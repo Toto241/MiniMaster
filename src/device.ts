@@ -28,6 +28,20 @@ import { withErrorHandling } from "./error-handler";
 const MAX_APP_BLACKLIST_ENTRIES = 200;
 const MAX_APP_BLACKLIST_VALUE_LENGTH = 4096;
 
+/**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes let the call sites read data type-safely. They are
+ * deliberately partial: only the fields this module actually touches are declared.
+ */
+interface ChildDeviceDoc {
+  masterImei?: string;
+  isLocked?: boolean;
+  appBlacklist?: string[];
+  usageRules?: object;
+}
+interface MasterDeviceDoc { fcmToken?: string }
+
 function normalizeAppBlacklist(appBlacklist: unknown): string[] {
   return validateStringArray(appBlacklist, "appBlacklist", {
     required: true,
@@ -199,7 +213,7 @@ export const getRulesForChild = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Child device not found.");
       }
 
-      const childData = doc.data();
+      const childData = doc.data() as ChildDeviceDoc | undefined;
       const isOwnerMaster = childData?.masterImei === requesterId;
       const isSelfChild = childId === requesterId;
       if (!isOwnerMaster && !isSelfChild) {
@@ -386,7 +400,7 @@ export const reportTamperEvent = functions.https.onCall(
         throw new functions.https.HttpsError("not-found", "Child device not found.");
       }
 
-      const masterImei = childDoc.data()?.masterImei;
+      const masterImei = (childDoc.data() as ChildDeviceDoc | undefined)?.masterImei;
       if (!masterImei) {
         throw new functions.https.HttpsError("not-found", "No parent linked to this child.");
       }
@@ -398,7 +412,7 @@ export const reportTamperEvent = functions.https.onCall(
       });
 
       const masterDoc = await db().collection("masters").doc(masterImei).get();
-      const fcmToken = masterDoc.data()?.fcmToken;
+      const fcmToken = (masterDoc.data() as MasterDeviceDoc | undefined)?.fcmToken;
       if (fcmToken) {
         await admin.messaging().send({
           token: fcmToken,

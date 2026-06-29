@@ -109,12 +109,13 @@ export function buildSuggestionFromEvents(
   });
 
   if (latestLimitViolation) {
+    const violationPackage = latestLimitViolation as string;
     return {
       userId,
       deviceId,
-      title: `Limit für ${latestLimitViolation} vorschlagen`,
-      description: `Das Gerät hat erneut ein Zeitlimit bei ${latestLimitViolation} erreicht. Das System schlägt nur eine strengere Regel vor; es wird nichts automatisch umgesetzt.`,
-      reason: `Mehrere TIME_LIMIT_REACHED-Events für ${latestLimitViolation}.`,
+      title: `Limit für ${violationPackage} vorschlagen`,
+      description: `Das Gerät hat erneut ein Zeitlimit bei ${violationPackage} erreicht. Das System schlägt nur eine strengere Regel vor; es wird nichts automatisch umgesetzt.`,
+      reason: `Mehrere TIME_LIMIT_REACHED-Events für ${violationPackage}.`,
       suggestedAction: "BLOCK",
       status: "pending_user_review",
     };

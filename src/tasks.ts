@@ -24,6 +24,34 @@ import {
 import { withErrorHandling } from "./error-handler";
 
 /**
+ * Firestore hands back documents as untyped `DocumentData` (`any`-valued), which
+ * trips the `no-unsafe-*` lint family at every field access. These narrow,
+ * caller-asserted shapes let the call sites read data type-safely. They are
+ * deliberately partial: only the fields this module actually touches are declared.
+ */
+interface TaskDoc {
+  description?: string;
+  status?: string;
+  photoUrl?: string;
+  deadline?: unknown;
+  createdAt?: unknown;
+  completedAt?: unknown;
+  updatedAt?: unknown;
+  unlockDuration?: number;
+  unlockUntil?: unknown;
+  rejectionReason?: string;
+  aiAnalysis?: unknown;
+}
+
+/** Input payload for the {@link createTask} callable. */
+interface CreateTaskData {
+  childId: string;
+  description: string;
+  deadlineISO: string;
+  unlockDuration?: number;
+}
+
+/**
  * Whitelist erlaubter Bild-MIME-Types für Photo-Proof Uploads.
  * Bewusst restriktiv: Nur verbreitete, von Gemini Vision unterstützte Formate.
  */
@@ -113,7 +141,7 @@ async function validatePhotoObjectMetadata(
     return;
   }
 
-  const contentType = String(metadata!.contentType || "").toLowerCase().split(";")[0]!.trim();
+  const contentType = String(metadata.contentType || "").toLowerCase().split(";")[0]!.trim();
   if (!contentType || !ALLOWED_PHOTO_MIME_TYPES.has(contentType)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -169,7 +197,7 @@ async function validatePhotoObjectMetadata(
 export const createTask = functions.https.onCall(
   withErrorHandling(
     "createTask",
-    async (data: { childId: string; description: string; deadlineISO: string; unlockDuration?: number }, context: CallableContext) => {
+    async (data: CreateTaskData, context: CallableContext) => {
       const { logger, traceId } = getTracedLogger(context, "createTask");
       const startTime = Date.now();
       const masterId = requireAuth(context);
@@ -269,7 +297,7 @@ export const getTasksForChild = functions.https.onCall(
         .get();
 
       const tasks = snapshot.docs.map((doc) => {
-        const task = doc.data();
+        const task = doc.data() as TaskDoc;
         return {
           id: doc.id,
           description: typeof task.description === "string" ? task.description : "",

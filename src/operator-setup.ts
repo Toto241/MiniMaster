@@ -62,17 +62,22 @@ export const MANUAL_CHECKLIST_ITEMS: ReadonlyArray<{
 
 const SETUP_CHECKLIST_DOC = "operatorConfig/setupChecklist";
 
+type ManualChecklistState = Record<
+  string,
+  { done: boolean; doneAt: string | null; doneBy: string | null; note: string | null }
+>;
+
 /**
  * Internal helper: read manual checklist state from Firestore.
  * Returns { itemId: { done, doneAt, doneBy, note } }.
  */
-async function readManualChecklistState(): Promise<Record<string, { done: boolean; doneAt: string | null; doneBy: string | null; note: string | null }>> {
+async function readManualChecklistState(): Promise<ManualChecklistState> {
   try {
     const doc = await db().doc(SETUP_CHECKLIST_DOC).get();
     if (!doc.exists) return {};
     const data = doc.data() || {};
     const items = (data as { items?: Record<string, unknown> }).items || {};
-    const out: Record<string, { done: boolean; doneAt: string | null; doneBy: string | null; note: string | null }> = {};
+    const out: ManualChecklistState = {};
     for (const [id, raw] of Object.entries(items)) {
       const v = raw as { done?: unknown; doneAt?: unknown; doneBy?: unknown; note?: unknown };
       const doneAt = v.doneAt;
@@ -104,8 +109,10 @@ export const getOperatorSetupStatus = functions.runWith({
   const projectId = process.env.GCLOUD_PROJECT
     || process.env.GCP_PROJECT
     || (() => {
-      try { return JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId || null; }
-      catch { return null; }
+      try {
+        const parsed = JSON.parse(process.env.FIREBASE_CONFIG || "{}") as { projectId?: unknown };
+        return parsed.projectId || null;
+      } catch { return null; }
     })();
 
   // ── Recovery Token ───────────────────────────────────────────────────────
