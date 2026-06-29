@@ -171,7 +171,7 @@ GitHub → Actions → "CI: Revalidate Release Gates"
 Expected result:
 - ✅ `npm run build` passes
 - ✅ `npm run lint` passes
-- ✅ `npm run test` passes (1500/1500 tests, 40 suites)
+- ✅ `npm run test` passes (2822/2822 tests, 126 suites)
 - ✅ `firebase deploy --dry-run` successful
 
 ---
@@ -318,7 +318,7 @@ Set recurring calendar event:
 - [ ] New key generated and securely stored
 - [ ] New key tested against staging endpoints
 - [ ] New key deployed to GitHub Secrets
-- [ ] CI/CD test deployment passes (1500/1500 tests, 40 suites)
+- [ ] CI/CD test deployment passes (2822/2822 tests, 126 suites)
 - [ ] Old key revoked successfully
 - [ ] Key rotation documented in RELEASE_EVIDENCE_REGISTER.md
 - [ ] No production incidents post-rotation (24h monitoring)
