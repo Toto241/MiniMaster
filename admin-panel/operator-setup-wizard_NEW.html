@@ -378,6 +378,17 @@
                 nachgereicht werden.
             </div>
 
+            <div class="wiz-note" role="note">
+                <strong>Hinweis – wo diese Secrets landen:</strong>
+                Hier eingetragene Werte schreibt der Wizard in die lokale <code>.env</code>;
+                fuer Cloud Functions werden sie erst beim naechsten <em>Deploy</em> wirksam.
+                Dieselben Schluessel (<code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>,
+                <code>RESEND_API_KEY</code>, <code>APPLE_PRIVATE_KEY</code>) lassen sich auch in
+                der „Komplett-Einrichtung“ direkt in den <strong>Secret Manager</strong> schreiben.
+                Pflege sie an <em>einer</em> Stelle, sonst koennen <code>.env</code> und Secret
+                Manager auseinanderlaufen (es gilt jeweils der zuletzt deployte Wert).
+            </div>
+
             <div class="wiz-field">
                 <label for="wiz-env-GEMINI_API_KEY">Gemini API Key <em>(empfohlen)</em></label>
                 <p class="wiz-hint">

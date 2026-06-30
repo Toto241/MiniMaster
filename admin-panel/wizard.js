@@ -38,12 +38,54 @@
 
     function prev() { showStep(currentStep - 1); }
 
+    // Format-Validierung der Firebase-Web-Felder (Step 2). Leere Felder sind
+    // erlaubt (Werte koennen per OAuth/CLI-Import kommen), aber AUSGEFUELLTE
+    // Felder muessen ihrem Format entsprechen – sonst landeten Tippfehler frueher
+    // ungeprueft in der Uebertragung. authDomain/storageBucket werden aus der
+    // projectId abgeleitet und daher nicht streng geprueft.
+    const FIREBASE_FIELD_VALIDATORS = {
+        projectId: { re: /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/, msg: "Project ID: 6–30 Zeichen, klein (a–z 0–9 -), Start Buchstabe." },
+        apiKey: { re: /^AIza[0-9A-Za-z_-]{35}$/, msg: "API Key: beginnt mit „AIza“, 39 Zeichen." },
+        messagingSenderId: { re: /^\d{6,}$/, msg: "Messaging Sender ID: nur Ziffern." },
+        appId: { re: /^1:\d+:web:[0-9a-fA-F]+$/, msg: "App ID Format: 1:<senderId>:web:<hash>." },
+        measurementId: { re: /^G-[A-Z0-9]{6,}$/, msg: "Measurement ID (optional): Format G-XXXXXXX." },
+        appCheckSiteKey: { re: /^6L[0-9A-Za-z_-]{30,}$/, msg: "App-Check/reCAPTCHA Site Key (optional): beginnt mit „6L“." },
+    };
+
+    function showFirebaseValidation(errors) {
+        const section = $('.wiz-step[data-step="2"]') || $(".wiz-step.is-active");
+        if (!section) return;
+        let node = document.getElementById("wiz-firebase-validation");
+        if (!node) {
+            node = document.createElement("p");
+            node.id = "wiz-firebase-validation";
+            node.setAttribute("role", "alert");
+            node.setAttribute("aria-live", "polite");
+            section.appendChild(node);
+        }
+        if (errors.length) {
+            node.textContent = "Bitte Format prüfen — " + errors.join("  ");
+            node.className = "wiz-status is-err";
+        } else {
+            node.textContent = "";
+            node.className = "wiz-status";
+        }
+    }
+
     function validateCurrent() {
-        // Step 2 hat „weiche" Validierung – Project ID ist empfohlen, aber wenn
-        // alle 7 Werte aus einer separaten Quelle (z. B. importierter JSON-Block)
-        // kommen, lassen wir es auch durch. Konkret: Wir lassen alles durch und
-        // werten erst beim Submit aus. Der Wizard ist eher Self-Service.
-        return true;
+        // Nur Step 2 (Firebase-Web-Konfiguration) wird geprueft; die uebrigen
+        // Schritte bleiben Self-Service und werden erst beim Submit ausgewertet.
+        if (currentStep !== 2) return true;
+        const values = collectFirebase();
+        const errors = [];
+        Object.keys(FIREBASE_FIELD_VALIDATORS).forEach((key) => {
+            const value = values[key];
+            if (value && !FIREBASE_FIELD_VALIDATORS[key].re.test(value)) {
+                errors.push(FIREBASE_FIELD_VALIDATORS[key].msg);
+            }
+        });
+        showFirebaseValidation(errors);
+        return errors.length === 0;
     }
 
     // ── Pub/Sub-Topic via gcloud (Play Billing RTDN) ───────────────────

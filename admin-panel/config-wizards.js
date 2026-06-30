@@ -146,26 +146,48 @@
     // ================================================================
     // A) EXTERNE INTEGRATIONEN
     // ================================================================
+    // Deep-Link-Ziele (Konsolen, in denen die Werte herkommen).
+    const LINKS = {
+        secretManager: "https://console.cloud.google.com/security/secret-manager",
+        appleDeveloper: "https://developer.apple.com/account",
+        appStoreConnectKeys: "https://appstoreconnect.apple.com/access/api",
+        playConsole: "https://play.google.com/console",
+        pubsub: "https://console.cloud.google.com/cloudpubsub/topic/list",
+        recaptchaAdmin: "https://www.google.com/recaptcha/admin",
+    };
     const APPLE_FIELDS = [
-        { key: "developerTeamId", label: "Apple Developer Team ID", placeholder: "10 Zeichen, GROSS" },
-        { key: "parentBundleId", label: "Eltern-App Bundle ID", placeholder: "com.example.parent" },
-        { key: "childBundleId", label: "Kind-App Bundle ID", placeholder: "com.example.child" },
-        { key: "appStoreConnectKeySecretPath", label: "App Store Connect Key (Secret-Pfad)", placeholder: "projects/…/secrets/…/versions/latest" },
+        { key: "developerTeamId", label: "Apple Developer Team ID", placeholder: "10 Zeichen, GROSS",
+          hint: "10-stellige Team-ID aus dem Apple Developer Account (Membership-Details).", link: LINKS.appleDeveloper, linkLabel: "Apple Developer" },
+        { key: "parentBundleId", label: "Eltern-App Bundle ID", placeholder: "com.example.parent",
+          hint: "Reverse-DNS-Bundle-ID der Eltern-/Master-iOS-App, exakt wie in App Store Connect registriert.", link: LINKS.appStoreConnectKeys, linkLabel: "App Store Connect" },
+        { key: "childBundleId", label: "Kind-App Bundle ID", placeholder: "com.example.child",
+          hint: "Reverse-DNS-Bundle-ID der Kind-iOS-App.", link: LINKS.appStoreConnectKeys, linkLabel: "App Store Connect" },
+        { key: "appStoreConnectKeySecretPath", label: "App Store Connect Key (Secret-Pfad)", placeholder: "projects/…/secrets/…/versions/latest",
+          hint: "Voller Secret-Manager-Pfad zum App-Store-Connect-API-Key (.p8). Hier NUR den Pfad eintragen, nie den Schlüssel selbst — anlegen unter Secret Manager.", link: LINKS.secretManager, linkLabel: "Secret Manager" },
     ];
     const APPLE_BOOLS = [{ key: "provisioningProfilesReady", label: "Provisioning Profiles bestätigt" }];
     const PLAY_FIELDS = [
-        { key: "parentPackageId", label: "Eltern-App Package ID", placeholder: "com.example.parent" },
-        { key: "childPackageId", label: "Kind-App Package ID", placeholder: "com.example.child" },
-        { key: "serviceAccountSecretPath", label: "Service-Account (Secret-Pfad)", placeholder: "projects/…/secrets/…/versions/latest" },
-        { key: "rtdnTopicName", label: "RTDN Pub/Sub Topic", placeholder: "play-billing-notifications" },
+        { key: "parentPackageId", label: "Eltern-App Package ID", placeholder: "com.example.parent",
+          hint: "Android-Package (applicationId) der Eltern-/Master-App, wie in der Play Console.", link: LINKS.playConsole, linkLabel: "Play Console" },
+        { key: "childPackageId", label: "Kind-App Package ID", placeholder: "com.example.child",
+          hint: "Android-Package der Kind-App.", link: LINKS.playConsole, linkLabel: "Play Console" },
+        { key: "serviceAccountSecretPath", label: "Service-Account (Secret-Pfad)", placeholder: "projects/…/secrets/…/versions/latest",
+          hint: "Secret-Manager-Pfad zum Play-Developer-Service-Account-JSON (Subscription-Verifizierung). Nur den Pfad, nicht das JSON.", link: LINKS.secretManager, linkLabel: "Secret Manager" },
+        { key: "rtdnTopicName", label: "RTDN Pub/Sub Topic", placeholder: "play-billing-notifications",
+          hint: "Pub/Sub-Topic für Play Real-Time Developer Notifications. Voll: projects/<projectId>/topics/<name>.", link: LINKS.pubsub, linkLabel: "Pub/Sub" },
     ];
     const PLAY_BOOLS = [{ key: "iapContractsSigned", label: "IAP-Verträge unterzeichnet" }];
     const SECRET_FIELDS = [
-        { key: "geminiApiKeyPath", label: "Gemini API Key (Secret-Pfad)" },
-        { key: "fcmServerKeyPath", label: "FCM Server Key (Secret-Pfad)" },
-        { key: "playIntegrityKeyPath", label: "Play Integrity Key (Secret-Pfad)" },
-        { key: "deviceCheckKeyPath", label: "DeviceCheck Key (Secret-Pfad)" },
-        { key: "recaptchaV3SiteKey", label: "reCAPTCHA v3 Site Key (öffentlich)" },
+        { key: "geminiApiKeyPath", label: "Gemini API Key (Secret-Pfad)",
+          hint: "Secret-Manager-Pfad zum Gemini-API-Key (nicht der Key selbst).", link: LINKS.secretManager, linkLabel: "Secret Manager" },
+        { key: "fcmServerKeyPath", label: "FCM Server Key (Secret-Pfad)",
+          hint: "Secret-Manager-Pfad zum FCM/Cloud-Messaging-Server-Key.", link: LINKS.secretManager, linkLabel: "Secret Manager" },
+        { key: "playIntegrityKeyPath", label: "Play Integrity Key (Secret-Pfad)",
+          hint: "Secret-Manager-Pfad zum Play-Integrity-API-Key.", link: LINKS.secretManager, linkLabel: "Secret Manager" },
+        { key: "deviceCheckKeyPath", label: "DeviceCheck Key (Secret-Pfad)",
+          hint: "Secret-Manager-Pfad zum Apple-DeviceCheck/App-Attest-Key.", link: LINKS.secretManager, linkLabel: "Secret Manager" },
+        { key: "recaptchaV3SiteKey", label: "reCAPTCHA v3 Site Key (öffentlich)",
+          hint: "ÖFFENTLICHER reCAPTCHA-v3-Site-Key (beginnt mit 6L) — der echte Wert, KEIN Secret-Pfad. Muss mit dem App-Check-Site-Key übereinstimmen.", link: LINKS.recaptchaAdmin, linkLabel: "reCAPTCHA Admin" },
     ];
     const RELEASE_BOOLS = [
         { key: "playDataSafetyComplete", label: "Play Data Safety vollständig" },
@@ -199,7 +221,22 @@
         btn.addEventListener("click", () => saveIntegrationField(category, def.key, input.value, def.label));
         row.appendChild(input);
         row.appendChild(btn);
+        if (def.link) {
+            const linkBtn = document.createElement("a");
+            linkBtn.className = "wiz-link-btn";
+            linkBtn.href = def.link;
+            linkBtn.target = "_blank";
+            linkBtn.rel = "noopener";
+            linkBtn.textContent = "🔗 " + (def.linkLabel || "Öffnen");
+            row.appendChild(linkBtn);
+        }
         wrap.appendChild(label);
+        if (def.hint) {
+            const hint = document.createElement("p");
+            hint.className = "wiz-hint";
+            hint.textContent = def.hint;
+            wrap.appendChild(hint);
+        }
         wrap.appendChild(row);
         return wrap;
     }
