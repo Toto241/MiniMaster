@@ -51,6 +51,17 @@ describe("Firestore Security Rules - Structural Validation", () => {
     it("should have rules for error_logs collection", () => {
       expect(rulesContent).toContain("error_logs");
     });
+
+    it("carves out credential docs (adminPin, bootstrapSentinel) from operatorConfig read AND write", () => {
+      // Regression: the admin-PIN scrypt hash must not be readable by lower-
+      // privileged operators, and the PIN doc must not be directly writable by an
+      // admin (bypassing setOperatorAdminPin's verification). Both the read and
+      // the write rule of operatorConfig must exclude these docIds.
+      const adminPinExclusions = (rulesContent.match(/docId != "adminPin"/g) || []).length;
+      const sentinelExclusions = (rulesContent.match(/docId != "bootstrapSentinel"/g) || []).length;
+      expect(adminPinExclusions).toBeGreaterThanOrEqual(2); // read + write
+      expect(sentinelExclusions).toBeGreaterThanOrEqual(2);
+    });
   });
 
   // ==================== Role-Based Access Tests ====================

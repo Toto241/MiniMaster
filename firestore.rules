@@ -343,8 +343,19 @@ service cloud.firestore {
     // but direct client writes are blocked — only Cloud Functions may persist
     // changes (via `patchExternalIntegrationsField` / `setOemValidationMatrix`).
     match /operatorConfig/{docId} {
-      allow read: if isOperator();
-      allow write: if isAdmin() && docId != "externalIntegrations";
+      // adminPin (scrypt hash of the admin PIN) and bootstrapSentinel are
+      // credential / security-control documents managed ONLY by the Admin SDK
+      // callables (getOperatorAdminPinStatus, setOperatorAdminPin, verifyAdminPin,
+      // bootstrapFirstAdmin). They must never be readable by lower-privileged
+      // operators (PIN-hash exposure) nor writable directly by an admin
+      // (bypassing setOperatorAdminPin's current-PIN verification). Firestore
+      // rules are OR-ed across overlapping matches, so the only way to deny is to
+      // exclude these docIds from the generic operatorConfig rule here.
+      allow read: if isOperator()
+        && docId != "adminPin" && docId != "bootstrapSentinel";
+      allow write: if isAdmin()
+        && docId != "externalIntegrations"
+        && docId != "adminPin" && docId != "bootstrapSentinel";
     }
 
     // Per-user wizard progress (setup/onboarding/config wizards). Managed
