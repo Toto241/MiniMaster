@@ -283,7 +283,7 @@ describe("setUsageRules — validation branch coverage", () => {
     await expect(wrapped({
       childId: "c1",
       usageRules: { appLimits: { "": 30 } },
-    }, asMaster)).rejects.toThrow(/appLimits entries/);
+    }, asMaster)).rejects.toThrow(/appLimits/);
   });
 
   it("wirft bei appLimits Eintrag mit nicht-numerischem Limit", async () => {
@@ -291,7 +291,7 @@ describe("setUsageRules — validation branch coverage", () => {
     await expect(wrapped({
       childId: "c1",
       usageRules: { appLimits: { "com.test": "thirty" } },
-    }, asMaster)).rejects.toThrow(/appLimits entries/);
+    }, asMaster)).rejects.toThrow(/appLimits/);
   });
 
   it("wirft bei appLimits Eintrag mit negativem Limit", async () => {
@@ -299,7 +299,35 @@ describe("setUsageRules — validation branch coverage", () => {
     await expect(wrapped({
       childId: "c1",
       usageRules: { appLimits: { "com.test": -5 } },
-    }, asMaster)).rejects.toThrow(/appLimits entries/);
+    }, asMaster)).rejects.toThrow(/appLimits/);
+  });
+
+  it("wirft bei appLimits-Limit über der Obergrenze (NaN/Infinity/zu groß)", async () => {
+    const wrapped = testEnv.wrap(fns.setUsageRules);
+    // Old code accepted any non-negative number; validateNumber now bounds it,
+    // which also rejects Infinity (JSON.parse('1e999')) and NaN.
+    await expect(wrapped({
+      childId: "c1",
+      usageRules: { appLimits: { "com.test": 999999 } },
+    }, asMaster)).rejects.toThrow(/appLimits/);
+  });
+
+  it("wirft bei appLimits-Key mit Pfad-Injection-Zeichen", async () => {
+    const wrapped = testEnv.wrap(fns.setUsageRules);
+    await expect(wrapped({
+      childId: "c1",
+      usageRules: { appLimits: { "../../evil/doc": 30 } },
+    }, asMaster)).rejects.toThrow(/package name/i);
+  });
+
+  it("wirft bei zu vielen appLimits-Einträgen (Batch-Schutz)", async () => {
+    const many: Record<string, number> = {};
+    for (let i = 0; i < 101; i++) many[`com.app${i}`] = 10;
+    const wrapped = testEnv.wrap(fns.setUsageRules);
+    await expect(wrapped({
+      childId: "c1",
+      usageRules: { appLimits: many },
+    }, asMaster)).rejects.toThrow(/more than 100/);
   });
 
   it("wirft bei ungültigem bedtimeStart Format", async () => {

@@ -525,14 +525,34 @@ export function validateUsageRules(value: unknown): Record<string, unknown> {
 
   if (rules.appLimits !== undefined) {
     const al = validateObject(rules.appLimits, "appLimits");
-    for (const [packageName, limit] of Object.entries(al)) {
-      if (!packageName || typeof limit !== "number" || limit < 0) {
+    const entries = Object.entries(al);
+    // [15] cap the entry count — these keys become per-app Firestore writes;
+    // an unbounded map could overflow the 500-write batch in replaceRulesForDevice.
+    const MAX_APP_LIMITS_ENTRIES = 100;
+    if (entries.length > MAX_APP_LIMITS_ENTRIES) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `appLimits cannot contain more than ${MAX_APP_LIMITS_ENTRIES} entries.`
+      );
+    }
+    // [10] keys reach Firestore document-path construction downstream — restrict
+    // them to valid Android package-name characters to prevent path injection.
+    const APP_PACKAGE_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,200}$/;
+    const sanitized: Record<string, number> = {};
+    for (const [packageName, limit] of entries) {
+      if (!APP_PACKAGE_NAME_PATTERN.test(packageName)) {
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "appLimits entries must contain a package name and non-negative numeric limit."
+          "appLimits keys must be valid package names (letters, digits, '.', '_', '-')."
         );
       }
+      // [16] validateNumber rejects NaN/Infinity and enforces the bounds, unlike
+      // the previous `typeof === number && >= 0` check (NaN/Infinity slipped through).
+      sanitized[packageName] = validateNumber(limit, `appLimits.${packageName}`, {
+        min: 0, max: 86400, integer: true,
+      });
     }
+    rules.appLimits = sanitized;
   }
 
   return rules;
