@@ -106,7 +106,7 @@ describe("verifyPurchase – iOS product binding", () => {
   beforeEach(() => { jest.clearAllMocks(); mockState.capturedUpdate = null; mockState.tokenOwner = null; });
 
   it("REJECTS an iOS purchase whose claimed sku does not match the verified productId", async () => {
-    mockAppleReturns("single_child_monthly"); // genuine cheap product
+    mockAppleReturns("minimaster.single_child_monthly"); // real iOS StoreKit id (prefixed) // genuine cheap product
     const wrapped = testEnv.wrap(fns.verifyPurchase);
     await expect(
       wrapped({ purchaseToken: "appletoken1", sku: "family_yearly", platform: "ios" }, asMaster)
@@ -116,7 +116,7 @@ describe("verifyPurchase – iOS product binding", () => {
   });
 
   it("GRANTS only the verified tier when sku matches the verified productId", async () => {
-    mockAppleReturns("single_child_monthly");
+    mockAppleReturns("minimaster.single_child_monthly"); // real iOS StoreKit id (prefixed)
     const wrapped = testEnv.wrap(fns.verifyPurchase);
     const res = await wrapped(
       { purchaseToken: "appletoken1", sku: "single_child_monthly", platform: "ios" },
@@ -132,7 +132,7 @@ describe("verifyPurchase – iOS product binding", () => {
   });
 
   it("REJECTS a purchase token already bound to a different account (token uniqueness)", async () => {
-    mockAppleReturns("single_child_monthly");
+    mockAppleReturns("minimaster.single_child_monthly"); // real iOS StoreKit id (prefixed)
     mockState.tokenOwner = "another-master"; // token already claimed by someone else
     const wrapped = testEnv.wrap(fns.verifyPurchase);
     await expect(

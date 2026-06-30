@@ -121,9 +121,15 @@ export const verifyPurchase = functions.https.onCall(
         // receive its higher tier/limits. (The Android path below is already
         // bound because the Play API takes the sku as subscriptionId.)
         if (isPurchaseValid) {
-          if (!appleResult?.productId) {
+          // iOS StoreKit product ids are prefixed (e.g. "minimaster.family_monthly")
+          // while the internal sku is unprefixed ("family_monthly"); normalise the
+          // prefix before binding so legitimate purchases are not rejected.
+          const verifiedSku = appleResult?.productId
+            ? appleResult.productId.replace(/^minimaster\./, "")
+            : undefined;
+          if (!verifiedSku) {
             isPurchaseValid = false; // cannot determine real entitlement -> deny
-          } else if (appleResult.productId !== sku) {
+          } else if (verifiedSku !== sku) {
             throw new functions.https.HttpsError(
               "permission-denied",
               "Purchase product does not match the requested subscription."
