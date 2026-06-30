@@ -142,6 +142,30 @@ export const verifyPurchase = functions.https.onCall(
       }
 
       if (isPurchaseValid) {
+        // One purchase token must entitle exactly one account. Claim it in a
+        // transaction keyed by a hash of the token; reject if it is already
+        // bound to a different master — otherwise one valid receipt could be
+        // replayed to grant unlimited accounts.
+        const tokenKey = crypto.createHash("sha256").update(`${platform}:${purchaseToken}`).digest("hex");
+        await db().runTransaction(async (tx) => {
+          const tokenRef = db().collection("purchase_tokens").doc(tokenKey);
+          const claim = await tx.get(tokenRef);
+          const owner = claim.exists
+            ? (claim.data() as { masterId?: string } | undefined)?.masterId
+            : undefined;
+          if (owner && owner !== masterId) {
+            throw new functions.https.HttpsError(
+              "permission-denied",
+              "This purchase is already associated with another account."
+            );
+          }
+          tx.set(tokenRef, {
+            masterId,
+            platform,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        });
+
         const now = admin.firestore.Timestamp.now();
         const durationMs = getSubscriptionDurationMs(sku);
         const expiresAt = appleExpiresAtMs

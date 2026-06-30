@@ -32,7 +32,11 @@ jest.mock("crypto", () => {
 });
 
 // Minimal state-backed Firebase mock: only what verifyPurchase touches.
-const mockState: { capturedUpdate: any } = { capturedUpdate: null };
+// tokenOwner simulates an existing purchase_tokens claim (null = unclaimed).
+const mockState: { capturedUpdate: any; tokenOwner: string | null } = {
+  capturedUpdate: null,
+  tokenOwner: null,
+};
 jest.mock("../firebase", () => {
   const makeDoc = (coll: string) => ({
     get: async () => ({ exists: true, data: () => (coll === "masters" ? {} : {}) }),
@@ -52,8 +56,16 @@ jest.mock("../firebase", () => {
   return {
     db: () => ({
       collection: makeColl,
-      // Force the rate limiter onto its in-memory fallback (deterministic in tests).
-      runTransaction: async () => { throw new Error("no firestore tx in unit test"); },
+      runTransaction: async (fn: any) => fn({
+        // Used by both the rate limiter and the purchase-token claim. For the
+        // token claim, exists/masterId reflects mockState.tokenOwner.
+        get: async () => ({
+          exists: mockState.tokenOwner !== null,
+          data: () => ({ masterId: mockState.tokenOwner }),
+        }),
+        set: () => undefined,
+        update: () => undefined,
+      }),
     }),
     auth: () => ({}),
     storage: () => ({}),
@@ -91,7 +103,7 @@ describe("verifyPurchase – iOS product binding", () => {
   let fns: any;
   beforeAll(() => { fns = require("../src/subscription"); });
   afterAll(() => testEnv.cleanup());
-  beforeEach(() => { jest.clearAllMocks(); mockState.capturedUpdate = null; });
+  beforeEach(() => { jest.clearAllMocks(); mockState.capturedUpdate = null; mockState.tokenOwner = null; });
 
   it("REJECTS an iOS purchase whose claimed sku does not match the verified productId", async () => {
     mockAppleReturns("single_child_monthly"); // genuine cheap product
@@ -117,6 +129,16 @@ describe("verifyPurchase – iOS product binding", () => {
     // The cheap tier is NOT premium and has childLimit 1 — proving no escalation.
     expect(sub.isPremium).toBe(false);
     expect(sub.childLimit).toBe(1);
+  });
+
+  it("REJECTS a purchase token already bound to a different account (token uniqueness)", async () => {
+    mockAppleReturns("single_child_monthly");
+    mockState.tokenOwner = "another-master"; // token already claimed by someone else
+    const wrapped = testEnv.wrap(fns.verifyPurchase);
+    await expect(
+      wrapped({ purchaseToken: "appletoken1", sku: "single_child_monthly", platform: "ios" }, asMaster)
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(mockState.capturedUpdate).toBeNull(); // no entitlement granted to the second account
   });
 
   it("DENIES when the verified transaction has no productId", async () => {
