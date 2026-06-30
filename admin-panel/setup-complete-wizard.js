@@ -127,6 +127,50 @@
         if (notice) notice.hidden = true;
     }
 
+    // Erstinbetriebnahme: ein angemeldeter, aber NICHT-Admin-Nutzer kann sich
+    // hier inline zum ersten Admin machen (frueher nur Verweis aufs Dashboard).
+    // Die Server-Funktion bootstrapFirstAdmin ist gegen Doppel-Bootstrap
+    // abgesichert (Firestore-Sentinel) und lehnt ab, wenn bereits ein Admin
+    // existiert — der Button kann also keine Sicherheits-Invariante umgehen.
+    async function bootstrapFirstAdminFlow() {
+        const btn = document.getElementById("scw-bootstrap-btn");
+        const status = document.getElementById("scw-bootstrap-status");
+        const setStatus = (msg) => { if (status) status.textContent = msg; };
+        if (btn) btn.disabled = true;
+        setStatus("Aktiviere …");
+        try {
+            const res = await callFn("bootstrapFirstAdmin", {});
+            setStatus((res && res.message) || "Erfolgreich – Seite wird neu geladen …");
+            // Neuen Admin-Claim ins ID-Token holen, dann neu laden.
+            if (auth && auth.currentUser) {
+                try { await auth.currentUser.getIdToken(true); } catch (_e) { /* ignore */ }
+            }
+            window.location.reload();
+        } catch (err) {
+            if (btn) btn.disabled = false;
+            setStatus("Fehlgeschlagen: " + friendlyError(err) + " – nutze stattdessen das Dashboard.");
+        }
+    }
+
+    function lockWizardWithBootstrap(message) {
+        isAdmin = false;
+        const shell = $("wiz-shell");
+        if (shell) shell.setAttribute("data-locked", "true");
+        const notice = $("scw-auth-notice");
+        if (!notice) return;
+        notice.hidden = false;
+        notice.innerHTML =
+            escapeHtml(message) +
+            '<br><span class="scw-row-hint">Erstinbetriebnahme – noch kein Admin im Projekt? ' +
+            'Dann kannst du dich (als angemeldeter Operator) jetzt selbst zum ersten Admin machen:</span>' +
+            '<div class="scw-row"><button type="button" id="scw-bootstrap-btn" class="wiz-btn">' +
+            "Als ersten Admin aktivieren</button> " +
+            '<span id="scw-bootstrap-status" class="scw-row-hint" role="status" aria-live="polite"></span></div>' +
+            '<a href="./index.html">Stattdessen zum Operator-Dashboard →</a>';
+        const btn = document.getElementById("scw-bootstrap-btn");
+        if (btn) btn.addEventListener("click", bootstrapFirstAdminFlow);
+    }
+
     // ── Step-Navigation ────────────────────────────────────────────────────
     function showStep(n) {
         if (n < 1 || n > TOTAL_STEPS) return;
@@ -839,9 +883,8 @@
                 const tokenResult = await user.getIdTokenResult();
                 const role = tokenResult && tokenResult.claims ? tokenResult.claims.role : null;
                 if (role !== "admin") {
-                    lockWizard(
-                        `Dein Konto (${user.email || "unbekannt"}) hat nicht die Rolle „admin". ` +
-                            "Bitte mit einem Admin-Konto anmelden."
+                    lockWizardWithBootstrap(
+                        `Dein Konto (${user.email || "unbekannt"}) hat nicht die Rolle „admin".`
                     );
                     return;
                 }
