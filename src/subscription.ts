@@ -114,6 +114,22 @@ export const verifyPurchase = functions.https.onCall(
         });
         isPurchaseValid = appleResult?.valid ?? false;
         appleExpiresAtMs = appleResult?.expiresDateMs;
+        // Bind the granted entitlement to the STORE-VERIFIED product, never the
+        // client-supplied sku. Apple's API verifies the receipt but not which
+        // product the caller claims; without this check an authenticated user
+        // with a genuine cheap subscription could request a premium/B2B sku and
+        // receive its higher tier/limits. (The Android path below is already
+        // bound because the Play API takes the sku as subscriptionId.)
+        if (isPurchaseValid) {
+          if (!appleResult?.productId) {
+            isPurchaseValid = false; // cannot determine real entitlement -> deny
+          } else if (appleResult.productId !== sku) {
+            throw new functions.https.HttpsError(
+              "permission-denied",
+              "Purchase product does not match the requested subscription."
+            );
+          }
+        }
       } else {
         isPurchaseValid = await withResilience(
           "play-store-verify",
@@ -479,7 +495,7 @@ type AppleTransactionResponse = {
  */
 export async function verifyAppleTransaction(
   originalTransactionId: string
-): Promise<{ valid: boolean; expiresDateMs?: number }> {
+): Promise<{ valid: boolean; expiresDateMs?: number; productId?: string }> {
   const logger = new TracedLogger(createTraceContext("verifyAppleTransaction"));
   const jwt = signAppleJWT();
   const url = `${APPLE_API_BASE}/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`;
@@ -533,7 +549,7 @@ export async function verifyAppleTransaction(
     isActive,
   });
 
-  return { valid: isActive, expiresDateMs };
+  return { valid: isActive, expiresDateMs, productId: latest.productId };
 }
 
 /**
