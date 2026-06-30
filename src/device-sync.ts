@@ -587,34 +587,43 @@ export const acknowledgeCommand = functions.https.onCall(
 
     const childRef = db().collection("children").doc(childId);
     const commandRef = childRef.collection("commands").doc(commandId);
-
-    const commandDoc = await commandRef.get();
-    if (!commandDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Kommando nicht gefunden.");
-    }
-
-    const commandData = commandDoc.data() as DeviceCommand;
-
-    // Idempotenz: bereits bewertetes Kommando zurückgeben
-    if (commandData.status === "applied" || commandData.status === "failed") {
-      return { success: true };
-    }
-
     const ackedAt = admin.firestore.Timestamp.fromMillis(appliedAt);
-    await commandRef.update({
-      status,
-      ackedAt,
-      ...(errorCode ? { errorCode } : {}),
+
+    // Read-check-write in one transaction so two concurrent acks cannot both
+    // pass the idempotency guard, and the lastPolicyVersion bump is atomic with
+    // the command status write.
+    const outcome = await db().runTransaction(async (tx) => {
+      const commandDoc = await tx.get(commandRef);
+      if (!commandDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Kommando nicht gefunden.");
+      }
+      const commandData = commandDoc.data() as DeviceCommand;
+      // Idempotenz: bereits bewertetes Kommando -> kein erneutes Schreiben
+      if (commandData.status === "applied" || commandData.status === "failed") {
+        return { alreadyAcked: true };
+      }
+
+      // All reads must precede writes inside a Firestore transaction.
+      const childDoc = status === "applied" ? await tx.get(childRef) : null;
+
+      tx.update(commandRef, {
+        status,
+        ackedAt,
+        ...(errorCode ? { errorCode } : {}),
+      });
+
+      if (status === "applied" && childDoc) {
+        const commandPolicyVersion = commandData.policyVersion || 0;
+        const currentLastVersion = (childDoc.data()?.lastPolicyVersion as number) || 0;
+        if (commandPolicyVersion > currentLastVersion) {
+          tx.update(childRef, { lastPolicyVersion: commandPolicyVersion });
+        }
+      }
+      return { alreadyAcked: false };
     });
 
-    // Bei erfolgreicher Anwendung: lastPolicyVersion aktualisieren
-    if (status === "applied") {
-      const commandPolicyVersion = commandData.policyVersion || 0;
-      const childDoc = await childRef.get();
-      const currentLastVersion = (childDoc.data()?.lastPolicyVersion as number) || 0;
-      if (commandPolicyVersion > currentLastVersion) {
-        await childRef.update({ lastPolicyVersion: commandPolicyVersion });
-      }
+    if (outcome.alreadyAcked) {
+      return { success: true };
     }
 
     functions.logger.info(`Command ${commandId} acknowledged with status '${status}' for child ${childId}`);

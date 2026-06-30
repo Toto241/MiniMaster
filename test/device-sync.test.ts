@@ -554,6 +554,27 @@ describe("fetchPendingCommands", () => {
 // ===================================================== acknowledgeCommand
 
 describe("acknowledgeCommand", () => {
+  // The ack path now wraps its read-check-write in a transaction. Delegate the
+  // transaction's get/update/set to each ref's own mock so the per-test
+  // cmdRef/childRef stubs and assertions keep working. tx.set has no ref method
+  // here, so the rate limiter (which shares runTransaction) still falls back to
+  // memory exactly as before. Scoped to this describe so register/publish tests
+  // keep the default transaction mock.
+  beforeEach(() => {
+    jest.spyOn(db, "runTransaction").mockImplementation(async (fn: any) =>
+      fn({
+        get: (ref: any) => ref.get(),
+        update: (ref: any, data: any) => ref.update(data),
+        set: (ref: any, data: any) => {
+          // tx.set is synchronous in real Firestore; throw (don't reject) when a
+          // ref has no set so the rate limiter falls back to memory as before.
+          if (typeof ref.set !== "function") throw new TypeError("tx.set is not a function");
+          return ref.set(data);
+        },
+      }),
+    );
+  });
+
   it("setzt Command-Status auf applied und aktualisiert lastPolicyVersion", async () => {
     const cmdUpdate = jest.fn().mockResolvedValue(undefined);
     const cmdRef = {
@@ -578,6 +599,8 @@ describe("acknowledgeCommand", () => {
     );
     expect(result).toEqual({ success: true });
     expect(cmdUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "applied" }));
+    // [13] regression: the read-check-write now runs inside a transaction.
+    expect(db.runTransaction).toHaveBeenCalled();
   });
 
   it("applied mit fehlender policyVersion lässt lastPolicyVersion unverändert", async () => {
