@@ -16,8 +16,17 @@ const mockLimit = jest.fn(() => ({ get: mockGet }));
 const mockWhere = jest.fn(() => ({ limit: mockLimit }));
 const mockCollection = jest.fn(() => ({ where: mockWhere }));
 
+// State returned by tx.get() inside runTransaction (the master's current data).
+// Tests set mockStoredData.subscription.lastEventTimeMillis to exercise the
+// idempotency/ordering guard.
+let mockStoredData: any = {};
+const mockRunTransaction = jest.fn(async (fn: any) => fn({
+  get: async () => ({ exists: true, data: () => mockStoredData }),
+  update: (_ref: any, data: any) => mockDocUpdate(data),
+}));
+
 jest.mock("../firebase", () => ({
-  db: jest.fn(() => ({ collection: mockCollection })),
+  db: jest.fn(() => ({ collection: mockCollection, runTransaction: mockRunTransaction })),
 }));
 
 jest.mock("firebase-admin", () => {
@@ -58,6 +67,7 @@ function setMasterNotFound() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockDocUpdate.mockResolvedValue(undefined);
+  mockStoredData = {};
 });
 
 describe("decodeRtdnPayload", () => {
@@ -128,6 +138,46 @@ describe("applyRtdnNotification", () => {
     expect(upd["subscription.expiresAt"]).toBeInstanceOf(admin.firestore.Timestamp);
     expect(upd["isPremium"]).toBe(true);
     expect(upd["subscription.lastNotificationType"]).toBe(RTDN_NOTIFICATION_TYPES.RENEWED);
+  });
+
+  it("skips a DUPLICATE notification (same eventTimeMillis) without writing — replay guard", async () => {
+    setMasterFound();
+    mockStoredData = { subscription: { lastEventTimeMillis: 5000 } };
+    const res = await applyRtdnNotification({
+      eventTimeMillis: "5000",
+      subscriptionNotification: {
+        notificationType: RTDN_NOTIFICATION_TYPES.RENEWED, purchaseToken: "tok", subscriptionId: "single_child_monthly",
+      },
+    });
+    expect(res.reason).toBe("stale_or_duplicate");
+    expect(mockDocUpdate).not.toHaveBeenCalled(); // no over-extension on redelivery
+  });
+
+  it("skips an OLDER, out-of-order notification (does not clobber newer state) — ordering guard", async () => {
+    setMasterFound();
+    mockStoredData = { subscription: { lastEventTimeMillis: 5000 } };
+    const res = await applyRtdnNotification({
+      eventTimeMillis: 1000, // arrives late, older than the already-applied 5000
+      subscriptionNotification: {
+        notificationType: RTDN_NOTIFICATION_TYPES.EXPIRED, purchaseToken: "tok", subscriptionId: "single_child_monthly",
+      },
+    });
+    expect(res.reason).toBe("stale_or_duplicate");
+    expect(mockDocUpdate).not.toHaveBeenCalled(); // paying customer not wrongly expired
+  });
+
+  it("applies a NEWER notification and records lastEventTimeMillis", async () => {
+    setMasterFound();
+    mockStoredData = { subscription: { lastEventTimeMillis: 1000 } };
+    const res = await applyRtdnNotification({
+      eventTimeMillis: "5000",
+      subscriptionNotification: {
+        notificationType: RTDN_NOTIFICATION_TYPES.RENEWED, purchaseToken: "tok", subscriptionId: "single_child_monthly",
+      },
+    });
+    expect(res.reason).toBe("applied");
+    expect(mockDocUpdate).toHaveBeenCalledTimes(1);
+    expect(mockDocUpdate.mock.calls[0][0]["subscription.lastEventTimeMillis"]).toBe(5000);
   });
 
   it("CANCELED: marks canceled and records canceledAt", async () => {

@@ -356,35 +356,41 @@ export const checkExpiredSubscriptions = functions.pubsub
         .where("subscription.expiresAt", "<=", now)
         .get();
 
-      const batch = db().batch();
-      let subCount = 0;
+      // Collect all updates first, then commit in chunks. A single Firestore
+      // batch is capped at 500 writes; with >500 expired subs/trials the old
+      // single-batch commit threw and silently expired NOTHING.
+      const updates: Array<{
+        ref: FirebaseFirestore.DocumentReference;
+        data: admin.firestore.UpdateData<admin.firestore.DocumentData>;
+      }> = [];
 
       expiredSubSnapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, {
+        updates.push({ ref: doc.ref, data: {
           "subscription.status": "expired",
           "subscription.expiredAt": now,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        subCount++;
+        } });
       });
+      const subCount = expiredSubSnapshot.size;
 
       const expiredTrialSnapshot = await db().collection("masters")
         .where("subscription.status", "==", "trial")
         .where("subscription.trialEndsAt", "<=", now)
         .get();
 
-      let trialCount = 0;
-
       expiredTrialSnapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, {
+        updates.push({ ref: doc.ref, data: {
           "subscription.status": "trial_expired",
           "subscription.trialExpiredAt": now,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        trialCount++;
+        } });
       });
+      const trialCount = expiredTrialSnapshot.size;
 
-      if (subCount > 0 || trialCount > 0) {
+      const BATCH_CHUNK = 450; // < Firestore's 500-write limit
+      for (let i = 0; i < updates.length; i += BATCH_CHUNK) {
+        const batch = db().batch();
+        for (const u of updates.slice(i, i + BATCH_CHUNK)) batch.update(u.ref, u.data);
         await batch.commit();
       }
 
@@ -640,11 +646,23 @@ export async function applyRtdnNotification(
   const masterId = doc.id;
   const now = admin.firestore.Timestamp.now();
 
+  // RTDN is at-least-once and unordered (Pub/Sub). Use eventTimeMillis to apply
+  // each notification at most once and only if it is newer than the last one
+  // applied, so duplicate deliveries are no-ops and a late-arriving OLDER
+  // notification cannot clobber a newer subscription state.
+  const rawEvt = payload.eventTimeMillis;
+  const eventTimeMillis = rawEvt !== undefined && rawEvt !== null && Number.isFinite(Number(rawEvt))
+    ? Number(rawEvt)
+    : undefined;
+
   const update: Record<string, unknown> = {
     "subscription.lastNotificationType": sub.notificationType,
     "subscription.lastNotificationAt": now,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
+  if (eventTimeMillis !== undefined) {
+    update["subscription.lastEventTimeMillis"] = eventTimeMillis;
+  }
 
   switch (sub.notificationType) {
     case RTDN_NOTIFICATION_TYPES.PURCHASED:
@@ -700,7 +718,30 @@ export async function applyRtdnNotification(
     }
   }
 
-  await doc.ref.update(update);
+  // Apply atomically: re-read the master inside a transaction and only write
+  // when this event is strictly newer than the last applied one. This makes
+  // concurrent/duplicate/out-of-order deliveries safe (no lost-update, no
+  // over-extension, no stale revoke).
+  const applied = await db().runTransaction(async (tx) => {
+    const fresh = await tx.get(doc.ref);
+    if (!fresh.exists) return false;
+    const freshData = fresh.data() as { subscription?: { lastEventTimeMillis?: number } } | undefined;
+    const storedEvt = freshData?.subscription?.lastEventTimeMillis;
+    if (eventTimeMillis !== undefined && typeof storedEvt === "number" && eventTimeMillis <= storedEvt) {
+      return false; // stale or duplicate
+    }
+    tx.update(doc.ref, update);
+    return true;
+  });
+
+  if (!applied) {
+    logger.info("RTDN skipped (stale, duplicate, or master gone)", {
+      masterId,
+      notificationType: sub.notificationType,
+      eventTimeMillis,
+    });
+    return { handled: true, reason: "stale_or_duplicate", masterId, notificationType: sub.notificationType };
+  }
 
   logger.info("RTDN processed", {
     masterId,
