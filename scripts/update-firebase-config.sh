@@ -10,7 +10,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Bekannte Standardwerte (abgeleitet von Project ID) ─────────────────
-DEFAULT_PROJECT_ID="minimaster-28fbd"
+# Projekt-ID aus .firebaserc (einzige Quelle der Wahrheit); ein Fork erfordert
+# nur das Editieren von .firebaserc. Fallback: minimaster-28fbd.
+# Pfad via stdin (bash loest MSYS/Windows-Pfade auf; node liest nur stdin) –
+# robust auf Linux/Mac und Windows-git-bash.
+DEFAULT_PROJECT_ID="$(node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{process.stdout.write(String(JSON.parse(s).projects.default||''))}catch(e){}})" < "$REPO_ROOT/.firebaserc" 2>/dev/null || true)"
+DEFAULT_PROJECT_ID="${DEFAULT_PROJECT_ID:-minimaster-28fbd}"
 DEFAULT_AUTH_DOMAIN="${DEFAULT_PROJECT_ID}.firebaseapp.com"
 DEFAULT_STORAGE_BUCKET="${DEFAULT_PROJECT_ID}.firebasestorage.app"
 

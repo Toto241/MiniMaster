@@ -48,7 +48,8 @@ permissions:
 
 env:
   NODE_VERSION: '22'
-  # Must match .firebaserc default project
+  # Fallback only — the deploy-backend job overrides FIREBASE_PROJECT_ID from
+  # .firebaserc (projects.default) at runtime, so a fork only edits .firebaserc.
   FIREBASE_PROJECT_ID: 'minimaster-28fbd'
 
 jobs:
@@ -60,6 +61,13 @@ jobs:
     steps:
     - name: 'Checkout code'
       uses: actions/checkout@v6
+
+    - name: 'Resolve Firebase project from .firebaserc'
+      run: |
+        PROJECT_ID="$(jq -r '.projects.default // empty' .firebaserc 2>/dev/null || true)"
+        RESOLVED="${PROJECT_ID:-${FIREBASE_PROJECT_ID}}"
+        echo "FIREBASE_PROJECT_ID=${RESOLVED}" >> "$GITHUB_ENV"
+        echo "Deploy target project: ${RESOLVED}"
 
     - name: 'Setup Node.js'
       uses: actions/setup-node@v6

@@ -15,7 +15,9 @@ param(
     [Parameter(Mandatory = $true)][string]$KeyPath,
     [switch]$SetCiSecret,
     [string]$Repo = "Toto241/MiniMaster",
-    [string]$ExpectedProject = "minimaster-28fbd"
+    # Empty = resolve from .firebaserc default project (single source of truth);
+    # pass explicitly only to override. Falls back to minimaster-28fbd.
+    [string]$ExpectedProject = ""
 )
 
 Set-StrictMode -Version Latest
@@ -36,6 +38,16 @@ function Fail([string]$Message) {
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $destPath = Join-Path $repoRoot "serviceAccountKey.json"
+
+# Single source of truth for the project id: .firebaserc default. Forking the
+# repo to another project only requires editing .firebaserc, not this script.
+if (-not $ExpectedProject) {
+    try {
+        $rc = Get-Content (Join-Path $repoRoot ".firebaserc") -Raw | ConvertFrom-Json
+        if ($rc.projects.default) { $ExpectedProject = [string]$rc.projects.default }
+    } catch { }
+    if (-not $ExpectedProject) { $ExpectedProject = "minimaster-28fbd" }
+}
 
 Write-Step "Validating key file: $KeyPath"
 if (-not (Test-Path -LiteralPath $KeyPath)) { Fail "File not found: $KeyPath" }
