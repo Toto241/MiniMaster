@@ -59,6 +59,8 @@ describe("verifyAppleTransaction", () => {
           {
             transactionId: "tx1",
             originalTransactionId: "otx1",
+            bundleId: "com.minimaster.masterapp",
+            type: "Auto-Renewable Subscription",
             productId: "minimaster.family_monthly",
             expiresDate: futureMs,
             purchaseDate: Date.now() - 86400000,
@@ -92,6 +94,8 @@ describe("verifyAppleTransaction", () => {
           {
             transactionId: "tx1",
             originalTransactionId: "otx1",
+            bundleId: "com.minimaster.masterapp",
+            type: "Auto-Renewable Subscription",
             productId: "minimaster.family_monthly",
             expiresDate: pastMs,
             purchaseDate: Date.now() - 172800000,
@@ -145,6 +149,29 @@ describe("verifyAppleTransaction", () => {
       ok: true,
       status: 200,
       json: async () => ({ data: [] }),
+    });
+
+    const result = await fns.verifyAppleTransaction("otx1");
+    expect(result.valid).toBe(false);
+  });
+
+  it("returns valid=false when the receipt is for a different bundleId (wrong app)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            transactionId: "tx1",
+            originalTransactionId: "otx1",
+            bundleId: "com.someone.else", // not APPLE_BUNDLE_ID
+            type: "Auto-Renewable Subscription",
+            productId: "minimaster.family_monthly",
+            expiresDate: Date.now() + 86400000,
+            environment: "Sandbox",
+          },
+        ],
+      }),
     });
 
     const result = await fns.verifyAppleTransaction("otx1");

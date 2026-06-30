@@ -89,6 +89,8 @@ function mockAppleReturns(productId: string) {
         {
           transactionId: "tx1",
           originalTransactionId: "otx1",
+          bundleId: "com.minimaster.masterapp",
+          type: "Auto-Renewable Subscription",
           productId,
           expiresDate: Date.now() + 30 * 24 * 60 * 60 * 1000,
           purchaseDate: Date.now() - 1000,
@@ -145,7 +147,7 @@ describe("verifyPurchase – iOS product binding", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ originalTransactionId: "otx1", expiresDate: Date.now() + 1000 }] }),
+      json: async () => ({ data: [{ originalTransactionId: "otx1", bundleId: "com.minimaster.masterapp", expiresDate: Date.now() + 1000 }] }),
     });
     const wrapped = testEnv.wrap(fns.verifyPurchase);
     await expect(

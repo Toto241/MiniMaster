@@ -574,6 +574,19 @@ export async function verifyAppleTransaction(
     return { valid: false };
   }
 
+  // Defense in depth: only honor receipts for THIS app, and only auto-renewable
+  // subscriptions (not consumables / non-renewing products).
+  if (latest.bundleId !== APPLE_BUNDLE_ID) {
+    logger.warn("Apple transaction bundleId mismatch", {
+      expected: APPLE_BUNDLE_ID, got: latest.bundleId,
+    });
+    return { valid: false };
+  }
+  if (latest.type && latest.type !== "Auto-Renewable Subscription") {
+    logger.warn("Apple transaction is not an auto-renewable subscription", { type: latest.type });
+    return { valid: false };
+  }
+
   const nowMs = Date.now();
   const expiresDateMs = latest.expiresDate;
   const isActive = expiresDateMs > nowMs;
