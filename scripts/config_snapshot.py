@@ -50,6 +50,8 @@ TRACKED_FILES: dict[str, Path] = {
     "web-control/firebase-config.js": REPO_ROOT / "web-control" / "firebase-config.js",
     "parent-panel/firebase-config.js": REPO_ROOT / "parent-panel" / "firebase-config.js",
     "child-panel/firebase-config.js": REPO_ROOT / "child-panel" / "firebase-config.js",
+    "iosMasterApp/GoogleService-Info.plist": REPO_ROOT / "iosMasterApp" / "GoogleService-Info.plist",
+    "iosChildApp/GoogleService-Info.plist": REPO_ROOT / "iosChildApp" / "GoogleService-Info.plist",
 }
 
 # Schema-Quellen, deren Hash mitprotokolliert wird (Drift-Erkennung).
@@ -58,6 +60,8 @@ SCHEMA_SOURCES: dict[str, Path] = {
     "admin-panel/firebase-config.template.js": REPO_ROOT / "admin-panel" / "firebase-config.template.js",
     "masterApp/google-services.template.json": REPO_ROOT / "masterApp" / "google-services.template.json",
     "childApp/google-services.template.json": REPO_ROOT / "childApp" / "google-services.template.json",
+    "iosMasterApp/GoogleService-Info.template.plist": REPO_ROOT / "iosMasterApp" / "GoogleService-Info.template.plist",
+    "iosChildApp/GoogleService-Info.template.plist": REPO_ROOT / "iosChildApp" / "GoogleService-Info.template.plist",
 }
 
 

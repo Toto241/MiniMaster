@@ -63,6 +63,16 @@ ARTIFACT_PROMPTS: list[tuple[str, str, tuple[str, ...]]] = [
         "Pfad zu serviceAccountKey.json (Firebase-Console -> Dienstkonten)",
         ("serviceAccountKey.json", "serviceAccount.json"),
     ),
+    (
+        "iosGoogleServiceMaster",
+        "Pfad zu iOS GoogleService-Info.plist (Master-App) - optional, leer lassen wenn kein iOS",
+        ("GoogleService-Info.plist", "GoogleService-Info-master.plist"),
+    ),
+    (
+        "iosGoogleServiceChild",
+        "Pfad zu iOS GoogleService-Info.plist (Child-App) - optional, leer lassen wenn kein iOS",
+        ("GoogleService-Info.plist", "GoogleService-Info-child.plist"),
+    ),
 ]
 
 

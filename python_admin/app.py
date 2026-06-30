@@ -6419,12 +6419,21 @@ ADMIN_PANEL_FIREBASE_CONFIG_FILE = REPO_ROOT / "admin-panel" / "firebase-config.
 GOOGLE_SERVICES_MASTER_FILE = REPO_ROOT / "masterApp" / "google-services.json"
 GOOGLE_SERVICES_CHILD_FILE = REPO_ROOT / "childApp" / "google-services.json"
 SERVICE_ACCOUNT_KEY_FILE = REPO_ROOT / "serviceAccountKey.json"
+GOOGLE_SERVICE_INFO_MASTER_FILE = REPO_ROOT / "iosMasterApp" / "GoogleService-Info.plist"
+GOOGLE_SERVICE_INFO_CHILD_FILE = REPO_ROOT / "iosChildApp" / "GoogleService-Info.plist"
 
 FIREBASE_ARTIFACT_TARGETS: dict[str, Path] = {
     "googleServicesMaster": GOOGLE_SERVICES_MASTER_FILE,
     "googleServicesChild": GOOGLE_SERVICES_CHILD_FILE,
     "serviceAccountKey": SERVICE_ACCOUNT_KEY_FILE,
+    "iosGoogleServiceMaster": GOOGLE_SERVICE_INFO_MASTER_FILE,
+    "iosGoogleServiceChild": GOOGLE_SERVICE_INFO_CHILD_FILE,
 }
+
+# Artefakte, die als Apple .plist (XML) statt JSON validiert werden.
+PLIST_ARTIFACT_KEYS: frozenset[str] = frozenset(
+    {"iosGoogleServiceMaster", "iosGoogleServiceChild"}
+)
 
 ARTIFACT_PLACEHOLDER_TOKENS: tuple[str, ...] = (
     "your-",
@@ -6432,6 +6441,19 @@ ARTIFACT_PLACEHOLDER_TOKENS: tuple[str, ...] = (
     "<your",
     "REPLACE_ME",
 )
+
+# Platzhalter-Marker der GoogleService-Info.template.plist.
+PLIST_PLACEHOLDER_TOKENS: tuple[str, ...] = (
+    "PLACEHOLDER_API_KEY",
+    "xxxxxxxx",
+    "aaaaaaaaaaaaaaaa",
+)
+
+# Key-ID des in den oeffentlichen Git-Verlauf geleakten und in GCP WIDERRUFENEN
+# Service-Account-Schluessels (siehe docs/SECURITY_INCIDENT_2026-06-27...).
+# Wird abgelehnt, damit eine stale Kopie nicht erneut eingespielt werden kann
+# (Paritaet mit scripts/install-firebase-key.ps1).
+REVOKED_SERVICE_ACCOUNT_KEY_ID_PREFIX = "7e76f1c1d4"
 
 # Alle Panel-Verzeichnisse, in die der Wizard die generierte firebase-config.js
 # spiegelt. Damit erbt jedes Panel automatisch die Werte – frueher war der
@@ -6665,6 +6687,102 @@ def _artifact_has_placeholder(text: str) -> bool:
     return any(token in text for token in ARTIFACT_PLACEHOLDER_TOKENS)
 
 
+def _plist_has_placeholder(text: str) -> bool:
+    return any(token in text for token in PLIST_PLACEHOLDER_TOKENS)
+
+
+def _expected_project_id() -> "str | None":
+    """Projekt-ID, fuer die dieses Repo konfiguriert ist (.firebaserc default)."""
+    try:
+        data = json.loads((REPO_ROOT / ".firebaserc").read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("projects"), dict):
+        return None
+    proj = data["projects"].get("default")
+    return proj if isinstance(proj, str) and proj else None
+
+
+def _validate_service_account_text(text: str) -> None:
+    """Lehnt unvollstaendige / widerrufene / projektfremde Service-Account-Keys ab
+    (Paritaet mit scripts/install-firebase-key.ps1)."""
+    try:
+        data = json.loads(text)
+    except Exception as exc:
+        raise ValueError(f"serviceAccountKey: kein valides JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError("serviceAccountKey: JSON ist kein Objekt.")
+    if (
+        data.get("type") != "service_account"
+        or not data.get("private_key")
+        or not data.get("client_email")
+    ):
+        raise ValueError(
+            "serviceAccountKey: kein vollstaendiger Service-Account-Key "
+            "(type/private_key/client_email fehlen)."
+        )
+    key_id = str(data.get("private_key_id") or "")
+    if key_id.startswith(REVOKED_SERVICE_ACCOUNT_KEY_ID_PREFIX):
+        raise ValueError(
+            "serviceAccountKey: das ist der WIDERRUFENE, geleakte Schluessel "
+            f"(Key-ID {REVOKED_SERVICE_ACCOUNT_KEY_ID_PREFIX}...). "
+            "Bitte einen frisch in der Firebase-Console erzeugten Schluessel verwenden."
+        )
+    expected = _expected_project_id()
+    actual = data.get("project_id")
+    if expected and actual != expected:
+        raise ValueError(
+            f"serviceAccountKey: gehoert zu Projekt '{actual}', erwartet '{expected}' "
+            "(laut .firebaserc) - falscher Schluessel."
+        )
+
+
+def _validate_ios_plist_text(key: str, text: str) -> None:
+    """Basis-Sanity einer GoogleService-Info.plist + Projekt-Abgleich."""
+    if "<plist" not in text or "GOOGLE_APP_ID" not in text or "PROJECT_ID" not in text:
+        raise ValueError(
+            f"{key}: keine gueltige GoogleService-Info.plist "
+            "(plist / GOOGLE_APP_ID / PROJECT_ID fehlen)."
+        )
+    expected = _expected_project_id()
+    if expected:
+        match = re.search(r"<key>PROJECT_ID</key>\s*<string>([^<]*)</string>", text)
+        actual = match.group(1).strip() if match else None
+        if actual and actual != expected:
+            raise ValueError(
+                f"{key}: PROJECT_ID '{actual}' passt nicht zu '{expected}' (laut .firebaserc)."
+            )
+
+
+def _validate_artifact_text(key: str, text: str) -> None:
+    """Format- und inhaltsspezifische Validierung eines Pflicht-Artefakts.
+
+    Bisher pruefte nur der CLI/Web-Pfad generisch auf valides JSON + Platzhalter.
+    Jetzt erhalten Service-Account-Keys denselben Schutz wie install-firebase-key.ps1
+    (vollstaendig / nicht widerrufen / richtiges Projekt) und iOS-Plists eine
+    plist-spezifische Pruefung statt eines fehlschlagenden JSON-Parse.
+    """
+    if key in PLIST_ARTIFACT_KEYS:
+        if _plist_has_placeholder(text):
+            raise ValueError(
+                f"{key}: enthaelt Platzhalter (PLACEHOLDER_/xxxx/aaaa). "
+                "Bitte die echte GoogleService-Info.plist aus der Firebase-Console verwenden."
+            )
+        _validate_ios_plist_text(key, text)
+        return
+    try:
+        json.loads(text)
+    except Exception as exc:
+        raise ValueError(f"{key}: kein valides JSON: {exc}") from exc
+    if _artifact_has_placeholder(text):
+        raise ValueError(
+            f"{key}: enthaelt Platzhalter (your-...). "
+            "Bitte die echte Datei aus der Firebase-Console verwenden."
+        )
+    if key == "serviceAccountKey":
+        _validate_service_account_text(text)
+
+
 # ─── Firebase CLI Wrapper (nur lesende Operationen) ──────────────────
 
 def _run_firebase_cli(args: list[str], *, timeout: int = 60) -> tuple[int, str, str]:
@@ -6844,6 +6962,22 @@ def _summarize_artifact(target: Path) -> dict[str, object]:
         return info
     try:
         raw = target.read_text(encoding="utf-8")
+    except Exception as exc:
+        info["error"] = f"Datei nicht lesbar: {exc}"
+        return info
+    if target.suffix == ".plist":
+        if "<plist" not in raw or "GOOGLE_APP_ID" not in raw:
+            info["error"] = "Keine gueltige GoogleService-Info.plist"
+            return info
+        if _plist_has_placeholder(raw):
+            info["error"] = "Enthaelt Platzhalter"
+            return info
+        match = re.search(r"<key>PROJECT_ID</key>\s*<string>([^<]*)</string>", raw)
+        if match:
+            info["projectId"] = match.group(1).strip()
+        info["valid"] = True
+        return info
+    try:
         data = json.loads(raw)
     except Exception as exc:
         info["error"] = f"JSON nicht parsbar: {exc}"
@@ -6922,15 +7056,7 @@ def _apply_artifact(key: str, raw: object) -> dict[str, object]:
             text = source.read_text(encoding="utf-8")
         except Exception as exc:
             raise ValueError(f"{key}: Quelldatei nicht lesbar: {exc}") from exc
-        try:
-            json.loads(text)
-        except Exception as exc:
-            raise ValueError(f"{key}: Quelldatei ist kein valides JSON: {exc}") from exc
-        if _artifact_has_placeholder(text):
-            raise ValueError(
-                f"{key}: Quelldatei enthaelt Platzhalter (your-...). "
-                "Bitte die echte Datei aus der Firebase-Console verwenden."
-            )
+        _validate_artifact_text(key, text)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")
         return {"key": key, "written": True, "path": str(target), "source": str(source)}
@@ -6938,20 +7064,12 @@ def _apply_artifact(key: str, raw: object) -> dict[str, object]:
     # kind == "content"
     if isinstance(value, str):
         text = value
-        try:
-            json.loads(text)
-        except Exception as exc:
-            raise ValueError(f"{key}: Inline-Inhalt ist kein valides JSON: {exc}") from exc
     else:
         try:
             text = json.dumps(value, ensure_ascii=False, indent=2)
         except Exception as exc:
             raise ValueError(f"{key}: Inline-Inhalt nicht serialisierbar: {exc}") from exc
-    if _artifact_has_placeholder(text):
-        raise ValueError(
-            f"{key}: Inline-Inhalt enthaelt Platzhalter (your-...). "
-            "Bitte die echte Datei aus der Firebase-Console verwenden."
-        )
+    _validate_artifact_text(key, text)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(text, encoding="utf-8")
     return {"key": key, "written": True, "path": str(target), "source": "inline"}
