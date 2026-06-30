@@ -9,7 +9,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../firebase";
-import { AuditLogger, checkRateLimit, requireAuth, requireSupportOrAdmin, validateAppCheck, getTracedLogger } from "./shared";
+import { AuditLogger, checkRateLimit, requireAuth, requireSupportOrAdmin, validateAppCheck, getTracedLogger, redactSecrets } from "./shared";
 
 // ==================== AI CLIENT ====================
 
@@ -1477,7 +1477,9 @@ export const getTicketUserData = functions.https.onCall(
     const masterData = masterDoc.exists ? (masterDoc.data() as Record<string, unknown>) : null;
 
     const childrenSnap = await db().collection("children").where("masterImei", "==", masterImei).get();
-    const children = childrenSnap.docs.map((doc) => ({ id: doc.id, ...rowData(doc) }));
+    // Strip credential fields (fcmToken, secretKey, …) before handing user data
+    // to a support agent — these would otherwise enable account takeover.
+    const children = childrenSnap.docs.map((doc) => redactSecrets({ id: doc.id, ...rowData(doc) }));
 
     await AuditLogger.log(
       "admin.user_impersonation", callerId, resolveImpersonationRole(context),
@@ -1486,7 +1488,7 @@ export const getTicketUserData = functions.https.onCall(
     );
 
     return {
-      master: masterData ? { id: masterImei, ...masterData } : null,
+      master: masterData ? redactSecrets({ id: masterImei, ...masterData }) : null,
       children,
       grantExpiresAt: grant.expiresAt?.toDate?.()?.toISOString() || null,
     };

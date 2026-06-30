@@ -447,3 +447,26 @@ export function hasActiveAccess(masterData: admin.firestore.DocumentData | undef
 
   return false;
 }
+
+// Credential / authentication-secret field names that must never be returned to
+// a non-owner (support agents) or written into a DSAR export.
+const SECRET_FIELD_NAMES: ReadonlySet<string> = new Set([
+  "secretKey", "fcmToken", "fcmTokens", "pinHash", "adminPin", "recoveryToken",
+]);
+const SECRET_FIELD_PATTERN = /secret|token|password|credential|pinhash/i;
+
+/**
+ * Returns a shallow copy of `record` with credential fields removed. Drops the
+ * known credentials above plus any TOP-LEVEL key whose name looks like a
+ * secret/token/password/credential, so a future credential field is redacted by
+ * default. Personal/PII data is preserved (DSAR must disclose personal data, not
+ * reusable authentication secrets).
+ */
+export function redactSecrets<T extends Record<string, unknown>>(record: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (SECRET_FIELD_NAMES.has(key) || SECRET_FIELD_PATTERN.test(key)) continue;
+    out[key] = value;
+  }
+  return out as Partial<T>;
+}

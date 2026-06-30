@@ -9,7 +9,7 @@ import * as admin from "firebase-admin";
 import * as fs from "fs";
 import * as path from "path";
 import { db, auth, storage } from "../firebase";
-import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, getTracedLogger, requireTier, requireAdminPinVerification } from "./shared";
+import { requireAuth, requireAdmin, checkRateLimit, validateAppCheck, AuditLogger, getTracedLogger, requireTier, requireAdminPinVerification, redactSecrets } from "./shared";
 import { TracedLogger } from "./tracing";
 
 const LEGAL_CONSENTS_COLLECTION = "masterLegalConsents";
@@ -295,7 +295,8 @@ export const exportUserData = functions.https.onCall(
         const tasks = tasksSnapshot.docs.map((t) => ({ id: t.id, ...rowData(t) }));
         const usageSnapshot = await childDoc.ref.collection("usageHistory").get();
         const usageHistory = usageSnapshot.docs.map((u) => ({ id: u.id, ...rowData(u) }));
-        childrenData.push({ id: childDoc.id, ...childInfo, tasks, usageHistory });
+        // Redact credential fields (fcmToken, …) from the DSAR child records.
+        childrenData.push({ id: childDoc.id, ...redactSecrets(childInfo), tasks, usageHistory });
       }
 
       const subsSnapshot = await db().collection("subscriptions").where("masterId", "==", masterId).get();
@@ -320,7 +321,7 @@ export const exportUserData = functions.https.onCall(
       const exportData = {
         exportedAt: new Date().toISOString(),
         masterId,
-        masterProfile: masterData,
+        masterProfile: redactSecrets(masterData as Record<string, unknown>),
         children: childrenData,
         subscriptions,
         supportTickets,

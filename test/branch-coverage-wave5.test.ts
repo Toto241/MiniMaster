@@ -1411,6 +1411,11 @@ describe("getTicketUserData grant status", () => {
     const wrapped = testEnv.wrap(fns.getTicketUserData);
     const res = await wrapped({ ticketId: "t1" }, asAdmin);
     expect(res.master).toBeTruthy();
+    // Support must never receive reusable credentials (regression: account takeover).
+    expect(res.master.secretKey).toBeUndefined();
+    expect(res.master.fcmToken).toBeUndefined();
+    expect(res.master.id).toBe("m1"); // non-secret field preserved
+    if (res.children.length) expect(res.children[0].fcmToken).toBeUndefined();
   });
 });
 

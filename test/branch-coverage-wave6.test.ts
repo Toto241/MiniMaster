@@ -1145,6 +1145,12 @@ describe("exportUserData full data", () => {
     expect(res.success).toBe(true);
     expect(res.data.masterId).toBe("m1");
     expect(res.data.masterProfile).toBeDefined();
+    // DSAR must not disclose reusable auth secrets (regression: credential leak).
+    expect(res.data.masterProfile.secretKey).toBeUndefined();
+    expect(res.data.masterProfile.fcmToken).toBeUndefined();
+    expect(res.data.masterProfile.imei).toBe("m1"); // non-secret PII preserved
+    expect(res.data.children[0].fcmToken).toBeUndefined();
+    expect(res.data.children[0].masterImei).toBe("m1"); // child PII preserved
   });
 
   it("exportUserData with context.app passes AppCheck", async () => {
