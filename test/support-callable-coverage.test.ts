@@ -691,6 +691,23 @@ describe("onTicketCreated", () => {
     await wrapped(snap as any, { params: { ticketId: "no-fcm-ticket" } } as any);
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it("eskaliert NICHT, wenn der Best-Effort-FCM-Versand fehlschlägt", async () => {
+    state.masters.m1.fcmToken = "fcm-token-m1"; // ensure a push is attempted
+    mockSend.mockRejectedValueOnce(new Error("FCM unavailable"));
+    state.supportTickets["fcm-fail-ticket"] = {
+      masterImei: "m1",
+      problemDescription: "App stürzt ab\n[ReplyTo] user@example.com",
+      status: "open",
+    };
+    const snap = { data: () => state.supportTickets["fcm-fail-ticket"], id: "fcm-fail-ticket" };
+    const wrapped = testEnv.wrap(fns.onTicketCreated);
+    // Must resolve (not throw) and must NOT escalate a healthy ticket.
+    await wrapped(snap as any, { params: { ticketId: "fcm-fail-ticket" } } as any);
+    expect(mockSend).toHaveBeenCalled();
+    expect(state.supportTickets["fcm-fail-ticket"].status).not.toBe("escalated");
+    expect(state.supportTickets["fcm-fail-ticket"].conversationStatus).toBe("awaiting_debug_consent");
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════

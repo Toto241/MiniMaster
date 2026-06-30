@@ -931,20 +931,31 @@ export const onTicketCreated = functions.firestore
             token: fcmToken,
           };
 
-          await getMessaging().send(notificationMessage);
-          functions.logger.info(`Push notification sent to ${masterImei}`);
+          // Best-effort notification — a delivery failure must NOT escalate an
+          // otherwise-healthy ticket (which the outer catch would do).
+          try {
+            await getMessaging().send(notificationMessage);
+            functions.logger.info(`Push notification sent to ${masterImei}`);
+          } catch (notifyErr) {
+            functions.logger.warn(`Best-effort push notification failed for ${masterImei}; not escalating.`, { error: String(notifyErr) });
+          }
         }
       }
 
       const meta = extractTicketContactMeta(problemDescription);
       if (meta.replyToEmail && isValidEmailAddress(meta.replyToEmail)) {
-        await sendSupportFollowUpEmail({
-          ticketId,
-          toEmail: meta.replyToEmail,
-          senderName: meta.senderName,
-          sourcePanel: meta.sourcePanel,
-          message: `${consentQuestion}\n\nAntworte mit: JA DEBUG oder NEIN DEBUG.`,
-        });
+        // Best-effort follow-up email — same rationale: do not escalate on failure.
+        try {
+          await sendSupportFollowUpEmail({
+            ticketId,
+            toEmail: meta.replyToEmail,
+            senderName: meta.senderName,
+            sourcePanel: meta.sourcePanel,
+            message: `${consentQuestion}\n\nAntworte mit: JA DEBUG oder NEIN DEBUG.`,
+          });
+        } catch (emailErr) {
+          functions.logger.warn("Best-effort support follow-up email failed; not escalating.", { error: String(emailErr) });
+        }
       }
 
       return;

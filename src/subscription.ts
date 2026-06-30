@@ -331,23 +331,29 @@ export const revokeSubscription = functions.https.onCall(
           throw new functions.https.HttpsError("not-found", "Subscription not found.");
         }
         masterId = masterId || (subDoc.data() as RevocationSubscriptionDoc | undefined)?.masterId;
-
-        await db().collection("subscriptions").doc(subscriptionId).update({
-          status: "revoked",
-          revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-          revokedBy: adminUid ?? "unknown-admin",
-        });
       }
 
       if (!masterId) {
         throw new functions.https.HttpsError("not-found", "Master account not found for subscription revocation.");
       }
 
+      // Revoke access on the master FIRST (it is the source of truth for
+      // hasActiveAccess); only then mark the subscription doc. If the second
+      // write fails, access is already revoked instead of the inconsistent
+      // "subscription revoked but master still premium".
       await db().collection("masters").doc(masterId).update({
         isPremium: false,
         "subscription.status": "revoked",
         "subscription.revokedAt": admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      if (subscriptionId) {
+        await db().collection("subscriptions").doc(subscriptionId).update({
+          status: "revoked",
+          revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+          revokedBy: adminUid ?? "unknown-admin",
+        });
+      }
 
       await AuditLogger.logSuccess(
         "admin.revoke_subscription", context, subscriptionId ? `subscriptions/${subscriptionId}` : `masters/${masterId}`, "subscription",
